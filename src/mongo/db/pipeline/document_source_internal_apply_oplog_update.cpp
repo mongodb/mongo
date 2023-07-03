@@ -28,19 +28,24 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/document_source_internal_apply_oplog_update.h"
-
-#include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <utility>
 
-#include "mongo/db/exec/add_fields_projection_executor.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/field_ref_set.h"
 #include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/document_source_internal_apply_oplog_update.h"
 #include "mongo/db/pipeline/document_source_internal_apply_oplog_update_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/update/update_driver.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -99,7 +104,7 @@ DocumentSource::GetNextResult DocumentSourceInternalApplyOplogUpdate::doGetNext(
 
 Value DocumentSourceInternalApplyOplogUpdate::serialize(SerializationOptions opts) const {
     return Value(Document{
-        {kStageName, Document{{kOplogUpdateFieldName, opts.serializeLiteralValue(_oplogUpdate)}}}});
+        {kStageName, Document{{kOplogUpdateFieldName, opts.serializeLiteral(_oplogUpdate)}}}});
 }
 
 }  // namespace mongo

@@ -1,22 +1,15 @@
 // Test that ClusterServerParameterOpObserver fires appropriately.
-// @tags: [requires_replication]
+// @tags: [requires_replication, requires_fcv_71]
 
 (function() {
 'use strict';
 
-const kUnknownCSPLogId = 6226300;
-const kUnknownCSPLogComponent = 'control';
-const kUnknownCSPLogLevel = 3;
-
 function runTest(conn) {
     const config = conn.getDB('config');
-    const originalLogLevel =
-        assert.commandWorked(config.setLogLevel(kUnknownCSPLogLevel, kUnknownCSPLogComponent))
-            .was.verbosity;
-    assert.writeOK(
-        config.clusterParameters.insert({_id: 'foo', clusterParameterTime: Date(), value: 123}));
-    assert.commandWorked(config.setLogLevel(originalLogLevel, kUnknownCSPLogComponent));
-    assert(checkLog.checkContainsOnceJson(conn, kUnknownCSPLogId, {name: 'foo'}));
+    const res =
+        config.clusterParameters.insert({_id: 'foo', clusterParameterTime: Date(), value: 123});
+    assert(res.hasWriteError());
+    assert.neq(res.getWriteError().length, 0);
 }
 
 const rst = new ReplSetTest({nodes: 2});

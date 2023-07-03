@@ -29,8 +29,14 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <map>
 #include <stack>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/index_bounds.h"

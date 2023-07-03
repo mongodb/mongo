@@ -29,13 +29,22 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
 #include <functional>
+#include <memory>
+#include <string>
+#include <utility>
 
 #include "mongo/base/string_data.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_change_notifier.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/sharding_initialization.h"
 
 namespace mongo {

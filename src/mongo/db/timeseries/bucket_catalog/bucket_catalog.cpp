@@ -27,28 +27,37 @@
  *    it in the license file.
  */
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <iterator>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
-
-#include <algorithm>
-#include <boost/iterator/transform_iterator.hpp>
-
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
+#include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
+#include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_compression.h"
-#include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -118,17 +127,6 @@ void finishWriteBatch(WriteBatch& batch, const CommitInfo& info) {
     invariant(batch.commitRights.load());
     batch.promise.emplaceValue(info);
 }
-
-/**
- * Abandons the write batch and notifies any waiters that the bucket has been cleared.
- */
-void abortWriteBatch(WriteBatch& batch, const Status& status) {
-    if (batch.promise.getFuture().isReady()) {
-        return;
-    }
-
-    batch.promise.setError(status);
-}
 }  // namespace
 
 BucketCatalog& BucketCatalog::get(ServiceContext* svcCtx) {
@@ -196,24 +194,22 @@ Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) 
     internal::waitToCommitBatch(catalog.bucketStateRegistry, stripe, batch);
 
     stdx::lock_guard stripeLock{stripe.mutex};
-    Bucket* bucket = internal::useBucketAndChangeState(
-        catalog.bucketStateRegistry,
-        stripe,
-        stripeLock,
-        batch->bucketHandle.bucketId,
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            invariant(input.has_value());
-            return input.value().setFlag(BucketStateFlag::kPrepared);
-        });
 
     if (isWriteBatchFinished(*batch)) {
         // Someone may have aborted it while we were waiting. Since we have the prepared batch, we
         // should now be able to fully abort the bucket.
-        if (bucket) {
-            internal::abort(catalog, stripe, stripeLock, batch, getBatchStatus());
-        }
+        internal::abort(catalog, stripe, stripeLock, batch, getBatchStatus());
         return getBatchStatus();
-    } else if (!bucket) {
+    }
+
+    Bucket* bucket =
+        internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
+                                                  stripe,
+                                                  stripeLock,
+                                                  batch->bucketHandle.bucketId,
+                                                  internal::BucketPrepareAction::kPrepare);
+
+    if (!bucket) {
         internal::abort(catalog,
                         stripe,
                         stripeLock,
@@ -242,15 +238,12 @@ boost::optional<ClosedBucket> finish(BucketCatalog& catalog,
     auto& stripe = catalog.stripes[batch->bucketHandle.stripe];
     stdx::lock_guard stripeLock{stripe.mutex};
 
-    Bucket* bucket = internal::useBucketAndChangeState(
-        catalog.bucketStateRegistry,
-        stripe,
-        stripeLock,
-        batch->bucketHandle.bucketId,
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            invariant(input.has_value());
-            return input.value().unsetFlag(BucketStateFlag::kPrepared);
-        });
+    Bucket* bucket =
+        internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
+                                                  stripe,
+                                                  stripeLock,
+                                                  batch->bucketHandle.bucketId,
+                                                  internal::BucketPrepareAction::kUnprepare);
     if (bucket) {
         bucket->preparedBatch.reset();
     }
@@ -324,51 +317,24 @@ void abort(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch, const Stat
 
 void directWriteStart(BucketStateRegistry& registry, const NamespaceString& ns, const OID& oid) {
     invariant(!ns.isTimeseriesBucketsCollection());
-    auto result = changeBucketState(
-        registry,
-        BucketId{ns, oid},
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            if (input.has_value()) {
-                if (input.value().isPrepared()) {
-                    return input.value();
-                }
-                return input.value().addDirectWrite();
-            }
-            // The underlying bucket isn't tracked by the catalog, but we need to insert a state
-            // here so that we can conflict reopening this bucket until we've completed our write
-            // and the reader has refetched.
-            return BucketState{}.setFlag(BucketStateFlag::kUntracked).addDirectWrite();
-        });
-    if (result.has_value() && result.value().isPrepared()) {
-        hangTimeseriesDirectModificationBeforeWriteConflict.pauseWhileSet();
-        throwWriteConflictException("Prepared bucket can no longer be inserted into.");
-    }
+    auto state = addDirectWrite(registry, BucketId{ns, oid});
     hangTimeseriesDirectModificationAfterStart.pauseWhileSet();
+
+    if (stdx::holds_alternative<DirectWriteCounter>(state)) {
+        // The direct write count was successfully incremented.
+        return;
+    }
+
+    // We cannot perform direct writes on prepared buckets.
+    invariant(isBucketStatePrepared(state));
+    hangTimeseriesDirectModificationBeforeWriteConflict.pauseWhileSet();
+    throwWriteConflictException("Prepared bucket can no longer be inserted into.");
 }
 
 void directWriteFinish(BucketStateRegistry& registry, const NamespaceString& ns, const OID& oid) {
     invariant(!ns.isTimeseriesBucketsCollection());
     hangTimeseriesDirectModificationBeforeFinish.pauseWhileSet();
-    (void)changeBucketState(
-        registry,
-        BucketId{ns, oid},
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            if (!input.has_value()) {
-                // We may have had multiple direct writes to this document in the same storage
-                // transaction. If so, a previous call to directWriteFinish may have cleaned up the
-                // state.
-                return boost::none;
-            }
-
-            auto& modified = input.value().removeDirectWrite();
-            if (!modified.isSet(BucketStateFlag::kPendingDirectWrite) &&
-                modified.isSet(BucketStateFlag::kUntracked)) {
-                // The underlying bucket is no longer tracked by the catalog, so we can clean up the
-                // state.
-                return boost::none;
-            }
-            return modified;
-        });
+    removeDirectWrite(registry, BucketId{ns, oid});
 }
 
 void clear(BucketCatalog& catalog, ShouldClearFn&& shouldClear) {

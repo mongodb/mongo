@@ -29,14 +29,39 @@
 
 #include "mongo/db/auth/validated_tenancy_scope.h"
 
-#include "mongo/base/init.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/crypto/hash_block.h"
+#include "mongo/crypto/sha256_block.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/security_token_gen.h"
-#include "mongo/db/multitenancy.h"
+#include "mongo/db/client.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_detail.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
@@ -102,11 +127,16 @@ ValidatedTenancyScope::ValidatedTenancyScope(Client* client, TenantId tenant)
             "Multitenancy not enabled, refusing to accept $tenant parameter",
             gMultitenancySupport);
 
-    uassert(ErrorCodes::Unauthorized,
-            "'$tenant' may only be specified with the useTenant action type",
-            client &&
-                AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(), ActionType::useTenant));
+    auto as = AuthorizationSession::get(client);
+    // The useTenant action type allows the action of impersonating any tenant, so we check against
+    // the cluster resource with the current authenticated user's tenant ID rather than the specific
+    // tenant ID being impersonated.
+    uassert(
+        ErrorCodes::Unauthorized,
+        "'$tenant' may only be specified with the useTenant action type",
+        client &&
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(as->getUserTenantId()), ActionType::useTenant));
 }
 
 boost::optional<ValidatedTenancyScope> ValidatedTenancyScope::create(Client* client,

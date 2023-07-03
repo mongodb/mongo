@@ -32,6 +32,10 @@
 #include <functional>
 #include <memory>
 #include <set>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -41,6 +45,7 @@ namespace mongo {
 
 class ExprMatchExpression;
 class MatchExpression;
+
 class PathMatchExpression;
 struct DepsTracker;
 

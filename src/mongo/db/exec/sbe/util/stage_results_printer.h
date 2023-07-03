@@ -30,7 +30,11 @@
 #pragma once
 
 #include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/values/slot.h"

@@ -29,28 +29,46 @@
 
 #include "mongo/db/storage/storage_engine_init.h"
 
+#include <exception>
 #include <map>
+#include <string>
+#include <utility>
 
-#include "mongo/base/init.h"
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine_change_context.h"
-#include "mongo/db/storage/storage_engine_feature_flags_gen.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/storage_engine_parameters_gen.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
+#include "mongo/db/storage/ticketholder_manager.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/priority_ticketholder.h"
-#include "mongo/util/concurrency/semaphore_ticketholder.h"
-#include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/concurrency/semaphore_ticketholder.h"  // IWYU pragma: keep
+#include "mongo/util/decorable.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -166,42 +184,33 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
         }
 
         auto svcCtx = opCtx->getServiceContext();
-        if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
-                .isEnabledAndIgnoreFCVUnsafeAtStartup()) {
-            std::unique_ptr<TicketHolderManager> ticketHolderManager;
+        std::unique_ptr<TicketHolderManager> ticketHolderManager;
 #ifdef __linux__
-            LOGV2_DEBUG(6902900, 1, "Using Priority Queue-based ticketing scheduler");
+        LOGV2_DEBUG(6902900, 1, "Using Priority Queue-based ticketing scheduler");
 
-            auto lowPriorityBypassThreshold = gLowPriorityAdmissionBypassThreshold.load();
-            ticketHolderManager = std::make_unique<TicketHolderManager>(
-                svcCtx,
-                std::make_unique<PriorityTicketHolder>(
-                    readTransactions, lowPriorityBypassThreshold, svcCtx),
-                std::make_unique<PriorityTicketHolder>(
-                    writeTransactions, lowPriorityBypassThreshold, svcCtx));
+        auto lowPriorityBypassThreshold = gLowPriorityAdmissionBypassThreshold.load();
+        ticketHolderManager = std::make_unique<TicketHolderManager>(
+            svcCtx,
+            std::make_unique<PriorityTicketHolder>(
+                readTransactions, lowPriorityBypassThreshold, svcCtx),
+            std::make_unique<PriorityTicketHolder>(
+                writeTransactions, lowPriorityBypassThreshold, svcCtx));
 #else
-            LOGV2_DEBUG(7207201, 1, "Using semaphore-based ticketing scheduler");
+        LOGV2_DEBUG(7207201, 1, "Using semaphore-based ticketing scheduler");
 
-            // PriorityTicketHolder is implemented using an equivalent mechanism to
-            // std::atomic::wait which isn't available until C++20. We've implemented it in Linux
-            // using futex calls. As this hasn't been implemented in non-Linux platforms we fallback
-            // to the existing semaphore implementation even if the feature flag is enabled.
-            //
-            // TODO SERVER-72616: Remove the ifdefs once TicketPool is implemented with atomic
-            // wait.
-            ticketHolderManager = std::make_unique<TicketHolderManager>(
-                svcCtx,
-                std::make_unique<SemaphoreTicketHolder>(readTransactions, svcCtx),
-                std::make_unique<SemaphoreTicketHolder>(writeTransactions, svcCtx));
+        // PriorityTicketHolder is implemented using an equivalent mechanism to
+        // std::atomic::wait which isn't available until C++20. We've implemented it in Linux
+        // using futex calls. As this hasn't been implemented in non-Linux platforms we fallback
+        // to the existing semaphore implementation even if the feature flag is enabled.
+        //
+        // TODO SERVER-72616: Remove the ifdefs once TicketPool is implemented with atomic
+        // wait.
+        ticketHolderManager = std::make_unique<TicketHolderManager>(
+            svcCtx,
+            std::make_unique<SemaphoreTicketHolder>(readTransactions, svcCtx),
+            std::make_unique<SemaphoreTicketHolder>(writeTransactions, svcCtx));
 #endif
-            TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
-        } else {
-            auto ticketHolderManager = std::make_unique<TicketHolderManager>(
-                svcCtx,
-                std::make_unique<SemaphoreTicketHolder>(readTransactions, svcCtx),
-                std::make_unique<SemaphoreTicketHolder>(writeTransactions, svcCtx));
-            TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
-        }
+        TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
     }
 
     ScopeGuard guard([&] {
@@ -401,40 +410,4 @@ void appendStorageEngineList(ServiceContext* service, BSONObjBuilder* result) {
     result->append("storageEngines", storageEngineList(service));
 }
 
-namespace {
-
-class StorageClientObserver final : public ServiceContext::ClientObserver {
-public:
-    void onCreateClient(Client* client) override{};
-    void onDestroyClient(Client* client) override{};
-    void onCreateOperationContext(OperationContext* opCtx) {
-        // Use a fully fledged lock manager even when the storage engine is not set.
-        opCtx->setLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
-
-        auto service = opCtx->getServiceContext();
-
-        // There are a few cases where we don't have a storage engine available yet when creating an
-        // operation context.
-        // 1. During startup, we create an operation context to allow the storage engine
-        //    initialization code to make use of the lock manager.
-        // 2. There are unit tests that create an operation context before initializing the storage
-        //    engine.
-        // 3. Unit tests that use an operation context but don't require a storage engine for their
-        //    testing purpose.
-        auto storageEngine = service->getStorageEngine();
-        if (!storageEngine) {
-            return;
-        }
-        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(storageEngine->newRecoveryUnit()),
-                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-    }
-    void onDestroyOperationContext(OperationContext* opCtx) {}
-};
-
-ServiceContext::ConstructorActionRegisterer registerStorageClientObserverConstructor{
-    "RegisterStorageClientObserverConstructor", [](ServiceContext* service) {
-        service->registerClientObserver(std::make_unique<StorageClientObserver>());
-    }};
-
-}  // namespace
 }  // namespace mongo

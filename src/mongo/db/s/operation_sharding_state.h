@@ -29,8 +29,12 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/status.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/database_version.h"
@@ -141,7 +145,7 @@ public:
      * If 'db' matches the 'db' in the namespace the client sent versions for, returns the database
      * version sent by the client (if any), else returns boost::none.
      */
-    boost::optional<DatabaseVersion> getDbVersion(StringData dbName) const;
+    boost::optional<DatabaseVersion> getDbVersion(const DatabaseName& dbName) const;
 
     /**
      * This method implements a best-effort attempt to wait for the critical section to complete

@@ -29,10 +29,13 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <string>
 
 #include "mongo/db/db_raii.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/basic.h"
 
 namespace mongo {
 

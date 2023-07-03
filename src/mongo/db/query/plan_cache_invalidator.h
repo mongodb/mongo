@@ -29,7 +29,14 @@
 
 #pragma once
 
+#include <cstddef>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 /**

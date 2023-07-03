@@ -110,7 +110,8 @@ function prepareCollection({dbToUse, collName, initialDocList}) {
     return coll;
 }
 
-function prepareShardedCollection({dbToUse, collName, initialDocList, includeMeta = true}) {
+function prepareShardedCollection(
+    {dbToUse, collName, initialDocList, includeMeta = true, shardKey, splitPoint}) {
     if (!dbToUse) {
         assert.neq(
             null, testDB, "testDB must be initialized before calling prepareShardedCollection");
@@ -127,13 +128,16 @@ function prepareShardedCollection({dbToUse, collName, initialDocList, includeMet
     assert.commandWorked(dbToUse.createCollection(coll.getName(), tsOptions));
     assert.commandWorked(coll.insert(initialDocList));
 
-    const shardKey = includeMeta ? {[metaFieldName]: 1} : {[timeFieldName]: 1};
+    if (!shardKey) {
+        shardKey = includeMeta ? {[metaFieldName]: 1} : {[timeFieldName]: 1};
+    }
     assert.commandWorked(coll.createIndex(shardKey));
     assert.commandWorked(
         dbToUse.adminCommand({shardCollection: coll.getFullName(), key: shardKey}));
 
-    const splitPoint =
-        includeMeta ? splitMetaPointBetweenTwoShards : splitTimePointBetweenTwoShards;
+    if (!splitPoint) {
+        splitPoint = includeMeta ? splitMetaPointBetweenTwoShards : splitTimePointBetweenTwoShards;
+    }
     // [MinKey, splitPoint) and [splitPoint, MaxKey) are the two chunks after the split.
     assert.commandWorked(
         dbToUse.adminCommand({split: dbToUse[sysCollName].getFullName(), middle: splitPoint}));
@@ -148,7 +152,7 @@ function prepareShardedCollection({dbToUse, collName, initialDocList, includeMet
     return coll;
 }
 
-function makeFindAndModifyCommand(coll, filter, fields, sort, collation) {
+function makeFindOneAndRemoveCommand(coll, filter, fields, sort, collation) {
     let findAndModifyCmd = {findAndModify: coll.getName(), query: filter, remove: true};
     if (fields) {
         findAndModifyCmd["fields"] = fields;
@@ -163,14 +167,37 @@ function makeFindAndModifyCommand(coll, filter, fields, sort, collation) {
     return findAndModifyCmd;
 }
 
+function makeFindOneAndUpdateCommand(
+    coll, filter, update, returnNew, upsert, fields, sort, collation) {
+    assert(filter !== undefined && update !== undefined);
+    let findAndModifyCmd = {findAndModify: coll.getName(), query: filter, update: update};
+    if (returnNew !== undefined) {
+        findAndModifyCmd["new"] = returnNew;
+    }
+    if (upsert !== undefined) {
+        findAndModifyCmd["upsert"] = upsert;
+    }
+    if (fields !== undefined) {
+        findAndModifyCmd["fields"] = fields;
+    }
+    if (sort !== undefined) {
+        findAndModifyCmd["sort"] = sort;
+    }
+    if (collation !== undefined) {
+        findAndModifyCmd["collation"] = collation;
+    }
+
+    return findAndModifyCmd;
+}
+
 /**
  * Returns the name of the caller of the function that called this function using the stack trace.
  *
  * This is useful for generating unique collection names. If the return function name is not unique
  * and the caller needs to generate a unique collection name, the caller can append a unique suffix.
  */
-function getCallerName() {
-    return `${new Error().stack.split('\n')[2].split('@')[0]}`;
+function getCallerName(callDepth = 2) {
+    return `${new Error().stack.split('\n')[callDepth].split('@')[0]}`;
 }
 
 function verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted) {
@@ -185,9 +212,22 @@ function verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted) {
     }
 }
 
-function verifyExplain(
-    {explain, rootStageName, bucketFilter, residualFilter, nBucketsUnpacked, nReturned}) {
+function verifyExplain({
+    explain,
+    rootStageName,
+    opType,
+    bucketFilter,
+    residualFilter,
+    nBucketsUnpacked,
+    nReturned,
+    nMatched,
+    nModified,
+    nUpserted,
+}) {
     jsTestLog(`Explain: ${tojson(explain)}`);
+    assert(opType === "updateOne" || opType === "deleteOne" || opType === "updateMany" ||
+           opType === "deleteMany");
+
     if (!rootStageName) {
         rootStageName = "TS_MODIFY";
     }
@@ -205,7 +245,7 @@ function verifyExplain(
         foundStage = foundStage.inputStage;
     }
 
-    assert.eq("deleteOne", foundStage.opType, `TS_MODIFY opType is wrong: ${tojson(foundStage)}`);
+    assert.eq(opType, foundStage.opType, `TS_MODIFY opType is wrong: ${tojson(foundStage)}`);
     assert.eq(bucketFilter,
               foundStage.bucketFilter,
               `TS_MODIFY bucketFilter is wrong: ${tojson(foundStage)}`);
@@ -222,14 +262,35 @@ function verifyExplain(
     assert.eq(
         "TS_MODIFY", tsModifyStage.stage, `Can't find TS_MODIFY stage: ${tojson(execStages)}`);
 
-    if (nBucketsUnpacked) {
+    if (nBucketsUnpacked !== undefined) {
         assert.eq(nBucketsUnpacked,
                   tsModifyStage.nBucketsUnpacked,
                   `Got wrong nBucketsUnpacked ${tojson(tsModifyStage)}`);
     }
-    if (nReturned) {
+    if (nReturned !== undefined) {
         assert.eq(
             nReturned, tsModifyStage.nReturned, `Got wrong nReturned ${tojson(tsModifyStage)}`);
+    }
+    if (nMatched !== undefined) {
+        assert.eq(nMatched,
+                  tsModifyStage.nMeasurementsMatched,
+                  `Got wrong nMeasurementsMatched ${tojson(tsModifyStage)}`);
+    }
+    if (nModified !== undefined) {
+        if (opType.startsWith("update")) {
+            assert.eq(nModified,
+                      tsModifyStage.nMeasurementsUpdated,
+                      `Got wrong nMeasurementsModified ${tojson(tsModifyStage)}`);
+        } else {
+            assert.eq(nModified,
+                      tsModifyStage.nMeasurementsDeleted,
+                      `Got wrong nMeasurementsModified ${tojson(tsModifyStage)}`);
+        }
+    }
+    if (nUpserted !== undefined) {
+        assert.eq(nUpserted,
+                  tsModifyStage.nMeasurementsUpserted,
+                  `Got wrong nMeasurementsUpserted ${tojson(tsModifyStage)}`);
     }
 }
 
@@ -255,6 +316,67 @@ function testDeleteOne({initialDocList, filter, expectedResultDocs, nDeleted}) {
 
 function getBucketCollection(coll) {
     return coll.getDB()[sysCollNamePrefix + coll.getName()];
+}
+
+/**
+ * Ensure the updateOne command operates correctly by examining documents after the update.
+ */
+function testUpdateOne({
+    initialDocList,
+    updateQuery,
+    updateObj,
+    c,
+    resultDocList,
+    nMatched,
+    nModified = nMatched,
+    upsert = false,
+    upsertedDoc,
+    failCode
+}) {
+    const collName = getCallerName();
+    jsTestLog(`Running ${collName}(${tojson(arguments[0])})`);
+
+    const testDB = getTestDB();
+    const coll = testDB.getCollection(collName);
+    prepareCollection({collName, initialDocList});
+
+    let upd = {q: updateQuery, u: updateObj, multi: false, upsert: upsert};
+    if (c) {
+        upd["c"] = c;
+        upd["upsertSupplied"] = true;
+    }
+    const updateCommand = {
+        update: coll.getName(),
+        updates: [upd],
+    };
+
+    const res = failCode ? assert.commandFailedWithCode(testDB.runCommand(updateCommand), failCode)
+                         : assert.commandWorked(testDB.runCommand(updateCommand));
+    if (!failCode) {
+        if (upsertedDoc) {
+            assert.eq(1, res.n, tojson(res));
+            assert.eq(0, res.nModified, tojson(res));
+            assert(res.hasOwnProperty("upserted"), tojson(res));
+            assert.eq(1, res.upserted.length);
+
+            if (upsertedDoc.hasOwnProperty("_id")) {
+                assert.eq(upsertedDoc._id, res.upserted[0]._id);
+            } else {
+                upsertedDoc["_id"] = res.upserted[0]._id;
+            }
+            resultDocList.push(upsertedDoc);
+        } else {
+            assert.eq(nMatched, res.n, tojson(res));
+            assert.eq(nModified, res.nModified, tojson(res));
+            assert(!res.hasOwnProperty("upserted"), tojson(res));
+        }
+    }
+
+    if (resultDocList) {
+        assert.sameMembers(resultDocList,
+                           coll.find().toArray(),
+                           "Collection contents did not match expected after update");
+    }
 }
 
 /**
@@ -296,45 +418,166 @@ function testFindOneAndRemove({
 
     const coll = prepareCollection({collName: callerName, initialDocList: initialDocList});
 
-    const findAndModifyCmd = makeFindAndModifyCommand(coll, filter, fields, sort, collation);
+    const findAndModifyCmd = makeFindOneAndRemoveCommand(coll, filter, fields, sort, collation);
     jsTestLog(`Running findAndModify remove: ${tojson(findAndModifyCmd)}`);
 
     const session = coll.getDB().getSession();
     const shouldRetryWrites = session.getOptions().shouldRetryWrites();
     // TODO SERVER-76583: Remove this check and always verify the result or verify the 'errorCode'.
-    if (!shouldRetryWrites && !errorCode) {
-        if (bucketFilter) {
-            const explainRes = assert.commandWorked(
-                coll.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"}));
-            verifyExplain({
-                explain: explainRes,
-                rootStageName: rootStage,
-                bucketFilter: bucketFilter,
-                residualFilter: residualFilter,
-                nBucketsUnpacked: nBucketsUnpacked,
-                nReturned: nReturned,
-            });
-        }
-
-        const res = assert.commandWorked(testDB.runCommand(findAndModifyCmd));
-        jsTestLog(`findAndModify remove result: ${tojson(res)}`);
-        assert.eq(nDeleted, res.lastErrorObject.n, tojson(res));
-        if (deletedDoc) {
-            assert.docEq(deletedDoc, res.value, tojson(res));
-        } else if (nDeleted === 1) {
-            assert.neq(null, res.value, tojson(res));
-        } else if (nDeleted === 0) {
-            assert.eq(null, res.value, tojson(res));
-        }
-
-        verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted);
-    } else if (errorCode) {
-        assert.commandFailedWithCode(
-            testDB.runCommand(findAndModifyCmd), errorCode, `cmd = ${tojson(findAndModifyCmd)}`);
-    } else {
-        // TODO SERVER-76583: Remove this test.
+    if (coll.getDB().getSession().getOptions().shouldRetryWrites()) {
         assert.commandFailedWithCode(
             testDB.runCommand(findAndModifyCmd), 7308305, `cmd = ${tojson(findAndModifyCmd)}`);
+        return;
+    }
+
+    if (errorCode) {
+        assert.commandFailedWithCode(
+            testDB.runCommand(findAndModifyCmd), errorCode, `cmd = ${tojson(findAndModifyCmd)}`);
+        return;
+    }
+
+    if (bucketFilter !== undefined) {
+        const explainRes = assert.commandWorked(
+            coll.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"}));
+        verifyExplain({
+            explain: explainRes,
+            rootStageName: rootStage,
+            opType: "deleteOne",
+            bucketFilter: bucketFilter,
+            residualFilter: residualFilter,
+            nBucketsUnpacked: nBucketsUnpacked,
+            nReturned: nReturned,
+        });
+    }
+
+    const res = assert.commandWorked(testDB.runCommand(findAndModifyCmd));
+    jsTestLog(`findAndModify remove result: ${tojson(res)}`);
+    assert.eq(nDeleted, res.lastErrorObject.n, tojson(res));
+    if (deletedDoc) {
+        assert.docEq(deletedDoc, res.value, tojson(res));
+    } else if (nDeleted === 1) {
+        assert.neq(null, res.value, tojson(res));
+    } else if (nDeleted === 0) {
+        assert.eq(null, res.value, tojson(res));
+    }
+
+    verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted);
+}
+
+/**
+ * Verifies that a findAndModify update returns the expected result(s) 'res'.
+ *
+ * - initialDocList: The initial documents in the collection.
+ * - cmd.filter: The 'query' spec for the findAndModify command.
+ * - cmd.update: The 'update' spec for the findAndModify command.
+ * - cmd.returnNew: The 'new' option for the findAndModify command.
+ * - cmd.upsert: The 'upsert' option for the findAndModify command.
+ * - cmd.fields: The projection for the findAndModify command.
+ * - cmd.sort: The sort option for the findAndModify command.
+ * - cmd.collation: The collation option for the findAndModify command.
+ * - res.errorCode: If errorCode is set, we expect the command to fail with that code and other
+ *                  fields of 'res' are ignored.
+ * - res.resultDocList: The expected documents in the collection after the update.
+ * - res.nModified: The expected number of documents deleted.
+ * - res.returnDoc: The expected document returned by the findAndModify command.
+ * - res.rootStage: The expected root stage of the explain plan.
+ * - res.bucketFilter: The expected bucket filter of the TS_MODIFY stage.
+ * - res.residualFilter: The expected residual filter of the TS_MODIFY stage.
+ * - res.nBucketsUnpacked: The expected number of buckets unpacked by the TS_MODIFY stage.
+ * - res.nMatched: The expected number of documents matched by the TS_MODIFY stage.
+ * - res.nModified: The expected number of documents modified by the TS_MODIFY stage.
+ * - res.nUpserted: The expected number of documents upserted by the TS_MODIFY stage.
+ */
+function testFindOneAndUpdate({
+    initialDocList,
+    cmd: {filter, update, returnNew, upsert, fields, sort, collation},
+    res: {
+        errorCode,
+        resultDocList,
+        returnDoc,
+        rootStage,
+        bucketFilter,
+        residualFilter,
+        nBucketsUnpacked,
+        nMatched,
+        nModified,
+        nUpserted,
+    },
+}) {
+    const collName = getCallerName();
+    jsTestLog(`Running ${collName}(${tojson(arguments[0])})`);
+
+    const testDB = getTestDB();
+    const coll = testDB.getCollection(collName);
+    prepareCollection({collName, initialDocList});
+
+    const findAndModifyCmd = makeFindOneAndUpdateCommand(
+        coll, filter, update, returnNew, upsert, fields, sort, collation);
+    jsTestLog(`Running findAndModify update: ${tojson(findAndModifyCmd)}`);
+
+    // TODO SERVER-76583: Remove this check and always verify the result or verify the 'errorCode'.
+    if (coll.getDB().getSession().getOptions().shouldRetryWrites()) {
+        assert.commandFailedWithCode(testDB.runCommand(findAndModifyCmd), 7314600);
+        return;
+    }
+
+    if (errorCode) {
+        assert.commandFailedWithCode(testDB.runCommand(findAndModifyCmd), errorCode);
+        return;
+    }
+
+    if (bucketFilter !== undefined) {
+        const explainRes = assert.commandWorked(
+            coll.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"}));
+        verifyExplain({
+            explain: explainRes,
+            rootStageName: rootStage,
+            opType: "updateOne",
+            bucketFilter: bucketFilter,
+            residualFilter: residualFilter,
+            nBucketsUnpacked: nBucketsUnpacked,
+            nReturned: returnDoc ? 1 : 0,
+            nMatched: nMatched,
+            nModified: nModified,
+            nUpserted: nUpserted,
+        });
+    }
+
+    const res = assert.commandWorked(testDB.runCommand(findAndModifyCmd));
+    jsTestLog(`findAndModify update result: ${tojson(res)}`);
+    if (upsert) {
+        assert(nUpserted !== undefined && (nUpserted === 0 || nUpserted === 1),
+               "nUpserted must be 0 or 1");
+
+        assert.eq(1, res.lastErrorObject.n, tojson(res));
+        if (returnNew !== undefined) {
+            assert(returnDoc, "returnDoc must be provided when upsert are true");
+            assert.docEq(returnDoc, res.value, tojson(res));
+        }
+
+        if (nUpserted === 1) {
+            assert(res.lastErrorObject.upserted, `Expected upserted ObjectId: ${tojson(res)}`);
+            assert.eq(false, res.lastErrorObject.updatedExisting, tojson(res));
+        } else {
+            assert(!res.lastErrorObject.upserted, `Expected no upserted ObjectId: ${tojson(res)}`);
+            assert.eq(true, res.lastErrorObject.updatedExisting, tojson(res));
+        }
+    } else {
+        if (returnDoc !== undefined && returnDoc !== null) {
+            assert.eq(1, res.lastErrorObject.n, tojson(res));
+            assert.eq(true, res.lastErrorObject.updatedExisting, tojson(res));
+            assert.docEq(returnDoc, res.value, tojson(res));
+        } else {
+            assert.eq(0, res.lastErrorObject.n, tojson(res));
+            assert.eq(false, res.lastErrorObject.updatedExisting, tojson(res));
+            assert.eq(null, res.value, tojson(res));
+        }
+    }
+
+    if (resultDocList !== undefined) {
+        assert.sameMembers(resultDocList,
+                           coll.find().toArray(),
+                           "Collection contents did not match expected after update");
     }
 }
 
@@ -532,7 +775,7 @@ function testFindOneAndRemoveOnShardedCollection({
     const coll = prepareShardedCollection(
         {collName: callerName, initialDocList: initialDocList, includeMeta: includeMeta});
 
-    const findAndModifyCmd = makeFindAndModifyCommand(coll, filter, fields, sort, collation);
+    const findAndModifyCmd = makeFindOneAndRemoveCommand(coll, filter, fields, sort, collation);
     jsTestLog(`Running findAndModify remove: ${tojson(findAndModifyCmd)}`);
 
     const session = coll.getDB().getSession();
@@ -551,6 +794,7 @@ function testFindOneAndRemoveOnShardedCollection({
             verifyExplain({
                 explain: explainRes,
                 rootStageName: rootStage,
+                opType: "deleteOne",
                 bucketFilter: bucketFilter,
                 residualFilter: residualFilter,
                 nBucketsUnpacked: nBucketsUnpacked,
@@ -591,6 +835,154 @@ function testFindOneAndRemoveOnShardedCollection({
         assert.commandFailedWithCode(
             testDB.runCommand(findAndModifyCmd), 7308305, `cmd = ${tojson(findAndModifyCmd)}`);
     }
+}
+
+/**
+ * Verifies that a findAndModify update on a sharded timeseries collection returns the expected
+ * result(s) 'res'.
+ *
+ * - initialDocList: The initial documents in the collection.
+ * - cmd.filter: The 'query' spec for the findAndModify command.
+ * - cmd.update: The 'update' spec for the findAndModify command.
+ * - cmd.returnNew: The 'new' option for the findAndModify command.
+ * - cmd.upsert: The 'upsert' option for the findAndModify command.
+ * - cmd.fields: The projection for the findAndModify command.
+ * - cmd.sort: The sort option for the findAndModify command.
+ * - cmd.collation: The collation option for the findAndModify command.
+ * - res.errorCode: If errorCode is set, we expect the command to fail with that code and other
+ *                  fields of 'res' are ignored.
+ * - res.resultDocList: The expected documents in the collection after the update.
+ * - res.returnDoc: The expected document returned by the findAndModify command.
+ * - res.writeType: "twoPhaseProtocol" or "targeted". On sharded time-series collection, we route
+ *                  queries to shards if the queries contain the shardkey. "twoPhaseProtocol" means
+ *                  that we cannot target a specific data-bearing shard from the query and should
+ *                  the scatter-gather-like two-phase protocol. On the other hand, "targeted" means
+ *                  we can from the query.
+ * - res.dataBearingShard: "primary", "other", "none", or "any". For "none" and "any", only
+ *                         the "twoPhaseProtocol" is allowed.
+ * - res.rootStage: The expected root stage of the explain plan.
+ * - res.bucketFilter: The expected bucket filter of the TS_MODIFY stage.
+ * - res.residualFilter: The expected residual filter of the TS_MODIFY stage.
+ * - res.nBucketsUnpacked: The expected number of buckets unpacked by the TS_MODIFY stage.
+ * - res.nMatched: The expected number of documents matched by the TS_MODIFY stage.
+ * - res.nModified: The expected number of documents modified by the TS_MODIFY stage.
+ * - res.nUpserted: The expected number of documents upserted by the TS_MODIFY stage.
+ */
+function testFindOneAndUpdateOnShardedCollection({
+    initialDocList,
+    startTxn = false,
+    includeMeta = true,
+    cmd: {filter, update, returnNew, upsert, fields, sort, collation},
+    res: {
+        errorCode,
+        resultDocList,
+        returnDoc,
+        writeType,
+        dataBearingShard,
+        rootStage,
+        bucketFilter,
+        residualFilter,
+        nBucketsUnpacked,
+        nMatched,
+        nModified,
+        nUpserted,
+    },
+}) {
+    const callerName = getCallerName();
+    jsTestLog(`Running ${callerName}(${tojson(arguments[0])})`);
+
+    const coll = prepareShardedCollection(
+        {collName: callerName, initialDocList: initialDocList, includeMeta: includeMeta});
+
+    const findAndModifyCmd = makeFindOneAndUpdateCommand(
+        coll, filter, update, returnNew, upsert, fields, sort, collation);
+    jsTestLog(`Running findAndModify update: ${tojson(findAndModifyCmd)}`);
+
+    if (errorCode) {
+        assert.commandFailedWithCode(coll.runCommand(findAndModifyCmd), errorCode);
+        assert.sameMembers(initialDocList,
+                           coll.find().toArray(),
+                           "Collection contents did not match expected after update failure.");
+        return;
+    }
+
+    // Explain can't be run inside a transaction.
+    if (!startTxn && bucketFilter) {
+        // Due to the limitation of two-phase write protocol, the TS_MODIFY stage's execution
+        // stats can't really show the results close to real execution. We can just verify
+        // plan part.
+        assert(writeType !== "twoPhaseProtocol" ||
+                   (nBucketsUnpacked === undefined && nMatched === undefined &&
+                    nModified === undefined),
+               "Can't verify stats for the two-phase protocol.");
+
+        const explainRes = assert.commandWorked(
+            coll.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"}));
+        verifyExplain({
+            explain: explainRes,
+            rootStageName: rootStage,
+            opType: "updateOne",
+            bucketFilter: bucketFilter,
+            residualFilter: residualFilter,
+            nBucketsUnpacked: nBucketsUnpacked,
+            nReturned: returnDoc ? 1 : 0,
+            nMatched: nMatched,
+            nModified: nModified,
+            nUpserted: nUpserted,
+        });
+    }
+
+    restartProfiler();
+    const res = (() => {
+        if (!startTxn) {
+            return assert.commandWorked(testDB.runCommand(findAndModifyCmd));
+        }
+
+        const session = coll.getDB().getMongo().startSession();
+        const sessionDb = session.getDatabase(coll.getDB().getName());
+        session.startTransaction();
+        const res = assert.commandWorked(sessionDb.runCommand(findAndModifyCmd));
+        session.commitTransaction();
+
+        return res;
+    })();
+    jsTestLog(`findAndModify update result: ${tojson(res)}`);
+    if (upsert) {
+        assert(nUpserted !== undefined && (nUpserted === 0 || nUpserted === 1),
+               "nUpserted must be 0 or 1");
+
+        assert.eq(1, res.lastErrorObject.n, tojson(res));
+        if (returnNew !== undefined) {
+            assert(returnDoc, "returnDoc must be provided when upsert are true");
+            assert.docEq(returnDoc, res.value, tojson(res));
+        }
+
+        if (nUpserted === 1) {
+            assert(res.lastErrorObject.upserted, `Expected upserted ObjectId: ${tojson(res)}`);
+            assert.eq(false, res.lastErrorObject.updatedExisting, tojson(res));
+        } else {
+            assert(!res.lastErrorObject.upserted, `Expected no upserted ObjectId: ${tojson(res)}`);
+            assert.eq(true, res.lastErrorObject.updatedExisting, tojson(res));
+        }
+    } else {
+        if (returnDoc !== undefined && returnDoc !== null) {
+            assert.eq(1, res.lastErrorObject.n, tojson(res));
+            assert.eq(true, res.lastErrorObject.updatedExisting, tojson(res));
+            assert.docEq(returnDoc, res.value, tojson(res));
+        } else {
+            assert.eq(0, res.lastErrorObject.n, tojson(res));
+            assert.eq(false, res.lastErrorObject.updatedExisting, tojson(res));
+            assert.eq(null, res.value, tojson(res));
+        }
+    }
+
+    if (resultDocList !== undefined) {
+        assert.sameMembers(resultDocList,
+                           coll.find().toArray(),
+                           "Collection contents did not match expected after update");
+    }
+
+    verifyThatRequestIsRoutedToCorrectShard(coll, "findAndModify", writeType, dataBearingShard);
 }
 
 /**

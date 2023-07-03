@@ -30,9 +30,14 @@
 #pragma once
 
 #include <bitset>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
 
 #include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_ast.h"
+#include "mongo/db/query/projection_policies.h"
 
 namespace mongo::projection_executor {
 /**

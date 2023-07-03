@@ -28,20 +28,38 @@
  */
 
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <memory>
+#include <string>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/commands.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/client.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/query/cursor_request.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/idl/command_generic_argument.h"
-#include "mongo/platform/basic.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace aggregation_request_helper {
@@ -143,7 +161,7 @@ NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) {
                               << typeName(firstElement.type()),
                 firstElement.type() == BSONType::String);
 
-        const NamespaceString nss(
+        NamespaceString nss(
             NamespaceStringUtil::parseNamespaceFromRequest(dbName, firstElement.valueStringData()));
 
         uassert(ErrorCodes::InvalidNamespace,
@@ -204,6 +222,30 @@ void validate(OperationContext* opCtx,
                           << " must only be set for the oplog namespace, not "
                           << nss.toStringForErrorMsg(),
             !hasRequestReshardingResumeToken || nss.isOplog());
+
+    auto requestResumeTokenElem = cmdObj[AggregateCommandRequest::kRequestResumeTokenFieldName];
+    uassert(ErrorCodes::InvalidOptions,
+            "$_requestResumeToken is not supported without Resharding Improvements",
+            !requestResumeTokenElem ||
+                resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility));
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << AggregateCommandRequest::kRequestResumeTokenFieldName
+                          << " must be a boolean type",
+            !requestResumeTokenElem || requestResumeTokenElem.isBoolean());
+    bool hasRequestResumeToken = requestResumeTokenElem && requestResumeTokenElem.boolean();
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << AggregateCommandRequest::kRequestResumeTokenFieldName
+                          << " must be set for non-oplog namespace",
+            !hasRequestResumeToken || !nss.isOplog());
+    if (hasRequestResumeToken) {
+        auto hintElem = cmdObj[AggregateCommandRequest::kHintFieldName];
+        uassert(ErrorCodes::BadValue,
+                "hint must be {$natural:1} if 'requestResumeToken' is enabled",
+                hintElem && hintElem.isABSONObj() &&
+                    SimpleBSONObjComparator::kInstance.evaluate(
+                        hintElem.Obj() == BSON(query_request_helper::kNaturalSortField << 1)));
+    }
 }
 
 void validateRequestForAPIVersion(const OperationContext* opCtx,

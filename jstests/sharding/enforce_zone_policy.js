@@ -85,9 +85,9 @@ assertBalanceCompleteAndStable(function() {
 }, 'chunks to zones a and b');
 
 // Tag the entire collection to shard0 and wait for everything to move to that shard
-st.removeTagRange(ns, {_id: -100}, {_id: 100}, 'a');
-st.removeTagRange(ns, {_id: MinKey}, {_id: -100}, 'b');
-st.removeTagRange(ns, {_id: 100}, {_id: MaxKey}, 'b');
+st.removeTagRange(ns, {_id: -100}, {_id: 100});
+st.removeTagRange(ns, {_id: MinKey}, {_id: -100});
+st.removeTagRange(ns, {_id: 100}, {_id: MaxKey});
 
 st.removeShardTag(st.shard1.shardName, 'a');
 st.removeShardTag(st.shard2.shardName, 'b');
@@ -102,7 +102,7 @@ assertBalanceCompleteAndStable(function() {
 
 // Remove all zones and ensure collection is correctly redistributed
 st.removeShardTag(st.shard0.shardName, 'a');
-st.removeTagRange(ns, {_id: MinKey}, {_id: MaxKey}, 'a');
+st.removeTagRange(ns, {_id: MinKey}, {_id: MaxKey});
 
 assertBalanceCompleteAndStable(checkClusterEvenlyBalanced, 'final');
 

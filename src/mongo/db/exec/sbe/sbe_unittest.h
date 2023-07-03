@@ -28,15 +28,23 @@
  */
 #pragma once
 
-#include "mongo/unittest/assert_that.h"
-#include "mongo/unittest/golden_test.h"
-#include "mongo/unittest/matcher.h"
-#include "mongo/unittest/unittest.h"
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
-#include <sstream>
+#include "mongo/unittest/assert_that.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/golden_test.h"
+#include "mongo/unittest/golden_test_base.h"
+#include "mongo/unittest/inline_auto_update.h"
+#include "mongo/unittest/matcher.h"
+#include "mongo/unittest/matcher_core.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {
 

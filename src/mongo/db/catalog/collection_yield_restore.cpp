@@ -29,9 +29,16 @@
 
 #include "mongo/db/catalog/collection_yield_restore.h"
 
+#include <memory>
+
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/snapshot_helper.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 LockedCollectionYieldRestore::LockedCollectionYieldRestore(OperationContext* opCtx,

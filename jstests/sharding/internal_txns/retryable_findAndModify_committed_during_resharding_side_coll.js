@@ -10,20 +10,17 @@
 
 load("jstests/sharding/internal_txns/libs/resharding_test.js");
 
-const storeFindAndModifyImagesInSideCollection = true;
 const abortOnInitialTry = false;
 
 {
-    const transactionTest = new InternalTransactionReshardingTest(
-        {reshardInPlace: false, storeFindAndModifyImagesInSideCollection});
+    const transactionTest = new InternalTransactionReshardingTest({reshardInPlace: false});
     transactionTest.runTestForFindAndModifyDuringResharding(
         transactionTest.InternalTxnType.kRetryable, abortOnInitialTry);
     transactionTest.stop();
 }
 
 {
-    const transactionTest = new InternalTransactionReshardingTest(
-        {reshardInPlace: true, storeFindAndModifyImagesInSideCollection});
+    const transactionTest = new InternalTransactionReshardingTest({reshardInPlace: true});
     transactionTest.runTestForFindAndModifyDuringResharding(
         transactionTest.InternalTxnType.kRetryable, abortOnInitialTry);
     transactionTest.stop();

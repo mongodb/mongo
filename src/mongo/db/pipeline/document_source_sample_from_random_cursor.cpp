@@ -28,18 +28,33 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
-
+#include <boost/exception/exception.hpp>
 #include <boost/math/distributions/beta.hpp>
+#include <boost/math/policies/policy.hpp>
+// IWYU pragma: no_include "boost/math/special_functions/detail/erf_inv.hpp"
+// IWYU pragma: no_include "boost/math/special_functions/detail/lanczos_sse2.hpp"
+#include <algorithm>
+#include <boost/math/tools/precision.hpp>
+#include <cstddef>
+#include <stdexcept>
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/client.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/random.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -146,7 +161,7 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNextNonDu
 }
 
 Value DocumentSourceSampleFromRandomCursor::serialize(SerializationOptions opts) const {
-    return Value(DOC(getSourceName() << DOC("size" << opts.serializeLiteralValue(_size))));
+    return Value(DOC(getSourceName() << DOC("size" << opts.serializeLiteral(_size))));
 }
 
 DepsTracker::State DocumentSourceSampleFromRandomCursor::getDependencies(DepsTracker* deps) const {

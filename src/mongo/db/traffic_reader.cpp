@@ -27,34 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cerrno>
+#include <cstddef>
+#include <cstdint>
 #include <fcntl.h>
 #include <iostream>
 #include <string>
-#include <sys/types.h>
-#include <vector>
+#include <system_error>
 
 #ifdef _WIN32
 #include <io.h>
-#else
-#include <unistd.h>
 #endif
 
-#include "mongo/base/data_cursor.h"
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_type_validated.h"
+#include "mongo/base/data_type_terminated.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/traffic_reader.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/shared_buffer.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 namespace {
 // Taken from src/mongo/gotools/mongoreplay/util.go

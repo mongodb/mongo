@@ -29,11 +29,23 @@
 
 #include "mongo/db/s/sharding_write_router.h"
 
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/server_options.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
-ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         CatalogCache* catalogCache) {
+ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx, const NamespaceString& nss) {
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         _scopedCss.emplace(CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss));
         _collDesc = (*_scopedCss)->getCollectionDescription(opCtx);
@@ -54,6 +66,8 @@ ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx,
             invariant(reshardingFields);
             const auto& donorFields = reshardingFields->getDonorFields();
             invariant(donorFields);
+            auto catalogCache = Grid::get(opCtx)->catalogCache();
+            invariant(catalogCache);
 
             _reshardingChunkMgr =
                 uassertStatusOK(

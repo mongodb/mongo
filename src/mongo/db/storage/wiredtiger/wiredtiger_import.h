@@ -29,13 +29,16 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 struct WTimportArgs {

@@ -115,6 +115,7 @@ class Symbolizer(Subcommand):
 
         urlinfo = self.multiversion_setup.get_urls(version=version_id,
                                                    buildvariant_name=buildvariant_name)
+        self.logger.info("Found urls to download and extract %s", urlinfo.urls)
 
         self.multiversion_setup.download_and_extract_from_urls(urlinfo.urls, bin_suffix=None,
                                                                install_dir=self.dest_dir)

@@ -29,6 +29,23 @@
 
 #include "mongo/db/exec/sbe/util/spilling.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/str.h"
+
 namespace mongo {
 namespace sbe {
 
@@ -41,17 +58,17 @@ void assertIgnorePrepareConflictsBehavior(OperationContext* opCtx) {
 }
 
 
-std::pair<RecordId, KeyString::TypeBits> encodeKeyString(KeyString::Builder& kb,
-                                                         const value::MaterializedRow& value) {
+std::pair<RecordId, key_string::TypeBits> encodeKeyString(key_string::Builder& kb,
+                                                          const value::MaterializedRow& value) {
     value.serializeIntoKeyString(kb);
     auto typeBits = kb.getTypeBits();
     auto rid = RecordId(kb.getBuffer(), kb.getSize());
     return {rid, typeBits};
 }
 
-KeyString::Value decodeKeyString(const RecordId& rid, KeyString::TypeBits typeBits) {
+key_string::Value decodeKeyString(const RecordId& rid, key_string::TypeBits typeBits) {
     auto rawKey = rid.getStr();
-    KeyString::Builder kb{KeyString::Version::kLatestVersion};
+    key_string::Builder kb{key_string::Version::kLatestVersion};
     kb.resetFromBuffer(rawKey.rawData(), rawKey.size());
     kb.setTypeBits(typeBits);
     return kb.getValueCopy();
@@ -72,7 +89,7 @@ int upsertToRecordStore(OperationContext* opCtx,
                         RecordStore* rs,
                         const RecordId& key,
                         const value::MaterializedRow& val,
-                        const KeyString::TypeBits& typeBits,  // recover type of value.
+                        const key_string::TypeBits& typeBits,  // recover type of value.
                         bool update) {
     BufBuilder bufValue;
     val.serializeForSorter(bufValue);
@@ -83,7 +100,7 @@ int upsertToRecordStore(OperationContext* opCtx,
                         RecordStore* rs,
                         const RecordId& key,
                         BufBuilder& buf,
-                        const KeyString::TypeBits& typeBits,  // recover type of value.
+                        const key_string::TypeBits& typeBits,  // recover type of value.
                         bool update) {
     // Append the 'typeBits' to the end of the val's buffer so the 'key' can be reconstructed when
     // draining HashAgg.

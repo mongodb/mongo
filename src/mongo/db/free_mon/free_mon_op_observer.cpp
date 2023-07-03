@@ -27,13 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <set>
+#include <utility>
 
-#include "mongo/db/free_mon/free_mon_op_observer.h"
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/free_mon/free_mon_controller.h"
+#include "mongo/db/free_mon/free_mon_op_observer.h"
 #include "mongo/db/free_mon/free_mon_storage.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace {
@@ -47,7 +52,7 @@ bool isStandaloneOrPrimary(OperationContext* opCtx) {
          repl::MemberState::RS_PRIMARY);
 }
 
-const auto getFreeMonDeleteState = OperationContext::declareDecoration<bool>();
+const auto getFreeMonDeleteState = OplogDeleteEntryArgs::declareDecoration<bool>();
 
 }  // namespace
 
@@ -78,7 +83,7 @@ void FreeMonOpObserver::onInserts(OperationContext* opCtx,
                                   std::vector<InsertStatement>::const_iterator end,
                                   std::vector<bool> fromMigrate,
                                   bool defaultFromMigrate,
-                                  InsertsOpStateAccumulator* opAccumulator) {
+                                  OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kServerConfigurationNamespace) {
         return;
     }
@@ -124,14 +129,16 @@ void FreeMonOpObserver::onUpdate(OperationContext* opCtx,
 
 void FreeMonOpObserver::aboutToDelete(OperationContext* opCtx,
                                       const CollectionPtr& coll,
-                                      const BSONObj& doc) {
+                                      const BSONObj& doc,
+                                      OplogDeleteEntryArgs* args,
+                                      OpStateAccumulator* opAccumulator) {
 
     bool isFreeMonDoc = (coll->ns() == NamespaceString::kServerConfigurationNamespace) &&
         (doc["_id"].str() == FreeMonStorage::kFreeMonDocIdKey);
 
     // Set a flag that indicates whether the document to be delete is the free monitoring state
     // document
-    getFreeMonDeleteState(opCtx) = isFreeMonDoc;
+    getFreeMonDeleteState(args) = isFreeMonDoc;
 }
 
 void FreeMonOpObserver::onDelete(OperationContext* opCtx,
@@ -147,7 +154,7 @@ void FreeMonOpObserver::onDelete(OperationContext* opCtx,
         return;
     }
 
-    if (getFreeMonDeleteState(opCtx) == true) {
+    if (getFreeMonDeleteState(args) == true) {
         auto controller = FreeMonController::get(opCtx->getServiceContext());
 
         if (controller != nullptr) {

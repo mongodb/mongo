@@ -29,13 +29,31 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

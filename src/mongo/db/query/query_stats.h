@@ -29,24 +29,37 @@
 
 #pragma once
 
+#include <algorithm>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/request_shapifier.h"
+#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/query_stats_transform_algorithm_gen.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
-#include <cstdint>
-#include <memory>
+#include "mongo/db/views/view.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
-
-class OpDebug;
-class AggregateCommandRequest;
-class FindCommandRequest;
 
 namespace {
 /**
@@ -96,44 +109,65 @@ struct AggregatedMetric {
 };
 
 extern CounterMetric queryStatsStoreSizeEstimateBytesMetric;
-// Used to aggregate the metrics for one telemetry key over all its executions.
+const auto kKeySize = sizeof(std::size_t);
+// Used to aggregate the metrics for one query stats key over all its executions.
 class QueryStatsEntry {
 public:
-    QueryStatsEntry(std::unique_ptr<RequestShapifier> requestShapifier,
-                    NamespaceStringOrUUID nss,
-                    const BSONObj& cmdObj)
-        : firstSeenTimestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0),
-          requestShapifier(std::move(requestShapifier)),
-          nss(nss),
-          oldQueryStatsKey(cmdObj.copy()) {
-        queryStatsStoreSizeEstimateBytesMetric.increment(sizeof(QueryStatsEntry) + sizeof(BSONObj));
+    QueryStatsEntry(std::unique_ptr<KeyGenerator> keyGenerator)
+        : firstSeenTimestamp(Date_t::now()), keyGenerator(std::move(keyGenerator)) {
+        // Increment by size of query stats store key (hash returns size_t) and value
+        // (QueryStatsEntry)
+        queryStatsStoreSizeEstimateBytesMetric.increment(kKeySize + size());
     }
 
+    QueryStatsEntry(QueryStatsEntry& entry) = delete;
+
+    QueryStatsEntry(QueryStatsEntry&& entry) = delete;
+
     ~QueryStatsEntry() {
-        queryStatsStoreSizeEstimateBytesMetric.decrement(sizeof(QueryStatsEntry) + sizeof(BSONObj));
+        // Decrement by size of query stats store key (hash returns size_t) and value
+        // (QueryStatsEntry)
+        queryStatsStoreSizeEstimateBytesMetric.decrement(kKeySize + size());
     }
 
     BSONObj toBSON() const {
         BSONObjBuilder builder{sizeof(QueryStatsEntry) + 100};
         builder.append("lastExecutionMicros", (BSONNumeric)lastExecutionMicros);
         builder.append("execCount", (BSONNumeric)execCount);
-        queryExecMicros.appendTo(builder, "queryExecMicros");
+        totalExecMicros.appendTo(builder, "totalExecMicros");
+        firstResponseExecMicros.appendTo(builder, "firstResponseExecMicros");
         docsReturned.appendTo(builder, "docsReturned");
         builder.append("firstSeenTimestamp", firstSeenTimestamp);
+        builder.append("latestSeenTimestamp", latestSeenTimestamp);
         return builder.obj();
     }
 
+    int64_t size() {
+        return sizeof(*this) + (keyGenerator ? keyGenerator->size() : 0);
+    }
+
     /**
-     * Redact a given queryStats key and set _keySize.
+     * Generate the queryStats key for this entry's request. If algorithm is not
+     * TransformAlgorithm::kNone, any identifying information (field names, namespace) will be
+     * anonymized.
      */
     BSONObj computeQueryStatsKey(OperationContext* opCtx,
-                                 bool applyHmacToIdentifiers,
+                                 TransformAlgorithmEnum algorithm,
                                  std::string hmacKey) const;
+
+    BSONObj getRepresentativeQueryShapeForDebug() const {
+        return keyGenerator->getRepresentativeQueryShapeForDebug();
+    }
 
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.
      */
-    const Timestamp firstSeenTimestamp;
+    const Date_t firstSeenTimestamp;
+
+    /**
+     * Timestamp for when the latest time this query shape was seen.
+     */
+    Date_t latestSeenTimestamp;
 
     /**
      * Last execution time in microseconds.
@@ -145,18 +179,23 @@ public:
      */
     uint64_t execCount = 0;
 
-    AggregatedMetric queryExecMicros;
+    /**
+     * Aggregates the total time for execution including getMore requests.
+     */
+    AggregatedMetric totalExecMicros;
+
+    /**
+     * Aggregates the time for execution for first batch only.
+     */
+    AggregatedMetric firstResponseExecMicros;
 
     AggregatedMetric docsReturned;
 
-    std::unique_ptr<RequestShapifier> requestShapifier;
-
-    NamespaceStringOrUUID nss;
-
-    // TODO: SERVER-73152 remove oldQueryStatsKey when RequestShapifier is used for agg.
-    BSONObj oldQueryStatsKey;
+    /**
+     * The KeyGenerator that can generate the query stats key for this request.
+     */
+    std::unique_ptr<KeyGenerator> keyGenerator;
 };
-
 struct TelemetryPartitioner {
     // The partitioning function for use with the 'Partitioned' utility.
     std::size_t operator()(const std::size_t k, const std::size_t nPartitions) const {
@@ -166,14 +205,9 @@ struct TelemetryPartitioner {
 
 struct QueryStatsStoreEntryBudgetor {
     size_t operator()(const std::size_t key, const std::shared_ptr<QueryStatsEntry>& value) {
-        // The buget estimator for <key,value> pair in LRU cache accounts for the size of the key
-        // and the size of the metrics, including the bson object used for generating the telemetry
-        // key at read time.
-
-        return sizeof(QueryStatsEntry) + sizeof(std::size_t) + value->oldQueryStatsKey.objsize();
+        return sizeof(decltype(key)) + value->size();
     }
 };
-
 using QueryStatsStore = PartitionedCache<std::size_t,
                                          std::shared_ptr<QueryStatsEntry>,
                                          QueryStatsStoreEntryBudgetor,
@@ -185,39 +219,57 @@ using QueryStatsStore = PartitionedCache<std::size_t,
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx);
 
 /**
- * Register a request for queryStats collection. The queryStats machinery may decide not to
- * collect anything but this should be called for all requests. The decision is made based on
- * the feature flag and queryStats parameters such as rate limiting.
+ * Registers a request for query stats collection. The function may decide not to collect anything,
+ * so this should be called for all requests. The decision is made based on the feature flag and
+ * query stats rate limiting.
  *
- * The caller is still responsible for subsequently calling writeQueryStats() once the request is
- * completed.
+ * The originating command/query does not persist through the end of query execution due to
+ * optimizations made to the original query and the expiration of OpCtx across getMores. In order
+ * to pair the query stats metrics that are collected at the end of execution with the original
+ * query, it is necessary to store the original query during planning and persist it through
+ * getMores.
  *
- * Note that calling this affects internal state. It should be called once for each request for
- * which telemetry may be collected.
- * TODO SERVER-73152 remove request-specific registers, leave only registerRequest
+ * During planning, registerRequest is called to serialize the query stats key and save it to
+ * OpDebug. If a query's execution is complete within the original operation,
+ * collectQueryStatsMongod/collectQueryStatsMongos will call writeQueryStats() and pass along the
+ * query stats key to be saved in the query stats store alongside metrics collected.
+ *
+ * However, OpDebug does not persist through cursor iteration, so if a query's execution will span
+ * more than one request/operation, it's necessary to save the query stats context to the cursor
+ * upon cursor registration. In these cases, collectQueryStatsMongod/collectQueryStatsMongos will
+ * aggregate each operation's metrics within the cursor. Once the request is eventually complete,
+ * the cursor calls writeQueryStats() on its destruction.
+ *
+ * Notes:
+ * - It's important to call registerRequest with the original request, before canonicalizing or
+ *   optimizing it, in order to preserve the user's input for the query shape.
+ * - Calling this affects internal state. It should be called exactly once for each request for
+ *   which query stats may be collected.
+ * - The std::function argument to construct an abstracted KeyGenerator is provided to break
+ *   library cycles so this library does not need to know how to parse everything. It is done as a
+ *   deferred construction callback to ensure that this feature does not impact performance if
+ *   collecting stats is not needed due to the feature being disabled or the request being rate
+ *   limited.
  */
-void registerAggRequest(const AggregateCommandRequest& request, OperationContext* opCtx);
-void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                     std::unique_ptr<RequestShapifier> requestShapifier,
-                     const NamespaceString& collection);
+void registerRequest(OperationContext* opCtx,
+                     const NamespaceString& collection,
+                     std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator);
 
 /**
- * Writes queryStats to the queryStats store for the operation identified by `queryStatsKey`.
+ * Writes query stats to the query stats store for the operation identified by `queryStatsKeyHash`.
+ *
+ * Direct calls to writeQueryStats in new code should be avoided in favor of calling existing
+ * functions:
+ *  - collectQueryStatsMongod/collectQueryStatsMongos in the case of requests that span one
+ *    operation
+ *  - ClientCursor::dispose/ClusterClientCursorImpl::kill in the case of requests that span
+ *    multiple operations (via getMore)
  */
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
-                     boost::optional<BSONObj> queryStatsKey,
-                     std::unique_ptr<RequestShapifier> requestShapifier,
+                     std::unique_ptr<KeyGenerator> keyGenerator,
                      uint64_t queryExecMicros,
+                     uint64_t firstResponseExecMicros,
                      uint64_t docsReturned);
-
-/**
- * Serialize the FindCommandRequest according to the Options passed in. Returns the serialized BSON
- * with hmac applied to all field names and literals.
- */
-BSONObj makeQueryStatsKey(const FindCommandRequest& findCommand,
-                          const SerializationOptions& opts,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          boost::optional<const QueryStatsEntry&> existingMetrics = boost::none);
 }  // namespace query_stats
 }  // namespace mongo

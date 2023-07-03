@@ -27,29 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
 
-#include "mongo/db/storage/record_store_test_harness.h"
-
-
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/mutable/damage_vector.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_calculator.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/shared_buffer.h"
 
 namespace mongo {
 namespace {
 
-using std::string;
-using std::unique_ptr;
-
 // Insert a record and try to perform an in-place update on it.
 TEST(RecordStoreTestHarness, UpdateWithDamages) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     if (!rs->updateWithDamagesSupported())
         return;
@@ -59,7 +68,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamages) {
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    string data = "00010111";
+    std::string data = "00010111";
     RecordId loc;
     const RecordData rec(data.c_str(), data.size() + 1);
     {
@@ -79,7 +88,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamages) {
         ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     }
 
-    string modifiedData = "11101000";
+    std::string modifiedData = "11101000";
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
@@ -107,6 +116,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamages) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
             ASSERT_EQUALS(modifiedData, record.data());
@@ -118,7 +128,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamages) {
 // containing overlapping DamageEvents.
 TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     if (!rs->updateWithDamagesSupported())
         return;
@@ -128,7 +138,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    string data = "00010111";
+    std::string data = "00010111";
     RecordId loc;
     const RecordData rec(data.c_str(), data.size() + 1);
     {
@@ -148,7 +158,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
         ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     }
 
-    string modifiedData = "10100010";
+    std::string modifiedData = "10100010";
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
@@ -172,6 +182,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
             ASSERT_EQUALS(modifiedData, record.data());
@@ -184,7 +195,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
 // specified by the DamageVector, and not -- for instance -- by the targetOffset.
 TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     if (!rs->updateWithDamagesSupported())
         return;
@@ -194,7 +205,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    string data = "00010111";
+    std::string data = "00010111";
     RecordId loc;
     const RecordData rec(data.c_str(), data.size() + 1);
     {
@@ -214,7 +225,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
         ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     }
 
-    string modifiedData = "10111010";
+    std::string modifiedData = "10111010";
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
@@ -238,6 +249,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
             ASSERT_EQUALS(modifiedData, record.data());
@@ -248,7 +260,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
 // Insert a record and try to call updateWithDamages() with an empty DamageVector.
 TEST(RecordStoreTestHarness, UpdateWithNoDamages) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     if (!rs->updateWithDamagesSupported())
         return;
@@ -258,7 +270,7 @@ TEST(RecordStoreTestHarness, UpdateWithNoDamages) {
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    string data = "my record";
+    std::string data = "my record";
     RecordId loc;
     const RecordData rec(data.c_str(), data.size() + 1);
     {
@@ -293,6 +305,7 @@ TEST(RecordStoreTestHarness, UpdateWithNoDamages) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
             ASSERT_EQUALS(data, record.data());
@@ -303,7 +316,7 @@ TEST(RecordStoreTestHarness, UpdateWithNoDamages) {
 // Insert a record and try to perform inserts and updates on it.
 TEST(RecordStoreTestHarness, UpdateWithDamagesScalar) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     if (!rs->updateWithDamagesSupported())
         return;
@@ -328,6 +341,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesScalar) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(obj0.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
     }
 
@@ -349,11 +363,13 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesScalar) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(obj1.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             // {u: {c: "123", d: 3}, i: {a: 1, e: 1}}
@@ -370,6 +386,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesScalar) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(obj2.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
     }
 }
@@ -377,7 +394,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesScalar) {
 // Insert a record with nested documents and try to perform updates on it.
 TEST(RecordStoreTestHarness, UpdateWithDamagesNested) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     if (!rs->updateWithDamagesSupported())
         return;
@@ -409,6 +426,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesNested) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(obj0.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
     }
 
@@ -430,6 +448,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesNested) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(obj1.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
     }
 }
@@ -437,7 +456,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesNested) {
 // Insert a record with nested arrays and try to perform updates on it.
 TEST(RecordStoreTestHarness, UpdateWithDamagesArray) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     if (!rs->updateWithDamagesSupported())
         return;
@@ -462,6 +481,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesArray) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(obj0.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
     }
 
@@ -483,6 +503,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamagesArray) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(obj1.binaryEqual(rs->dataFor(opCtx.get(), loc).toBson()));
     }
 }

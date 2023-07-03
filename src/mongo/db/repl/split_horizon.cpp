@@ -27,27 +27,31 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/split_horizon.h"
 
+#include <algorithm>
+#include <iterator>
+#include <mutex>
 #include <utility>
+#include <vector>
 
-#include "mongo/bson/util/bson_extract.h"
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/client.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
-
-using namespace std::literals::string_literals;
-
-using std::begin;
-using std::end;
 
 namespace mongo {
 namespace repl {
 namespace {
+
+using namespace std::literals::string_literals;
+
 const auto getSplitHorizonParameters = Client::declareDecoration<SplitHorizon::Parameters>();
 
 using AllMappings = SplitHorizon::AllMappings;
@@ -125,8 +129,10 @@ SplitHorizon::ForwardMapping computeForwardMappings(
 
         const auto horizonEntries = [&] {
             std::vector<MapMember> rv;
-            std::transform(
-                begin(*horizonsObject), end(*horizonsObject), inserter(rv, end(rv)), convert);
+            std::transform(std::begin(*horizonsObject),
+                           std::end(*horizonsObject),
+                           inserter(rv, end(rv)),
+                           convert);
             return rv;
         }();
 

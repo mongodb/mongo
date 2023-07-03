@@ -28,10 +28,29 @@
  */
 #include "mongo/db/exec/sbe/stages/column_scan.h"
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/preprocessor/control/iif.hpp>
+#include <list>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/index/columns_access_method.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace sbe {
@@ -115,13 +134,14 @@ void ColumnScanStage::prepare(CompileCtx& ctx) {
     }
 
     tassert(6610200, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
-    std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid);
+    _coll.acquireCollection(_opCtx, _collUuid);
 
-    auto indexCatalog = _coll->getIndexCatalog();
+    auto indexCatalog = _coll.getPtr()->getIndexCatalog();
     auto indexDesc = indexCatalog->findIndexByName(_opCtx, _columnIndexName);
     tassert(6610201,
             str::stream() << "could not find index named '" << _columnIndexName
-                          << "' in collection '" << _collName->toStringForErrorMsg() << "'",
+                          << "' in collection '" << _coll.getCollName()->toStringForErrorMsg()
+                          << "'",
             indexDesc);
     _weakIndexCatalogEntry = indexCatalog->getEntryShared(indexDesc);
 }
@@ -177,12 +197,11 @@ void ColumnScanStage::doRestoreState(bool relinquishCursor) {
     invariant(!_coll);
 
     // If this stage has not been prepared, then yield recovery is a no-op.
-    if (!_collName) {
+    if (!_coll.getCollName()) {
         return;
     }
 
-    tassert(6610202, "Catalog epoch should be initialized", _catalogEpoch);
-    _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+    _coll.restoreCollection(_opCtx, _collUuid);
 
     auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
     uassert(ErrorCodes::QueryPlanKilled,
@@ -264,14 +283,12 @@ void ColumnScanStage::open(bool reOpen) {
             // make some validity checks (the collection has not been dropped, renamed, etc.).
             tassert(
                 6610207, "ColumnScanStage is not open but have _rowStoreCursor", !_rowStoreCursor);
-            tassert(6610208, "Collection name should be initialized", _collName);
-            tassert(6610209, "Catalog epoch should be initialized", _catalogEpoch);
-            _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+            _coll.restoreCollection(_opCtx, _collUuid);
         }
     }
 
     if (!_rowStoreCursor) {
-        _rowStoreCursor = _coll->getCursor(_opCtx, true /* forward */);
+        _rowStoreCursor = _coll.getPtr()->getCursor(_opCtx, true /* forward */);
     }
 
     if (_columnCursors.empty()) {

@@ -51,8 +51,7 @@ for (var i = 90; i < 93; i++) {
     spec["field" + (i + 1)] = 1;
     spec["field" + (i + 2)] = 1;
     indexJobs.push(startParallelShell(
-        setupDBStr + "printjson(db.index_multi.createIndex(" + tojson(spec) + "," +
-            "{ background: true }));" +
+        setupDBStr + "printjson(db.index_multi.createIndex(" + tojson(spec) + "));" +
             "db.results.insert(Object.extend(" +
             "db.runCommand({ getlasterror: 1 }), " + tojson(spec) + ") );",
         null,    // port
@@ -67,8 +66,7 @@ for (var i = 30; i < 90; i += 2) {
     spec["field" + i] = 1;
     spec["field" + (i + 1)] = 1;
     indexJobs.push(startParallelShell(
-        setupDBStr + "printjson(db.index_multi.createIndex(" + tojson(spec) + ", " +
-            "{ background: true }));" +
+        setupDBStr + "printjson(db.index_multi.createIndex(" + tojson(spec) + "));" +
             "db.results.insert(Object.extend(" +
             "db.runCommand({ getlasterror: 1 }), " + tojson(spec) + ") );",
         null,    // port
@@ -82,8 +80,7 @@ for (var i = 0; i < 30; i++) {
     var spec = {};
     spec["field" + i] = 1;
     indexJobs.push(startParallelShell(
-        setupDBStr + "printjson(db.index_multi.createIndex(" + tojson(spec) + ", " +
-            "{ background: true }));" +
+        setupDBStr + "printjson(db.index_multi.createIndex(" + tojson(spec) + "));" +
             "db.results.insert(Object.extend(" +
             "db.runCommand({ getlasterror: 1 }), " + tojson(spec) + ") );",
         null,    // port

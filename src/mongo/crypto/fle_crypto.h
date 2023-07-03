@@ -30,30 +30,44 @@
 #pragma once
 
 #include <array>
+#include <boost/move/utility_core.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <compare>
 #include <cstdint>
+#include <cstring>
+#include <functional>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "mongo/base/data_range.h"
+#include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_validated.h"
 #include "mongo/base/secure_allocator.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto_types.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_stats.h"
+#include "mongo/crypto/fle_stats_gen.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/crypto/symmetric_crypto.h"
+#include "mongo/crypto/symmetric_key.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/uuid.h"
 
 namespace mongo {

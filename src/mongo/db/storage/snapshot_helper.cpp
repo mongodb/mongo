@@ -28,13 +28,26 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/optional.hpp>
+#include <string>
 
-#include "mongo/db/storage/snapshot_helper.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

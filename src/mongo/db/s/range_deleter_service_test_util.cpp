@@ -27,10 +27,41 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <map>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deleter_service_test.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

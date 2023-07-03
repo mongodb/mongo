@@ -27,11 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
 
+#ifndef _WIN32
+#include <pthread.h>
+#endif
+
+#include "mongo/base/string_data.h"
 #include "mongo/platform/stack_locator.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

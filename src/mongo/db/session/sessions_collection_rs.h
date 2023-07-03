@@ -33,8 +33,10 @@
 #include <type_traits>
 
 #include "mongo/client/connpool.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/sessions_collection.h"
 #include "mongo/platform/mutex.h"

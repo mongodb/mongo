@@ -28,26 +28,55 @@
  */
 
 
-#include "mongo/db/index/index_descriptor_fwd.h"
-#include "mongo/db/service_context.h"
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <list>
+#include <mutex>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/client/dbclient_base.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/commands/list_collections_filter.h"
-#include "mongo/db/index_build_entry_helpers.h"
+#include "mongo/db/client.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
 #include "mongo/db/repl/collection_cloner.h"
-#include "mongo/db/repl/database_cloner_gen.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/wire_version.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationInitialSync
 
@@ -88,7 +117,8 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
                      kProgressMeterSecondsBetween,
                      kProgressMeterCheckInterval,
                      "documents copied",
-                     str::stream() << _sourceNss.toString() << " collection clone progress"),
+                     str::stream() << NamespaceStringUtil::serialize(_sourceNss)
+                                   << " collection clone progress"),
       _scheduleDbWorkFn([this](executor::TaskExecutor::CallbackFn work) {
           auto task = [this, work = std::move(work)](
                           OperationContext* opCtx,
@@ -411,8 +441,10 @@ void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
     }
 
     // Schedule the next document batch insertion.
-    auto&& scheduleResult = _scheduleDbWorkFn(
-        [=](const executor::TaskExecutor::CallbackArgs& cbd) { insertDocumentsCallback(cbd); });
+    auto&& scheduleResult =
+        _scheduleDbWorkFn([=, this](const executor::TaskExecutor::CallbackArgs& cbd) {
+            insertDocumentsCallback(cbd);
+        });
 
     if (!scheduleResult.isOK()) {
         Status newStatus = scheduleResult.getStatus().withContext(
@@ -440,9 +472,9 @@ void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
             }
         },
         [&](const BSONObj& data) {
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
             // Only hang when cloning the specified collection, or if no collection was specified.
-            auto nss = data["nss"].str();
-            return nss.empty() || nss == _sourceNss.toString();
+            return fpNss.isEmpty() || fpNss == _sourceNss;
         });
 }
 
@@ -483,14 +515,14 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
             }
         },
         [&](const BSONObj& data) {
-            return data["namespace"].String() == _sourceNss.ns() &&
+            return NamespaceStringUtil::parseFailPointData(data, "namespace") == _sourceNss &&
                 static_cast<int>(_stats.documentsCopied) >= data["numDocsToClone"].numberInt();
         });
 }
 
 bool CollectionCloner::isMyFailPoint(const BSONObj& data) const {
-    auto nss = data["nss"].str();
-    return (nss.empty() || nss == _sourceNss.toString()) && BaseCloner::isMyFailPoint(data);
+    const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
+    return (fpNss.isEmpty() || fpNss == _sourceNss) && BaseCloner::isMyFailPoint(data);
 }
 
 void CollectionCloner::waitForDatabaseWorkToComplete() {

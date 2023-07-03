@@ -27,8 +27,15 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <utility>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::sbe {
 

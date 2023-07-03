@@ -29,7 +29,18 @@
 
 #pragma once
 
+#include <cstddef>
+#include <memory>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/rpc/message.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 

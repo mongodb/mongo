@@ -28,18 +28,37 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstdint>
+#include <mutex>
 
-#include "mongo/db/s/transaction_coordinator_service.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_params_gen.h"
-#include "mongo/db/storage/flow_control.h"
+#include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/s/transaction_coordinator_util.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/idl/mutable_observer_registry.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/grid.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/future_impl.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 

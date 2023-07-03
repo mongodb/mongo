@@ -28,14 +28,48 @@
  */
 
 
+#include <ctime>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/process_id.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/http_client.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -67,11 +101,11 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const override {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                  ActionType::serverStatus)) {
+        if (!as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::serverStatus)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 

@@ -28,12 +28,37 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <memory>
+#include <utility>
+#include <vector>
 
-#include "mongo/s/cluster_ddl.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/async_requests_sender.h"
+#include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/cluster_ddl.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/read_through_cache.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

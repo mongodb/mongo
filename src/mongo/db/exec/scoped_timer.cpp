@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/scoped_timer.h"
+
+#include "mongo/platform/compiler.h"
 
 namespace mongo {
 ScopedTimer::ScopedTimer(Nanoseconds* counter, TickSource* ts)
-    : _counter(counter), _tickSource(ts), _startTS(ts->getTicks()) {}
+    : _counter(counter), _tickSource(ts), _clockSource(nullptr), _startTS(ts->getTicks()) {}
 
 ScopedTimer::ScopedTimer(Nanoseconds* counter, ClockSource* cs)
-    : _counter(counter), _clockSource(cs), _startCS(cs->now()) {}
+    : _counter(counter), _tickSource(nullptr), _clockSource(cs), _startCS(cs->now()) {}
 
 ScopedTimer::~ScopedTimer() {
-    if (_clockSource) {
+    if (MONGO_likely(_clockSource)) {
         *_counter += Nanoseconds{
             (durationCount<Milliseconds>(_clockSource->now() - _startCS) * 1000 * 1000)};
         return;

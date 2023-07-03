@@ -10,6 +10,8 @@ env.InjectThirdParty(libraries=['zlib', 'zstd'])
 
 if env.TargetOSIs('linux') and env['TARGET_ARCH'] == 'x86_64':
     platform_name = 'linux_x86_64'
+elif env.TargetOSIs('linux') and env['TARGET_ARCH'] == 'aarch64':
+    platform_name = 'linux_aarch64'
 else:
     # So the linter doesn't complain about platform_name being undefined.
     platform_name = 'unsupported'

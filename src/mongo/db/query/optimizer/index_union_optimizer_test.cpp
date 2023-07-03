@@ -27,17 +27,35 @@
  *    it in the license file.
  */
 
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/abt/utils.h"
-#include "mongo/db/query/optimizer/cascades/logical_props_derivation.h"
-#include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
-#include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/cost_model/cost_model_gen.h"
+#include "mongo/db/query/optimizer/bool_expression.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
+#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
-#include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
+#include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/abt_hash.h"
+#include "mongo/db/query/optimizer/utils/physical_plan_builder.h"
 #include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/unittest/framework.h"
 
 using namespace mongo::optimizer::unit_test_abt_literals;
 

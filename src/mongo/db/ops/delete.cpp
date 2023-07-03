@@ -27,15 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/curop.h"
 #include "mongo/db/ops/delete.h"
-
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

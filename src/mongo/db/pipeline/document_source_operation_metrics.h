@@ -29,7 +29,32 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -44,15 +69,17 @@ public:
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec) {
-            return std::make_unique<LiteParsed>(spec.fieldName());
+            return std::make_unique<LiteParsed>(spec.fieldName(), nss.tenantId());
         }
 
-        explicit LiteParsed(std::string parseTimeName)
-            : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+        explicit LiteParsed(std::string parseTimeName, const boost::optional<TenantId>& tenantId)
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _privileges({Privilege(ResourcePattern::forClusterResource(tenantId),
+                                     ActionType::operationMetrics)}) {}
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final {
-            return {Privilege(ResourcePattern::forClusterResource(), ActionType::operationMetrics)};
+            return _privileges;
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
@@ -62,6 +89,9 @@ public:
         bool isInitialSource() const final {
             return true;
         }
+
+    private:
+        const PrivilegeVector _privileges;
     };
 
     DocumentSourceOperationMetrics(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,

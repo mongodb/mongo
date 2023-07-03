@@ -27,15 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
 
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_query_stats.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {
@@ -80,7 +90,7 @@ TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfUnrecognisedParameterSpe
     ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(
                            fromjson("{$queryStats: {foo: true}}").firstElement(), getExpCtx()),
                        AssertionException,
-                       ErrorCodes::FailedToParse);
+                       40415);
 }
 
 TEST_F(DocumentSourceQueryStatsTest, ParseAndSerialize) {
@@ -91,5 +101,44 @@ TEST_F(DocumentSourceQueryStatsTest, ParseAndSerialize) {
     ASSERT_DOCUMENT_EQ(queryStatsOp->serialize().getDocument(), expected);
 }
 
+TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfAlgorithmIsNotSupported) {
+    auto obj = fromjson(R"({
+        $queryStats: {
+            transformIdentifiers: {
+                algorithm: "randomalgo"
+            }
+        }
+    })");
+    ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(obj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+}
+
+TEST_F(DocumentSourceQueryStatsTest,
+       ShouldFailToParseIfTransformIdentifiersSpecifiedButEmptyAlgorithm) {
+    auto obj = fromjson(R"({
+        $queryStats: {
+            transformIdentifiers: {
+                algorithm: ""
+            }
+        }
+    })");
+    ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(obj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+}
+
+TEST_F(DocumentSourceQueryStatsTest,
+       ShouldFailToParseIfTransformIdentifiersSpecifiedButNoAlgorithm) {
+    auto obj = fromjson(R"({
+        $queryStats: {
+            transformIdentifiers: {
+            }
+        }
+    })");
+    ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(obj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       40414);
+}
 }  // namespace
 }  // namespace mongo

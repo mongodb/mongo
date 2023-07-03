@@ -29,10 +29,15 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
+#include <utility>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {

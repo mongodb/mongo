@@ -27,19 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <functional>
+#include <limits>
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/matcher.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/inline_auto_update.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -813,8 +827,8 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
 
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.identifierHmacPolicy = applyHmacForTest;
-    opts.applyHmacToIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
+    opts.transformIdentifiers = true;
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$expr":{"$sum":["$HASH<a>","$HASH<b>"]}})",

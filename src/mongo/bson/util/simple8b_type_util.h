@@ -27,13 +27,18 @@
  *    it in the license file.
  */
 
+#include <absl/base/config.h>
+#include <absl/numeric/int128.h>
+#include <array>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/int128.h"
-
-#include <array>
-#include <boost/optional.hpp>
-#include <cstdint>
 
 namespace mongo {
 

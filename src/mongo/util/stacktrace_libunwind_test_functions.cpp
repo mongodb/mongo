@@ -37,8 +37,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/stacktrace.h"
 
-#include <sstream>
-
 #define PREVENT_TAIL_CALL asm volatile("")  // NOLINT
 
 // "static" means internal linkage only for functions at namespace scope.

@@ -26,9 +26,16 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
+#include <map>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonelement.h"
 #include "mongo/client/replica_set_monitor_protocol_test_util.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Performs updates that will change a document's shard key while migrating chunks and killing
  * sessions. Only runs updates that cause a document to change shards to increase the odds of
@@ -11,9 +9,11 @@
  *  uses_transactions,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/random_moveChunk_update_shard_key.js";
 load('jstests/concurrency/fsm_workload_helpers/kill_session.js');  // for killSession
-load('jstests/concurrency/fsm_workloads/random_moveChunk_update_shard_key.js');
 load('jstests/libs/override_methods/retry_on_killed_session.js');
 
 // By default retry_on_killed_session.js will only retry known retryable operations like reads and
@@ -21,7 +21,7 @@ load('jstests/libs/override_methods/retry_on_killed_session.js');
 // into always retrying killed operations.
 TestData.alwaysRetryOnKillSessionErrors = true;
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.retryOnKilledSession = true;
 
     // The base workload uses connCache, so wrap killSessions so the fsm runner doesn't complain

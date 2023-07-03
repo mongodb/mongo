@@ -28,20 +28,32 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/repl/wait_for_majority_service.h"
-
+#include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <iterator>
+#include <mutex>
+#include <string>
+#include <tuple>
+#include <type_traits>
 #include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/static_immortal.h"
 

@@ -27,15 +27,40 @@
  *    it in the license file.
  */
 
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands/create_gen.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/write_block_bypass.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

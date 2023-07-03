@@ -29,8 +29,13 @@
 
 #pragma once
 
+#include <memory>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/out_of_line_executor.h"
 
 namespace mongo {

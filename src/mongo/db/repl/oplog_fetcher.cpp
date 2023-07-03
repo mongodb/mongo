@@ -30,22 +30,63 @@
 
 #include "mongo/db/repl/oplog_fetcher.h"
 
-#include "mongo/bson/mutable/document.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstdint>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <mutex>
+
+#include "mongo/base/counter.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_auth.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/timer_stats.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/resharding/resume_token_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/net/ssl_options.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -240,7 +281,7 @@ std::string OplogFetcher::toString() {
     output << "OplogFetcher -";
     output << " last optime fetched: " << _lastFetched.toString();
     output << " source: " << _config.source.toString();
-    output << " namespace: " << _nss.toString();
+    output << " namespace: " << toStringForLogging(_nss);
     output << " active: " << _isActive_inlock();
     output << " shutting down?:" << _isShuttingDown_inlock();
     output << " first batch: " << _firstBatch;

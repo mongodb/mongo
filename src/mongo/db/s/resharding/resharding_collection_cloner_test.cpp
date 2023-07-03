@@ -27,23 +27,56 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <deque>
+#include <functional>
 #include <vector>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog_cache_mock.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {

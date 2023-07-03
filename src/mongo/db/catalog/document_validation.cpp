@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
 #include "mongo/db/catalog/document_validation.h"
 

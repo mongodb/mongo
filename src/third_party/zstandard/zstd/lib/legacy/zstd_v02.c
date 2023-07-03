@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Yann Collet, Facebook, Inc.
+ * Copyright (c) Yann Collet, Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -28,7 +28,7 @@
    low-level memory access routines
    Copyright (C) 2013-2015, Yann Collet.
 
-   BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+   BSD 2-Clause License (https://opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are
@@ -115,24 +115,6 @@ extern "C" {
 /****************************************************************
 *  Memory I/O
 *****************************************************************/
-/* MEM_FORCE_MEMORY_ACCESS
- * By default, access to unaligned memory is controlled by `memcpy()`, which is safe and portable.
- * Unfortunately, on some target/compiler combinations, the generated assembly is sub-optimal.
- * The below switch allow to select different access method for improved performance.
- * Method 0 (default) : use `memcpy()`. Safe and portable.
- * Method 1 : `__packed` statement. It depends on compiler extension (ie, not portable).
- *            This method is safe if your compiler supports it, and *generally* as fast or faster than `memcpy`.
- * Method 2 : direct access. This method is portable but violate C standard.
- *            It can generate buggy code on targets generating assembly depending on alignment.
- *            But in some circumstances, it's the only known way to get the most performance (ie GCC + ARMv6)
- * See http://fastcompression.blogspot.fr/2015/08/accessing-unaligned-memory.html for details.
- * Prefer these methods in priority order (0 > 1 > 2)
- */
-#ifndef MEM_FORCE_MEMORY_ACCESS   /* can be defined externally, on command line for example */
-#  if defined(__INTEL_COMPILER) || defined(__GNUC__) || defined(__ICCARM__)
-#    define MEM_FORCE_MEMORY_ACCESS 1
-#  endif
-#endif
 
 MEM_STATIC unsigned MEM_32bits(void) { return sizeof(void*)==4; }
 MEM_STATIC unsigned MEM_64bits(void) { return sizeof(void*)==8; }
@@ -142,33 +124,6 @@ MEM_STATIC unsigned MEM_isLittleEndian(void)
     const union { U32 u; BYTE c[4]; } one = { 1 };   /* don't use static : performance detrimental  */
     return one.c[0];
 }
-
-#if defined(MEM_FORCE_MEMORY_ACCESS) && (MEM_FORCE_MEMORY_ACCESS==2)
-
-/* violates C standard on structure alignment.
-Only use if no other choice to achieve best performance on target platform */
-MEM_STATIC U16 MEM_read16(const void* memPtr) { return *(const U16*) memPtr; }
-MEM_STATIC U32 MEM_read32(const void* memPtr) { return *(const U32*) memPtr; }
-MEM_STATIC U64 MEM_read64(const void* memPtr) { return *(const U64*) memPtr; }
-
-MEM_STATIC void MEM_write16(void* memPtr, U16 value) { *(U16*)memPtr = value; }
-
-#elif defined(MEM_FORCE_MEMORY_ACCESS) && (MEM_FORCE_MEMORY_ACCESS==1)
-
-/* __pack instructions are safer, but compiler specific, hence potentially problematic for some compilers */
-/* currently only defined for gcc and icc */
-typedef union { U16 u16; U32 u32; U64 u64; } __attribute__((packed)) unalign;
-
-MEM_STATIC U16 MEM_read16(const void* ptr) { return ((const unalign*)ptr)->u16; }
-MEM_STATIC U32 MEM_read32(const void* ptr) { return ((const unalign*)ptr)->u32; }
-MEM_STATIC U64 MEM_read64(const void* ptr) { return ((const unalign*)ptr)->u64; }
-
-MEM_STATIC void MEM_write16(void* memPtr, U16 value) { ((unalign*)memPtr)->u16 = value; }
-
-#else
-
-/* default method, safe and standard.
-   can sometimes prove slower */
 
 MEM_STATIC U16 MEM_read16(const void* memPtr)
 {
@@ -189,9 +144,6 @@ MEM_STATIC void MEM_write16(void* memPtr, U16 value)
 {
     memcpy(memPtr, &value, sizeof(value));
 }
-
-#endif /* MEM_FORCE_MEMORY_ACCESS */
-
 
 MEM_STATIC U16 MEM_readLE16(const void* memPtr)
 {
@@ -269,7 +221,7 @@ MEM_STATIC size_t MEM_readLEST(const void* memPtr)
    header file (to include)
    Copyright (C) 2013-2015, Yann Collet.
 
-   BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+   BSD 2-Clause License (https://opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are
@@ -433,7 +385,7 @@ MEM_STATIC size_t BIT_lookBits(BIT_DStream_t* bitD, U32 nbBits)
 }
 
 /*! BIT_lookBitsFast :
-*   unsafe version; only works only if nbBits >= 1 */
+*   unsafe version; only works if nbBits >= 1 */
 MEM_STATIC size_t BIT_lookBitsFast(BIT_DStream_t* bitD, U32 nbBits)
 {
     const U32 bitMask = sizeof(bitD->bitContainer)*8 - 1;
@@ -453,7 +405,7 @@ MEM_STATIC size_t BIT_readBits(BIT_DStream_t* bitD, U32 nbBits)
 }
 
 /*!BIT_readBitsFast :
-*  unsafe version; only works only if nbBits >= 1 */
+*  unsafe version; only works if nbBits >= 1 */
 MEM_STATIC size_t BIT_readBitsFast(BIT_DStream_t* bitD, U32 nbBits)
 {
     size_t value = BIT_lookBitsFast(bitD, nbBits);
@@ -510,7 +462,7 @@ MEM_STATIC unsigned BIT_endOfDStream(const BIT_DStream_t* DStream)
    Error codes and messages
    Copyright (C) 2013-2015, Yann Collet
 
-   BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+   BSD 2-Clause License (https://opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are
@@ -609,7 +561,7 @@ typedef unsigned FSE_DTable;   /* don't allocate that. It's just a way to be mor
    header file for static linking (only)
    Copyright (C) 2013-2015, Yann Collet
 
-   BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+   BSD 2-Clause License (https://opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are
@@ -753,7 +705,7 @@ MEM_STATIC unsigned FSE_endOfDState(const FSE_DState_t* DStatePtr)
    header file for static linking (only)
    Copyright (C) 2013-2015, Yann Collet
 
-   BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+   BSD 2-Clause License (https://opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are
@@ -822,7 +774,7 @@ static size_t HUF_decompress4X6 (void* dst, size_t dstSize, const void* cSrc, si
     Header File
     Copyright (C) 2014-2015, Yann Collet.
 
-    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+    BSD 2-Clause License (https://opensource.org/licenses/bsd-license.php)
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions are
@@ -882,7 +834,7 @@ typedef struct ZSTD_CCtx_s ZSTD_CCtx;   /* incomplete type */
     Header File for static linking only
     Copyright (C) 2014-2015, Yann Collet.
 
-    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+    BSD 2-Clause License (https://opensource.org/licenses/bsd-license.php)
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions are
@@ -946,7 +898,7 @@ typedef struct ZSTD_DCtx_s ZSTD_DCtx;
    FSE : Finite State Entropy coder
    Copyright (C) 2013-2015, Yann Collet.
 
-   BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+   BSD 2-Clause License (https://opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are
@@ -1450,7 +1402,7 @@ static size_t FSE_decompress(void* dst, size_t maxDstSize, const void* cSrc, siz
    Huff0 : Huffman coder, part of New Generation Entropy library
    Copyright (C) 2013-2015, Yann Collet.
 
-   BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+   BSD 2-Clause License (https://opensource.org/licenses/bsd-license.php)
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are
@@ -2609,7 +2561,7 @@ static size_t HUF_decompress (void* dst, size_t dstSize, const void* cSrc, size_
     zstd - standard compression library
     Copyright (C) 2014-2015, Yann Collet.
 
-    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+    BSD 2-Clause License (https://opensource.org/licenses/bsd-license.php)
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions are
@@ -3114,12 +3066,19 @@ static size_t ZSTD_execSequence(BYTE* op,
     const BYTE* const litEnd = *litPtr + sequence.litLength;
 
     /* checks */
-    if (oLitEnd > oend_8) return ERROR(dstSize_tooSmall);   /* last match must start at a minimum distance of 8 from oend */
+    size_t const seqLength = sequence.litLength + sequence.matchLength;
+
+    if (seqLength > (size_t)(oend - op)) return ERROR(dstSize_tooSmall);
+    if (sequence.litLength > (size_t)(litLimit - *litPtr)) return ERROR(corruption_detected);
+    /* Now we know there are no overflow in literal nor match lengths, can use the pointer check */
+    if (oLitEnd > oend_8) return ERROR(dstSize_tooSmall);
+    if (sequence.offset > (U32)(oLitEnd - base)) return ERROR(corruption_detected);
+
     if (oMatchEnd > oend) return ERROR(dstSize_tooSmall);   /* overwrite beyond dst buffer */
     if (litEnd > litLimit) return ERROR(corruption_detected);   /* overRead beyond lit buffer */
 
     /* copy Literals */
-    ZSTD_wildcopy(op, *litPtr, sequence.litLength);   /* note : oLitEnd <= oend-8 : no risk of overwrite beyond oend */
+    ZSTD_wildcopy(op, *litPtr, (ptrdiff_t)sequence.litLength);   /* note : oLitEnd <= oend-8 : no risk of overwrite beyond oend */
     op = oLitEnd;
     *litPtr = litEnd;   /* update for next sequence */
 

@@ -78,9 +78,6 @@ if (allowCompoundWildcardIndexes) {
 
 assertWildcardQuery({_fts: {$gt: 0, $lt: 4}}, {'_fts': 1}, false /* isCompound */);
 if (allowCompoundWildcardIndexes) {
-    // The expanded CWI key pattern shouldn't have '_fts'. The query is a $and query and 'pre' field
-    // is the prefix of the CWI, so it's basically a query on the non-wildcard prefix field of a
-    // CWI. The only eligible expanded CWI is with key pattern {"pre": 1, "$_path": 1}.
     assertWildcardQuery({_fts: 10, pre: 1}, {'pre': 1, '$_path': 1}, true /* isCompound */);
 }
 

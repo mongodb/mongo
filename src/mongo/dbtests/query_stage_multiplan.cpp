@@ -27,36 +27,87 @@
  *    it in the license file.
  */
 
+#include <boost/container/small_vector.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/mock_stage.h"
 #include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/explain.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/mock_yield_policies.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_lib.h"
+#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder_util.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo {
 
@@ -72,7 +123,8 @@ namespace {
 using std::unique_ptr;
 using std::vector;
 
-static const NamespaceString nss("unittests.QueryStageMultiPlan");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageMultiPlan");
 
 std::unique_ptr<QuerySolution> createQuerySolution() {
     auto soln = std::make_unique<QuerySolution>();
@@ -154,8 +206,8 @@ unique_ptr<PlanStage> getIxScanPlan(ExpressionContext* expCtx,
     ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
     ixparams.direction = 1;
 
-    auto ixscan = std::make_unique<IndexScan>(expCtx, coll, ixparams, sharedWs, nullptr);
-    return std::make_unique<FetchStage>(expCtx, sharedWs, std::move(ixscan), nullptr, coll);
+    auto ixscan = std::make_unique<IndexScan>(expCtx, &coll, ixparams, sharedWs, nullptr);
+    return std::make_unique<FetchStage>(expCtx, sharedWs, std::move(ixscan), nullptr, &coll);
 }
 
 unique_ptr<MatchExpression> makeMatchExpressionFromFilter(ExpressionContext* expCtx,
@@ -175,7 +227,7 @@ unique_ptr<PlanStage> getCollScanPlan(ExpressionContext* expCtx,
     CollectionScanParams csparams;
     csparams.direction = CollectionScanParams::FORWARD;
 
-    unique_ptr<PlanStage> root(new CollectionScan(expCtx, coll, csparams, sharedWs, matchExpr));
+    unique_ptr<PlanStage> root(new CollectionScan(expCtx, &coll, csparams, sharedWs, matchExpr));
 
     return root;
 }
@@ -205,7 +257,7 @@ std::unique_ptr<MultiPlanStage> runMultiPlanner(ExpressionContext* expCtx,
     // Hand the plans off to the MPS.
     auto cq = makeCanonicalQuery(expCtx->opCtx, nss, BSON("foo" << desiredFooValue));
 
-    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(expCtx, coll, cq.get());
+    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(expCtx, &coll, cq.get());
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -259,7 +311,7 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
     auto cq = makeCanonicalQuery(_opCtx.get(), nss, filterObj);
 
     unique_ptr<MultiPlanStage> mps =
-        std::make_unique<MultiPlanStage>(_expCtx.get(), ctx.getCollection(), cq.get());
+        std::make_unique<MultiPlanStage>(_expCtx.get(), &ctx.getCollection(), cq.get());
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -393,7 +445,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     findCommand->setFilter(BSON("a" << 1 << "b" << 1));
     findCommand->setSort(BSON("b" << 1));
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-    verify(statusWithCQ.isOK());
+    MONGO_verify(statusWithCQ.isOK());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
     ASSERT(nullptr != cq.get());
     auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollection());
@@ -417,12 +469,12 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
 
     // Fill out the MultiPlanStage.
     unique_ptr<MultiPlanStage> mps(
-        new MultiPlanStage(_expCtx.get(), collection.getCollection(), cq.get()));
+        new MultiPlanStage(_expCtx.get(), &collection.getCollection(), cq.get()));
     unique_ptr<WorkingSet> ws(new WorkingSet());
     // Put each solution from the planner into the MPR.
     for (size_t i = 0; i < solutions.size(); ++i) {
         auto&& root = stage_builder::buildClassicExecutableTree(
-            _opCtx.get(), collection.getCollection(), *cq, *solutions[i], ws.get());
+            _opCtx.get(), &collection.getCollection(), *cq, *solutions[i], ws.get());
         mps->addPlan(std::move(solutions[i]), std::move(root), ws.get());
     }
 
@@ -508,7 +560,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
     findCommand->setFilter(BSON("x" << 1));
     auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
     unique_ptr<MultiPlanStage> mps =
-        std::make_unique<MultiPlanStage>(_expCtx.get(), ctx.getCollection(), cq.get());
+        std::make_unique<MultiPlanStage>(_expCtx.get(), &ctx.getCollection(), cq.get());
 
     // Put each plan into the MultiPlanStage. Takes ownership of 'firstPlan' and 'secondPlan'.
     mps->addPlan(std::make_unique<QuerySolution>(), std::move(firstPlan), ws.get());
@@ -534,6 +586,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
                            ctx.getCollection(),
                            ExplainOptions::Verbosity::kExecAllPlans,
                            BSONObj(),
+                           SerializationContext::stateCommandReply(),
                            BSONObj(),
                            &bob);
     BSONObj explained = bob.done();
@@ -637,7 +690,7 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlannin
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
     MultiPlanStage multiPlanStage(
-        _expCtx.get(), coll.getCollection(), canonicalQuery.get(), PlanCachingMode::NeverCache);
+        _expCtx.get(), &coll.getCollection(), canonicalQuery.get(), PlanCachingMode::NeverCache);
     multiPlanStage.addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     multiPlanStage.addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -678,7 +731,7 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfKilledDuringPlanning) {
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
     MultiPlanStage multiPlanStage(
-        _expCtx.get(), coll.getCollection(), canonicalQuery.get(), PlanCachingMode::NeverCache);
+        _expCtx.get(), &coll.getCollection(), canonicalQuery.get(), PlanCachingMode::NeverCache);
     multiPlanStage.addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     multiPlanStage.addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -723,7 +776,7 @@ TEST_F(QueryStageMultiPlanTest, AddsContextDuringException) {
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
     MultiPlanStage multiPlanStage(
-        _expCtx.get(), ctx.getCollection(), canonicalQuery.get(), PlanCachingMode::NeverCache);
+        _expCtx.get(), &ctx.getCollection(), canonicalQuery.get(), PlanCachingMode::NeverCache);
     unique_ptr<WorkingSet> sharedWs(new WorkingSet());
     multiPlanStage.addPlan(
         createQuerySolution(), std::make_unique<ThrowyPlanStage>(_expCtx.get()), sharedWs.get());

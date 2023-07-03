@@ -29,54 +29,45 @@
 
 #include "mongo/db/query/query_stats.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/hash/hash.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <climits>
+#include <list>
+
+#include "mongo/base/status_with.h"
 #include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/exec/projection_executor_builder.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
-#include "mongo/db/query/find_command.h"
-#include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/projection_ast_util.h"
-#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_stats_util.h"
 #include "mongo/db/query/rate_limiting.h"
 #include "mongo/db/query/serialization_options.h"
-#include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/util/memory_util.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/debug_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/processinfo.h"
-#include "mongo/util/system_clock_source.h"
-#include "query_shape.h"
-#include <optional>
+#include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
 namespace query_stats {
-
-/**
- * Redacts all BSONObj field names as if they were paths, unless the field name is a special hint
- * operator.
- */
-namespace {
-
-boost::optional<std::string> getApplicationName(const OperationContext* opCtx) {
-    if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
-        return metadata->getApplicationName().toString();
-    }
-    return boost::none;
-}
-}  // namespace
 
 CounterMetric queryStatsStoreSizeEstimateBytesMetric("queryStats.queryStatsStoreSizeEstimateBytes");
 
@@ -107,7 +98,7 @@ size_t capQueryStatsStoreSize(size_t requestedSize) {
  * Get the queryStats store size based on the query job's value.
  */
 size_t getQueryStatsStoreSize() {
-    auto status = memory_util::MemorySize::parse(queryQueryStatsStoreSize.get());
+    auto status = memory_util::MemorySize::parse(internalQueryStatsCacheSize.get());
     uassertStatusOK(status);
     size_t requestedSize = memory_util::convertToSizeInBytes(status.getValue());
     return capQueryStatsStoreSize(requestedSize);
@@ -212,7 +203,7 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         }
         globalQueryStatsStoreManager =
             std::make_unique<QueryStatsStoreManager>(size, numPartitions);
-        auto configuredSamplingRate = queryQueryStatsSamplingRate.load();
+        auto configuredSamplingRate = internalQueryStatsRateLimit.load();
         queryStatsRateLimiter(serviceCtx) = std::make_unique<RateLimiting>(
             configuredSamplingRate < 0 ? INT_MAX : configuredSamplingRate);
     }};
@@ -242,11 +233,12 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
     }
     // Cannot collect queryStats if sampling rate is not greater than 0. Note that we do not
     // increment queryStatsRateLimitedRequestsMetric here since queryStats is entirely disabled.
-    if (queryStatsRateLimiter(serviceCtx)->getSamplingRate() <= 0) {
+    auto samplingRate = queryStatsRateLimiter(serviceCtx)->getSamplingRate();
+    if (samplingRate <= 0) {
         return false;
     }
     // Check if rate limiting allows us to collect queryStats for this request.
-    if (queryStatsRateLimiter(serviceCtx)->getSamplingRate() < INT_MAX &&
+    if (samplingRate < INT_MAX &&
         !queryStatsRateLimiter(serviceCtx)->handleRequestSlidingWindow()) {
         queryStatsRateLimitedRequestsMetric.increment();
         return false;
@@ -254,90 +246,11 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
     return true;
 }
 
-/**
- * Add a field to the find op's queryStats key. The `value` will have hmac applied.
- */
-void addToFindKey(BSONObjBuilder& builder, const StringData& fieldName, const BSONObj& value) {
-    serializeBSONWhenNotEmpty(value.redact(false), fieldName, &builder);
-}
-
-/**
- * Recognize FLE payloads in a query and throw an exception if found.
- */
-void throwIfEncounteringFLEPayload(const BSONElement& e) {
-    constexpr auto safeContentLabel = "__safeContent__"_sd;
-    constexpr auto fieldpath = "$__safeContent__"_sd;
-    if (e.type() == BSONType::Object) {
-        auto fieldname = e.fieldNameStringData();
-        uassert(ErrorCodes::EncounteredFLEPayloadWhileApplyingHmac,
-                "Encountered __safeContent__, or an $_internalFle operator, which indicate a "
-                "rewritten FLE2 query.",
-                fieldname != safeContentLabel && !fieldname.startsWith("$_internalFle"_sd));
-    } else if (e.type() == BSONType::String) {
-        auto val = e.valueStringData();
-        uassert(ErrorCodes::EncounteredFLEPayloadWhileApplyingHmac,
-                "Encountered $__safeContent__ fieldpath, which indicates a rewritten FLE2 query.",
-                val != fieldpath);
-    } else if (e.type() == BSONType::BinData && e.isBinData(BinDataType::Encrypt)) {
-        int len;
-        auto data = e.binData(len);
-        uassert(ErrorCodes::EncounteredFLEPayloadWhileApplyingHmac,
-                "FLE1 Payload encountered in expression.",
-                len > 1 && data[1] != char(EncryptedBinDataType::kDeterministic));
-    }
-}
-
-/**
- * Upon reading telemetry data, we apply hmac to some keys. This is the list. See
- * QueryStatsEntry::makeQueryStatsKey().
- */
-const stdx::unordered_set<std::string> kKeysToApplyHmac = {"pipeline", "find"};
-
 std::string sha256HmacStringDataHasher(std::string key, const StringData& sd) {
     auto hashed = SHA256Block::computeHmac(
         (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.rawData(), sd.size());
     return hashed.toString();
 }
-
-std::string sha256HmacFieldNameHasher(std::string key, const BSONElement& e) {
-    auto&& fieldName = e.fieldNameStringData();
-    return sha256HmacStringDataHasher(key, fieldName);
-}
-
-std::string constantFieldNameHasher(const BSONElement& e) {
-    return {"###"};
-}
-
-/**
- * Admittedly an abuse of the BSON redaction interface, we recognize FLE payloads here and avoid
- * collecting queryStats for the query.
- */
-std::string fleSafeFieldNameRedactor(const BSONElement& e) {
-    throwIfEncounteringFLEPayload(e);
-    // Ideally we would change interface to avoid copying here.
-    return e.fieldNameStringData().toString();
-}
-
-/**
- * Append the element to the builder and apply hmac to any literals within the element. The element
- * may be of any type.
- */
-void appendWithAbstractedLiterals(BSONObjBuilder& builder, const BSONElement& el) {
-    if (el.type() == Object) {
-        builder.append(el.fieldNameStringData(), el.Obj().redact(false, fleSafeFieldNameRedactor));
-    } else if (el.type() == Array) {
-        BSONObjBuilder arrayBuilder = builder.subarrayStart(fleSafeFieldNameRedactor(el));
-        for (auto&& arrayElem : el.Obj()) {
-            appendWithAbstractedLiterals(arrayBuilder, arrayElem);
-        }
-        arrayBuilder.done();
-    } else {
-        auto fieldName = fleSafeFieldNameRedactor(el);
-        builder.append(fieldName, "###"_sd);
-    }
-}
-
-static const StringData replacementForLiteralArgs = "?"_sd;
 
 std::size_t hash(const BSONObj& obj) {
     return absl::hash_internal::CityHash64(obj.objdata(), obj.objsize());
@@ -346,139 +259,19 @@ std::size_t hash(const BSONObj& obj) {
 }  // namespace
 
 BSONObj QueryStatsEntry::computeQueryStatsKey(OperationContext* opCtx,
-                                              bool applyHmacToIdentifiers,
+                                              TransformAlgorithmEnum algorithm,
                                               std::string hmacKey) const {
-    // The telemetry key for find queries is generated by serializing all the command fields
-    // and applying hmac if SerializationOptions indicate to do so. The resulting key is of the
-    // form:
-    // {
-    //    queryShape: {
-    //        cmdNs: {db: "...", coll: "..."},
-    //        find: "...",
-    //        filter: {"...": {"$eq": "?number"}},
-    //    },
-    //    applicationName: kHashedApplicationName
-    // }
-    // queryShape may include additional fields, eg hint, limit sort, etc, depending on the original
-    // query.
-
-    // TODO SERVER-73152 incorporate aggregation request into same path so that nullptr check is
-    // unnecessary
-    if (requestShapifier != nullptr) {
-        auto serializationOpts = applyHmacToIdentifiers
-            ? SerializationOptions(
-                  [&](StringData sd) { return sha256HmacStringDataHasher(hmacKey, sd); },
-                  LiteralSerializationPolicy::kToDebugTypeString)
-            : SerializationOptions(LiteralSerializationPolicy::kToDebugTypeString);
-        return requestShapifier->makeQueryStatsKey(serializationOpts, opCtx);
-    }
-
-    // TODO SERVER-73152 remove all special aggregation logic below
-    // The telemetry key for agg queries is of the following form:
-    // { "agg": {...}, "namespace": "...", "applicationName": "...", ... }
-    //
-    // The part of the key we need to apply hmac to is the object in the <CMD_TYPE> element. In the
-    // case of an aggregate() command, it will look something like: > "pipeline" : [ { "$queryStats"
-    // : {} },
-    //					{ "$addFields" : { "x" : { "$someExpr" {} } } } ],
-    // We should preserve the top-level stage names in the pipeline but apply hmac to all field
-    // names of children.
-
-    // TODO: SERVER-73152 literal and field name redaction for aggregate command.
-    if (!applyHmacToIdentifiers) {
-        return oldQueryStatsKey;
-    }
-    BSONObjBuilder hmacAppliedBuilder;
-    for (BSONElement e : oldQueryStatsKey) {
-        if ((e.type() == Object || e.type() == Array) &&
-            kKeysToApplyHmac.count(e.fieldNameStringData().toString()) == 1) {
-            auto hmacApplicator = [&](BSONObjBuilder subObj, const BSONObj& obj) {
-                for (BSONElement e2 : obj) {
-                    if (e2.type() == Object) {
-                        subObj.append(e2.fieldNameStringData(),
-                                      e2.Obj().redact(false, [&](const BSONElement& e) {
-                                          return sha256HmacFieldNameHasher(hmacKey, e);
-                                      }));
-                    } else {
-                        subObj.append(e2);
-                    }
-                }
-                subObj.done();
-            };
-
-            // Now we're inside the <CMD_TYPE>:{} entry and want to preserve the top-level field
-            // names. If it's a [pipeline] array, we redact each element in isolation.
-            if (e.type() == Object) {
-                hmacApplicator(hmacAppliedBuilder.subobjStart(e.fieldNameStringData()), e.Obj());
-            } else {
-                BSONObjBuilder subArr = hmacAppliedBuilder.subarrayStart(e.fieldNameStringData());
-                for (BSONElement stage : e.Obj()) {
-                    hmacApplicator(subArr.subobjStart(""), stage.Obj());
-                }
-            }
-        } else {
-            hmacAppliedBuilder.append(e);
-        }
-    }
-    return hmacAppliedBuilder.obj();
+    return keyGenerator->generate(
+        opCtx,
+        algorithm == TransformAlgorithmEnum::kHmacSha256
+            ? boost::optional<SerializationOptions::TokenizeIdentifierFunc>(
+                  [&](StringData sd) { return sha256HmacStringDataHasher(hmacKey, sd); })
+            : boost::none);
 }
 
-// The originating command/query does not persist through the end of query execution. In order to
-// pair the queryStats metrics that are collected at the end of execution with the original query,
-// it is necessary to register the original query during planning and persist it after execution.
-
-// During planning, registerRequest is called to serialize the query shape and context (together,
-// the queryStats context) and save it to OpDebug. Moreover, as query execution may span more than
-// one request/operation and OpDebug does not persist through cursor iteration, it is necessary to
-// communicate the queryStats context across operations. In this way, the queryStats context is
-// registered to the cursor, so upon getMore() calls, the cursor manager passes the queryStats key
-// from the pinned cursor to the new OpDebug.
-
-// Once query execution is complete, the queryStats context is grabbed from OpDebug, a queryStats
-// key is generated from this and metrics are paired to this key in the queryStats store.
-void registerAggRequest(const AggregateCommandRequest& request, OperationContext* opCtx) {
-    if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
-        return;
-    }
-
-    // Queries against metadata collections should never appear in queryStats data.
-    if (request.getNamespace().isFLE2StateCollection()) {
-        return;
-    }
-
-    if (!shouldCollect(opCtx->getServiceContext())) {
-        return;
-    }
-
-    BSONObjBuilder queryStatsKey;
-    BSONObjBuilder pipelineBuilder = queryStatsKey.subarrayStart("pipeline"_sd);
-    try {
-        for (auto&& stage : request.getPipeline()) {
-            BSONObjBuilder stageBuilder = pipelineBuilder.subobjStart("stage"_sd);
-            appendWithAbstractedLiterals(stageBuilder, stage.firstElement());
-            stageBuilder.done();
-        }
-        pipelineBuilder.done();
-        queryStatsKey.append("namespace", request.getNamespace().toString());
-        if (request.getReadConcern()) {
-            queryStatsKey.append("readConcern", *request.getReadConcern());
-        }
-        if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
-            queryStatsKey.append("applicationName", metadata->getApplicationName());
-        }
-    } catch (ExceptionFor<ErrorCodes::EncounteredFLEPayloadWhileApplyingHmac>&) {
-        return;
-    }
-
-    BSONObj key = queryStatsKey.obj();
-    CurOp::get(opCtx)->debug().queryStatsStoreKeyHash = hash(key);
-    CurOp::get(opCtx)->debug().queryStatsStoreKey = key.getOwned();
-}
-
-void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                     std::unique_ptr<RequestShapifier> requestShapifier,
-                     const NamespaceString& collection) {
-    auto opCtx = expCtx->opCtx;
+void registerRequest(OperationContext* opCtx,
+                     const NamespaceString& collection,
+                     std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator) {
     if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         return;
     }
@@ -491,12 +284,20 @@ void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     if (!shouldCollect(opCtx->getServiceContext())) {
         return;
     }
-    SerializationOptions options;
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.replacementForLiteralArgs = replacementForLiteralArgs;
-    CurOp::get(opCtx)->debug().queryStatsStoreKeyHash =
-        hash(requestShapifier->makeQueryStatsKey(options, expCtx));
-    CurOp::get(opCtx)->debug().queryStatsRequestShapifier = std::move(requestShapifier);
+    auto& opDebug = CurOp::get(opCtx)->debug();
+
+    if (opDebug.queryStatsKeyGenerator) {
+        // A find() request may have already registered the shapifier. Ie, it's a find command over
+        // a non-physical collection, eg view, which is implemented by generating an agg pipeline.
+        LOGV2_DEBUG(7198700,
+                    2,
+                    "Query stats request shapifier already registered",
+                    "collection"_attr = collection);
+        return;
+    }
+
+    opDebug.queryStatsKeyGenerator = makeKeyGenerator();
+    opDebug.queryStatsStoreKeyHash = opDebug.queryStatsKeyGenerator->hash();
 }
 
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
@@ -509,9 +310,9 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
 
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
-                     boost::optional<BSONObj> queryStatsKey,
-                     std::unique_ptr<RequestShapifier> requestShapifier,
+                     std::unique_ptr<KeyGenerator> keyGenerator,
                      const uint64_t queryExecMicros,
+                     const uint64_t firstResponseExecMicros,
                      const uint64_t docsReturned) {
     if (!queryStatsKeyHash) {
         return;
@@ -523,11 +324,12 @@ void writeQueryStats(OperationContext* opCtx,
     if (statusWithMetrics.isOK()) {
         metrics = *statusWithMetrics.getValue();
     } else {
-        BSONObj key = queryStatsKey.value_or(BSONObj{});
+        tassert(7315200,
+                "keyGenerator cannot be null when writing a new entry to the telemetry store",
+                keyGenerator != nullptr);
         size_t numEvicted =
             queryStatsStore.put(*queryStatsKeyHash,
-                                std::make_shared<QueryStatsEntry>(
-                                    std::move(requestShapifier), CurOp::get(opCtx)->getNSS(), key),
+                                std::make_shared<QueryStatsEntry>(std::move(keyGenerator)),
                                 partitionLock);
         queryStatsEvictedMetric.increment(numEvicted);
         auto newMetrics = partitionLock->get(*queryStatsKeyHash);
@@ -546,9 +348,11 @@ void writeQueryStats(OperationContext* opCtx,
         metrics = newMetrics.getValue()->second;
     }
 
+    metrics->latestSeenTimestamp = Date_t::now();
     metrics->lastExecutionMicros = queryExecMicros;
     metrics->execCount++;
-    metrics->queryExecMicros.aggregate(queryExecMicros);
+    metrics->totalExecMicros.aggregate(queryExecMicros);
+    metrics->firstResponseExecMicros.aggregate(firstResponseExecMicros);
     metrics->docsReturned.aggregate(docsReturned);
 }
 }  // namespace query_stats

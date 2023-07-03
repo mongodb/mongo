@@ -27,35 +27,73 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <cstdint>
+#include <functional>
+#include <initializer_list>
 #include <memory>
+#include <set>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
+#include "mongo/db/auth/access_checks_gen.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_checks.h"
+#include "mongo/db/auth/authorization_contract.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_for_test.h"
+#include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/restriction_environment.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/security_token_gen.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/sockaddr.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -96,7 +134,7 @@ public:
         _opCtx = _client->makeOperationContext();
         auto localManagerState = std::make_unique<FailureCapableAuthzManagerExternalStateMock>();
         managerState = localManagerState.get();
-        managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
+        managerState->setAuthzVersion(_opCtx.get(), AuthorizationManager::schemaVersion26Final);
         auto uniqueAuthzManager = std::make_unique<AuthorizationManagerImpl>(
             getServiceContext(), std::move(localManagerState));
         authzManager = uniqueAuthzManager.get();
@@ -136,8 +174,7 @@ public:
 
         return managerState->insert(
             _opCtx.get(),
-            NamespaceString::createNamespaceString_forTest(
-                username.getTenant(), DatabaseName::kAdmin.db(), NamespaceString::kSystemUsers),
+            NamespaceString::makeTenantUsersCollection(username.getTenant()),
             userDoc.obj(),
             {});
     }
@@ -201,9 +238,14 @@ const NamespaceString testFooNss = NamespaceString::createNamespaceString_forTes
 const NamespaceString testBarNss = NamespaceString::createNamespaceString_forTest("test.bar");
 const NamespaceString testQuxNss = NamespaceString::createNamespaceString_forTest("test.qux");
 
-const ResourcePattern testDBResource(ResourcePattern::forDatabaseName("test"));
-const ResourcePattern otherDBResource(ResourcePattern::forDatabaseName("other"));
-const ResourcePattern adminDBResource(ResourcePattern::forDatabaseName("admin"));
+const DatabaseName testDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
+const DatabaseName otherDB = DatabaseName::createDatabaseName_forTest(boost::none, "other"_sd);
+const DatabaseName adminDB = DatabaseName::createDatabaseName_forTest(boost::none, "admin"_sd);
+const DatabaseName ignoredDB = DatabaseName::createDatabaseName_forTest(boost::none, "ignored"_sd);
+
+const ResourcePattern testDBResource = ResourcePattern::forDatabaseName(testDB);
+const ResourcePattern otherDBResource = ResourcePattern::forDatabaseName(otherDB);
+const ResourcePattern adminDBResource = ResourcePattern::forDatabaseName(adminDB);
 const ResourcePattern testFooCollResource(ResourcePattern::forExactNamespace(testFooNss));
 const ResourcePattern testBarCollResource(ResourcePattern::forExactNamespace(testBarNss));
 const ResourcePattern testQuxCollResource(ResourcePattern::forExactNamespace(testQuxNss));
@@ -326,7 +368,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     AuthorizationContract ac(
         std::initializer_list<AccessCheckEnum>{},
         std::initializer_list<Privilege>{
-            Privilege(ResourcePattern::forDatabaseName("ignored"),
+            Privilege(ResourcePattern::forDatabaseName(ignoredDB),
                       {ActionType::insert, ActionType::dbStats}),
             Privilege(ResourcePattern::forExactNamespace(
                           NamespaceString::createNamespaceString_forTest("ignored.ignored")),
@@ -338,7 +380,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     // Verify against a smaller contract that verifyContract fails
     AuthorizationContract acMissing(std::initializer_list<AccessCheckEnum>{},
                                     std::initializer_list<Privilege>{
-                                        Privilege(ResourcePattern::forDatabaseName("ignored"),
+                                        Privilege(ResourcePattern::forDatabaseName(ignoredDB),
                                                   {ActionType::insert, ActionType::dbStats}),
                                     });
     ASSERT_THROWS_CODE(authzSession->verifyContract(&acMissing), AssertionException, 5452401);
@@ -786,7 +828,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInpr
 
 TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActionOnMongoD) {
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forClusterResource(), ActionType::inprog));
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::inprog));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
     auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
@@ -800,7 +842,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActi
 
 TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActionOnMongoS) {
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forClusterResource(), ActionType::inprog));
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::inprog));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
     auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
@@ -1147,40 +1189,57 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsCoauthorizedNobodyWhenAuthIs
     authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
 }
 
+const auto listTestCollectionsPayload = BSON("listCollections"_sd << 1 << "$db"
+                                                                  << "test"_sd);
+const auto listTestCollectionsCmd =
+    ListCollections::parse(IDLParserContext("listTestCollectionsCmd"), listTestCollectionsPayload);
+const auto listOtherCollectionsPayload = BSON("listCollections"_sd << 1 << "$db"
+                                                                   << "other"_sd);
+const auto listOtherCollectionsCmd = ListCollections::parse(
+    IDLParserContext("listOtherCollectionsCmd"), listOtherCollectionsPayload);
+const auto listOwnTestCollectionsPayload =
+    BSON("listCollections"_sd << 1 << "$db"
+                              << "test"_sd
+                              << "nameOnly"_sd << true << "authorizedCollections"_sd << true);
+const auto listOwnTestCollectionsCmd = ListCollections::parse(
+    IDLParserContext("listOwnTestCollectionsCmd"), listOwnTestCollectionsPayload);
+
 TEST_F(AuthorizationSessionTest, CannotListCollectionsWithoutListCollectionsPrivilege) {
-    BSONObj cmd = BSON("listCollections" << 1);
-    // With no privileges, there is not authorization to list collections
+    // With no privileges, there is no authorization to list collections
     ASSERT_EQ(ErrorCodes::Unauthorized,
-              authzSession->checkAuthorizedToListCollections(testFooNss.db(), cmd).getStatus());
+              authzSession->checkAuthorizedToListCollections(listTestCollectionsCmd).getStatus());
     ASSERT_EQ(ErrorCodes::Unauthorized,
-              authzSession->checkAuthorizedToListCollections(testBarNss.db(), cmd).getStatus());
-    ASSERT_EQ(ErrorCodes::Unauthorized,
-              authzSession->checkAuthorizedToListCollections(testQuxNss.db(), cmd).getStatus());
+              authzSession->checkAuthorizedToListCollections(listOtherCollectionsCmd).getStatus());
 }
 
 TEST_F(AuthorizationSessionTest, CanListCollectionsWithListCollectionsPrivilege) {
-    BSONObj cmd = BSON("listCollections" << 1);
-    // The listCollections privilege authorizes the list collections command.
+    // The listCollections privilege authorizes the list collections command on the named database
+    // only.
     authzSession->assumePrivilegesForDB(Privilege(testDBResource, ActionType::listCollections));
 
-    ASSERT_OK(authzSession->checkAuthorizedToListCollections(testFooNss.db(), cmd).getStatus());
-    ASSERT_OK(authzSession->checkAuthorizedToListCollections(testBarNss.db(), cmd).getStatus());
-    ASSERT_OK(authzSession->checkAuthorizedToListCollections(testQuxNss.db(), cmd).getStatus());
+    // "test" DB is okay.
+    ASSERT_OK(authzSession->checkAuthorizedToListCollections(listTestCollectionsCmd).getStatus());
+
+    // "other" DB is not.
+    ASSERT_EQ(ErrorCodes::Unauthorized,
+              authzSession->checkAuthorizedToListCollections(listOtherCollectionsCmd).getStatus());
 }
 
 TEST_F(AuthorizationSessionTest, CanListOwnCollectionsWithPrivilege) {
-    BSONObj cmd =
-        BSON("listCollections" << 1 << "nameOnly" << true << "authorizedCollections" << true);
-    // The listCollections privilege authorizes the list collections command.
+    // Any privilege on a DB implies authorization to list one's own collections.
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
 
-    ASSERT_OK(authzSession->checkAuthorizedToListCollections(testFooNss.db(), cmd).getStatus());
-    ASSERT_OK(authzSession->checkAuthorizedToListCollections(testBarNss.db(), cmd).getStatus());
-    ASSERT_OK(authzSession->checkAuthorizedToListCollections(testQuxNss.db(), cmd).getStatus());
+    // Just own collections is okay.
+    ASSERT_OK(
+        authzSession->checkAuthorizedToListCollections(listOwnTestCollectionsCmd).getStatus());
 
+    // All collections is not.
     ASSERT_EQ(ErrorCodes::Unauthorized,
-              authzSession->checkAuthorizedToListCollections("other", cmd).getStatus());
+              authzSession->checkAuthorizedToListCollections(listTestCollectionsCmd).getStatus());
 }
+
+const auto kAnyResource = ResourcePattern::forAnyResource(boost::none);
+const auto kAnyNormalResource = ResourcePattern::forAnyNormalResource(boost::none);
 
 TEST_F(AuthorizationSessionTest, CanCheckIfHasAnyPrivilegeOnResource) {
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(testFooCollResource));
@@ -1188,36 +1247,29 @@ TEST_F(AuthorizationSessionTest, CanCheckIfHasAnyPrivilegeOnResource) {
     // If we have a collection privilege, we have actions on that collection
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testFooCollResource));
-    ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(
-        ResourcePattern::forDatabaseName(testFooNss.db())));
     ASSERT_FALSE(
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyNormalResource()));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyResource()));
+        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forDatabaseName(testDB)));
+    ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(kAnyNormalResource));
+    ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(kAnyResource));
 
     // If we have a database privilege, we have actions on that database and all collections it
     // contains
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forDatabaseName(testFooNss.db()), ActionType::find));
+        Privilege(ResourcePattern::forDatabaseName(testDB), ActionType::find));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testFooCollResource));
-    ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(
-        ResourcePattern::forDatabaseName(testFooNss.db())));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyNormalResource()));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyResource()));
+    ASSERT_TRUE(
+        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forDatabaseName(testDB)));
+    ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(kAnyNormalResource));
+    ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(kAnyResource));
 
     // If we have a privilege on anyNormalResource, we have actions on all databases and all
     // collections they contain
-    authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forAnyNormalResource(), ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(kAnyNormalResource, ActionType::find));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testFooCollResource));
-    ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(
-        ResourcePattern::forDatabaseName(testFooNss.db())));
     ASSERT_TRUE(
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyNormalResource()));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyResource()));
+        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forDatabaseName(testDB)));
+    ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(kAnyNormalResource));
+    ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(kAnyResource));
 }
 
 TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
@@ -1239,7 +1291,7 @@ TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
 
     // The useUUID privilege allows UUIDs to be parsed
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forClusterResource(), ActionType::useUUID));
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useUUID));
 
     ASSERT_TRUE(authzSession->isAuthorizedToParseNamespaceElement(stringObj.firstElement()));
     ASSERT_TRUE(authzSession->isAuthorizedToParseNamespaceElement(uuidObj.firstElement()));
@@ -1252,7 +1304,7 @@ TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
         std::initializer_list<AccessCheckEnum>{
             AccessCheckEnum::kIsAuthorizedToParseNamespaceElement},
         std::initializer_list<Privilege>{
-            Privilege(ResourcePattern::forClusterResource(), ActionType::useUUID)});
+            Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useUUID)});
 
     authzSession->verifyContract(&ac);
 }
@@ -1397,15 +1449,17 @@ TEST_F(AuthorizationSessionTest, ExpiredSessionWithReauth) {
 
 
 TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
+    const auto kTenantOID = OID::gen();
+    const TenantId kTenantId(kTenantOID);
+
     // Tests authorization flow from unauthenticated to active (via token) to unauthenticated to
     // active (via stateful connection) to unauthenticated.
     using VTS = auth::ValidatedTenancyScope;
 
     // Create and authorize a security token user.
     constexpr auto authUserFieldName = auth::SecurityToken::kAuthenticatedUserFieldName;
-    auto kOid = OID::gen();
-    auto body = BSON("ping" << 1 << "$tenant" << kOid);
-    const UserName user("spencer", "test", TenantId(kOid));
+    auto body = BSON("ping" << 1 << "$tenant" << kTenantOID);
+    const UserName user("spencer", "test", kTenantId);
     const UserRequest userRequest(user, boost::none);
     const UserName adminUser("admin", "admin");
     const UserRequest adminUserRequest(adminUser, boost::none);
@@ -1423,7 +1477,13 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), userRequest, boost::none));
 
     // Assert that the session is authenticated and authorized as expected.
-    assertSecurityToken(testFooCollResource, ActionType::insert);
+    const auto kFooCollNss =
+        NamespaceString::createNamespaceString_forTest(kTenantId, "test"_sd, "foo"_sd);
+    const auto kFooCollRsrc = ResourcePattern::forExactNamespace(kFooCollNss);
+    assertSecurityToken(kFooCollRsrc, ActionType::insert);
+
+    // TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
+    // Add additional tests for cross-tenancy authorizations.
 
     // Assert that another user can't be authorized while the security token is auth'd.
     ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), adminUserRequest, boost::none));
@@ -1436,23 +1496,21 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
 
     // Assert that a connection-based user with an expiration policy can be authorized after token
     // logout.
+    const auto kSomeCollNss = NamespaceString::createNamespaceString_forTest(
+        boost::none, "anydb"_sd, "somecollection"_sd);
+    const auto kSomeCollRsrc = ResourcePattern::forExactNamespace(kSomeCollNss);
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), adminUserRequest, expirationTime));
-    assertActive(ResourcePattern::forExactNamespace(
-                     NamespaceString::createNamespaceString_forTest("anydb.somecollection")),
-                 ActionType::insert);
+    assertActive(kSomeCollRsrc, ActionType::insert);
 
     // Check that logout proceeds normally.
     authzSession->logoutDatabase(_client.get(), "admin", "Kill the test!");
-    assertLogout(ResourcePattern::forExactNamespace(
-                     NamespaceString::createNamespaceString_forTest("anydb.somecollection")),
-                 ActionType::insert);
+    assertLogout(kSomeCollRsrc, ActionType::insert);
 }
 
 class SystemBucketsTest : public AuthorizationSessionTest {
 protected:
-    static constexpr auto sb_db_test = "sb_db_test"_sd;
-    static constexpr auto sb_db_other = "sb_db_other"_sd;
-    static constexpr auto sb_coll_test = "sb_coll_test"_sd;
+    static const DatabaseName sb_db_test;
+    static const DatabaseName sb_db_other;
 
     static const ResourcePattern testMissingSystemBucketResource;
     static const ResourcePattern otherMissingSystemBucketResource;
@@ -1465,7 +1523,14 @@ protected:
     static const ResourcePattern testBucketResource;
     static const ResourcePattern otherBucketResource;
     static const ResourcePattern otherDbBucketResource;
+
+    static const ResourcePattern sbCollTestInAnyDB;
 };
+
+const DatabaseName SystemBucketsTest::sb_db_test =
+    DatabaseName::createDatabaseName_forTest(boost::none, "sb_db_test"_sd);
+const DatabaseName SystemBucketsTest::sb_db_other =
+    DatabaseName::createDatabaseName_forTest(boost::none, "sb_db_other"_sd);
 
 const ResourcePattern SystemBucketsTest::testMissingSystemBucketResource(
     ResourcePattern::forExactNamespace(
@@ -1488,11 +1553,17 @@ const ResourcePattern SystemBucketsTest::otherDbSystemBucketResource(
         NamespaceString::createNamespaceString_forTest("sb_db_other.system.buckets.sb_coll_test")));
 
 const ResourcePattern SystemBucketsTest::testBucketResource(
-    ResourcePattern::forExactSystemBucketsCollection("sb_db_test", "sb_coll_test"));
+    ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceString_forTest(
+        boost::none /* tenantId */, "sb_db_test"_sd, "sb_coll_test"_sd)));
 const ResourcePattern SystemBucketsTest::otherBucketResource(
-    ResourcePattern::forExactSystemBucketsCollection("sb_db_test", "sb_coll_other"));
+    ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceString_forTest(
+        boost::none /* tenantId */, "sb_db_test"_sd, "sb_coll_other"_sd)));
 const ResourcePattern SystemBucketsTest::otherDbBucketResource(
-    ResourcePattern::forExactSystemBucketsCollection("sb_db_other", "sb_coll_test"));
+    ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceString_forTest(
+        boost::none /* tenantId */, "sb_db_other"_sd, "sb_coll_test"_sd)));
+
+const ResourcePattern SystemBucketsTest::sbCollTestInAnyDB(
+    ResourcePattern::forAnySystemBucketsInAnyDatabase(boost::none, "sb_coll_test"_sd));
 
 TEST_F(SystemBucketsTest, CheckExactSystemBucketsCollection) {
     // If we have a system_buckets exact priv
@@ -1521,7 +1592,7 @@ TEST_F(SystemBucketsTest, CheckExactSystemBucketsCollection) {
 TEST_F(SystemBucketsTest, CheckAnySystemBuckets) {
     // If we have an any system_buckets priv
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forAnySystemBuckets(), ActionType::find));
+        Privilege(ResourcePattern::forAnySystemBuckets(boost::none), ActionType::find));
 
     ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(testSystemBucketResource,
                                                                 ActionType::insert));
@@ -1546,7 +1617,7 @@ TEST_F(SystemBucketsTest, CheckAnySystemBuckets) {
 TEST_F(SystemBucketsTest, CheckAnySystemBucketsInDatabase) {
     // If we have a system_buckets in a db priv
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forAnySystemBucketsInDatabase("sb_db_test"), ActionType::find));
+        Privilege(ResourcePattern::forAnySystemBucketsInDatabase(sb_db_test), ActionType::find));
 
     ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(testSystemBucketResource,
                                                                 ActionType::insert));
@@ -1570,8 +1641,7 @@ TEST_F(SystemBucketsTest, CheckAnySystemBucketsInDatabase) {
 
 TEST_F(SystemBucketsTest, CheckforAnySystemBucketsInAnyDatabase) {
     // If we have a system_buckets for a coll in any db priv
-    authzSession->assumePrivilegesForDB(Privilege(
-        ResourcePattern::forAnySystemBucketsInAnyDatabase("sb_coll_test"), ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find));
 
 
     ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(testSystemBucketResource,
@@ -1600,10 +1670,8 @@ TEST_F(SystemBucketsTest, CanCheckIfHasAnyPrivilegeOnResourceForSystemBuckets) {
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testSystemBucketResource));
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(
         ResourcePattern::forDatabaseName(sb_db_test)));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyNormalResource()));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyResource()));
+    ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(kAnyNormalResource));
+    ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(kAnyResource));
 
     // If we have any buckets in a database privilege, we have actions on that database and all
     // system.buckets collections it contains
@@ -1614,22 +1682,17 @@ TEST_F(SystemBucketsTest, CanCheckIfHasAnyPrivilegeOnResourceForSystemBuckets) {
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testSystemBucketResource));
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(
         ResourcePattern::forDatabaseName(sb_db_test)));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyNormalResource()));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyResource()));
+    ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(kAnyNormalResource));
+    ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(kAnyResource));
 
     // If we have a privilege on any systems buckets in any db, we have actions on all databases and
     // system.buckets.<coll> they contain
-    authzSession->assumePrivilegesForDB(Privilege(
-        ResourcePattern::forAnySystemBucketsInAnyDatabase(sb_coll_test), ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testSystemBucketResource));
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(
         ResourcePattern::forDatabaseName(sb_db_test)));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyNormalResource()));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyResource()));
+    ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(kAnyNormalResource));
+    ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(kAnyResource));
 }
 
 TEST_F(SystemBucketsTest, CheckBuiltinRolesForSystemBuckets) {
@@ -1695,13 +1758,12 @@ TEST_F(SystemBucketsTest, CanCheckIfHasAnyPrivilegeInResourceDBForSystemBuckets)
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_test));
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_other));
 
-    authzSession->assumePrivilegesForDB(Privilege(
-        ResourcePattern::forAnySystemBucketsInAnyDatabase(sb_coll_test), ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_test));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_other));
 
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forAnySystemBuckets(), ActionType::find));
+        Privilege(ResourcePattern::forAnySystemBuckets(boost::none), ActionType::find));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_test));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_other));
 }

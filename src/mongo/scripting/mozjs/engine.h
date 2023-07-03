@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
 #include <jsapi.h>
+#include <string>
 
 #include "mongo/platform/mutex.h"
 #include "mongo/scripting/deadline_monitor.h"

@@ -28,10 +28,17 @@
  */
 
 #include "mongo/db/pipeline/window_function/window_function_covariance.h"
-#include "mongo/db/pipeline/window_function/window_function_sum.h"
 
-#include "mongo/db/pipeline/document_source.h"
+#include <limits>
+#include <vector>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/window_function/window_function_sum.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

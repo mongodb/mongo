@@ -29,6 +29,8 @@
 
 #include "mongo/db/s/global_index/global_index_cloner_fetcher_factory.h"
 
+#include <utility>
+
 namespace mongo {
 namespace global_index {
 

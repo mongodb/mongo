@@ -22,6 +22,13 @@ const unshardedDbName = "unsharded_db";
 const unshardedNs = unshardedDbName + ".unsharded_coll";
 const indexedNs = "db_with_index.coll";
 
+const timeseriesDbName = "timeseriesDB";
+const timeseriesUnshardedCollName = "unsharded_timeseries_coll";
+const timeseriesShardedCollName = "sharded_timeseries_coll";
+const timeseriesShardedNs = timeseriesDbName + "." + timeseriesShardedCollName;
+const timeseriesShardedBucketsNs =
+    `${timeseriesDbName}.system.buckets.${timeseriesShardedCollName}`;
+
 function basicCRUD(conn) {
     assert.commandWorked(st.s.getCollection(unshardedNs).insert([{x: 1}, {x: -1}]));
 
@@ -132,29 +139,6 @@ const newShardName =
 
 {
     //
-    // ShardingStateRecovery doesn't block step up.
-    //
-
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 0}, to: configShardName}));
-
-    const hangMigrationFp = configureFailPoint(st.configRS.getPrimary(), "moveChunkHangAtStep5");
-    const moveChunkThread = new Thread(function(mongosHost, ns, newShardName) {
-        const mongos = new Mongo(mongosHost);
-        assert.commandWorked(
-            mongos.adminCommand({moveChunk: ns, find: {skey: 0}, to: newShardName}));
-    }, st.s.host, ns, newShardName);
-    moveChunkThread.start();
-    hangMigrationFp.wait();
-
-    // Stepping up shouldn't hang because of ShardingStateRecovery.
-    st.configRS.stepUp(st.configRS.getSecondary());
-
-    hangMigrationFp.off();
-    moveChunkThread.join();
-}
-
-{
-    //
     // Collections on the config server support changeStreamPreAndPostImages when the config server
     // is acting as a shard.
     //
@@ -194,6 +178,24 @@ const newShardName =
         st.s.adminCommand({moveChunk: indexedNs, find: {_id: 0}, to: configShardName}));
     assert.commandWorked(st.s.getCollection(indexedNs).createIndex({oldKey: 1}));
 
+    // Create a sharded and unsharded timeseries collection and verify they and their buckets
+    // collections are correctly dropped. This provides coverage for views and sharded views.
+    const timeseriesDB = st.s.getDB(timeseriesDbName);
+    assert.commandWorked(timeseriesDB.createCollection(timeseriesUnshardedCollName,
+                                                       {timeseries: {timeField: "time"}}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: timeseriesDbName, to: configShardName}));
+    assert.commandWorked(timeseriesDB.createCollection(timeseriesShardedCollName,
+                                                       {timeseries: {timeField: "time"}}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: timeseriesShardedNs, key: {time: 1}}));
+    assert.commandWorked(timeseriesDB[timeseriesShardedCollName].insert({time: ISODate()}));
+    st.printShardingStatus();
+    assert.commandWorked(st.s.adminCommand({
+        moveChunk: timeseriesShardedBucketsNs,
+        find: {"control.min.time": 0},
+        to: configShardName,
+        _waitForDelete: true
+    }));
+
     // Use write concern to verify the commands support them. Any values weaker than the default
     // sharding metadata write concerns will be upgraded.
     let removeRes = assert.commandWorked(
@@ -209,15 +211,22 @@ const newShardName =
         {moveChunk: ns, find: {skey: -1}, to: newShardName, _waitForDelete: true}));
     assert.commandWorked(st.s.adminCommand(
         {moveChunk: indexedNs, find: {_id: 0}, to: newShardName, _waitForDelete: true}));
+    assert.commandWorked(st.s.adminCommand({
+        moveChunk: timeseriesShardedBucketsNs,
+        find: {"control.min.time": 0},
+        to: newShardName,
+        _waitForDelete: true
+    }));
 
     // Blocked because of the sharded and unsharded databases and the remaining chunk.
     removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
     assert.eq("ongoing", removeRes.state);
     assert.eq(1, removeRes.remaining.chunks);
-    assert.eq(2, removeRes.remaining.dbs);
+    assert.eq(3, removeRes.remaining.dbs);
 
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: newShardName}));
     assert.commandWorked(st.s.adminCommand({movePrimary: unshardedDbName, to: newShardName}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: timeseriesDbName, to: newShardName}));
 
     // The draining sharded collections should not have been locally dropped yet.
     assert(configPrimary.getCollection(ns).exists());
@@ -244,11 +253,12 @@ const newShardName =
     suspendRangeDeletionFp.off();
     ConfigShardUtil.waitForRangeDeletions(st.s);
 
-    // Start the final transition command. This will trigger locally dropping collections on the
-    // config server. Hang after removing one collection and trigger a failover to verify the final
-    // transition can be resumed on the new primary and the collection dropping is idempotent.
+    // Start the final transition command. This will trigger locally dropping all tracked user
+    // databases on the config server. Hang after removing one database and trigger a failover to
+    // verify the final transition can be resumed on the new primary and the database dropping is
+    // idempotent.
     const hangRemoveFp = configureFailPoint(
-        st.configRS.getPrimary(), "hangAfterDroppingCollectionInTransitionToDedicatedConfigServer");
+        st.configRS.getPrimary(), "hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer");
     const finishRemoveThread = new Thread(function(mongosHost) {
         const mongos = new Mongo(mongosHost);
         return mongos.adminCommand({transitionToDedicatedConfigServer: 1});
@@ -334,39 +344,6 @@ const newShardName =
         st.s.adminCommand({moveChunk: indexedNs, find: {_id: 0}, to: configShardName}));
     assert.sameMembers(st.configRS.getPrimary().getCollection(indexedNs).getIndexKeys(),
                        [{_id: 1}, {oldKey: 1}, {newKey: 1}]);
-}
-
-{
-    //
-    // transitionFromDedicatedConfigServer requires replication to all config server nodes.
-    //
-    // TODO SERVER-75391: Remove.
-    //
-
-    // Transition to dedicated mode so the config server can transition back to config shard mode.
-    let removeRes = assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
-    assert.eq("started", removeRes.state);
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: ns, find: {skey: 0}, to: newShardName, _waitForDelete: true}));
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: ns, find: {skey: 5}, to: newShardName, _waitForDelete: true}));
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: indexedNs, find: {_id: 0}, to: newShardName, _waitForDelete: true}));
-    assert.commandWorked(st.s.adminCommand({movePrimary: "directDB", to: newShardName}));
-    assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
-
-    // transitionFromDedicatedConfigServer times out with a lagged config secondary despite having a
-    // majority of its set still replicating.
-    const laggedSecondary = st.configRS.getSecondary();
-    st.configRS.awaitReplication();
-    stopServerReplication(laggedSecondary);
-    assert.commandFailedWithCode(
-        st.s.adminCommand({transitionFromDedicatedConfigServer: 1, maxTimeMS: 1000}),
-        ErrorCodes.MaxTimeMSExpired);
-    restartServerReplication(laggedSecondary);
-
-    // Now it succeeds.
-    assert.commandWorked(st.s.adminCommand({transitionFromDedicatedConfigServer: 1}));
 }
 
 st.stop();

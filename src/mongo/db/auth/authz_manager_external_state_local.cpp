@@ -28,27 +28,48 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
 
-#include "mongo/db/auth/authz_manager_external_state_local.h"
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/util/bson_extract.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/address_restriction.h"
-#include "mongo/db/auth/auth_options_gen.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/auth_types_gen.h"
-#include "mongo/db/auth/privilege_parser.h"
+#include "mongo/db/auth/authz_manager_external_state_local.h"
+#include "mongo/db/auth/builtin_roles.h"
+#include "mongo/db/auth/parsed_privilege_gen.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/restriction_set.h"
 #include "mongo/db/auth/user_document_parser.h"
-#include "mongo/db/multitenancy.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/storage/snapshot_manager.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
@@ -461,6 +482,7 @@ StatusWith<ResolvedRoleData> AuthzManagerExternalStateLocal::resolveRoles(
     const bool processPrivs = option & ResolveRoleOption::kPrivileges;
     const bool processRests = option & ResolveRoleOption::kRestrictions;
     const bool walkIndirect = (option & ResolveRoleOption::kDirectOnly) == 0;
+    IDLParserContext idlctx("resolveRoles");
 
     RoleNameSet inheritedRoles;
     PrivilegeVector inheritedPrivileges;
@@ -520,8 +542,15 @@ StatusWith<ResolvedRoleData> AuthzManagerExternalStateLocal::resolveRoles(
                                 << "Invalid 'privileges' field in role document '" << role << "'"};
                 }
                 for (const auto& privElem : elem.Obj()) {
-                    auto priv = Privilege::fromBSON(privElem);
-                    Privilege::addPrivilegeToPrivilegeVector(&inheritedPrivileges, priv);
+                    if (privElem.type() != Object) {
+                        return {ErrorCodes::UnsupportedFormat,
+                                "Expected privilege document as object, got {}"_format(
+                                    typeName(privElem.type()))};
+                    }
+                    auto pp = auth::ParsedPrivilege::parse(idlctx, privElem.Obj());
+                    Privilege::addPrivilegeToPrivilegeVector(
+                        &inheritedPrivileges,
+                        Privilege::resolvePrivilegeWithTenant(role.getTenant(), pp));
                 }
             }
 
@@ -752,7 +781,7 @@ public:
         // invalidators will purge cache on a per-tenant basis as needed.
         auto db = nss.dbName();
         auto coll = nss.coll();
-        if (db.db() != DatabaseName::kAdmin.db()) {
+        if (!db.isAdminDB()) {
             return;
         }
 

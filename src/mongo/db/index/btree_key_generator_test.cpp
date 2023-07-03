@@ -28,18 +28,27 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/index/btree_key_generator.h"
-
 #include <algorithm>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <iostream>
+#include <memory>
+#include <string>
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/json.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -60,7 +69,7 @@ std::string dumpKeyset(const KeyStringSet& keyStrings) {
     std::stringstream ss;
     ss << "[ ";
     for (auto& keyString : keyStrings) {
-        auto key = KeyString::toBson(keyString, Ordering::make(BSONObj()));
+        auto key = key_string::toBson(keyString, Ordering::make(BSONObj()));
         ss << key.toString() << " ";
     }
     ss << "]";
@@ -119,7 +128,7 @@ bool testKeygen(const BSONObj& kp,
     }
 
     auto keyGen = std::make_unique<BtreeKeyGenerator>(
-        fieldNames, fixed, sparse, KeyString::Version::kLatestVersion, Ordering::make(BSONObj()));
+        fieldNames, fixed, sparse, key_string::Version::kLatestVersion, Ordering::make(BSONObj()));
 
     auto runTest = [&](bool skipMultikey) {
         //
@@ -182,8 +191,8 @@ bool testKeygen(const BSONObj& kp,
 TEST(BtreeKeyGeneratorTest, GetIdKeyFromObject) {
     BSONObj keyPattern = fromjson("{_id: 1}");
     BSONObj genKeysFrom = fromjson("{_id: 'foo', b: 4}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 'foo'}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 'foo'}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -192,8 +201,8 @@ TEST(BtreeKeyGeneratorTest, GetIdKeyFromObject) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromObjectSimple) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{b: 4, a: 5}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 5}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 5}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -202,8 +211,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromObjectSimple) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromObjectDotted) {
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: {b: 4}, c: 'foo'}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 4}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 4}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -212,12 +221,12 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromObjectDotted) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromArraySimple) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{a: [1, 2, 3]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -226,8 +235,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArraySimple) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromArrayWithIdenticalValues) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{a: [0, 0, 0]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 0}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 0}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -236,8 +245,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArrayWithIdenticalValues) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromArrayWithEquivalentValues) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{a: [0, NumberInt(0), NumberLong(0)]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 0}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 0}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -246,12 +255,12 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArrayWithEquivalentValues) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromArrayFirstElement) {
     BSONObj keyPattern = fromjson("{a: 1, b: 1}");
     BSONObj genKeysFrom = fromjson("{a: [1, 2, 3], b: 2}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1, '': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2, '': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 3, '': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1, '': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2, '': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 3, '': 2}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}, MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -260,12 +269,12 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArrayFirstElement) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromArraySecondElement) {
     BSONObj keyPattern = fromjson("{first: 1, a: 1}");
     BSONObj genKeysFrom = fromjson("{first: 5, a: [1, 2, 3]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 5, '': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 5, '': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 5, '': 3}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 5, '': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 5, '': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 5, '': 3}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}, {0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -274,12 +283,12 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArraySecondElement) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromSecondLevelArray) {
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: {b: [1, 2, 3]}}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     MultikeyPaths expectedMultikeyPaths{{1U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -303,12 +312,12 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromParallelArraysBasic) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromArraySubobjectBasic) {
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [{b:1,c:4}, {b:2,c:4}, {b:3,c:4}]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -317,10 +326,10 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArraySubobjectBasic) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromSubobjectWithArrayOfSubobjects) {
     BSONObj keyPattern = fromjson("{'a.b.c': 1}");
     BSONObj genKeysFrom = fromjson("{a: {b: [{c: 1}, {c: 2}]}}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release()};
     MultikeyPaths expectedMultikeyPaths{{1U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -329,12 +338,15 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromSubobjectWithArrayOfSubobjects) {
 TEST(BtreeKeyGeneratorTest, GetKeysArraySubobjectCompoundIndex) {
     BSONObj keyPattern = fromjson("{'a.b': 1, d: 99}");
     BSONObj genKeysFrom = fromjson("{a: [{b:1,c:4}, {b:2,c:4}, {b:3,c:4}], d: 99}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1, '': 99}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2, '': 99}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 3, '': 99}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
+                                       fromjson("{'': 1, '': 99}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(key_string::Version::kLatestVersion,
+                                       fromjson("{'': 2, '': 99}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       fromjson("{'': 3, '': 99}"),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}, MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -343,14 +355,14 @@ TEST(BtreeKeyGeneratorTest, GetKeysArraySubobjectCompoundIndex) {
 TEST(BtreeKeyGeneratorTest, GetKeysArraySubobjectSingleMissing) {
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [{foo: 41}, {b:1,c:4}, {b:2,c:4}, {b:3,c:4}]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString4(
-        KeyString::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString4(
+        key_string::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{
         keyString1.release(), keyString2.release(), keyString3.release(), keyString4.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
@@ -360,8 +372,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysArraySubobjectSingleMissing) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromArraySubobjectMissing) {
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [{foo: 41}, {foo: 41}, {foo: 41}]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -370,8 +382,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArraySubobjectMissing) {
 TEST(BtreeKeyGeneratorTest, GetKeysMissingField) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{b: 1}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -380,8 +392,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysMissingField) {
 TEST(BtreeKeyGeneratorTest, GetKeysSubobjectMissing) {
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [1, 2]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -390,9 +402,9 @@ TEST(BtreeKeyGeneratorTest, GetKeysSubobjectMissing) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromCompound) {
     BSONObj keyPattern = fromjson("{x: 1, y: 1}");
     BSONObj genKeysFrom = fromjson("{x: 'a', y: 'b'}");
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     fromjson("{'': 'a', '': 'b'}"),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      fromjson("{'': 'a', '': 'b'}"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}, MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -401,9 +413,9 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromCompound) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromCompoundMissing) {
     BSONObj keyPattern = fromjson("{x: 1, y: 1}");
     BSONObj genKeysFrom = fromjson("{x: 'a'}");
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     fromjson("{'': 'a', '': null}"),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      fromjson("{'': 'a', '': null}"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}, MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -412,8 +424,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromCompoundMissing) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromArraySubelementComplex) {
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a:[{b:[2]}]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     // Both the 'a' and 'a.b' arrays contain a single element, so they are considered multikey.
     MultikeyPaths expectedMultikeyPaths{{0U, 1U}};
@@ -438,12 +450,12 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromParallelArraysComplex) {
 TEST(BtreeKeyGeneratorTest, GetKeysAlternateMissing) {
     BSONObj keyPattern = fromjson("{'a.b': 1, 'a.c': 1}");
     BSONObj genKeysFrom = fromjson("{a:[{b:1},{c:2}]}");
-    KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': null, '': 2}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': 1, '': null}"),
-                                      Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
+                                       fromjson("{'': null, '': 2}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(key_string::Version::kLatestVersion,
+                                       fromjson("{'': 1, '': null}"),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}, {0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -452,12 +464,12 @@ TEST(BtreeKeyGeneratorTest, GetKeysAlternateMissing) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromMultiComplex) {
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a:[{b:1},{b:[1,2,3]}]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     MultikeyPaths expectedMultikeyPaths{{0U, 1U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -466,12 +478,12 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromMultiComplex) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromArrayOfSubobjectsWithArrayValues) {
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [{b: [1, 2]}, {b: [2, 3]}]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     MultikeyPaths expectedMultikeyPaths{{0U, 1U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -480,12 +492,12 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArrayOfSubobjectsWithArrayValues) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromArrayOfSubobjectsWithNonDistinctArrayValues) {
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [{b: [1, 2, 3]}, {b: [2]}, {b: [3, 1]}]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     MultikeyPaths expectedMultikeyPaths{{0U, 1U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -494,14 +506,15 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromArrayOfSubobjectsWithNonDistinctArrayValu
 TEST(BtreeKeyGeneratorTest, GetKeysArrayEmpty) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{a:[1,2]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': undefined}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString4(
-        KeyString::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       fromjson("{'': undefined}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString4(
+        key_string::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.getValueCopy(), keyString2.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -526,10 +539,10 @@ TEST(BtreeKeyGeneratorTest, GetKeysArrayEmpty) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromDoubleArray) {
     BSONObj keyPattern = fromjson("{a: 1, a: 1}");
     BSONObj genKeysFrom = fromjson("{a:[1,2]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1, '': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2, '': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1, '': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2, '': 2}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}, {0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -538,9 +551,9 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromDoubleArray) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromDoubleEmptyArray) {
     BSONObj keyPattern = fromjson("{a: 1, a: 1}");
     BSONObj genKeysFrom = fromjson("{a:[]}");
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     fromjson("{'': undefined, '': undefined}"),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      fromjson("{'': undefined, '': undefined}"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}, {0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -549,13 +562,13 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromDoubleEmptyArray) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromMultiEmptyArray) {
     BSONObj keyPattern = fromjson("{a: 1, b: 1}");
     BSONObj genKeysFrom = fromjson("{a: 1, b: [1, 2]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1, '': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1, '': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': 1, '': undefined}"),
-                                      Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1, '': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 1, '': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       fromjson("{'': 1, '': undefined}"),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.getValueCopy(), keyString2.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}, {0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -574,8 +587,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromMultiEmptyArray) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromNestedEmptyArray) {
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a:[]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -584,9 +597,9 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromNestedEmptyArray) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromMultiNestedEmptyArray) {
     BSONObj keyPattern = fromjson("{'a.b': 1, 'a.c': 1}");
     BSONObj genKeysFrom = fromjson("{a:[]}");
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     fromjson("{'': null, '': null}"),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      fromjson("{'': null, '': null}"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}, {0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -595,15 +608,15 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromMultiNestedEmptyArray) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromUnevenNestedEmptyArray) {
     BSONObj keyPattern = fromjson("{'a': 1, 'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a:[]}");
-    KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': undefined, '': null}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': {b:1}, '': 1}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': {b:[]}, '': undefined}"),
-                                      Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
+                                       fromjson("{'': undefined, '': null}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(key_string::Version::kLatestVersion,
+                                       fromjson("{'': {b:1}, '': 1}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       fromjson("{'': {b:[]}, '': undefined}"),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}, {0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -623,9 +636,9 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromUnevenNestedEmptyArray) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromReverseUnevenNestedEmptyArray) {
     BSONObj keyPattern = fromjson("{'a.b': 1, 'a': 1}");
     BSONObj genKeysFrom = fromjson("{a:[]}");
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     fromjson("{'': null, '': undefined}"),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      fromjson("{'': null, '': undefined}"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}, {0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -635,9 +648,9 @@ TEST(BtreeKeyGeneratorTest, SparseReverseUnevenNestedEmptyArray) {
     const bool sparse = true;
     BSONObj keyPattern = fromjson("{'a.b': 1, 'a': 1}");
     BSONObj genKeysFrom = fromjson("{a:[]}");
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     fromjson("{'': null, '': undefined}"),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      fromjson("{'': null, '': undefined}"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}, {0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, sparse));
@@ -679,8 +692,8 @@ TEST(BtreeKeyGeneratorTest, SparseNonObjectMissingNestedField) {
     const bool sparse = true;
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a:[]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys;
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, sparse));
@@ -697,12 +710,13 @@ TEST(BtreeKeyGeneratorTest, SparseNonObjectMissingNestedField) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromIndexedArrayIndex) {
     BSONObj keyPattern = fromjson("{'a.0': 1}");
     BSONObj genKeysFrom = fromjson("{a:[1]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': [1]}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': undefined}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': [1]}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       fromjson("{'': undefined}"),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.getValueCopy()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -740,12 +754,13 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromIndexedArrayIndex) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromDoubleIndexedArrayIndex) {
     BSONObj keyPattern = fromjson("{'a.0.0': 1}");
     BSONObj genKeysFrom = fromjson("{a:[[1]]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': undefined}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       fromjson("{'': undefined}"),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -774,12 +789,13 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromDoubleIndexedArrayIndex) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromObjectWithinArray) {
     BSONObj keyPattern = fromjson("{'a.0.b': 1}");
     BSONObj genKeysFrom = fromjson("{a:[{b:1}]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': [1]}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': undefined}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': [1]}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       fromjson("{'': undefined}"),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.getValueCopy()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -822,10 +838,10 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromObjectWithinArray) {
 TEST(BtreeKeyGeneratorTest, GetKeysPositionalElementIsExpandedArray) {
     BSONObj keyPattern = fromjson("{'a.0.b': 1}");
     BSONObj genKeysFrom = fromjson("{a:[[{b:1}, {b:2}]]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release()};
     MultikeyPaths expectedMultikeyPaths{{1U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -834,8 +850,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysPositionalElementIsExpandedArray) {
 TEST(BtreeKeyGeneratorTest, GetKeysTrailingPositionalElementIsSingletonArray) {
     BSONObj keyPattern = fromjson("{'a.b.c.3': 1}");
     BSONObj genKeysFrom = fromjson("{a:{b:{c:[0,1,2,[3]]}}}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': [3]}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': [3]}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -844,8 +860,9 @@ TEST(BtreeKeyGeneratorTest, GetKeysTrailingPositionalElementIsSingletonArray) {
 TEST(BtreeKeyGeneratorTest, GetKeysTrailingPositionalElementIsEmptyArray) {
     BSONObj keyPattern = fromjson("{'a.b.c.3': 1}");
     BSONObj genKeysFrom = fromjson("{a:{b:{c:[0,1,2,[]]}}}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': undefined}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      fromjson("{'': undefined}"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -854,8 +871,9 @@ TEST(BtreeKeyGeneratorTest, GetKeysTrailingPositionalElementIsEmptyArray) {
 TEST(BtreeKeyGeneratorTest, GetKeysManyPositionalElementsComplex) {
     BSONObj keyPattern = fromjson("{'a.0.1.2.b.0': 1}");
     BSONObj genKeysFrom = fromjson("{a:[[1, [1, 2, [{b: [[], 2]}]]], 1]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': undefined}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      fromjson("{'': undefined}"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{3U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -864,8 +882,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysManyPositionalElementsComplex) {
 TEST(BtreeKeyGeneratorTest, GetKeysFromArrayWithinObjectWithinArray) {
     BSONObj keyPattern = fromjson("{'a.0.b.0': 1}");
     BSONObj genKeysFrom = fromjson("{a:[{b:[1]}]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -904,12 +922,12 @@ TEST(BtreeKeyGeneratorTest, ParallelArraysUneven) {
 TEST(BtreeKeyGeneratorTest, MultipleArraysNotParallel) {
     BSONObj keyPattern = fromjson("{'a.b.c': 1}");
     BSONObj genKeysFrom = fromjson("{a: [1, 2, {b: {c: [3, 4]}}]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 4}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 4}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     MultikeyPaths expectedMultikeyPaths{{0U, 2U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -918,13 +936,13 @@ TEST(BtreeKeyGeneratorTest, MultipleArraysNotParallel) {
 TEST(BtreeKeyGeneratorTest, MultipleArraysNotParallelCompound) {
     BSONObj keyPattern = fromjson("{'a.b.c': 1, 'a.b.d': 1}");
     BSONObj genKeysFrom = fromjson("{a: [1, 2, {b: {c: [3, 4], d: 5}}]}");
-    KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': null, '': null}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 3, '': 5}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 4, '': 5}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
+                                       fromjson("{'': null, '': null}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 3, '': 5}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 4, '': 5}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     MultikeyPaths expectedMultikeyPaths{{0U, 2U}, {0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -933,21 +951,21 @@ TEST(BtreeKeyGeneratorTest, MultipleArraysNotParallelCompound) {
 TEST(BtreeKeyGeneratorTest, GetKeysComplexNestedArrays) {
     BSONObj keyPattern = fromjson("{'a.b.c.d': 1, 'a.g': 1, 'a.b.f': 1, 'a.b.c': 1, 'a.b.e': 1}");
     BSONObj genKeysFrom = fromjson("{a: [1, {b: [2, {c: [3, {d: 1}], e: 4}, 5, {f: 6}], g: 7}]}");
-    KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
-                                      fromjson("{'':null, '':null, '':null, '':null, '':null}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(KeyString::Version::kLatestVersion,
-                                      fromjson("{'':null, '':7, '':null, '':null, '':null}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(KeyString::Version::kLatestVersion,
-                                      fromjson("{'':null, '':7, '':null, '':3, '':4}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString4(KeyString::Version::kLatestVersion,
-                                      fromjson("{'':null, '':7, '':6, '':null, '':null}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString5(KeyString::Version::kLatestVersion,
-                                      fromjson("{'':1, '':7, '':null, '':{d: 1}, '':4}"),
-                                      Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
+                                       fromjson("{'':null, '':null, '':null, '':null, '':null}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(key_string::Version::kLatestVersion,
+                                       fromjson("{'':null, '':7, '':null, '':null, '':null}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       fromjson("{'':null, '':7, '':null, '':3, '':4}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString4(key_string::Version::kLatestVersion,
+                                       fromjson("{'':null, '':7, '':6, '':null, '':null}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString5(key_string::Version::kLatestVersion,
+                                       fromjson("{'':1, '':7, '':null, '':{d: 1}, '':4}"),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(),
                               keyString2.release(),
                               keyString3.release(),
@@ -961,8 +979,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysComplexNestedArrays) {
 TEST(BtreeKeyGeneratorTest, GetKeys2DArray) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{a: [[2]]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': [2]}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': [2]}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1019,8 +1037,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysParallelArraysOneArrayEmptyNested) {
 TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternMissingElement) {
     BSONObj keyPattern = fromjson("{'a.2': 1}");
     BSONObj genKeysFrom = fromjson("{a: [{'2': 5}]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 5}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 5}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1030,8 +1048,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternMissingElement) {
 TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray) {
     BSONObj keyPattern = fromjson("{'a.2': 1}");
     BSONObj genKeysFrom = fromjson("{a: [[1, 2, 5]]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1041,8 +1059,9 @@ TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray) {
 TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray2) {
     BSONObj keyPattern = fromjson("{'a.2': 1}");
     BSONObj genKeysFrom = fromjson("{a: [[1, 2, 5], [3, 4, 6], [0, 1, 2]]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': [0, 1, 2]}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      fromjson("{'': [0, 1, 2]}"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1052,8 +1071,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray2) {
 TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray3) {
     BSONObj keyPattern = fromjson("{'a.2': 1}");
     BSONObj genKeysFrom = fromjson("{a: [{'0': 1, '1': 2, '2': 5}]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 5}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 5}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1063,8 +1082,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray3) {
 TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray4) {
     BSONObj keyPattern = fromjson("{'a.b.2': 1}");
     BSONObj genKeysFrom = fromjson("{a: [{b: [[1, 2, 5]]}]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U, 1U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1074,10 +1093,10 @@ TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray4) {
 TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray5) {
     BSONObj keyPattern = fromjson("{'a.2': 1}");
     BSONObj genKeysFrom = fromjson("{a: [[1, 2, 5], {'2': 6}]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 6}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 6}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1086,8 +1105,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysPositionalKeyPatternNestedArray5) {
 TEST(BtreeKeyGeneratorTest, GetNullKeyNestedArray) {
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [[1, 2, 5]]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1096,18 +1115,18 @@ TEST(BtreeKeyGeneratorTest, GetNullKeyNestedArray) {
 TEST(BtreeKeyGeneratorTest, GetKeysUnevenNestedArrays) {
     BSONObj keyPattern = fromjson("{a: 1, 'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [1, {b: [2, 3, 4]}]}");
-    KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': 1, '': null}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': {b:[2,3,4]}, '': 2}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': {b:[2,3,4]}, '': 3}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString4(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': {b:[2,3,4]}, '': 4}"),
-                                      Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
+                                       fromjson("{'': 1, '': null}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(key_string::Version::kLatestVersion,
+                                       fromjson("{'': {b:[2,3,4]}, '': 2}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       fromjson("{'': {b:[2,3,4]}, '': 3}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString4(key_string::Version::kLatestVersion,
+                                       fromjson("{'': {b:[2,3,4]}, '': 4}"),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{
         keyString1.release(), keyString2.release(), keyString3.release(), keyString4.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}, {0U, 1U}};
@@ -1119,8 +1138,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysUnevenNestedArrays) {
 TEST(BtreeKeyGeneratorTest, GetKeysRepeatedFieldName) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{a: 2, a: 3}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1131,10 +1150,10 @@ TEST(BtreeKeyGeneratorTest, GetKeysRepeatedFieldName) {
 TEST(BtreeKeyGeneratorTest, GetKeysEmptyPathPiece) {
     BSONObj keyPattern = fromjson("{'a..c': 1}");
     BSONObj genKeysFrom = fromjson("{a: {'': [{c: 1}, {c: 2}]}}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release()};
     MultikeyPaths expectedMultikeyPaths{{1U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1145,10 +1164,10 @@ TEST(BtreeKeyGeneratorTest, GetKeysEmptyPathPiece) {
 TEST(BtreeKeyGeneratorTest, GetKeysLastPathPieceEmpty) {
     BSONObj keyPattern = fromjson("{'a.': 1}");
     BSONObj genKeysFrom = fromjson("{a: 2}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': {'': 2}}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': {'': 2}}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1162,8 +1181,8 @@ TEST(BtreeKeyGeneratorTest, GetKeysLastPathPieceEmpty) {
 TEST(BtreeKeyGeneratorTest, GetKeysFirstPathPieceEmpty) {
     BSONObj keyPattern = fromjson("{'.a': 1}");
     BSONObj genKeysFrom = fromjson("{a: 2}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1172,12 +1191,12 @@ TEST(BtreeKeyGeneratorTest, GetKeysFirstPathPieceEmpty) {
 TEST(BtreeKeyGeneratorTest, GetKeysFirstPathPieceEmpty2) {
     BSONObj keyPattern = fromjson("{'.a': 1}");
     BSONObj genKeysFrom = fromjson("{'': [{a: [1, 2, 3]}]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     MultikeyPaths expectedMultikeyPaths{{0U, 1U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1195,8 +1214,8 @@ TEST(BtreeKeyGeneratorTest, PositionalKeyPatternParallelArrays) {
 TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_b_Extracts_b_ElementInsideSingleton2DArray) {
     BSONObj keyPattern = fromjson("{'a.0.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [[{b: 1}]]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{1U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1205,8 +1224,8 @@ TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_b_Extracts_b_ElementInsideSingleton2D
 TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_0_b_Extracts_b_ElementInsideSingleton2DArray) {
     BSONObj keyPattern = fromjson("{'a.0.0.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [[{b: 1}]]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1216,12 +1235,12 @@ TEST(BtreeKeyGeneratorTest,
      KeyPattern_a_0_0_b_ExtractsEachValueFrom_b_ArrayInsideSingleton2DArray) {
     BSONObj keyPattern = fromjson("{'a.0.0.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [[{b: [1, 2, 3]}]]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     MultikeyPaths expectedMultikeyPaths{{3U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1230,8 +1249,8 @@ TEST(BtreeKeyGeneratorTest,
 TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_0_b_Extracts_b_ElementInsideSingleton3DArray) {
     BSONObj keyPattern = fromjson("{'a.0.0.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [[[ {b: 1} ]]]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{2U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1240,12 +1259,12 @@ TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_0_b_Extracts_b_ElementInsideSingleton
 TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_0_b_ExtractsEach_b_ElementInside3DArray) {
     BSONObj keyPattern = fromjson("{'a.0.0.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [[[{b: 1}, {b: 2}, {b: 3}]]]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 1}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 3}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     MultikeyPaths expectedMultikeyPaths{{2U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1254,8 +1273,8 @@ TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_0_b_ExtractsEach_b_ElementInside3DArr
 TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_0_b_ExtractsNullFrom4DArray) {
     BSONObj keyPattern = fromjson("{'a.0.0.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: [[[[ {b: 1} ]]]]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': null}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{2U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1264,8 +1283,8 @@ TEST(BtreeKeyGeneratorTest, KeyPattern_a_0_0_b_ExtractsNullFrom4DArray) {
 TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays5) {
     BSONObj keyPattern = fromjson("{'a.b.1': 1}");
     BSONObj genKeysFrom = fromjson("{a: [{b: [1, 2]}]}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 2}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}};
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths));
@@ -1275,18 +1294,18 @@ TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays5) {
 TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays6) {
     BSONObj keyPattern = fromjson("{'a': 1, 'a.b': 1, 'a.0.b':1, 'a.b.0': 1, 'a.0.b.0': 1}");
     BSONObj genKeysFrom = fromjson("{a: [{b: [1,2]}, {b: 3}]}");
-    KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': {b:3}, '': 3, '': 1, '': null, '': 1}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': {b:3}, '': 3, '': 2, '': null, '': 1}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': {b:[1,2]}, '': 1, '': 1, '': 1, '': 1}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString4(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': {b:[1,2]}, '': 2, '': 2, '': 1, '': 1}"),
-                                      Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
+                                       fromjson("{'': {b:3}, '': 3, '': 1, '': null, '': 1}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(key_string::Version::kLatestVersion,
+                                       fromjson("{'': {b:3}, '': 3, '': 2, '': null, '': 1}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       fromjson("{'': {b:[1,2]}, '': 1, '': 1, '': 1, '': 1}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString4(key_string::Version::kLatestVersion,
+                                       fromjson("{'': {b:[1,2]}, '': 2, '': 2, '': 1, '': 1}"),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{
         keyString1.release(), keyString2.release(), keyString3.release(), keyString4.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}, {0U, 1U}, {2U}, {0U}, MultikeyComponents{}};
@@ -1297,20 +1316,20 @@ TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays6) {
 TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays7) {
     BSONObj keyPattern = fromjson("{'a': 1, 'a.b': 1, 'a.0.b':1, 'a.b.0': 1, 'a.0.b.0': 1}");
     BSONObj genKeysFrom = fromjson("{a: [{b: [1,2]}, {b: {'0': 3}}]}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion,
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion,
         fromjson("{'': {b:{'0':3}}, '': {'0':3}, '': 1, '': 3, '': 1}"),
         Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion,
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion,
         fromjson("{'': {b:{'0':3}}, '': {'0':3}, '': 2, '': 3, '': 1}"),
         Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': {b:[1,2]}, '': 1, '': 1, '': 1, '': 1}"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString4(KeyString::Version::kLatestVersion,
-                                      fromjson("{'': {b:[1,2]}, '': 2, '': 2, '': 1, '': 1}"),
-                                      Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       fromjson("{'': {b:[1,2]}, '': 1, '': 1, '': 1, '': 1}"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString4(key_string::Version::kLatestVersion,
+                                       fromjson("{'': {b:[1,2]}, '': 2, '': 2, '': 1, '': 1}"),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{
         keyString1.release(), keyString2.release(), keyString3.release(), keyString4.release()};
     MultikeyPaths expectedMultikeyPaths{{0U}, {0U, 1U}, {2U}, {0U}, MultikeyComponents{}};
@@ -1320,8 +1339,8 @@ TEST(BtreeKeyGeneratorTest, PositionalKeyPatternNestedArrays7) {
 TEST(BtreeKeyGeneratorTest, GetCollationAwareIdKeyFromObject) {
     BSONObj keyPattern = fromjson("{_id: 1}");
     BSONObj genKeysFrom = fromjson("{_id: 'foo', b: 4}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 'oof'}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 'oof'}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
@@ -1332,8 +1351,8 @@ TEST(BtreeKeyGeneratorTest, GetCollationAwareIdKeyFromObject) {
 TEST(BtreeKeyGeneratorTest, GetCollationAwareKeysFromObjectSimple) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{b: 4, a: 'foo'}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 'oof'}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 'oof'}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
@@ -1344,8 +1363,8 @@ TEST(BtreeKeyGeneratorTest, GetCollationAwareKeysFromObjectSimple) {
 TEST(BtreeKeyGeneratorTest, GetCollationAwareKeysFromObjectDotted) {
     BSONObj keyPattern = fromjson("{'a.b': 1}");
     BSONObj genKeysFrom = fromjson("{a: {b: 'foo'}, c: 4}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 'oof'}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 'oof'}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
@@ -1356,12 +1375,12 @@ TEST(BtreeKeyGeneratorTest, GetCollationAwareKeysFromObjectDotted) {
 TEST(BtreeKeyGeneratorTest, GetCollationAwareKeysFromArraySimple) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{a: ['foo', 'bar', 'baz']}");
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, fromjson("{'': 'oof'}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, fromjson("{'': 'rab'}"), Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(
-        KeyString::Version::kLatestVersion, fromjson("{'': 'zab'}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, fromjson("{'': 'oof'}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, fromjson("{'': 'rab'}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(
+        key_string::Version::kLatestVersion, fromjson("{'': 'zab'}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     MultikeyPaths expectedMultikeyPaths{{0U}};
@@ -1372,8 +1391,8 @@ TEST(BtreeKeyGeneratorTest, GetCollationAwareKeysFromArraySimple) {
 TEST(BtreeKeyGeneratorTest, CollatorDoesNotAffectNonStringIdKey) {
     BSONObj keyPattern = fromjson("{_id: 1}");
     BSONObj genKeysFrom = fromjson("{_id: 5, b: 4}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 5}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 5}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
@@ -1384,8 +1403,8 @@ TEST(BtreeKeyGeneratorTest, CollatorDoesNotAffectNonStringIdKey) {
 TEST(BtreeKeyGeneratorTest, CollatorDoesNotAffectNonStringKeys) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{b: 4, a: 5}");
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, fromjson("{'': 5}"), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, fromjson("{'': 5}"), Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
@@ -1396,9 +1415,9 @@ TEST(BtreeKeyGeneratorTest, CollatorDoesNotAffectNonStringKeys) {
 TEST(BtreeKeyGeneratorTest, GetCollationAwareKeysFromNestedObject) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{b: 4, a: {c: 'foo'}}");
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     fromjson("{'': {c: 'oof'}}"),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      fromjson("{'': {c: 'oof'}}"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};
@@ -1409,9 +1428,9 @@ TEST(BtreeKeyGeneratorTest, GetCollationAwareKeysFromNestedObject) {
 TEST(BtreeKeyGeneratorTest, GetCollationAwareKeysFromNestedArray) {
     BSONObj keyPattern = fromjson("{a: 1}");
     BSONObj genKeysFrom = fromjson("{b: 4, a: {c: ['foo', 'bar', 'baz']}}");
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     fromjson("{'': {c: ['oof', 'rab', 'zab']}}"),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      fromjson("{'': {c: ['oof', 'rab', 'zab']}}"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     MultikeyPaths expectedMultikeyPaths{MultikeyComponents{}};

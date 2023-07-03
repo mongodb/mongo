@@ -31,7 +31,10 @@ const st = new ShardingTest({
     // phase to fail with a TransactionTooLargeForCache error. To make the test setup work reliably,
     // disable the cluster parameter refresher since it periodically runs internal transactions
     // against the the config server.
-    mongosOptions: {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}}
+    mongosOptions: {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}},
+    configOptions:
+        {setParameter:
+             {'reshardingCriticalSectionTimeoutMillis': 24 * 60 * 60 * 1000 /* 1 day */}}
 });
 const configRSPrimary = st.configRS.getPrimary();
 

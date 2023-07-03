@@ -4,6 +4,7 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   references_foreign_collection,
  * ]
  */
 (function() {

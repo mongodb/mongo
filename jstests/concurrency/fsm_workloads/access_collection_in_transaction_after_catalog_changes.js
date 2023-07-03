@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Transactions with local (and majority) readConcern perform untimestamped reads and do not check
  * the min visible snapshot for collections, so they can access collections whose catalog
@@ -14,7 +12,7 @@
  * @tags: [uses_transactions, requires_replication]
  */
 
-var $config = (function() {
+export const $config = (function() {
     var states = (function() {
         function init(db, collName) {
             this.session = db.getMongo().startSession();

@@ -29,11 +29,24 @@
 
 #include "mongo/db/repl/read_concern_args.h"
 
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_write_concern_provenance_base_gen.h"
 #include "mongo/db/repl/bson_extract_optime.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication

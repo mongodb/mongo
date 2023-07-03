@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
-
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {

@@ -29,7 +29,14 @@
 
 #include "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status_with.h"
 #include "mongo/db/client.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::plan_cache_util {
 namespace {

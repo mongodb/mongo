@@ -20,7 +20,7 @@ load("jstests/libs/parallelTester.js");   // For Thread.
 
 const kMaxBatchSize = 1;
 
-function runTest({storeFindAndModifyImagesInSideCollection = false}) {
+function runTest() {
     const tenantMigrationTest = new TenantMigrationTest({
         name: jsTestName(),
         quickGarbageCollection: true,
@@ -43,12 +43,6 @@ function runTest({storeFindAndModifyImagesInSideCollection = false}) {
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
-    const setParam = {
-        setParameter: 1,
-        storeFindAndModifyImagesInSideCollection,
-    };
-    donorPrimary.adminCommand(setParam);
-    recipientPrimary.adminCommand(setParam);
     const rsConn = new Mongo(donorRst.getURL());
 
     const tenantSession = rsConn.startSession({retryWrites: true});
@@ -197,5 +191,4 @@ function runTest({storeFindAndModifyImagesInSideCollection = false}) {
     tenantMigrationTest.stop();
 }
 
-runTest({storeFindAndModifyImagesInSideCollection: false});
-runTest({storeFindAndModifyImagesInSideCollection: true});
+runTest();

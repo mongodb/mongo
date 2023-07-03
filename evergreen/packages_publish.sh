@@ -1,12 +1,24 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
+set -o verbose
+
+packagesfile=packages.tgz
+
+curl https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz >> $packagesfile
+
+podman run \
+  -v $(pwd):$(pwd) \
+  -w $(pwd) \
+  --env-host \
+  ${UPLOAD_LOCK_IMAGE} \
+  -key=${version_id}/${build_id}/packages/${packagesfile} -tag=task-id=${EVERGREEN_TASK_ID} ${packagesfile}
+
 cd src
 
 . ./notary_env.sh
 
 set -o errexit
-set -o verbose
 
 CURATOR_RELEASE=${curator_release}
 curl -L -O http://boxes.10gen.com/build/curator/curator-dist-rhel70-$CURATOR_RELEASE.tar.gz

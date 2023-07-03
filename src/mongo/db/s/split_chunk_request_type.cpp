@@ -29,9 +29,20 @@
 
 #include "mongo/db/s/split_chunk_request_type.h"
 
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -136,7 +147,7 @@ BSONObj SplitChunkRequest::toConfigCommandBSON(const BSONObj& writeConcern) {
 }
 
 void SplitChunkRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuilder) {
-    cmdBuilder->append(kConfigsvrSplitChunk, _nss.ns());
+    cmdBuilder->append(kConfigsvrSplitChunk, NamespaceStringUtil::serialize(_nss));
     cmdBuilder->append(kCollEpoch, _epoch);
     _chunkRange.append(cmdBuilder);
     {

@@ -29,12 +29,21 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
 
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
@@ -71,7 +80,7 @@ public:
                 size_t keyPrefixSize,
                 WorkingSet* ws,
                 const MatchExpression* filter,
-                const CollectionPtr& collection);
+                VariantCollectionPtrOrAcquisition collection);
 
     void addChild(std::unique_ptr<PlanStage> child);
 

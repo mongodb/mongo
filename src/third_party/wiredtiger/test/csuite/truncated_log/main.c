@@ -184,11 +184,11 @@ fill_db(void)
         if (use_columns)
             cursor->set_key(cursor, i + 1);
         else {
-            testutil_check(__wt_snprintf(k, sizeof(k), "key%03" PRIu32, i));
+            testutil_snprintf(k, sizeof(k), "key%03" PRIu32, i);
             cursor->set_key(cursor, k);
         }
-        testutil_check(
-          __wt_snprintf(v, sizeof(v), "value%0*" PRIu32, (int)(V_SIZE - (strlen("value") + 1)), i));
+        testutil_snprintf(
+          v, sizeof(v), "value%0*" PRIu32, (int)(V_SIZE - (strlen("value") + 1)), i);
         cursor->set_value(cursor, v);
         testutil_check(cursor->insert(cursor));
 
@@ -276,7 +276,7 @@ main(int argc, char *argv[])
         usage();
 
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
 
     /*
      * Fork a child to do its work. Wait for it to exit.
@@ -351,7 +351,7 @@ main(int argc, char *argv[])
         /* At this point $PATH is inside `home`, which we intend to delete. cd to the parent dir. */
         if (chdir("../") != 0)
             testutil_die(errno, "root chdir: %s", home);
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
     }
 
     return (EXIT_SUCCESS);

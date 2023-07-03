@@ -29,20 +29,56 @@
 
 #include "mongo/db/index_build_entry_helpers.h"
 
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_build_entry_gen.h"
 #include "mongo/db/catalog/local_oplog_info.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -236,9 +272,16 @@ Status persistIndexCommitQuorum(OperationContext* opCtx, const IndexBuildEntry& 
 Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexBuildEntry) {
     return writeConflictRetry(
         opCtx, "addIndexBuildEntry", NamespaceString::kIndexBuildEntryNamespace, [&]() -> Status {
-            AutoGetCollection collection(
-                opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-            if (!collection) {
+            const auto collection =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString::kIndexBuildEntryNamespace,
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+
+            if (!collection.exists()) {
                 str::stream ss;
                 ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
                 return Status(ErrorCodes::NamespaceNotFound, ss);
@@ -252,7 +295,7 @@ Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexB
             auto oplogSlot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
             Status status = collection_internal::insertDocument(
                 opCtx,
-                *collection,
+                collection.getCollectionPtr(),
                 InsertStatement(kUninitializedStmtId, indexBuildEntry.toBSON(), oplogSlot),
                 nullptr);
 

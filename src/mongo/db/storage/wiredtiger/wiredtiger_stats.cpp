@@ -29,8 +29,21 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
 
+#include <cstdint>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <wiredtiger.h>
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {

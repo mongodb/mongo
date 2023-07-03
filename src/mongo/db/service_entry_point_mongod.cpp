@@ -29,24 +29,59 @@
 
 #include "mongo/db/service_entry_point_mongod.h"
 
+#include <memory>
+#include <mutex>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync_locked.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/read_concern.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
-#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/scoped_operation_completion_sharding_actions.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_entry_point_common.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/polymorphic_scoped.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

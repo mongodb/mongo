@@ -59,13 +59,13 @@ static bool use_columns = false;
  * trace --
  *     Trace an operation.
  */
-#define trace(fmt, ...)                                                    \
-    do {                                                                   \
-        testutil_assert(tnext < WT_ELEMENTS(tlist));                       \
-        testutil_check(__wt_snprintf(tmp, sizeof(tmp), fmt, __VA_ARGS__)); \
-        free(tlist[tnext]);                                                \
-        tlist[tnext] = dstrdup(tmp);                                       \
-        ++tnext;                                                           \
+#define trace(fmt, ...)                                        \
+    do {                                                       \
+        testutil_assert(tnext < WT_ELEMENTS(tlist));           \
+        testutil_snprintf(tmp, sizeof(tmp), fmt, __VA_ARGS__); \
+        free(tlist[tnext]);                                    \
+        tlist[tnext] = dstrdup(tmp);                           \
+        ++tnext;                                               \
     } while (0)
 
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
@@ -130,7 +130,7 @@ change_key(u_int n)
     if (use_columns)
         keyrecno = n + 1;
     else
-        testutil_check(__wt_snprintf(keystr, sizeof(keystr), "%010u.key", n));
+        testutil_snprintf(keystr, sizeof(keystr), "%010u.key", n);
 }
 
 /*
@@ -203,7 +203,7 @@ modify(WT_SESSION *session, WT_CURSOR *c)
 
     /* Set a read timestamp 90% of the time. */
     if (mmrand(1, 10) != 1) {
-        testutil_check(__wt_snprintf(tmp, sizeof(tmp), "read_timestamp=%" PRIx64, ts));
+        testutil_snprintf(tmp, sizeof(tmp), "read_timestamp=%" PRIx64, ts);
         testutil_check(session->timestamp_transaction(session, tmp));
     }
 
@@ -226,7 +226,7 @@ modify(WT_SESSION *session, WT_CURSOR *c)
         trace("modify read-ts=%" PRIu64 ", commit-ts=%" PRIu64, ts, ts + 1);
         trace("returned {%s}", v);
 
-        testutil_check(__wt_snprintf(tmp, sizeof(tmp), "commit_timestamp=%" PRIx64, ts + 1));
+        testutil_snprintf(tmp, sizeof(tmp), "commit_timestamp=%" PRIx64, ts + 1);
         testutil_check(session->timestamp_transaction(session, tmp));
         testutil_check(session->commit_transaction(session, NULL));
 
@@ -250,7 +250,7 @@ repeat(WT_SESSION *session, WT_CURSOR *c)
 
     for (i = 0; i < lnext; ++i) {
         testutil_check(session->begin_transaction(session, "isolation=snapshot"));
-        testutil_check(__wt_snprintf(tmp, sizeof(tmp), "read_timestamp=%" PRIx64, list[i].ts));
+        testutil_snprintf(tmp, sizeof(tmp), "read_timestamp=%" PRIx64, list[i].ts);
         testutil_check(session->timestamp_transaction(session, tmp));
 
         set_key(c);
@@ -297,15 +297,15 @@ trace_die(void)
         fprintf(stderr, "%s\n", tlist[i]);
 }
 
-#define SET_VALUE(key, value)                                                           \
-    do {                                                                                \
-        char *__p;                                                                      \
-        memset(value, '.', sizeof(value));                                              \
-        value[sizeof(value) - 1] = '\0';                                                \
-        testutil_check(__wt_snprintf(value, sizeof(value), "%010u.value", (u_int)key)); \
-        for (__p = value; *__p != '\0'; ++__p)                                          \
-            ;                                                                           \
-        *__p = '.';                                                                     \
+#define SET_VALUE(key, value)                                               \
+    do {                                                                    \
+        char *__p;                                                          \
+        memset(value, '.', sizeof(value));                                  \
+        value[sizeof(value) - 1] = '\0';                                    \
+        testutil_snprintf(value, sizeof(value), "%010u.value", (u_int)key); \
+        for (__p = value; *__p != '\0'; ++__p)                              \
+            ;                                                               \
+        *__p = '.';                                                         \
     } while (0)
 
 /*
@@ -361,10 +361,10 @@ main(int argc, char *argv[])
         usage();
 
     testutil_work_dir_from_path(path, sizeof(path), home);
-    testutil_make_work_dir(path);
+    testutil_recreate_dir(path);
 
-    testutil_check(__wt_snprintf(
-      table_config, sizeof(table_config), "key_format=%s,value_format=S", use_columns ? "r" : "S"));
+    testutil_snprintf(
+      table_config, sizeof(table_config), "key_format=%s,value_format=S", use_columns ? "r" : "S");
 
     /* Load 100 records. */
     testutil_check(wiredtiger_open(
@@ -427,6 +427,6 @@ main(int argc, char *argv[])
     cleanup();
 
     if (!preserve)
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
     return (EXIT_SUCCESS);
 }

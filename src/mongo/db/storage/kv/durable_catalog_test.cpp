@@ -27,28 +27,79 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+// IWYU pragma: no_include "cxxabi.h"
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <fmt/format.h>
 #include <iostream>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/index_spec.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_impl.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/import_options.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/devnull/devnull_kv_engine.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/storage_engine_impl.h"
-#include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 namespace {
@@ -114,7 +165,7 @@ public:
             operationContext(),
             nss,
             catalogId,
-            getCatalog()->getMetaData(operationContext(), catalogId),
+            getCatalog()->getParsedCatalogEntry(operationContext(), catalogId)->metadata,
             std::move(coll.second));
 
         CollectionCatalog::write(operationContext(), [&](CollectionCatalog& catalog) {
@@ -144,7 +195,7 @@ public:
             spec.textDefaultLanguage("swedish");
         }
 
-        auto desc = std::make_unique<IndexDescriptor>(indexType, spec.toBSON());
+        auto desc = IndexDescriptor(indexType, spec.toBSON());
 
         IndexCatalogEntry* entry = nullptr;
         auto collWriter = getCollectionWriter();
@@ -152,11 +203,10 @@ public:
             WriteUnitOfWork wuow(operationContext());
             const bool isSecondaryBackgroundIndexBuild = false;
             boost::optional<UUID> buildUUID(twoPhase, UUID::gen());
-            ASSERT_OK(collWriter.getWritableCollection(operationContext())
-                          ->prepareForIndexBuild(operationContext(),
-                                                 desc.get(),
-                                                 buildUUID,
-                                                 isSecondaryBackgroundIndexBuild));
+            ASSERT_OK(
+                collWriter.getWritableCollection(operationContext())
+                    ->prepareForIndexBuild(
+                        operationContext(), &desc, buildUUID, isSecondaryBackgroundIndexBuild));
             entry = collWriter.getWritableCollection(operationContext())
                         ->getIndexCatalog()
                         ->createIndexEntry(operationContext(),
@@ -230,7 +280,7 @@ protected:
         imd.spec = descriptor.infoObj();
         imd.ready = true;
 
-        md = getCatalog()->getMetaData(operationContext(), catalogId);
+        md = getCatalog()->getParsedCatalogEntry(operationContext(), catalogId)->metadata;
         md->insertIndex(std::move(imd));
         getCatalog()->putMetaData(operationContext(), catalogId, *md);
 
@@ -256,6 +306,11 @@ protected:
                                                                   const BSONObj& storageMetadata) {
         Lock::DBLock dbLock(operationContext(), nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), nss, MODE_X);
+
+        uassert(ErrorCodes::NamespaceExists,
+                str::stream() << "Collection already exists. NS: " << nss.toStringForErrorMsg(),
+                !CollectionCatalog::get(operationContext())
+                     ->lookupCollectionByNamespace(operationContext(), nss));
 
         WriteUnitOfWork wuow(operationContext());
         auto res = getCatalog()->importCollection(
@@ -659,7 +714,9 @@ public:
 
         // Verify that the durable catalog has 'expected' as multikey paths for this index
         Lock::GlobalLock globalLock{operationContext(), MODE_IS};
-        auto md = getCatalog()->getMetaData(operationContext(), collection->getCatalogId());
+        auto md = getCatalog()
+                      ->getParsedCatalogEntry(operationContext(), collection->getCatalogId())
+                      ->metadata;
 
         auto indexOffset = md->findIndexOffset(indexEntry->descriptor()->indexName());
         assertMultikeyPathsAreEqual(md->indexes[indexOffset].multikeyPaths, expected);
@@ -748,26 +805,28 @@ TEST_F(ImportCollectionTest, ImportCollection) {
     auto idxIdentObj = BSON("_id_" << idxIdent);
 
     // Import should fail with missing "md" field.
-    ASSERT_THROWS_CODE(importCollectionTest(
-                           nss,
-                           BSON("idxIdent" << idxIdentObj << "ns" << nss.ns() << "ident" << ident),
-                           storageMetadata),
-                       AssertionException,
-                       ErrorCodes::BadValue);
-
-    // Import should fail with missing "ident" field.
     ASSERT_THROWS_CODE(
-        importCollectionTest(nss,
-                             BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns" << nss.ns()),
-                             storageMetadata),
+        importCollectionTest(
+            nss,
+            BSON("idxIdent" << idxIdentObj << "ns" << nss.ns_forTest() << "ident" << ident),
+            storageMetadata),
         AssertionException,
         ErrorCodes::BadValue);
 
+    // Import should fail with missing "ident" field.
+    ASSERT_THROWS_CODE(importCollectionTest(nss,
+                                            BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns"
+                                                      << nss.ns_forTest()),
+                                            storageMetadata),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+
     // Import should success with validate inputs.
-    auto swImportResult = importCollectionTest(
-        nss,
-        BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns" << nss.ns() << "ident" << ident),
-        storageMetadata);
+    auto swImportResult =
+        importCollectionTest(nss,
+                             BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns"
+                                       << nss.ns_forTest() << "ident" << ident),
+                             storageMetadata);
     ASSERT_OK(swImportResult.getStatus());
     DurableCatalog::ImportResult importResult = std::move(swImportResult.getValue());
 
@@ -786,8 +845,8 @@ TEST_F(ImportCollectionTest, ImportCollection) {
     // match.
     md->options.uuid = importResult.uuid;
     ASSERT_BSONOBJ_EQ(getCatalog()->getCatalogEntry(operationContext(), importResult.catalogId),
-                      BSON("md" << md->toBSON() << "idxIdent" << idxIdentObj << "ns" << nss.ns()
-                                << "ident" << ident));
+                      BSON("md" << md->toBSON() << "idxIdent" << idxIdentObj << "ns"
+                                << nss.ns_forTest() << "ident" << ident));
 
     // Since there was not a collision, the rand should not have changed.
     ASSERT_EQ(rand, getCatalog()->getRand_forTest());
@@ -823,7 +882,7 @@ TEST_F(ImportCollectionTest, ImportCollectionRandConflict) {
         auto swImportResult =
             importCollectionTest(nss,
                                  BSON("md" << md->toBSON() << "idxIdent" << BSON("_id_" << idxIdent)
-                                           << "ns" << nss.ns() << "ident" << ident),
+                                           << "ns" << nss.ns_forTest() << "ident" << ident),
                                  storageMetadata);
         ASSERT_OK(swImportResult.getStatus());
     }
@@ -855,8 +914,8 @@ TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLa
                               ->lookupCollectionByNamespace(operationContext(), regularNss);
         RecordId catalogId = collection->getCatalogId();
         ASSERT(!getCatalog()
-                    ->getMetaData(operationContext(), catalogId)
-                    ->timeseriesBucketsMayHaveMixedSchemaData);
+                    ->getParsedCatalogEntry(operationContext(), catalogId)
+                    ->metadata->timeseriesBucketsMayHaveMixedSchemaData);
     }
 
     {
@@ -871,11 +930,11 @@ TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLa
                               ->lookupCollectionByNamespace(operationContext(), bucketsNss);
         RecordId catalogId = collection->getCatalogId();
         ASSERT(getCatalog()
-                   ->getMetaData(operationContext(), catalogId)
-                   ->timeseriesBucketsMayHaveMixedSchemaData);
+                   ->getParsedCatalogEntry(operationContext(), catalogId)
+                   ->metadata->timeseriesBucketsMayHaveMixedSchemaData);
         ASSERT_FALSE(*getCatalog()
-                          ->getMetaData(operationContext(), catalogId)
-                          ->timeseriesBucketsMayHaveMixedSchemaData);
+                          ->getParsedCatalogEntry(operationContext(), catalogId)
+                          ->metadata->timeseriesBucketsMayHaveMixedSchemaData);
     }
 }
 
@@ -894,9 +953,12 @@ TEST_F(DurableCatalogTest, CreateCollectionCatalogEntryHasCorrectTenantNamespace
     ASSERT_EQ(getCatalog()->getEntry(catalogId).nss, nss);
 
     Lock::GlobalLock globalLock{operationContext(), MODE_IS};
-    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogId)->nss.tenantId(),
+    ASSERT_EQ(getCatalog()
+                  ->getParsedCatalogEntry(operationContext(), catalogId)
+                  ->metadata->nss.tenantId(),
               nss.tenantId());
-    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogId)->nss, nss);
+    ASSERT_EQ(getCatalog()->getParsedCatalogEntry(operationContext(), catalogId)->metadata->nss,
+              nss);
 
     auto catalogEntry = getCatalog()->scanForCatalogEntryByNss(operationContext(), nss);
 
@@ -937,7 +999,9 @@ TEST_F(DurableCatalogTest, ScanForCatalogEntryByNssBasic) {
     ASSERT(catalogEntryThird != boost::none);
     ASSERT_EQ(nssThird, catalogEntryThird->metadata->nss);
     ASSERT_EQ(catalogIdAndUUIDThird.uuid, catalogEntryThird->metadata->options.uuid);
-    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogIdAndUUIDThird.catalogId)->nss,
+    ASSERT_EQ(getCatalog()
+                  ->getParsedCatalogEntry(operationContext(), catalogIdAndUUIDThird.catalogId)
+                  ->metadata->nss,
               nssThird);
     ASSERT_EQ(getCatalog()->getEntry(catalogIdAndUUIDThird.catalogId).nss, nssThird);
 
@@ -946,7 +1010,9 @@ TEST_F(DurableCatalogTest, ScanForCatalogEntryByNssBasic) {
     ASSERT_EQ(nssSecond, catalogEntrySecond->metadata->nss);
     ASSERT_EQ(catalogIdAndUUIDSecond.uuid, catalogEntrySecond->metadata->options.uuid);
     ASSERT(catalogEntrySecond->metadata->options.timeseries);
-    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogIdAndUUIDSecond.catalogId)->nss,
+    ASSERT_EQ(getCatalog()
+                  ->getParsedCatalogEntry(operationContext(), catalogIdAndUUIDSecond.catalogId)
+                  ->metadata->nss,
               nssSecond);
     ASSERT_EQ(getCatalog()->getEntry(catalogIdAndUUIDSecond.catalogId).nss, nssSecond);
 
@@ -955,7 +1021,9 @@ TEST_F(DurableCatalogTest, ScanForCatalogEntryByNssBasic) {
     ASSERT_EQ(nssFirst, catalogEntryFirst->metadata->nss);
     ASSERT_EQ(catalogIdAndUUIDFirst.uuid, catalogEntryFirst->metadata->options.uuid);
     ASSERT_EQ(nssFirst.tenantId(), catalogEntryFirst->metadata->nss.tenantId());
-    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogIdAndUUIDFirst.catalogId)->nss,
+    ASSERT_EQ(getCatalog()
+                  ->getParsedCatalogEntry(operationContext(), catalogIdAndUUIDFirst.catalogId)
+                  ->metadata->nss,
               nssFirst);
     ASSERT_EQ(getCatalog()->getEntry(catalogIdAndUUIDFirst.catalogId).nss, nssFirst);
 

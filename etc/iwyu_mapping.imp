@@ -1,4 +1,9 @@
 [
+    {include: ["\"mongo/platform/compiler_gcc.h\"", "private", "\"mongo/platform/compiler.h\"", "public"]},
+    {include: ["\"float.h\"", "private", "<cfloat>", "public"]},
+    {include: ["\"limits.h\"", "private", "<climits>", "public"]},
+    {include: ["\"stdarg.h\"", "private", "<cstdarg>", "public"]},
+
     {include: ["<boost/smart_ptr/detail/operator_bool.hpp>", "private", "<boost/smart_ptr.hpp>", "public"]},
     {include: ["\"boost/smart_ptr/detail/operator_bool.hpp\"", "private", "<boost/smart_ptr.hpp>", "public"]},
     {include: ["<boost/optional/detail/optional_relops.hpp>", "private", "<boost/optional.hpp>", "public"]},

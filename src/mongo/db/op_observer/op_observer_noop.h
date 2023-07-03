@@ -41,6 +41,10 @@ namespace mongo {
  */
 class OpObserverNoop : public OpObserver {
 public:
+    NamespaceFilters getNamespaceFilters() const override {
+        return {NamespaceFilter::kAll, NamespaceFilter::kAll};
+    }
+
     void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const UUID& uuid,
@@ -95,7 +99,7 @@ public:
                    std::vector<InsertStatement>::const_iterator end,
                    std::vector<bool> fromMigrate,
                    bool defaultFromMigrate,
-                   InsertsOpStateAccumulator* opAccumulator = nullptr) override {}
+                   OpStateAccumulator* opAccumulator = nullptr) override {}
 
     void onInsertGlobalIndexKey(OperationContext* opCtx,
                                 const NamespaceString& globalIndexNss,
@@ -115,7 +119,9 @@ public:
 
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
-                       const BSONObj& doc) override {}
+                       const BSONObj& doc,
+                       OplogDeleteEntryArgs* args,
+                       OpStateAccumulator* opAccumulator = nullptr) override {}
 
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,

@@ -27,12 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/update/current_date_node.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/update/current_date_node.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

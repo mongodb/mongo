@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
+#include "mongo/bson/util/builder.h"
 
 namespace mongo {
 

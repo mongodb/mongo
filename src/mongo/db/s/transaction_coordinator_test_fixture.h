@@ -29,13 +29,24 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <memory>
 #include <set>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/client.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/transaction_coordinator.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 
 namespace mongo {
 

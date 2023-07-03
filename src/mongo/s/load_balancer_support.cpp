@@ -28,16 +28,26 @@
  */
 #include "mongo/s/load_balancer_support.h"
 
+#include <boost/move/utility_core.hpp>
 #include <memory>
+#include <string>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/hello_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo::load_balancer_support {

@@ -29,12 +29,12 @@
 
 #include "mongo/client/sasl_client_session.h"
 
-#include "mongo/base/init.h"
-#include "mongo/util/allocator.h"
+#include <cstddef>
+#include <limits>
+#include <type_traits>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/signal_handlers_synchronous.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 SaslClientSession::SaslClientSessionFactoryFn SaslClientSession::create;

@@ -83,12 +83,11 @@
  *
  */
 
-#include "mongo/platform/basic.h"
-
 #ifdef _WIN32
 
 #include <conio.h>
 #include <io.h>
+
 #define strcasecmp _stricmp
 #define strdup _strdup
 #define isatty _isatty
@@ -101,26 +100,38 @@
 #include <cstdlib>
 #include <cstring>
 #include <sys/ioctl.h>
-#include <sys/types.h>
 #include <termios.h>
-#include <unistd.h>
 
 #endif /* _WIN32 */
 
-#include "linenoise.h"
-#include "linenoise_utf8.h"
-#include "mk_wcwidth.h"
+#ifdef __linux__
+#include <features.h>
+#include <strings.h>
+#endif
+
 #include <cerrno>
+#include <cstdint>
 #include <cstdio>
 #include <cwctype>
 #include <fcntl.h>
 #include <memory>
 #include <sstream>
 #include <string>
+#include <system_error>
 #include <vector>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
 #include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/shell/linenoise.h"
+#include "mongo/shell/linenoise_utf8.h"
+#include "mongo/shell/mk_wcwidth.h"
 #include "mongo/util/errno_util.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 using std::string;
 using std::vector;

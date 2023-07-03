@@ -36,7 +36,9 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {

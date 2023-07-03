@@ -28,14 +28,16 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/embedded/index_builds_coordinator_embedded.h"
-
-#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/util/str.h"
+#include "mongo/embedded/index_builds_coordinator_embedded.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -88,7 +90,7 @@ IndexBuildsCoordinatorEmbedded::resumeIndexBuild(OperationContext* opCtx,
 }
 
 void IndexBuildsCoordinatorEmbedded::_signalPrimaryForAbortAndWaitForExternalAbort(
-    OperationContext* opCtx, ReplIndexBuildState* replState, const Status& abortStatus) {}
+    OperationContext* opCtx, ReplIndexBuildState* replState) {}
 
 void IndexBuildsCoordinatorEmbedded::_signalPrimaryForCommitReadiness(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {}

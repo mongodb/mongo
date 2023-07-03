@@ -27,14 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/embedded/periodic_runner_embedded.h"
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <functional>
+#include <mutex>
+#include <queue>
+#include <utility>
 
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
+#include "mongo/embedded/periodic_runner_embedded.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -192,7 +198,7 @@ void PeriodicRunnerEmbedded::PeriodicJobImpl::stop() {
     }
 }
 
-Milliseconds PeriodicRunnerEmbedded::PeriodicJobImpl::getPeriod() {
+Milliseconds PeriodicRunnerEmbedded::PeriodicJobImpl::getPeriod() const {
     stdx::lock_guard<Latch> lk(_mutex);
     return _job.interval;
 }

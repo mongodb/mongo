@@ -27,20 +27,31 @@
  *    it in the license file.
  */
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <deque>
 #include <memory>
 #include <set>
+#include <string>
 
+#include "mongo/base/status.h"
 #include "mongo/executor/connection_pool.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/executor_test_util.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace executor {
 namespace connection_pool_test_details {
 
 class ConnectionPoolTest;
+
 class PoolImpl;
 
 /**

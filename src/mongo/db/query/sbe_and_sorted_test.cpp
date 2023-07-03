@@ -27,11 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/shard_filterer_factory_interface.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 
@@ -66,7 +78,7 @@ protected:
             buildPlanStage(std::move(querySolution), false, nullptr);
 
         // Prepare the sbe::PlanStage for execution and collect all results.
-        auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
+        auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
         auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessors[0]);
         sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
 

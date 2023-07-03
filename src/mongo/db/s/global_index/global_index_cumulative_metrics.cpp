@@ -29,6 +29,14 @@
 
 #include "mongo/db/s/global_index/global_index_cumulative_metrics.h"
 
+#include <array>
+#include <cstdint>
+#include <memory>
+#include <utility>
+
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 namespace mongo {
 namespace global_index {
 

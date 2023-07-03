@@ -32,6 +32,8 @@
 #include <absl/hash/hash.h>
 #include <absl/strings/string_view.h>
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"

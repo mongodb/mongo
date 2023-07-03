@@ -28,24 +28,36 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/concurrency/thread_pool.h"
-
-#include <deque>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <cstdint>
+#include <deque>
+#include <exception>
 #include <list>
+#include <mutex>
 #include <sstream>
-#include <vector>
+#include <thread>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/hierarchical_acquisition.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor

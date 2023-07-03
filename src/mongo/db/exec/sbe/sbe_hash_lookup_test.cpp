@@ -31,16 +31,44 @@
  * This file contains tests for sbe::LoopJoinStage.
  */
 
+#include <cstdint>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/util/stage_results_printer.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/golden_test.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
+
 namespace mongo::sbe {
 
 class HashLookupStageTest : public PlanStageTestFixture {

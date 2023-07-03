@@ -30,23 +30,40 @@
 
 #include "mongo/executor/connection_pool.h"
 
-#include "mongo/db/service_context.h"
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/tuple/tuple.hpp>
 #include <fmt/format.h>
-#include <fmt/ostream.h>
+#include <iterator>
+#include <list>
 #include <memory>
+#include <queue>
+#include <system_error>
+#include <type_traits>
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/server_feature_flags_gen.h"
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/connection_pool_stats.h"
-#include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/lru_cache.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kConnectionPool
 
@@ -688,8 +705,7 @@ SemiFuture<ConnectionPool::ConnectionHandle> ConnectionPool::_get(const HostAndP
 
     // Only count connections being checked-out for ordinary use, not lease, towards cumulative wait
     // time.
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe() && !lease) {
+    if (!lease) {
         connFuture = std::move(connFuture).tap([connRequestedAt, pool = pool](const auto& conn) {
             pool->recordConnectionWaitTime(connRequestedAt);
         });
@@ -716,10 +732,7 @@ void ConnectionPool::appendConnectionStats(ConnectionPoolStats* stats) const {
                                      pool->getOnceUsedConnections(),
                                      pool->getTotalConnUsageTime()};
 
-        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-        if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
-            hostStats.acquisitionWaitTimes = pool->connectionWaitTimeStats();
-        }
+        hostStats.acquisitionWaitTimes = pool->connectionWaitTimeStats();
         stats->updateStatsForHost(_name, host, hostStats);
     }
 }
@@ -959,6 +972,16 @@ void ConnectionPool::SpecificPool::finishRefresh(ConnectionInterface* connPtr, S
         return;
     }
 
+    // If the host and port were dropped, let this lapse and spawn new connections
+    if (!conn || conn->getGeneration() != _generation) {
+        LOGV2_DEBUG(22564,
+                    kDiagnosticLogLevel,
+                    "Dropping late refreshed connection to {hostAndPort}",
+                    "Dropping late refreshed connection",
+                    "hostAndPort"_attr = _hostAndPort);
+        return;
+    }
+
     // Pass a failure on through
     if (!status.isOK()) {
         LOGV2_DEBUG(22563,
@@ -968,16 +991,6 @@ void ConnectionPool::SpecificPool::finishRefresh(ConnectionInterface* connPtr, S
                     "hostAndPort"_attr = _hostAndPort,
                     "error"_attr = redact(status));
         processFailure(status);
-        return;
-    }
-
-    // If the host and port were dropped, let this lapse and spawn new connections
-    if (!conn || conn->getGeneration() != _generation) {
-        LOGV2_DEBUG(22564,
-                    kDiagnosticLogLevel,
-                    "Dropping late refreshed connection to {hostAndPort}",
-                    "Dropping late refreshed connection",
-                    "hostAndPort"_attr = _hostAndPort);
         return;
     }
 
@@ -1010,7 +1023,29 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
     }
 
     if (auto status = conn->getStatus(); !status.isOK()) {
-        // TODO: alert via some callback if the host is bad
+        // Our error handling here is determined by the MongoDB SDAM specification for handling
+        // application errors on established connections. In particular, if a network error occurs,
+        // we must close all idle sockets in the connection pool for the server: "if one socket is
+        // bad, it is likely that all are." However, if the error is just a network _timeout_ error,
+        // we don't drop the connections because the timeout may indicate a slow operation rather
+        // than an unavailable server. Additionally, if we can isolate the error to a single
+        // socket/connection based on it's type, we won't drop other connections/sockets.
+        //
+        // See the spec for additional details:
+        // https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#application-errors
+        bool isSingleConnectionError = status.code() == ErrorCodes::ConnectionError;
+        if (ErrorCodes::isNetworkError(status) && !isSingleConnectionError &&
+            !ErrorCodes::isNetworkTimeoutError(status)) {
+            LOGV2_DEBUG(7719500,
+                        kDiagnosticLogLevel,
+                        "Connection failed to {hostAndPort} due to {error}",
+                        "Connection failed",
+                        "hostAndPort"_attr = _hostAndPort,
+                        "error"_attr = redact(status));
+            processFailure(status);
+            return;
+        }
+        // Otherwise, drop the one connection.
         LOGV2(22566,
               "Ending connection to host {hostAndPort} due to bad connection status: {error}; "
               "{numOpenConns} connections to that host remain open",

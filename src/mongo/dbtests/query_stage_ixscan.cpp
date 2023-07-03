@@ -27,16 +27,46 @@
  *    it in the license file.
  */
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/client/dbclient_base.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/index_scan.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/interval.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace QueryStageIxscan {
@@ -112,7 +142,7 @@ public:
 
         // This child stage gets owned and freed by the caller.
         MatchExpression* filter = nullptr;
-        return new IndexScan(_expCtx.get(), _collPtr, params, &_ws, filter);
+        return new IndexScan(_expCtx.get(), &_collPtr, params, &_ws, filter);
     }
 
     IndexScan* createIndexScan(BSONObj startKey,
@@ -137,14 +167,14 @@ public:
         params.bounds.fields.push_back(oil);
 
         MatchExpression* filter = nullptr;
-        return new IndexScan(_expCtx.get(), _collPtr, params, &_ws, filter);
+        return new IndexScan(_expCtx.get(), &_collPtr, params, &_ws, filter);
     }
 
     static const char* ns() {
         return "unittest.QueryStageIxscan";
     }
     static NamespaceString nss() {
-        return NamespaceString(ns());
+        return NamespaceString::createNamespaceString_forTest(ns());
     }
 
 protected:

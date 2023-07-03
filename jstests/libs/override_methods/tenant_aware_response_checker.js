@@ -23,7 +23,7 @@ function checkExpectedDbNameInString(str, dbName, prefixedDbName, originalRes) {
     }
     // Currently, we do not expect prefixed db name in db name field as we only test with
     // "featureFlagRequireTenantID: true".
-    // TODO SERVER-70740: expect prefixed db name if "expectPrefix" option in request is true.
+    // TODO SERVER-78300: expect prefixed db name if "expectPrefix" option in request is true.
     assert.eq(false,
               wordInString(str, prefixedDbName),
               `Response db name "${str}" does not match sent db name "${

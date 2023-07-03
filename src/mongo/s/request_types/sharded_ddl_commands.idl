@@ -236,6 +236,10 @@ structs:
                 type: array<ShardKeyRange>
                 description: "The key ranges for the new shard key. This should be continuous and complete."
                 optional: true
+            forceRedistribution:
+                type: bool
+                description: "Whether initiate reshardCollection if the shardKey doesn't change."
+                optional: true
 
     SetAllowMigrationsRequest:
         description: "Parameters sent for the set allow migrations command"
@@ -314,6 +318,7 @@ commands:
         api_version: ""
         cpp_name: ShardsvrDropDatabaseParticipant
         strict: false
+        reply_type: OkReply
 
     _shardsvrDropCollection:
         description: "Parser for the _shardsvrDropCollection command"
@@ -340,6 +345,7 @@ commands:
                 type: bool 
                 description: "Whether the drop comes as a result of an interrupted migration process."
                 optional: true
+        reply_type: OkReply
 
     _shardsvrRenameCollection:
         command_name: _shardsvrRenameCollection
@@ -356,6 +362,7 @@ commands:
                               C2C needs to do the renames to replicate create collection."
                 type: bool
                 optional: true
+        reply_type: OkReply
 
     _shardsvrSetAllowMigrations:
         command_name: _shardsvrSetAllowMigrations
@@ -366,22 +373,6 @@ commands:
         api_version: ""
         chained_structs:
             SetAllowMigrationsRequest: SetAllowMigrationsRequest
-
-    _configsvrRenameCollectionMetadata:
-        command_name: _configsvrRenameCollectionMetadata
-        cpp_name: ConfigsvrRenameCollectionMetadata
-        description: "Internal command for renaming collection metadata on the CSRS"
-        strict: false
-        namespace: concatenate_with_db
-        api_version: ""
-        fields:
-            to:
-                type: namespacestring
-                description: "The new namespace for the collection being renamed."
-            optFromCollection:
-                description: "Information of the source collection to rename, used only for sharded collection."
-                type: CollectionType
-                optional: true
 
     _shardsvrReshardCollection:
         command_name: _shardsvrReshardCollection

@@ -27,16 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/classic_stage_builder.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -76,7 +91,7 @@ public:
         ASSERT_OK(statusWithCQ.getStatus());
 
         stage_builder::ClassicStageBuilder builder{
-            opCtx(), CollectionPtr::null, *statusWithCQ.getValue(), *querySolution, workingSet()};
+            opCtx(), &CollectionPtr::null, *statusWithCQ.getValue(), *querySolution, workingSet()};
         return builder.build(querySolution->root());
     }
 

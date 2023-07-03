@@ -28,21 +28,31 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <string>
 
-#include "mongo/db/ftdc/util.h"
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include <boost/filesystem.hpp>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/constants.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/ftdc/util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 

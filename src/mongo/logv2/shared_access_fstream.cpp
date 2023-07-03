@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/logv2/shared_access_fstream.h"
 
 #if defined(_WIN32) && defined(_MSC_VER)
@@ -37,7 +35,7 @@
 #include <filesystem>
 #include <io.h>
 
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
 namespace mongo {
 FILE* Win32SharedAccessFileDescriptor::_open(const wchar_t* filename,

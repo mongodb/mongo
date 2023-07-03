@@ -15,7 +15,7 @@ if (!checkSBEEnabled(db)) {
 }
 
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsaiExperimental"}));
 
 const coll = db.cqf_analyze;
 const syscoll = db.system.statistics.cqf_analyze;

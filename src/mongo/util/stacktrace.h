@@ -33,12 +33,15 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <iosfwd>
 #include <string>
+#include <utility>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 
 /**
  * All-thread backtrace is only implemented on Linux. Even on Linux, it's only AS-safe

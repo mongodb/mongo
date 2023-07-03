@@ -1,7 +1,7 @@
 // Tests that commands properly handle their underlying plan executor failing or being killed.
 // @tags: [
-//    # TODO SERVER-64007: Support yielding in CQF plans.
-//    cqf_incompatible,
+//    # TODO SERVER-70446: Enable yielding for index plans in CQF.
+//    cqf_experimental_incompatible,
 // ]
 (function() {
 'use strict';
@@ -212,7 +212,7 @@ assertCommandPropogatesPlanExecutorKillReason({find: coll.getName(), filter: {a:
                                               {usesIndex: true});
 
 assertCommandPropogatesPlanExecutorKillReason(
-    {update: coll.getName(), updates: [{q: {a: {$gte: 0}}, u: {$set: {a: 1}}}]},
+    {update: coll.getName(), updates: [{q: {a: {$gte: 0}}, u: {$set: {a: 1}}, multi: true}]},
     {curOpFilter: {op: 'update'}, usesIndex: true});
 
 assertCommandPropogatesPlanExecutorKillReason(

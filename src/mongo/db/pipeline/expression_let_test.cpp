@@ -27,12 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <functional>
+#include <string>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace ExpressionTests {
@@ -44,8 +54,8 @@ std::string applyHmacForTest(StringData s) {
 
 TEST(RedactionTest, ExpressionLet) {
     SerializationOptions options;
-    options.identifierHmacPolicy = applyHmacForTest;
-    options.applyHmacToIdentifiers = true;
+    options.transformIdentifiersCallback = applyHmacForTest;
+    options.transformIdentifiers = true;
 
     auto expCtx = ExpressionContextForTest{};
 

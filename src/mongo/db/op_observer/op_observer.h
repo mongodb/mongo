@@ -29,23 +29,45 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <set>
 #include <string>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rollback.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/transaction/transaction_operations.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
 struct InsertStatement;
-class OperationContext;
-
-namespace repl {
-class OpTime;
-}  // namespace repl
 
 struct OpTimeBundle {
     repl::OpTime writeOpTime;
@@ -56,13 +78,20 @@ struct OpTimeBundle {
  * The generic container for onUpdate/onDelete/onUnpreparedTransactionCommit state-passing between
  * OpObservers. Despite the naming, some OpObserver's don't strictly observe. This struct is written
  * by OpObserverImpl and useful for later observers to inspect state they need.
+ *
+ * These structs are decorable to support the sharing of critical resources between OpObserverImpl
+ * and MigrationChunkClonerSourceOpObserver. No other decorations should be added to these structs.
  */
-struct OpStateAccumulator {
-    OpTimeBundle opTime;
-};
+struct OpStateAccumulator : Decorable<OpStateAccumulator> {
+    OpStateAccumulator() = default;
 
-struct InsertsOpStateAccumulator {
-    std::vector<repl::OpTime> opTimes;
+    // Use either 'opTime' for non-insert operations or 'insertOpTimes', but not both.
+    OpTimeBundle opTime;
+    std::vector<repl::OpTime> insertOpTimes;
+
+private:
+    OpStateAccumulator(const OpStateAccumulator&) = delete;
+    OpStateAccumulator& operator=(const OpStateAccumulator&) = delete;
 };
 
 enum class RetryableFindAndModifyLocation {
@@ -90,7 +119,15 @@ struct OplogUpdateEntryArgs {
         : updateArgs(updateArgs), coll(coll) {}
 };
 
-struct OplogDeleteEntryArgs {
+/**
+ * Holds supplementary information required for OpObserver::onDelete() to write out an
+ * oplog entry for deleting a single document from a collection.
+ *
+ * This struct is also passed to OpObserver::aboutToDelete() so that OpObserver
+ * implementations may include additional information (via decorations) to be shared with
+ * the onDelete() method within the same implementation.
+ */
+struct OplogDeleteEntryArgs : Decorable<OplogDeleteEntryArgs> {
     const BSONObj* deletedDoc = nullptr;
 
     // "fromMigrate" indicates whether the delete was induced by a chunk migration, and so
@@ -131,6 +168,24 @@ class OpObserver {
 public:
     using ApplyOpsOplogSlotAndOperationAssignment = TransactionOperations::ApplyOpsInfo;
 
+    /**
+     * Used by CRUD ops: onInserts, onUpdate, aboutToDelete, and onDelete.
+     */
+    enum class NamespaceFilter {
+        kConfig,           // config database (i.e. config.*)
+        kSystem,           // system collection (i.e. *.system.*)
+        kConfigAndSystem,  // run the observer on config and system, but not user collections
+        kAll,              // run the observer on all collections/databases
+        kNone,             // never run the observer for this CRUD event
+    };
+
+    // Controls the OpObserverRegistry's filtering of CRUD events.
+    // Each OpObserver declares which events it cares about with this.
+    struct NamespaceFilters {
+        NamespaceFilter updateFilter;  // onInserts, onUpdate
+        NamespaceFilter deleteFilter;  // aboutToDelete, onDelete
+    };
+
     enum class CollectionDropType {
         // The collection is being dropped immediately, in one step.
         kOnePhase,
@@ -141,6 +196,12 @@ public:
     };
 
     virtual ~OpObserver() = default;
+
+    // Used by the OpObserverRegistry to filter out CRUD operations.
+    // With this method, each OpObserver should declare if it wants to subscribe
+    // to a subset of operations to special internal collections. This helps
+    // improve performance. Avoid using 'kAll' as much as possible.
+    virtual NamespaceFilters getNamespaceFilters() const = 0;
 
     virtual void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                         const NamespaceString& nss,
@@ -201,7 +262,7 @@ public:
      * and is intended to be forwarded to downstream subsystems that expect a single
      * 'fromMigrate' to describe the entire set of inserts.
      * Examples: ShardServerOpObserver, UserWriteBlockModeOpObserver, and
-     * OpObserverShardingImpl::shardObserveInsertsOp().
+     * MigrationChunkClonerSourceOpObserver::onInserts().
      */
     virtual void onInserts(OperationContext* opCtx,
                            const CollectionPtr& coll,
@@ -209,7 +270,7 @@ public:
                            std::vector<InsertStatement>::const_iterator end,
                            std::vector<bool> fromMigrate,
                            bool defaultFromMigrate,
-                           InsertsOpStateAccumulator* opAccumulator = nullptr) = 0;
+                           OpStateAccumulator* opAccumulator = nullptr) = 0;
 
     virtual void onInsertGlobalIndexKey(OperationContext* opCtx,
                                         const NamespaceString& globalIndexNss,
@@ -229,7 +290,9 @@ public:
 
     virtual void aboutToDelete(OperationContext* opCtx,
                                const CollectionPtr& coll,
-                               const BSONObj& doc) = 0;
+                               const BSONObj& doc,
+                               OplogDeleteEntryArgs* args,
+                               OpStateAccumulator* opAccumulator = nullptr) = 0;
 
     /**
      * Handles logging before document is deleted.

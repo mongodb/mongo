@@ -27,23 +27,72 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/flat_hash_map.h>
+#include <cstddef>
+#include <cstdint>
+#include <set>
 
-#include "mongo/db/query/plan_explainer_sbe.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include <queue>
-
-#include "mongo/db/exec/plan_stats_walker.h"
+#include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
+#include "mongo/db/fts/fts_query.h"
 #include "mongo/db/fts/fts_query_impl.h"
-#include "mongo/db/keypattern.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_explainer_impl.h"
+#include "mongo/db/query/plan_explainer_sbe.h"
+#include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
+#include "mongo/db/query/projection.h"
+#include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace {
+/**
+ * This function replaces field names in *replace* with those from the object
+ * *fieldNames*, preserving field ordering.  Both objects must have the same
+ * number of fields.
+ *
+ * Example:
+ *
+ *     replaceBSONKeyNames({ 'a': 1, 'b' : 1 }, { '': 'foo', '', 'bar' }) =>
+ *
+ *         { 'a' : 'foo' }, { 'b' : 'bar' }
+ */
+BSONObj replaceBSONFieldNames(const BSONObj& replace, const BSONObj& fieldNames) {
+    invariant(replace.nFields() == fieldNames.nFields());
+
+    BSONObjBuilder bob;
+    auto iter = fieldNames.begin();
+
+    for (const BSONElement& el : replace) {
+        bob.appendAs(el, (*iter++).fieldNameStringData());
+    }
+
+    return bob.obj();
+}
+
 void statsToBSON(const QuerySolutionNode* node,
                  BSONObjBuilder* bob,
                  const BSONObjBuilder* topLevelBob) {
@@ -81,6 +130,34 @@ void statsToBSON(const QuerySolutionNode* node,
             if (csn->maxRecord) {
                 csn->maxRecord->appendToBSONAs(bob, "maxRecord");
             }
+            break;
+        }
+        case STAGE_COUNT_SCAN: {
+            auto csn = static_cast<const CountScanNode*>(node);
+
+            bob->append("keyPattern", csn->index.keyPattern);
+            bob->append("indexName", csn->index.identifier.catalogName);
+            auto collation =
+                csn->index.infoObj.getObjectField(IndexDescriptor::kCollationFieldName);
+            if (!collation.isEmpty()) {
+                bob->append("collation", collation);
+            }
+            bob->appendBool("isMultiKey", csn->index.multikey);
+            if (!csn->index.multikeyPaths.empty()) {
+                appendMultikeyPaths(csn->index.keyPattern, csn->index.multikeyPaths, bob);
+            }
+            bob->appendBool("isUnique", csn->index.unique);
+            bob->appendBool("isSparse", csn->index.sparse);
+            bob->appendBool("isPartial", csn->index.filterExpr != nullptr);
+            bob->append("indexVersion", static_cast<int>(csn->index.version));
+
+            BSONObjBuilder indexBoundsBob(bob->subobjStart("indexBounds"));
+            indexBoundsBob.append("startKey",
+                                  replaceBSONFieldNames(csn->startKey, csn->index.keyPattern));
+            indexBoundsBob.append("startKeyInclusive", csn->startKeyInclusive);
+            indexBoundsBob.append("endKey",
+                                  replaceBSONFieldNames(csn->endKey, csn->index.keyPattern));
+            indexBoundsBob.append("endKeyInclusive", csn->endKeyInclusive);
             break;
         }
         case STAGE_GEO_NEAR_2D: {
@@ -175,7 +252,8 @@ void statsToBSON(const QuerySolutionNode* node,
         case STAGE_EQ_LOOKUP: {
             auto eln = static_cast<const EqLookupNode*>(node);
 
-            bob->append("foreignCollection", eln->foreignCollection.toString());
+            bob->append("foreignCollection",
+                        NamespaceStringUtil::serialize(eln->foreignCollection));
             bob->append("localField", eln->joinFieldLocal.fullPath());
             bob->append("foreignField", eln->joinFieldForeign.fullPath());
             bob->append("asField", eln->joinField.fullPath());
@@ -419,7 +497,7 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->collectionScansNonTailable = _debugInfo->mainStats.collectionScansNonTailable;
 }
 
-void PlanExplainerSBE::getSecondarySummaryStats(std::string secondaryColl,
+void PlanExplainerSBE::getSecondarySummaryStats(const NamespaceString& secondaryColl,
                                                 PlanSummaryStats* statsOut) const {
     tassert(6466202, "statsOut should be a valid pointer", statsOut);
 

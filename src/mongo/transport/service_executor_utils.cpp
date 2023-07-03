@@ -29,22 +29,30 @@
 
 #include "mongo/transport/service_executor_utils.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <exception>
 #include <fmt/format.h>
-#include <functional>
 #include <memory>
-
-#include "mongo/logv2/log.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/transport/service_executor.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/thread_safety_context.h"
+#include <string>
+#include <system_error>
+#include <utility>
 
 #if !defined(_WIN32)
+#include <pthread.h>
 #include <sys/resource.h>
-#include <unistd.h>
 #endif
+
+#include "mongo/base/error_codes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/thread_safety_context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -28,12 +28,13 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
-#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
-
+#include "mongo/db/aggregated_index_usage_tracker.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

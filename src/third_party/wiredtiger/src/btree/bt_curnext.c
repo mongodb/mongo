@@ -780,6 +780,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
     cursor = &cbt->iface;
     key_out_of_bounds = false;
     need_walk = false;
+    newpage = false;
     session = CUR2S(cbt);
     total_skipped = 0;
 
@@ -951,9 +952,17 @@ err:
          * eg: Initial data set : (1,2,3,...10) insert key 11 in a prepare transaction. loop on next
          * will return 1,2,3...10 and subsequent call to next will return a prepare conflict. Now if
          * we call prev key 10 will be returned which will be same as earlier returned key.
+         *
+         * Additionally, reset the cursor check when we are using read uncommitted isolation mode
+         * and cross a page boundary. It's possible to see out-of-order keys when the earlier
+         * returned key is removed and new keys are inserted at the start of the page.
          */
-        if (!F_ISSET(cbt, WT_CBT_ITERATE_RETRY_PREV))
+        if (!F_ISSET(cbt, WT_CBT_ITERATE_RETRY_PREV)) {
+            if (session->txn->isolation == WT_ISO_READ_UNCOMMITTED && newpage) {
+                __wt_cursor_key_order_reset(cbt);
+            }
             ret = __wt_cursor_key_order_check(session, cbt, true);
+        }
 
         if (need_walk) {
             /*

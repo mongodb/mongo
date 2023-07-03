@@ -201,6 +201,8 @@ last-continuous:
     ticket: SERVER-65022
   - test_file: jstests/sharding/database_versioning_all_commands.js
     ticket: SERVER-65101
+  - test_file: jstests/sharding/database_versioning_all_commands.js
+    ticket: SERVER-75911
   - test_file: jstests/sharding/sessions_collection_auto_healing.js
     ticket: SERVER-65188
   - test_file: jstests/replsets/sessions_collection_auto_healing.js
@@ -266,7 +268,7 @@ last-continuous:
   - test_file: jstests/sharding/collection_uuid_shard_capped_collection.js
     ticket: SERVER-67885
   - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-68361
+    ticket: SERVER-71219
   - test_file: jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
     ticket: SERVER-68556
   - test_file: jstests/core/txns/no_writes_to_system_collections_in_txn.js
@@ -391,9 +393,29 @@ last-continuous:
     ticket: SERVER-76988
   - test_file: jstests/sharding/analyze_shard_key/configure_query_analyzer_persistence.js
     ticket: SERVER-77247
+  - test_file: jstests/core/timeseries/timeseries_create_collection.js
+    ticket: SERVER-77382
+  - test_file: jstests/replsets/tenant_migration_retryable_internal_transaction.js
+    ticket: SERVER-77237
+  - test_file: jstests/sharding/cluster_time_across_add_shard.js
+    ticket: SERVER-60466
+  - test_file: jstests/sharding/move_chunk_deferred_lookup.js
+    ticket: SERVER-78050
+  - test_file: jstests/replsets/tenant_migrations_back_to_back_2.js
+    ticket: SERVER-78176
+  - test_file: jstests/sharding/transfer_mods_large_batches.js
+    ticket: SERVER-78414
+  - test_file: jstests/core/query/elemmatch/elemmatch_or_pushdown_paths.js
+    ticket: SERVER-74954
+  - test_file: jstests/core/find_with_resume_after_param.js
+    ticket: SERVER-77386
+  - test_file: jstests/core/timeseries/timeseries_resume_after.js
+    ticket: SERVER-77386
   suites: null
 last-lts:
   all:
+  - test_file: jstests/sharding/database_versioning_all_commands.js
+    ticket: SERVER-75911
   - test_file: jstests/core/query/null_query_semantics.js
     ticket: SERVER-21929
   - test_file: jstests/core/query/or/or_to_in.js
@@ -463,7 +485,7 @@ last-lts:
   - test_file: jstests/core/txns/errors_on_committed_transaction.js
     ticket: SERVER-52547
   - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-52906
+    ticket: SERVER-71219
   - test_file: jstests/sharding/migration_waits_for_majority_commit.js
     ticket: SERVER-52906
   - test_file: jstests/sharding/migration_ignore_interrupts_1.js
@@ -732,8 +754,6 @@ last-lts:
     ticket: SERVER-67723
   - test_file: jstests/sharding/collection_uuid_shard_capped_collection.js
     ticket: SERVER-67885
-  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-68361
   - test_file: jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
     ticket: SERVER-68556
   - test_file: jstests/core/txns/no_writes_to_system_collections_in_txn.js
@@ -866,4 +886,28 @@ last-lts:
     ticket: SERVER-76988
   - test_file: jstests/sharding/analyze_shard_key/configure_query_analyzer_persistence.js
     ticket: SERVER-77247
+  - test_file: jstests/core/timeseries/timeseries_create_collection.js
+    ticket: SERVER-77382
+  - test_file: jstests/replsets/tenant_migration_retryable_internal_transaction.js
+    ticket: SERVER-77237
+  - test_file: jstests/sharding/cluster_time_across_add_shard.js
+    ticket: SERVER-60466
+  - test_file: jstests/sharding/move_chunk_deferred_lookup.js
+    ticket: SERVER-78050
+  - test_file: jstests/core/find_with_resume_after_param.js
+    ticket: SERVER-77386
+  - test_file: jstests/core/timeseries/timeseries_resume_after.js
+    ticket: SERVER-77386
+  - test_file: jstests/replsets/tenant_migrations_back_to_back_2.js
+    ticket: SERVER-78176
+  - test_file: jstests/core/index/wildcard/compound_wildcard_index_or.js
+    ticket: SERVER-78307
+  - test_file: jstests/core/index/wildcard/compound_wildcard_index_unbounded.js
+    ticket: SERVER-78307
+  - test_file: jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
+    ticket: SERVER-78307
+  - test_file: jstests/sharding/transfer_mods_large_batches.js
+    ticket: SERVER-78414
+  - test_file: jstests/core/query/elemmatch/elemmatch_or_pushdown_paths.js
+    ticket: SERVER-74954
   suites: null

@@ -29,19 +29,23 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <map>
 #include <string>
 
-#include <MurmurHash3.h>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/murmur3.h"
 
 namespace mongo {
 
@@ -168,6 +172,13 @@ enum ResourceType {
     RESOURCE_METADATA,
 
     /**
+     * Resource DDL types used for multi-granularity locking on DDL operations.
+     * These resources are not related to the storage hierarchy.
+     */
+    RESOURCE_DDL_DATABASE,
+    RESOURCE_DDL_COLLECTION,
+
+    /**
      * Resource type used for locking general resources not related to the storage hierarchy. These
      * can't be created manually, use Lock::ResourceMutex::ResourceMutex() instead.
      */
@@ -193,8 +204,15 @@ enum class ResourceGlobalId : uint8_t {
 /**
  * Maps the resource id to a human-readable string.
  */
-static const char* ResourceTypeNames[] = {
-    "Invalid", "Global", "Tenant", "Database", "Collection", "Metadata", "Mutex"};
+static const char* ResourceTypeNames[] = {"Invalid",
+                                          "Global",
+                                          "Tenant",
+                                          "Database",
+                                          "Collection",
+                                          "Metadata",
+                                          "DDLDatabase",
+                                          "DDLCollection",
+                                          "Mutex"};
 
 /**
  * Maps the global resource id to a human-readable string.
@@ -232,8 +250,8 @@ static const char* resourceGlobalIdName(ResourceGlobalId id) {
  * Uniquely identifies a lockable resource.
  */
 class ResourceId {
-    // We only use 3 bits for the resource type in the ResourceId hash
-    enum { resourceTypeBits = 3 };
+    // We only use 4 bits for the resource type in the ResourceId hash
+    enum { resourceTypeBits = 4 };
     MONGO_STATIC_ASSERT(ResourceTypesCount <= (1 << resourceTypeBits));
 
 public:
@@ -289,13 +307,10 @@ public:
     }
 
 private:
-    ResourceId(uint64_t fullHash) : _fullHash(fullHash) {}
+    friend class ResourceCatalog;
+    friend class ResourceIdTest;
 
-    // Used to allow Lock::ResourceMutex to create ResourceIds with RESOURCE_MUTEX type
-    static ResourceId makeMutexResourceId(uint64_t hashId) {
-        return ResourceId(fullHash(ResourceType::RESOURCE_MUTEX, hashId));
-    }
-    friend class Lock;
+    ResourceId(uint64_t fullHash) : _fullHash(fullHash) {}
 
     void verifyNoResourceMutex(ResourceType type) {
         invariant(
@@ -316,9 +331,7 @@ private:
     }
 
     static uint64_t hashStringData(StringData str) {
-        char hash[16];
-        MurmurHash3_x64_128(str.rawData(), str.size(), 0, hash);
-        return static_cast<size_t>(ConstDataView(hash).read<LittleEndian<std::uint64_t>>());
+        return murmur3<sizeof(uint64_t)>(str, 0 /*seed*/);
     }
 };
 

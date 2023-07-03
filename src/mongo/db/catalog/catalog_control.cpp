@@ -30,23 +30,43 @@
 #define LOGV2_FOR_RECOVERY(ID, DLEVEL, MESSAGE, ...) \
     LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kStorageRecovery}, MESSAGE, ##__VA_ARGS__)
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/catalog_control.h"
-
 #include "mongo/db/catalog/catalog_stats.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/historical_catalogid_tracker.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/rebuild_indexes.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -270,7 +290,7 @@ void openCatalog(OperationContext* opCtx,
                   "index"_attr = indexName);
         }
 
-        std::vector<BSONObj> indexSpecs = entry.second.second;
+        const std::vector<BSONObj>& indexSpecs = entry.second.second;
         fassert(40690, rebuildIndexesOnCollection(opCtx, collection, indexSpecs, RepairData::kNo));
     }
 

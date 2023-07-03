@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * findAndModify_upsert.js
  *
@@ -8,7 +6,7 @@
  * created) based on the 'query' specification, and updated using the
  * $push operator.
  */
-var $config = (function() {
+export const $config = (function() {
     var data = {sort: false, shardKey: {tid: 1}};
 
     var states = (function() {

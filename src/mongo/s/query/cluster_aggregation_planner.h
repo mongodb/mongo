@@ -29,14 +29,33 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <functional>
 #include <memory>
+#include <utility>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/query/cluster_aggregate.h"
 #include "mongo/s/query/cluster_client_cursor_guard.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace cluster_aggregation_planner {

@@ -9,7 +9,7 @@ load('jstests/libs/analyze_plan.js');
 "use strict";
 
 let options = {
-    setParameter: {internalQueryStatsSamplingRate: 0},
+    setParameter: {internalQueryStatsRateLimit: 0},
 };
 
 const conn = MongoRunner.runMongod(options);
@@ -28,7 +28,7 @@ assert.eq(telStore.cursor.firstBatch.length, 0);
 
 // Reading telemetry store should work now with a sampling rate of greater than 0.
 assert.commandWorked(
-    testdb.adminCommand({setParameter: 1, internalQueryStatsSamplingRate: 2147483647}));
+    testdb.adminCommand({setParameter: 1, internalQueryStatsRateLimit: 2147483647}));
 coll.aggregate([{$match: {foo: 1}}], {cursor: {batchSize: 2}});
 telStore = assert.commandWorked(
     testdb.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}));

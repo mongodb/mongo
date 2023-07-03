@@ -9,7 +9,7 @@ load('jstests/libs/analyze_plan.js');
 
 // Turn on the collecting of telemetry metrics.
 let options = {
-    setParameter: {internalQueryStatsSamplingRate: -1},
+    setParameter: {internalQueryStatsRateLimit: -1},
 };
 
 const conn = MongoRunner.runMongod(options);

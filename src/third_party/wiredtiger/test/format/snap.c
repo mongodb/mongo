@@ -299,11 +299,11 @@ snap_verify_callback(WT_CURSOR *cursor, int ret, void *arg)
         if (snap->op == REMOVE)
             strcpy(snap_buf, "remove");
         else
-            testutil_check(__wt_snprintf(snap_buf, sizeof(snap_buf), "0x%02x", (u_int)snap->bitv));
+            testutil_snprintf(snap_buf, sizeof(snap_buf), "0x%02x", (u_int)snap->bitv);
         if (ret == WT_NOTFOUND)
             strcpy(ret_buf, "notfound");
         else
-            testutil_check(__wt_snprintf(ret_buf, sizeof(ret_buf), "0x%02x", (u_int)bitv));
+            testutil_snprintf(ret_buf, sizeof(ret_buf), "0x%02x", (u_int)bitv);
         fprintf(stderr, "snapshot-isolation: %" PRIu64 " search: expected {%s}, found {%s}\n",
           keyno, snap_buf, ret_buf);
         break;
@@ -752,8 +752,8 @@ snap_repeat_rollback(WT_SESSION *session, TINFO **tinfo_array, size_t tinfo_coun
                     snap_repeat(tinfo, snap);
                     ++count;
                     if (count % 100 == 0) {
-                        testutil_check(__wt_snprintf(
-                          buf, sizeof(buf), "rollback_to_stable: %" PRIu32 " ops repeated", count));
+                        testutil_snprintf(
+                          buf, sizeof(buf), "rollback_to_stable: %" PRIu32 " ops repeated", count);
                         track(buf, 0ULL);
                     }
                 }
@@ -765,7 +765,6 @@ snap_repeat_rollback(WT_SESSION *session, TINFO **tinfo_array, size_t tinfo_coun
     }
 
     /* Show the final result. */
-    testutil_check(
-      __wt_snprintf(buf, sizeof(buf), "rollback_to_stable: %" PRIu32 " ops repeated", count));
+    testutil_snprintf(buf, sizeof(buf), "rollback_to_stable: %" PRIu32 " ops repeated", count);
     track(buf, 0ULL);
 }

@@ -29,13 +29,17 @@
 
 #include "mongo/db/query/query_stats_util.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <climits>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/status.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/query/partitioned_cache.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/client.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
-#include "mongo/logv2/log.h"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

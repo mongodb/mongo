@@ -29,54 +29,92 @@
 
 #include "mongo/s/mongos_main.h"
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <cstdlib>
+#include <exception>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
+#include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/initialize_server_global_state.h"
+#include "mongo/db/keys_collection_client.h"
 #include "mongo/db/keys_collection_client_sharded.h"
-#include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/process_health/fault_manager.h"
+#include "mongo/db/query/query_settings_manager.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_liaison_mongos.h"
 #include "mongo/db/session/kill_sessions.h"
+#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_impl.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/session/session.h"
+#include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/idl/cluster_server_parameter_refresher.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/process_id.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/s/balancer_configuration.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/commands/kill_sessions_remote.h"
-#include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
@@ -95,36 +133,41 @@
 #include "mongo/s/sharding_uptime_reporter.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/version_mongos.h"
-#include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
+#include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
-#include "mongo/util/admin_access.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/background.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/exception_filter_win32.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/debugger.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/fast_clock_source_factory.h"
+#include "mongo/util/future.h"
 #include "mongo/util/latch_analyzer.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ocsp/ocsp_manager.h"
 #include "mongo/util/net/private/ssl_expiration.h"
-#include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/ntservice.h"
-#include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/ntservice.h"                       // IWYU pragma: keep
+#include "mongo/util/options_parser/startup_options.h"  // IWYU pragma: keep
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers.h"
-#include "mongo/util/stacktrace.h"
-#include "mongo/util/str.h"
-#include "mongo/util/text.h"
-#include "mongo/util/version.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+#include "mongo/util/time_support.h"
+#include "mongo/util/version/releases.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -147,6 +190,180 @@ const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
 constexpr auto kSignKeysRetryInterval = Seconds{1};
 
 boost::optional<ShardingUptimeReporter> shardingUptimeReporter;
+
+class ShardingReplicaSetChangeListener final
+    : public ReplicaSetChangeNotifier::Listener,
+      public std::enable_shared_from_this<ShardingReplicaSetChangeListener> {
+public:
+    ShardingReplicaSetChangeListener(ServiceContext* serviceContext)
+        : _serviceContext(serviceContext) {}
+    ~ShardingReplicaSetChangeListener() final = default;
+
+    void onFoundSet(const Key& key) noexcept final {}
+
+    void onConfirmedSet(const State& state) noexcept final {
+        const auto& connStr = state.connStr;
+        const auto& setName = connStr.getSetName();
+
+        try {
+            LOGV2(471693,
+                  "Updating the shard registry with confirmed replica set",
+                  "connectionString"_attr = connStr);
+            Grid::get(_serviceContext)
+                ->shardRegistry()
+                ->updateReplSetHosts(connStr,
+                                     ShardRegistry::ConnectionStringUpdateType::kConfirmed);
+        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+            LOGV2(471694,
+                  "Unable to update the shard registry with confirmed replica set",
+                  "error"_attr = e);
+        }
+
+        bool updateInProgress = false;
+        {
+            stdx::lock_guard lock(_mutex);
+            if (!_hasUpdateState(lock, setName)) {
+                _updateStates.emplace(std::piecewise_construct,
+                                      std::forward_as_tuple(setName),
+                                      std::forward_as_tuple());
+            }
+            auto& updateState = _updateStates.at(setName);
+            updateState.nextUpdateToSend = connStr;
+            updateInProgress = updateState.updateInProgress;
+        }
+
+        if (!updateInProgress) {
+            _scheduleUpdateConfigServer(setName);
+        }
+    }
+
+    void onPossibleSet(const State& state) noexcept final {
+        try {
+            Grid::get(_serviceContext)
+                ->shardRegistry()
+                ->updateReplSetHosts(state.connStr,
+                                     ShardRegistry::ConnectionStringUpdateType::kPossible);
+        } catch (const DBException& ex) {
+            LOGV2_DEBUG(22849,
+                        2,
+                        "Unable to update sharding state with possible replica set due to {error}",
+                        "Unable to update sharding state with possible replica set",
+                        "error"_attr = ex);
+        }
+    }
+
+    void onDroppedSet(const Key& key) noexcept final {}
+
+private:
+    // Schedules updates for replica set 'setName' on the config server. Loosly preserves ordering
+    // of update execution. Newer updates will not be overwritten by older updates in config.shards.
+    void _scheduleUpdateConfigServer(const std::string& setName) {
+        ConnectionString updatedConnectionString;
+        {
+            stdx::lock_guard lock(_mutex);
+            if (!_hasUpdateState(lock, setName)) {
+                return;
+            }
+            auto& updateState = _updateStates.at(setName);
+            if (updateState.updateInProgress) {
+                return;
+            }
+            updateState.updateInProgress = true;
+            updatedConnectionString = updateState.nextUpdateToSend.value();
+            updateState.nextUpdateToSend = boost::none;
+        }
+
+        auto executor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
+        auto schedStatus =
+            executor
+                ->scheduleWork([self = shared_from_this(),
+                                setName,
+                                update = std::move(updatedConnectionString)](const auto& args) {
+                    self->_updateConfigServer(args.status, setName, update);
+                })
+                .getStatus();
+        if (ErrorCodes::isCancellationError(schedStatus.code())) {
+            LOGV2_DEBUG(22848,
+                        2,
+                        "Unable to schedule updating sharding state with confirmed replica set due"
+                        " to {error}",
+                        "Unable to schedule updating sharding state with confirmed replica set",
+                        "error"_attr = schedStatus);
+            return;
+        }
+        uassertStatusOK(schedStatus);
+    }
+
+    void _updateConfigServer(const Status& status,
+                             const std::string& setName,
+                             const ConnectionString& update) {
+        if (ErrorCodes::isCancellationError(status.code())) {
+            stdx::lock_guard lock(_mutex);
+            _updateStates.erase(setName);
+            return;
+        }
+
+        if (MONGO_unlikely(failReplicaSetChangeConfigServerUpdateHook.shouldFail())) {
+            _endUpdateConfigServer(setName, update);
+            return;
+        }
+
+        try {
+            LOGV2(22846,
+                  "Updating sharding state with confirmed replica set",
+                  "connectionString"_attr = update);
+            ShardRegistry::updateReplicaSetOnConfigServer(_serviceContext, update);
+        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+            LOGV2(22847,
+                  "Unable to update sharding state with confirmed replica set",
+                  "error"_attr = e);
+        } catch (...) {
+            _endUpdateConfigServer(setName, update);
+            throw;
+        }
+        _endUpdateConfigServer(setName, update);
+    }
+
+    void _endUpdateConfigServer(const std::string& setName, const ConnectionString& update) {
+        bool moreUpdates = false;
+        {
+            stdx::lock_guard lock(_mutex);
+            invariant(_hasUpdateState(lock, setName));
+            auto& updateState = _updateStates.at(setName);
+            updateState.updateInProgress = false;
+            moreUpdates = (updateState.nextUpdateToSend != boost::none);
+            if (!moreUpdates) {
+                _updateStates.erase(setName);
+            }
+        }
+        if (moreUpdates) {
+            auto executor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
+            executor->schedule([self = shared_from_this(), setName](const auto& _) {
+                self->_scheduleUpdateConfigServer(setName);
+            });
+        }
+    }
+
+    // Returns true if a ReplSetConfigUpdateState exists for replica set setName.
+    bool _hasUpdateState(WithLock, const std::string& setName) {
+        return (_updateStates.find(setName) != _updateStates.end());
+    }
+
+    ServiceContext* _serviceContext;
+
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingReplicaSetChangeListenerMongod::mutex");
+
+    struct ReplSetConfigUpdateState {
+        ReplSetConfigUpdateState() = default;
+        ReplSetConfigUpdateState(const ReplSetConfigUpdateState&) = delete;
+        ReplSetConfigUpdateState& operator=(const ReplSetConfigUpdateState&) = delete;
+
+        // True when an update to the config.shards is in progress.
+        bool updateInProgress = false;
+        boost::optional<ConnectionString> nextUpdateToSend;
+    };
+    stdx::unordered_map<std::string, ReplSetConfigUpdateState> _updateStates;
+};
 
 Status waitForSigningKeys(OperationContext* opCtx) {
     auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
@@ -188,7 +405,6 @@ Status waitForSigningKeys(OperationContext* opCtx) {
         }
     }
 }
-
 
 /**
  * Abort all active transactions in the catalog that has not yet been committed.
@@ -405,7 +621,9 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
 #endif
 }
 
-Status initializeSharding(OperationContext* opCtx) {
+Status initializeSharding(
+    OperationContext* opCtx,
+    std::shared_ptr<ReplicaSetChangeNotifier::Listener>* replicaSetChangeListener) {
     auto targeterFactory = std::make_unique<RemoteCommandTargeterFactoryImpl>();
     auto targeterFactoryPtr = targeterFactory.get();
 
@@ -474,6 +692,24 @@ Status initializeSharding(OperationContext* opCtx) {
         return status;
     }
 
+    *replicaSetChangeListener =
+        ReplicaSetMonitor::getNotifier().makeListener<ShardingReplicaSetChangeListener>(
+            opCtx->getServiceContext());
+
+    // Reset the shard register config connection string in case it missed the replica set monitor
+    // notification.
+    auto configShardConnStr =
+        Grid::get(opCtx->getServiceContext())->shardRegistry()->getConfigServerConnectionString();
+    if (configShardConnStr.type() == ConnectionString::ConnectionType::kReplicaSet) {
+        ConnectionString rsMonitorConfigConnStr(
+            ReplicaSetMonitor::get(configShardConnStr.getSetName())->getServerAddress(),
+            ConnectionString::ConnectionType::kReplicaSet);
+        Grid::get(opCtx->getServiceContext())
+            ->shardRegistry()
+            ->updateReplSetHosts(rsMonitorConfigConnStr,
+                                 ShardRegistry::ConnectionStringUpdateType::kConfirmed);
+    }
+
     status = loadGlobalSettingsFromConfigServer(opCtx, Grid::get(opCtx)->catalogClient());
     if (!status.isOK()) {
         return status;
@@ -512,180 +748,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionHandling"))(Ini
 
     WireSpec::instance().initialize(std::move(spec));
 }
-
-class ShardingReplicaSetChangeListener final
-    : public ReplicaSetChangeNotifier::Listener,
-      public std::enable_shared_from_this<ShardingReplicaSetChangeListener> {
-public:
-    ShardingReplicaSetChangeListener(ServiceContext* serviceContext)
-        : _serviceContext(serviceContext) {}
-    ~ShardingReplicaSetChangeListener() final = default;
-
-    void onFoundSet(const Key& key) noexcept final {}
-
-    void onConfirmedSet(const State& state) noexcept final {
-        const auto& connStr = state.connStr;
-        const auto& setName = connStr.getSetName();
-
-        try {
-            LOGV2(471693,
-                  "Updating the shard registry with confirmed replica set",
-                  "connectionString"_attr = connStr);
-            Grid::get(_serviceContext)
-                ->shardRegistry()
-                ->updateReplSetHosts(connStr,
-                                     ShardRegistry::ConnectionStringUpdateType::kConfirmed);
-        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
-            LOGV2(471694,
-                  "Unable to update the shard registry with confirmed replica set",
-                  "error"_attr = e);
-        }
-
-        bool updateInProgress = false;
-        {
-            stdx::lock_guard lock(_mutex);
-            if (!_hasUpdateState(lock, setName)) {
-                _updateStates.emplace(std::piecewise_construct,
-                                      std::forward_as_tuple(setName),
-                                      std::forward_as_tuple());
-            }
-            auto& updateState = _updateStates.at(setName);
-            updateState.nextUpdateToSend = connStr;
-            updateInProgress = updateState.updateInProgress;
-        }
-
-        if (!updateInProgress) {
-            _scheduleUpdateConfigServer(setName);
-        }
-    }
-
-    void onPossibleSet(const State& state) noexcept final {
-        try {
-            Grid::get(_serviceContext)
-                ->shardRegistry()
-                ->updateReplSetHosts(state.connStr,
-                                     ShardRegistry::ConnectionStringUpdateType::kPossible);
-        } catch (const DBException& ex) {
-            LOGV2_DEBUG(22849,
-                        2,
-                        "Unable to update sharding state with possible replica set due to {error}",
-                        "Unable to update sharding state with possible replica set",
-                        "error"_attr = ex);
-        }
-    }
-
-    void onDroppedSet(const Key& key) noexcept final {}
-
-private:
-    // Schedules updates for replica set 'setName' on the config server. Loosly preserves ordering
-    // of update execution. Newer updates will not be overwritten by older updates in config.shards.
-    void _scheduleUpdateConfigServer(const std::string& setName) {
-        ConnectionString updatedConnectionString;
-        {
-            stdx::lock_guard lock(_mutex);
-            if (!_hasUpdateState(lock, setName)) {
-                return;
-            }
-            auto& updateState = _updateStates.at(setName);
-            if (updateState.updateInProgress) {
-                return;
-            }
-            updateState.updateInProgress = true;
-            updatedConnectionString = updateState.nextUpdateToSend.value();
-            updateState.nextUpdateToSend = boost::none;
-        }
-
-        auto executor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
-        auto schedStatus =
-            executor
-                ->scheduleWork([self = shared_from_this(),
-                                setName,
-                                update = std::move(updatedConnectionString)](const auto& args) {
-                    self->_updateConfigServer(args.status, setName, update);
-                })
-                .getStatus();
-        if (ErrorCodes::isCancellationError(schedStatus.code())) {
-            LOGV2_DEBUG(22848,
-                        2,
-                        "Unable to schedule updating sharding state with confirmed replica set due"
-                        " to {error}",
-                        "Unable to schedule updating sharding state with confirmed replica set",
-                        "error"_attr = schedStatus);
-            return;
-        }
-        uassertStatusOK(schedStatus);
-    }
-
-    void _updateConfigServer(const Status& status,
-                             const std::string& setName,
-                             const ConnectionString& update) {
-        if (ErrorCodes::isCancellationError(status.code())) {
-            stdx::lock_guard lock(_mutex);
-            _updateStates.erase(setName);
-            return;
-        }
-
-        if (MONGO_unlikely(failReplicaSetChangeConfigServerUpdateHook.shouldFail())) {
-            _endUpdateConfigServer(setName, update);
-            return;
-        }
-
-        try {
-            LOGV2(22846,
-                  "Updating sharding state with confirmed replica set",
-                  "connectionString"_attr = update);
-            ShardRegistry::updateReplicaSetOnConfigServer(_serviceContext, update);
-        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
-            LOGV2(22847,
-                  "Unable to update sharding state with confirmed replica set",
-                  "error"_attr = e);
-        } catch (...) {
-            _endUpdateConfigServer(setName, update);
-            throw;
-        }
-        _endUpdateConfigServer(setName, update);
-    }
-
-    void _endUpdateConfigServer(const std::string& setName, const ConnectionString& update) {
-        bool moreUpdates = false;
-        {
-            stdx::lock_guard lock(_mutex);
-            invariant(_hasUpdateState(lock, setName));
-            auto& updateState = _updateStates.at(setName);
-            updateState.updateInProgress = false;
-            moreUpdates = (updateState.nextUpdateToSend != boost::none);
-            if (!moreUpdates) {
-                _updateStates.erase(setName);
-            }
-        }
-        if (moreUpdates) {
-            auto executor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
-            executor->schedule([self = shared_from_this(), setName](const auto& _) {
-                self->_scheduleUpdateConfigServer(setName);
-            });
-        }
-    }
-
-    // Returns true if a ReplSetConfigUpdateState exists for replica set setName.
-    bool _hasUpdateState(WithLock, const std::string& setName) {
-        return (_updateStates.find(setName) != _updateStates.end());
-    }
-
-    ServiceContext* _serviceContext;
-
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingReplicaSetChangeListenerMongod::mutex");
-
-    struct ReplSetConfigUpdateState {
-        ReplSetConfigUpdateState() = default;
-        ReplSetConfigUpdateState(const ReplSetConfigUpdateState&) = delete;
-        ReplSetConfigUpdateState& operator=(const ReplSetConfigUpdateState&) = delete;
-
-        // True when an update to the config.shards is in progress.
-        bool updateInProgress = false;
-        boost::optional<ConnectionString> nextUpdateToSend;
-    };
-    stdx::unordered_map<std::string, ReplSetConfigUpdateState> _updateStates;
-};
 
 ExitCode runMongosServer(ServiceContext* serviceContext) {
     ThreadClient tc("mongosMain", serviceContext);
@@ -738,12 +800,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks
     globalConnPool.addHook(new ShardingConnectionHook(std::move(unshardedHookList)));
 
-    // Hook up a Listener for changes from the ReplicaSetMonitor
-    // This will last for the scope of this function. i.e. until shutdown finishes
-    auto shardingRSCL =
-        ReplicaSetMonitor::getNotifier().makeListener<ShardingReplicaSetChangeListener>(
-            serviceContext);
-
     // Mongos connection pools already takes care of authenticating new connections so the
     // replica set connection shouldn't need to.
     DBClientReplicaSet::setAuthPooledSecondaryConn(false);
@@ -754,12 +810,16 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     ReadWriteConcernDefaults::create(serviceContext, readWriteConcernDefaultsCacheLookupMongoS);
     ChangeStreamOptionsManager::create(serviceContext);
+    query_settings::QuerySettingsManager::create(serviceContext);
 
     auto opCtxHolder = tc->makeOperationContext();
     auto const opCtx = opCtxHolder.get();
 
+    // Keep listener alive until shutdown.
+    std::shared_ptr<ReplicaSetChangeNotifier::Listener> replicaSetChangeListener;
+
     try {
-        uassertStatusOK(initializeSharding(opCtx));
+        uassertStatusOK(initializeSharding(opCtx, &replicaSetChangeListener));
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::CallbackCanceled) {
             invariant(globalInShutdownDeprecated());
@@ -968,6 +1028,7 @@ ExitCode mongos_main(int argc, char* argv[]) {
     if (argc < 1)
         return ExitCode::badOptions;
 
+    waitForDebugger();
 
     setupSignalHandlers();
 
@@ -983,10 +1044,7 @@ ExitCode mongos_main(int argc, char* argv[]) {
     }
 
     try {
-        auto serviceContextHolder = ServiceContext::make();
-        serviceContextHolder->registerClientObserver(
-            std::make_unique<LockerMongosClientObserver>());
-        setGlobalServiceContext(std::move(serviceContextHolder));
+        setGlobalServiceContext(ServiceContext::make());
     } catch (...) {
         auto cause = exceptionToStatus();
         LOGV2_FATAL_OPTIONS(

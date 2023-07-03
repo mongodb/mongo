@@ -29,27 +29,51 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/catalog/uncommitted_multikey.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_stats.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/split_prepare_session_manager.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/stats/single_transaction_stats.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/transaction_metrics_observer.h"
 #include "mongo/db/transaction/transaction_operations.h"
 #include "mongo/idl/mutable_observer_registry.h"
@@ -57,7 +81,10 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -82,7 +109,7 @@ class TransactionParticipant {
     struct ObservableState;
 
     /**
-     * Indicates the state of the current multi-document transaction, if any.  If the transaction is
+     * Indicates the state of the current multi-document transaction, if any. If the transaction is
      * in any state but kInProgress, no more operations can be collected. Once the transaction is in
      * kPrepared, the transaction is not allowed to abort outside of an 'abortTransaction' command.
      * At this point, aborting the transaction must log an 'abortTransaction' oplog entry.
@@ -346,6 +373,10 @@ public:
             return o().txnState.isInRetryableWriteMode();
         }
 
+        const std::vector<NamespaceString>& affectedNamespaces() const {
+            return o().affectedNamespaces;
+        }
+
         /**
          * If this session is holding stashed locks in txnResourceStash, reports the current state
          * of the session using the provided builder.
@@ -565,12 +596,13 @@ public:
         void unstashTransactionResources(OperationContext* opCtx, const std::string& cmdName);
 
         /**
-         * Puts a transaction into a prepared state and returns the prepareTimestamp.
+         * Puts a transaction into a prepared state and returns the prepareTimestamp and the list of
+         * affected namespaces.
          *
          * On secondary, the "prepareTimestamp" will be given in the oplog.
          */
-        Timestamp prepareTransaction(OperationContext* opCtx,
-                                     boost::optional<repl::OpTime> prepareOptime);
+        std::pair<Timestamp, std::vector<NamespaceString>> prepareTransaction(
+            OperationContext* opCtx, boost::optional<repl::OpTime> prepareOptime);
 
         /**
          * Sets the prepare optime used for recovery.
@@ -997,6 +1029,7 @@ public:
         // invalidating a transaction, or starting a new transaction. It releases the Client lock
         // before releasing this participant's locks and aborting its storage transaction.
         void _resetTransactionStateAndUnlock(stdx::unique_lock<Client>* lk,
+                                             OperationContext* opCtx,
                                              TransactionState::StateFlag state);
 
         /* Releases the resources held in *o().txnResources to the operation context.
@@ -1161,6 +1194,9 @@ private:
 
         // Tracks and updates transaction metrics upon the appropriate transaction event.
         TransactionMetricsObserver transactionMetricsObserver;
+
+        // Contains a list of affected namespaces to be reported to transaction coordinator.
+        std::vector<NamespaceString> affectedNamespaces;
     } _o;
 
     /**

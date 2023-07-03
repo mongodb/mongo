@@ -29,9 +29,19 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/uuid.h"
 

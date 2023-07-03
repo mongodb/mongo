@@ -29,26 +29,63 @@
 
 #include "mongo/s/write_ops/bulk_write_exec.h"
 
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <numeric>
+#include <string>
+#include <utility>
+#include <variant>
+
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands/bulk_write_common.h"
+#include "mongo/db/commands/bulk_write_crud_op.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/s/async_requests_sender.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/index_version.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/shard_version_factory.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/write_op.h"
-#include "mongo/s/write_ops/write_without_shard_key_util.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -59,6 +96,11 @@ namespace {
 // The number of times we'll try to continue a batch op if no progress is being made. This only
 // applies when no writes are occurring and metadata is not changing on reload.
 const int kMaxRoundsWithoutProgress(5);
+
+bool isVerboseWc(const BSONObj& wc) {
+    BSONElement wElem = wc["w"];
+    return !wElem.isNumber() || wElem.Number() != 0;
+}
 
 // Send and process the child batches. Each child batch is targeted at a unique shard: therefore
 // one shard will have only one batch incoming.
@@ -76,10 +118,22 @@ void executeChildBatches(OperationContext* opCtx,
             bulkReq.serialize(BSONObj(), &builder);
 
             logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
-            builder.append(WriteConcernOptions::kWriteConcernField,
-                           opCtx->getWriteConcern().toBSON());
 
-            return builder.obj();
+            auto wc = opCtx->getWriteConcern().toBSON();
+            if (isVerboseWc(wc)) {
+                builder.append(WriteConcernOptions::kWriteConcernField,
+                               opCtx->getWriteConcern().toBSON());
+            } else {
+                // Mongos needs to send to the shard with w > 0 so it will be able to see the
+                // writeErrors
+                builder.append(WriteConcernOptions::kWriteConcernField, upgradeWriteConcern(wc));
+            }
+
+            auto obj = builder.obj();
+            // When running a debug build, verify that estSize is at least the BSON serialization
+            // size.
+            dassert(childBatch.second->getEstimatedSizeBytes() >= obj.objsize());
+            return obj;
         }();
 
         requests.emplace_back(childBatch.first, request);
@@ -100,8 +154,13 @@ void executeChildBatches(OperationContext* opCtx,
         auto response = ars.next();
 
         Status responseStatus = response.swResponse.getStatus();
-        // TODO (SERVER-76957): The status may not be OK, handle it.
-        invariant(responseStatus.isOK());
+        // When the responseStatus is not OK, this means that mongos was unable to receive a
+        // response from the shard the write batch was sent to, or mongos faced some other local
+        // error (for example, mongos was shutting down). In these cases, throw and return the
+        // error to the client.
+        // Note that this is different from an operation within the bulkWrite command having an
+        // error.
+        uassertStatusOK(responseStatus);
 
         auto bwReply = BulkWriteCommandReply::parse(IDLParserContext("bulkWrite"),
                                                     response.swResponse.getValue().data);
@@ -284,10 +343,21 @@ StatusWith<bool> BulkWriteOp::target(const std::vector<std::unique_ptr<NSTargete
         },
         // getWriteSizeFn:
         [&](const WriteOp& writeOp) {
-            // TODO(SERVER-73536): Account for the size of the
-            // outgoing request.
-            return 1;
+            // If retryable writes are used, MongoS needs to send an additional array of stmtId(s)
+            // corresponding to the statements that got routed to each individual shard, so they
+            // need to be accounted in the potential request size so it does not exceed the max BSON
+            // size.
+            const int writeSizeBytes = writeOp.getWriteItem().getSizeForBulkWriteBytes() +
+                write_ops::kWriteCommandBSONArrayPerElementOverheadBytes +
+                (_txnNum ? write_ops::kStmtIdSize +
+                         write_ops::kWriteCommandBSONArrayPerElementOverheadBytes
+                         : 0);
+
+            // TODO SERVER-78084: Determine if we we need to consider the potential size of errors
+            // received in response to the command here.
+            return writeSizeBytes;
         },
+        getBaseBatchCommandSizeEstimate(),
         targetedBatches);
 }
 
@@ -410,7 +480,6 @@ void BulkWriteOp::noteBatchResponse(
     for (const auto& write : targetedBatch.getWrites()) {
         ++index;
         WriteOp& writeOp = _writeOps[write->writeOpRef.first];
-        // TODO (SERVER-76953) : Handle unordered operations
         // When an error is encountered on an ordered bulk write, it is impossible for any of the
         // remaining operations to have been executed. For that reason we cancel them here so they
         // may be retargeted and retried.
@@ -420,12 +489,34 @@ void BulkWriteOp::noteBatchResponse(
             continue;
         }
 
-        auto& reply = replyItems[index];
+        // On most errors (for example, a DuplicateKeyError) unordered bulkWrite on a shard attempts
+        // to execute following operations even if a preceding operation errored. This isn't true
+        // for StaleConfig or StaleDbVersion errors. On these errors, since the shard knows that it
+        // following operations will also be stale, it stops right away.
+        // For that reason, although typically we can expect the size of replyItems to match the
+        // size of the number of operations sent (even in the case of errors), when a staleness
+        // error is received the size of replyItems will be <= the size of the number of operations.
+        // When this is the case, we treat all the remaining operations which may not have a
+        // replyItem as having failed with a staleness error.
+        if (!ordered && lastError &&
+            (lastError->getStatus().code() == ErrorCodes::StaleDbVersion ||
+             ErrorCodes::isStaleShardVersionError(lastError->getStatus()))) {
+            // Decrement the index so it keeps pointing to the same error (i.e. the
+            // last error, which is a staleness error).
+            LOGV2_DEBUG(7695304,
+                        4,
+                        "Duplicating the error for op",
+                        "opIdx"_attr = write->writeOpRef.first,
+                        "error"_attr = lastError->getStatus());
+            invariant(index == (int)replyItems.size());
+            index--;
+        }
 
+        auto& reply = replyItems[index];
         if (reply.getStatus().isOK()) {
             writeOp.noteWriteComplete(*write);
         } else {
-            lastError.emplace(reply.getIdx(), reply.getStatus());
+            lastError.emplace(write->writeOpRef.first, reply.getStatus());
             writeOp.noteWriteError(*write, *lastError);
 
             auto origWrite = BulkWriteCRUDOp(_clientRequest.getOps()[write->writeOpRef.first]);
@@ -468,6 +559,53 @@ std::vector<BulkWriteReplyItem> BulkWriteOp::generateReplyItems() const {
 
     return replyItems;
 }
+
+int BulkWriteOp::getBaseBatchCommandSizeEstimate() const {
+    // For simplicity, we build a dummy bulk write command request that contains all the common
+    // fields and serialize it to get the base command size.
+    // TODO SERVER-78301: Re-evaluate this estimation method and consider switching to a more
+    // efficient approach.
+    // We only bother to copy over variable-size and/or optional fields, since the value of fields
+    // that are fixed-size and always present (e.g. 'ordered') won't affect the size calculation.
+    BulkWriteCommandRequest request;
+
+    // These have not been set yet, but will be set later on for each namespace as part of the
+    // write targeting and batch building process. To ensure we save space for these fields, we
+    // add dummy versions to the namespaces before serializing.
+    static const ShardVersion mockShardVersion =
+        ShardVersionFactory::make(ChunkVersion::IGNORED(), CollectionIndexes());
+    static const DatabaseVersion mockDBVersion = DatabaseVersion(UUID::gen(), Timestamp());
+
+    auto nsInfo = _clientRequest.getNsInfo();
+    for (auto& ns : nsInfo) {
+        ns.setShardVersion(mockShardVersion);
+        ns.setDatabaseVersion(mockDBVersion);
+    }
+    request.setNsInfo(nsInfo);
+
+    request.setDbName(_clientRequest.getDbName());
+    request.setDollarTenant(_clientRequest.getDollarTenant());
+    request.setLet(_clientRequest.getLet());
+    // We'll account for the size to store each individual op as we add them, so just put an empty
+    // vector as a placeholder for the array. This will ensure we properly count the size of the
+    // field name and the empty array.
+    request.setOps({});
+
+    if (_isRetryableWrite) {
+        // We'll account for the size to store each individual stmtId as we add ops, so similar to
+        // above with ops, we just put an empty vector as a placeholder for now.
+        request.setStmtIds({});
+    }
+
+    BSONObjBuilder builder;
+    request.serialize(BSONObj(), &builder);
+    // Add writeConcern and lsid/txnNumber to ensure we save space for them.
+    logical_session_id_helpers::serializeLsidAndTxnNumber(_opCtx, &builder);
+    builder.append(WriteConcernOptions::kWriteConcernField, _opCtx->getWriteConcern().toBSON());
+
+    return builder.obj().objsize();
+}
+
 }  // namespace bulk_write_exec
 
 }  // namespace mongo

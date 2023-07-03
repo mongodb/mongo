@@ -29,9 +29,22 @@
 
 #pragma once
 
+#include <memory>
 #include <set>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 

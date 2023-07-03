@@ -27,22 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <array>
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
+#include <ostream>
+#include <thread>
+#include <tuple>
+#include <type_traits>
 
-#include "mongo/unittest/unittest.h"
+#include <boost/optional/optional.hpp>
 
-#include "mongo/util/producer_consumer_queue.h"
-
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/producer_consumer_queue.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
-
 namespace {
 
 using namespace producer_consumer_queue_detail;
@@ -136,9 +145,7 @@ std::enable_if_t<requiresMultiProducer && requiresMultiConsumer> runCallbackWith
 
 class ProducerConsumerQueueTest : public unittest::Test {
 public:
-    ProducerConsumerQueueTest() {
-        _serviceCtx->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-    }
+    ProducerConsumerQueueTest() = default;
 
     template <bool requiresMultiProducer, bool requiresMultiConsumer, typename Callback>
     void runPermutations(Callback&& callback) {

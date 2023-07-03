@@ -27,22 +27,41 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <deque>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
-#include "mongo/db/pipeline/window_function/window_function_exec_non_removable.h"
+#include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_removable_document.h"
 #include "mongo/db/pipeline/window_function/window_function_integral.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/sort_pattern.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {

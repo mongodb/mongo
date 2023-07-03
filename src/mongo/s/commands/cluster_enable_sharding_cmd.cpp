@@ -28,14 +28,35 @@
  */
 
 
-#include "mongo/db/auth/action_set.h"
+#include <memory>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_gen.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -70,9 +91,10 @@ public:
             const auto dbName = getDbName();
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
-            ScopeGuard purgeDatabaseOnExit([&] { catalogCache->purgeDatabase(dbName); });
+            ScopeGuard purgeDatabaseOnExit(
+                [&] { catalogCache->purgeDatabase(DatabaseNameUtil::serialize(dbName)); });
 
-            ConfigsvrCreateDatabase configsvrCreateDatabase{dbName.toString()};
+            ConfigsvrCreateDatabase configsvrCreateDatabase{DatabaseNameUtil::serialize(dbName)};
             configsvrCreateDatabase.setDbName(DatabaseName::kAdmin);
             configsvrCreateDatabase.setPrimaryShardId(request().getPrimaryShard());
 
@@ -91,16 +113,19 @@ public:
 
             auto createDbResponse = ConfigsvrCreateDatabaseResponse::parse(
                 IDLParserContext("configsvrCreateDatabaseResponse"), response.response);
-            catalogCache->onStaleDatabaseVersion(dbName, createDbResponse.getDatabaseVersion());
+            catalogCache->onStaleDatabaseVersion(DatabaseNameUtil::serialize(dbName),
+                                                 createDbResponse.getDatabaseVersion());
             purgeDatabaseOnExit.dismiss();
         }
 
     private:
-        StringData getDbName() const {
-            return request().getCommandParameter();
+        DatabaseName getDbName() const {
+            const auto& cmd = request();
+            return DatabaseNameUtil::deserialize(cmd.getDbName().tenantId(),
+                                                 cmd.getCommandParameter());
         }
         NamespaceString ns() const override {
-            return {getDbName(), ""};
+            return NamespaceString(getDbName());
         }
 
         bool supportsWriteConcern() const override {

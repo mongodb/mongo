@@ -27,16 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <array>
 #include <benchmark/benchmark.h>
+#include <cmath>
+#include <cstdint>
+#include <fmt/format.h>
+#include <random>
+#include <string>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/util/base64.h"
-
-#include <random>
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -148,9 +158,7 @@ BSONObj getCompressedFTDC() {
 // The large literal emits this on Visual Studio: Fatal error C1091: compiler limit: string exceeds
 // 65535 bytes in length
 #if !defined(_MSC_VER)
-    StringData compressedBase64Encoded = {
-#include "mongo/bson/util/bson_column_compressed_data.inl"
-    };
+    StringData compressedBase64Encoded = {};
 
     std::string compressed = base64::decode(compressedBase64Encoded);
     BSONObjBuilder builder;

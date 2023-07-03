@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 
 #if !(defined(_WIN32) || MONGO_CONFIG_DEBUG_BUILD)
 

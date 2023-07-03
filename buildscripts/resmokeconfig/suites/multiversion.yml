@@ -18,7 +18,6 @@ selector:
   exclude_with_any_tags:
   - featureFlagToaster
   - featureFlagSpoon
-  - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
 
 # Multiversion tests start their own mongod's.
 executor:

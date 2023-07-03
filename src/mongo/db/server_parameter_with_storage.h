@@ -35,18 +35,33 @@
  * rather parameters should be defined in .idl files.
  */
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <functional>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/server_parameter.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/synchronized_value.h"
 
@@ -319,7 +334,7 @@ public:
     Status validateValue(const element_type& newValue,
                          const boost::optional<TenantId>& tenantId) const {
         for (const auto& validator : _validators) {
-            const auto status = validator(newValue, tenantId);
+            auto status = validator(newValue, tenantId);
             if (!status.isOK()) {
                 return status;
             }

@@ -29,11 +29,17 @@
 
 #pragma once
 
+#include <string>
+#include <utility>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/cascades/memo_explain_interface.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node_defs.h"
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * reindex_background.js
  *
@@ -11,24 +9,23 @@
  * @tags: [SERVER-40561, creates_background_indexes]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/reindex.js');     // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/reindex.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.prefix = 'reindex_background';
 
     $config.states.createIndexes = function createIndexes(db, collName) {
         const coll = db[this.threadCollName];
-        const options = {background: true};
 
         // The number of indexes created here is also stored in data.nIndexes.
-        assertWorkedHandleTxnErrors(coll.createIndex({text: 'text'}, options),
+        assertWorkedHandleTxnErrors(coll.createIndex({text: 'text'}),
                                     ErrorCodes.IndexBuildAlreadyInProgress);
-        assertWorkedHandleTxnErrors(coll.createIndex({geo: '2dsphere'}, options),
+        assertWorkedHandleTxnErrors(coll.createIndex({geo: '2dsphere'}),
                                     ErrorCodes.IndexBuildAlreadyInProgress);
-        assertWorkedHandleTxnErrors(coll.createIndex({integer: 1}, options),
+        assertWorkedHandleTxnErrors(coll.createIndex({integer: 1}),
                                     ErrorCodes.IndexBuildAlreadyInProgress);
-        assertWorkedHandleTxnErrors(coll.createIndex({"$**": 1}, options),
+        assertWorkedHandleTxnErrors(coll.createIndex({"$**": 1}),
                                     ErrorCodes.IndexBuildAlreadyInProgress);
     };
 

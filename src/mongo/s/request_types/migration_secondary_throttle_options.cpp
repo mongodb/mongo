@@ -27,13 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <utility>
+#include <variant>
 
-#include "mongo/s/request_types/migration_secondary_throttle_options.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/request_types/migration_secondary_throttle_options.h"
+#include "mongo/stdx/variant.h"
 
 namespace mongo {
 namespace {

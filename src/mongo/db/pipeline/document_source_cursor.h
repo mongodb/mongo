@@ -29,15 +29,42 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
 #include <deque>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

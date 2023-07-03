@@ -28,34 +28,62 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <absl/container/inlined_vector.h>
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <bitset>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <deque>
+#include <iterator>
+#include <map>
+#include <string_view>
 
-#include "mongo/db/query/sbe_stage_builder_index_scan.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
-#include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
-#include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
-#include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
-#include "mongo/db/exec/sbe/stages/makeobj.h"
 #include "mongo/db/exec/sbe/stages/project.h"
-#include "mongo/db/exec/sbe/stages/spool.h"
-#include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/interval.h"
+#include "mongo/db/query/interval_evaluation_tree.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
-#include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/db/query/sbe_stage_builder_index_scan.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/overloaded_visitor.h"
-#include <boost/optional.hpp>
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/id_generator.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -234,7 +262,7 @@ PlanStageSlots buildPlanStageSlots(StageBuilderState& state,
                 sbe::value::copyValue(sbe::value::TypeTags::bsonObject,
                                       sbe::value::bitcastFrom<const char*>(keyPattern.objdata()));
             auto slot =
-                state.data->env->registerSlot(bsonObjTag, bsonObjVal, true, state.slotIdGenerator);
+                state.env->registerSlot(bsonObjTag, bsonObjVal, true, state.slotIdGenerator);
             state.keyPatternToSlotMap[keyPattern] = slot;
             outputs.set(PlanStageSlots::kIndexKeyPattern, slot);
         }
@@ -286,9 +314,9 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
     auto boundsSlot = [&] {
         if (intervals) {
             auto [boundsTag, boundsVal] = packIndexIntervalsInSbeArray(std::move(*intervals));
-            return state.data->env->registerSlot(boundsTag, boundsVal, true, state.slotIdGenerator);
+            return state.env->registerSlot(boundsTag, boundsVal, true, state.slotIdGenerator);
         } else {
-            return state.data->env->registerSlot(
+            return state.env->registerSlot(
                 sbe::value::TypeTags::Nothing, 0, true, state.slotIdGenerator);
         }
     }();
@@ -377,7 +405,7 @@ generateGenericMultiIntervalIndexScan(StageBuilderState& state,
                                       const std::string& indexName,
                                       const IndexScanNode* ixn,
                                       const BSONObj& keyPattern,
-                                      KeyString::Version version,
+                                      key_string::Version version,
                                       Ordering ordering,
                                       sbe::IndexKeysInclusionSet indexKeysToInclude,
                                       sbe::value::SlotVector indexKeySlots,
@@ -390,7 +418,7 @@ generateGenericMultiIntervalIndexScan(StageBuilderState& state,
     std::unique_ptr<sbe::EExpression> boundsExpr;
 
     if (hasDynamicIndexBounds) {
-        boundsSlot.emplace(state.data->env->registerSlot(
+        boundsSlot.emplace(state.env->registerSlot(
             sbe::value::TypeTags::Nothing, 0, true /* owned */, state.slotIdGenerator));
         boundsExpr = makeVariable(*boundsSlot);
     } else {
@@ -501,15 +529,6 @@ bool canGenerateSingleIntervalIndexScan(const std::vector<interval_evaluation_tr
 }
 }  // namespace
 
-/**
- * Constructs the most simple version of an index scan from the single interval index bounds.
- *
- * In case when the 'lowKey' and 'highKey' are not specified, slots will be registered for them in
- * the runtime environment and their slot ids returned as a pair in the third element of the tuple.
- *
- * If 'indexKeySlot' is provided, than the corresponding slot will be filled out with each KeyString
- * in the index.
- */
 std::tuple<std::unique_ptr<sbe::PlanStage>,
            PlanStageSlots,
            boost::optional<std::pair<sbe::value::SlotId, sbe::value::SlotId>>>
@@ -518,8 +537,8 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                 const std::string& indexName,
                                 const BSONObj& keyPattern,
                                 bool forward,
-                                std::unique_ptr<KeyString::Value> lowKey,
-                                std::unique_ptr<KeyString::Value> highKey,
+                                std::unique_ptr<key_string::Value> lowKey,
+                                std::unique_ptr<key_string::Value> highKey,
                                 sbe::IndexKeysInclusionSet indexKeysToInclude,
                                 sbe::value::SlotVector indexKeySlots,
                                 const PlanStageReqs& reqs,
@@ -533,10 +552,10 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
             (lowKey && highKey) || (!lowKey && !highKey));
     const bool shouldRegisterLowHighKeyInRuntimeEnv = !lowKey;
 
-    auto lowKeySlot = !lowKey ? boost::make_optional(state.data->env->registerSlot(
+    auto lowKeySlot = !lowKey ? boost::make_optional(state.env->registerSlot(
                                     sbe::value::TypeTags::Nothing, 0, true, slotIdGenerator))
                               : boost::none;
-    auto highKeySlot = !highKey ? boost::make_optional(state.data->env->registerSlot(
+    auto highKeySlot = !highKey ? boost::make_optional(state.env->registerSlot(
                                       sbe::value::TypeTags::Nothing, 0, true, slotIdGenerator))
                                 : boost::none;
 
@@ -627,7 +646,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
                                      accessMethod->getSortedDataInterface()->getKeyStringVersion(),
                                      accessMethod->getSortedDataInterface()->getOrdering());
 
-    auto keyPattern = descriptor->keyPattern();
+    auto keyPattern = ixn->index.keyPattern;
 
     // Determine the set of fields from the index required to apply the filter and union those with
     // the set of fields from the index required by the parent stage.
@@ -743,7 +762,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
 
 IndexIntervals makeIntervalsFromIndexBounds(const IndexBounds& bounds,
                                             bool forward,
-                                            KeyString::Version version,
+                                            key_string::Version version,
                                             Ordering ordering) {
     auto lowKeyInclusive{IndexBounds::isStartIncludedInBound(bounds.boundInclusion)};
     auto highKeyInclusive{IndexBounds::isEndIncludedInBound(bounds.boundInclusion)};
@@ -772,20 +791,8 @@ IndexIntervals makeIntervalsFromIndexBounds(const IndexBounds& bounds,
                     "Generated interval [lowKey, highKey]",
                     "lowKey"_attr = lowKey,
                     "highKey"_attr = highKey);
-        // Note that 'makeKeyFromBSONKeyForSeek()' is intended to compute the "start" key for an
-        // index scan. The logic for computing a "discriminator" for an "end" key is reversed, which
-        // is why we use 'makeKeyStringFromBSONKey()' to manually specify the discriminator for the
-        // end key.
-        result.push_back(
-            {std::make_unique<KeyString::Value>(
-                 IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-                     lowKey, version, ordering, forward, lowKeyInclusive)),
-             std::make_unique<KeyString::Value>(IndexEntryComparison::makeKeyStringFromBSONKey(
-                 highKey,
-                 version,
-                 ordering,
-                 forward != highKeyInclusive ? KeyString::Discriminator::kExclusiveBefore
-                                             : KeyString::Discriminator::kExclusiveAfter))});
+        result.push_back(makeKeyStringPair(
+            lowKey, lowKeyInclusive, highKey, highKeyInclusive, version, ordering, forward));
     }
     return result;
 }
@@ -803,10 +810,10 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
         obj->reserve(2);
         obj->push_back("l"_sd,
                        sbe::value::TypeTags::ksValue,
-                       sbe::value::bitcastFrom<KeyString::Value*>(lowKey.release()));
+                       sbe::value::bitcastFrom<key_string::Value*>(lowKey.release()));
         obj->push_back("h"_sd,
                        sbe::value::TypeTags::ksValue,
-                       sbe::value::bitcastFrom<KeyString::Value*>(highKey.release()));
+                       sbe::value::bitcastFrom<key_string::Value*>(highKey.release()));
         guard.reset();
         arr->push_back(tag, val);
     }
@@ -838,7 +845,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     sbe::value::SlotId recordIdSlot;
     ParameterizedIndexScanSlots parameterizedScanSlots;
 
-    auto keyPattern = descriptor->keyPattern();
+    auto keyPattern = ixn->index.keyPattern;
 
     // Determine the set of fields from the index required to apply the filter and union those with
     // the set of fields from the index required by the parent stage.
@@ -959,7 +966,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
 
         // Generate a branch stage that will either execute an optimized or a generic index scan
         // based on the condition in the slot 'isGenericScanSlot'.
-        auto isGenericScanSlot = state.data->env->registerSlot(
+        auto isGenericScanSlot = state.env->registerSlot(
             sbe::value::TypeTags::Nothing, 0, true /* owned */, state.slotIdGenerator);
         auto isGenericScanCondition = makeVariable(isGenericScanSlot);
         stage = sbe::makeS<sbe::BranchStage>(std::move(genericStage),

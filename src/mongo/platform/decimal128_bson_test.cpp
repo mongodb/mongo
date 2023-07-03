@@ -28,24 +28,25 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
-#include <array>
-#include <cmath>
-#include <memory>
+#include <cstddef>
 #include <string>
 #include <utility>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/config.h"
-#include "mongo/db/json.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/shared_buffer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

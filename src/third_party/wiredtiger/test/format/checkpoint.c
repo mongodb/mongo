@@ -48,9 +48,8 @@ wts_checkpoints(void)
     if (g.checkpoint_config != CHECKPOINT_WIREDTIGER)
         return;
 
-    testutil_check(
-      __wt_snprintf(config, sizeof(config), ",checkpoint=(wait=%" PRIu32 ",log_size=%" PRIu32 ")",
-        GV(CHECKPOINT_WAIT), MEGABYTE(GV(CHECKPOINT_LOG_SIZE))));
+    testutil_snprintf(config, sizeof(config), ",checkpoint=(wait=%" PRIu32 ",log_size=%" PRIu32 ")",
+      GV(CHECKPOINT_WAIT), MEGABYTE(GV(CHECKPOINT_LOG_SIZE)));
     testutil_check(g.wts_conn->reconfigure(g.wts_conn, config));
 }
 
@@ -117,8 +116,8 @@ checkpoint(void *arg)
                 ret = lock_try_writelock(session, &g.backup_lock);
                 if (ret == 0) {
                     backup_locked = true;
-                    testutil_check(__wt_snprintf(config_buf, sizeof(config_buf),
-                      "name=mine.%" PRIu32, mmrand(&g.extra_rnd, 1, 4)));
+                    testutil_snprintf(config_buf, sizeof(config_buf), "name=mine.%" PRIu32,
+                      mmrand(&g.extra_rnd, 1, 4));
                     ckpt_config = config_buf;
                     ckpt_vrfy_name = config_buf + strlen("name=");
                     ebusy_ok = true;

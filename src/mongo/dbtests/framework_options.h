@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 

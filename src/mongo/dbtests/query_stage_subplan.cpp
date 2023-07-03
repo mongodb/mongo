@@ -27,32 +27,59 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <cstddef>
+#include <fmt/format.h>
 #include <memory>
+#include <string>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/subplan.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/mock_yield_policies.h"
-#include "mongo/db/query/query_test_service_context.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/service_context.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {
 
-static const NamespaceString nss("unittests.QueryStageSubplan");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageSubplan");
 
 class QueryStageSubplanTest : public unittest::Test {
 public:
@@ -151,7 +178,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
 
     WorkingSet ws;
     std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(_expCtx.get(), collection, &ws, plannerParams, cq.get()));
+        new SubplanStage(_expCtx.get(), &collection, &ws, plannerParams, cq.get()));
 
     // Plan selection should succeed due to falling back on regular planning.
     NoopYieldPolicy yieldPolicy(_expCtx->opCtx, _clock);
@@ -190,7 +217,7 @@ void assertSubplanFromCache(QueryStageSubplanTest* test, const dbtests::WriteCon
 
     WorkingSet ws;
     std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(test->expCtx(), collection, &ws, plannerParams, cq.get()));
+        new SubplanStage(test->expCtx(), &collection, &ws, plannerParams, cq.get()));
 
     NoopYieldPolicy yieldPolicy(test->opCtx(), test->serviceContext()->getFastClockSource());
     ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
@@ -203,7 +230,7 @@ void assertSubplanFromCache(QueryStageSubplanTest* test, const dbtests::WriteCon
     // If we repeat the same query, the plan for the first branch should have come from
     // the cache.
     ws.clear();
-    subplan.reset(new SubplanStage(test->expCtx(), collection, &ws, plannerParams, cq.get()));
+    subplan.reset(new SubplanStage(test->expCtx(), &collection, &ws, plannerParams, cq.get()));
 
     ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
@@ -270,7 +297,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
 
     WorkingSet ws;
     std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(_expCtx.get(), collection, &ws, plannerParams, cq.get()));
+        new SubplanStage(_expCtx.get(), &collection, &ws, plannerParams, cq.get()));
 
     NoopYieldPolicy yieldPolicy(_expCtx->opCtx, _clock);
     ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
@@ -284,7 +311,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
     // from the cache (because the first call to pickBestPlan() refrained from creating any
     // cache entries).
     ws.clear();
-    subplan.reset(new SubplanStage(_expCtx.get(), collection, &ws, plannerParams, cq.get()));
+    subplan.reset(new SubplanStage(_expCtx.get(), &collection, &ws, plannerParams, cq.get()));
 
     ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
@@ -326,7 +353,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
 
     WorkingSet ws;
     std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(_expCtx.get(), collection, &ws, plannerParams, cq.get()));
+        new SubplanStage(_expCtx.get(), &collection, &ws, plannerParams, cq.get()));
 
     NoopYieldPolicy yieldPolicy(_expCtx->opCtx, _clock);
     ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
@@ -340,7 +367,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
     // from the cache (because the first call to pickBestPlan() refrained from creating any
     // cache entries).
     ws.clear();
-    subplan.reset(new SubplanStage(_expCtx.get(), collection, &ws, plannerParams, cq.get()));
+    subplan.reset(new SubplanStage(_expCtx.get(), &collection, &ws, plannerParams, cq.get()));
 
     ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
 
@@ -498,7 +525,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
 
     WorkingSet ws;
     std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(_expCtx.get(), collection, &ws, plannerParams, cq.get()));
+        new SubplanStage(_expCtx.get(), &collection, &ws, plannerParams, cq.get()));
 
     NoopYieldPolicy yieldPolicy(_expCtx->opCtx, _clock);
     ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
@@ -543,7 +570,7 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning)
     // Create the SubplanStage.
     WorkingSet workingSet;
     auto coll = ctx.getCollection();
-    SubplanStage subplanStage(_expCtx.get(), coll, &workingSet, params, canonicalQuery.get());
+    SubplanStage subplanStage(_expCtx.get(), &coll, &workingSet, params, canonicalQuery.get());
 
     AlwaysTimeOutYieldPolicy alwaysTimeOutPolicy(_expCtx->opCtx,
                                                  serviceContext()->getFastClockSource());
@@ -569,7 +596,7 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
     // Create the SubplanStage.
     WorkingSet workingSet;
     auto coll = ctx.getCollection();
-    SubplanStage subplanStage(_expCtx.get(), coll, &workingSet, params, canonicalQuery.get());
+    SubplanStage subplanStage(_expCtx.get(), &coll, &workingSet, params, canonicalQuery.get());
 
     AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(_expCtx->opCtx,
                                                             serviceContext()->getFastClockSource());
@@ -606,7 +633,8 @@ TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelect
 
     // Create the SubplanStage.
     WorkingSet workingSet;
-    SubplanStage subplanStage(_expCtx.get(), collection, &workingSet, params, canonicalQuery.get());
+    SubplanStage subplanStage(
+        _expCtx.get(), &collection, &workingSet, params, canonicalQuery.get());
 
     // Mimic a yield by saving the state of the subplan stage. Then, drop an index not being used
     // while yielded.
@@ -653,7 +681,8 @@ TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSele
 
     // Create the SubplanStage.
     WorkingSet workingSet;
-    SubplanStage subplanStage(_expCtx.get(), collection, &workingSet, params, canonicalQuery.get());
+    SubplanStage subplanStage(
+        _expCtx.get(), &collection, &workingSet, params, canonicalQuery.get());
 
     NoopYieldPolicy yieldPolicy(_expCtx->opCtx, serviceContext()->getFastClockSource());
     ASSERT_OK(subplanStage.pickBestPlan(&yieldPolicy));

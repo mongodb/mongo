@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -183,7 +183,7 @@ static config_t no_pledged_src_size_with_dict = {
 };
 
 static param_value_t const ldm_param_values[] = {
-    {.param = ZSTD_c_enableLongDistanceMatching, .value = 1},
+    {.param = ZSTD_c_enableLongDistanceMatching, .value = ZSTD_ps_enable},
 };
 
 static config_t ldm = {
@@ -204,7 +204,7 @@ static config_t mt = {
 
 static param_value_t const mt_ldm_param_values[] = {
     {.param = ZSTD_c_nbWorkers, .value = 2},
-    {.param = ZSTD_c_enableLongDistanceMatching, .value = 1},
+    {.param = ZSTD_c_enableLongDistanceMatching, .value = ZSTD_ps_enable},
 };
 
 static config_t mt_ldm = {

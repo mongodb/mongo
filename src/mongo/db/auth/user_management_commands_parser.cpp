@@ -27,27 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/user_management_commands_parser.h"
-
-#include <algorithm>
 #include <string>
 #include <vector>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/parsed_privilege_gen.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/privilege_parser.h"
-#include "mongo/db/auth/user_document_parser.h"
+#include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/idl/command_generic_argument.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -149,30 +150,18 @@ Status parseRoleNamesFromBSONArray(const BSONArray& rolesArray,
  * If parsedPrivileges is not NULL, adds to it the privileges parsed out of the input BSONArray.
  */
 Status parseAndValidatePrivilegeArray(const BSONArray& privileges,
-                                      PrivilegeVector* parsedPrivileges) {
-    for (BSONObjIterator it(privileges); it.more(); it.next()) {
-        BSONElement element = *it;
+                                      PrivilegeVector* parsedPrivileges) try {
+    for (const auto& element : privileges) {
         if (element.type() != Object) {
             return Status(ErrorCodes::FailedToParse,
                           "Elements in privilege arrays must be objects");
         }
 
-        ParsedPrivilege parsedPrivilege;
-        std::string errmsg;
-        if (!parsedPrivilege.parseBSON(element.Obj(), &errmsg)) {
-            return Status(ErrorCodes::FailedToParse, errmsg);
-        }
-        if (!parsedPrivilege.isValid(&errmsg)) {
-            return Status(ErrorCodes::FailedToParse, errmsg);
-        }
-
-        Privilege privilege;
+        auto parsedPrivilege =
+            auth::ParsedPrivilege::parse(IDLParserContext("privilege"), element.Obj());
         std::vector<std::string> unrecognizedActions;
-        Status status = ParsedPrivilege::parsedPrivilegeToPrivilege(
-            parsedPrivilege, &privilege, &unrecognizedActions);
-        if (!status.isOK()) {
-            return status;
-        }
+        auto privilege = Privilege::resolvePrivilegeWithTenant(
+            boost::none /* tenantId */, parsedPrivilege, &unrecognizedActions);
         if (unrecognizedActions.size()) {
             std::string unrecognizedActionsString;
             str::joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');
@@ -184,6 +173,8 @@ Status parseAndValidatePrivilegeArray(const BSONArray& privileges,
         parsedPrivileges->push_back(privilege);
     }
     return Status::OK();
+} catch (const DBException& ex) {
+    return Status(ErrorCodes::FailedToParse, ex.toStatus().reason());
 }
 
 }  // namespace auth

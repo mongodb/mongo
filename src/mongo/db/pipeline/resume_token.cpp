@@ -27,19 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <ostream>
+#include <set>
 
-#include "mongo/db/pipeline/resume_token.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
-#include <limits>
-
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/pipeline/change_stream_helpers_legacy.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/optional_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 constexpr StringData ResumeToken::kDataFieldName;
@@ -165,7 +175,7 @@ ResumeToken::ResumeToken(const ResumeTokenData& data) {
     }
 
     auto keyObj = builder.obj();
-    KeyString::Builder encodedToken(KeyString::Version::V1, keyObj, Ordering::make(BSONObj()));
+    key_string::Builder encodedToken(key_string::Version::V1, keyObj, Ordering::make(BSONObj()));
     _hexKeyString = hexblob::encode(encodedToken.getBuffer(), encodedToken.getSize());
     const auto& typeBits = encodedToken.getTypeBits();
     if (!typeBits.isAllZeros())
@@ -185,7 +195,7 @@ bool ResumeToken::operator==(const ResumeToken& other) const {
 }
 
 ResumeTokenData ResumeToken::getData() const {
-    KeyString::TypeBits typeBits(KeyString::Version::V1);
+    key_string::TypeBits typeBits(key_string::Version::V1);
     if (!_typeBits.missing()) {
         BSONBinData typeBitsBinData = _typeBits.getBinData();
         BufReader typeBitsReader(typeBitsBinData.data, typeBitsBinData.length);
@@ -200,10 +210,10 @@ ResumeTokenData ResumeToken::getData() const {
     hexblob::decode(_hexKeyString, &hexDecodeBuf);
     BSONBinData keyStringBinData =
         BSONBinData(hexDecodeBuf.buf(), hexDecodeBuf.len(), BinDataType::BinDataGeneral);
-    auto internalBson = KeyString::toBsonSafe(static_cast<const char*>(keyStringBinData.data),
-                                              keyStringBinData.length,
-                                              Ordering::make(BSONObj()),
-                                              typeBits);
+    auto internalBson = key_string::toBsonSafe(static_cast<const char*>(keyStringBinData.data),
+                                               keyStringBinData.length,
+                                               Ordering::make(BSONObj()),
+                                               typeBits);
 
     BSONObjIterator i(internalBson);
     ResumeTokenData result;

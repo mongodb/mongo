@@ -29,7 +29,14 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
@@ -45,18 +52,18 @@ public:
 
     /**
      * Checks that the given host is valid to be used in this sharded cluster, based on its
-     * isMaster response.
+     * "hello" response.
      */
     Status validateHost(const HostAndPort& remoteHost,
                         const BSONObj& request,
-                        const executor::RemoteCommandResponse& isMasterReply) override;
+                        const executor::RemoteCommandResponse& helloReply) override;
 
     /**
      * Implementation of validateHost can be called without a ShardingNetworkConnectionHook
      * instance.
      */
     static Status validateHostImpl(const HostAndPort& remoteHost,
-                                   const executor::RemoteCommandResponse& isMasterReply);
+                                   const executor::RemoteCommandResponse& helloReply);
 
     /**
      * Makes a SetShardVersion request for initializing sharding information on the new connection.

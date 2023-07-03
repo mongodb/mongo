@@ -27,11 +27,19 @@
  *    it in the license file.
  */
 
-#include <boost/filesystem.hpp>
+#include <fmt/format.h>
+#include <memory>
+#include <string>
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace mozjs {

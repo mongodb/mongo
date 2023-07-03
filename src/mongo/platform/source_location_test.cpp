@@ -28,10 +28,15 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <type_traits>
 
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/source_location_test.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

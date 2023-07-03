@@ -29,6 +29,7 @@
 
 #include "mongo/base/data_range_cursor.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

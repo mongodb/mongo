@@ -27,24 +27,53 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
+#include <map>
 
-#include <boost/optional.hpp>
-#include <iostream>
-#include <vector>
+#include <boost/optional/optional.hpp>
 
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/processinfo.h"
 
 using boost::optional;
-using mongo::ProcessInfo;
 
-namespace mongo_test {
+namespace mongo {
+
+namespace {
+using StringMap = std::map<std::string, uint64_t>;
+
+StringMap toStringMap(BSONObj& obj) {
+    StringMap map;
+
+    for (const auto& e : obj) {
+        map[e.fieldName()] = e.numberLong();
+    }
+
+    return map;
+}
+
+#define ASSERT_KEY(_key) ASSERT_TRUE(stringMap.find(_key) != stringMap.end());
+
 TEST(ProcessInfo, SysInfoIsInitialized) {
     ProcessInfo processInfo;
     if (processInfo.supported()) {
         ASSERT_FALSE(processInfo.getOsType().empty());
     }
+}
+
+TEST(FTDCProcSysInfo, TestSysInfo) {
+    auto sysInfo = ProcessInfo();
+    BSONObjBuilder builder;
+    sysInfo.appendSystemDetails(builder);
+    BSONObj obj = builder.obj();
+
+    auto stringMap = toStringMap(obj);
+    ASSERT_KEY("cpuString");
 }
 
 TEST(ProcessInfo, GetNumAvailableCores) {
@@ -59,4 +88,5 @@ TEST(ProcessInfo, GetNumAvailableCores) {
 TEST(ProcessInfo, GetNumCoresReturnsNonZeroNumberOfProcessors) {
     ASSERT_GREATER_THAN(ProcessInfo::getNumCores(), 0u);
 }
-}  // namespace mongo_test
+}  // namespace
+}  // namespace mongo

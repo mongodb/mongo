@@ -29,6 +29,12 @@
 
 #include "mongo/db/audit.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/util/assert_util_core.h"
+
 namespace mongo {
 namespace audit {
 std::function<void(OperationContext*)> initializeManager;
@@ -80,7 +86,7 @@ void logDropUser(Client* client, const UserName& username) {
     invariant(client);
 }
 
-void logDropAllUsersFromDatabase(Client* client, StringData dbname) {
+void logDropAllUsersFromDatabase(Client* client, const DatabaseName& dbname) {
     invariant(client);
 }
 
@@ -125,7 +131,7 @@ void logDropRole(Client* client, const RoleName& role) {
     invariant(client);
 }
 
-void logDropAllRolesFromDatabase(Client* client, StringData dbname) {
+void logDropAllRolesFromDatabase(Client* client, const DatabaseName& dbname) {
     invariant(client);
 }
 
@@ -198,7 +204,7 @@ void logImportCollection(Client* client, const NamespaceString& nsname) {
     invariant(client);
 }
 
-void logCreateDatabase(Client* client, StringData dbname) {
+void logCreateDatabase(Client* client, const DatabaseName& dbname) {
     invariant(client);
 }
 
@@ -219,7 +225,7 @@ void logDropView(Client* client,
     invariant(client);
 }
 
-void logDropDatabase(Client* client, StringData dbname) {
+void logDropDatabase(Client* client, const DatabaseName& dbname) {
     invariant(client);
 }
 

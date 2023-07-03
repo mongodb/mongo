@@ -27,19 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
+#include <vector>
 
-#include "mongo/db/catalog/create_collection.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_builds_manager.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/ttl.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -173,8 +190,6 @@ private:
 };
 
 TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBatchMultiDeletes",
-                                                               true);
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
@@ -205,8 +220,6 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
 }
 
 TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBatchMultiDeletes",
-                                                               true);
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
@@ -253,8 +266,6 @@ TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
 // Demonstrate sub-pass behavior when all expired documents are drained before the sub-pass reaches
 // its time limit.
 TEST_F(TTLTest, TTLSingleSubPass) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBatchMultiDeletes",
-                                                               true);
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     // Set 'ttlMonitorSubPasstargetSecs' to a day to guarantee the sub-pass target time is never
@@ -300,8 +311,6 @@ TEST_F(TTLTest, TTLSingleSubPass) {
 }
 
 TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBatchMultiDeletes",
-                                                               true);
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     // Set the target time for each sub-pass to 0 to test when only a single iteration of deletes is
@@ -381,8 +390,6 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
 }
 
 TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBatchMultiDeletes",
-                                                               true);
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     // Set the target time for each sub-pass to 0 to test when only a single iteration of deletes is
@@ -466,8 +473,6 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
 
 // Tests that, between sub-passes, newly added TTL indexes are not ignored.
 TEST_F(TTLTest, TTLSubPassesStartRemovingFromNewTTLIndex) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBatchMultiDeletes",
-                                                               true);
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     // Set the target time for each sub-pass to 0 to test when only a single iteration of deletes is

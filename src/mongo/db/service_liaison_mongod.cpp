@@ -28,15 +28,19 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <mutex>
 
-#include "mongo/db/service_liaison_mongod.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/client.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/db/service_liaison_mongod.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/clock_source.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl

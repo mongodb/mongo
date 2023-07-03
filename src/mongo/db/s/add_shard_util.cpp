@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/add_shard_util.h"
-
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 

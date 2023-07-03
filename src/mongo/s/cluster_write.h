@@ -29,7 +29,18 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <vector>
+
+#include "mongo/bson/oid.h"
+#include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/commands/bulk_write_parser.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/bulk_write_exec.h"
 
 namespace mongo {
@@ -41,6 +52,7 @@ namespace cluster {
  */
 void write(OperationContext* opCtx,
            const BatchedCommandRequest& request,
+           NamespaceString* nss,
            BatchWriteExecStats* stats,
            BatchedCommandResponse* response,
            boost::optional<OID> targetEpoch = boost::none);

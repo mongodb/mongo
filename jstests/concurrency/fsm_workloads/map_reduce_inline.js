@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * map_reduce_inline.js
  *
@@ -13,7 +11,7 @@
  *   does_not_support_causal_consistency
  * ]
  */
-var $config = (function() {
+export const $config = (function() {
     function mapper() {
         if (this.hasOwnProperty('key') && this.hasOwnProperty('value')) {
             var obj = {};

@@ -79,37 +79,40 @@ structs:
     description: "The metrics about the characteristics of a shard key."
     strict: false
     fields:
-      numDocs:
+      numDocsTotal:
         type: long
-        description: "The number of the documents in the collection."
-        validator: { gte: 0 }
-        optional: true
-      isUnique:
-        type: bool
-        description: "Whether the shard key index enforces a uniqueness constraint."
-        optional: true
-      numDistinctValues:
+        description: "The number of documents in the collection."
+        validator: { gt: 0 }
+      numOrphanDocs:
         type: long
-        description: "The number of distinct shard key values in the collection."
+        description: "The number of orphan documents in the collection."
         validator: { gte: 0 }
-        optional: true
-      mostCommonValues:
-        type: array<ValueFrequencyMetrics>
-        description: "The value and frequency of the most common shard key values."
-        optional: true
-      monotonicity:
-        type: MonotonicityMetrics
-        description: "The monotonicity metrics for the shard key."
         optional: true
       avgDocSizeBytes:
         type: long
         description: "The average document size in bytes."
-        validator: { gte: 0 }
-        optional: true
-      numOrphanDocs:
+        validator: { gt: 0 }
+      numDocsSampled:
         type: long
-        description: "The number of the orphan documents in the collection."
-        validator: { gte: 0 }
+        description: "The number of sampled documents when calculating the metrics about the
+                     characteristics of the shard key."
+        validator: { gt: 0 }
+      isUnique:
+        type: bool
+        description: "Whether the shard key index enforces a uniqueness constraint."
+      numDistinctValues:
+        type: long
+        description: "The number of distinct shard key values in the collection."
+        validator: { gt: 0 }
+      mostCommonValues:
+        type: array<ValueFrequencyMetrics>
+        description: "The value and frequency of the most common shard key values."
+      monotonicity:
+        type: MonotonicityMetrics
+        description: "The monotonicity metrics for the shard key."
+      note:
+        description: "The note about how to interpret the metrics."
+        type: string
         optional: true
 
   ReadSampleSize:
@@ -289,19 +292,15 @@ structs:
   analyzeShardKeyResponse:
     description: "The response for the 'analyzeShardKey' command."
     strict: false
-    inline_chained_structs: true
-    chained_structs:
-      KeyCharacteristicsMetrics: keyCharacteristics
     fields:
+      keyCharacteristics:
+        type: KeyCharacteristicsMetrics
+        optional: true
       readDistribution:
         type: ReadDistributionMetrics
         optional: true
       writeDistribution:
         type: WriteDistributionMetrics
-        optional: true
-      note:
-        description: "The note about how to interpret the metrics."
-        type: string
         optional: true
 
 commands:
@@ -318,6 +317,34 @@ commands:
         description: "The shard key to evaluate."
         validator:
           callback: validateShardKeyPattern
+      keyCharacteristics:
+        type: bool
+        cpp_name: analyzeKeyCharacteristics
+        description: "The boolean specifying whether the command should calculate the metrics about
+                     the characteristics of the shard key."
+        default: true
+      readWriteDistribution:
+        type: bool
+        cpp_name: analyzeReadWriteDistribution
+        description: "The boolean specifying whether the command should calculate the metrics about
+                     the read and write distribution."
+        default: true
+      sampleRate:
+        description: "The proportion of the documents in the collection, in the range (0,1] to
+                     sample when calculating the metrics about the characteristics of the shard
+                     key."
+        type: safeDouble
+        validator:
+          gt: 0
+          lte: 1
+        optional: true
+      sampleSize:
+        description: "The number of documents to sample when calculating the metrics about the
+                      characteristics of the shard key."
+        type: safeInt64
+        validator:
+          gt: 0
+        optional: true
       $readPreference:
         type: readPreference
         cpp_name: readPreference

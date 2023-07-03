@@ -1,5 +1,3 @@
-'use strict';
-
 /*
  * yield_sort_merge.js (extends yield_fetch.js)
  *
@@ -8,10 +6,10 @@
  *
  * Other workloads that need an index { a: 1, b: 1 } can extend this.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/yield.js');       // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     /*
      * Execute a query that will use the SORT_MERGE stage.
      */

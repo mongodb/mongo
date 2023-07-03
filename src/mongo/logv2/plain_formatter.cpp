@@ -29,44 +29,65 @@
 
 #include "mongo/logv2/plain_formatter.h"
 
+#include <algorithm>
+#include <any>
+#include <boost/log/attributes/value_extraction.hpp>
+#include <boost/log/utility/formatting_ostream.hpp>
+#include <cstddef>
+#include <deque>
+#include <fmt/format.h>
+#include <functional>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <variant>
+
+#include <boost/cstdint.hpp>
+#include <boost/exception/exception.hpp>
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/constants.h"
-#include "mongo/stdx/variant.h"
-#include "mongo/util/str_escape.h"
-
-#include <boost/container/small_vector.hpp>
-#include <boost/log/attributes/value_extraction.hpp>
-#include <boost/log/expressions/message.hpp>
-#include <boost/log/utility/formatting_ostream.hpp>
-
-#include <any>
-#include <deque>
-#include <fmt/format.h>
+#include "mongo/logv2/log_truncation.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 
 namespace mongo::logv2 {
 namespace {
 
 struct TextValueExtractor {
     void operator()(const char* name, CustomAttributeValue const& val) {
-        if (val.stringSerialize) {
-            fmt::memory_buffer buffer;
-            val.stringSerialize(buffer);
-            _addString(name, fmt::to_string(buffer));
-        } else if (val.toString) {
-            _addString(name, val.toString());
-        } else if (val.BSONAppend) {
-            BSONObjBuilder builder;
-            val.BSONAppend(builder, name);
-            BSONElement element = builder.done().getField(name);
-            _addString(name, element.toString(false));
-        } else if (val.BSONSerialize) {
-            BSONObjBuilder builder;
-            val.BSONSerialize(builder);
-            operator()(name, builder.done());
-        } else if (val.toBSONArray) {
-            operator()(name, val.toBSONArray());
+        try {
+            if (val.stringSerialize) {
+                fmt::memory_buffer buffer;
+                val.stringSerialize(buffer);
+                _addString(name, fmt::to_string(buffer));
+            } else if (val.toString) {
+                _addString(name, val.toString());
+            } else if (val.BSONAppend) {
+                BSONObjBuilder builder;
+                val.BSONAppend(builder, name);
+                BSONElement element = builder.done().getField(name);
+                _addString(name, element.toString(false));
+            } else if (val.BSONSerialize) {
+                BSONObjBuilder builder;
+                val.BSONSerialize(builder);
+                operator()(name, builder.done());
+            } else if (val.toBSONArray) {
+                operator()(name, val.toBSONArray());
+            }
+        } catch (...) {
+            Status s = exceptionToStatus();
+            _addString(name, std::string("Failed to serialize due to exception: ") + s.toString());
         }
     }
 

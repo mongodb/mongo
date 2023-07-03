@@ -27,16 +27,31 @@
  *    it in the license file.
  */
 
+#include <boost/move/utility_core.hpp>
+#include <cstdint>
+#include <memory>
+#include <s2cellid.h>
+#include <utility>
+#include <variant>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/matcher/expression_text_base.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/parsed_match_expression_for_test.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/query_shape_test_gen.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -89,6 +104,9 @@ TEST(QueryPredicateShape, Equals) {
     ASSERT_REDACTED_SHAPE_EQ_AUTO(  // NOLINT
         R"({"$and":[{"REDACT_a":{"$eq":"?number"}},{"REDACT_b":{"$eq":"?number"}}]})",
         "{a: 5, b: 6}");
+    ASSERT_REDACTED_SHAPE_EQ_AUTO(  // NOLINT
+        R"({"REDACT_foo.REDACT_$bar":{"$eq":"?number"}})",
+        R"({"foo.$bar":0})");
 }
 
 TEST(QueryPredicateShape, ArraySubTypes) {
@@ -524,46 +542,46 @@ TEST(QueryPredicateShape, OptimizedExprPredicates) {
 TEST(SortPatternShape, NormalSortPattern) {
     boost::intrusive_ptr<ExpressionContext> expCtx;
     expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts;
-    opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"a.b.c":1,"foo":-1})",
-        query_shape::extractSortShape(fromjson(R"({"a.b.c": 1, "foo": -1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({"a.b.c": 1, "foo": -1})"),
+                                      expCtx,
+                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
 }
 
 TEST(SortPatternShape, NaturalSortPattern) {
     boost::intrusive_ptr<ExpressionContext> expCtx;
     expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts;
-    opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({$natural: 1})",
-        query_shape::extractSortShape(fromjson(R"({$natural: 1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({$natural: 1})"),
+                                      expCtx,
+                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({$natural: -1})",
-        query_shape::extractSortShape(fromjson(R"({$natural: -1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({$natural: -1})"),
+                                      expCtx,
+                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
 }
 
 TEST(SortPatternShape, NaturalSortPatternWithMeta) {
     boost::intrusive_ptr<ExpressionContext> expCtx;
     expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts;
-    opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({$natural: 1, x: '?'})",
-        query_shape::extractSortShape(
-            fromjson(R"({$natural: 1, x: {$meta: "textScore"}})"), expCtx, opts));
+        R"({$natural: 1, x: '?object'})",
+        query_shape::extractSortShape(fromjson(R"({$natural: 1, x: {$meta: "textScore"}})"),
+                                      expCtx,
+                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
 }
 
 TEST(SortPatternShape, MetaPatternWithoutNatural) {
     boost::intrusive_ptr<ExpressionContext> expCtx;
     expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts;
-    opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"normal":1,"$computed1":{"$meta":"textScore"}})",
-        query_shape::extractSortShape(
-            fromjson(R"({normal: 1, x: {$meta: "textScore"}})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({normal: 1, x: {$meta: "textScore"}})"),
+                                      expCtx,
+                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
 }
 
 // Here we have one test to ensure that the redaction policy is accepted and applied in the
@@ -571,10 +589,9 @@ TEST(SortPatternShape, MetaPatternWithoutNatural) {
 TEST(SortPatternShape, RespectsRedactionPolicy) {
     boost::intrusive_ptr<ExpressionContext> expCtx;
     expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts;
-    opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
+    SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"REDACT_normal":1,"REDACT_y":1})",
         query_shape::extractSortShape(fromjson(R"({normal: 1, y: 1})"), expCtx, opts));
@@ -587,11 +604,11 @@ TEST(SortPatternShape, RespectsRedactionPolicy) {
 
 TEST(QueryShapeIDL, ShapifyIDLStruct) {
     SerializationOptions options;
-    options.applyHmacToIdentifiers = true;
-    options.identifierHmacPolicy = [](StringData s) -> std::string {
+    options.transformIdentifiers = true;
+    options.transformIdentifiersCallback = [](StringData s) -> std::string {
         return str::stream() << "HASH<" << s << ">";
     };
-    options.replacementForLiteralArgs = "?"_sd;
+    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
 
     auto nested = NestedStruct("value",
                                ExampleEnumEnum::Value1,
@@ -600,8 +617,10 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                                {1, 2, 3, 4},
                                "field.path",
                                {"field.path.1", "fieldpath2"},
-                               NamespaceString{"db", "coll"},
-                               NamespaceString{"db", "coll"});
+                               NamespaceString::createNamespaceString_forTest("db", "coll"),
+                               NamespaceString::createNamespaceString_forTest("db", "coll"),
+                               177,
+                               true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "stringField": "value",
@@ -620,24 +639,28 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                 "fieldpath2"
             ],
             "nss": "db.coll",
-            "plainNss": "db.coll"
+            "plainNss": "db.coll",
+            "safeInt64Field": 177,
+            "boolField": true
         })",
         nested.toBSON());
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "stringField": "?",
+            "stringField": "?string",
             "enumField": "EnumValue1",
-            "stringIntVariant": "?",
+            "stringIntVariant": "?number",
             "stringIntVariantEnum": "hello",
-            "arrayOfInts": "?",
+            "arrayOfInts": "?array<?number>",
             "fieldpath": "HASH<field>.HASH<path>",
             "fieldpathList": [
                 "HASH<field>.HASH<path>.HASH<1>",
                 "HASH<fieldpath2>"
             ],
             "nss": "HASH<db.coll>",
-            "plainNss": "db.coll"
+            "plainNss": "db.coll",
+            "safeInt64Field": "?number",
+            "boolField": "?bool"
         })",
         nested.toBSON(options));
 
@@ -662,7 +685,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                     "fieldpath2"
                 ],
                 "nss": "db.coll",
-                "plainNss": "db.coll"
+                "plainNss": "db.coll",
+                "safeInt64Field": 177,
+                "boolField": true
             },
             "nested_no_shape": {
                 "stringField": "value",
@@ -681,7 +706,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                     "fieldpath2"
                 ],
                 "nss": "db.coll",
-                "plainNss": "db.coll"
+                "plainNss": "db.coll",
+                "safeInt64Field": 177,
+                "boolField": true
             }
         })",
         parent.toBSON());
@@ -689,18 +716,20 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "nested_shape": {
-                "stringField": "?",
+                "stringField": "?string",
                 "enumField": "EnumValue1",
-                "stringIntVariant": "?",
+                "stringIntVariant": "?number",
                 "stringIntVariantEnum": "hello",
-                "arrayOfInts": "?",
+                "arrayOfInts": "?array<?number>",
                 "fieldpath": "HASH<field>.HASH<path>",
                 "fieldpathList": [
                     "HASH<field>.HASH<path>.HASH<1>",
                     "HASH<fieldpath2>"
                 ],
                 "nss": "HASH<db.coll>",
-                "plainNss": "db.coll"
+                "plainNss": "db.coll",
+                "safeInt64Field": "?number",
+                "boolField": "?bool"
             },
             "nested_no_shape": {
                 "stringField": "value",
@@ -719,7 +748,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                     "fieldpath2"
                 ],
                 "nss": "db.coll",
-                "plainNss": "db.coll"
+                "plainNss": "db.coll",
+                "safeInt64Field": 177,
+                "boolField": true
             }
         })",
         parent.toBSON(options));

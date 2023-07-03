@@ -29,7 +29,23 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/commit_quorum_options.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl_index_build_state.h"
+#include "mongo/db/resumable_index_builds_gen.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -96,8 +112,7 @@ private:
                                          std::shared_ptr<ReplIndexBuildState> replState) override;
 
     void _signalPrimaryForAbortAndWaitForExternalAbort(OperationContext* opCtx,
-                                                       ReplIndexBuildState* replState,
-                                                       const Status& abortStatus) override;
+                                                       ReplIndexBuildState* replState) override;
 
     void _signalPrimaryForCommitReadiness(OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState) override;

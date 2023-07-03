@@ -27,27 +27,42 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/rpc/metadata.h"
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/logical_time_validator.h"
-#include "mongo/db/multitenancy.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_block_bypass.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/testing_proctor.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace rpc {
+MONGO_FAIL_POINT_DEFINE(failIfOperationKeyMismatch);
 
 BSONObj makeEmptyMetadata() {
     return BSONObj();
@@ -83,10 +98,17 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
 
     if (clientOperationKeyElem &&
         (TestingProctor::instance().isEnabled() ||
-         authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::internal))) {
+         authSession->isAuthorizedForActionsOnResource(
+             ResourcePattern::forClusterResource(opMsg.getValidatedTenantId()),
+             ActionType::internal))) {
         auto opKey = uassertStatusOK(UUID::parse(clientOperationKeyElem));
         opCtx->setOperationKey(std::move(opKey));
+        failIfOperationKeyMismatch.execute([&](const BSONObj& data) {
+            tassert(7446600,
+                    "OperationKey in request does not match test provided OperationKey",
+                    data["clientOperationKey"].String() ==
+                        opCtx->getOperationKey()->toBSON()["uuid"].String());
+        });
     }
 
     if (readPreferenceElem) {

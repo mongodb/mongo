@@ -28,15 +28,40 @@
  */
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <mutex>
+#include <queue>
+#include <set>
+#include <string>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -140,6 +165,8 @@ private:
          * Code executed by the internal thread
          */
         void _runRangeDeletions();
+
+        ServiceContext* const _service;
 
         mutable Mutex _mutex = MONGO_MAKE_LATCH("ReadyRangeDeletionsProcessor");
 

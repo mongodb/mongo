@@ -102,9 +102,9 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
-                                 const BSONObj&) const override {
-        return Impl::checkAuthForOperation(opCtx);
+                                 const DatabaseName& dbName,
+                                 const BSONObj& bsonObj) const override {
+        return Impl::checkAuthForOperation(opCtx, dbName, bsonObj);
     }
 
     bool isTransactionCommand() const final {

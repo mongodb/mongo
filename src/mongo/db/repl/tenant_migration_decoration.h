@@ -30,8 +30,12 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

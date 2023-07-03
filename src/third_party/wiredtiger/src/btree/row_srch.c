@@ -386,14 +386,6 @@ __wt_row_search(WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, bool insert, WT_REF *le
     __cursor_pos_clear(cbt);
 
     /*
-     * In some cases we expect we're comparing more than a few keys with matching prefixes, so it's
-     * faster to avoid the memory fetches by skipping over those prefixes. That's done by tracking
-     * the length of the prefix match for the lowest and highest keys we compare as we descend the
-     * tree. The high boundary is reset on each new page, the lower boundary is maintained.
-     */
-    skiplow = 0;
-
-    /*
      * If a cursor repeatedly appends to the tree, compare the search key against the last key on
      * each internal page during insert before doing the full binary search.
      *
@@ -428,7 +420,6 @@ restart:
          * Discard the currently held page and restart the search from the root.
          */
         WT_RET(__wt_page_release(session, current, 0));
-        skiplow = 0;
     }
 
     /* Search the internal pages of the tree. */
@@ -492,16 +483,22 @@ restart:
             }
         else if (collator == NULL) {
             /*
-             * Reset the skipped prefix counts; we'd normally expect the parent's skipped prefix
-             * values to be larger than the child's values and so we'd only increase them as we walk
-             * down the tree (in other words, if we can skip N bytes on the parent, we can skip at
-             * least N bytes on the child). However, if a child internal page was split up into the
-             * parent, the child page's key space will have been truncated, and the values from the
-             * parent's search may be wrong for the child. We only need to reset the high count
-             * because the split-page algorithm truncates the end of the internal page's key space,
-             * the low count is still correct.
+             * In some cases we expect we're comparing more than a few keys with matching prefixes,
+             * so it's faster to avoid the memory fetches by skipping over those prefixes. That's
+             * done by tracking the length of the prefix match for the lowest and highest keys we've
+             * seen previously.
+             *
+             * Normally we'd expect every parent page's skippable prefixes to be shorter than the
+             * prefixes we can skip in the child page, and so we'd skip increasingly longer prefixes
+             * as we walk down the tree (in other words, if we can skip N bytes on the parent, we
+             * can skip at least N bytes on the child). However, if the search threads cache this
+             * skippable prefix size as they move down the tree, and if the tree structure changes
+             * in parallel - for example page splits reducing the child pages key space or a keys
+             * destined for a now-deleted sibling page being inserted into the current page - the
+             * skippable prefix can be incorrect for the page. To protect against this we reset the
+             * skippable prefix length each time we move to a new page.
              */
-            skiphigh = 0;
+            skiphigh = skiplow = 0;
 
             for (; limit != 0; limit >>= 1) {
                 indx = base + (limit >> 1);
@@ -509,7 +506,7 @@ restart:
                 __wt_ref_key(page, descent, &item->data, &item->size);
 
                 match = WT_MIN(skiplow, skiphigh);
-                cmp = __wt_lex_compare_skip(srch_key, item, &match);
+                cmp = __wt_lex_compare_skip(session, srch_key, item, &match);
                 if (cmp > 0) {
                     skiplow = match;
                     base = indx + 1;
@@ -648,14 +645,22 @@ leaf_only:
         }
     else if (collator == NULL) {
         /*
-         * Reset the skipped prefix counts; we'd normally expect the parent's skipped prefix values
-         * to be larger than the child's values and so we'd only increase them as we walk down the
-         * tree (in other words, if we can skip N bytes on the parent, we can skip at least N bytes
-         * on the child). However, leaf pages at the end of the tree can be extended, causing the
-         * parent's search to be wrong for the child. We only need to reset the high count, the page
-         * can only be extended so the low count is still correct.
+         * In some cases we expect we're comparing more than a few keys with matching prefixes, so
+         * it's faster to avoid the memory fetches by skipping over those prefixes. That's done by
+         * tracking the length of the prefix match for the lowest and highest keys we've seen
+         * previously.
+         *
+         * Normally we'd expect every parent page's skippable prefixes to be shorter than the
+         * prefixes we can skip in the child page, and so we'd skip increasingly longer prefixes as
+         * we walk down the tree (in other words, if we can skip N bytes on the parent, we can skip
+         * at least N bytes on the child). However, if the search threads cache this skippable
+         * prefix size as they move down the tree, and if the tree structure changes in parallel -
+         * for example page splits reducing the child pages key space or a keys destined for a
+         * now-deleted sibling page being inserted into the current page - the skippable prefix can
+         * be incorrect for the page. To protect against this we reset the skippable prefix length
+         * each time we move to a new page.
          */
-        skiphigh = 0;
+        skiphigh = skiplow = 0;
 
         for (; limit != 0; limit >>= 1) {
             indx = base + (limit >> 1);
@@ -663,7 +668,7 @@ leaf_only:
             WT_ERR(__wt_row_leaf_key(session, page, rip, item, true));
 
             match = WT_MIN(skiplow, skiphigh);
-            cmp = __wt_lex_compare_skip(srch_key, item, &match);
+            cmp = __wt_lex_compare_skip(session, srch_key, item, &match);
             if (cmp > 0) {
                 skiplow = match;
                 base = indx + 1;

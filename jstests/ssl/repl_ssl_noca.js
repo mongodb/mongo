@@ -1,3 +1,6 @@
+// TODO BUILD-17503 Remove this tag
+// @tags: [incompatible_with_macos]
+
 (function() {
 'use strict';
 if (_isWindows()) {

@@ -29,9 +29,18 @@
 
 #include "mongo/db/query/max_time_ms_parser.h"
 
+#include <climits>
+#include <cmath>
 #include <fmt/format.h>
 
-#include "mongo/bson/bsonobjbuilder.h"
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

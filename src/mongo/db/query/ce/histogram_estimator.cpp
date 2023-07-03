@@ -29,22 +29,41 @@
 
 #include "mongo/db/query/ce/histogram_estimator.h"
 
-#include "mongo/db/pipeline/abt/utils.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <map>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/ce/bound_utils.h"
 #include "mongo/db/query/ce/heuristic_predicate_estimation.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
 #include "mongo/db/query/ce/sel_tree_utils.h"
-
 #include "mongo/db/query/cqf_command_utils.h"
-
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/bool_expression.h"
+#include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/explain.h"
-#include "mongo/db/query/optimizer/utils/abt_hash.h"
-#include "mongo/db/query/optimizer/utils/ce_math.h"
-#include "mongo/db/query/optimizer/utils/memo_utils.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
-
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/db/query/stats/value_utils.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -294,7 +313,7 @@ public:
         SelectivityTreeBuilder selTreeBuilder;
         selTreeBuilder.pushDisj();
         PSRExpr::visitDisjuncts(node.getReqMap().getRoot(),
-                                [&](const PSRExpr::Node& n, const size_t) {
+                                [&](const PSRExpr::Node& n, const PSRExpr::VisitorContext&) {
                                     estimateConjunct(n, selTreeBuilder, childResult);
                                 });
 
@@ -365,47 +384,50 @@ private:
                           const CEType& childResult) {
         // Initial first pass through the requirements map to extract information about each path.
         std::map<std::string, SargableConjunct> conjunctRequirements;
-        PSRExpr::visitConjuncts(conj, [&](const PSRExpr::Node& atom, const size_t) {
-            PSRExpr::visitAtom(atom, [&](const PartialSchemaEntry& e) {
-                const auto& [key, req] = e;
-                if (req.getIsPerfOnly()) {
-                    // Ignore perf-only requirements.
-                    return;
-                }
+        PSRExpr::visitConjuncts(
+            conj, [&](const PSRExpr::Node& atom, const PSRExpr::VisitorContext&) {
+                PSRExpr::visitAtom(
+                    atom, [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
+                        const auto& [key, req] = e;
+                        if (req.getIsPerfOnly()) {
+                            // Ignore perf-only requirements.
+                            return;
+                        }
 
-                const auto serializedPath = serializePath(key._path.ref());
-                const auto& interval = req.getIntervals();
-                const bool isPathArrInterval =
-                    (_arrayOnlyInterval == interval) && !pathEndsInTraverse(key._path.ref());
+                        const auto serializedPath = serializePath(key._path.ref());
+                        const auto& interval = req.getIntervals();
+                        const bool isPathArrInterval = (_arrayOnlyInterval == interval) &&
+                            !pathEndsInTraverse(key._path.ref());
 
-                // Check if we have already seen this path.
-                if (auto conjunctIt = conjunctRequirements.find({serializedPath});
-                    conjunctIt != conjunctRequirements.end()) {
-                    auto& conjunctReq = conjunctIt->second;
-                    if (isPathArrInterval) {
-                        // We should estimate this path's intervals using $elemMatch semantics.
-                        // Don't push back the interval for estimation; instead, we use it to change
-                        // how we estimate other intervals along this path.
-                        conjunctReq.includeScalar = false;
-                    } else {
-                        // We will need to estimate this interval.
-                        conjunctReq.intervals.push_back(interval);
-                    }
-                    return;
-                }
+                        // Check if we have already seen this path.
+                        if (auto conjunctIt = conjunctRequirements.find({serializedPath});
+                            conjunctIt != conjunctRequirements.end()) {
+                            auto& conjunctReq = conjunctIt->second;
+                            if (isPathArrInterval) {
+                                // We should estimate this path's intervals using $elemMatch
+                                // semantics. Don't push back the interval for estimation; instead,
+                                // we use it to change how we estimate other intervals along this
+                                // path.
+                                conjunctReq.includeScalar = false;
+                            } else {
+                                // We will need to estimate this interval.
+                                conjunctReq.intervals.push_back(interval);
+                            }
+                            return;
+                        }
 
-                // Get histogram from statistics if it exists, or null if not.
-                const auto* histogram = _stats->getHistogram(serializedPath);
+                        // Get histogram from statistics if it exists, or null if not.
+                        const auto* histogram = _stats->getHistogram(serializedPath);
 
-                // Add this path to the map. If this is not a 'PathArr' interval, add it to the
-                // vector of intervals we will be estimating.
-                SargableConjunct sc{!isPathArrInterval, histogram, {}};
-                if (sc.includeScalar) {
-                    sc.intervals.push_back(interval);
-                }
-                conjunctRequirements.emplace(serializedPath, std::move(sc));
+                        // Add this path to the map. If this is not a 'PathArr' interval, add it to
+                        // the vector of intervals we will be estimating.
+                        SargableConjunct sc{!isPathArrInterval, histogram, {}};
+                        if (sc.includeScalar) {
+                            sc.intervals.push_back(interval);
+                        }
+                        conjunctRequirements.emplace(serializedPath, std::move(sc));
+                    });
             });
-        });
 
         selTreeBuilder.pushConj();
         for (const auto& conjunctRequirement : conjunctRequirements) {

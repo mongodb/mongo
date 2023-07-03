@@ -6,7 +6,7 @@ include(CheckTypeSize)
 # Helper function for evaluating a list of dependencies. Mostly used by the
 # "config_X" helpers to evaluate the dependencies required to enable the config
 # option.
-#   depends - a list (semicolon seperated) of dependencies to evaluate.
+#   depends - a list (semicolon separated) of dependencies to evaluate.
 #   enabled - name of the output variable set with either 'ON' or 'OFF' (based
 #             on evaluated dependencies). Output variable is set in the callers scope.
 function(eval_dependency depends enabled)
@@ -34,7 +34,7 @@ endfunction()
 #   description - docstring to describe the configuration option (viewable in the cmake-gui).
 #   DEFAULT <default string> -  Default value of the configuration string. Used when not manually set
 #       by a cmake script or in the cmake-gui.
-#   DEPENDS <deps> - list of dependencies (semicolon seperated) required for the configuration string
+#   DEPENDS <deps> - list of dependencies (semicolon separated) required for the configuration string
 #       to be present and set in the cache. If any of the dependencies aren't met, the
 #       configuration value won't be present in the cache.
 #   INTERNAL - hides the configuration option from the cmake-gui by default. Useful if you don't want
@@ -84,7 +84,7 @@ endfunction()
 #   config_name - name of the configuration option.
 #   description - docstring to describe the configuration option (viewable in the cmake-gui).
 #   OPTIONS - a list of option values that the configuration option can be set to. Each option is itself a semicolon
-#       seperated list consisting of "<option-name>;<config-name>;<option-dependencies>".
+#       separated list consisting of "<option-name>;<config-name>;<option-dependencies>".
 #       * option-name: name of the given option stored in the ${config_name} cache variable and presented
 #           to users in the gui (usually something understandable).
 #       * config-name: an additional cached configuration variable that is made available if the option is selected.
@@ -172,7 +172,7 @@ endfunction()
 #   description - docstring to describe the configuration option (viewable in the cmake-gui).
 #   DEFAULT <default-value> -  default value of the configuration bool (ON/OFF). Used when not manually set
 #       by a cmake script or in the cmake-gui or when dependencies aren't met.
-#   DEPENDS <deps> - list of dependencies (semicolon seperated) required for the configuration bool
+#   DEPENDS <deps> - list of dependencies (semicolon separated) required for the configuration bool
 #       to be set to the desired value. If any of the dependencies aren't met the configuration value
 #       will be set to its default value.
 #   DEPENDS_ERROR <config-val> <error-string> - specifically throw a fatal error when the configuration option is set to
@@ -251,7 +251,7 @@ endfunction()
 #   description - docstring to describe the configuration option (viewable in the cmake-gui).
 #   FUNC <function-symbol> - function symbol we want to search for.
 #   FILE <include-header> - header we expect the function symbol to be defined e.g a std header.
-#   DEPENDS <deps> - list of dependencies (semicolon seperated) required for the configuration to be evaluated.
+#   DEPENDS <deps> - list of dependencies (semicolon separated) required for the configuration to be evaluated.
 #       If any of the dependencies aren't met the configuration value will be set to '0' (false).
 #   LIBS <library-dependencies> - a list of any additional library dependencies needed to successfully link with the function symbol.
 function(config_func config_name description)
@@ -318,7 +318,7 @@ endfunction()
 #   config_name - name of the configuration option.
 #   description - docstring to describe the configuration option (viewable in the cmake-gui).
 #   FILE <include-header> - header we want to search for e.g a std header.
-#   DEPENDS <deps> - list of dependencies (semicolon seperated) required for the configuration to be evaluated.
+#   DEPENDS <deps> - list of dependencies (semicolon separated) required for the configuration to be evaluated.
 #       If any of the dependencies aren't met the configuration value will be set to '0' (false).
 function(config_include config_name description)
     cmake_parse_arguments(
@@ -381,7 +381,7 @@ endfunction()
 #   description - docstring to describe the configuration option (viewable in the cmake-gui).
 #   LIB <library> - library we are searching for (defined as if we are linking against it e.g -lpthread).
 #   FUNC <function-symbol> - function symbol we expect to be available to link against within the library.
-#   DEPENDS <deps> - list of dependencies (semicolon seperated) required for the configuration to be evaluated.
+#   DEPENDS <deps> - list of dependencies (semicolon separated) required for the configuration to be evaluated.
 #       If any of the dependencies aren't met the configuration value will be set to '0' (false).
 function(config_lib config_name description)
     cmake_parse_arguments(
@@ -460,7 +460,7 @@ endfunction()
 #   config_name - name of the configuration option.
 #   description - docstring to describe the configuration option (viewable in the cmake-gui).
 #   SOURCE <source-file> - specific source file we want to test compile.
-#   DEPENDS <deps> - list of dependencies (semicolon seperated) required for the configuration to be evaluated.
+#   DEPENDS <deps> - list of dependencies (semicolon separated) required for the configuration to be evaluated.
 #       If any of the dependencies aren't met the configuration value will be set to '0' (false).
 #   LIBS <library-dependencies> - a list of any additional library dependencies needed to successfully compile the source.
 function(config_compile config_name description)
@@ -666,7 +666,7 @@ macro(source_python3_package python_libs python_version python_executable)
     if("${CMAKE_VERSION}" VERSION_LESS "3.12.0")
         # This method of finding python libs has been deprecated since version 3.12.
         # If we are running with a greater CMake version, opt to use the Python3 package.
-        set(Python_ADDITIONAL_VERSIONS 3.9 3.8 3.7 3.6 3.5)
+        set(Python_ADDITIONAL_VERSIONS 3.11 3.9 3.8 3.7 3.6 3.5)
         find_package(PythonInterp ${required_version} REQUIRED)
         find_package(PythonLibs ${required_version} REQUIRED)
         include_directories(${PYTHON_INCLUDE_DIRS})

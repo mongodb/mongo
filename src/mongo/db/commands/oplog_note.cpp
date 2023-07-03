@@ -28,26 +28,45 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <ostream>
+#include <string>
 
-#include "mongo/db/commands.h"
-
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -111,11 +130,12 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const override {
         if (!AuthorizationSession::get(opCtx->getClient())
-                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                    ActionType::appendOplogNote)) {
+                 ->isAuthorizedForActionsOnResource(
+                     ResourcePattern::forClusterResource(dbName.tenantId()),
+                     ActionType::appendOplogNote)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();

@@ -6,19 +6,9 @@
 load('jstests/aggregation/extras/utils.js');  // For arrayEq()
 load("jstests/libs/feature_flag_util.js");    // for isEnabled
 
-function checkNsSerializedCorrectly(
-    featureFlagRequireTenantId, kTenant, kDbName, kCollectionName, nsField) {
-    if (featureFlagRequireTenantId) {
-        // This case represents the upgraded state where we will not include the tenantId as the
-        // db prefix.
-        const nss = kDbName + (kCollectionName == "" ? "" : "." + kCollectionName);
-        assert.eq(nsField, nss);
-    } else {
-        // This case represents the downgraded state where we will continue to prefix namespaces.
-        const prefixedNss =
-            kTenant + "_" + kDbName + (kCollectionName == "" ? "" : "." + kCollectionName);
-        assert.eq(nsField, prefixedNss);
-    }
+function checkNsSerializedCorrectly(kDbName, kCollectionName, nsField) {
+    const nss = kDbName + (kCollectionName == "" ? "" : "." + kCollectionName);
+    assert.eq(nsField, nss);
 }
 
 const rst = new ReplSetTest({
@@ -88,13 +78,11 @@ const tokenDB = tokenConn.getDB(kDbName);
         const findRes = assert.commandWorked(
             tokenDB.runCommand({find: kCollName, filter: {a: 1}, batchSize: 1}));
         assert(arrayEq([{_id: 0, a: 1, b: 1}], findRes.cursor.firstBatch), tojson(findRes));
-        checkNsSerializedCorrectly(
-            featureFlagRequireTenantId, kTenant, kDbName, kCollName, findRes.cursor.ns);
+        checkNsSerializedCorrectly(kDbName, kCollName, findRes.cursor.ns);
 
         const getMoreRes = assert.commandWorked(
             tokenDB.runCommand({getMore: findRes.cursor.id, collection: kCollName}));
-        checkNsSerializedCorrectly(
-            featureFlagRequireTenantId, kTenant, kDbName, kCollName, getMoreRes.cursor.ns);
+        checkNsSerializedCorrectly(kDbName, kCollName, getMoreRes.cursor.ns);
     }
 
     // Test the aggregate command.
@@ -102,18 +90,17 @@ const tokenDB = tokenConn.getDB(kDbName);
         const aggRes = assert.commandWorked(
             tokenDB.runCommand({aggregate: kCollName, pipeline: [{$match: {a: 1}}], cursor: {}}));
         assert(arrayEq([{_id: 0, a: 1, b: 1}], aggRes.cursor.firstBatch), tojson(aggRes));
-        checkNsSerializedCorrectly(
-            featureFlagRequireTenantId, kTenant, kDbName, kCollName, aggRes.cursor.ns);
+        checkNsSerializedCorrectly(kDbName, kCollName, aggRes.cursor.ns);
     }
 
     // Find and modify the document.
     {
         const fad1 = assert.commandWorked(
             tokenDB.runCommand({findAndModify: kCollName, query: {a: 1}, update: {$inc: {a: 10}}}));
-        assert.eq({_id: 0, a: 1, b: 1}, fad1.value);
+        assert.eq({_id: 0, a: 1, b: 1}, fad1.value, tojson(fad1));
         const fad2 = assert.commandWorked(tokenDB.runCommand(
             {findAndModify: kCollName, query: {a: 11}, update: {$set: {a: 1, b: 1}}}));
-        assert.eq({_id: 0, a: 11, b: 1}, fad2.value);
+        assert.eq({_id: 0, a: 11, b: 1}, fad2.value, tojson(fad2));
     }
 
     // Create a view on the collection, and check that listCollections sees the original
@@ -135,8 +122,7 @@ const tokenDB = tokenConn.getDB(kDbName);
             {"name": viewName, "type": "view"}
         ];
         assert(arrayEq(expectedColls, colls.cursor.firstBatch), tojson(colls.cursor.firstBatch));
-        checkNsSerializedCorrectly(
-            featureFlagRequireTenantId, kTenant, kDbName, "$cmd.listCollections", colls.cursor.ns);
+        checkNsSerializedCorrectly(kDbName, "$cmd.listCollections", colls.cursor.ns);
 
         const prefixedDbName = kTenant + '_' + tokenDB.getName();
         const targetDb = featureFlagRequireTenantId ? tokenDB.getName() : prefixedDbName;
@@ -150,12 +136,14 @@ const tokenDB = tokenConn.getDB(kDbName);
 
         // Check that the resulting array of catalog entries contains our target databases and
         // namespaces.
-        assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kCollName)));
+        assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kCollName)),
+               tojson(resultArray));
 
         // Also check that the resulting array contains views specific to our target database.
-        assert(
-            resultArray.some((entry) => (entry.db === targetDb) && (entry.name === targetViews)));
-        assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === viewName)));
+        assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === targetViews)),
+               tojson(resultArray));
+        assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === viewName)),
+               tojson(resultArray));
 
         // Get catalog when specifying our target collection, which should only return one
         // result.
@@ -165,16 +153,16 @@ const tokenDB = tokenConn.getDB(kDbName);
 
         // Check that the resulting array of catalog entries contains our target databases and
         // namespaces.
-        assert(resultArray.length == 1);
-        assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kCollName)));
+        assert.eq(resultArray.length, 1, tojson(resultArray));
+        assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kCollName)),
+               tojson(resultArray));
     }
 
     // Test explain command with find
     {
         const cmdRes = tokenDB.runCommand({explain: {find: kCollName, filter: {a: 1}}});
         assert.eq(1, cmdRes.executionStats.nReturned, tojson(cmdRes));
-        checkNsSerializedCorrectly(
-            featureFlagRequireTenantId, kTenant, kDbName, kCollName, cmdRes.queryPlanner.namespace);
+        checkNsSerializedCorrectly(kDbName, kCollName, cmdRes.queryPlanner.namespace);
     }
 
     // Test count and distinct command.
@@ -184,11 +172,11 @@ const tokenDB = tokenConn.getDB(kDbName);
 
         const resCount =
             assert.commandWorked(tokenDB.runCommand({count: kCollName, query: {c: 1}}));
-        assert.eq(2, resCount.n);
+        assert.eq(2, resCount.n, tojson(resCount));
 
-        const resDitinct =
+        const resDistinct =
             assert.commandWorked(tokenDB.runCommand({distinct: kCollName, key: 'd', query: {}}));
-        assert.eq([1, 2], resDitinct.values.sort());
+        assert.eq([1, 2], resDistinct.values.sort(), tojson(resDistinct));
     }
 
     // Rename the collection.
@@ -202,7 +190,7 @@ const tokenDB = tokenConn.getDB(kDbName);
         // Verify the the renamed collection by findAndModify existing documents.
         const fad1 = assert.commandWorked(tokenDB.runCommand(
             {findAndModify: kCollName + "_renamed", query: {a: 1}, update: {$set: {a: 11, b: 1}}}));
-        assert.eq({_id: 0, a: 1, b: 1}, fad1.value);
+        assert.eq({_id: 0, a: 1, b: 1}, fad1.value, tojson(fad1));
 
         // Reset the collection name and document data.
         assert.commandWorked(
@@ -220,17 +208,17 @@ const tokenDB = tokenConn.getDB(kDbName);
         const tokenAdminDB = tokenConn.getDB('admin');
         const dbs =
             assert.commandWorked(tokenAdminDB.runCommand({listDatabases: 1, nameOnly: true}));
-        assert.eq(3, dbs.databases.length);
+        assert.eq(3, dbs.databases.length, tojson(dbs));
         const expectedDbs = featureFlagRequireTenantId
             ? ["admin", kDbName, kOtherDbName]
             : [kTenant + "_admin", kTenant + "_" + kDbName, kTenant + "_" + kOtherDbName];
-        assert(arrayEq(expectedDbs, dbs.databases.map(db => db.name)));
+        assert(arrayEq(expectedDbs, dbs.databases.map(db => db.name)), tojson(dbs));
     }
 
     {
         // Test the collStats command.
         let res = assert.commandWorked(tokenDB.runCommand({collStats: kCollName}));
-        checkNsSerializedCorrectly(featureFlagRequireTenantId, kTenant, kDbName, kCollName, res.ns);
+        checkNsSerializedCorrectly(kDbName, kCollName, res.ns);
 
         // perform the same test on a timeseries collection
         const timeFieldName = "time";
@@ -238,12 +226,8 @@ const tokenDB = tokenConn.getDB(kDbName);
         assert.commandWorked(
             tokenDB.createCollection(tsColl, {timeseries: {timeField: timeFieldName}}));
         res = assert.commandWorked(tokenDB.runCommand({collStats: tsColl}));
-        checkNsSerializedCorrectly(featureFlagRequireTenantId, kTenant, kDbName, tsColl, res.ns);
-        checkNsSerializedCorrectly(featureFlagRequireTenantId,
-                                   kTenant,
-                                   kDbName,
-                                   'system.buckets.' + tsColl,
-                                   res.timeseries.bucketsNs);
+        checkNsSerializedCorrectly(kDbName, tsColl, res.ns);
+        checkNsSerializedCorrectly(kDbName, 'system.buckets.' + tsColl, res.timeseries.bucketsNs);
     }
 
     // Drop the collection, and then the database. Check that listCollections no longer returns
@@ -251,8 +235,7 @@ const tokenDB = tokenConn.getDB(kDbName);
     {
         // Drop the collection, and check that the "ns" returned is serialized correctly.
         const dropRes = assert.commandWorked(tokenDB.runCommand({drop: kCollName}));
-        checkNsSerializedCorrectly(
-            featureFlagRequireTenantId, kTenant, kDbName, kCollName, dropRes.ns);
+        checkNsSerializedCorrectly(kDbName, kCollName, dropRes.ns);
 
         const collsAfterDropColl = assert.commandWorked(
             tokenDB.runCommand({listCollections: 1, nameOnly: true, filter: {name: kCollName}}));
@@ -307,28 +290,29 @@ const tokenDB = tokenConn.getDB(kDbName);
             createIndexes: kCollName,
             indexes: [{key: {a: 1}, name: "indexA"}, {key: {b: 1}, name: "indexB"}]
         }));
-        assert.eq(3, res.numIndexesAfter);
+        assert.eq(3, res.numIndexesAfter, tojson(res));
 
         res = assert.commandWorked(tokenDB.runCommand({listIndexes: kCollName}));
-        assert.eq(3, res.cursor.firstBatch.length);
+        assert.eq(3, res.cursor.firstBatch.length, tojson(res.cursor.firstBatch));
         assert(arrayEq(
-            [
-                {key: {"_id": 1}, name: "_id_"},
-                {key: {a: 1}, name: "indexA"},
-                {key: {b: 1}, name: "indexB"}
-            ],
-            getIndexesKeyAndName(res.cursor.firstBatch)));
-        checkNsSerializedCorrectly(
-            featureFlagRequireTenantId, kTenant, kDbName, kCollName, res.cursor.ns);
+                   [
+                       {key: {"_id": 1}, name: "_id_"},
+                       {key: {a: 1}, name: "indexA"},
+                       {key: {b: 1}, name: "indexB"}
+                   ],
+                   getIndexesKeyAndName(res.cursor.firstBatch)),
+               tojson(res.cursor.firstBatch));
+        checkNsSerializedCorrectly(kDbName, kCollName, res.cursor.ns);
 
         // Drop those new created indexes.
         res = assert.commandWorked(
             tokenDB.runCommand({dropIndexes: kCollName, index: ["indexA", "indexB"]}));
 
         res = assert.commandWorked(tokenDB.runCommand({listIndexes: kCollName}));
-        assert.eq(1, res.cursor.firstBatch.length);
-        assert(arrayEq([{key: {"_id": 1}, name: "_id_"}],
-                       getIndexesKeyAndName(res.cursor.firstBatch)));
+        assert.eq(1, res.cursor.firstBatch.length, tojson(res.cursor.firstBatch));
+        assert(
+            arrayEq([{key: {"_id": 1}, name: "_id_"}], getIndexesKeyAndName(res.cursor.firstBatch)),
+            tojson(res.cursor.firstBatch));
     }
 
     // Test aggregation stage commands
@@ -384,9 +368,9 @@ const tokenDB = tokenConn.getDB(kDbName);
                 cursor: {}
             }));
 
-            assert(arrayEq(graphLookupTarget, graphLookupRes.cursor.firstBatch));
-            checkNsSerializedCorrectly(
-                featureFlagRequireTenantId, kTenant, kDbName, kCollA, graphLookupRes.cursor.ns);
+            assert(arrayEq(graphLookupTarget, graphLookupRes.cursor.firstBatch),
+                   tojson(graphLookupRes.cursor.firstBatch));
+            checkNsSerializedCorrectly(kDbName, kCollA, graphLookupRes.cursor.ns);
         }
 
         // $out agg stage using string input for collection name
@@ -394,16 +378,15 @@ const tokenDB = tokenConn.getDB(kDbName);
         {
             const outStrRes = assert.commandWorked(tokenDB.runCommand(
                 {aggregate: kCollA, pipeline: [graphLookupStage, outStageStr], cursor: {}}));
-            checkNsSerializedCorrectly(
-                featureFlagRequireTenantId, kTenant, kDbName, kCollA, outStrRes.cursor.ns);
+            checkNsSerializedCorrectly(kDbName, kCollA, outStrRes.cursor.ns);
 
             // Because we're using the same graphLookup stage from the first test, we should see the
             // exact same results but stored in kCollC
             let projectRes = assert.commandWorked(tokenDB.runCommand(
                 {aggregate: kCollC, pipeline: [{$project: {_id: 1, connections: 1}}], cursor: {}}));
-            assert(arrayEq(graphLookupTarget, projectRes.cursor.firstBatch));
-            checkNsSerializedCorrectly(
-                featureFlagRequireTenantId, kTenant, kDbName, kCollC, projectRes.cursor.ns);
+            assert(arrayEq(graphLookupTarget, projectRes.cursor.firstBatch),
+                   tojson(projectRes.cursor.firstBatch));
+            checkNsSerializedCorrectly(kDbName, kCollC, projectRes.cursor.ns);
             assert.commandWorked(tokenDB.runCommand({drop: kCollC}));
         }
 
@@ -412,16 +395,15 @@ const tokenDB = tokenConn.getDB(kDbName);
         {
             const outObjRes = assert.commandWorked(tokenDB.runCommand(
                 {aggregate: kCollA, pipeline: [graphLookupStage, outStageObj], cursor: {}}));
-            checkNsSerializedCorrectly(
-                featureFlagRequireTenantId, kTenant, kDbName, kCollA, outObjRes.cursor.ns);
+            checkNsSerializedCorrectly(kDbName, kCollA, outObjRes.cursor.ns);
 
             // Because we're using the same graphLookup stage from the first test, we should see the
             // exact same results but stored in kCollD
             let projectRes = assert.commandWorked(tokenDB.runCommand(
                 {aggregate: kCollD, pipeline: [{$project: {_id: 1, connections: 1}}], cursor: {}}));
-            assert(arrayEq(graphLookupTarget, projectRes.cursor.firstBatch));
-            checkNsSerializedCorrectly(
-                featureFlagRequireTenantId, kTenant, kDbName, kCollD, projectRes.cursor.ns);
+            assert(arrayEq(graphLookupTarget, projectRes.cursor.firstBatch),
+                   tojson(projectRes.cursor.firstBatch));
+            checkNsSerializedCorrectly(kDbName, kCollD, projectRes.cursor.ns);
             assert.commandWorked(tokenDB.runCommand({drop: kCollD}));
         }
 
@@ -437,9 +419,9 @@ const tokenDB = tokenConn.getDB(kDbName);
                 cursor: {}
             }));
 
-            assert(arrayEq(lookupTarget, lookupPipelineRes.cursor.firstBatch));
-            checkNsSerializedCorrectly(
-                featureFlagRequireTenantId, kTenant, kDbName, kCollA, lookupPipelineRes.cursor.ns);
+            assert(arrayEq(lookupTarget, lookupPipelineRes.cursor.firstBatch),
+                   tojson(lookupPipelineRes.cursor.firstBatch));
+            checkNsSerializedCorrectly(kDbName, kCollA, lookupPipelineRes.cursor.ns);
         }
 
         // $merge agg stage
@@ -447,14 +429,13 @@ const tokenDB = tokenConn.getDB(kDbName);
         {
             const mergeRes = assert.commandWorked(
                 tokenDB.runCommand({aggregate: kCollA, pipeline: [mergeStage], cursor: {}}));
-            checkNsSerializedCorrectly(
-                featureFlagRequireTenantId, kTenant, kDbName, kCollA, mergeRes.cursor.ns);
+            checkNsSerializedCorrectly(kDbName, kCollA, mergeRes.cursor.ns);
 
             // Merging kCollA into a new collection kCollD should give us matching contents
             let findRes = assert.commandWorked(tokenDB.runCommand({find: kCollD}));
-            assert(arrayEq(collADocs, findRes.cursor.firstBatch));
-            checkNsSerializedCorrectly(
-                featureFlagRequireTenantId, kTenant, kDbName, kCollD, findRes.cursor.ns);
+            assert(arrayEq(collADocs, findRes.cursor.firstBatch),
+                   tojson(findRes.cursor.firstBatch));
+            checkNsSerializedCorrectly(kDbName, kCollD, findRes.cursor.ns);
             assert.commandWorked(tokenDB.runCommand({drop: kCollD}));
         }
 
@@ -464,9 +445,9 @@ const tokenDB = tokenConn.getDB(kDbName);
             const unionWithRes = assert.commandWorked(
                 tokenDB.runCommand({aggregate: kCollA, pipeline: [unionWithStage], cursor: {}}));
 
-            assert(arrayEq(collADocs.concat(collBDocs), unionWithRes.cursor.firstBatch));
-            checkNsSerializedCorrectly(
-                featureFlagRequireTenantId, kTenant, kDbName, kCollA, unionWithRes.cursor.ns);
+            assert(arrayEq(collADocs.concat(collBDocs), unionWithRes.cursor.firstBatch),
+                   tojson(unionWithRes.cursor.firstBatch));
+            checkNsSerializedCorrectly(kDbName, kCollA, unionWithRes.cursor.ns);
         }
 
         // $collStats agg stage
@@ -477,33 +458,28 @@ const tokenDB = tokenConn.getDB(kDbName);
 
             const collStatsRes = assert.commandWorked(
                 tokenDB.runCommand({aggregate: kCollD, pipeline: [collStatsStage], cursor: {}}));
-            assert.eq(1, collStatsRes.cursor.firstBatch.length);
+            assert.eq(
+                1, collStatsRes.cursor.firstBatch.length, tojson(collStatsRes.cursor.firstBatch));
 
-            checkNsSerializedCorrectly(featureFlagRequireTenantId,
-                                       kTenant,
-                                       kDbName,
-                                       kCollD,
-                                       collStatsRes.cursor.firstBatch[0].ns);
-            checkNsSerializedCorrectly(
-                featureFlagRequireTenantId, kTenant, kDbName, kCollD, collStatsRes.cursor.ns);
+            checkNsSerializedCorrectly(kDbName, kCollD, collStatsRes.cursor.firstBatch[0].ns);
+            checkNsSerializedCorrectly(kDbName, kCollD, collStatsRes.cursor.ns);
 
             let stats = collStatsRes.cursor.firstBatch[0];
-            assert('latencyStats' in collStatsRes.cursor.firstBatch[0]);
-            assert(stats.latencyStats.writes.ops == 1);
-            assert(stats.latencyStats.reads.ops == 1);
-            assert(stats.latencyStats.commands.ops == 0);
-            assert(stats.latencyStats.transactions.ops == 0);
+            assert('latencyStats' in stats, tojson(stats));
+            assert.eq(stats.latencyStats.writes.ops, 1, tojson(stats));
+            assert.eq(stats.latencyStats.reads.ops, 1, tojson(stats));
+            assert.eq(stats.latencyStats.commands.ops, 0, tojson(stats));
+            assert.eq(stats.latencyStats.transactions.ops, 0, tojson(stats));
 
             // Also check the next() cursor results.
             const collStatsResNext = tokenDB.collD.aggregate(collStatsStage).next();
-            checkNsSerializedCorrectly(
-                featureFlagRequireTenantId, kTenant, kDbName, kCollD, collStatsResNext.ns);
+            checkNsSerializedCorrectly(kDbName, kCollD, collStatsResNext.ns);
 
-            assert('latencyStats' in collStatsResNext);
-            assert(collStatsResNext.latencyStats.writes.ops == 1);
-            assert(collStatsResNext.latencyStats.reads.ops == 2);
-            assert(collStatsResNext.latencyStats.commands.ops == 0);
-            assert(collStatsResNext.latencyStats.transactions.ops == 0);
+            assert('latencyStats' in collStatsResNext, tojson(collStatsResNext));
+            assert.eq(collStatsResNext.latencyStats.writes.ops, 1, tojson(collStatsResNext));
+            assert.eq(collStatsResNext.latencyStats.reads.ops, 2, tojson(collStatsResNext));
+            assert.eq(collStatsResNext.latencyStats.commands.ops, 0, tojson(collStatsResNext));
+            assert.eq(collStatsResNext.latencyStats.transactions.ops, 0, tojson(collStatsResNext));
 
             assert.commandWorked(tokenDB.runCommand({drop: kCollD}));
         }
@@ -516,9 +492,8 @@ const tokenDB = tokenConn.getDB(kDbName);
     // Test the validate command.
     {
         const validateRes = assert.commandWorked(tokenDB.runCommand({validate: kCollName}));
-        assert(validateRes.valid);
-        checkNsSerializedCorrectly(
-            featureFlagRequireTenantId, kTenant, kDbName, kCollName, validateRes.ns);
+        assert(validateRes.valid, tojson(validateRes));
+        checkNsSerializedCorrectly(kDbName, kCollName, validateRes.ns);
     }
 }
 
@@ -549,15 +524,15 @@ const tokenDB = tokenConn.getDB(kDbName);
 
     const fadOtherUser = assert.commandWorked(
         tokenDB2.runCommand({findAndModify: kCollName, query: {b: 1}, update: {$inc: {b: 10}}}));
-    assert.eq(null, fadOtherUser.value);
+    assert.eq(null, fadOtherUser.value, tojson(fadOtherUser));
 
     const countOtherUser =
         assert.commandWorked(tokenDB2.runCommand({count: kCollName, query: {c: 1}}));
-    assert.eq(0, countOtherUser.n);
+    assert.eq(0, countOtherUser.n, tojson(countOtherUser));
 
     const distinctOtherUer =
         assert.commandWorked(tokenDB2.runCommand({distinct: kCollName, key: 'd', query: {}}));
-    assert.eq([], distinctOtherUer.values);
+    assert.eq([], distinctOtherUer.values, tojson(distinctOtherUer));
 
     const fromName = kDbName + '.' + kCollName;
     const toName = fromName + "_renamed";
@@ -579,9 +554,10 @@ const tokenDB = tokenConn.getDB(kDbName);
     const dbsWithDiffToken = assert.commandWorked(
         tokenConn.getDB('admin').runCommand({listDatabases: 1, nameOnly: true}));
     // Only the 'admin' db exists
-    assert.eq(1, dbsWithDiffToken.databases.length);
+    assert.eq(1, dbsWithDiffToken.databases.length, tojson(dbsWithDiffToken));
     const expectedAdminDb = featureFlagRequireTenantId ? "admin" : kOtherTenant + "_admin";
-    assert(arrayEq([expectedAdminDb], dbsWithDiffToken.databases.map(db => db.name)));
+    assert(arrayEq([expectedAdminDb], dbsWithDiffToken.databases.map(db => db.name)),
+           tojson(dbsWithDiffToken));
 
     // Attempt to drop the database, then check it was not dropped.
     assert.commandWorked(tokenDB2.runCommand({dropDatabase: 1}));
@@ -639,9 +615,9 @@ const tokenDB = tokenConn.getDB(kDbName);
             pipeline: [lookupPlannerStage, {$project: {_id: 1, refs: 1}}],
             cursor: {}
         }));
-        assert(arrayEq(lookupTarget, lookupPlannerRes.cursor.firstBatch));
-        checkNsSerializedCorrectly(
-            featureFlagRequireTenantId, kTenant, kDbName, kCollA, lookupPlannerRes.cursor.ns);
+        assert(arrayEq(lookupTarget, lookupPlannerRes.cursor.firstBatch),
+               tojson(lookupPlannerRes.cursor.firstBatch));
+        checkNsSerializedCorrectly(kDbName, kCollA, lookupPlannerRes.cursor.ns);
     }
 }
 
@@ -661,7 +637,8 @@ const tokenDB = tokenConn.getDB(kDbName);
             update: {$inc: {b: 10}},
             '$tenant': kTenant
         }));
-        assert.eq({_id: 0, a: 1, b: 1}, fadCorrectDollarTenant.value);
+        assert.eq(
+            {_id: 0, a: 1, b: 1}, fadCorrectDollarTenant.value, tojson(fadCorrectDollarTenant));
 
         const fadOtherDollarTenant = assert.commandWorked(privelegedDB.runCommand({
             findAndModify: kCollName,
@@ -669,7 +646,7 @@ const tokenDB = tokenConn.getDB(kDbName);
             update: {$inc: {b: 10}},
             '$tenant': kOtherTenant
         }));
-        assert.eq(null, fadOtherDollarTenant.value);
+        assert.eq(null, fadOtherDollarTenant.value, tojson(fadOtherDollarTenant));
 
         // Reset document data.
         assert.commandWorked(privelegedDB.runCommand({
@@ -695,7 +672,7 @@ const tokenDB = tokenConn.getDB(kDbName);
             update: {$set: {a: 11, b: 1}},
             '$tenant': kTenant
         }));
-        assert.eq({_id: 0, a: 1, b: 1}, fad1.value);
+        assert.eq({_id: 0, a: 1, b: 1}, fad1.value, tojson(fad1));
 
         // Reset the collection name and document data.
         assert.commandWorked(privelegedAdminDB.runCommand(
@@ -716,14 +693,14 @@ const tokenDB = tokenConn.getDB(kDbName);
         createIndexes: kCollName,
         indexes: [{key: {c: 1}, name: "indexC", expireAfterSeconds: 50}]
     }));
-    assert.eq(2, res.numIndexesAfter);
+    assert.eq(2, res.numIndexesAfter, tojson(res));
     jsTestLog(`Created index`);
 
     // Modify the index with the tenantId
     res = assert.commandWorked(tokenDB.runCommand(
         {"collMod": kCollName, "index": {"keyPattern": {c: 1}, expireAfterSeconds: 100}}));
-    assert.eq(50, res.expireAfterSeconds_old);
-    assert.eq(100, res.expireAfterSeconds_new);
+    assert.eq(50, res.expireAfterSeconds_old, tojson(res));
+    assert.eq(100, res.expireAfterSeconds_new, tojson(res));
 
     // Drop the index created
     assert.commandWorked(tokenDB.runCommand({dropIndexes: kCollName, index: ["indexC"]}));

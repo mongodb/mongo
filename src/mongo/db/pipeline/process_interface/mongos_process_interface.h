@@ -29,9 +29,58 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <deque>
+#include <list>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/shard_filterer.h"
+#include "mongo/db/generic_cursor_gen.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/common_process_interface.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
+#include "mongo/db/pipeline/storage_stats_spec_gen.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/resource_yielder.h"
+#include "mongo/db/storage/backup_cursor_state.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/database_version.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -125,7 +174,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Status appendStorageStats(OperationContext* opCtx,
+    Status appendStorageStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const NamespaceString& nss,
                               const StorageStatsSpec& spec,
                               BSONObjBuilder* builder,

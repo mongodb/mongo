@@ -28,8 +28,31 @@
  */
 
 #include "mongo/db/pipeline/accumulator_multi.h"
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <iterator>
+#include <memory>
+#include <type_traits>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sort_pattern.h"
-#include "mongo/util/version/releases.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 using FirstLastSense = AccumulatorFirstLastN::Sense;
@@ -80,7 +103,7 @@ void AccumulatorN::processInternal(const Value& input, bool merging) {
 
     if (merging) {
         tassert(5787803, "input must be an array when 'merging' is true", input.isArray());
-        auto array = input.getArray();
+        const auto& array = input.getArray();
         for (auto&& val : array) {
             _processValue(val);
         }
@@ -464,17 +487,30 @@ Document AccumulatorTopBottomN<sense, single>::serialize(
     if constexpr (!single) {
         args.addField(kFieldNameN, Value(initializer->serialize(options)));
     }
-    auto serializedArg = argument->serialize(options);
 
-    // If 'argument' contains a field named 'output', this means that we are serializing the
-    // accumulator's original output expression under the field name 'output'. Otherwise, we are
-    // serializing a custom argument under the field name 'output'. For instance, a merging $group
-    // will provide an argument that merges multiple partial groups.
-    if (auto output = serializedArg[kFieldNameOutput]; !output.missing()) {
-        args.addField(kFieldNameOutput, Value(output));
+    // If 'argument' is either an ExpressionObject or an ExpressionConstant of object type, then
+    // we are serializing the original expression under the 'output' field of the object. Otherwise,
+    // we're serializing a custom expression for merging group.
+    if (auto argObj = dynamic_cast<ExpressionObject*>(argument.get())) {
+        bool foundOutputField = false;
+        for (auto& child : argObj->getChildExpressions()) {
+            if (child.first == kFieldNameOutput) {
+                auto output = child.second->serialize(options);
+                args.addField(kFieldNameOutput, output);
+                foundOutputField = true;
+                break;
+            }
+        }
+        tassert(7773700, "'output' field should be present.", foundOutputField);
+    } else if (auto argConst = dynamic_cast<ExpressionConstant*>(argument.get())) {
+        auto output = argConst->getValue().getDocument()[kFieldNameOutput];
+        tassert(7773701, "'output' field should be present.", !output.missing());
+        args.addField(kFieldNameOutput, output);
     } else {
+        auto serializedArg = argument->serialize(options);
         args.addField(kFieldNameOutput, serializedArg);
     }
+
     args.addField(kFieldNameSortBy,
                   Value(_sortPattern.serialize(
                       SortPattern::SortKeySerialization::kForPipelineSerialization, options)));
@@ -685,17 +721,17 @@ Value AccumulatorTopBottomN<sense, single>::getValueConst(bool toBeMerged) const
     };
 
     if constexpr (!single) {
-        return Value(result);
+        return Value(std::move(result));
     } else {
         if (toBeMerged) {
-            return Value(result);
+            return Value(std::move(result));
         } else {
             if (result.empty()) {
                 // This only occurs in a window function scenario, an accumulator will always have
                 // at least one value processed.
                 return Value(BSONNULL);
             }
-            return Value(result[0]);
+            return Value(std::move(result[0]));
         }
     }
 }

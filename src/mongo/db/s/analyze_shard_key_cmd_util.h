@@ -29,27 +29,39 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <utility>
 
+#include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/platform/basic.h"
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace analyze_shard_key {
 
 /**
  * Returns metrics about the characteristics of the shard key (i.e. the cardinality, frequency
- * and monotonicity).
+ * and monotonicity) if the shard key has a supporting index.
  */
-KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* opCtx,
-                                                             const NamespaceString& nss,
-                                                             const UUID& collUuid,
-                                                             const KeyPattern& shardKey);
+boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
+    OperationContext* opCtx,
+    const UUID& analyzeShardKeyId,
+    const NamespaceString& nss,
+    const UUID& collUuid,
+    const KeyPattern& shardKey,
+    boost::optional<double> sampleRate,
+    boost::optional<int64_t> sampleSize);
 
 /**
  * Returns metrics about the read and write distribution based on sampled queries.
  */
 std::pair<ReadDistributionMetrics, WriteDistributionMetrics> calculateReadWriteDistributionMetrics(
     OperationContext* opCtx,
+    const UUID& analyzeShardKeyId,
     const NamespaceString& nss,
     const UUID& collUuid,
     const KeyPattern& shardKey);

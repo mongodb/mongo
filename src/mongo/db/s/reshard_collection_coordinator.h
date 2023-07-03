@@ -29,8 +29,21 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <memory>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/s/reshard_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 
 namespace mongo {

@@ -28,17 +28,35 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <mutex>
 
-#include "mongo/db/index/duplicate_key_tracker.h"
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/status_with.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/index/duplicate_key_tracker.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/storage/execution_context.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/progress_meter.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
@@ -50,45 +68,44 @@ static constexpr StringData kKeyField = "key"_sd;
 }
 
 DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx, const IndexCatalogEntry* entry)
-    : _indexCatalogEntry(entry),
-      _keyConstraintsTable(opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
+    : _keyConstraintsTable(opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
           opCtx, KeyFormat::Long)) {
 
-    invariant(_indexCatalogEntry->descriptor()->unique());
+    invariant(entry->descriptor()->unique());
 }
 
 DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx,
                                          const IndexCatalogEntry* entry,
-                                         StringData ident)
-    : _indexCatalogEntry(entry) {
+                                         StringData ident) {
     _keyConstraintsTable =
         opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
             opCtx, ident);
 
-    invariant(_indexCatalogEntry->descriptor()->unique(),
+    invariant(entry->descriptor()->unique(),
               str::stream() << "Duplicate key tracker table exists on disk with ident: " << ident
-                            << " but the index is not unique: "
-                            << _indexCatalogEntry->descriptor());
+                            << " but the index is not unique: " << entry->descriptor());
 }
 
 void DuplicateKeyTracker::keepTemporaryTable() {
     _keyConstraintsTable->keep();
 }
 
-Status DuplicateKeyTracker::recordKey(OperationContext* opCtx, const KeyString::Value& key) {
+Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
+                                      const IndexCatalogEntry* indexCatalogEntry,
+                                      const key_string::Value& key) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     LOGV2_DEBUG(20676,
                 1,
                 "Index build: recording duplicate key conflict on unique index",
-                "index"_attr = _indexCatalogEntry->descriptor()->indexName());
+                "index"_attr = indexCatalogEntry->descriptor()->indexName());
 
-    // The KeyString::Value will be serialized in the format [KeyString][TypeBits]. We need to
+    // The key_string::Value will be serialized in the format [KeyString][TypeBits]. We need to
     // store the TypeBits for error reporting later on. The RecordId does not need to be stored, so
     // we exclude it from the serialization.
     BufBuilder builder;
     if (KeyFormat::Long ==
-        _indexCatalogEntry->accessMethod()
+        indexCatalogEntry->accessMethod()
             ->asSortedData()
             ->getSortedDataInterface()
             ->rsKeyFormat()) {
@@ -109,20 +126,21 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx, const KeyString::
     if (numDuplicates % 1000 == 0) {
         LOGV2_INFO(4806700,
                    "Index build: high number of duplicate keys on unique index",
-                   "index"_attr = _indexCatalogEntry->descriptor()->indexName(),
+                   "index"_attr = indexCatalogEntry->descriptor()->indexName(),
                    "numDuplicateKeys"_attr = numDuplicates);
     }
 
     return Status::OK();
 }
 
-Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx) const {
+Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx,
+                                             const IndexCatalogEntry* indexCatalogEntry) const {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
     auto constraintsCursor = _keyConstraintsTable->rs()->getCursor(opCtx);
     auto record = constraintsCursor->next();
 
-    auto index = _indexCatalogEntry->accessMethod()->asSortedData()->getSortedDataInterface();
+    auto index = indexCatalogEntry->accessMethod()->asSortedData()->getSortedDataInterface();
 
     static const char* curopMessage = "Index Build: checking for duplicate keys";
     ProgressMeterHolder progress;
@@ -139,7 +157,7 @@ Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx) const {
         resolved++;
 
         BufReader reader(record->data.data(), record->data.size());
-        auto key = KeyString::Value::deserialize(reader, index->getKeyStringVersion());
+        auto key = key_string::Value::deserialize(reader, index->getKeyStringVersion());
 
         auto status = index->dupKeyCheck(opCtx, key);
         if (!status.isOK())
@@ -171,7 +189,7 @@ Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx) const {
                 logLevel,
                 "index build: resolved duplicate key conflicts for unique index",
                 "numResolved"_attr = resolved,
-                "indexName"_attr = _indexCatalogEntry->descriptor()->indexName());
+                "indexName"_attr = indexCatalogEntry->descriptor()->indexName());
     return Status::OK();
 }
 

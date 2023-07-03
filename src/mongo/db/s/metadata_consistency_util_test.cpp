@@ -30,9 +30,27 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/db/s/metadata_consistency_util.h"
+
+#include <cstddef>
+#include <string>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/fail_point.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/random.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 
 namespace mongo {
@@ -69,7 +87,8 @@ class MetadataConsistencyTest : public ShardServerTestFixture {
 protected:
     std::string _shardName = "shard0000";
     const ShardId _shardId{_shardName};
-    const NamespaceString _nss{"TestDB", "TestColl"};
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
     const UUID _collUuid = UUID::gen();
     const KeyPattern _keyPattern{BSON("x" << 1)};
     const CollectionType _coll{
@@ -199,7 +218,8 @@ TEST_F(MetadataConsistencyTest, FindZoneRangeOverlapInconsistency) {
 
 class MetadataConsistencyRandomRoutingTableTest : public ShardServerTestFixture {
 protected:
-    const NamespaceString _nss{"TestDB", "TestColl"};
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
     const UUID _collUuid = UUID::gen();
     const KeyPattern _keyPattern{BSON("x" << 1)};
     const CollectionType _coll{

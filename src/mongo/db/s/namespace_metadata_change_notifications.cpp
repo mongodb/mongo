@@ -27,9 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <mutex>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/s/namespace_metadata_change_notifications.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 
@@ -46,13 +51,38 @@ NamespaceMetadataChangeNotifications::createNotification(const NamespaceString& 
 
     stdx::lock_guard<Latch> lg(_mutex);
 
-    auto& notifList = _notificationsList[nss];
+    auto& notifList = _notificationsList[nss].second;
     notifToken->itToErase = notifList.insert(notifList.end(), notifToken);
 
     return {this, std::move(notifToken)};
 }
 
-void NamespaceMetadataChangeNotifications::notifyChange(const NamespaceString& nss) {
+Timestamp NamespaceMetadataChangeNotifications::get(OperationContext* opCtx,
+                                                    ScopedNotification& notif) {
+    // Wait for notification to be ready
+    notif.get(opCtx);
+
+    // Get value and replace notification token under lock
+    auto nss = notif.getToken()->nss;
+    auto newToken = std::make_shared<NotificationToken>(nss);
+
+    stdx::lock_guard<Latch> lock(_mutex);
+    auto& [opTime, notifList] = _notificationsList[nss];
+
+    // Put new token in _notificationsList
+    newToken->itToErase = notifList.insert(notifList.end(), newToken);
+
+    // Deregister old token from notifications list.
+    _unregisterNotificationToken_inlock(lock, *notif.getToken());
+
+    // Update scoped notification.
+    notif.replaceToken(std::move(newToken));
+
+    return opTime;
+}
+
+void NamespaceMetadataChangeNotifications::notifyChange(const NamespaceString& nss,
+                                                        const Timestamp& commitTime) {
     stdx::lock_guard<Latch> lock(_mutex);
 
     auto mapIt = _notificationsList.find(nss);
@@ -60,25 +90,30 @@ void NamespaceMetadataChangeNotifications::notifyChange(const NamespaceString& n
         return;
     }
 
-    for (auto& notifToken : mapIt->second) {
-        notifToken->notify.set();
-        notifToken->itToErase.reset();
-    }
+    auto& [opTime, notifList] = mapIt->second;
 
-    _notificationsList.erase(mapIt);
+    if (commitTime <= opTime)
+        return;
+
+    opTime = commitTime;
+    for (auto& notifToken : notifList) {
+        if (!notifToken->notify)
+            notifToken->notify.set();
+    }
 }
 
 void NamespaceMetadataChangeNotifications::_unregisterNotificationToken(
-    std::shared_ptr<NotificationToken> token) {
+    const NotificationToken& token) {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    if (!token->itToErase) {
-        return;
-    }
+    _unregisterNotificationToken_inlock(lg, token);
+}
 
-    auto mapIt = _notificationsList.find(token->nss);
-    auto& notifList = mapIt->second;
-    notifList.erase(*token->itToErase);
+void NamespaceMetadataChangeNotifications::_unregisterNotificationToken_inlock(
+    WithLock lk, const NotificationToken& token) {
+    auto mapIt = _notificationsList.find(token.nss);
+    auto& notifList = mapIt->second.second;
+    notifList.erase(*token.itToErase);
 
     if (notifList.empty()) {
         _notificationsList.erase(mapIt);

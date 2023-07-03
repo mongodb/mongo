@@ -27,7 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/db/jsobj.h"
+#include <cstring>
+#include <memory>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -93,7 +102,7 @@ Labeler BSONObjBuilderValueStream::operator<<(const Labeler::Label& l) {
 
 void BSONObjBuilderValueStream::endField(StringData nextFieldName) {
     if (haveSubobj()) {
-        verify(_fieldName.rawData());
+        MONGO_verify(_fieldName.rawData());
         _builder->append(_fieldName, subobj()->done());
         _subobj.reset();
     }

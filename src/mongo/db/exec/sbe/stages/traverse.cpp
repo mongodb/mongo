@@ -27,11 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/inlined_vector.h>
+#include <string>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/traverse.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::sbe {
 TraverseStage::TraverseStage(std::unique_ptr<PlanStage> outer,

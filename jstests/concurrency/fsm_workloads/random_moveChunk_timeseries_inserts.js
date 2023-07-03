@@ -11,14 +11,15 @@
  *  requires_fcv_51,
  * ]
  */
-'use strict';
-
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from 'jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js';
 load('jstests/concurrency/fsm_workload_helpers/chunks.js');  // for chunk helpers
 load("jstests/core/timeseries/libs/timeseries.js");          // For 'TimeseriesTest' helpers.
 load("jstests/libs/analyze_plan.js");                        // for 'getPlanStages'
-load('jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js');
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.nonShardCollName = "unsharded";
 
     // A random non-round start value was chosen so that we can verify the rounding behavior that

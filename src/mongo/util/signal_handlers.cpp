@@ -28,33 +28,37 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/signal_handlers.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "bits/types/siginfo_t.h"
+#include <cerrno>
 #include <csignal>
+#include <cstring>
 #include <ctime>
+#include <memory>
 
-#if !defined(_WIN32)
-#include <unistd.h>
-#endif
-
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_util.h"
-#include "mongo/platform/process_id.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers_synchronous.h"
-#include "mongo/util/signal_win32.h"
+#include "mongo/util/signal_win32.h"  // IWYU pragma: keep
 #include "mongo/util/stacktrace.h"
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

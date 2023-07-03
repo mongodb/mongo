@@ -28,15 +28,23 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
+#include <cstring>
 #include <random>
+#include <string>
 #include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/shared_buffer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -99,13 +107,13 @@ BSONObj generateBson(BsonValueType bsonValueType) {
 }
 
 static BsonsAndKeyStrings generateBsonsAndKeyStrings(BsonValueType bsonValueType,
-                                                     KeyString::Version version) {
+                                                     key_string::Version version) {
     BsonsAndKeyStrings result;
     result.bsonSize = 0;
     result.keystringSize = 0;
     for (int i = 0; i < kSampleSize; i++) {
         BSONObj bson = generateBson(bsonValueType);
-        KeyString::Builder ks(version, bson, ALL_ASCENDING);
+        key_string::Builder ks(version, bson, ALL_ASCENDING);
         result.bsonSize += bson.objsize();
         result.keystringSize += ks.getSize();
         result.bsons[i] = bson;
@@ -122,13 +130,13 @@ static BsonsAndKeyStrings generateBsonsAndKeyStrings(BsonValueType bsonValueType
 }
 
 void BM_BSONToKeyString(benchmark::State& state,
-                        const KeyString::Version version,
+                        const key_string::Version version,
                         BsonValueType bsonType) {
     const BsonsAndKeyStrings bsonsAndKeyStrings = generateBsonsAndKeyStrings(bsonType, version);
     for (auto _ : state) {
         benchmark::ClobberMemory();
         for (const auto& bson : bsonsAndKeyStrings.bsons) {
-            benchmark::DoNotOptimize(KeyString::Builder(version, bson, ALL_ASCENDING));
+            benchmark::DoNotOptimize(key_string::Builder(version, bson, ALL_ASCENDING));
         }
     }
     state.SetBytesProcessed(state.iterations() * bsonsAndKeyStrings.bsonSize);
@@ -136,7 +144,7 @@ void BM_BSONToKeyString(benchmark::State& state,
 }
 
 void BM_KeyStringToBSON(benchmark::State& state,
-                        const KeyString::Version version,
+                        const key_string::Version version,
                         BsonValueType bsonType) {
     const BsonsAndKeyStrings bsonsAndKeyStrings = generateBsonsAndKeyStrings(bsonType, version);
     for (auto _ : state) {
@@ -144,10 +152,10 @@ void BM_KeyStringToBSON(benchmark::State& state,
         for (size_t i = 0; i < kSampleSize; i++) {
             BufReader buf(bsonsAndKeyStrings.typebits[i].get(), bsonsAndKeyStrings.typebitsLens[i]);
             benchmark::DoNotOptimize(
-                KeyString::toBson(bsonsAndKeyStrings.keystrings[i].get(),
-                                  bsonsAndKeyStrings.keystringLens[i],
-                                  ALL_ASCENDING,
-                                  KeyString::TypeBits::fromBuffer(version, &buf)));
+                key_string::toBson(bsonsAndKeyStrings.keystrings[i].get(),
+                                   bsonsAndKeyStrings.keystringLens[i],
+                                   ALL_ASCENDING,
+                                   key_string::TypeBits::fromBuffer(version, &buf)));
         }
     }
     state.SetBytesProcessed(state.iterations() * bsonsAndKeyStrings.bsonSize);
@@ -156,19 +164,19 @@ void BM_KeyStringToBSON(benchmark::State& state,
 
 void BM_KeyStringValueAssign(benchmark::State& state, BsonValueType bsonType) {
     // The KeyString version does not matter for this test.
-    const auto version = KeyString::Version::V1;
+    const auto version = key_string::Version::V1;
     const BsonsAndKeyStrings bsonsAndKeyStrings = generateBsonsAndKeyStrings(bsonType, version);
 
     // Pre-construct the values.
-    std::vector<KeyString::Value> values;
+    std::vector<key_string::Value> values;
     for (size_t i = 0; i < kSampleSize; i++) {
-        KeyString::HeapBuilder builder(version, bsonsAndKeyStrings.bsons[i], ALL_ASCENDING);
+        key_string::HeapBuilder builder(version, bsonsAndKeyStrings.bsons[i], ALL_ASCENDING);
         values.emplace_back(builder.release());
     }
 
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        KeyString::Value oldValue = values[0];
+        key_string::Value oldValue = values[0];
         for (size_t i = 1; i < kSampleSize; i++) {
             oldValue = values[i];
         }
@@ -179,13 +187,13 @@ void BM_KeyStringValueAssign(benchmark::State& state, BsonValueType bsonType) {
 
 void BM_KeyStringHeapBuilderRelease(benchmark::State& state, BsonValueType bsonType) {
     // The KeyString version does not matter for this test.
-    const auto version = KeyString::Version::V1;
+    const auto version = key_string::Version::V1;
     const BsonsAndKeyStrings bsonsAndKeyStrings = generateBsonsAndKeyStrings(bsonType, version);
 
     for (auto _ : state) {
         benchmark::ClobberMemory();
         for (size_t i = 0; i < kSampleSize; i++) {
-            KeyString::HeapBuilder builder(version, bsonsAndKeyStrings.bsons[i], ALL_ASCENDING);
+            key_string::HeapBuilder builder(version, bsonsAndKeyStrings.bsons[i], ALL_ASCENDING);
             benchmark::DoNotOptimize(builder.release());
         }
     }
@@ -195,13 +203,13 @@ void BM_KeyStringHeapBuilderRelease(benchmark::State& state, BsonValueType bsonT
 
 void BM_KeyStringStackBuilderCopy(benchmark::State& state, BsonValueType bsonType) {
     // The KeyString version does not matter for this test.
-    const auto version = KeyString::Version::V1;
+    const auto version = key_string::Version::V1;
     const BsonsAndKeyStrings bsonsAndKeyStrings = generateBsonsAndKeyStrings(bsonType, version);
 
     for (auto _ : state) {
         benchmark::ClobberMemory();
         for (size_t i = 0; i < kSampleSize; i++) {
-            KeyString::Builder builder(version, bsonsAndKeyStrings.bsons[i], ALL_ASCENDING);
+            key_string::Builder builder(version, bsonsAndKeyStrings.bsons[i], ALL_ASCENDING);
             benchmark::DoNotOptimize(builder.getValueCopy());
         }
     }
@@ -214,18 +222,18 @@ void BM_KeyStringRecordIdStrAppend(benchmark::State& state, const size_t size) {
     auto rid = RecordId(buf.c_str(), size);
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        benchmark::DoNotOptimize(KeyString::Builder(KeyString::Version::V1, rid));
+        benchmark::DoNotOptimize(key_string::Builder(key_string::Version::V1, rid));
     }
 }
 
 void BM_KeyStringRecordIdStrDecode(benchmark::State& state, const size_t size) {
     const auto buf = std::string(size, 'a');
-    KeyString::Builder ks(KeyString::Version::V1, RecordId(buf.c_str(), size));
+    key_string::Builder ks(key_string::Version::V1, RecordId(buf.c_str(), size));
     auto ksBuf = ks.getBuffer();
     auto ksSize = ks.getSize();
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        benchmark::DoNotOptimize(KeyString::decodeRecordIdStrAtEnd(ksBuf, ksSize));
+        benchmark::DoNotOptimize(key_string::decodeRecordIdStrAtEnd(ksBuf, ksSize));
     }
 }
 
@@ -247,25 +255,25 @@ BENCHMARK_CAPTURE(BM_KeyStringStackBuilderCopy, Decimal, DECIMAL);
 BENCHMARK_CAPTURE(BM_KeyStringStackBuilderCopy, String, STRING);
 BENCHMARK_CAPTURE(BM_KeyStringStackBuilderCopy, Array, ARRAY);
 
-BENCHMARK_CAPTURE(BM_BSONToKeyString, V0_Int, KeyString::Version::V0, INT);
-BENCHMARK_CAPTURE(BM_BSONToKeyString, V1_Int, KeyString::Version::V1, INT);
-BENCHMARK_CAPTURE(BM_BSONToKeyString, V0_Double, KeyString::Version::V0, DOUBLE);
-BENCHMARK_CAPTURE(BM_BSONToKeyString, V1_Double, KeyString::Version::V1, DOUBLE);
-BENCHMARK_CAPTURE(BM_BSONToKeyString, V1_Decimal, KeyString::Version::V1, DECIMAL);
-BENCHMARK_CAPTURE(BM_BSONToKeyString, V0_String, KeyString::Version::V0, STRING);
-BENCHMARK_CAPTURE(BM_BSONToKeyString, V1_String, KeyString::Version::V1, STRING);
-BENCHMARK_CAPTURE(BM_BSONToKeyString, V0_Array, KeyString::Version::V0, ARRAY);
-BENCHMARK_CAPTURE(BM_BSONToKeyString, V1_Array, KeyString::Version::V1, ARRAY);
+BENCHMARK_CAPTURE(BM_BSONToKeyString, V0_Int, key_string::Version::V0, INT);
+BENCHMARK_CAPTURE(BM_BSONToKeyString, V1_Int, key_string::Version::V1, INT);
+BENCHMARK_CAPTURE(BM_BSONToKeyString, V0_Double, key_string::Version::V0, DOUBLE);
+BENCHMARK_CAPTURE(BM_BSONToKeyString, V1_Double, key_string::Version::V1, DOUBLE);
+BENCHMARK_CAPTURE(BM_BSONToKeyString, V1_Decimal, key_string::Version::V1, DECIMAL);
+BENCHMARK_CAPTURE(BM_BSONToKeyString, V0_String, key_string::Version::V0, STRING);
+BENCHMARK_CAPTURE(BM_BSONToKeyString, V1_String, key_string::Version::V1, STRING);
+BENCHMARK_CAPTURE(BM_BSONToKeyString, V0_Array, key_string::Version::V0, ARRAY);
+BENCHMARK_CAPTURE(BM_BSONToKeyString, V1_Array, key_string::Version::V1, ARRAY);
 
-BENCHMARK_CAPTURE(BM_KeyStringToBSON, V0_Int, KeyString::Version::V0, INT);
-BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_Int, KeyString::Version::V1, INT);
-BENCHMARK_CAPTURE(BM_KeyStringToBSON, V0_Double, KeyString::Version::V0, DOUBLE);
-BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_Double, KeyString::Version::V1, DOUBLE);
-BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_Decimal, KeyString::Version::V1, DECIMAL);
-BENCHMARK_CAPTURE(BM_KeyStringToBSON, V0_String, KeyString::Version::V0, STRING);
-BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_String, KeyString::Version::V1, STRING);
-BENCHMARK_CAPTURE(BM_KeyStringToBSON, V0_Array, KeyString::Version::V0, ARRAY);
-BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_Array, KeyString::Version::V1, ARRAY);
+BENCHMARK_CAPTURE(BM_KeyStringToBSON, V0_Int, key_string::Version::V0, INT);
+BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_Int, key_string::Version::V1, INT);
+BENCHMARK_CAPTURE(BM_KeyStringToBSON, V0_Double, key_string::Version::V0, DOUBLE);
+BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_Double, key_string::Version::V1, DOUBLE);
+BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_Decimal, key_string::Version::V1, DECIMAL);
+BENCHMARK_CAPTURE(BM_KeyStringToBSON, V0_String, key_string::Version::V0, STRING);
+BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_String, key_string::Version::V1, STRING);
+BENCHMARK_CAPTURE(BM_KeyStringToBSON, V0_Array, key_string::Version::V0, ARRAY);
+BENCHMARK_CAPTURE(BM_KeyStringToBSON, V1_Array, key_string::Version::V1, ARRAY);
 
 BENCHMARK_CAPTURE(BM_KeyStringRecordIdStrAppend, 16B, 16);
 BENCHMARK_CAPTURE(BM_KeyStringRecordIdStrAppend, 512B, 512);

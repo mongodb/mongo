@@ -27,13 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
 
-#include "mongo/util/uuid.h"
-
 #include "mongo/util/processinfo.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {

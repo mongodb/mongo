@@ -29,10 +29,35 @@
 
 #include "mongo/db/pipeline/document_source_query_stats.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <list>
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/util/partitioned.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/pipeline/document_source_query_stats_gen.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/lru_key_value.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -48,49 +73,10 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,
                                            feature_flags::gFeatureFlagQueryStats);
 
 namespace {
-/**
- * Try to parse the applyHmacToIdentifiers property from the element.
- */
-boost::optional<bool> parseApplyHmacToIdentifiers(const BSONElement& el) {
-    if (el.fieldNameStringData() == "applyHmacToIdentifiers"_sd) {
-        auto type = el.type();
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << DocumentSourceQueryStats::kStageName
-                              << " applyHmacToIdentifiers parameter must be boolean. Found type: "
-                              << typeName(type),
-                type == BSONType::Bool);
-        return el.trueValue();
-    }
-    return boost::none;
-}
 
 /**
- * Try to parse the `hmacKey' property from the element.
- */
-boost::optional<std::string> parseHmacKey(const BSONElement& el) {
-    if (el.fieldNameStringData() == "hmacKey"_sd) {
-        auto type = el.type();
-        if (el.isBinData(BinDataType::BinDataGeneral)) {
-            int len;
-            auto data = el.binData(len);
-            uassert(ErrorCodes::FailedToParse,
-                    str::stream() << DocumentSourceQueryStats::kStageName
-                                  << "hmacKey must be greater than or equal to 32 bytes",
-                    len >= 32);
-            return {{data, (size_t)len}};
-        }
-        uasserted(ErrorCodes::FailedToParse,
-                  str::stream()
-                      << DocumentSourceQueryStats::kStageName
-                      << " hmacKey parameter must be bindata of length 32 or greater. Found type: "
-                      << typeName(type));
-    }
-    return boost::none;
-}
-
-/**
- * Parse the spec object calling the `ctor` with the bool applyHmacToIdentifiers and std::string
- * hmacKey arguments.
+ * Parse the spec object calling the `ctor` with the TransformAlgorithm enum algorithm and
+ * std::string hmacKey arguments.
  */
 template <typename Ctor>
 auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
@@ -98,35 +84,31 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
             str::stream() << DocumentSourceQueryStats::kStageName
                           << " value must be an object. Found: " << typeName(spec.type()),
             spec.type() == BSONType::Object);
-
-    bool applyHmacToIdentifiers = false;
+    BSONObj obj = spec.embeddedObject();
+    TransformAlgorithmEnum algorithm = TransformAlgorithmEnum::kNone;
     std::string hmacKey;
-    for (auto&& el : spec.embeddedObject()) {
-        if (auto maybeApplyHmacToIdentifiers = parseApplyHmacToIdentifiers(el);
-            maybeApplyHmacToIdentifiers) {
-            applyHmacToIdentifiers = *maybeApplyHmacToIdentifiers;
-        } else if (auto maybeHmacKey = parseHmacKey(el); maybeHmacKey) {
-            hmacKey = *maybeHmacKey;
-        } else {
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream()
-                          << DocumentSourceQueryStats::kStageName
-                          << " parameters object may only contain 'applyHmacToIdentifiers' or "
-                             "'hmacKey' options. Found: "
-                          << el.fieldName());
+    auto parsed = DocumentSourceQueryStatsSpec::parse(
+        IDLParserContext(DocumentSourceQueryStats::kStageName.toString()), obj);
+    boost::optional<TransformIdentifiersSpec> transformIdentifiers =
+        parsed.getTransformIdentifiers();
+
+    if (transformIdentifiers) {
+        algorithm = transformIdentifiers->getAlgorithm();
+        boost::optional<ConstDataRange> hmacKeyContainer = transformIdentifiers->getHmacKey();
+        if (hmacKeyContainer) {
+            hmacKey = std::string(hmacKeyContainer->data(), (size_t)hmacKeyContainer->length());
         }
     }
-
-    return ctor(applyHmacToIdentifiers, hmacKey);
+    return ctor(algorithm, hmacKey);
 }
 
 }  // namespace
 
 std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
-    return parseSpec(spec, [&](bool applyHmacToIdentifiers, std::string hmacKey) {
+    return parseSpec(spec, [&](TransformAlgorithmEnum algorithm, std::string hmacKey) {
         return std::make_unique<DocumentSourceQueryStats::LiteParsed>(
-            spec.fieldName(), applyHmacToIdentifiers, hmacKey);
+            spec.fieldName(), nss.tenantId(), algorithm, hmacKey);
     });
 }
 
@@ -136,10 +118,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
 
     uassert(ErrorCodes::InvalidNamespace,
             "$queryStats must be run against the 'admin' database with {aggregate: 1}",
-            nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
+            nss.isAdminDB() && nss.isCollectionlessAggregateNS());
 
-    return parseSpec(spec, [&](bool applyHmacToIdentifiers, std::string hmacKey) {
-        return new DocumentSourceQueryStats(pExpCtx, applyHmacToIdentifiers, hmacKey);
+    return parseSpec(spec, [&](TransformAlgorithmEnum algorithm, std::string hmacKey) {
+        return new DocumentSourceQueryStats(pExpCtx, algorithm, hmacKey);
     });
 }
 
@@ -190,8 +172,8 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
         for (auto&& [key, metrics] : *partition) {
             try {
-                auto queryStatsKey = metrics->computeQueryStatsKey(
-                    pExpCtx->opCtx, _applyHmacToIdentifiers, _hmacKey);
+                auto queryStatsKey =
+                    metrics->computeQueryStatsKey(pExpCtx->opCtx, _algorithm, _hmacKey);
                 _materializedPartition.push_back({{"key", std::move(queryStatsKey)},
                                                   {"metrics", metrics->toBSON()},
                                                   {"asOf", partitionReadTime}});
@@ -202,10 +184,17 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
                             "Error encountered when applying hmac to query shape, will not publish "
                             "queryStats for this entry.",
                             "status"_attr = ex.toStatus(),
-                            "hash"_attr = key);
-                if (kDebugBuild) {
+                            "hash"_attr = *key,
+                            "representativeQueryShape"_attr =
+                                metrics->getRepresentativeQueryShapeForDebug());
+                if (kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) {
+                    auto keyString = std::to_string(*key);
+                    auto queryShape = metrics->getRepresentativeQueryShapeForDebug();
                     tasserted(7349401,
-                              "Was not able to re-parse queryStats key when reading queryStats.");
+                              "Was not able to re-parse queryStats key when reading queryStats. "
+                              "Status: " +
+                                  ex.toString() + " Hash: " + keyString +
+                                  " Query Shape: " + queryShape.toString());
                 }
             }
         }

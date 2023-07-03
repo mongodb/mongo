@@ -29,10 +29,36 @@
 
 #include "mongo/db/change_stream_pre_image_util.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <variant>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/change_stream_options_gen.h"
 #include "mongo/db/change_stream_options_manager.h"
-#include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/service_context.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 // Fail point to set current time for time-based expiration of pre-images.
@@ -102,6 +128,13 @@ RecordIdBound getAbsoluteMaxPreImageRecordIdBoundForNs(const UUID& nsUUID) {
         ChangeStreamPreImageId(nsUUID, Timestamp::max(), std::numeric_limits<int64_t>::max())));
 }
 
+UUID getPreImageNsUUID(const BSONObj& preImageObj) {
+    auto parsedUUID = UUID::parse(preImageObj[ChangeStreamPreImage::kIdFieldName]
+                                      .Obj()[ChangeStreamPreImageId::kNsUUIDFieldName]);
+    tassert(7027400, "Pre-image collection UUID must be of UUID type", parsedUUID.isOK());
+    return std::move(parsedUUID.getValue());
+}
+
 boost::optional<UUID> findNextCollectionUUID(OperationContext* opCtx,
                                              const CollectionPtr* preImagesCollPtr,
                                              boost::optional<UUID> currentNsUUID,
@@ -125,12 +158,9 @@ boost::optional<UUID> findNextCollectionUUID(OperationContext* opCtx,
     if (planExecutor->getNext(&preImageObj, nullptr) == PlanExecutor::IS_EOF) {
         return boost::none;
     }
-    auto parsedUUID = UUID::parse(preImageObj["_id"].Obj()["nsUUID"]);
-    tassert(7027400, "Pre-image collection UUID must be of UUID type", parsedUUID.isOK());
 
     firstDocWallTime = preImageObj[ChangeStreamPreImage::kOperationTimeFieldName].date();
-
-    return {std::move(parsedUUID.getValue())};
+    return getPreImageNsUUID(preImageObj);
 }
 
 Date_t getCurrentTimeForPreImageRemoval(OperationContext* opCtx) {

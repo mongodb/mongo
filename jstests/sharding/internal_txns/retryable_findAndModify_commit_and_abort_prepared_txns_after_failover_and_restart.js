@@ -34,11 +34,6 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts) {
     let testDB = st.rs0.getPrimary().getDB(kDbName);
     let testColl = testDB.getCollection(kCollName);
 
-    assert.commandWorked(testDB.adminCommand({
-        setParameter: 1,
-        storeFindAndModifyImagesInSideCollection: testOpts.enableFindAndModifyImageCollection
-    }));
-
     assert.commandWorked(testDB.createCollection(kCollName));
     if (testOpts.runFindAndModifyWithPreOrPostImage) {
         assert.commandWorked(testColl.insert({_id: 0, x: 0}));

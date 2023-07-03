@@ -27,21 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <boost/intrusive_ptr.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <memory>
 #include <string>
+#include <variant>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/cst/c_node.h"
-#include "mongo/db/cst/cst_pipeline_translation.h"
 #include "mongo/db/cst/cst_sort_translation.h"
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
+#include "mongo/db/cst/path.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {

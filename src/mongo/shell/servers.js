@@ -462,6 +462,8 @@ MongoRunner.arrOptions = function(binaryName, args) {
         // If we've specified a particular binary version, use that
         if (o.binVersion && o.binVersion != "" && o.binVersion != shellVersion()) {
             binaryName += "-" + o.binVersion;
+        } else {
+            binaryName = getMongoSuffixPath(binaryName);
         }
 
         // Manage legacy options
@@ -1028,8 +1030,7 @@ MongoRunner.runMongod = function(opts) {
             }
         }
 
-        var mongodProgram = MongoRunner.getMongodPath();
-        opts = MongoRunner.arrOptions(mongodProgram, opts);
+        opts = MongoRunner.arrOptions("mongod", opts);
     }
 
     var mongod = MongoRunner._startWithArgs(opts, env, waitForConnect);
@@ -1066,8 +1067,7 @@ MongoRunner.runMongos = function(opts) {
         runId = opts.runId;
         waitForConnect = opts.waitForConnect;
         env = opts.env;
-        var mongosProgram = MongoRunner.getMongosPath();
-        opts = MongoRunner.arrOptions(mongosProgram, opts);
+        opts = MongoRunner.arrOptions("mongos", opts);
     }
 
     var mongos = MongoRunner._startWithArgs(opts, env, waitForConnect);
@@ -1103,8 +1103,7 @@ MongoRunner.runMongoq = function(opts) {
         runId = opts.runId;
         waitForConnect = opts.waitForConnect;
         env = opts.env;
-        var mongoqProgram = MongoRunner.getMongoqPath();
-        opts = MongoRunner.arrOptions(mongoqProgram, opts);
+        opts = MongoRunner.arrOptions("mongoqd", opts);
     }
 
     var mongoq = MongoRunner._startWithArgs(opts, env, waitForConnect);

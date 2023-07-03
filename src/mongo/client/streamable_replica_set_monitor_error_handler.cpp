@@ -28,7 +28,18 @@
  */
 #include "mongo/client/streamable_replica_set_monitor_error_handler.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

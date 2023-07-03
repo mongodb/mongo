@@ -29,15 +29,27 @@
 
 #include "mongo/db/op_observer/op_observer_util.h"
 
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 
-namespace mongo::repl {
+namespace mongo {
 
-const OperationContext::Decoration<boost::optional<DocumentKey>> documentKeyDecoration =
-    OperationContext::declareDecoration<boost::optional<DocumentKey>>();
+const OplogDeleteEntryArgs::Decoration<boost::optional<DocumentKey>> documentKeyDecoration =
+    OplogDeleteEntryArgs::declareDecoration<boost::optional<DocumentKey>>();
+
+const OpStateAccumulator::Decoration<std::unique_ptr<ShardingWriteRouter>>
+    shardingWriteRouterOpStateAccumulatorDecoration =
+        OpStateAccumulator::declareDecoration<std::unique_ptr<ShardingWriteRouter>>();
 
 MONGO_FAIL_POINT_DEFINE(addDestinedRecipient);
 MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
@@ -100,7 +112,7 @@ BSONObj DocumentKey::getShardKeyAndId() const {
     return getId();
 }
 
-DocumentKey getDocumentKey(OperationContext* opCtx, const CollectionPtr& coll, BSONObj const& doc) {
+DocumentKey getDocumentKey(const CollectionPtr& coll, BSONObj const& doc) {
     auto idField = doc["_id"];
     BSONObj id = idField ? idField.wrap() : doc;
     boost::optional<BSONObj> shardKey;
@@ -114,4 +126,4 @@ DocumentKey getDocumentKey(OperationContext* opCtx, const CollectionPtr& coll, B
     return {std::move(id), std::move(shardKey)};
 }
 
-}  // namespace mongo::repl
+}  // namespace mongo

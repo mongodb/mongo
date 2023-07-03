@@ -29,13 +29,22 @@
 
 #include "mongo/db/query/index_tag.h"
 
-#include "mongo/db/matcher/expression_array.h"
-#include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/query/indexability.h"
-#include "mongo/stdx/unordered_map.h"
-
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/container/small_vector.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <limits>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/matcher/expression_path.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -125,21 +134,33 @@ void sortUsingTags(MatchExpression* tree) {
         });
 }
 
-// Attaches 'node' to 'target'. If 'target' is an AND, adds 'node' as a child of 'target'.
-// Otherwise, creates an AND that is a child of 'targetParent' at position 'targetPosition', and
-// adds 'target' and 'node' as its children. Tags 'node' with 'tagData'.
+/**
+ * Attaches 'node' to 'target'. If 'target' is an AND, adds 'node' as a child of 'target'.
+ * Otherwise, creates an AND that is a child of 'targetParent' at position 'targetPosition', and
+ * adds 'target' and 'node' as its children. Tags 'node' with 'tagData'. If 'node' appears as a key
+ * in 'pathsToUpdate', then we set the new path onto the clone.
+ */
 void attachNode(MatchExpression* node,
                 MatchExpression* target,
                 OrMatchExpression* targetParent,
                 size_t targetPosition,
-                std::unique_ptr<MatchExpression::TagData> tagData) {
+                std::unique_ptr<MatchExpression::TagData> tagData,
+                const stdx::unordered_map<MatchExpression*, FieldRef>& pathsToUpdate) {
     auto clone = node->clone();
     if (clone->matchType() == MatchExpression::NOT) {
         IndexTag* indexTag = checked_cast<IndexTag*>(tagData.get());
         clone->setTag(new IndexTag(indexTag->index));
         clone->getChild(0)->setTag(tagData.release());
+
+        if (auto it = pathsToUpdate.find(node->getChild(0)); it != pathsToUpdate.end()) {
+            checked_cast<PathMatchExpression*>(clone->getChild(0))
+                ->setPath(it->second.dottedField());
+        }
     } else {
         clone->setTag(tagData.release());
+        if (auto it = pathsToUpdate.find(node); it != pathsToUpdate.end()) {
+            checked_cast<PathMatchExpression*>(clone.get())->setPath(it->second.dottedField());
+        }
     }
 
     if (MatchExpression::AND == target->matchType()) {
@@ -169,17 +190,24 @@ stdx::unordered_map<size_t, std::vector<OrPushdownTag::Destination>> partitionCh
     return childDestinations;
 }
 
-// Finds the node within 'tree' that is an indexed OR, if one exists.
-MatchExpression* getIndexedOr(MatchExpression* tree) {
+/**
+ * Finds the node within 'tree' that is an indexed OR, if one exists. It also returns the subpath in
+ * which the indexed OR lives.
+ */
+std::pair<MatchExpression*, FieldRef> getIndexedOr(FieldRef currentPath, MatchExpression* tree) {
     if (MatchExpression::OR == tree->matchType() && tree->getTag()) {
-        return tree;
+        return {tree, std::move(currentPath)};
     }
+    if (const auto* fieldRef = tree->fieldRef()) {
+        currentPath = currentPath + *fieldRef;
+    }
+
     for (size_t i = 0; i < tree->numChildren(); ++i) {
-        if (auto indexedOrChild = getIndexedOr(tree->getChild(i))) {
-            return indexedOrChild;
+        if (auto result = getIndexedOr(currentPath, tree->getChild(i)); result.first) {
+            return result;
         }
     }
-    return nullptr;
+    return {};
 }
 
 // Pushes down 'node' along the routes in 'target' specified in 'destinations'. Each value in the
@@ -187,7 +215,8 @@ MatchExpression* getIndexedOr(MatchExpression* tree) {
 // descendant of 'target'.
 bool pushdownNode(MatchExpression* node,
                   MatchExpression* target,
-                  std::vector<OrPushdownTag::Destination> destinations) {
+                  std::vector<OrPushdownTag::Destination> destinations,
+                  const stdx::unordered_map<MatchExpression*, FieldRef>& pathsToUpdate) {
     if (MatchExpression::OR == target->matchType()) {
         OrMatchExpression* orNode = static_cast<OrMatchExpression*>(target);
         bool moveToAllChildren = true;
@@ -211,13 +240,15 @@ bool pushdownNode(MatchExpression* node,
                                orNode->getChild(i),
                                orNode,
                                i,
-                               std::move(childDestinations->second[0].tagData));
+                               std::move(childDestinations->second[0].tagData),
+                               pathsToUpdate);
                 } else {
 
                     // This child was specified by a non-trivial route in destinations, so we recur.
                     moveToAllChildren = pushdownNode(node,
                                                      orNode->getChild(i),
-                                                     std::move(childDestinations->second)) &&
+                                                     std::move(childDestinations->second),
+                                                     pathsToUpdate) &&
                         moveToAllChildren;
                 }
             }
@@ -226,36 +257,81 @@ bool pushdownNode(MatchExpression* node,
     }
 
     if (MatchExpression::AND == target->matchType()) {
-        auto indexedOr = getIndexedOr(target);
+        auto [indexedOr, fieldRef_unused] = getIndexedOr({} /*fieldRef*/, target);
         invariant(indexedOr);
-        return pushdownNode(node, indexedOr, std::move(destinations));
+        return pushdownNode(node, indexedOr, std::move(destinations), pathsToUpdate);
     }
 
     MONGO_UNREACHABLE_TASSERT(4457014);
 }
 
-// Populates 'out' with all descendants of 'node' that have OrPushdownTags, assuming the initial
-// input is an ELEM_MATCH_OBJECT.
-void getElemMatchOrPushdownDescendants(MatchExpression* node, std::vector<MatchExpression*>* out) {
+/**
+ * Populates 'out' with all descendants of 'node' that have OrPushdownTags, assuming the initial
+ * input is an ELEM_MATCH_OBJECT. The "currentPath" argument is the combined path traversed so far.
+ * Additionally, we populate a map to keep track of paths to update afterward during cloning.
+ */
+void getElemMatchOrPushdownDescendants(
+    const FieldRef& indexedOrPath,
+    FieldRef currentPath,
+    MatchExpression* node,
+    std::vector<MatchExpression*>* out,
+    stdx::unordered_map<MatchExpression*, FieldRef>* pathsToUpdate) {
+    const bool updatePath = node->fieldRef() != nullptr;
+    if (updatePath) {
+        currentPath = currentPath + *node->fieldRef();
+    }
+
+    // Do not do extra pushdown of OR inside $elemmatch.
     if (node->getTag() && node->getTag()->getType() == TagType::OrPushdownTag) {
+        if (updatePath) {
+            // Make sure that we remove the common prefix between the "destination" OR and the
+            // current expression, as it may be contained within the same $elemmatch.
+
+            const auto prefixSize = indexedOrPath.commonPrefixSize(currentPath);
+            for (auto i = 0; i < prefixSize; i++) {
+                currentPath.removeFirstPart();
+            }
+            if (currentPath != *node->fieldRef()) {
+                pathsToUpdate->emplace(node, std::move(currentPath));
+            }
+        }
         out->push_back(node);
     } else if (node->matchType() == MatchExpression::ELEM_MATCH_OBJECT ||
                node->matchType() == MatchExpression::AND) {
         for (size_t i = 0; i < node->numChildren(); ++i) {
-            getElemMatchOrPushdownDescendants(node->getChild(i), out);
+            getElemMatchOrPushdownDescendants(
+                indexedOrPath, currentPath, node->getChild(i), out, pathsToUpdate);
         }
     } else if (node->matchType() == MatchExpression::NOT) {
         // The immediate child of NOT may be tagged, but there should be no tags deeper than this.
         auto* childNode = node->getChild(0);
         if (childNode->getTag() && childNode->getTag()->getType() == TagType::OrPushdownTag) {
+            if (!childNode->path().empty()) {
+                // Make sure that we remove the common prefix between the "destination" OR and the
+                // current expression, as it may be contained within the same $elemmatch.
+
+                currentPath = currentPath + *childNode->fieldRef();
+                const auto prefixSize = indexedOrPath.commonPrefixSize(currentPath);
+                for (auto i = 0; i < prefixSize; i++) {
+                    currentPath.removeFirstPart();
+                }
+                if (currentPath != *childNode->fieldRef()) {
+                    pathsToUpdate->emplace(childNode, std::move(currentPath));
+                }
+            }
             out->push_back(node);
         }
     }
 }
 
-// Attempts to push the given node down into the 'indexedOr' subtree. Returns true if the predicate
-// can subsequently be trimmed from the MatchExpression tree, false otherwise.
-bool processOrPushdownNode(MatchExpression* node, MatchExpression* indexedOr) {
+/**
+ * Attempts to push the given node down into the 'indexedOr' subtree. Returns true if the predicate
+ * can subsequently be trimmed from the MatchExpression tree, false otherwise. Also supplied is a
+ * map to optionally update the path of the 'node' being pushed down.
+ */
+bool processOrPushdownNode(MatchExpression* node,
+                           MatchExpression* indexedOr,
+                           const stdx::unordered_map<MatchExpression*, FieldRef>& pathsToUpdate) {
     // If the node is a negation, then its child is the predicate node that may be tagged.
     auto* predNode = node->matchType() == MatchExpression::NOT ? node->getChild(0) : node;
 
@@ -272,7 +348,7 @@ bool processOrPushdownNode(MatchExpression* node, MatchExpression* indexedOr) {
     predNode->setTag(nullptr);
 
     // Attempt to push the node into the indexedOr, then re-set its tag to the indexTag.
-    const bool pushedDown = pushdownNode(node, indexedOr, std::move(destinations));
+    const bool pushedDown = pushdownNode(node, indexedOr, std::move(destinations), pathsToUpdate);
     predNode->setTag(indexTag.release());
 
     // Return true if we can trim the predicate. We could trim the node even if it had an index tag
@@ -289,7 +365,7 @@ void resolveOrPushdowns(MatchExpression* tree) {
     }
     if (MatchExpression::AND == tree->matchType()) {
         AndMatchExpression* andNode = static_cast<AndMatchExpression*>(tree);
-        MatchExpression* indexedOr = getIndexedOr(andNode);
+        auto [indexedOr, indexedOrPath] = getIndexedOr({} /*fieldRef*/, andNode);
 
         if (indexedOr) {
             for (size_t i = 0; i < andNode->numChildren(); ++i) {
@@ -300,11 +376,17 @@ void resolveOrPushdowns(MatchExpression* tree) {
                 // entirety.
                 if (child->matchType() == MatchExpression::ELEM_MATCH_OBJECT) {
                     std::vector<MatchExpression*> orPushdownDescendants;
-                    getElemMatchOrPushdownDescendants(child, &orPushdownDescendants);
+                    stdx::unordered_map<MatchExpression*, FieldRef> pathsToUpdate;
+                    getElemMatchOrPushdownDescendants(indexedOrPath,
+                                                      {} /*currentPath*/,
+                                                      child,
+                                                      &orPushdownDescendants,
+                                                      &pathsToUpdate);
                     for (auto descendant : orPushdownDescendants) {
-                        static_cast<void>(processOrPushdownNode(descendant, indexedOr));
+                        static_cast<void>(
+                            processOrPushdownNode(descendant, indexedOr, pathsToUpdate));
                     }
-                } else if (processOrPushdownNode(child, indexedOr)) {
+                } else if (processOrPushdownNode(child, indexedOr, {} /*pathsToUpdate*/)) {
                     // The indexed $or can completely satisfy the child predicate, so we trim it.
                     auto ownedChild = andNode->removeChild(i);
                     --i;

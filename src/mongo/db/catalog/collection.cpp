@@ -29,9 +29,9 @@
 
 #include "mongo/db/catalog/collection.h"
 
-#include <sstream>
-
-#include "mongo/logv2/log.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -102,10 +102,10 @@ std::pair<std::unique_ptr<CollatorInterface>, ExpressionContext::CollationMatche
 resolveCollator(OperationContext* opCtx, BSONObj userCollation, const CollectionPtr& collection) {
     if (!collection || !collection->getDefaultCollator()) {
         if (userCollation.isEmpty()) {
-            return {nullptr, ExpressionContext::CollationMatchesDefault::kNoDefault};
+            return {nullptr, ExpressionContext::CollationMatchesDefault::kYes};
         } else {
             return {getUserCollator(opCtx, userCollation),
-                    ExpressionContext::CollationMatchesDefault::kNoDefault};
+                    ExpressionContext::CollationMatchesDefault::kYes};
         }
     }
 

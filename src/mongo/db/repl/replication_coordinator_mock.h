@@ -29,14 +29,52 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/member_data.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/split_horizon.h"
+#include "mongo/db/repl/split_prepare_session_manager.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
+#include "mongo/rpc/topology_version_gen.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -45,6 +83,13 @@ struct ConnectionPoolStats;
 }  // namespace executor
 
 namespace repl {
+
+inline repl::ReplSettings createServerlessReplSettings() {
+    repl::ReplSettings settings;
+    settings.setOplogSizeBytes(5 * 1024 * 1024);
+    settings.setServerlessMode();
+    return settings;
+}
 
 /**
  * A mock ReplicationCoordinator.  Currently it is extremely simple and exists solely to link
@@ -145,7 +190,7 @@ public:
     virtual void setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime);
 
     virtual void setMyLastAppliedOpTimeAndWallTimeForward(
-        const OpTimeAndWallTime& opTimeAndWallTime);
+        const OpTimeAndWallTime& opTimeAndWallTime, bool advanceGlobalTimestamp);
     virtual void setMyLastDurableOpTimeAndWallTimeForward(
         const OpTimeAndWallTime& opTimeAndWallTime);
 
@@ -350,6 +395,15 @@ public:
     void setAwaitReplicationReturnValueFunction(
         AwaitReplicationReturnValueFunction returnValueFunction);
 
+    using RunCmdOnPrimaryAndAwaitResponseFunction =
+        std::function<BSONObj(OperationContext* opCtx,
+                              const std::string& dbName,
+                              const BSONObj& cmdObj,
+                              OnRemoteCmdScheduledFn onRemoteCmdScheduled,
+                              OnRemoteCmdCompleteFn onRemoteCmdComplete)>;
+    void setRunCmdOnPrimaryAndAwaitResponseFunction(
+        RunCmdOnPrimaryAndAwaitResponseFunction runCmdFunction);
+
     /**
      * Always allow writes even if this node is a writable primary. Used by sharding unit tests.
      */
@@ -439,6 +493,8 @@ public:
         return false;
     }
 
+    boost::optional<UUID> getInitialSyncId(OperationContext* opCtx) override;
+
 private:
     void _setMyLastAppliedOpTimeAndWallTime(WithLock lk,
                                             const OpTimeAndWallTime& opTimeAndWallTime);
@@ -451,6 +507,7 @@ private:
                                                                                   const OpTime&) {
         return StatusAndDuration(Status::OK(), Milliseconds(0));
     };
+    RunCmdOnPrimaryAndAwaitResponseFunction _runCmdOnPrimaryAndAwaitResponseFn;
 
     // Guards all the variables below
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicationCoordinatorExternalStateMock::_mutex");

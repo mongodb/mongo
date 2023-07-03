@@ -29,13 +29,22 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 namespace mongo {
 
@@ -63,7 +72,7 @@ public:
     WildcardKeyGenerator(BSONObj keyPattern,
                          BSONObj pathProjection,
                          const CollatorInterface* collator,
-                         KeyString::Version keyStringVersion,
+                         key_string::Version keyStringVersion,
                          Ordering ordering,
                          boost::optional<KeyFormat> rsKeyFormat = boost::none);
 
@@ -92,7 +101,7 @@ private:
     WildcardProjection _proj;
     const CollatorInterface* _collator;
     const BSONObj _keyPattern;
-    const KeyString::Version _keyStringVersion;
+    const key_string::Version _keyStringVersion;
     const Ordering _ordering;
     const boost::optional<KeyFormat> _rsKeyFormat;
     boost::optional<BtreeKeyGenerator> _preBtreeGenerator = boost::none;

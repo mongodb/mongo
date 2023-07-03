@@ -29,13 +29,30 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <memory>
 #include <queue>
 
-#include "mongo/db/query/request_shapifier.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/s/query/cluster_client_cursor.h"
+#include "mongo/s/query/cluster_query_result.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -121,7 +138,7 @@ public:
 
     bool shouldOmitDiagnosticInformation() const final;
 
-    std::unique_ptr<query_stats::RequestShapifier> getRequestShapifier() final;
+    std::unique_ptr<query_stats::KeyGenerator> getKeyGenerator() final;
 
 private:
     bool _killed = false;

@@ -29,13 +29,22 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <tuple>
+#include <vector>
 
+#include "mongo/crypto/hash_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/session/kill_sessions_gen.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 

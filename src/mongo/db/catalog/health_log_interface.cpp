@@ -28,7 +28,14 @@
  */
 
 #include "mongo/db/catalog/health_log_interface.h"
+
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/db/operation_context.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 

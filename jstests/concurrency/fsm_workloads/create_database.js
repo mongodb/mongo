@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * create_database.js
  *
@@ -14,7 +12,7 @@
 
 load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 
-var $config = (function() {
+export const $config = (function() {
     let data = {
         checkCommandResult: function checkCommandResult(mayFailWithDatabaseDifferCase, res) {
             if (mayFailWithDatabaseDifferCase)

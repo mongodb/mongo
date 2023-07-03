@@ -28,14 +28,13 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/executor/async_multicaster.h"
-
 #include <memory>
+#include <mutex>
+#include <utility>
 
-#include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/executor/async_multicaster.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"

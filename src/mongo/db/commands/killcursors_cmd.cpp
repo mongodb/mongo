@@ -27,12 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
 
-#include "mongo/db/auth/authorization_session.h"
+#include "mongo/base/status.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/killcursors_common.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/db/stats/top.h"
 

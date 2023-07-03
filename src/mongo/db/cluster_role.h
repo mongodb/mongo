@@ -31,8 +31,14 @@
 
 namespace mongo {
 /**
- * ClusterRole is not mutually exclusive when featureFlagCatalogShard is true. In this mode, a
- * config server cluster role is also a shard server cluster role.
+ * Represents the role this node plays in a sharded cluster, based on its startup parameters. Roles
+ * are not mutually exclusive.
+ *
+ * A mongod started with --shardsvr has the "ShardServer" role, one started with --configsvr has the
+ * "ShardServer" and "ConfigServer" roles, and one started without either flag has the "None" role,
+ * meaning it is a standalone replica set.
+ *
+ * A mongos always has the "None" role.
  */
 class ClusterRole {
 public:
@@ -51,15 +57,15 @@ public:
         return *this;
     }
 
+    /**
+     * Returns if this node has the given role.
+     */
     bool has(const ClusterRole& other) const;
 
-    // Returns true if this mongod was started with --shardsvr, false otherwise.
+    /**
+     * Returns true if this mongod was started with --shardsvr, false otherwise.
+     */
     bool exclusivelyHasShardRole();
-
-    // Returns true if this mongod was started with --configsvr in a non-config shard topology,
-    // false otherwise.
-    // TODO SERVER-75391: Remove.
-    bool exclusivelyHasConfigRole();
 
 private:
     Value _value;

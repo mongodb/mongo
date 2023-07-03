@@ -898,9 +898,12 @@ __log_open_verify(WT_SESSION_IMPL *session, uint32_t id, WT_FH **fhp, WT_LSN *ls
     WT_RET(__wt_scr_alloc(session, 0, &buf));
     salvage_mode = (need_salvagep != NULL && F_ISSET(conn, WT_CONN_SALVAGE));
 
-    if (log == NULL)
-        allocsize = WT_LOG_ALIGN;
-    else
+    if (log == NULL) {
+        if (FLD_ISSET(conn->direct_io, WT_DIRECT_IO_LOG))
+            allocsize = (uint32_t)conn->buffer_alignment;
+        else
+            allocsize = WT_LOG_ALIGN;
+    } else
         allocsize = log->allocsize;
     if (lsnp != NULL)
         WT_ZERO_LSN(lsnp);
@@ -1781,7 +1784,7 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t log_size, wt_off_t 
     WT_LOG *log;
     WT_LOG_RECORD *logrec;
     wt_off_t off, remainder;
-    size_t allocsize, buf_left, bufsz, rdlen;
+    size_t alignedsz, allocsize, buf_left, bufsz, rdlen;
     char *buf, *p, *zerobuf;
     bool corrupt;
 
@@ -1807,6 +1810,11 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t log_size, wt_off_t 
         bufsz = (size_t)remainder;
     WT_RET(__wt_calloc_def(session, bufsz, &buf));
     WT_ERR(__wt_calloc_def(session, bufsz, &zerobuf));
+    if (FLD_ISSET(conn->direct_io, WT_DIRECT_IO_LOG)) {
+        alignedsz = bufsz;
+        WT_ERR(__wt_realloc_aligned(session, &bufsz, alignedsz, &buf));
+        WT_ERR(__wt_realloc_aligned(session, &bufsz, alignedsz, &zerobuf));
+    }
 
     /*
      * Read in a chunk starting at the given offset. Compare against a known zero byte chunk.
@@ -1918,9 +1926,11 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
     /*
      * If we have to wait for a synchronous operation, we do not pass handling of this slot off to
      * the worker thread. The caller is responsible for freeing the slot in that case. Otherwise the
-     * worker thread will free it.
+     * worker thread will free it. Make sure the server thread is running as logging can be called
+     * before it starts up.
      */
-    if (!F_ISSET_ATOMIC_16(slot, WT_SLOT_FLUSH | WT_SLOT_SYNC_FLAGS)) {
+    if (!F_ISSET_ATOMIC_16(slot, WT_SLOT_FLUSH | WT_SLOT_SYNC_FLAGS) &&
+      FLD_ISSET(conn->server_flags, WT_CONN_SERVER_LOG)) {
         if (freep != NULL)
             *freep = 0;
         slot->slot_state = WT_LOG_SLOT_WRITTEN;

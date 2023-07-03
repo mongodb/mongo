@@ -28,10 +28,13 @@
  */
 #pragma once
 
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 // This overload is used when building validation error messages.
 inline StringBuilder& operator<<(StringBuilder& os, const Fle2RangeOperator& op) {

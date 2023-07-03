@@ -29,7 +29,16 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <cstddef>
+#include <vector>
+
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 
 namespace mongo {

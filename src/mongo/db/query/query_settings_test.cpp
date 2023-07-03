@@ -33,12 +33,17 @@
 
 #include "mongo/db/query/query_settings.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 using mongo::AllowedIndicesFilter;
 using mongo::BSONObj;

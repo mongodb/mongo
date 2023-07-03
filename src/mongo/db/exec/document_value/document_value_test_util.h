@@ -29,8 +29,15 @@
 
 #pragma once
 
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/inline_auto_update.h"
 #include "mongo/unittest/unittest.h"
 

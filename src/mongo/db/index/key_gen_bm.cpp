@@ -27,13 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
+#include <cstddef>
+#include <cstdint>
 #include <random>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 namespace mongo {
 namespace {
@@ -54,7 +61,7 @@ void BM_KeyGenBasic(benchmark::State& state, bool skipMultikey) {
     BtreeKeyGenerator generator({kFieldName},
                                 {BSONElement{}},
                                 false,
-                                KeyString::Version::kLatestVersion,
+                                key_string::Version::kLatestVersion,
                                 makeOrdering(kFieldName));
 
     SharedBufferFragmentBuilder allocator(kMemBlockSize,
@@ -84,7 +91,7 @@ void BM_KeyGenArray(benchmark::State& state, int32_t elements) {
     BtreeKeyGenerator generator({kFieldName},
                                 {BSONElement{}},
                                 false,
-                                KeyString::Version::kLatestVersion,
+                                key_string::Version::kLatestVersion,
                                 makeOrdering(kFieldName));
 
     SharedBufferFragmentBuilder allocator(kMemBlockSize,
@@ -112,7 +119,7 @@ void BM_KeyGenArrayZero(benchmark::State& state, int32_t elements) {
     BtreeKeyGenerator generator({kFieldName},
                                 {BSONElement{}},
                                 false,
-                                KeyString::Version::kLatestVersion,
+                                key_string::Version::kLatestVersion,
                                 makeOrdering(kFieldName));
 
     SharedBufferFragmentBuilder allocator(kMemBlockSize,
@@ -145,7 +152,7 @@ void BM_KeyGenArrayOfArray(benchmark::State& state, int32_t elements) {
     BtreeKeyGenerator generator({kFieldName},
                                 {BSONElement{}},
                                 false,
-                                KeyString::Version::kLatestVersion,
+                                key_string::Version::kLatestVersion,
                                 makeOrdering(kFieldName));
 
     SharedBufferFragmentBuilder allocator(kMemBlockSize,

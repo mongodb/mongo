@@ -27,8 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/embedded/embedded_options.h"
+#include <string>
 
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/embedded/embedded_options.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 

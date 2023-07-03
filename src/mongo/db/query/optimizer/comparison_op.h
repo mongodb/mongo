@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/optimizer/utils/printable_enum.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer {
 

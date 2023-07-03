@@ -29,19 +29,59 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <functional>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_for_window_functions.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/accumulator_percentile.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/percentile_algo.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
+#include "mongo/db/pipeline/window_function/window_function_integral.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/serialization_options.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 class WindowFunctionExec;
@@ -502,9 +542,9 @@ public:
         MutableDocument subObj;
         tassert(5433604, "ExpMovingAvg neither N nor alpha was set", _N || _alpha);
         if (_N) {
-            subObj[kNArg] = opts.serializeLiteralValue(_N.get());
+            subObj[kNArg] = opts.serializeLiteral(_N.get());
         } else {
-            subObj[kAlphaArg] = opts.serializeLiteralValue(_alpha.get());
+            subObj[kAlphaArg] = opts.serializeLiteral(_alpha.get());
         }
         subObj[kInputArg] = _input->serialize(opts);
         MutableDocument outerObj;
@@ -946,7 +986,7 @@ public:
                        boost::intrusive_ptr<::mongo::Expression> initializeExpr,
                        WindowBounds bounds,
                        std::vector<double> ps,
-                       int32_t method)
+                       PercentileMethod method)
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)),
           _ps(std::move(ps)),
           _method(method),
@@ -960,7 +1000,7 @@ public:
 
 private:
     std::vector<double> _ps;
-    int32_t _method;
+    PercentileMethod _method;
     boost::intrusive_ptr<::mongo::Expression> _intializeExpr;
 };
 

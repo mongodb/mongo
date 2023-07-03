@@ -18,7 +18,7 @@
 //   # Plan cache state is node-local and will not get migrated alongside tenant data.
 //   tenant_migration_incompatible,
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
-//   cqf_incompatible,
+//   cqf_experimental_incompatible,
 // ]
 (function() {
 'use strict';
@@ -31,7 +31,7 @@ if (!checkSBEEnabled(db)) {
     return;
 }
 
-const testDb = db.getSiblingDB('cached_plan_trial_does_not_discard_work');
+const testDb = db.getSiblingDB('trial_does_not_discard_work');
 assert.commandWorked(testDb.dropDatabase());
 const coll = testDb.getCollection('test');
 

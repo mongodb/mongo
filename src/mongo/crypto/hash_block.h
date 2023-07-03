@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <MurmurHash3.h>
 #include <array>
 #include <cstddef>
 #include <string>
@@ -43,6 +42,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/murmur3.h"
 #include "mongo/util/secure_compare_memory.h"
 
 namespace mongo {
@@ -303,10 +303,8 @@ public:
      * ex: std::unordered_set<HashBlock, HashBlock::Hash> shaSet;
      */
     struct Hash {
-        std::size_t operator()(const HashBlock& HashBlock) const {
-            uint32_t hash;
-            MurmurHash3_x86_32(HashBlock.data(), HashBlock::kHashLength, 0, &hash);
-            return hash;
+        std::size_t operator()(const HashBlock& hashBlock) const {
+            return murmur3<sizeof(uint32_t)>(hashBlock.toCDR(), 0 /*seed*/);
         }
     };
 

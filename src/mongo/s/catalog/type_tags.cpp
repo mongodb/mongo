@@ -27,16 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstring>
+#include <type_traits>
+#include <utility>
 
-#include "mongo/s/catalog/type_tags.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -136,7 +144,7 @@ BSONObj TagsType::toBSON() const {
     BSONObjBuilder builder;
 
     if (_ns)
-        builder.append(ns.name(), getNS().ns());
+        builder.append(ns.name(), NamespaceStringUtil::serialize(getNS()));
     if (_tag)
         builder.append(tag.name(), getTag());
     if (_minKey)

@@ -30,21 +30,33 @@
 
 #include "mongo/db/query/index_bounds_builder.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <s2cellid.h>
+#include <s2region.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
 #include <cmath>
 #include <limits>
-#include <s2.h>
-#include <s2cell.h>
-#include <s2regioncoverer.h>
+#include <memory>
+#include <set>
+#include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/geo/geoconstants.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/geo/geometry_container.h"
+#include "mongo/db/geo/shapes.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/s2_common.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
+#include "mongo/db/matcher/expression_type.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/query/analyze_regex.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -53,8 +65,15 @@
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -270,9 +289,9 @@ void IndexBoundsBuilder::translateAndUnion(const MatchExpression* expr,
 
 bool typeMatch(const BSONObj& obj) {
     BSONObjIterator it(obj);
-    verify(it.more());
+    MONGO_verify(it.more());
     BSONElement first = it.next();
-    verify(it.more());
+    MONGO_verify(it.more());
     BSONElement second = it.next();
     return first.canonicalType() == second.canonicalType();
 }
@@ -693,7 +712,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         BSONObjBuilder bob;
         buildBoundsForQueryElementForLT(dataElt, index.collator, &bob);
         BSONObj dataObj = bob.done().getOwned();
-        verify(dataObj.isOwned());
+        MONGO_verify(dataObj.isOwned());
         bool inclusiveBounds = dataElt.type() == BSONType::Array;
         Interval interval =
             makeRangeInterval(dataObj,
@@ -781,7 +800,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         BSONObjBuilder bob;
         buildBoundsForQueryElementForLT(dataElt, index.collator, &bob);
         BSONObj dataObj = bob.done().getOwned();
-        verify(dataObj.isOwned());
+        MONGO_verify(dataObj.isOwned());
 
         bool inclusiveBounds = dataElt.type() == BSONType::Array || typeMatch(dataObj);
         const Interval interval = makeRangeInterval(
@@ -853,7 +872,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         BSONObjBuilder bob;
         buildBoundsForQueryElementForGT(dataElt, index.collator, &bob);
         BSONObj dataObj = bob.done().getOwned();
-        verify(dataObj.isOwned());
+        MONGO_verify(dataObj.isOwned());
         bool inclusiveBounds = dataElt.type() == BSONType::Array;
         Interval interval =
             makeRangeInterval(dataObj,
@@ -942,7 +961,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         BSONObjBuilder bob;
         buildBoundsForQueryElementForGT(dataElt, index.collator, &bob);
         BSONObj dataObj = bob.done().getOwned();
-        verify(dataObj.isOwned());
+        MONGO_verify(dataObj.isOwned());
         bool inclusiveBounds = dataElt.type() == BSONType::Array || typeMatch(dataObj);
         const Interval interval = makeRangeInterval(
             dataObj, IndexBounds::makeBoundInclusionFromBoundBools(true, inclusiveBounds));
@@ -1005,7 +1024,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         bob.appendMinForType("", NumberDouble);
         bob.appendMaxForType("", NumberDouble);
         BSONObj dataObj = bob.obj();
-        verify(dataObj.isOwned());
+        MONGO_verify(dataObj.isOwned());
         oilOut->intervals.push_back(
             makeRangeInterval(dataObj, BoundInclusion::kIncludeBothStartAndEndKeys));
         *tightnessOut = IndexBoundsBuilder::INEXACT_COVERED;
@@ -1109,14 +1128,14 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
     } else if (MatchExpression::GEO == expr->matchType()) {
         const GeoMatchExpression* gme = static_cast<const GeoMatchExpression*>(expr);
         if ("2dsphere" == elt.valueStringDataSafe()) {
-            verify(gme->getGeoExpression().getGeometry().hasS2Region());
+            MONGO_verify(gme->getGeoExpression().getGeometry().hasS2Region());
             const S2Region& region = gme->getGeoExpression().getGeometry().getS2Region();
             S2IndexingParams indexParams;
             ExpressionParams::initialize2dsphereParams(index.infoObj, index.collator, &indexParams);
             ExpressionMapping::cover2dsphere(region, indexParams, oilOut);
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         } else if ("2d" == elt.valueStringDataSafe()) {
-            verify(gme->getGeoExpression().getGeometry().hasR2Region());
+            MONGO_verify(gme->getGeoExpression().getGeometry().hasR2Region());
             const R2Region& region = gme->getGeoExpression().getGeometry().getR2Region();
 
             ExpressionMapping::cover2d(
@@ -1127,7 +1146,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             LOGV2_WARNING(20934,
                           "Planner error trying to build geo bounds for an index element",
                           "element"_attr = elt.toString());
-            verify(0);
+            MONGO_verify(0);
         }
     } else if (MatchExpression::INTERNAL_BUCKET_GEO_WITHIN == expr->matchType()) {
         const InternalBucketGeoWithinMatchExpression* ibgwme =
@@ -1151,7 +1170,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         LOGV2_WARNING(20935,
                       "Planner error while trying to build bounds for expression",
                       "expression"_attr = redact(expr->debugString()));
-        verify(0);
+        MONGO_verify(0);
     }
 }
 
@@ -1162,9 +1181,9 @@ Interval IndexBoundsBuilder::makeRangeInterval(const BSONObj& obj, BoundInclusio
     ret.startInclusive = IndexBounds::isStartIncludedInBound(boundInclusion);
     ret.endInclusive = IndexBounds::isEndIncludedInBound(boundInclusion);
     BSONObjIterator it(obj);
-    verify(it.more());
+    MONGO_verify(it.more());
     ret.start = it.next();
-    verify(it.more());
+    MONGO_verify(it.more());
     ret.end = it.next();
     return ret;
 }
@@ -1190,7 +1209,7 @@ void IndexBoundsBuilder::intersectize(const OrderedIntervalList& oilA, OrderedIn
         }
 
         Interval::IntervalComparison cmp = oilAIntervals[oilAIdx].compare(oilBIntervals[oilBIdx]);
-        verify(Interval::INTERVAL_UNKNOWN != cmp);
+        MONGO_verify(Interval::INTERVAL_UNKNOWN != cmp);
 
         if (cmp == Interval::INTERVAL_PRECEDES || cmp == Interval::INTERVAL_PRECEDES_COULD_UNION) {
             // oilAIntervals is before oilBIntervals. move oilAIntervals forward.
@@ -1242,7 +1261,7 @@ void IndexBoundsBuilder::unionize(OrderedIntervalList* oilOut) {
         Interval::IntervalComparison cmp = iv[i].compare(iv[i + 1]);
 
         // This means our sort didn't work.
-        verify(Interval::INTERVAL_SUCCEEDS != cmp);
+        MONGO_verify(Interval::INTERVAL_SUCCEEDS != cmp);
 
         // Intervals are correctly ordered.
         if (Interval::INTERVAL_PRECEDES == cmp) {
@@ -1345,7 +1364,7 @@ void IndexBoundsBuilder::translateRegex(const RegexMatchExpression* rme,
         bob.appendMinForType("", String);
         bob.appendMaxForType("", String);
         BSONObj dataObj = bob.obj();
-        verify(dataObj.isOwned());
+        MONGO_verify(dataObj.isOwned());
         oilOut->intervals.push_back(
             makeRangeInterval(dataObj, BoundInclusion::kIncludeStartKeyOnly));
     }
@@ -1376,7 +1395,7 @@ void IndexBoundsBuilder::translateEquality(const BSONElement& data,
             dataObj = ExpressionMapping::hash(dataObj.firstElement());
         }
 
-        verify(dataObj.isOwned());
+        MONGO_verify(dataObj.isOwned());
         oil->intervals.push_back(makePointInterval(dataObj));
 
         if (isHashed) {

@@ -27,20 +27,45 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/database_name.h"
+#include "mongo/db/commands/create_gen.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_critical_section_document_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/s/sharding_recovery_service.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 
@@ -53,7 +78,8 @@ public:
 
     inline static const NamespaceString dbName =
         NamespaceString::createNamespaceString_forTest("TestDB");
-    inline static const BSONObj dbOpReason = BSON("Dummy operation on database" << dbName.ns());
+    inline static const BSONObj dbOpReason =
+        BSON("Dummy operation on database" << dbName.ns_forTest());
 
     inline static const BSONObj differentOpReason = BSON("Yet another dummy operation" << true);
 
@@ -73,7 +99,8 @@ public:
     boost::optional<CollectionCriticalSectionDocument> readCriticalSectionDocument(
         const NamespaceString& nss, const BSONObj& reason) {
         FindCommandRequest findOp(NamespaceString::kCollectionCriticalSectionsNamespace);
-        findOp.setFilter(BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()));
+        findOp.setFilter(
+            BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString_forTest()));
 
         DBDirectClient dbClient(opCtx());
         auto cursor = dbClient.find(std::move(findOp));
@@ -109,10 +136,11 @@ public:
         ASSERT_NE(doc->getBlockReads(), blockReads);
 
         DBDirectClient dbClient(opCtx());
-        dbClient.update(NamespaceString::kCollectionCriticalSectionsNamespace,
-                        BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()),
-                        BSON("$set" << BSON(CollectionCriticalSectionDocument::kBlockReadsFieldName
-                                            << blockReads)));
+        dbClient.update(
+            NamespaceString::kCollectionCriticalSectionsNamespace,
+            BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString_forTest()),
+            BSON("$set" << BSON(CollectionCriticalSectionDocument::kBlockReadsFieldName
+                                << blockReads)));
     }
 
     void deleteReadCriticalSectionDocument(const NamespaceString& nss, const BSONObj& reason) {
@@ -120,9 +148,10 @@ public:
         ASSERT(readCriticalSectionDocument(nss, reason));
 
         DBDirectClient dbClient(opCtx());
-        dbClient.remove(NamespaceString::kCollectionCriticalSectionsNamespace,
-                        BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()),
-                        false /* removeMany */);
+        dbClient.remove(
+            NamespaceString::kCollectionCriticalSectionsNamespace,
+            BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString_forTest()),
+            false /* removeMany */);
     }
 
     void assertCriticalSectionCatchUpEnteredInMemory(const NamespaceString& nss) {
@@ -618,8 +647,9 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
     {
         WriteUnitOfWork wuow(opCtx());
         AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
-        opObserver().aboutToDelete(opCtx(), criticalSectionColl(), doc.toBSON());
-        opObserver().onDelete(opCtx(), criticalSectionColl(), kUninitializedStmtId, {});
+        OplogDeleteEntryArgs args;
+        opObserver().aboutToDelete(opCtx(), criticalSectionColl(), doc.toBSON(), &args);
+        opObserver().onDelete(opCtx(), criticalSectionColl(), kUninitializedStmtId, args);
         wuow.commit();
     }
 
@@ -686,8 +716,9 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
     {
         WriteUnitOfWork wuow(opCtx());
         AutoGetCollection coll(opCtx(), collNss, MODE_IX);
-        opObserver().aboutToDelete(opCtx(), criticalSectionColl(), doc.toBSON());
-        opObserver().onDelete(opCtx(), criticalSectionColl(), kUninitializedStmtId, {});
+        OplogDeleteEntryArgs args;
+        opObserver().aboutToDelete(opCtx(), criticalSectionColl(), doc.toBSON(), &args);
+        opObserver().onDelete(opCtx(), criticalSectionColl(), kUninitializedStmtId, args);
         wuow.commit();
     }
 

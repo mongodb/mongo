@@ -29,21 +29,34 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <memory>
+#include <tuple>
+#include <utility>
+#include <vector>
+
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/async_rpc_targeter.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/assert_util_core.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
-#include <memory>
-#include <vector>
 
 
 namespace mongo {
@@ -70,7 +83,7 @@ public:
     /**
      * Update underlying shard targeter's view of topology on error.
      */
-    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) override final {
+    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) override {
         invariant(_shardFromLastResolve,
                   "Cannot propagate a remote command error to a ShardTargeter before calling "
                   "resolve and obtaining a shard.");

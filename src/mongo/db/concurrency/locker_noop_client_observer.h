@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/concurrency/locker_noop.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
@@ -48,10 +48,245 @@ public:
     void onDestroyClient(Client* client) final {}
 
     void onCreateOperationContext(OperationContext* opCtx) override {
-        opCtx->setLockState(std::make_unique<LockerNoop>());
+        opCtx->setLockState(std::make_unique<LockerNoop_DoNotUse>());
     }
 
     void onDestroyOperationContext(OperationContext* opCtx) final {}
+
+private:
+    /**
+     * Locker, which cannot be used to lock/unlock resources and just returns true for checks for
+     * whether a particular resource is locked. Do not use it for cases where actual locking
+     * behaviour is expected or locking is performed.
+     */
+    class LockerNoop_DoNotUse : public Locker {
+    public:
+        LockerNoop_DoNotUse() {}
+
+        virtual bool isNoop() const {
+            return true;
+        }
+
+        virtual ClientState getClientState() const {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual LockerId getId() const {
+            MONGO_UNREACHABLE;
+        }
+
+        stdx::thread::id getThreadId() const override {
+            MONGO_UNREACHABLE;
+        }
+
+        void updateThreadIdToCurrentThread() override {
+            MONGO_UNREACHABLE;
+        }
+
+        void unsetThreadId() override {
+            MONGO_UNREACHABLE;
+        }
+
+        void setSharedLocksShouldTwoPhaseLock(bool sharedLocksShouldTwoPhaseLock) override {
+            MONGO_UNREACHABLE;
+        }
+
+        void setMaxLockTimeout(Milliseconds maxTimeout) override {
+            MONGO_UNREACHABLE;
+        }
+
+        bool hasMaxLockTimeout() override {
+            MONGO_UNREACHABLE;
+        }
+
+        void unsetMaxLockTimeout() override {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual void lockGlobal(OperationContext* opCtx, LockMode mode, Date_t deadline) {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual void lockGlobal(LockMode mode, Date_t deadline) {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual bool unlockGlobal() {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual void beginWriteUnitOfWork() override {}
+
+        virtual void endWriteUnitOfWork() override {}
+
+        virtual bool inAWriteUnitOfWork() const {
+            return false;
+        }
+
+        virtual bool wasGlobalLockTakenForWrite() const {
+            return false;
+        }
+
+        virtual bool wasGlobalLockTakenInModeConflictingWithWrites() const {
+            return false;
+        }
+
+        virtual bool wasGlobalLockTaken() const {
+            return false;
+        }
+
+        virtual void setGlobalLockTakenInMode(LockMode mode) {}
+
+        virtual LockResult lockRSTLBegin(OperationContext* opCtx, LockMode mode) {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual void lockRSTLComplete(OperationContext* opCtx,
+                                      LockMode mode,
+                                      Date_t deadline,
+                                      const LockTimeoutCallback& onTimeout) {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual bool unlockRSTLforPrepare() {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual void lock(OperationContext* opCtx,
+                          ResourceId resId,
+                          LockMode mode,
+                          Date_t deadline) {}
+
+        virtual void lock(ResourceId resId, LockMode mode, Date_t deadline) {}
+
+        virtual void downgrade(ResourceId resId, LockMode newMode) {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual bool unlock(ResourceId resId) {
+            return true;
+        }
+
+        virtual LockMode getLockMode(ResourceId resId) const {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual bool isLockHeldForMode(ResourceId resId, LockMode mode) const {
+            return true;
+        }
+
+        virtual bool isDbLockedForMode(const DatabaseName& dbName, LockMode mode) const {
+            return true;
+        }
+
+        virtual bool isCollectionLockedForMode(const NamespaceString& nss, LockMode mode) const {
+            return true;
+        }
+
+        virtual ResourceId getWaitingResource() const {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual void getLockerInfo(LockerInfo* lockerInfo,
+                                   boost::optional<SingleThreadedLockStats> lockStatsBase) const {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual boost::optional<LockerInfo> getLockerInfo(
+            boost::optional<SingleThreadedLockStats> lockStatsBase) const {
+            return boost::none;
+        }
+
+        virtual void saveLockStateAndUnlock(LockSnapshot* stateOut) {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore) {
+            MONGO_UNREACHABLE;
+        }
+        virtual void restoreLockState(const LockSnapshot& stateToRestore) {
+            MONGO_UNREACHABLE;
+        }
+
+        void releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) override {
+            MONGO_UNREACHABLE;
+        }
+
+        void restoreWriteUnitOfWorkAndLock(OperationContext* opCtx,
+                                           const LockSnapshot& stateToRestore) override {
+            MONGO_UNREACHABLE;
+        };
+
+        void releaseWriteUnitOfWork(WUOWLockSnapshot* stateOut) override {
+            MONGO_UNREACHABLE;
+        }
+
+        void restoreWriteUnitOfWork(const WUOWLockSnapshot& stateToRestore) override {
+            MONGO_UNREACHABLE;
+        };
+
+        virtual void releaseTicket() {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual void reacquireTicket(OperationContext* opCtx) {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual bool hasReadTicket() const {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual bool hasWriteTicket() const {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual void dump() const {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual bool isW() const {
+            return false;
+        }
+
+        virtual bool isR() const {
+            MONGO_UNREACHABLE;
+        }
+
+        virtual bool isLocked() const {
+            // This is necessary because replication makes decisions based on the answer to this,
+            // and we wrote unit tests to test the behavior specifically when this returns "false".
+            return false;
+        }
+
+        virtual bool isWriteLocked() const {
+            return true;
+        }
+
+        virtual bool isReadLocked() const {
+            return true;
+        }
+
+        virtual bool isRSTLExclusive() const {
+            return true;
+        }
+
+        virtual bool isRSTLLocked() const {
+            return true;
+        }
+
+        virtual bool hasLockPending() const {
+            MONGO_UNREACHABLE;
+        }
+
+        bool isGlobalLockedRecursively() override {
+            return false;
+        }
+
+        bool canSaveLockState() override {
+            return false;
+        }
+    };
 };
 
 /**

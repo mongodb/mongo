@@ -29,6 +29,12 @@
 
 #include "mongo/db/catalog/validate_results.h"
 
+#include <cstddef>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+
 namespace mongo {
 
 void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj, bool debugging) const {

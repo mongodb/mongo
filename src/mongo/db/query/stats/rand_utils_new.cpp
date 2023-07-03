@@ -30,13 +30,16 @@
 #include "mongo/db/query/stats/rand_utils_new.h"
 
 #include <algorithm>
-#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
 #include <fmt/format.h>
+#include <limits>
+#include <set>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::stats {

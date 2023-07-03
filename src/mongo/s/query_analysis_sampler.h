@@ -29,12 +29,23 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <map>
+#include <mutex>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/periodic_runner.h"
+#include "mongo/util/tick_source.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -133,7 +144,7 @@ public:
             return _collUuid;
         }
 
-        double getRate() const {
+        double getSamplesPerSecond() const {
             return _numTokensPerSecond;
         }
 
@@ -153,7 +164,7 @@ public:
          * Sets a new rate. Causes the bucket to be refilled with tokens created since last refill
          * time according to the previous rate.
          */
-        void refreshRate(double numTokensPerSecond);
+        void refreshSamplesPerSecond(double numTokensPerSecond);
 
     private:
         /**

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * findAndModify_update.js
  *
@@ -8,7 +6,7 @@
  * selected based on 'query' and 'sort' specifications, and updated
  * using either the $min or $max operator.
  */
-var $config = (function() {
+export const $config = (function() {
     var data = {
         numDocsPerThread: 3,  // >1 for 'sort' to be meaningful
         shardKey: {tid: 1}

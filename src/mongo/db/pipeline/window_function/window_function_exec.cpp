@@ -28,6 +28,20 @@
  */
 
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
+
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <variant>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/db/pipeline/document_source_set_window_fields.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_derivative.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_first_last.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_linear_fill.h"
@@ -35,7 +49,9 @@
 #include "mongo/db/pipeline/window_function/window_function_exec_non_removable_range.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_removable_document.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_removable_range.h"
+#include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/pipeline/window_function/window_function_shift.h"
+#include "mongo/stdx/variant.h"
 
 namespace mongo {
 

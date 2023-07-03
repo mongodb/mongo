@@ -30,12 +30,18 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/authz_manager_external_state_local.h"
 #include "mongo/db/auth/builtin_roles.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 

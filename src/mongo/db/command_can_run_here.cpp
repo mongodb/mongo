@@ -27,13 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/command_can_run_here.h"
-
 #include "mongo/client/read_preference.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 

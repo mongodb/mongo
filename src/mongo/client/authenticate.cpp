@@ -28,28 +28,41 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <utility>
+#include <vector>
 
-#include "mongo/client/authenticate.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_command_constants.h"
+#include "mongo/db/auth/user.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/wire_version.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/password_digest.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
@@ -215,7 +228,7 @@ Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
     }
 
     BSONObjBuilder builder;
-    builder.append("ismaster", 1);
+    builder.append("hello", 1);
     builder.append("saslSupportedMechs", username.getUnambiguousName());
     if (stepDownBehavior == StepDownBehavior::kKeepConnectionOpen) {
         builder.append("hangUpOnStepDown", false);
@@ -299,11 +312,12 @@ StringData getSaslCommandUserFieldName() {
 
 namespace {
 
-StatusWith<std::shared_ptr<SaslClientSession>> _speculateSaslStart(BSONObjBuilder* isMaster,
-                                                                   const std::string& mechanism,
-                                                                   const HostAndPort& host,
-                                                                   StringData authDB,
-                                                                   BSONObj params) {
+StatusWith<std::shared_ptr<SaslClientSession>> _speculateSaslStart(
+    BSONObjBuilder* helloRequestBuilder,
+    const std::string& mechanism,
+    const HostAndPort& host,
+    StringData authDB,
+    BSONObj params) {
     if (mechanism == kMechanismSaslPlain) {
         return {ErrorCodes::BadValue, "PLAIN mechanism not supported with speculativeSaslStart"};
     }
@@ -325,13 +339,13 @@ StatusWith<std::shared_ptr<SaslClientSession>> _speculateSaslStart(BSONObjBuilde
     saslStart.append("mechanism", mechanism);
     saslStart.appendBinData("payload", int(payload.size()), BinDataGeneral, payload.c_str());
     saslStart.append("db", authDB);
-    isMaster->append(kSpeculativeAuthenticate, saslStart.obj());
+    helloRequestBuilder->append(kSpeculativeAuthenticate, saslStart.obj());
 
     return session;
 }
 
 StatusWith<SpeculativeAuthType> _speculateAuth(
-    BSONObjBuilder* isMaster,
+    BSONObjBuilder* helloRequestBuilder,
     const std::string& mechanism,
     const HostAndPort& host,
     StringData authDB,
@@ -339,17 +353,18 @@ StatusWith<SpeculativeAuthType> _speculateAuth(
     std::shared_ptr<SaslClientSession>* saslClientSession) {
     if (mechanism == kMechanismMongoX509) {
         // MONGODB-X509
-        isMaster->append(kSpeculativeAuthenticate,
-                         BSON(kAuthenticateCommand << "1" << saslCommandMechanismFieldName
-                                                   << mechanism << saslCommandUserDBFieldName
-                                                   << "$external"));
+        helloRequestBuilder->append(kSpeculativeAuthenticate,
+                                    BSON(kAuthenticateCommand
+                                         << "1" << saslCommandMechanismFieldName << mechanism
+                                         << saslCommandUserDBFieldName << "$external"));
         return SpeculativeAuthType::kAuthenticate;
     }
 
     // Proceed as if this is a SASL mech and we either have a password,
     // or we don't need one (e.g. MONGODB-AWS).
     // Failure is absolutely an option.
-    auto swSaslClientSession = _speculateSaslStart(isMaster, mechanism, host, authDB, params);
+    auto swSaslClientSession =
+        _speculateSaslStart(helloRequestBuilder, mechanism, host, authDB, params);
     if (!swSaslClientSession.isOK()) {
         return swSaslClientSession.getStatus();
     }
@@ -368,7 +383,7 @@ std::string getBSONString(BSONObj container, StringData field) {
 }
 }  // namespace
 
-SpeculativeAuthType speculateAuth(BSONObjBuilder* isMasterRequest,
+SpeculativeAuthType speculateAuth(BSONObjBuilder* helloRequestBuilder,
                                   const MongoURI& uri,
                                   std::shared_ptr<SaslClientSession>* saslClientSession) {
     auto mechanism = uri.getOption("authMechanism").get_value_or(kMechanismScramSha256.toString());
@@ -380,7 +395,7 @@ SpeculativeAuthType speculateAuth(BSONObjBuilder* isMasterRequest,
 
     auto params = std::move(optParams.value());
 
-    auto ret = _speculateAuth(isMasterRequest,
+    auto ret = _speculateAuth(helloRequestBuilder,
                               mechanism,
                               uri.getServers().front(),
                               uri.getAuthenticationDatabase(),
@@ -396,7 +411,7 @@ SpeculativeAuthType speculateAuth(BSONObjBuilder* isMasterRequest,
 
 SpeculativeAuthType speculateInternalAuth(
     const HostAndPort& remoteHost,
-    BSONObjBuilder* isMasterRequest,
+    BSONObjBuilder* helloRequestBuilder,
     std::shared_ptr<SaslClientSession>* saslClientSession) try {
     auto params = getInternalAuthParams(0, kMechanismScramSha256.toString());
     if (params.isEmpty()) {
@@ -406,8 +421,8 @@ SpeculativeAuthType speculateInternalAuth(
     auto mechanism = getBSONString(params, saslCommandMechanismFieldName);
     auto authDB = getBSONString(params, saslCommandUserDBFieldName);
 
-    auto ret =
-        _speculateAuth(isMasterRequest, mechanism, remoteHost, authDB, params, saslClientSession);
+    auto ret = _speculateAuth(
+        helloRequestBuilder, mechanism, remoteHost, authDB, params, saslClientSession);
     if (!ret.isOK()) {
         return SpeculativeAuthType::kNone;
     }

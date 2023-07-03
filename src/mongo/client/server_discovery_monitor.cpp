@@ -29,18 +29,41 @@
 
 #include "mongo/client/server_discovery_monitor.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
 #include <algorithm>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <iterator>
+#include <ratio>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/client/replica_set_monitor.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/replica_set_monitor_server_parameters.h"
-#include "mongo/client/sdam/sdam.h"
+#include "mongo/client/sdam/server_description.h"
+#include "mongo/client/sdam/topology_description.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -241,7 +264,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
     });
 
     BSONObjBuilder bob;
-    bob.append("isMaster", 1);
+    bob.append("hello", 1);
     bob.append("maxAwaitTimeMS", maxAwaitTimeMS);
     bob.append("topologyVersion", _topologyVersion->toBSON());
 
@@ -301,7 +324,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
 
 StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_scheduleSingleHello() {
     BSONObjBuilder bob;
-    bob.append("isMaster", 1);
+    bob.append("hello", 1);
     if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
         WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
     }

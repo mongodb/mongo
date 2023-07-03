@@ -29,17 +29,33 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_catalog.h"
-
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_build_interceptor.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 
 namespace mongo {
@@ -47,7 +63,6 @@ namespace mongo {
 class Client;
 class Collection;
 class CollectionPtr;
-
 class IndexDescriptor;
 struct InsertDeleteOptions;
 
@@ -117,9 +132,18 @@ public:
 
     const IndexCatalogEntry* getEntry(const IndexDescriptor* desc) const override;
 
-    std::shared_ptr<const IndexCatalogEntry> getEntryShared(const IndexDescriptor*) const override;
+    IndexCatalogEntry* getWritableEntryByName(
+        OperationContext* opCtx,
+        StringData name,
+        InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) override;
 
-    std::shared_ptr<IndexCatalogEntry> getEntryShared(const IndexDescriptor*) override;
+    IndexCatalogEntry* getWritableEntryByKeyPatternAndOptions(
+        OperationContext* opCtx,
+        const BSONObj& key,
+        const BSONObj& indexSpec,
+        InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) override;
+
+    std::shared_ptr<const IndexCatalogEntry> getEntryShared(const IndexDescriptor*) const override;
 
     std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllReadyEntriesShared() const override;
 
@@ -129,7 +153,7 @@ public:
 
     IndexCatalogEntry* createIndexEntry(OperationContext* opCtx,
                                         Collection* collection,
-                                        std::unique_ptr<IndexDescriptor> descriptor,
+                                        IndexDescriptor&& descriptor,
                                         CreateIndexEntryFlags flags) override;
 
     StatusWith<BSONObj> createIndexOnEmptyCollection(OperationContext* opCtx,
@@ -150,7 +174,8 @@ public:
     std::vector<BSONObj> removeExistingIndexesNoChecks(
         OperationContext* opCtx,
         const CollectionPtr& collection,
-        const std::vector<BSONObj>& indexSpecsToBuild) const override;
+        const std::vector<BSONObj>& indexSpecsToBuild,
+        bool removeInProgressIndexBuilds) const override;
 
     void dropIndexes(OperationContext* opCtx,
                      Collection* collection,
@@ -162,17 +187,13 @@ public:
                         bool includingIdIndex,
                         std::function<void(const IndexDescriptor*)> onDropFn) override;
 
-    Status dropIndex(OperationContext* opCtx,
-                     Collection* collection,
-                     const IndexDescriptor* desc) override;
-
     Status resetUnfinishedIndexForRecovery(OperationContext* opCtx,
                                            Collection* collection,
-                                           const IndexDescriptor* desc) override;
+                                           IndexCatalogEntry* entry) override;
 
     Status dropUnfinishedIndex(OperationContext* opCtx,
                                Collection* collection,
-                               const IndexDescriptor* desc) override;
+                               IndexCatalogEntry* entry) override;
 
     Status dropIndexEntry(OperationContext* opCtx,
                           Collection* collection,
@@ -339,6 +360,13 @@ private:
                            const CollectionPtr& collection,
                            long long numIndexesInCollectionCatalogEntry,
                            const std::vector<std::string>& indexNamesToDrop);
+
+    /**
+     * Returns a writable IndexCatalogEntry copy that will be returned by current and future calls
+     * to this function. Any previous IndexCatalogEntry/IndexDescriptor pointers that were returned
+     * may be invalidated.
+     */
+    IndexCatalogEntry* _getWritableEntry(const IndexDescriptor* descriptor);
 
     IndexCatalogEntryContainer _readyIndexes;
     IndexCatalogEntryContainer _buildingIndexes;

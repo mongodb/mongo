@@ -36,7 +36,9 @@
 #include "mongo/db/auth/access_checks_gen.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/action_type_gen.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -56,6 +58,7 @@ namespace mongo {
 class AuthorizationContract {
 public:
     AuthorizationContract() = default;
+    AuthorizationContract(bool isTestModeEnabled) : _isTestModeEnabled(isTestModeEnabled){};
 
     template <typename Checks, typename Privileges>
     AuthorizationContract(const Checks& checks, const Privileges& privileges) {
@@ -110,6 +113,9 @@ private:
 
     // Set of privileges performed per resource pattern type
     std::array<ActionSet, kNumMatchTypeEnum> _privilegeChecks;
+
+    // If false accounting and mutex guards are disabled
+    bool _isTestModeEnabled{true};
 };
 
 }  // namespace mongo

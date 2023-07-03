@@ -27,19 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <memory>
+#include <string>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/primary_only_service.h"
-#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/resharding_operation_time_gen.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
@@ -104,8 +117,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
 
         Response typedRun(OperationContext* opCtx) {

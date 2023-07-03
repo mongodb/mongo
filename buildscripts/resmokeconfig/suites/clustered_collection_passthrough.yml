@@ -60,9 +60,11 @@ selector:
   - jstests/core/**/index_bounds_pipe.js
   # Expects an index on _id to cover the query.
   - jstests/core/**/covered_index_simple_id.js
-  # TODO (SERVER-61259): $text not supported: "No query solutions"
+  # TODO (SERVER-78045): $text not supported: "No query solutions"
   - jstests/core/**/fts6.js
   - jstests/core/**/fts_projection.js
+  # Assumes there is one collection that is not clustered.
+  - jstests/core/find_with_resume_after_param.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
@@ -88,7 +90,5 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        # SBE is not compatible with clustered collections
-        internalQueryFrameworkControl: "forceClassicEngine"
         failpoint.clusterAllCollectionsByDefault: "{mode: 'alwaysOn'}"
     num_nodes: 2

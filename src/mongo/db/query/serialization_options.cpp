@@ -31,16 +31,26 @@
 
 #include "mongo/db/query/serialization_options.h"
 
-#include <boost/optional.hpp>
+#include <absl/container/node_hash_map.h>
 #include <string>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/query/explain_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -307,8 +317,10 @@ ArraySubtypeInfo getSubTypeFromValueArray(const Value& arrayVal) {
 
 }  // namespace
 
-// TODO SERVER-76329 use the new policy.
-const SerializationOptions SerializationOptions::kDefaultQueryShapeSerializeOptions =
+const SerializationOptions SerializationOptions::kRepresentativeQueryShapeSerializeOptions =
+    SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+
+const SerializationOptions SerializationOptions::kDebugQueryShapeSerializeOptions =
     SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
 
 // Overloads for BSONElem and Value.
@@ -364,25 +376,18 @@ Value SerializationOptions::serializeLiteral(const ImplicitValue& v) const {
 }
 
 std::string SerializationOptions::serializeFieldPathFromString(StringData path) const {
-    if (applyHmacToIdentifiers) {
-        // Some valid field names are considered invalid as a FieldPath (for example, fields
-        // like "foo.$bar" where a sub-component is prefixed with "$"). For now, if
-        // serializeFieldPath errors due to an "invalid" field name, we'll serialize that field
-        // name with this placeholder.
-        // TODO SERVER-75623 Implement full redaction for all field names and remove placeholder
+    if (transformIdentifiers) {
         try {
-            return serializeFieldPath(path);
+            return serializeFieldPath(FieldPath(path, false, false));
         } catch (DBException& ex) {
-            LOGV2_DEBUG(
-                7549808,
-                1,
-                "Failed to convert a path string to a FieldPath, so replacing with placeholder",
-                "pathString"_attr = path,
-                "failure"_attr = ex.toStatus());
-            return serializeFieldPath("dollarPlaceholder");
+            LOGV2_DEBUG(7549808,
+                        1,
+                        "Failed to convert a path string to a FieldPath",
+                        "pathString"_attr = path,
+                        "failure"_attr = ex.toStatus());
+            return serializeFieldPath("invalidFieldPathPlaceholder");
         }
     }
     return path.toString();
 }
-
 }  // namespace mongo

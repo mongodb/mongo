@@ -30,15 +30,19 @@
 
 #include "mongo/db/pipeline/document_source_change_stream.h"
 
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/bson/bson_helper.h"
-#include "mongo/db/feature_compatibility_version_documentation.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/change_stream_constants.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/db/basic_types.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
-#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
-#include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
@@ -47,19 +51,16 @@
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
-#include "mongo/db/pipeline/document_source_change_stream_split_large_event.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/resume_token.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/intrusive_counter.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

@@ -29,13 +29,29 @@
 
 #include "mongo/client/connection_pool.h"
 
-#include "mongo/client/authenticate.h"
-#include "mongo/client/mongo_uri.h"
+#include <boost/optional.hpp>
+#include <mutex>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/internal_auth.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/ssl_options.h"
 
 namespace mongo {
 namespace {
@@ -173,8 +189,8 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
             false,  // auto reconnect
             0,      // socket timeout
             {},     // MongoURI
-            [this, target](const executor::RemoteCommandResponse& isMasterReply) {
-                return _hook->validateHost(target, BSONObj(), isMasterReply);
+            [this, target](const executor::RemoteCommandResponse& helloReply) {
+                return _hook->validateHost(target, BSONObj(), helloReply);
             }));
     } else {
         conn.reset(new DBClientConnection());

@@ -31,22 +31,49 @@
  * This file tests db/exec/fetch.cpp.  Fetch goes to disk so we cannot test outside of a dbtest.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <cstddef>
 #include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/client/dbclient_cursor.h"
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace QueryStageFetch {
 
@@ -81,7 +108,7 @@ public:
         return "unittests.QueryStageFetch";
     }
     static NamespaceString nss() {
-        return NamespaceString(ns());
+        return NamespaceString::createNamespaceString_forTest(ns());
     }
 
 protected:
@@ -143,7 +170,7 @@ public:
         }
 
         auto fetchStage =
-            std::make_unique<FetchStage>(_expCtx.get(), &ws, std::move(mockStage), nullptr, coll);
+            std::make_unique<FetchStage>(_expCtx.get(), &ws, std::move(mockStage), nullptr, &coll);
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state;
@@ -205,12 +232,12 @@ public:
         BSONObj filterObj = BSON("foo" << 6);
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(filterObj, _expCtx);
-        verify(statusWithMatcher.isOK());
+        MONGO_verify(statusWithMatcher.isOK());
         unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
         // Matcher requires that foo==6 but we only have data with foo==5.
         auto fetchStage = std::make_unique<FetchStage>(
-            _expCtx.get(), &ws, std::move(mockStage), filterExpr.get(), coll);
+            _expCtx.get(), &ws, std::move(mockStage), filterExpr.get(), &coll);
 
         // First call should return a fetch request as it's not in memory.
         WorkingSetID id = WorkingSet::INVALID_ID;

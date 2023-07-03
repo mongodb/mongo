@@ -35,6 +35,7 @@
 #include <limits>
 #include <memory>
 #include <random>
+#include <utility>
 
 namespace mongo {
 

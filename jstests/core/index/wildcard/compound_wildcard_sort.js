@@ -5,6 +5,11 @@
  *   # We may choose a different plan if other indexes are created, which would break the test.
  *   assumes_no_implicit_index_creation,
  *   assumes_read_concern_local,
+ *   # Some expected query plans require the multi-planner to choose the optimal plan that uses a
+ *   # more efficient CWI (non-generic). Sharded suites could mislead the multi-planner to choose a
+ *   # worse CWI because the planner may not run sufficient trials if there's no enough docs in some
+ *   # shard.
+ *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   featureFlagCompoundWildcardIndexes,
  *   requires_fcv_70,
@@ -177,22 +182,18 @@ function testIndexesForWildcardField(wildcardField, subFields) {
 
         const valid = getValidKeyPatternPrefixesForSort(keyPattern);
         for (const kp of valid) {
-            // CWI with regular prefix cannot provide blocking sort for sort orders containing the
-            // wildcard field.
-            if (!keyPattern.hasOwnProperty('pre')) {
-                {
-                    // Test sort on compound fields + first wildcard field (number).
-                    const sort = replaceFieldWith(kp, wildcardField, [subFields[0]]);
-                    const wildFieldPred = {[subFields[0]]: {$lte: 43}};
-                    runSortTestForWildcardField({index: keyPattern, sort, wildFieldPred});
-                }
+            {
+                // Test sort on compound fields + first wildcard field (number).
+                const sort = replaceFieldWith(kp, wildcardField, [subFields[0]]);
+                const wildFieldPred = {[subFields[0]]: {$lte: 43}};
+                runSortTestForWildcardField({index: keyPattern, sort, wildFieldPred});
+            }
 
-                {
-                    // Test sort on compound fields + second wildcard field (string).
-                    const sort = replaceFieldWith(kp, wildcardField, [subFields[1]]);
-                    const wildFieldPred = {[subFields[1]]: {$gt: ""}};
-                    runSortTestForWildcardField({index: keyPattern, sort, wildFieldPred});
-                }
+            {
+                // Test sort on compound fields + second wildcard field (string).
+                const sort = replaceFieldWith(kp, wildcardField, [subFields[1]]);
+                const wildFieldPred = {[subFields[1]]: {$gt: ""}};
+                runSortTestForWildcardField({index: keyPattern, sort, wildFieldPred});
             }
 
             {

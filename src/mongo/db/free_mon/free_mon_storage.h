@@ -30,7 +30,9 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/free_mon/free_mon_storage_gen.h"
 #include "mongo/db/operation_context.h"

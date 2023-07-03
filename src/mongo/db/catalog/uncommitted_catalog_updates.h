@@ -29,11 +29,24 @@
 
 #pragma once
 
+#include <boost/container/small_vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <vector>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/views_for_database.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/views/view.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -139,7 +152,8 @@ public:
      * collection must be used to drop an index.
      */
     static bool isTwoPhaseCommitEntry(const Entry& entry) {
-        return (entry.action == Entry::Action::kWritableCollection ||
+        return (entry.action == Entry::Action::kCreatedCollection ||
+                entry.action == Entry::Action::kWritableCollection ||
                 entry.action == Entry::Action::kRenamedCollection ||
                 entry.action == Entry::Action::kDroppedCollection ||
                 entry.action == Entry::Action::kRecreatedCollection);
@@ -251,6 +265,38 @@ public:
         return _entries.empty();
     }
 
+    /**
+     * Flag to check of callbacks with the RecoveryUnit has been registered for this instance.
+     */
+    bool hasRegisteredWithRecoveryUnit() const {
+        return _callbacksRegisteredWithRecoveryUnit;
+    }
+
+    /**
+     * Mark that callbacks with the RecoveryUnit has been registered for this instance.
+     */
+    void markRegisteredWithRecoveryUnit() {
+        invariant(!_callbacksRegisteredWithRecoveryUnit);
+        _callbacksRegisteredWithRecoveryUnit = true;
+    }
+
+    /**
+     * Flag to check if precommit has executed successfully and all uncommitted collections have
+     * been registered as pending commit
+     */
+    bool hasPrecommitted() const {
+        return _preCommitted;
+    }
+
+    /**
+     * Mark that precommit has executed successfully and all uncommitted collections have
+     * been registered as pending commit
+     */
+    void markPrecommitted() {
+        invariant(!_preCommitted);
+        _preCommitted = true;
+    }
+
     static UncommittedCatalogUpdates& get(OperationContext* opCtx);
 
 private:
@@ -269,6 +315,9 @@ private:
     std::vector<Entry> _entries;
 
     stdx::unordered_set<DatabaseName> _ignoreExternalViewChanges;
+
+    bool _callbacksRegisteredWithRecoveryUnit = false;
+    bool _preCommitted = false;
 };
 
 /**
@@ -312,6 +361,7 @@ public:
 private:
     struct Entry {
         std::shared_ptr<const Collection> collection;
+        // TODO(SERVER-78226): Replace `nss` and `uuid` with a type which can express "nss and uuid"
         boost::optional<NamespaceString> nss;
         boost::optional<UUID> uuid;
     };

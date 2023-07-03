@@ -28,10 +28,35 @@
  */
 
 #include "mongo/bson/util/bsoncolumn.h"
+
+#include <absl/numeric/int128.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <array>
+#include <cstdint>
+#include <cstring>
+#include <forward_list>
+#include <limits>
+#include <string>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/simple8b_builder.h"
 #include "mongo/bson/util/simple8b_type_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -6388,7 +6413,7 @@ TEST_F(BSONColumnTest, Intermediate) {
 #if !defined(_MSC_VER) || _MSC_VER >= 1929
 TEST_F(BSONColumnTest, FTDCRoundTrip) {
     StringData compressedBase64Encoded = {
-#include "mongo/bson/util/bson_column_compressed_data.inl"
+#include "mongo/bson/util/bson_column_compressed_data.inl"  // IWYU pragma: keep
     };
 
     std::string compressed = base64::decode(compressedBase64Encoded);

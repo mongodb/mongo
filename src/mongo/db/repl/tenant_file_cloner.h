@@ -31,14 +31,35 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <iosfwd>
 #include <memory>
+#include <string>
+#include <sys/types.h>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_connection.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/repl/base_cloner.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/db/repl/tenant_base_cloner.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/progress_meter.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::repl {
 

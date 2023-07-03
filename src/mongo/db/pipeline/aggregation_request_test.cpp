@@ -27,22 +27,46 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <fmt/format.h>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "mongo/db/pipeline/aggregation_request_helper.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -789,6 +813,44 @@ TEST(AggregationRequestTest, ShouldIgnoreQueryOptions) {
         "{}, $db: 'a'}");
     ASSERT_OK(aggregation_request_helper::parseFromBSONForTests(nss, inputBson).getStatus());
 }
+
+TEST(AggregationRequestTest, ShouldRejectRequestResumeTokenIfNonBooleanType) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               true);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
+    const BSONObj validRequest = fromjson(
+        "{aggregate: 'collection',"
+        "pipeline: [],"
+        "$_requestResumeToken: true,"
+        "hint: {$natural: 1},"
+        "$db: 'a', "
+        "cursor: {}}");
+    const BSONObj nonBoolReshardingResumeToken = fromjson("{$_requestResumeToken: 'yes'}");
+    aggregationRequestParseFailureHelper(
+        nss, validRequest, nonBoolReshardingResumeToken, ErrorCodes::TypeMismatch);
+}
+
+TEST(AggregationRequestTest, ShouldRejectRequestResumeTokenIfOplogNss) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               true);
+    NamespaceString nonOplogNss = NamespaceString::createNamespaceString_forTest("a.collection");
+    const BSONObj validRequest = fromjson(
+        "{aggregate: 'collection',"
+        "pipeline: [],"
+        "$_requestResumeToken: true,"
+        "hint: {$natural: 1},"
+        "$db: 'a', "
+        "cursor: {}}");
+    ASSERT_OK(
+        aggregation_request_helper::parseFromBSONForTests(nonOplogNss, validRequest).getStatus());
+
+    NamespaceString oplogNss = NamespaceString::createNamespaceString_forTest("local.oplog.rs");
+    auto status =
+        aggregation_request_helper::parseFromBSONForTests(oplogNss, validRequest).getStatus();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status, ErrorCodes::FailedToParse);
+}
+
 
 }  // namespace
 }  // namespace mongo

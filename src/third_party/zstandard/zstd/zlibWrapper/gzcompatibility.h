@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2021, Przemyslaw Skibinski, Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -11,10 +11,10 @@
 
 
 #if ZLIB_VERNUM <= 0x1240
-ZEXTERN int ZEXPORT gzclose_r OF((gzFile file));
-ZEXTERN int ZEXPORT gzclose_w OF((gzFile file));
-ZEXTERN int ZEXPORT gzbuffer OF((gzFile file, unsigned size));
-ZEXTERN z_off_t ZEXPORT gzoffset OF((gzFile file));
+ZEXTERN int ZEXPORT gzclose_r _Z_OF((gzFile file));
+ZEXTERN int ZEXPORT gzclose_w _Z_OF((gzFile file));
+ZEXTERN int ZEXPORT gzbuffer _Z_OF((gzFile file, unsigned size));
+ZEXTERN z_off_t ZEXPORT gzoffset _Z_OF((gzFile file));
 
 #if !defined(_WIN32) && defined(Z_LARGE64)
 #  define z_off64_t off64_t
@@ -40,7 +40,7 @@ struct gzFile_s {
 #if ZLIB_VERNUM <= 0x1270
 #if defined(_WIN32) && !defined(Z_SOLO)
 #    include <stddef.h>         /* for wchar_t */
-ZEXTERN gzFile         ZEXPORT gzopen_w OF((const wchar_t *path,
+ZEXTERN gzFile         ZEXPORT gzopen_w _Z_OF((const wchar_t *path,
                                             const char *mode));
 #endif
 #endif
@@ -61,8 +61,8 @@ ZEXTERN gzFile         ZEXPORT gzopen_w OF((const wchar_t *path,
 #  endif
 #  undef z_longlong
 #endif
-ZEXTERN z_size_t ZEXPORT gzfread OF((voidp buf, z_size_t size, z_size_t nitems,
+ZEXTERN z_size_t ZEXPORT gzfread _Z_OF((voidp buf, z_size_t size, z_size_t nitems,
                                      gzFile file));
-ZEXTERN z_size_t ZEXPORT gzfwrite OF((voidpc buf, z_size_t size,
+ZEXTERN z_size_t ZEXPORT gzfwrite _Z_OF((voidpc buf, z_size_t size,
                                       z_size_t nitems, gzFile file));
 #endif

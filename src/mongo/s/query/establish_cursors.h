@@ -31,11 +31,18 @@
 
 #include <boost/optional.hpp>
 #include <memory>
+#include <set>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/cursor_id.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/client/shard.h"

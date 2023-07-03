@@ -29,14 +29,35 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/bson/bson_validate.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_validation.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/column_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -82,10 +103,8 @@ public:
     }
 
     BSONValidateMode getBSONValidateMode() const {
-        return feature_flags::gExtendValidateCommand.isEnabled(
-                   serverGlobalParams.featureCompatibility) &&
-                (_mode == ValidateMode::kForegroundCheckBSON ||
-                 _mode == ValidateMode::kBackgroundCheckBSON || isFullValidation())
+        return isFullValidation() || _mode == ValidateMode::kForegroundCheckBSON ||
+                _mode == ValidateMode::kBackgroundCheckBSON
             ? BSONValidateMode::kFull
             : BSONValidateMode::kExtended;
     }
@@ -136,8 +155,8 @@ public:
         return _collection;
     }
 
-    const std::vector<std::shared_ptr<const IndexCatalogEntry>>& getIndexes() const {
-        return _indexes;
+    const std::vector<std::string>& getIndexIdents() const {
+        return _indexIdents;
     }
 
     const StringSet& getSkippedIndexes() const {
@@ -248,11 +267,11 @@ private:
     // constructor
     boost::optional<UUID> _uuid;
 
-    // Stores the indexes that are going to be validated. When validate yields periodically we'll
-    // use this list to determine if validation should abort when an existing index that was
+    // Stores the index idents that are going to be validated. When validate yields periodically
+    // we'll use this list to determine if validation should abort when an existing index that was
     // being validated is dropped. Additionally we'll use this list to determine which indexes to
     // skip during validation that may have been created in-between yields.
-    std::vector<std::shared_ptr<const IndexCatalogEntry>> _indexes;
+    std::vector<std::string> _indexIdents;
 
     // Shared cursors to be used during validation, created in 'initializeCursors()'.
     StringMap<std::unique_ptr<SortedDataInterfaceThrottleCursor>> _indexCursors;

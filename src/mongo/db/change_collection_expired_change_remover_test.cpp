@@ -27,33 +27,59 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <memory>
+#include <vector>
 
-#include "mongo/db/change_collection_expired_documents_remover.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/change_collection_truncate_markers.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
-#include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/change_streams_cluster_parameter_gen.h"
-#include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
-#include "pipeline/change_stream_test_helpers.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

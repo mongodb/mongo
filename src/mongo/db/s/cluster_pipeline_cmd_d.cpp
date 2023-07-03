@@ -27,10 +27,34 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/commands/cluster_pipeline_cmd.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
 
 namespace mongo {
 namespace {
@@ -45,12 +69,15 @@ struct ClusterPipelineCommandD {
         return kNoApiVersions;
     }
 
-    static void doCheckAuthorization(OperationContext* opCtx, const PrivilegeVector& privileges) {
+    static void doCheckAuthorization(OperationContext* opCtx,
+                                     const OpMsgRequest& opMsgRequest,
+                                     const PrivilegeVector& privileges) {
         uassert(ErrorCodes::Unauthorized,
                 "Unauthorized",
                 AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::internal));
+                    ->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(opMsgRequest.getValidatedTenantId()),
+                        ActionType::internal));
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {

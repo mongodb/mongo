@@ -28,12 +28,25 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <memory>
+#include <utility>
+#include <vector>
 
-#include "mongo/bson/bsonobjbuilder.h"
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/abt/abt_translate_bm_fixture.h"
 #include "mongo/db/pipeline/abt/canonical_query_translation.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/cqf_command_utils.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/query_test_service_context.h"
 
 namespace mongo::optimizer {
@@ -56,7 +69,7 @@ public:
                                BSONObj projectSpec) override final {
         QueryTestServiceContext testServiceContext;
         auto opCtx = testServiceContext.makeOperationContext();
-        auto nss = NamespaceString("test.bm");
+        auto nss = NamespaceString::createNamespaceString_forTest("test.bm");
 
         Metadata metadata{{}};
         auto prefixId = PrefixId::createForTests();

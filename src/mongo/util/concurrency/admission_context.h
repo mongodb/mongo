@@ -28,6 +28,9 @@
  */
 #pragma once
 
+#include <cstdint>
+#include <type_traits>
+
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/tick_source.h"

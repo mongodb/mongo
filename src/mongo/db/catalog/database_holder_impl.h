@@ -29,9 +29,14 @@
 
 #pragma once
 
-#include "mongo/db/catalog/database_holder.h"
+#include <boost/optional/optional.hpp>
+#include <vector>
 
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/string_map.h"
 
@@ -55,12 +60,12 @@ public:
 
     void closeAll(OperationContext* opCtx) override;
 
-    std::set<DatabaseName> getNamesWithConflictingCasing(const DatabaseName& dbName) override;
+    boost::optional<DatabaseName> getNameWithConflictingCasing(const DatabaseName& dbName) override;
 
     std::vector<DatabaseName> getNames() override;
 
 private:
-    std::set<DatabaseName> _getNamesWithConflictingCasing_inlock(const DatabaseName& dbName);
+    boost::optional<DatabaseName> _getNameWithConflictingCasing_inlock(const DatabaseName& dbName);
 
     typedef stdx::unordered_map<DatabaseName, Database*> DBs;
     mutable SimpleMutex _m;

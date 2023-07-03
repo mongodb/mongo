@@ -27,8 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/db/jsobj.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/mutable/mutable_bson_test_utils.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 namespace {
 

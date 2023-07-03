@@ -27,15 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/db/commands/map_reduce_gen.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
-
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

@@ -27,18 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
-#include "mongo/db/update/pullall_node.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/json.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/element.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/update/pullall_node.h"
+#include "mongo/db/update/update_executor.h"
 #include "mongo/db/update/update_node_test_fixture.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {
@@ -94,6 +101,7 @@ TEST_F(PullAllNodeTest, TargetNotFound) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -112,6 +120,7 @@ TEST_F(PullAllNodeTest, TargetArrayElementNotFound) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: [1, 2]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -145,6 +154,7 @@ TEST_F(PullAllNodeTest, ApplyWithSingleNumber) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: ['a', {r: 1, b: 2}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -177,6 +187,7 @@ TEST_F(PullAllNodeTest, ApplyWithElementNotPresentInArray) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -194,6 +205,7 @@ TEST_F(PullAllNodeTest, ApplyWithWithTwoElements) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: [{r: 1, b: 2}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -211,6 +223,7 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElements) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -228,6 +241,7 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsButOutOfOrder) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -245,6 +259,7 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsAndThenSome) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -265,6 +280,7 @@ TEST_F(PullAllNodeTest, ApplyWithCollator) {
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: ['baz']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 

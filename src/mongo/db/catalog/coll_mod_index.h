@@ -27,12 +27,19 @@
  *    it in the license file.
  */
 
+#include <boost/optional/optional.hpp>
+#include <list>
+#include <set>
+
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/key_string.h"
 
@@ -77,7 +84,7 @@ std::list<std::set<RecordId>> scanIndexForDuplicates(
     OperationContext* opCtx,
     const CollectionPtr& collection,
     const IndexDescriptor* idx,
-    boost::optional<KeyString::Value> firstKeyString = {});
+    boost::optional<key_string::Value> firstKeyString = {});
 
 /**
  * Builds a BSONArray of the violations with duplicate index keys and returns the formatted error

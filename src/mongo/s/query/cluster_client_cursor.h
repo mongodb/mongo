@@ -234,6 +234,9 @@ public:
 
     void incrementCursorMetrics(OpDebug::AdditiveMetrics newMetrics) {
         _metrics.add(newMetrics);
+        if (!_firstResponseExecutionTime) {
+            _firstResponseExecutionTime = _metrics.executionTime;
+        }
     }
 
     //
@@ -267,15 +270,18 @@ public:
     virtual bool shouldOmitDiagnosticInformation() const = 0;
 
     /**
-     * Returns and releases ownership of the RequestShapifier associated with the request this
+     * Returns and releases ownership of the KeyGenerator associated with the request this
      * cursor is handling.
      */
-    virtual std::unique_ptr<query_stats::RequestShapifier> getRequestShapifier() = 0;
+    virtual std::unique_ptr<query_stats::KeyGenerator> getKeyGenerator() = 0;
 
 protected:
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
     // Useful for diagnostics like queryStats.
     OpDebug::AdditiveMetrics _metrics;
+
+    // The execution time collected from the initial operation prior to any getMore requests.
+    boost::optional<Microseconds> _firstResponseExecutionTime;
 
 private:
     // Unused maxTime budget for this cursor.

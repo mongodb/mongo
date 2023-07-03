@@ -29,19 +29,34 @@
 
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/balancer/auto_merger_policy.h"
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
+#include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/db/s/balancer/cluster_statistics.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
 class ChunkType;
 class ClusterStatistics;
+
 class BalancerCommandsScheduler;
 class BalancerDefragmentationPolicy;
 class MigrationSecondaryThrottleOptions;

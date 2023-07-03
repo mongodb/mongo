@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/mutex.h"

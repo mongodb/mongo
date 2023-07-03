@@ -29,12 +29,24 @@
 
 #pragma once
 
+#include <cstddef>
+#include <memory>
+#include <string>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_connection.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/initial_sync_base_cloner.h"
 #include "mongo/db/repl/initial_sync_shared_data.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace repl {
@@ -82,7 +94,7 @@ private:
      * Validation function to ensure we connect only to primary or secondary nodes.
      *
      * Because the cloner connection is separate from the usual inter-node connection pool and
-     * did not have the 'hangUpOnStepDown:false' flag set in the initial isMaster request, we
+     * did not have the 'hangUpOnStepDown:false' flag set in the initial "hello" request, we
      * will always disconnect if the sync source transitions to a state other than PRIMARY
      * or SECONDARY.  It will not disconnect on a PRIMARY to SECONDARY or SECONDARY to PRIMARY
      * transition because we no longer do that (the flag name is anachronistic).  After
@@ -99,7 +111,7 @@ private:
      * would succeed and we would have an inconsistent node.  If other data was added we would
      * invariant during oplog application with a NamespaceNotFound error.
      */
-    Status ensurePrimaryOrSecondary(const executor::RemoteCommandResponse& isMasterReply);
+    Status ensurePrimaryOrSecondary(const executor::RemoteCommandResponse& helloReply);
 
     /**
      * Stage function that makes a connection to the sync source.

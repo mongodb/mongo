@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Perform point-in-time snapshot reads that span a 'find' and multiple 'getmore's concurrently with
  * CRUD operations.
@@ -13,7 +11,8 @@
  */
 
 load('jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js');
-var $config = (function() {
+
+export const $config = (function() {
     const data = {numIds: 100, numDocsToInsertPerThread: 5, batchSize: 10};
 
     const states = {
@@ -78,7 +77,7 @@ var $config = (function() {
         },
 
         createIndex: function createIndex(db, collName) {
-            db[collName].createIndex({a: 1}, {background: true});
+            db[collName].createIndex({a: 1});
         },
 
         dropIndex: function dropIndex(db, collName) {

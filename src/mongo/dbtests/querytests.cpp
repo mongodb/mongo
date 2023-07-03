@@ -27,34 +27,84 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <fmt/format.h>
 #include <iostream>
+#include <list>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/client/index_spec.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/multi_index_block.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/cursor_manager.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/queued_data_stage.h"
+#include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/json.h"
-#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/find.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
 
 void insertOplogDocument(OperationContext* opCtx, Timestamp ts, StringData ns) {
-    AutoGetCollection coll(opCtx, NamespaceString{ns}, MODE_IX);
+    AutoGetCollection coll(opCtx, NamespaceString::createNamespaceString_forTest(ns), MODE_IX);
     WriteUnitOfWork wuow(opCtx);
     auto doc = BSON("ts" << ts);
     InsertStatement stmt;
@@ -1224,7 +1274,7 @@ public:
         OldClientContext ctx(
             &_opCtx, NamespaceString::createNamespaceString_forTest("unittests.DirectLocking"));
         _client.remove(NamespaceString::createNamespaceString_forTest("a.b"), BSONObj());
-        ASSERT_EQUALS("unittests", ctx.db()->name().db());
+        ASSERT_EQUALS("unittests", ctx.db()->name().toString_forTest());
     }
     const char* ns;
 };
@@ -1283,7 +1333,7 @@ public:
         std::unique_ptr<DBClientCursor> cursor = _client.find(std::move(findRequest));
         while (cursor->more()) {
             BSONObj o = cursor->next();
-            verify(validateBSON(o).isOK());
+            MONGO_verify(validateBSON(o).isOK());
         }
     }
     void run() {
@@ -1414,7 +1464,7 @@ public:
             CollectionOptions collectionOptions = unittest::assertGet(
                 CollectionOptions::parse(fromjson("{ capped : true, size : 2000, max: 10000 }"),
                                          CollectionOptions::parseForCommand));
-            NamespaceString nss(ns());
+            NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns());
             ASSERT(ctx.db()->userCreateNS(&_opCtx, nss, collectionOptions, false).isOK());
             wunit.commit();
         }
@@ -1593,11 +1643,12 @@ public:
         for (int k = 0; k < 5; ++k) {
             auto ts = Timestamp(1000, i++);
             insertOplogDocument(&_opCtx, ts, ns());
-            FindCommandRequest findRequest{NamespaceString{ns()}};
+            FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
             findRequest.setSort(BSON("$natural" << 1));
             unsigned min = _client.find(findRequest)->next()["ts"].timestamp().getInc();
             for (unsigned j = -1; j < i; ++j) {
-                FindCommandRequest findRequestInner{NamespaceString{ns()}};
+                FindCommandRequest findRequestInner{
+                    NamespaceString::createNamespaceString_forTest(ns())};
                 findRequestInner.setFilter(BSON("ts" << GTE << Timestamp(1000, j)));
                 std::unique_ptr<DBClientCursor> c = _client.find(findRequestInner);
                 ASSERT(c->more());
@@ -1651,11 +1702,12 @@ public:
 
         for (int k = 0; k < 5; ++k) {
             insertOplogDocument(&_opCtx, Timestamp(1000, i++), ns());
-            FindCommandRequest findRequest{NamespaceString{ns()}};
+            FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
             findRequest.setSort(BSON("$natural" << 1));
             unsigned min = _client.find(findRequest)->next()["ts"].timestamp().getInc();
             for (unsigned j = -1; j < i; ++j) {
-                FindCommandRequest findRequestInner{NamespaceString{ns()}};
+                FindCommandRequest findRequestInner{
+                    NamespaceString::createNamespaceString_forTest(ns())};
                 findRequestInner.setFilter(BSON("ts" << GTE << Timestamp(1000, j)));
                 std::unique_ptr<DBClientCursor> c = _client.find(findRequestInner);
                 ASSERT(c->more());
@@ -1716,7 +1768,7 @@ public:
         }
 
         // Check oplog replay mode with empty collection.
-        FindCommandRequest findRequest{NamespaceString{ns()}};
+        FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
         findRequest.setFilter(BSON("ts" << GTE << Timestamp(1000, 50)));
         std::unique_ptr<DBClientCursor> c = _client.find(findRequest);
         ASSERT(!c->more());
@@ -1774,7 +1826,7 @@ public:
         insert(nss(), BSON("a" << 3));
         std::unique_ptr<DBClientCursor> cursor =
             _client.find(FindCommandRequest{NamespaceStringOrUUID{"unittests", *coll_opts.uuid}});
-        ASSERT_EQUALS(string(ns()), cursor->getns());
+        ASSERT_EQUALS(nss(), cursor->getNamespaceString());
         for (int i = 1; i <= 3; ++i) {
             ASSERT(cursor->more());
             BSONObj obj(cursor->next());
@@ -1928,7 +1980,7 @@ public:
         {
             // With five results and a batch size of 5, a cursor is created since we don't know
             // there are no more results.
-            FindCommandRequest findRequest{NamespaceString{ns()}};
+            FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
             findRequest.setBatchSize(5);
             std::unique_ptr<DBClientCursor> c = _client.find(std::move(findRequest));
             ASSERT(c->more());
@@ -1942,7 +1994,7 @@ public:
         {
             // With a batchsize of 6 we know there are no more results so we don't create a
             // cursor.
-            FindCommandRequest findRequest{NamespaceString{ns()}};
+            FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
             findRequest.setBatchSize(6);
             std::unique_ptr<DBClientCursor> c = _client.find(std::move(findRequest));
             ASSERT(c->more());

@@ -29,11 +29,17 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+#include <functional>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <unordered_set>
+#include <vector>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/sdam/election_id_set_version_pair.h"
@@ -41,6 +47,9 @@
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/platform/basic.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::sdam {
 class TopologyDescription : public std::enable_shared_from_this<TopologyDescription> {

@@ -90,16 +90,15 @@ env.Library(
 )
 
 env.Library(
-    target="test_utils",
+    target='test_utils',
     source=[
         'test_utils.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_values',
         '$BUILD_DIR/mongo/db/exec/sbe/sbe_abt_test_util',
         '$BUILD_DIR/mongo/db/query/optimizer/unit_test_pipeline_utils',
-        "$BUILD_DIR/mongo/unittest/unittest",
+        '$BUILD_DIR/mongo/db/server_base',
         'query_ce_heuristic',
         'query_ce_histogram',
         'query_ce_sampling',
@@ -107,9 +106,9 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target="histogram_estimator_test",
+    target='histogram_estimator_test',
     source=[
-        "histogram_estimator_test.cpp",
+        'histogram_estimator_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/stats/stats_test_utils',
@@ -160,9 +159,9 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target="heuristic_dataflow_nodes_test",
+    target='heuristic_dataflow_nodes_test',
     source=[
-        "heuristic_dataflow_nodes_test.cpp",
+        'heuristic_dataflow_nodes_test.cpp',
     ],
     LIBDEPS=[
         'test_utils',
@@ -180,7 +179,7 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target="maxdiff_histogram_test",
+    target='maxdiff_histogram_test',
     source=[
         'maxdiff_histogram_test.cpp',
     ],

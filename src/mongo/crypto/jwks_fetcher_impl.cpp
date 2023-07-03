@@ -29,10 +29,22 @@
 
 #include "mongo/crypto/jwks_fetcher_impl.h"
 
+#include <memory>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/data_builder.h"
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/auth/oauth_authorization_server_metadata_gen.h"
 #include "mongo/db/auth/oauth_discovery_factory.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/http_client.h"
+#include "mongo/util/str.h"
 
 namespace mongo::crypto {
 

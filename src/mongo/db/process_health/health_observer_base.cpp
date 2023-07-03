@@ -30,9 +30,23 @@
 
 #include "mongo/db/process_health/health_observer_base.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <mutex>
+#include <type_traits>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/process_health/deadline_future.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future_impl.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
 

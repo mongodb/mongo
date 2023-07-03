@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * This test checks high level invariants of various transaction related metrics reported in
  * serverStatus and currentOp.
@@ -7,13 +5,14 @@
  * @tags: [uses_transactions, uses_prepare_transaction, assumes_snapshot_transactions]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation.js";
 load('jstests/concurrency/fsm_workload_helpers/check_transaction_server_status_invariants.js');
-load('jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation.js');
 load('jstests/core/txns/libs/prepare_helpers.js');
-// for $config
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.setup = function(db, collName, cluster) {
         $super.setup.apply(this, arguments);
         this.prepareProbability = 0.5;

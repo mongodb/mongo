@@ -1,11 +1,9 @@
-'use strict';
-
 /**
  * Performs concurrent upsert and delete operations against a small set of documents with a unique
  * index in place. One specific scenario this test exercises is upsert retry in the case where an
  * upsert generates an insert, which then fails due to another operation inserting first.
  */
-var $config = (function() {
+export const $config = (function() {
     const data = {
         numDocs: 4,
         getDocValue: function() {

@@ -27,27 +27,69 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <iterator>
+#include <map>
+#include <mutex>
+#include <set>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
-#include "mongo/idl/cluster_server_parameter_refresher.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/commands/list_databases_for_all_tenants_gen.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/client.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
-#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/resource_yielder.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_api.h"
-#include "mongo/db/vector_clock.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/inline_executor.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/idl/cluster_server_parameter_common.h"
+#include "mongo/idl/cluster_server_parameter_refresher.h"
 #include "mongo/idl/cluster_server_parameter_refresher_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
-#include "mongo/util/stacktrace.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/version/releases.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 MONGO_FAIL_POINT_DEFINE(skipClusterParameterRefresh);
+MONGO_FAIL_POINT_DEFINE(blockAndFailClusterParameterRefresh);
+MONGO_FAIL_POINT_DEFINE(blockAndSucceedClusterParameterRefresh);
+MONGO_FAIL_POINT_DEFINE(countPromiseWaitersClusterParameterRefresh);
+
 namespace mongo {
 namespace {
 
@@ -184,6 +226,49 @@ void ClusterServerParameterRefresher::setPeriod(Milliseconds period) {
 }
 
 Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCtx) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    if (_refreshPromise) {
+        // We expect the future to never be ready here, because we complete the promise and then
+        // delete it under a lock, meaning new futures taken out on the current promise under a lock
+        // are always on active promises. If the future is ready here, the below logic will still
+        // work, but this is unexpected.
+        auto future = _refreshPromise->getFuture();
+        if (MONGO_unlikely(future.isReady())) {
+            LOGV2_DEBUG(7782200,
+                        3,
+                        "Cluster parameter refresh request unexpectedly joining on "
+                        "already-fulfilled refresh call");
+        }
+        countPromiseWaitersClusterParameterRefresh.shouldFail();
+        // Wait for the job to finish and return its result with getNoThrow.
+        lk.unlock();
+        return future.getNoThrow();
+    }
+    // No active job; make a new promise and run the job ourselves.
+    _refreshPromise = std::make_unique<SharedPromise<void>>();
+    lk.unlock();
+    // Run _refreshParameters unlocked to allow new futures to be gotten from our promise.
+    Status status = _refreshParameters(opCtx);
+    lk.lock();
+    // Complete the promise and detach it from the object, allowing a new job to be created the
+    // next time refreshParameters is run. Note that the futures of this promise hold references to
+    // it which will still be valid after we detach it from the object.
+    _refreshPromise->setFrom(status);
+    _refreshPromise = nullptr;
+    return status;
+}
+
+Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opCtx) {
+    if (MONGO_unlikely(blockAndFailClusterParameterRefresh.shouldFail())) {
+        blockAndFailClusterParameterRefresh.pauseWhileSet();
+        return Status(ErrorCodes::FailPointEnabled, "failClusterParameterRefresh was enabled");
+    }
+
+    if (MONGO_unlikely(blockAndSucceedClusterParameterRefresh.shouldFail())) {
+        blockAndSucceedClusterParameterRefresh.pauseWhileSet();
+        return Status::OK();
+    }
+
     invariant(isMongos());
     multiversion::FeatureCompatibilityVersion fcv;
     TenantIdMap<stdx::unordered_map<std::string, BSONObj>> clusterParameterDocs;

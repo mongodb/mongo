@@ -29,24 +29,53 @@
 
 #pragma once
 
-#include <deque>
-
+#include <array>
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <deque>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/async_client.h"
+#include "mongo/db/baton.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/connection_pool_tl.h"
+#include "mongo/executor/hedge_options_util.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log_severity.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/strong_weak_finish_line.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 
 namespace mongo {
@@ -258,7 +287,8 @@ private:
         static auto make(NetworkInterfaceTL* interface,
                          RemoteCommandRequestOnAny request,
                          const TaskExecutor::CallbackHandle& cbHandle,
-                         RemoteCommandOnReplyFn&& onReply);
+                         RemoteCommandOnReplyFn&& onReply,
+                         const BatonHandle& baton);
 
         Future<RemoteCommandResponse> sendRequest(
             std::shared_ptr<RequestState> requestState) override;

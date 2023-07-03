@@ -27,28 +27,49 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <map>
+#include <memory>
+#include <utility>
 
-#include "mongo/s/sessions_collection_sharded.h"
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/cursor_id.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/session/sessions_collection_rs.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_find.h"
+#include "mongo/s/sessions_collection_sharded.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -136,7 +157,7 @@ void SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
 
-        cluster::write(opCtx, request, &stats, &response);
+        cluster::write(opCtx, request, nullptr /* nss */, &stats, &response);
         uassertStatusOK(response.toStatus());
     };
 
@@ -155,7 +176,7 @@ void SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
 
-        cluster::write(opCtx, request, &stats, &response);
+        cluster::write(opCtx, request, nullptr, &stats, &response);
         uassertStatusOK(response.toStatus());
     };
 

@@ -27,37 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/base/simple_string_data_comparator.h"
-
-#include <MurmurHash3.h>
-
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_view.h"
+#include "mongo/util/murmur3.h"
 
 namespace mongo {
-
-namespace {
-
-template <int SizeofSizeT>
-size_t murmur3(StringData str, size_t seed);
-
-template <>
-size_t murmur3<4>(StringData str, size_t seed) {
-    char hash[4];
-    MurmurHash3_x86_32(str.rawData(), str.size(), seed, &hash);
-    return ConstDataView(hash).read<LittleEndian<std::uint32_t>>();
-}
-
-template <>
-size_t murmur3<8>(StringData str, size_t seed) {
-    char hash[16];
-    MurmurHash3_x64_128(str.rawData(), str.size(), seed, hash);
-    return static_cast<size_t>(ConstDataView(hash).read<LittleEndian<std::uint64_t>>());
-}
-
-}  // namespace
 
 const SimpleStringDataComparator SimpleStringDataComparator::kInstance{};
 

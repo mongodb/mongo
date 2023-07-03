@@ -29,10 +29,18 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <list>
 #include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
@@ -40,9 +48,13 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {

@@ -28,34 +28,84 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/none.hpp>
+#include <boost/smart_ptr.hpp>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/s/rename_collection_coordinator.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/ops/insert.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/distinct_command_gen.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
+#include "mongo/db/s/rename_collection_coordinator.h"
 #include "mongo/db/s/sharded_index_catalog_commands_gen.h"
+#include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_util.h"
-#include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/async_rpc.h"
+#include "mongo/executor/async_rpc_util.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_collection_gen.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -98,7 +148,8 @@ void renameIndexMetadataInShards(OperationContext* opCtx,
                                  const RenameCollectionRequest& request,
                                  const OperationSessionInfo& osi,
                                  const std::shared_ptr<executor::TaskExecutor>& executor,
-                                 RenameCollectionCoordinatorDocument* doc) {
+                                 RenameCollectionCoordinatorDocument* doc,
+                                 const CancellationToken& token) {
     const auto [configTime, newIndexVersion] = [opCtx]() -> std::pair<LogicalTime, Timestamp> {
         VectorClock::VectorTime vt = VectorClock::get(opCtx)->getTime();
         return {vt.configTime(), vt.clusterTime().asTimestamp()};
@@ -119,14 +170,13 @@ void renameIndexMetadataInShards(OperationContext* opCtx,
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     ShardsvrRenameIndexMetadata renameIndexCatalogReq(
         nss, toNss, {doc->getSourceUUID().value(), newIndexVersion});
-    const auto renameIndexCatalogCmdObj =
-        CommandHelpers::appendMajorityWriteConcern(renameIndexCatalogReq.toBSON({}));
-    sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx,
-        toNss.db(),
-        renameIndexCatalogCmdObj.addFields(osi.toBSON()),
-        participants,
-        executor);
+    renameIndexCatalogReq.setDbName(toNss.dbName());
+    async_rpc::GenericArgs args;
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrRenameIndexMetadata>>(
+        renameIndexCatalogReq, executor, token, args);
+    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
 }
 
 std::vector<ShardId> getLatestCollectionPlacementInfoFor(OperationContext* opCtx,
@@ -134,7 +184,7 @@ std::vector<ShardId> getLatestCollectionPlacementInfoFor(OperationContext* opCtx
                                                          const UUID& uuid) {
     // Use the content of config.chunks to obtain the placement of the collection being renamed.
     // The request is equivalent to 'configDb.chunks.distinct("shard", {uuid:collectionUuid})'.
-    auto query = BSON(NamespacePlacementType::kNssFieldName << nss.ns());
+    auto query = BSON(NamespacePlacementType::kNssFieldName << NamespaceStringUtil::serialize(nss));
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
@@ -174,8 +224,9 @@ SemiFuture<BatchedCommandResponse> deleteShardedCollectionStatement(
     int stmtId) {
 
     if (uuid) {
-        const auto deleteCollectionQuery = BSON(
-            CollectionType::kNssFieldName << nss.ns() << CollectionType::kUuidFieldName << *uuid);
+        const auto deleteCollectionQuery =
+            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)
+                                               << CollectionType::kUuidFieldName << *uuid);
 
         write_ops::DeleteCommandRequest deleteOp(CollectionType::ConfigNS);
         deleteOp.setDeletes({[&]() {
@@ -203,7 +254,7 @@ SemiFuture<BatchedCommandResponse> renameShardedCollectionStatement(
     newCollectionType.setEpoch(OID::gen());
 
     // Implemented as an upsert to be idempotent
-    auto query = BSON(CollectionType::kNssFieldName << newNss.ns());
+    auto query = BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(newNss));
     write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
     updateOp.setUpdates({[&] {
         write_ops::UpdateOpEntry entry;
@@ -248,8 +299,8 @@ SemiFuture<BatchedCommandResponse> updateZonesStatement(const txn_api::Transacti
                                                         const NamespaceString& oldNss,
                                                         const NamespaceString& newNss) {
 
-    const auto query = BSON(TagsType::ns(oldNss.ns().toString()));
-    const auto update = BSON("$set" << BSON(TagsType::ns(newNss.ns().toString())));
+    const auto query = BSON(TagsType::ns(NamespaceStringUtil::serialize(oldNss)));
+    const auto update = BSON("$set" << BSON(TagsType::ns(NamespaceStringUtil::serialize(newNss))));
 
     BatchedCommandRequest request([&] {
         write_ops::UpdateCommandRequest updateOp(TagsType::ConfigNS);
@@ -269,7 +320,7 @@ SemiFuture<BatchedCommandResponse> updateZonesStatement(const txn_api::Transacti
 SemiFuture<BatchedCommandResponse> deleteZonesStatement(const txn_api::TransactionClient& txnClient,
                                                         const NamespaceString& nss) {
 
-    const auto query = BSON(TagsType::ns(nss.ns().toString()));
+    const auto query = BSON(TagsType::ns(NamespaceStringUtil::serialize(nss)));
     const auto hint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
 
     BatchedCommandRequest request([&] {
@@ -312,14 +363,16 @@ SemiFuture<BatchedCommandResponse> deleteShardingIndexCatalogMetadataStatement(
 
 void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                                            const boost::optional<CollectionType>& optFromCollType,
+                                           const NamespaceString& fromNss,
                                            const NamespaceString& toNss,
                                            const boost::optional<UUID>& droppedTargetUUID,
                                            const WriteConcernOptions& writeConcern,
                                            const std::shared_ptr<executor::TaskExecutor>& executor,
                                            const OperationSessionInfo& osi) {
+
+    std::string logMsg = str::stream() << fromNss.ns() << " to " << toNss.ns();
     if (optFromCollType) {
         // Case sharded FROM collection
-        auto fromNss = optFromCollType->getNss();
         auto fromUUID = optFromCollType->getUuid();
 
         // Every statement in the transaction runs under the same clusterTime. To ensure in the
@@ -388,7 +441,7 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                                                              6,
                                                              upsertCollResponse);
                 })
-                // update tags and check it was sucessful
+                // update tags and check it was successful
                 .thenRunOn(txnExec)
                 .then([&](const BatchedCommandResponse& insertCollResponse) {
                     uassertStatusOK(insertCollResponse.toStatus());
@@ -404,6 +457,15 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
         const bool useClusterTransaction = true;
         sharding_ddl_util::runTransactionOnShardingCatalog(
             opCtx, std::move(transactionChain), writeConcern, osi, useClusterTransaction, executor);
+
+        ShardingLogging::get(opCtx)->logChange(
+            opCtx,
+            "renameCollection.metadata",
+            str::stream() << logMsg << ": dropped target collection and renamed source collection",
+            BSON("newCollMetadata" << optFromCollType->toBSON()),
+            ShardingCatalogClient::kMajorityWriteConcern,
+            Grid::get(opCtx)->shardRegistry()->getConfigShard(),
+            Grid::get(opCtx)->catalogClient());
     } else {
         // Case unsharded FROM collection : just delete the target collection if sharded
         auto now = VectorClock::get(opCtx)->getTime();
@@ -446,6 +508,15 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
         const bool useClusterTransaction = true;
         sharding_ddl_util::runTransactionOnShardingCatalog(
             opCtx, std::move(transactionChain), writeConcern, osi, useClusterTransaction, executor);
+
+        ShardingLogging::get(opCtx)->logChange(opCtx,
+                                               "renameCollection.metadata",
+                                               str::stream()
+                                                   << logMsg << " : dropped target collection.",
+                                               BSONObj(),
+                                               ShardingCatalogClient::kMajorityWriteConcern,
+                                               Grid::get(opCtx)->shardRegistry()->getConfigShard(),
+                                               Grid::get(opCtx)->catalogClient());
     }
 }
 }  // namespace
@@ -496,14 +567,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     sharding_ddl_util::getCriticalSectionReasonForRename(fromNss, toNss);
 
                 try {
-                    uassert(ErrorCodes::IllegalOperation,
-                            "Renaming a timeseries collection is not allowed",
-                            !fromNss.isTimeseriesBucketsCollection());
-
-                    uassert(ErrorCodes::IllegalOperation,
-                            "Renaming to a bucket namespace is not allowed",
-                            !toNss.isTimeseriesBucketsCollection());
-
                     uassert(ErrorCodes::InvalidOptions,
                             "Cannot provide an expected collection UUID when renaming between "
                             "databases",
@@ -648,8 +711,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 ShardingLogging::get(opCtx)->logChange(
                     opCtx,
                     "renameCollection.start",
-                    fromNss.ns(),
-                    BSON("source" << fromNss.toString() << "destination" << toNss.toString()),
+                    NamespaceStringUtil::serialize(fromNss),
+                    BSON("source" << NamespaceStringUtil::serialize(fromNss) << "destination"
+                                  << NamespaceStringUtil::serialize(toNss)),
                     ShardingCatalogClient::kMajorityWriteConcern);
 
                 // Block migrations on involved sharded collections
@@ -665,7 +729,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kBlockCrudAndRename,
-            [this, executor = executor, anchor = shared_from_this()] {
+            [this, token, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -687,9 +751,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 renameCollParticipantRequest.setDbName(fromNss.dbName());
                 renameCollParticipantRequest.setTargetUUID(_doc.getTargetUUID());
                 renameCollParticipantRequest.setRenameCollectionRequest(_request);
-                const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
-                                        renameCollParticipantRequest.toBSON({}))
-                                        .addFields(getNewSession(opCtx).toBSON());
 
                 // We need to send the command to all the shards because both movePrimary and
                 // moveChunk leave garbage behind for sharded collections. At the same time, the
@@ -703,15 +764,18 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     std::remove(participants.begin(), participants.end(), primaryShardId),
                     participants.end());
 
-                sharding_ddl_util::sendAuthenticatedCommandToShards(
-                    opCtx, fromNss.db(), cmdObj, participants, **executor);
-
-                sharding_ddl_util::sendAuthenticatedCommandToShards(
-                    opCtx, fromNss.db(), cmdObj, {primaryShardId}, **executor);
+                async_rpc::GenericArgs args;
+                async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+                async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
+                auto opts = std::make_shared<
+                    async_rpc::AsyncRPCOptions<ShardsvrRenameCollectionParticipant>>(
+                    renameCollParticipantRequest, **executor, token, args);
+                sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
+                sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, {primaryShardId});
             }))
         .then(_buildPhaseHandler(
             Phase::kRenameMetadata,
-            [this, executor = executor, anchor = shared_from_this()] {
+            [this, token, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -721,8 +785,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(
                     opCtx,
                     BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName
-                         << BSON("$in"
-                                 << BSON_ARRAY(nss().toString() << _request.getTo().toString()))));
+                         << BSON("$in" << BSON_ARRAY(
+                                     NamespaceStringUtil::serialize(nss())
+                                     << NamespaceStringUtil::serialize(_request.getTo())))));
 
                 // For an unsharded collection the CSRS server can not verify the targetUUID.
                 // Use the session ID + txnNumber to ensure no stale requests get through.
@@ -733,21 +798,28 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                 if ((_doc.getTargetIsSharded() || _doc.getOptShardedCollInfo())) {
                     const auto& osi = getNewSession(opCtx);
-                    renameIndexMetadataInShards(opCtx, nss(), _request, osi, **executor, &_doc);
+                    renameIndexMetadataInShards(
+                        opCtx, nss(), _request, osi, **executor, &_doc, token);
                 }
 
                 const auto& osi = getNewSession(opCtx);
                 renameCollectionMetadataInTransaction(opCtx,
                                                       _doc.getOptShardedCollInfo(),
+                                                      nss(),
                                                       _request.getTo(),
                                                       _doc.getTargetUUID(),
                                                       ShardingCatalogClient::kMajorityWriteConcern,
                                                       **executor,
                                                       osi);
+
+                // Checkpoint the configTime to ensure that, in the case of a stepdown, the new
+                // primary will start-up from a configTime that is inclusive of the renamed
+                // metadata.
+                VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
             }))
         .then(_buildPhaseHandler(
             Phase::kUnblockCRUD,
-            [this, executor = executor, anchor = shared_from_this()] {
+            [this, token, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -764,13 +836,15 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     fromNss, _doc.getSourceUUID().value());
                 unblockParticipantRequest.setDbName(fromNss.dbName());
                 unblockParticipantRequest.setRenameCollectionRequest(_request);
-                auto const cmdObj =
-                    CommandHelpers::appendMajorityWriteConcern(unblockParticipantRequest.toBSON({}))
-                        .addFields(getNewSession(opCtx).toBSON());
                 auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
-                sharding_ddl_util::sendAuthenticatedCommandToShards(
-                    opCtx, fromNss.db(), cmdObj, participants, **executor);
+                async_rpc::GenericArgs args;
+                async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+                async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
+                auto opts = std::make_shared<
+                    async_rpc::AsyncRPCOptions<ShardsvrRenameCollectionUnblockParticipant>>(
+                    unblockParticipantRequest, **executor, token, args);
+                sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
 
                 // Delete chunks belonging to the previous incarnation of the target collection.
                 // This is performed after releasing the critical section in order to reduce stalls
@@ -800,8 +874,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             ShardingLogging::get(opCtx)->logChange(
                 opCtx,
                 "renameCollection.end",
-                nss().ns(),
-                BSON("source" << nss().toString() << "destination" << _request.getTo().toString()),
+                NamespaceStringUtil::serialize(nss()),
+                BSON("source" << NamespaceStringUtil::serialize(nss()) << "destination"
+                              << NamespaceStringUtil::serialize(_request.getTo())),
                 ShardingCatalogClient::kMajorityWriteConcern);
             LOGV2(5460504, "Collection renamed", logAttrs(nss()));
         }));

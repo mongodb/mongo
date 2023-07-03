@@ -27,22 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/sbe/expressions/expression.h"
-
-#include <iomanip>
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <functional>
 #include <sstream>
-#include <stack>
 #include <vector>
 
+#include <absl/container/inlined_vector.h>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/ordering.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/stages/spool.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
+#include "mongo/db/exec/sbe/vm/label.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -681,6 +689,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"bitTestPosition",
      BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::bitTestPosition, false}},
     {"bsonSize", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::bsonSize, false}},
+    {"strLenBytes", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::strLenBytes, false}},
     {"toLower", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::toLower, false}},
     {"toUpper", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::toUpper, false}},
     {"coerceToBool", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::coerceToBool, false}},
@@ -812,6 +821,13 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::aggMinNMerge, true}},
     {"aggMinNFinalize",
      BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::aggMinNFinalize, false}},
+    {"aggRank", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRank, true}},
+    {"aggRankColl", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggRankColl, true}},
+    {"aggDenseRank", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggDenseRank, true}},
+    {"aggDenseRankColl",
+     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::aggDenseRankColl, true}},
+    {"aggRankFinalize",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRankFinalize, false}},
 };
 
 /**

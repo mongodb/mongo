@@ -26,16 +26,27 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 
-#include "mongo/db/query/sbe_sub_planner.h"
 
-#include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/plan_cache_key_factory.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/exec/plan_cache_util.h"
+#include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/query/all_indices_required_checker.h"
+#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
+#include "mongo/db/query/sbe_plan_ranker.h"
+#include "mongo/db/query/sbe_sub_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo::sbe {
 CandidatePlans SubPlanner::plan(

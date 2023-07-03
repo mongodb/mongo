@@ -24,7 +24,7 @@ function validateCurrentOpMongos(currentOp) {
     assert(currentOp.hasOwnProperty("desc"), currentOp);
     assert(currentOp.hasOwnProperty("ns"), currentOp);
     assert(currentOp.hasOwnProperty("collUuid"), currentOp);
-    assert(currentOp.hasOwnProperty("sampleRate"), currentOp);
+    assert(currentOp.hasOwnProperty("samplesPerSecond"), currentOp);
     assert(currentOp.hasOwnProperty("startTime"), currentOp);
     assert(currentOp.hasOwnProperty("sampledReadsCount"), currentOp);
     assert(currentOp.hasOwnProperty("sampledWritesCount"), currentOp);
@@ -36,7 +36,7 @@ function validateCurrentOpMongod(currentOp, isShardSvr) {
     assert(currentOp.hasOwnProperty("desc"), currentOp);
     assert(currentOp.hasOwnProperty("ns"), currentOp);
     assert(currentOp.hasOwnProperty("collUuid"), currentOp);
-    assert.eq(currentOp.hasOwnProperty("sampleRate"), !isShardSvr, currentOp);
+    assert.eq(currentOp.hasOwnProperty("samplesPerSecond"), !isShardSvr, currentOp);
     assert(currentOp.hasOwnProperty("startTime"), currentOp);
     assert(currentOp.hasOwnProperty("sampledReadsCount"), currentOp);
     assert(currentOp.hasOwnProperty("sampledWritesCount"), currentOp);
@@ -103,16 +103,16 @@ const opKindNoop = 2;
  * attached in 'oldState'.
  */
 function assertCurrentOpAndServerStatusMongos(
-    ns, opKind, oldState, newState, {expectedSampleRate} = {}) {
+    ns, opKind, oldState, newState, {expectedSamplesPerSecond} = {}) {
     const errMsg = {opKind, oldState, newState};
 
     validateCurrentOpMongos(newState.currentOp[0]);
     assert.eq(newState.currentOp.length, 1, errMsg);
     assert.eq(newState.currentOp[0].ns, ns, errMsg);
-    if (expectedSampleRate !== undefined) {
-        if (newState.currentOp[0].sampleRate != expectedSampleRate) {
+    if (expectedSamplesPerSecond !== undefined) {
+        if (newState.currentOp[0].samplesPerSecond != expectedSamplesPerSecond) {
             jsTest.log("The actual sample rate doesn't match the expected sample rate " +
-                       tojson({errMsg, expectedSampleRate}));
+                       tojson({errMsg, expectedSamplesPerSecond}));
             return false;
         }
     }

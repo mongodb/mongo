@@ -27,7 +27,21 @@
  *    it in the license file.
  */
 
+#include <iosfwd>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/sbe_unittest.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/golden_test.h"
 
 namespace mongo::sbe {
 

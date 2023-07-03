@@ -27,12 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
+#include <cstddef>
+#include <map>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/ce/benchmark_utils.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/optimizer/containers.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/collection_statistics.h"
+#include "mongo/db/query/stats/collection_statistics_mock.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/rand_utils.h"
+#include "mongo/db/query/stats/value_utils.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/test_info.h"
+#include "mongo/util/str.h"
 
 namespace mongo::optimizer::ce {
 namespace {
@@ -146,7 +170,7 @@ BenchmarkRuntimeParameters generateHistorgrams(
  * A test fixture for CE benchmaarks. It provides a common 'setUp' hook to be invoked before each
  * benchmark, as well as a 'runBenchmarks' driver to be used in each TEST_F.
  */
-class CEBenchmarkTest : public LockerNoopServiceContextTest {
+class CEBenchmarkTest : public ServiceContextTest {
 protected:
     /**
      * Given a 'benchmarkName' name (which corresponds to a test name specified in a TEST_F

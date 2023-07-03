@@ -106,7 +106,7 @@ class test_backup11(backup_base):
             lambda:self.assertEquals(self.session.open_cursor(None,
             bkup_c, config), 0), msg)
 
-        # - We cannot make multiple incremental duplcate backup cursors.
+        # - We cannot make multiple incremental duplicate backup cursors.
         # - We cannot duplicate the duplicate backup cursor.
         config = 'incremental=(file=test.wt)'
         dupc = self.session.open_cursor(None, bkup_c, config)

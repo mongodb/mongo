@@ -28,15 +28,44 @@
  */
 
 
-#include "mongo/db/auth/action_set.h"
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/index_version.h"
+#include "mongo/s/sharding_index_catalog_cache.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/read_through_cache.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -95,7 +124,8 @@ public:
 
         if (nss.coll().empty()) {
             // Return the database's information.
-            auto cachedDbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.ns()));
+            auto cachedDbInfo = uassertStatusOK(
+                catalogCache->getDatabase(opCtx, NamespaceStringUtil::serialize(nss)));
             result.append("primaryShard", cachedDbInfo->getPrimary().toString());
             result.append("version", cachedDbInfo->getVersion().toBSON());
         } else {

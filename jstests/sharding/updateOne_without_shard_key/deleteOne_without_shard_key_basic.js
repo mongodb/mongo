@@ -3,8 +3,7 @@
  *
  * @tags: [
  *  requires_sharding,
- *  requires_fcv_63,
- *  featureFlagUpdateOneWithoutShardKey,
+ *  requires_fcv_71,
  * ]
  */
 (function() {

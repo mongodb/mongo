@@ -32,53 +32,58 @@
  */
 
 #include "mongo/db/auth/action_set.h"
+
+#include <memory>
+
 #include "mongo/db/auth/action_type.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
 
 TEST(ActionSetTest, ParseActionSetFromStringVector) {
-    ActionSet result;
-    std::vector<std::string> actions1 = {"find", "insert", "update", "remove"};
-    std::vector<std::string> actions2 = {"update", "find", "remove", "insert"};
+    const std::vector<StringData> actions1 = {"find"_sd, "insert"_sd, "update"_sd, "remove"_sd};
+    const std::vector<StringData> actions2 = {"update"_sd, "find"_sd, "remove"_sd, "insert"_sd};
     std::vector<std::string> unrecognized;
 
-    ASSERT_OK(ActionSet::parseActionSetFromStringVector(actions1, &result, &unrecognized));
-    ASSERT_TRUE(result.contains(ActionType::find));
-    ASSERT_TRUE(result.contains(ActionType::insert));
-    ASSERT_TRUE(result.contains(ActionType::update));
-    ASSERT_TRUE(result.contains(ActionType::remove));
+    auto set1 = ActionSet::parseFromStringVector(actions1, &unrecognized);
+    ASSERT_TRUE(set1.contains(ActionType::find));
+    ASSERT_TRUE(set1.contains(ActionType::insert));
+    ASSERT_TRUE(set1.contains(ActionType::update));
+    ASSERT_TRUE(set1.contains(ActionType::remove));
     ASSERT_TRUE(unrecognized.empty());
 
     // Order of the strings doesn't matter
-    ASSERT_OK(ActionSet::parseActionSetFromStringVector(actions2, &result, &unrecognized));
-    ASSERT_TRUE(result.contains(ActionType::find));
-    ASSERT_TRUE(result.contains(ActionType::insert));
-    ASSERT_TRUE(result.contains(ActionType::update));
-    ASSERT_TRUE(result.contains(ActionType::remove));
+    auto set2 = ActionSet::parseFromStringVector(actions2, &unrecognized);
+    ASSERT_TRUE(set2.contains(ActionType::find));
+    ASSERT_TRUE(set2.contains(ActionType::insert));
+    ASSERT_TRUE(set2.contains(ActionType::update));
+    ASSERT_TRUE(set2.contains(ActionType::remove));
     ASSERT_TRUE(unrecognized.empty());
 
-    ASSERT_OK(ActionSet::parseActionSetFromStringVector({"find"}, &result, &unrecognized));
-
-    ASSERT_TRUE(result.contains(ActionType::find));
-    ASSERT_FALSE(result.contains(ActionType::insert));
-    ASSERT_FALSE(result.contains(ActionType::update));
-    ASSERT_FALSE(result.contains(ActionType::remove));
+    // Only one ActionType
+    auto findSet = ActionSet::parseFromStringVector({"find"}, &unrecognized);
+    ASSERT_TRUE(findSet.contains(ActionType::find));
+    ASSERT_FALSE(findSet.contains(ActionType::insert));
+    ASSERT_FALSE(findSet.contains(ActionType::update));
+    ASSERT_FALSE(findSet.contains(ActionType::remove));
     ASSERT_TRUE(unrecognized.empty());
 
-    ASSERT_OK(ActionSet::parseActionSetFromStringVector({""}, &result, &unrecognized));
-
-    ASSERT_FALSE(result.contains(ActionType::find));
-    ASSERT_FALSE(result.contains(ActionType::insert));
-    ASSERT_FALSE(result.contains(ActionType::update));
-    ASSERT_FALSE(result.contains(ActionType::remove));
+    // Empty string as an ActionType
+    auto nonEmptyBlankSet = ActionSet::parseFromStringVector({""}, &unrecognized);
+    ASSERT_FALSE(nonEmptyBlankSet.contains(ActionType::find));
+    ASSERT_FALSE(nonEmptyBlankSet.contains(ActionType::insert));
+    ASSERT_FALSE(nonEmptyBlankSet.contains(ActionType::update));
+    ASSERT_FALSE(nonEmptyBlankSet.contains(ActionType::remove));
     ASSERT_TRUE(unrecognized.size() == 1);
     ASSERT_TRUE(unrecognized.front().empty());
-
     unrecognized.clear();
-    ASSERT_OK(ActionSet::parseActionSetFromStringVector({"INVALID INPUT"}, &result, &unrecognized));
-    ASSERT_TRUE(unrecognized.size() == 1);
+
+    // Unknown ActionType
+    auto unknownSet = ActionSet::parseFromStringVector({"INVALID INPUT"}, &unrecognized);
+    ASSERT_TRUE(unknownSet.empty());
+    ASSERT_EQ(unrecognized.size(), 1UL);
     ASSERT_TRUE(unrecognized.front() == "INVALID INPUT");
 }
 
@@ -109,15 +114,9 @@ TEST(ActionSetTest, ToString) {
 }
 
 TEST(ActionSetTest, IsSupersetOf) {
-    ActionSet set1, set2, set3;
-    std::vector<std::string> actions1 = {"find", "update", "insert"};
-    std::vector<std::string> actions2 = {"find", "update", "remove"};
-    std::vector<std::string> actions3 = {"find", "update"};
-    std::vector<std::string> unrecognized;
-
-    ASSERT_OK(ActionSet::parseActionSetFromStringVector(actions1, &set1, &unrecognized));
-    ASSERT_OK(ActionSet::parseActionSetFromStringVector(actions2, &set2, &unrecognized));
-    ASSERT_OK(ActionSet::parseActionSetFromStringVector(actions3, &set3, &unrecognized));
+    ActionSet set1({ActionType::find, ActionType::update, ActionType::insert});
+    ActionSet set2({ActionType::find, ActionType::update, ActionType::remove});
+    ActionSet set3({ActionType::find, ActionType::update});
 
     ASSERT_FALSE(set1.isSupersetOf(set2));
     ASSERT_TRUE(set1.isSupersetOf(set3));
@@ -130,11 +129,7 @@ TEST(ActionSetTest, IsSupersetOf) {
 }
 
 TEST(ActionSetTest, anyAction) {
-    ActionSet set;
-    std::vector<std::string> actions = {"anyAction"};
-    std::vector<std::string> unrecognized;
-
-    ASSERT_OK(ActionSet::parseActionSetFromStringVector(actions, &set, &unrecognized));
+    ActionSet set{ActionType::anyAction};
     ASSERT_TRUE(set.contains(ActionType::find));
     ASSERT_TRUE(set.contains(ActionType::insert));
     ASSERT_TRUE(set.contains(ActionType::anyAction));
@@ -186,6 +181,16 @@ TEST(ActionSetTest, constructor) {
     ActionSet set3{ActionType::find, ActionType::insert};
     ASSERT_TRUE(set3.contains(ActionType::find));
     ASSERT_TRUE(set3.contains(ActionType::insert));
+}
+
+TEST(ActionSetTest, DuplicateActions) {
+    auto fromString = ActionSet::parseFromStringVector({"find"_sd, "find"_sd, "insert"_sd});
+    ASSERT_TRUE(fromString.contains(ActionType::find));
+    ASSERT_TRUE(fromString.contains(ActionType::insert));
+
+    ActionSet fromEnum({ActionType::find, ActionType::find, ActionType::insert});
+    ASSERT_TRUE(fromEnum.contains(ActionType::find));
+    ASSERT_TRUE(fromEnum.contains(ActionType::insert));
 }
 
 }  // namespace

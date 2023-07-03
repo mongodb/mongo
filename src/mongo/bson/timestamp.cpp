@@ -28,14 +28,11 @@
  */
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/bson/bsontypes.h"
 
-#include <cstdint>
-#include <ctime>
 #include <iostream>
 #include <limits>
-#include <sstream>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/time_support.h"
 

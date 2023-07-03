@@ -22,7 +22,7 @@ const assertApprox = AnalyzeShardKeyUtil.assertApprox;
 const queryAnalysisSamplerConfigurationRefreshSecs = 1;
 const queryAnalysisWriterIntervalSecs = 1;
 
-const sampleRate = 10000;
+const samplesPerSecond = 10000;
 const analyzeShardKeyNumRanges = 10;
 
 const st = new ShardingTest({
@@ -112,7 +112,8 @@ function runTest({isShardedColl, execCtxType}) {
     assert.commandWorked(mongosDB.getCollection(collName).insert(docs));
     const collectionUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, collName);
 
-    assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate}));
+    assert.commandWorked(
+        st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond}));
     QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collectionUuid);
 
     // Test with a mix of modifier, replacement and pipeline updates and findAndModify updates.
@@ -238,7 +239,8 @@ function runTest({isShardedColl, execCtxType}) {
     assert.eq(res0.writeDistribution.sampleSize.total, numTotal, res0);
     assert.eq(res0.writeDistribution.percentageOfShardKeyUpdates, 100, res0);
 
-    assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate}));
+    assert.commandWorked(
+        st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond}));
     QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collectionUuid);
 
     // Below are not shard key updates.

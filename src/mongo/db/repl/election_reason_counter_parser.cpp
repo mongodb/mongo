@@ -29,6 +29,9 @@
 
 #include "mongo/db/repl/election_reason_counter_parser.h"
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/idl/idl_parser.h"
+
 namespace mongo {
 namespace repl {
 

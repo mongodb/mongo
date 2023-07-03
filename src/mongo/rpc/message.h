@@ -30,11 +30,17 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring>
+#include <string>
+#include <utility>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/encoded_value_storage.h"
 #include "mongo/base/static_assert.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/shared_buffer.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -389,7 +395,7 @@ public:
     explicit Message(SharedBuffer data) : _buf(std::move(data)) {}
 
     MsgData::View header() const {
-        verify(!empty());
+        MONGO_verify(!empty());
         return _buf.get();
     }
 
@@ -431,7 +437,7 @@ public:
 
     // use to set first buffer if empty
     void setData(SharedBuffer buf) {
-        verify(empty());
+        MONGO_verify(empty());
         _buf = std::move(buf);
     }
 

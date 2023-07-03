@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/uuid.h"
 
@@ -79,7 +81,7 @@ void insertKey(OperationContext* opCtx,
  * the above, this variant requires the call to be wrapped inside a writeConflictRetry.
  */
 void insertKey(OperationContext* opCtx,
-               const CollectionPtr& container,
+               const ScopedCollectionAcquisition& container,
                const BSONObj& key,
                const BSONObj& docKey);
 

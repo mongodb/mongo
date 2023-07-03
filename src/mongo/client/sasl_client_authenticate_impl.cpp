@@ -35,21 +35,43 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include <cstdint>
+#include <boost/smart_ptr.hpp>
+#include <functional>
+#include <memory>
+#include <ostream>
 #include <string>
+#include <utility>
 
-#include "mongo/base/init.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/db/auth/sasl_command_constants.h"
+#include "mongo/db/database_name.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/password_digest.h"
 

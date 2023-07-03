@@ -27,16 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "cxxabi.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+#include <future>
+#include <system_error>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/baton.h"
 #include "mongo/db/client.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
-#include "mongo/s/commands/cluster_commands_gen.h"
 #include "mongo/stdx/future.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
@@ -95,7 +103,7 @@ TEST_F(MoveChunkRegistration, GetActiveMigrationNamespace) {
     auto originalScopedDonateChunk =
         assertGet(_registry.registerDonateChunk(operationContext(), createMoveRangeRequest(nss)));
 
-    ASSERT_EQ(nss.ns(), _registry.getActiveDonateChunkNss()->ns());
+    ASSERT_EQ(nss, _registry.getActiveDonateChunkNss());
 
     // Need to signal the registered migration so the destructor doesn't invariant
     originalScopedDonateChunk.signalComplete(Status::OK());

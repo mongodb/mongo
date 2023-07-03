@@ -27,11 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <system_error>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/shell_exec.h"
-
-#include <memory>
 
 #ifdef _WIN32
 #include <processthreadsapi.h>
@@ -43,7 +49,7 @@
 
 #include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 #include "mongo/util/time_support.h"
 
 namespace mongo {

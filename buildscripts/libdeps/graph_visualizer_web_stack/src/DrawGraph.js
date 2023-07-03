@@ -20,6 +20,8 @@ import { setLinksTrans } from "./redux/linksTrans";
 import { setShowTransitive } from "./redux/showTransitive";
 import LoadingBar from "./LoadingBar";
 
+const {REACT_APP_API_URL} = process.env;
+
 const handleFindNode = (node_value, graphData, activeComponent, forceRef) => {
   var targetNode = null;
   if (graphData) {
@@ -131,7 +133,7 @@ const DrawGraph = ({
           "selected_nodes": nodes.filter(node => node.selected == true).map(node => node.node),
           "transitive_edges": showTransitive
       };
-      fetch('/api/graphs/' + gitHash + '/d3', {
+      fetch(REACT_APP_API_URL + '/api/graphs/' + gitHash + '/d3', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -144,7 +146,7 @@ const DrawGraph = ({
           setLinks(data.graphData.links);
           setLinksTrans(data.graphData.links_trans);
         });
-      fetch('/api/graphs/' + gitHash + '/nodes/details', {
+      fetch(REACT_APP_API_URL + '/api/graphs/' + gitHash + '/nodes/details', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

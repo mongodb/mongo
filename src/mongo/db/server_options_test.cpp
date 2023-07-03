@@ -27,14 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/config.h"
 
-#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
-#include <unistd.h>
-#endif
+#include <boost/algorithm/string/join.hpp>
+#include <ostream>
+#include <utility>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include <fmt/format.h>
+
 #ifndef _WIN32
 #include <cstdlib>
-#include <sys/types.h>
 #include <sys/wait.h>
 #endif
 
@@ -42,25 +48,41 @@
 #include <TargetConditionals.h>
 #endif
 
-#include <boost/algorithm/string/join.hpp>
-#include <boost/filesystem.hpp>
-
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/db/server_options_nongeneral_gen.h"
 #include "mongo/db/server_options_server_helpers.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/value.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -949,8 +971,6 @@ TEST(ClusterRole, Equality) {
 
     ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer).exclusivelyHasShardRole());
     ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).exclusivelyHasShardRole());
-
-    ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).exclusivelyHasConfigRole());
 }
 
 #if !defined(_WIN32) && !(defined(__APPLE__) && TARGET_OS_TV)

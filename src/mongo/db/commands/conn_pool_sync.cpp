@@ -27,11 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 namespace {
@@ -56,8 +67,8 @@ public:
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                  ActionType::connPoolSync)) {
+        if (!as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::connPoolSync)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 

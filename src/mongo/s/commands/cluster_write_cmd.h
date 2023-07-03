@@ -29,14 +29,37 @@
 
 #pragma once
 
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/commands/write_commands_common.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/explain_verbosity_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 
@@ -77,6 +100,7 @@ public:
      */
     static bool handleWouldChangeOwningShardError(OperationContext* opCtx,
                                                   BatchedCommandRequest* request,
+                                                  const NamespaceString& nss,
                                                   BatchedCommandResponse* response,
                                                   BatchWriteExecStats stats);
 

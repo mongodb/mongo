@@ -28,11 +28,29 @@
  */
 
 #include "mongo/db/commands/set_profiling_filter_globally_cmd.h"
+
+#include <memory>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
+#include "mongo/db/profile_filter.h"
 #include "mongo/db/profile_filter_impl.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -43,8 +61,8 @@ Status SetProfilingFilterGloballyCmd::checkAuthForOperation(OperationContext* op
                                                             const DatabaseName& dbName,
                                                             const BSONObj& cmdObj) const {
     AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-    return authSession->isAuthorizedForActionsOnResource(ResourcePattern::forAnyNormalResource(),
-                                                         ActionType::enableProfiler)
+    return authSession->isAuthorizedForActionsOnResource(
+               ResourcePattern::forAnyNormalResource(dbName.tenantId()), ActionType::enableProfiler)
         ? Status::OK()
         : Status(ErrorCodes::Unauthorized, "unauthorized");
 }

@@ -29,10 +29,17 @@
 
 #pragma once
 
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo::projection_executor_utils {
 /**

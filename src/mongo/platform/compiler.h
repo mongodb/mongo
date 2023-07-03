@@ -189,9 +189,9 @@
 
 
 #if defined(_MSC_VER)
-#include "mongo/platform/compiler_msvc.h"
+#include "mongo/platform/compiler_msvc.h"  // IWYU pragma: export
 #elif defined(__GNUC__)
-#include "mongo/platform/compiler_gcc.h"
+#include "mongo/platform/compiler_gcc.h"  // IWYU pragma: export
 #else
 #error "Unsupported compiler family"
 #endif

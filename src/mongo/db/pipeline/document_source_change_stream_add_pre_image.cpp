@@ -27,18 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/util/assert_util.h"
+#include <boost/move/utility_core.hpp>
+#include <memory>
 
-#include "mongo/platform/basic.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
-
-#include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
-#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
-#include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -140,27 +149,15 @@ boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
 }
 
 Value DocumentSourceChangeStreamAddPreImage::serialize(SerializationOptions opts) const {
-    BSONObjBuilder builder;
-    if (opts.verbosity) {
-        BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
-        sub.append("stage"_sd, kStageName);
-        opts.serializeLiteralValue(
-                FullDocumentBeforeChangeMode_serializer(_fullDocumentBeforeChangeMode))
-            .addToBsonObj(&sub, kFullDocumentBeforeChangeFieldName);
-        sub.done();
-    } else {
-        BSONObjBuilder sub(builder.subobjStart(kStageName));
-        if (opts.replacementForLiteralArgs) {
-            sub.append(
-                DocumentSourceChangeStreamAddPreImageSpec::kFullDocumentBeforeChangeFieldName,
-                *opts.replacementForLiteralArgs);
-        } else {
-            DocumentSourceChangeStreamAddPreImageSpec(_fullDocumentBeforeChangeMode)
-                .serialize(&sub);
-        }
-        sub.done();
-    }
-    return Value(builder.obj());
+    return opts.verbosity
+        ? Value(Document{
+              {DocumentSourceChangeStream::kStageName,
+               Document{{"stage"_sd, "internalAddPreImage"_sd},
+                        {"fullDocumentBeforeChange"_sd,
+                         FullDocumentBeforeChangeMode_serializer(_fullDocumentBeforeChangeMode)}}}})
+        : Value(Document{{kStageName,
+                          DocumentSourceChangeStreamAddPreImageSpec(_fullDocumentBeforeChangeMode)
+                              .toBSON(opts)}});
 }
 
 std::string DocumentSourceChangeStreamAddPreImage::makePreImageNotFoundErrorMsg(

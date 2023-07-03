@@ -47,7 +47,7 @@ setup_log_file(WTPERF *wtperf)
 
     len = strlen(wtperf->monitor_dir) + strlen(opts->table_name) + strlen(".stat") + 2;
     fname = dmalloc(len);
-    testutil_check(__wt_snprintf(fname, len, "%s/%s.stat", wtperf->monitor_dir, opts->table_name));
+    testutil_snprintf(fname, len, "%s/%s.stat", wtperf->monitor_dir, opts->table_name);
     if ((wtperf->logf = fopen(fname, "w")) == NULL) {
         ret = errno;
         fprintf(stderr, "%s: %s\n", fname, strerror(ret));
@@ -127,7 +127,7 @@ backup_read(WTPERF *wtperf, const char *filename)
     /* Open the file handle. */
     len = strlen(wtperf->home) + strlen(filename) + 10;
     buf = dmalloc(len);
-    testutil_check(__wt_snprintf(buf, len, "%s/%s", wtperf->home, filename));
+    testutil_snprintf(buf, len, "%s/%s", wtperf->home, filename);
     error_sys_check(rfd = open(buf, O_RDONLY, 0644));
 
     /* Get the file's size. */

@@ -29,33 +29,67 @@
 
 #include "mongo/embedded/embedded.h"
 
+#include <cstdint>
+#include <cstdlib>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <ostream>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/config.h"
-#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/dbclient_base.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_impl.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/fsync_locked.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/global_settings.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_liaison_mongod.h"
-#include "mongo/db/session/kill_sessions_local.h"
+#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_impl.h"
-#include "mongo/db/session/session_killer.h"
+#include "mongo/db/session/sessions_collection.h"
 #include "mongo/db/session/sessions_collection_standalone.h"
 #include "mongo/db/startup_recovery.h"
 #include "mongo/db/storage/control/storage_control.h"
-#include "mongo/db/storage/encryption_hooks.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/db/ttl.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/embedded/embedded_options_parser_init.h"
 #include "mongo/embedded/index_builds_coordinator_embedded.h"
 #include "mongo/embedded/oplog_writer_embedded.h"
@@ -64,19 +98,22 @@
 #include "mongo/embedded/replication_coordinator_embedded.h"
 #include "mongo/embedded/service_entry_point_embedded.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/platform/process_id.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
-#include "mongo/util/background.h"
+#include "mongo/transport/service_entry_point.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
-#include "mongo/util/periodic_runner_factory.h"
+#include "mongo/util/periodic_runner.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
-#include <boost/filesystem.hpp>
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
 
 namespace mongo {
 namespace embedded {
@@ -147,7 +184,6 @@ ServiceContext::ConstructorActionRegisterer collectionShardingStateFactoryRegist
 }  // namespace
 
 using logv2::LogComponent;
-using std::endl;
 
 void shutdown(ServiceContext* srvContext) {
     {
@@ -166,22 +202,23 @@ void shutdown(ServiceContext* srvContext) {
         // We should always be able to acquire the global lock at shutdown.
         // Close all open databases, shutdown storage engine and run all deinitializers.
         auto shutdownOpCtx = serviceContext->makeOperationContext(client);
-        {
-            // TODO (SERVER-71610): Fix to be interruptible or document exception.
-            UninterruptibleLockGuard noInterrupt(shutdownOpCtx->lockState());  // NOLINT.
-            Lock::GlobalLock lk(shutdownOpCtx.get(), MODE_X);
-            auto databaseHolder = DatabaseHolder::get(shutdownOpCtx.get());
-            databaseHolder->closeAll(shutdownOpCtx.get());
+        // Service context is in shutdown mode, even new operation contexts are considered killed.
+        // Marking the opCtx as executing shutdown prevents this, and makes the opCtx ignore all
+        // interrupts.
+        shutdownOpCtx->setIsExecutingShutdown();
 
-            LogicalSessionCache::set(serviceContext, nullptr);
+        Lock::GlobalLock lk(shutdownOpCtx.get(), MODE_X);
+        auto databaseHolder = DatabaseHolder::get(shutdownOpCtx.get());
+        databaseHolder->closeAll(shutdownOpCtx.get());
 
-            repl::ReplicationCoordinator::get(serviceContext)->shutdown(shutdownOpCtx.get());
-            IndexBuildsCoordinator::get(serviceContext)->shutdown(shutdownOpCtx.get());
+        LogicalSessionCache::set(serviceContext, nullptr);
 
-            // Global storage engine may not be started in all cases before we exit
-            if (serviceContext->getStorageEngine()) {
-                shutdownGlobalStorageEngineCleanly(serviceContext);
-            }
+        repl::ReplicationCoordinator::get(serviceContext)->shutdown(shutdownOpCtx.get());
+        IndexBuildsCoordinator::get(serviceContext)->shutdown(shutdownOpCtx.get());
+
+        // Global storage engine may not be started in all cases before we exit
+        if (serviceContext->getStorageEngine()) {
+            shutdownGlobalStorageEngineCleanly(serviceContext);
         }
     }
     setGlobalServiceContext(nullptr);
@@ -290,12 +327,12 @@ ServiceContext* initialize(const char* yaml_config) {
 
     {
         std::stringstream ss;
-        ss << endl;
-        ss << "*********************************************************************" << endl;
-        ss << " ERROR: dbpath (" << storageGlobalParams.dbpath << ") does not exist." << endl;
-        ss << " Create this directory or give existing directory in --dbpath." << endl;
-        ss << " See http://dochub.mongodb.org/core/startingandstoppingmongo" << endl;
-        ss << "*********************************************************************" << endl;
+        ss << std::endl;
+        ss << "*********************************************************************" << std::endl;
+        ss << " ERROR: dbpath (" << storageGlobalParams.dbpath << ") does not exist." << std::endl;
+        ss << " Create this directory or give existing directory in --dbpath." << std::endl;
+        ss << " See http://dochub.mongodb.org/core/startingandstoppingmongo" << std::endl;
+        ss << "*********************************************************************" << std::endl;
         uassert(50677, ss.str().c_str(), boost::filesystem::exists(storageGlobalParams.dbpath));
     }
 

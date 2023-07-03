@@ -27,13 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/auth/restriction.h"
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/auth/restriction_mock.h"
 #include "mongo/db/auth/restriction_set.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/net/sockaddr.h"
 
 namespace mongo {
 

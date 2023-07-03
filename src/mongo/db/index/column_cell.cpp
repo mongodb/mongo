@@ -30,7 +30,24 @@
 
 #include "mongo/db/index/column_cell.h"
 
+#include <cmath>
+#include <cstdint>
+#include <limits>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/storage/column_store.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

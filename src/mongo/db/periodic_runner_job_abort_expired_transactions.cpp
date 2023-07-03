@@ -28,16 +28,28 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <ratio>
+#include <string>
 
-#include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
-
+#include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions_local.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
+#include "mongo/idl/mutable_observer_registry.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -62,6 +74,10 @@ Milliseconds getPeriod(const Argument& transactionLifetimeLimitSeconds) {
 }
 
 }  // namespace
+
+// Tracks the number of passes the "abortExpiredTransactions" thread makes to abort expired
+// transactions.
+CounterMetric abortExpiredTransactionsPasses("abortExpiredTransactions.passes");
 
 auto PeriodicThreadToAbortExpiredTransactions::get(ServiceContext* serviceContext)
     -> PeriodicThreadToAbortExpiredTransactions& {
@@ -111,6 +127,7 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
 
             try {
                 killAllExpiredTransactions(opCtx.get());
+                abortExpiredTransactionsPasses.increment(1);
             } catch (ExceptionForCat<ErrorCategory::CancellationError>& ex) {
                 LOGV2_DEBUG(4684101, 2, "Periodic job canceled", "{reason}"_attr = ex.reason());
             }

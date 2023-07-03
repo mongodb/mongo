@@ -27,12 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/s/type_shard_collection.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/time_support.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -47,11 +58,11 @@ const BSONObj kDefaultCollation = BSON("locale"
 TEST(ShardCollectionType, FromBSONEmptyShardKeyFails) {
     ASSERT_THROWS_CODE(
         ShardCollectionType(BSON(ShardCollectionType::kNssFieldName
-                                 << kNss.ns() << ShardCollectionType::kEpochFieldName << OID::gen()
-                                 << ShardCollectionType::kTimestampFieldName << Timestamp(1, 1)
-                                 << ShardCollectionType::kUuidFieldName << UUID::gen()
-                                 << ShardCollectionType::kKeyPatternFieldName << BSONObj()
-                                 << ShardCollectionType::kUniqueFieldName << true)),
+                                 << kNss.ns_forTest() << ShardCollectionType::kEpochFieldName
+                                 << OID::gen() << ShardCollectionType::kTimestampFieldName
+                                 << Timestamp(1, 1) << ShardCollectionType::kUuidFieldName
+                                 << UUID::gen() << ShardCollectionType::kKeyPatternFieldName
+                                 << BSONObj() << ShardCollectionType::kUniqueFieldName << true)),
         DBException,
         ErrorCodes::ShardKeyNotFound);
 }
@@ -63,7 +74,7 @@ TEST(ShardCollectionType,
 
     ShardCollectionType shardCollType(
         BSON(ShardCollectionType::kNssFieldName
-             << kNss.ns() << ShardCollectionType::kEpochFieldName << epoch
+             << kNss.ns_forTest() << ShardCollectionType::kEpochFieldName << epoch
              << ShardCollectionType::kTimestampFieldName << timestamp
              << ShardCollectionType::kUuidFieldName << UUID::gen()
              << ShardCollectionType::kKeyPatternFieldName << kKeyPattern

@@ -28,18 +28,28 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/client/replica_set_monitor_manager.h"
-
+#include <absl/container/flat_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
+#include <mutex>
+#include <set>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/client/replica_set_monitor_server_parameters.h"
+#include "mongo/client/sdam/topology_listener.h"
 #include "mongo/client/streamable_replica_set_monitor.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
@@ -47,9 +57,14 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/util/duration.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -74,8 +89,8 @@ const auto getGlobalRSMMonitorManager =
 
 Status ReplicaSetMonitorManagerNetworkConnectionHook::validateHost(
     const HostAndPort& remoteHost,
-    const BSONObj& isMasterRequest,
-    const executor::RemoteCommandResponse& isMasterReply) {
+    const BSONObj& helloRequest,
+    const executor::RemoteCommandResponse& helloReply) {
     auto monitor = ReplicaSetMonitorManager::get()->getMonitorForHost(remoteHost);
     if (!monitor) {
         return Status::OK();
@@ -87,19 +102,19 @@ Status ReplicaSetMonitorManagerNetworkConnectionHook::validateHost(
         auto publisher = streamableMonitor->getEventsPublisher();
         if (publisher) {
             try {
-                if (isMasterReply.status.isOK()) {
+                if (helloReply.status.isOK()) {
                     publisher->onServerHandshakeCompleteEvent(
-                        *isMasterReply.elapsed, remoteHost, isMasterReply.data);
+                        *helloReply.elapsed, remoteHost, helloReply.data);
                 } else {
                     publisher->onServerHandshakeFailedEvent(
-                        remoteHost, isMasterReply.status, isMasterReply.data);
+                        remoteHost, helloReply.status, helloReply.data);
                 }
             } catch (const DBException& exception) {
                 LOGV2_ERROR(4712101,
                             "An error occurred publishing a ReplicaSetMonitor handshake event",
                             "error"_attr = exception.toStatus(),
                             "replicaSet"_attr = monitor->getName(),
-                            "handshakeStatus"_attr = isMasterReply.status);
+                            "handshakeStatus"_attr = helloReply.status);
                 return exception.toStatus();
             }
         }

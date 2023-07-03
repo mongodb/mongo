@@ -3,7 +3,7 @@
 
 /* gzlib.c -- zlib functions common to reading and writing gzip files
  * Copyright (C) 2004-2017 Mark Adler
- * For conditions of distribution and use, see http://www.zlib.net/zlib_license.html
+ * For conditions of distribution and use, see https://www.zlib.net/zlib_license.html
  */
 
 #include "gzguts.h"
@@ -19,8 +19,8 @@
 #endif
 
 /* Local functions */
-local void gz_reset OF((gz_statep));
-local gzFile gz_open OF((const void *, int, const char *));
+local void gz_reset _Z_OF((gz_statep));
+local gzFile gz_open _Z_OF((const void *, int, const char *));
 
 #if defined UNDER_CE
 

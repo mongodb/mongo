@@ -29,6 +29,13 @@
 
 #pragma once
 
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/db/tenant_id.h"
@@ -60,8 +67,11 @@ public:
      * Do not use this function when serializing a NamespaceString object for catalog.
      */
     static std::string serialize(const NamespaceString& ns,
-                                 const SerializationContext& context = SerializationContext(),
-                                 const SerializationOptions& = {});
+                                 const SerializationContext& context = SerializationContext());
+
+    static std::string serialize(const NamespaceString& ns,
+                                 const SerializationOptions& options,
+                                 const SerializationContext& context = SerializationContext());
 
     /**
      * Serializes a NamespaceString object for catalog.
@@ -73,11 +83,14 @@ public:
      */
     static std::string serializeForCatalog(const NamespaceString& ns);
 
-    // TODO SERVER-74284: Privatize the worker functions
-    static std::string serializeForStorage(
-        const NamespaceString& ns, const SerializationContext& context = SerializationContext());
-
-    static std::string serializeForCommands(
+    /**
+     * This function serialize a NamespaceString without checking for presence of TenantId. This
+     * must only be used by auth systems which are not yet tenant aware.
+     *
+     * TODO SERVER-74896 Remove this function. Any remaining call sites must be changed to use the
+     * proper NamespaceStringUtil serialize method..
+     */
+    static std::string serializeForAuth(
         const NamespaceString& ns, const SerializationContext& context = SerializationContext());
 
     /**
@@ -109,17 +122,6 @@ public:
         StringData ns,
         const SerializationContext& context = SerializationContext());
 
-    // TODO SERVER-74284: Privatize the worker functions
-    static NamespaceString deserializeForStorage(
-        boost::optional<TenantId> tenantId,
-        StringData ns,
-        const SerializationContext& context = SerializationContext());
-
-    static NamespaceString deserializeForCommands(
-        boost::optional<TenantId> tenantId,
-        StringData ns,
-        const SerializationContext& context = SerializationContext());
-
     static NamespaceString parseNamespaceFromRequest(const boost::optional<TenantId>& tenantId,
                                                      StringData ns);
 
@@ -139,6 +141,31 @@ public:
     static NamespaceString parseNamespaceFromDoc(const DatabaseName& dbName, StringData coll);
 
     static NamespaceString parseNamespaceFromResponse(const DatabaseName& dbName, StringData coll);
+
+    /**
+     * Constructs a NamespaceString from the string 'ns'. Should only be used when reading a
+     * namespace from disk. 'ns' is expected to contain a tenantId when running in Serverless mode.
+     */
+    static NamespaceString parseFromStringExpectTenantIdInMultitenancyMode(StringData ns);
+
+    static NamespaceString parseFailPointData(const BSONObj& data, StringData nsFieldName);
+
+private:
+    static std::string serializeForStorage(
+        const NamespaceString& ns, const SerializationContext& context = SerializationContext());
+
+    static std::string serializeForCommands(
+        const NamespaceString& ns, const SerializationContext& context = SerializationContext());
+
+    static NamespaceString deserializeForStorage(
+        boost::optional<TenantId> tenantId,
+        StringData ns,
+        const SerializationContext& context = SerializationContext());
+
+    static NamespaceString deserializeForCommands(
+        boost::optional<TenantId> tenantId,
+        StringData ns,
+        const SerializationContext& context = SerializationContext());
 };
 
 }  // namespace mongo

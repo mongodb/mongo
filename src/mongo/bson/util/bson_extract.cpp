@@ -29,7 +29,11 @@
 
 #include "mongo/bson/util/bson_extract.h"
 
-#include "mongo/db/jsobj.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

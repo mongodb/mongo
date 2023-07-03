@@ -29,7 +29,36 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -58,10 +87,15 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::string parseTimeName, UserMode allUsers, LocalOpsMode localOps)
+        LiteParsed(std::string parseTimeName,
+                   const boost::optional<TenantId>& tenantId,
+                   UserMode allUsers,
+                   LocalOpsMode localOps)
             : LiteParsedDocumentSource(std::move(parseTimeName)),
               _allUsers(allUsers),
-              _localOps(localOps) {}
+              _localOps(localOps),
+              _privileges(
+                  {Privilege(ResourcePattern::forClusterResource(tenantId), ActionType::inprog)}) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
@@ -69,17 +103,15 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final {
-            PrivilegeVector privileges;
-
             // In a sharded cluster, we always need the inprog privilege to run $currentOp on the
             // shards. If we are only looking up local mongoS operations, we do not need inprog to
             // view our own ops but *do* require it to view other users' ops.
             if (_allUsers == UserMode::kIncludeAll ||
                 (isMongos && _localOps == LocalOpsMode::kRemoteShardOps)) {
-                privileges.push_back({ResourcePattern::forClusterResource(), ActionType::inprog});
+                return _privileges;
             }
 
-            return privileges;
+            return PrivilegeVector();
         }
 
         bool allowedToPassthroughFromMongos() const final {
@@ -102,6 +134,7 @@ public:
     private:
         const UserMode _allUsers;
         const LocalOpsMode _localOps;
+        const PrivilegeVector _privileges;
     };
 
     static boost::intrusive_ptr<DocumentSourceCurrentOp> create(
@@ -112,17 +145,26 @@ public:
         boost::optional<LocalOpsMode> showLocalOpsOnMongoS = boost::none,
         boost::optional<TruncationMode> truncateOps = boost::none,
         boost::optional<CursorMode> idleCursors = boost::none,
-        boost::optional<BacktraceMode> backtrace = boost::none);
+        boost::optional<BacktraceMode> backtrace = boost::none,
+        boost::optional<bool> targetAllNodes = boost::none);
 
     const char* getSourceName() const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         bool showLocalOps =
             _showLocalOpsOnMongoS.value_or(kDefaultLocalOpsMode) == LocalOpsMode::kLocalMongosOps;
+        HostTypeRequirement hostTypeRequirement;
+        if (showLocalOps) {
+            hostTypeRequirement = HostTypeRequirement::kLocalOnly;
+        } else if (_targetAllNodes.value_or(false)) {
+            hostTypeRequirement = HostTypeRequirement::kAllShardServers;
+        } else {
+            hostTypeRequirement = HostTypeRequirement::kAnyShard;
+        }
         StageConstraints constraints(
             StreamType::kStreaming,
             PositionRequirement::kFirst,
-            (showLocalOps ? HostTypeRequirement::kLocalOnly : HostTypeRequirement::kAnyShard),
+            hostTypeRequirement,
             DiskUseRequirement::kNoDiskUse,
             FacetRequirement::kNotAllowed,
             TransactionRequirement::kNotAllowed,
@@ -153,7 +195,8 @@ private:
                             boost::optional<LocalOpsMode> showLocalOpsOnMongoS,
                             boost::optional<TruncationMode> truncateOps,
                             boost::optional<CursorMode> idleCursors,
-                            boost::optional<BacktraceMode> backtrace)
+                            boost::optional<BacktraceMode> backtrace,
+                            boost::optional<bool> targetAllNodes)
         : DocumentSource(kStageName, pExpCtx),
           _includeIdleConnections(includeIdleConnections),
           _includeIdleSessions(includeIdleSessions),
@@ -161,7 +204,8 @@ private:
           _showLocalOpsOnMongoS(showLocalOpsOnMongoS),
           _truncateOps(truncateOps),
           _idleCursors(idleCursors),
-          _backtrace(backtrace) {}
+          _backtrace(backtrace),
+          _targetAllNodes(targetAllNodes) {}
 
     GetNextResult doGetNext() final;
 
@@ -173,6 +217,7 @@ private:
     boost::optional<CursorMode> _idleCursors;
     boost::optional<BacktraceMode> _backtrace;
 
+    boost::optional<bool> _targetAllNodes;
     std::string _shardName;
 
     std::vector<BSONObj> _ops;

@@ -29,22 +29,59 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 #include <algorithm>
+#include <map>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/client/index_spec.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_yield_restore.h"
+#include "mongo/db/catalog/index_build_block.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/resource_catalog.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/resumable_index_builds_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -55,7 +92,7 @@ namespace {
 class CollectionCatalogTest : public ServiceContextMongoDTest {
 public:
     CollectionCatalogTest()
-        : nss("testdb", "testcol"),
+        : nss(NamespaceString::createNamespaceString_forTest("testdb", "testcol")),
           col(nullptr),
           colUUID(UUID::gen()),
           nextUUID(UUID::gen()),
@@ -195,7 +232,7 @@ public:
             auto collName = coll->ns();
             ResourceId rid(RESOURCE_COLLECTION, collName);
 
-            ASSERT_NE(ResourceCatalog::get(getServiceContext()).name(rid), boost::none);
+            ASSERT_NE(ResourceCatalog::get().name(rid), boost::none);
             numEntries++;
         }
         ASSERT_EQ(5, numEntries);
@@ -237,20 +274,20 @@ TEST_F(CollectionCatalogResourceTest, RemoveAllResources) {
 
     const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "resourceDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
-    ASSERT_EQ(boost::none, ResourceCatalog::get(getServiceContext()).name(rid));
+    ASSERT_EQ(boost::none, ResourceCatalog::get().name(rid));
 
     for (int i = 0; i < 5; i++) {
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(
             "resourceDb", "coll" + std::to_string(i));
         rid = ResourceId(RESOURCE_COLLECTION, nss);
-        ASSERT_EQ(boost::none, ResourceCatalog::get(getServiceContext()).name(rid));
+        ASSERT_EQ(boost::none, ResourceCatalog::get().name(rid));
     }
 }
 
 TEST_F(CollectionCatalogResourceTest, LookupDatabaseResource) {
     const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "resourceDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
-    auto ridStr = ResourceCatalog::get(getServiceContext()).name(rid);
+    auto ridStr = ResourceCatalog::get().name(rid);
 
     ASSERT(ridStr);
     ASSERT(ridStr->find(dbName.toStringWithTenantId_forTest()) != std::string::npos);
@@ -259,14 +296,14 @@ TEST_F(CollectionCatalogResourceTest, LookupDatabaseResource) {
 TEST_F(CollectionCatalogResourceTest, LookupMissingDatabaseResource) {
     const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "missingDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
-    ASSERT(!ResourceCatalog::get(getServiceContext()).name(rid));
+    ASSERT(!ResourceCatalog::get().name(rid));
 }
 
 TEST_F(CollectionCatalogResourceTest, LookupCollectionResource) {
     const NamespaceString collNs =
         NamespaceString::createNamespaceString_forTest(boost::none, "resourceDb.coll1");
     auto rid = ResourceId(RESOURCE_COLLECTION, collNs);
-    auto ridStr = ResourceCatalog::get(getServiceContext()).name(rid);
+    auto ridStr = ResourceCatalog::get().name(rid);
 
     ASSERT(ridStr);
     ASSERT(ridStr->find(collNs.toStringWithTenantId_forTest()) != std::string::npos);
@@ -276,7 +313,7 @@ TEST_F(CollectionCatalogResourceTest, LookupMissingCollectionResource) {
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest(boost::none, "resourceDb.coll5");
     auto rid = ResourceId(RESOURCE_COLLECTION, nss);
-    ASSERT(!ResourceCatalog::get(getServiceContext()).name(rid));
+    ASSERT(!ResourceCatalog::get().name(rid));
 }
 
 TEST_F(CollectionCatalogResourceTest, RemoveCollection) {
@@ -285,7 +322,7 @@ TEST_F(CollectionCatalogResourceTest, RemoveCollection) {
     auto coll = catalog.lookupCollectionByNamespace(opCtx.get(), NamespaceString(collNs));
     catalog.deregisterCollection(opCtx.get(), coll->uuid(), /*isDropPending=*/false, boost::none);
     auto rid = ResourceId(RESOURCE_COLLECTION, collNs);
-    ASSERT(!ResourceCatalog::get(getServiceContext()).name(rid));
+    ASSERT(!ResourceCatalog::get().name(rid));
 }
 
 // Create an iterator over the CollectionCatalog and assert that all collections are present.
@@ -318,15 +355,16 @@ TEST_F(CollectionCatalogTest, OnCreateCollection) {
 
 TEST_F(CollectionCatalogTest, LookupCollectionByUUID) {
     // Ensure the string value of the NamespaceString of the obtained Collection is equal to
-    // nss.ns().
-    ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), colUUID)->ns().ns(), nss.ns());
+    // nss.ns_forTest().
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), colUUID)->ns().ns_forTest(),
+                  nss.ns_forTest());
     // Ensure lookups of unknown UUIDs result in null pointers.
     ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), UUID::gen()) == nullptr);
 }
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUID) {
-    // Ensure the string value of the obtained NamespaceString is equal to nss.ns().
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), colUUID)->ns(), nss.ns());
+    // Ensure the string value of the obtained NamespaceString is equal to nss.ns_forTest().
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), colUUID)->ns_forTest(), nss.ns_forTest());
     // Ensure namespace lookups of unknown UUIDs result in empty NamespaceStrings.
     ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), UUID::gen()), boost::none);
 }
@@ -622,81 +660,6 @@ TEST_F(CollectionCatalogTest, DatabaseProfileLevel) {
               serverGlobalParams.defaultProfile + 1);
 }
 
-TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommittedCollections) {
-    NamespaceString aColl = NamespaceString::createNamespaceString_forTest("dbA", "collA");
-    NamespaceString b1Coll = NamespaceString::createNamespaceString_forTest("dbB", "collB1");
-    NamespaceString b2Coll = NamespaceString::createNamespaceString_forTest("dbB", "collB2");
-    NamespaceString cColl = NamespaceString::createNamespaceString_forTest("dbC", "collC");
-    NamespaceString d1Coll = NamespaceString::createNamespaceString_forTest("dbD", "collD1");
-    NamespaceString d2Coll = NamespaceString::createNamespaceString_forTest("dbD", "collD2");
-    NamespaceString d3Coll = NamespaceString::createNamespaceString_forTest("dbD", "collD3");
-
-    std::vector<NamespaceString> nsss = {aColl, b1Coll, b2Coll, cColl, d1Coll, d2Coll, d3Coll};
-    for (auto& nss : nsss) {
-        std::shared_ptr<Collection> newColl = std::make_shared<CollectionMock>(nss);
-        catalog.registerCollection(opCtx.get(), std::move(newColl), boost::none);
-    }
-
-    // One dbName with only an invisible collection does not appear in dbNames. Use const_cast to
-    // modify the collection in the catalog inplace, this bypasses copy-on-write behavior.
-    auto invisibleCollA =
-        const_cast<Collection*>(catalog.lookupCollectionByNamespace(opCtx.get(), aColl));
-    invisibleCollA->setCommitted(false);
-
-    Lock::DBLock dbLock(opCtx.get(), aColl.dbName(), MODE_S);
-    auto res = catalog.getAllCollectionNamesFromDb(
-        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "dbA"));
-    ASSERT(res.empty());
-
-    std::vector<DatabaseName> dbNames = {
-        DatabaseName::createDatabaseName_forTest(boost::none, "dbB"),
-        DatabaseName::createDatabaseName_forTest(boost::none, "dbC"),
-        DatabaseName::createDatabaseName_forTest(boost::none, "dbD"),
-        DatabaseName::createDatabaseName_forTest(boost::none, "testdb")};
-    ASSERT(catalog.getAllDbNames() == dbNames);
-
-    // One dbName with both visible and invisible collections is still visible.
-    std::vector<NamespaceString> dbDNss = {d1Coll, d2Coll, d3Coll};
-    for (auto& nss : dbDNss) {
-        // Test each combination of one collection in dbD being invisible while the other two are
-        // visible.
-        std::vector<NamespaceString> dCollList = dbDNss;
-        dCollList.erase(std::find(dCollList.begin(), dCollList.end(), nss));
-
-        // Use const_cast to modify the collection in the catalog inplace, this bypasses
-        // copy-on-write behavior.
-        auto invisibleCollD =
-            const_cast<Collection*>(catalog.lookupCollectionByNamespace(opCtx.get(), nss));
-        invisibleCollD->setCommitted(false);
-
-        Lock::DBLock dbLock(opCtx.get(), d1Coll.dbName(), MODE_S);
-        res = catalog.getAllCollectionNamesFromDb(
-            opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "dbD"));
-        std::sort(res.begin(), res.end());
-        ASSERT(res == dCollList);
-
-        ASSERT(catalog.getAllDbNames() == dbNames);
-        invisibleCollD->setCommitted(true);
-    }
-
-    invisibleCollA->setCommitted(true);  // reset visibility.
-
-    // If all dbNames consist only of invisible collections, none of these dbs is visible.
-    for (auto& nss : nsss) {
-        // Use const_cast to modify the collection in the catalog inplace, this bypasses
-        // copy-on-write behavior.
-        auto invisibleColl =
-            const_cast<Collection*>(catalog.lookupCollectionByNamespace(opCtx.get(), nss));
-        invisibleColl->setCommitted(false);
-    }
-
-    std::vector<DatabaseName> dbList = {
-        DatabaseName::createDatabaseName_forTest(boost::none, "testdb")};
-    ASSERT(catalog.getAllDbNames() == dbList);
-
-    catalog.deregisterAllCollectionsAndViews(getServiceContext());
-}
-
 class ForEachCollectionFromDbTest : public CatalogTestFixture {
 public:
     void createTestData() {
@@ -881,7 +844,7 @@ public:
                           const NamespaceString& from,
                           const NamespaceString& to,
                           Timestamp timestamp) {
-        invariant(from.db() == to.db());
+        invariant(from == to);
 
         _setupDDLOperation(opCtx, timestamp);
         WriteUnitOfWork wuow(opCtx);
@@ -934,7 +897,7 @@ public:
         auto indexBuildBlock = std::make_unique<IndexBuildBlock>(
             writableColl->ns(), indexSpec, IndexBuildMethod::kForeground, UUID::gen());
         uassertStatusOK(indexBuildBlock->init(opCtx, writableColl, /*forRecover=*/false));
-        uassertStatusOK(indexBuildBlock->getEntry(opCtx, writableColl)
+        uassertStatusOK(indexBuildBlock->getWritableEntry(opCtx, writableColl)
                             ->accessMethod()
                             ->initializeAsEmpty(opCtx));
         wuow.commit();
@@ -1033,13 +996,17 @@ public:
         Timestamp timestamp,
         bool openSnapshotBeforeCommit,
         bool expectedExistence,
-        int expectedNumIndexes) {
+        int expectedNumIndexes,
+        std::function<void(OperationContext*)> extraOpHook = {}) {
         _concurrentDDLOperationAndEstablishConsistentCollection(
             opCtx,
             readNssOrUUID,
             timestamp,
-            [this, &nss, &indexSpec](OperationContext* opCtx) {
+            [this, &nss, &indexSpec, extraOpHook](OperationContext* opCtx) {
                 _createIndex(opCtx, nss, indexSpec);
+                if (extraOpHook) {
+                    extraOpHook(opCtx);
+                }
             },
             openSnapshotBeforeCommit,
             expectedExistence,
@@ -1054,13 +1021,17 @@ public:
         Timestamp timestamp,
         bool openSnapshotBeforeCommit,
         bool expectedExistence,
-        int expectedNumIndexes) {
+        int expectedNumIndexes,
+        std::function<void(OperationContext*)> extraOpHook = {}) {
         _concurrentDDLOperationAndEstablishConsistentCollection(
             opCtx,
             readNssOrUUID,
             timestamp,
-            [this, &nss, &indexName](OperationContext* opCtx) {
+            [this, &nss, &indexName, extraOpHook](OperationContext* opCtx) {
                 _dropIndex(opCtx, nss, indexName);
+                if (extraOpHook) {
+                    extraOpHook(opCtx);
+                }
             },
             openSnapshotBeforeCommit,
             expectedExistence,
@@ -1103,10 +1074,11 @@ private:
             uassertStatusOK(storageEngine->getCatalog()->createCollection(
                 opCtx, nss, options, /*allocateDefaultSpace=*/true));
         auto& catalogId = catalogIdRecordStorePair.first;
+        auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
+        auto metadata = catalogEntry->metadata;
         std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
-            opCtx, nss, catalogId, options, std::move(catalogIdRecordStorePair.second));
+            opCtx, nss, catalogId, metadata, std::move(catalogIdRecordStorePair.second));
         ownedCollection->init(opCtx);
-        ownedCollection->setCommitted(false);
 
         // Adds the collection to the in-memory catalog.
         CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
@@ -1125,11 +1097,11 @@ private:
         writableCollection->getAllIndexes(&indexNames);
         for (const auto& indexName : indexNames) {
             IndexCatalog* indexCatalog = writableCollection->getIndexCatalog();
-            auto indexDescriptor = indexCatalog->findIndexByName(
+            auto writableEntry = indexCatalog->getWritableEntryByName(
                 opCtx, indexName, IndexCatalog::InclusionPolicy::kReady);
 
             // This also adds the index ident to the drop-pending reaper.
-            ASSERT_OK(indexCatalog->dropIndex(opCtx, writableCollection, indexDescriptor));
+            ASSERT_OK(indexCatalog->dropIndexEntry(opCtx, writableCollection, writableEntry));
         }
 
         // Add the collection ident to the drop-pending reaper.
@@ -1184,11 +1156,11 @@ private:
         Collection* writableCollection = collection.getWritableCollection(opCtx);
 
         IndexCatalog* indexCatalog = writableCollection->getIndexCatalog();
-        auto indexDescriptor =
-            indexCatalog->findIndexByName(opCtx, indexName, IndexCatalog::InclusionPolicy::kReady);
+        auto writableEntry = indexCatalog->getWritableEntryByName(
+            opCtx, indexName, IndexCatalog::InclusionPolicy::kReady);
 
         // This also adds the index ident to the drop-pending reaper.
-        ASSERT_OK(indexCatalog->dropIndex(opCtx, writableCollection, indexDescriptor));
+        ASSERT_OK(indexCatalog->dropIndexEntry(opCtx, writableCollection, writableEntry));
     }
 
     /**
@@ -1237,10 +1209,24 @@ private:
             // The onCommit handler must be registered prior to the DDL operation so it's executed
             // before any onCommit handlers set up in the operation.
             if (!openSnapshotBeforeCommit) {
-                newOpCtx.get()->recoveryUnit()->onCommit(
-                    [&commitHandler](OperationContext*, boost::optional<Timestamp>) {
-                        commitHandler();
-                    });
+                // Need to use 'registerChangeForCatalogVisibility' so it can happen after storage
+                // engine commit but before the changes become visible in the catalog.
+                class ChangeForCatalogVisibility : public RecoveryUnit::Change {
+                public:
+                    ChangeForCatalogVisibility(std::function<void()> commitHandler)
+                        : callback(std::move(commitHandler)) {}
+
+                    void commit(OperationContext* opCtx, boost::optional<Timestamp>) final {
+                        callback();
+                    }
+
+                    void rollback(OperationContext* opCtx) final {}
+
+                    std::function<void()> callback;
+                };
+
+                newOpCtx.get()->recoveryUnit()->registerChangeForCatalogVisibility(
+                    std::make_unique<ChangeForCatalogVisibility>(commitHandler));
             }
 
             ddlOperation(newOpCtx.get());
@@ -1293,32 +1279,31 @@ private:
             ASSERT_EQ(coll->getIndexCatalog()->numIndexesTotal(), expectedNumIndexes);
 
             auto catalogEntry =
-                DurableCatalog::get(opCtx)->getCatalogEntry(opCtx, coll->getCatalogId());
-            ASSERT(!catalogEntry.isEmpty());
-            ASSERT(
-                coll->isMetadataEqual(DurableCatalog::getMetadataFromCatalogEntry(catalogEntry)));
+                DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, coll->getCatalogId());
+            ASSERT(catalogEntry);
+            ASSERT(coll->isMetadataEqual(catalogEntry->metadata->toBSON()));
 
             // Lookups from the catalog should return the newly opened collection.
             ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx, coll->ns()), coll);
             ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx, coll->uuid()), coll);
         } else {
             ASSERT(!coll);
-            if (auto nss = nssOrUUID.nss()) {
+            if (nssOrUUID.isNamespaceString()) {
                 auto catalogEntry =
-                    DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, *nss);
+                    DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nssOrUUID.nss());
                 ASSERT(!catalogEntry);
 
                 // Lookups from the catalog should return the newly opened collection (in this case
                 // nullptr).
-                ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx, *nss), coll);
-            } else if (auto uuid = nssOrUUID.uuid()) {
+                ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx, nssOrUUID.nss()), coll);
+            } else {
                 auto catalogEntry =
-                    DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, *uuid);
+                    DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, nssOrUUID.uuid());
                 ASSERT(!catalogEntry);
 
                 // Lookups from the catalog should return the newly opened collection (in this case
                 // nullptr).
-                ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx, *uuid), coll);
+                ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx, nssOrUUID.uuid()), coll);
             }
         }
 
@@ -2493,10 +2478,13 @@ TEST_F(CollectionCatalogTimestampTest,
     createCollection(opCtx.get(), originalNss, createOriginalCollectionTs);
     createCollection(opCtx.get(), targetNss, createTargetCollectionTs);
 
-    // We expect to find the UUID for the target collection
+    // We expect to find the UUID for the original collection
     UUID uuid = CollectionCatalog::get(opCtx.get())
-                    ->lookupCollectionByNamespace(opCtx.get(), targetNss)
+                    ->lookupCollectionByNamespace(opCtx.get(), originalNss)
                     ->uuid();
+    UUID uuidDropped = CollectionCatalog::get(opCtx.get())
+                           ->lookupCollectionByNamespace(opCtx.get(), targetNss)
+                           ->uuid();
 
     // When the snapshot is opened right after the rename is committed to the durable catalog, and
     // the openCollection looks for the targetNss, we find the original collection.
@@ -2507,6 +2495,8 @@ TEST_F(CollectionCatalogTimestampTest,
                 CollectionCatalog::get(opCtx.get())->lookupCollectionByUUID(opCtx.get(), uuid);
             ASSERT(coll);
             ASSERT_EQ(coll->ns(), targetNss);
+            ASSERT(!CollectionCatalog::get(opCtx.get())
+                        ->lookupCollectionByUUID(opCtx.get(), uuidDropped));
 
             ASSERT_EQ(CollectionCatalog::get(opCtx.get())->lookupNSSByUUID(opCtx.get(), uuid),
                       targetNss);
@@ -2718,6 +2708,41 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionBef
                                                           1);
 }
 
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentCreateIndexAndOpenCollectionBeforeCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    // When the snapshot is opened right before the second index create is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentCreateIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                          nss,
+                                                          nss,
+                                                          BSON("v" << 2 << "name"
+                                                                   << "y_1"
+                                                                   << "key" << BSON("y" << 1)),
+                                                          createYIndexTs,
+                                                          true,
+                                                          true,
+                                                          1,
+                                                          makeIndexMultikey);
+}
+
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionAfterCommit) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);
@@ -2744,6 +2769,41 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionAft
                                                           false,
                                                           true,
                                                           2);
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentCreateIndexAndOpenCollectionAfterCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    // When the snapshot is opened right after the second index create is committed to the durable
+    // catalog, the collection instance should have both indexes.
+    concurrentCreateIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                          nss,
+                                                          nss,
+                                                          BSON("v" << 2 << "name"
+                                                                   << "y_1"
+                                                                   << "key" << BSON("y" << 1)),
+                                                          createYIndexTs,
+                                                          false,
+                                                          true,
+                                                          2,
+                                                          makeIndexMultikey);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionByUUIDBeforeCommit) {
@@ -2777,6 +2837,45 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionByU
                                                           1);
 }
 
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentCreateIndexAndOpenCollectionByUUIDBeforeCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    // When the snapshot is opened right before the second index create is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentCreateIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                          nss,
+                                                          uuidWithDbName,
+                                                          BSON("v" << 2 << "name"
+                                                                   << "y_1"
+                                                                   << "key" << BSON("y" << 1)),
+                                                          createYIndexTs,
+                                                          true,
+                                                          true,
+                                                          1,
+                                                          makeIndexMultikey);
+}
+
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionByUUIDAfterCommit) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);
@@ -2808,6 +2907,45 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionByU
                                                           2);
 }
 
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentCreateIndexAndOpenCollectionByUUIDAfterCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    // When the snapshot is opened right after the second index create is committed to the durable
+    // catalog, the collection instance should have both indexes.
+    concurrentCreateIndexAndEstablishConsistentCollection(opCtx.get(),
+                                                          nss,
+                                                          uuidWithDbName,
+                                                          BSON("v" << 2 << "name"
+                                                                   << "y_1"
+                                                                   << "key" << BSON("y" << 1)),
+                                                          createYIndexTs,
+                                                          false,
+                                                          true,
+                                                          2,
+                                                          makeIndexMultikey);
+}
+
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionBeforeCommit) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);
@@ -2834,6 +2972,38 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionBefor
         opCtx.get(), nss, nss, "y_1", dropIndexTs, true, true, 2);
 }
 
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropIndexAndOpenCollectionBeforeCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    // When the snapshot is opened right before the index drop is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentDropIndexAndEstablishConsistentCollection(
+        opCtx.get(), nss, nss, "y_1", dropIndexTs, true, true, 2, makeIndexMultikey);
+}
+
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionAfterCommit) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);
@@ -2858,6 +3028,38 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionAfter
     // catalog, the collection instance should not have the second index.
     concurrentDropIndexAndEstablishConsistentCollection(
         opCtx.get(), nss, nss, "y_1", dropIndexTs, false, true, 1);
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropIndexAndOpenCollectionAfterCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    // When the snapshot is opened right after the index drop is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentDropIndexAndEstablishConsistentCollection(
+        opCtx.get(), nss, nss, "y_1", dropIndexTs, false, true, 1, makeIndexMultikey);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionByUUIDBeforeCommit) {
@@ -2889,6 +3091,42 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionByUUI
         opCtx.get(), nss, uuidWithDbName, "y_1", dropIndexTs, true, true, 2);
 }
 
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropIndexAndOpenCollectionByUUIDBeforeCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    // When the snapshot is opened right before the index drop is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentDropIndexAndEstablishConsistentCollection(
+        opCtx.get(), nss, uuidWithDbName, "y_1", dropIndexTs, true, true, 2, makeIndexMultikey);
+}
+
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionByUUIDAfterCommit) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);
@@ -2916,6 +3154,42 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionByUUI
     // catalog, the collection instance should not have the second index.
     concurrentDropIndexAndEstablishConsistentCollection(
         opCtx.get(), nss, uuidWithDbName, "y_1", dropIndexTs, false, true, 1);
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropIndexAndOpenCollectionByUUIDAfterCommitWithUnrelatedMultikey) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+
+    auto makeIndexMultikey = [nss](OperationContext* opCtx) {
+        auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+        coll->setIndexIsMultikey(opCtx, "x_1", {{0U}});
+    };
+
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    // When the snapshot is opened right after the index drop is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentDropIndexAndEstablishConsistentCollection(
+        opCtx.get(), nss, uuidWithDbName, "y_1", dropIndexTs, false, true, 1, makeIndexMultikey);
 }
 
 TEST_F(CollectionCatalogTimestampTest, OpenCollectionBetweenIndexBuildInProgressAndReady) {
@@ -3009,36 +3283,57 @@ TEST_F(CollectionCatalogTimestampTest, ResolveNamespaceStringOrUUIDAtLatest) {
     }
 }
 
-TEST_F(CollectionCatalogTimestampTest, MixedModeWrites) {
-    // This test simulates the creation and dropping of system.profile collections. This collection
-    // is created untimestamped, but dropped with a timestamp.
-    // TODO SERVER-75740: Remove this test.
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("system.profile");
-
-    // Initialize the oldest timestamp.
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.catalogIdTracker().cleanup(Timestamp(1, 1));
-    });
-
-    // Create and drop the collection. We have a time window where the namespace exists.
-    createCollection(opCtx.get(), nss, Timestamp::min());
-    dropCollection(opCtx.get(), nss, Timestamp(10, 10));
-
-    // Before performing cleanup, re-create the collection.
+TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
+    const NamespaceString nss("test.abc");
     createCollection(opCtx.get(), nss, Timestamp::min());
 
-    // Perform collection catalog cleanup.
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.catalogIdTracker().cleanup(Timestamp(20, 20));
-    });
+    {
+        // Start but do not finish an index build.
+        IndexSpec spec;
+        spec.version(1).name("x_1").addKeys(BSON("x" << 1));
+        auto desc = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
+        AutoGetCollection autoColl(opCtx.get(), nss, MODE_X);
+        WriteUnitOfWork wuow(opCtx.get());
+        auto collWriter = autoColl.getWritableCollection(opCtx.get());
+        ASSERT_OK(collWriter->prepareForIndexBuild(opCtx.get(), &desc, boost::none, false));
+        collWriter->getIndexCatalog()->createIndexEntry(
+            opCtx.get(), collWriter, std::move(desc), CreateIndexEntryFlags::kNone);
+        wuow.commit();
+    }
 
-    // Drop the re-created collection.
-    dropCollection(opCtx.get(), nss, Timestamp(30, 30));
+    // In a different client, open the latest collection instance and verify the index is not ready.
+    auto newClient = opCtx->getServiceContext()->makeClient("alternativeClient");
+    auto newOpCtx = newClient->makeOperationContext();
+    auto latestCatalog = CollectionCatalog::latest(newOpCtx.get());
+    auto latestColl =
+        latestCatalog->establishConsistentCollection(newOpCtx.get(), nss, boost::none);
 
-    // Cleanup again.
-    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
-        catalog.catalogIdTracker().cleanup(Timestamp(25, 25));
-    });
+    ASSERT_EQ(1, latestColl->getIndexCatalog()->numIndexesTotal());
+    ASSERT_EQ(0, latestColl->getIndexCatalog()->numIndexesReady());
+    ASSERT_EQ(1, latestColl->getIndexCatalog()->numIndexesInProgress());
+    const IndexDescriptor* desc = latestColl->getIndexCatalog()->findIndexByName(
+        newOpCtx.get(), "x_1", IndexCatalog::InclusionPolicy::kUnfinished);
+    const IndexCatalogEntry* entry = latestColl->getIndexCatalog()->getEntry(desc);
+    ASSERT(!entry->isReady());
+
+    {
+        // Now finish the index build on the original client.
+        AutoGetCollection autoColl(opCtx.get(), nss, MODE_X);
+        WriteUnitOfWork wuow(opCtx.get());
+        auto collWriter = autoColl.getWritableCollection(opCtx.get());
+        auto writableEntry = collWriter->getIndexCatalog()->getWritableEntryByName(
+            opCtx.get(), "x_1", IndexCatalog::InclusionPolicy::kUnfinished);
+        ASSERT_NOT_EQUALS(desc, writableEntry->descriptor());
+        collWriter->getIndexCatalog()->indexBuildSuccess(opCtx.get(), collWriter, writableEntry);
+        ASSERT(writableEntry->isReady());
+        wuow.commit();
+    }
+
+    // The index entry in the different client remains untouched.
+    ASSERT_EQ(1, latestColl->getIndexCatalog()->numIndexesTotal());
+    ASSERT_EQ(0, latestColl->getIndexCatalog()->numIndexesReady());
+    ASSERT_EQ(1, latestColl->getIndexCatalog()->numIndexesInProgress());
+    ASSERT(!entry->isReady());
 }
 }  // namespace
 }  // namespace mongo

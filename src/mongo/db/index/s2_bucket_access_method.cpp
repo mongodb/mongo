@@ -30,17 +30,28 @@
 
 #include "mongo/db/index/s2_bucket_access_method.h"
 
-#include <vector>
+#include <boost/move/utility_core.hpp>
+#include <cmath>
+#include <s2cellid.h>
+#include <string>
+#include <utility>
 
-#include "mongo/base/status.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/geoparser.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
@@ -119,6 +130,7 @@ void S2BucketAccessMethod::validateDocument(const CollectionPtr& collection,
 
 void S2BucketAccessMethod::doGetKeys(OperationContext* opCtx,
                                      const CollectionPtr& collection,
+                                     const IndexCatalogEntry* entry,
                                      SharedBufferFragmentBuilder& pooledBufferBuilder,
                                      const BSONObj& obj,
                                      GetKeysContext context,
@@ -128,7 +140,7 @@ void S2BucketAccessMethod::doGetKeys(OperationContext* opCtx,
                                      const boost::optional<RecordId>& id) const {
     ExpressionKeysPrivate::getS2Keys(pooledBufferBuilder,
                                      obj,
-                                     _descriptor->keyPattern(),
+                                     entry->descriptor()->keyPattern(),
                                      _params,
                                      keys,
                                      multikeyPaths,

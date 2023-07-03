@@ -28,7 +28,12 @@
  */
 
 #include "mongo/db/query/rate_limiting.h"
-#include "mongo/unittest/unittest.h"
+
+#include <memory>
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

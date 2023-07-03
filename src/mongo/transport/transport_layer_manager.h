@@ -29,17 +29,38 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <memory>
+#include <mutex>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/config.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/baton.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/wire_version.h"
+#include "mongo/executor/connection_metrics.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/ssl_connection_context.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/time_support.h"
-
-#include <boost/optional.hpp>
 
 namespace mongo {
 struct ServerGlobalParams;

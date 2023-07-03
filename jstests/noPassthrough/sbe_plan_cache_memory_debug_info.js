@@ -6,7 +6,7 @@
  * stripping debug info even though the size of the classic cache may be below the threshold.
  * @tags: [
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
- *   cqf_incompatible,
+ *   cqf_experimental_incompatible,
  * ]
  */
 (function() {

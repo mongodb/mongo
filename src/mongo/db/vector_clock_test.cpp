@@ -28,20 +28,29 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <limits>
 #include <memory>
+#include <ratio>
 
-#include "mongo/bson/bsonobj.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/vector_clock_test_fixture.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

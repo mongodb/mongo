@@ -29,18 +29,50 @@
 
 #include "mongo/db/s/query_analysis_writer.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <cstdint>
+#include <future>
+#include <new>
+#include <set>
+#include <system_error>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/update/document_diff_calculator.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/query_analysis_sample_tracker.h"
+#include "mongo/stdx/future.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/static_immortal.h"
+#include "mongo/util/synchronized_value.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -50,7 +82,7 @@ namespace {
 
 const NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("testDb", "testColl0");
 const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("testDb", "testColl1");
-const int sampleRate = 100;
+const int samplesPerSecond = 100;
 
 TEST(QueryAnalysisWriterBufferTest, AddBasic) {
     auto buffer = QueryAnalysisWriter::Buffer(nss0);
@@ -180,9 +212,9 @@ public:
 
         auto& tracker = QueryAnalysisSampleTracker::get(operationContext());
         auto configuration0 = CollectionQueryAnalyzerConfiguration(
-            nss0, getCollectionUUID(nss0), sampleRate, Date_t::now());
+            nss0, getCollectionUUID(nss0), samplesPerSecond, Date_t::now());
         auto configuration1 = CollectionQueryAnalyzerConfiguration(
-            nss1, getCollectionUUID(nss1), sampleRate, Date_t::now());
+            nss1, getCollectionUUID(nss1), samplesPerSecond, Date_t::now());
         tracker.refreshConfigurations({configuration0, configuration1});
     }
 
@@ -490,7 +522,7 @@ private:
     int _getConfigDocumentsCount(const NamespaceString& configNss,
                                  const NamespaceString& collNss) const {
         DBDirectClient client(operationContext());
-        return client.count(configNss, BSON("ns" << collNss.toString()));
+        return client.count(configNss, BSON("ns" << collNss.toString_forTest()));
     }
 
     /**
@@ -529,7 +561,7 @@ TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenSampledQueriesIndexExists) {
         FailPoint::alwaysOn,
         0,
         BSON("failCommands" << BSON_ARRAY("createIndexes") << "namespace"
-                            << NamespaceString::kConfigSampledQueriesNamespace.toString()
+                            << NamespaceString::kConfigSampledQueriesNamespace.toStringForErrorMsg()
                             << "errorCode" << ErrorCodes::IndexAlreadyExists
                             << "failInternalCommands" << true << "failLocalClients" << true));
     auto& writer = *QueryAnalysisWriter::get(operationContext());
@@ -543,13 +575,14 @@ TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenSampledQueriesIndexExists) {
 
 TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenSampledQueriesDiffIndexExists) {
     auto failCreateIndexes = globalFailPointRegistry().find("failCommand");
-    failCreateIndexes->setMode(
-        FailPoint::alwaysOn,
-        0,
-        BSON("failCommands" << BSON_ARRAY("createIndexes") << "namespace"
-                            << NamespaceString::kConfigSampledQueriesDiffNamespace.toString()
-                            << "errorCode" << ErrorCodes::IndexAlreadyExists
-                            << "failInternalCommands" << true << "failLocalClients" << true));
+    failCreateIndexes
+        ->setMode(FailPoint::alwaysOn,
+                  0,
+                  BSON("failCommands"
+                       << BSON_ARRAY("createIndexes") << "namespace"
+                       << NamespaceString::kConfigSampledQueriesDiffNamespace.toStringForErrorMsg()
+                       << "errorCode" << ErrorCodes::IndexAlreadyExists << "failInternalCommands"
+                       << true << "failLocalClients" << true));
     auto& writer = *QueryAnalysisWriter::get(operationContext());
     auto future = writer.createTTLIndexes(operationContext());
     future.get();
@@ -564,11 +597,11 @@ TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenAnalyzeShardKeySplitPointsIn
     failCreateIndexes->setMode(
         FailPoint::alwaysOn,
         0,
-        BSON(
-            "failCommands" << BSON_ARRAY("createIndexes") << "namespace"
-                           << NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace.toString()
-                           << "errorCode" << ErrorCodes::IndexAlreadyExists
-                           << "failInternalCommands" << true << "failLocalClients" << true));
+        BSON("failCommands"
+             << BSON_ARRAY("createIndexes") << "namespace"
+             << NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace.toStringForErrorMsg()
+             << "errorCode" << ErrorCodes::IndexAlreadyExists << "failInternalCommands" << true
+             << "failLocalClients" << true));
     auto& writer = *QueryAnalysisWriter::get(operationContext());
     auto future = writer.createTTLIndexes(operationContext());
     future.get();

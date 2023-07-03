@@ -63,6 +63,7 @@
 #include "mongo/db/pipeline/document_source_list_cached_and_active_users.h"
 #include "mongo/db/pipeline/document_source_list_catalog.h"
 #include "mongo/db/pipeline/document_source_list_local_sessions.h"
+#include "mongo/db/pipeline/document_source_list_sampled_queries.h"
 #include "mongo/db/pipeline/document_source_list_sessions.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -87,6 +88,10 @@
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
+#include "mongo/db/s/document_source_analyze_shard_key_read_write_distribution.h"
+#include "mongo/db/s/resharding/document_source_resharding_add_resume_id.h"
+#include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
+#include "mongo/db/s/resharding/document_source_resharding_ownership_match.h"
 
 namespace mongo {
 
@@ -151,6 +156,7 @@ void registerMongodVisitor(ServiceContext* service) {
                        DocumentSourceListCachedAndActiveUsers,
                        DocumentSourceListCatalog,
                        DocumentSourceListLocalSessions,
+                       analyze_shard_key::DocumentSourceListSampledQueries,
                        DocumentSourceListSessions,
                        DocumentSourceLookUp,
                        DocumentSourceMatch,
@@ -172,6 +178,20 @@ void registerMongodVisitor(ServiceContext* service) {
                        DocumentSourceQueryStats,
                        DocumentSourceUnionWith,
                        DocumentSourceUnwind>(&registry);
+}
+
+/**
+ * See 'registerMongodVisitor'. This function has the same semantics except for the DocumentSources
+ * defined in the 's/sharding_runtime_d' module.
+ */
+template <typename T>
+void registerShardingRuntimeDVisitor(ServiceContext* service) {
+    auto& registry = getDocumentSourceVisitorRegistry(service);
+    registerVisitFuncs<T,
+                       analyze_shard_key::DocumentSourceAnalyzeShardKeyReadWriteDistribution,
+                       DocumentSourceReshardingAddResumeId,
+                       DocumentSourceReshardingIterateTransaction,
+                       DocumentSourceReshardingOwnershipMatch>(&registry);
 }
 
 }  // namespace mongo

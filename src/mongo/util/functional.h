@@ -30,7 +30,12 @@
 #pragma once
 
 #include <functional>
+#include <iosfwd>
+#include <memory>
 #include <type_traits>
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"

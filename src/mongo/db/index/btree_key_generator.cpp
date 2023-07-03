@@ -29,10 +29,28 @@
 
 #include "mongo/db/index/btree_key_generator.h"
 
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <iterator>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -89,7 +107,7 @@ std::pair<BSONElement, bool> extractNonArrayElementAtPath(const BSONObj& obj, St
 BtreeKeyGenerator::BtreeKeyGenerator(std::vector<const char*> fieldNames,
                                      std::vector<BSONElement> fixed,
                                      bool isSparse,
-                                     KeyString::Version keyStringVersion,
+                                     key_string::Version keyStringVersion,
                                      Ordering ordering)
     : _keyStringVersion(keyStringVersion),
       _isIdIndex(fieldNames.size() == 1 && std::string("_id") == fieldNames[0]),
@@ -217,7 +235,7 @@ void BtreeKeyGenerator::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder
         if (e.eoo()) {
             keys->insert(_nullKeyString);
         } else {
-            KeyString::PooledBuilder keyString(pooledBufferBuilder, _keyStringVersion, _ordering);
+            key_string::PooledBuilder keyString(pooledBufferBuilder, _keyStringVersion, _ordering);
 
             if (collator) {
                 keyString.appendBSONElement(e, [&](StringData stringData) {
@@ -314,7 +332,7 @@ void BtreeKeyGenerator::_getKeysWithoutArray(SharedBufferFragmentBuilder& pooled
                                              const boost::optional<RecordId>& id,
                                              KeyStringSet* keys) const {
 
-    KeyString::PooledBuilder keyString{pooledBufferBuilder, _keyStringVersion, _ordering};
+    key_string::PooledBuilder keyString{pooledBufferBuilder, _keyStringVersion, _ordering};
     size_t numNotFound{0};
 
     for (auto&& fieldName : _fieldNames) {
@@ -432,7 +450,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
         if (_isSparse && numNotFound == fieldNames->size()) {
             return;
         }
-        KeyString::PooledBuilder keyString(pooledBufferBuilder, _keyStringVersion, _ordering);
+        key_string::PooledBuilder keyString(pooledBufferBuilder, _keyStringVersion, _ordering);
         for (const auto& elem : *fixed) {
             if (collator) {
                 keyString.appendBSONElement(elem, [&](StringData stringData) {
@@ -583,12 +601,12 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
     }
 }
 
-KeyString::Value BtreeKeyGenerator::_buildNullKeyString() const {
+key_string::Value BtreeKeyGenerator::_buildNullKeyString() const {
     BSONObjBuilder nullKeyBuilder;
     for (size_t i = 0; i < _fieldNames.size(); ++i) {
         nullKeyBuilder.appendNull("");
     }
-    KeyString::HeapBuilder nullKeyString(_keyStringVersion, nullKeyBuilder.obj(), _ordering);
+    key_string::HeapBuilder nullKeyString(_keyStringVersion, nullKeyBuilder.obj(), _ordering);
     return nullKeyString.release();
 }
 

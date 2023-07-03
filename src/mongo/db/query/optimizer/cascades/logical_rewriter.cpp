@@ -29,11 +29,37 @@
 
 #include "mongo/db/query/optimizer/cascades/logical_rewriter.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <memory>
+#include <queue>
+#include <type_traits>
+#include <vector>
+
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/bool_expression.h"
+#include "mongo/db/query/optimizer/cascades/rewrite_queues.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
+#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
+#include "mongo/db/query/optimizer/utils/physical_plan_builder.h"
 #include "mongo/db/query/optimizer/utils/reftracker_utils.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer::cascades {
 
@@ -1161,18 +1187,21 @@ struct SubstituteConvert<EvaluationNode> {
             return;
         }
 
-        PSRExpr::visitDNF(conversion->_reqMap.getRoot(), [&](PartialSchemaEntry& entry) {
-            auto& [key, req] = entry;
-            req = {
-                evalNode.getProjectionName(), std::move(req.getIntervals()), req.getIsPerfOnly()};
+        PSRExpr::visitDNF(conversion->_reqMap.getRoot(),
+                          [&](PartialSchemaEntry& entry, const PSRExpr::VisitorContext&) {
+                              auto& [key, req] = entry;
+                              req = {evalNode.getProjectionName(),
+                                     std::move(req.getIntervals()),
+                                     req.getIsPerfOnly()};
 
-            uassert(6624114,
-                    "Eval partial schema requirement must contain a variable name.",
-                    key._projectionName);
-            uassert(6624115,
-                    "Eval partial schema requirement cannot have a range",
-                    isIntervalReqFullyOpenDNF(req.getIntervals()));
-        });
+                              uassert(
+                                  6624114,
+                                  "Eval partial schema requirement must contain a variable name.",
+                                  key._projectionName);
+                              uassert(6624115,
+                                      "Eval partial schema requirement cannot have a range",
+                                      isIntervalReqFullyOpenDNF(req.getIntervals()));
+                          });
 
         ProjectionRenames projectionRenames_unused;
         const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(scanProjName,
@@ -1286,11 +1315,10 @@ struct SplitRequirementsFetchTransport {
 
         const auto& [key, req] = node.getExpr();
         const bool perfOnly = req.getIsPerfOnly();
-        const auto outputBinding = keepProj ? req.getBoundProjectionName() : boost::none;
+        auto outputBinding = keepProj ? req.getBoundProjectionName() : boost::none;
         // perfOnly predicates on the fetch side become trivially true.
-        const auto intervals = ((perfOnly && !left) || !keepPred)
-            ? IntervalReqExpr::makeSingularDNF()
-            : req.getIntervals();
+        auto intervals = ((perfOnly && !left) || !keepPred) ? IntervalReqExpr::makeSingularDNF()
+                                                            : req.getIntervals();
 
         if (outputBinding || !isIntervalReqFullyOpenDNF(intervals)) {
             builder.atom(key,
@@ -1667,7 +1695,8 @@ struct ExploreConvert<SargableNode> {
                                                                 *leftReqs,
                                                                 scanDef,
                                                                 hints,
-                                                                ctx.getConstFold());
+                                                                ctx.getConstFold(),
+                                                                isIndex);
             if (isIndex && leftCandidateIndexes.empty() &&
                 PSRExpr::isSingletonDisjunction(leftReqs->getRoot())) {
                 // Reject rewrite, because further splitting can only be conjunctive,
@@ -1682,7 +1711,8 @@ struct ExploreConvert<SargableNode> {
                                                                 *rightReqs,
                                                                 scanDef,
                                                                 hints,
-                                                                ctx.getConstFold());
+                                                                ctx.getConstFold(),
+                                                                isIndex);
             }
 
             if (isIndex && rightCandidateIndexes.empty() &&

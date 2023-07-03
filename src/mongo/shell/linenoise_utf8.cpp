@@ -30,12 +30,18 @@
 #include "mongo/shell/linenoise_utf8.h"
 
 #ifdef _WIN32
-#include "mongo/platform/windows_basic.h"
-#include "mongo/util/text.h"
 #include <io.h>
+
+#include "mongo/platform/windows_basic.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 #else
+#include "mongo/config.h"  // IWYU pragma: keep
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
+#endif
+
 
 namespace linenoise_utf8 {
 

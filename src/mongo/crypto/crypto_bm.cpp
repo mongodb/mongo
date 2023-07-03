@@ -27,15 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <array>
 #include <benchmark/benchmark.h>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
 
-#include "mongo/crypto/aead_encryption.h"
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
 #include "mongo/crypto/fle_crypto.h"
-#include "mongo/crypto/fle_fields_util.h"
+#include "mongo/crypto/fle_crypto_types.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/crypto/symmetric_key.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

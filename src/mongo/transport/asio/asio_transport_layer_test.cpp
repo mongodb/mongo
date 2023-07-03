@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/transport/asio/asio_transport_layer.h"
-
 #include <fstream>
 #include <queue>
 #include <system_error>
@@ -40,7 +38,6 @@
 
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/config.h"
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -50,6 +47,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/asio/asio_session.h"
+#include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_options_gen.h"
@@ -66,7 +64,6 @@
 #include "mongo/util/waitable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -363,8 +360,6 @@ public:
     }
 
 private:
-    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagConnHealthMetrics",
-                                                                true};
     std::unique_ptr<transport::AsioTransportLayer> _tla;
     MockSEP _sep;
 
@@ -864,7 +859,7 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
  * client-side of this connection is associated with `_connThread`, and the server-side is wrapped
  * inside `_client`.
  */
-class AsioNetworkingBatonTest : public LockerNoopServiceContextTest {
+class AsioNetworkingBatonTest : public ServiceContextTest {
 public:
     /**
      * Emplaces a Promise with the first ingress session. Can optionally accept

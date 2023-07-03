@@ -28,7 +28,27 @@
  */
 
 #include "mongo/db/geo/shapes.h"
-#include "mongo/db/jsobj.h"
+
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdlib>
+#include <r1interval.h>
+#include <s1angle.h>
+#include <s2.h>
+#include <s2cap.h>
+#include <s2cell.h>
+#include <s2latlng.h>
+#include <s2polygon.h>
+#include <s2polyline.h>
+#include <util/math/vector2-inl.h>
+#include <util/math/vector2.h>
+
+#include <s2cellid.h>
+#include <util/math/vector3-inl.h>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 using std::abs;
@@ -105,8 +125,8 @@ bool Box::onBoundary(double bound, double val, double fudge) const {
 }
 
 bool Box::mid(double amin, double amax, double bmin, double bmax, bool min, double* res) const {
-    verify(amin <= amax);
-    verify(bmin <= bmax);
+    MONGO_verify(amin <= amax);
+    MONGO_verify(bmin <= bmax);
 
     if (amin < bmin) {
         if (amax < bmin)
@@ -629,7 +649,7 @@ double spheredist_rad(const Point& p1, const Point& p2) {
 
     if (cross_prod >= 1 || cross_prod <= -1) {
         // fun with floats
-        verify(fabs(cross_prod) - 1 < 1e-6);
+        MONGO_verify(fabs(cross_prod) - 1 < 1e-6);
         return cross_prod > 0 ? 0 : M_PI;
     }
 

@@ -29,15 +29,23 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <compare>
+#include <iterator>
 #include <map>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/transport/transport_layer.h"

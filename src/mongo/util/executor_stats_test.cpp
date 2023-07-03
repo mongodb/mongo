@@ -28,18 +28,27 @@
  */
 
 
+#include <cstddef>
 #include <fmt/format.h>
 #include <functional>
 #include <memory>
+#include <ratio>
 #include <string>
-#include <tuple>
-#include <vector>
+#include <utility>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/executor_stats.h"
+#include "mongo/util/functional.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -28,9 +28,15 @@
  */
 
 #include "mongo/db/process_health/fault_facet.h"
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/process_health/fault_facet_impl.h"
 #include "mongo/db/process_health/fault_facet_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/service_context.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 namespace process_health {

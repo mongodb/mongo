@@ -27,8 +27,30 @@
  *    it in the license file.
  */
 
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -43,7 +65,8 @@ protected:
         shard.setHost(_shardName + ":12");
         setupShards({shard});
     }
-    const NamespaceString _nss{"TestDB", "TestColl"};
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
     const UUID _collUuid = UUID::gen();
     const KeyPattern _keyPattern{BSON("x" << 1)};
 };

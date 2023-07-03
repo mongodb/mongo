@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include <cstddef>
+#include <memory>
+
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"

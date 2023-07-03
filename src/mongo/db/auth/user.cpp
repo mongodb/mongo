@@ -29,18 +29,28 @@
 
 #include "mongo/db/auth/user.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <cstddef>
 #include <vector>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/data_range.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/sequence_util.h"
+#include "mongo/db/multitenancy_gen.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -104,11 +114,25 @@ const User::CredentialData& User::getCredentials() const {
 }
 
 ActionSet User::getActionsForResource(const ResourcePattern& resource) const {
-    stdx::unordered_map<ResourcePattern, Privilege>::const_iterator it = _privileges.find(resource);
-    if (it == _privileges.end()) {
-        return ActionSet();
+    if (gMultitenancySupport) {
+        // TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
+        // During migration of resource patterns, we may have a mismatch between privileges and
+        // privilege checks where one may have a tenantId attached and the other doesn't.
+        // Once all checks have been updated, we can remove this branch and use the find below.
+        ActionSet actions;
+        for (const auto& priv : _privileges) {
+            if (priv.second.getResourcePattern().matchesIgnoringTenant(resource)) {
+                actions.addAllActionsFromSet(priv.second.getActions());
+            }
+        }
+        return actions;
     }
-    return it->second.getActions();
+
+    if (auto it = _privileges.find(resource); it != _privileges.end()) {
+        return it->second.getActions();
+    }
+
+    return ActionSet();
 }
 
 bool User::hasActionsForResource(const ResourcePattern& resource) const {

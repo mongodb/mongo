@@ -29,7 +29,28 @@
 
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <memory>
+#include <string>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/data_view.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 
 namespace mongo::timeseries {
 

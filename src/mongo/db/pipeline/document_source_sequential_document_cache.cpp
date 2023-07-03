@@ -27,11 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <iterator>
+#include <list>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
-
-#include "mongo/db/pipeline/document_source_match.h"
 
 namespace mongo {
 
@@ -160,7 +166,7 @@ Value DocumentSourceSequentialDocumentCache::serialize(SerializationOptions opts
         return Value(Document{
             {kStageName,
              Document{{"maxSizeBytes"_sd,
-                       opts.serializeLiteralValue(static_cast<long long>(_cache->maxSizeBytes()))},
+                       opts.serializeLiteral(static_cast<long long>(_cache->maxSizeBytes()))},
                       {"status"_sd,
                        _cache->isBuilding()      ? "kBuilding"_sd
                            : _cache->isServing() ? "kServing"_sd

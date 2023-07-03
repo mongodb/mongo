@@ -27,28 +27,54 @@
  *    it in the license file.
  */
 
-#include <fstream>
+#include <algorithm>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fstream>  // IWYU pragma: keep
 #include <iostream>
 #include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
-#include <boost/algorithm/string.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/format.hpp>
-#include <boost/optional/optional.hpp>
+#include <absl/container/node_hash_set.h>
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/filesystem/path_traits.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/client/sdam/election_id_set_version_pair.h"
 #include "mongo/client/sdam/json_test_arg_parser.h"
+#include "mongo/client/sdam/sdam_configuration.h"
 #include "mongo/client/sdam/sdam_configuration_parameters_gen.h"
+#include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/client/sdam/server_description.h"
+#include "mongo/client/sdam/topology_description.h"
 #include "mongo/client/sdam/topology_manager.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/optional_util.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -85,13 +111,13 @@ public:
         for (auto& response : bsonResponses) {
             const auto pair = response.Array();
             const auto address = HostAndPort(pair[0].String());
-            const auto bsonIsMaster = pair[1].Obj();
+            const auto bsonHello = pair[1].Obj();
 
-            if (bsonIsMaster.nFields() == 0) {
-                _isMasterResponses.push_back(HelloOutcome(address, BSONObj(), "network error"));
+            if (bsonHello.nFields() == 0) {
+                _helloResponses.push_back(HelloOutcome(address, BSONObj(), "network error"));
             } else {
-                _isMasterResponses.push_back(
-                    HelloOutcome(address, bsonIsMaster, duration_cast<HelloRTT>(kLatency)));
+                _helloResponses.push_back(
+                    HelloOutcome(address, bsonHello, duration_cast<HelloRTT>(kLatency)));
             }
         }
         _topologyOutcome = phase["outcome"].Obj();
@@ -112,7 +138,7 @@ public:
     PhaseResult execute(TopologyManager& topology) const {
         PhaseResult testResult{{}, _phaseNum};
 
-        for (const auto& response : _isMasterResponses) {
+        for (const auto& response : _helloResponses) {
             auto descriptionStr =
                 (response.getResponse()) ? response.getResponse()->toString() : "[ Network Error ]";
             LOGV2(20202,
@@ -429,7 +455,7 @@ private:
 
     MongoURI _testUri;
     int _phaseNum;
-    std::vector<HelloOutcome> _isMasterResponses;
+    std::vector<HelloOutcome> _helloResponses;
     BSONObj _topologyOutcome;
 };
 

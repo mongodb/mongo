@@ -30,19 +30,29 @@
 
 #include "mongo/db/storage/storage_file_util.h"
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 #include <cerrno>
-#include <cstring>
+#include <string>
+#include <system_error>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #ifdef __linux__
 #include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #endif
 
-#include <boost/filesystem/path.hpp>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/file.h"
+#include "mongo/util/str.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

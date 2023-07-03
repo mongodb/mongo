@@ -27,16 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <cstdint>
+#include <memory>
+#include <string>
 
-#include "mongo/db/session/logical_session_id_helpers.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/data_range.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/feature_compatibility_version_documentation.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/session/logical_session_cache.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/read_through_cache.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -158,7 +173,8 @@ LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& fromClient
                                 return authSession->isAuthorizedForPrivilege(priv);
                             }) ||
                     authSession->isAuthorizedForPrivilege(Privilege(
-                        ResourcePattern::forClusterResource(), ActionType::impersonate)) ||
+                        ResourcePattern::forClusterResource(authSession->getUserTenantId()),
+                        ActionType::impersonate)) ||
                     getLogicalSessionUserDigestForLoggedInUser(opCtx) == fromClient.getUid());
 
         lsid.setUid(*fromClient.getUid());

@@ -90,12 +90,12 @@ main(int argc, char *argv[])
     opts->nthreads = NUM_THREADS;
     opts->table_type = TABLE_ROW;
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, NULL, conn_config, &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf), TABLE_CONFIG_FMT,
-      opts->table_type == TABLE_ROW ? "Q" : "r", opts->table_type == TABLE_FIX ? "8t" : "Q"));
+    testutil_snprintf(tableconf, sizeof(tableconf), TABLE_CONFIG_FMT,
+      opts->table_type == TABLE_ROW ? "Q" : "r", opts->table_type == TABLE_FIX ? "8t" : "Q");
     testutil_check(session->create(session, opts->uri, tableconf));
 
     cs = clock();

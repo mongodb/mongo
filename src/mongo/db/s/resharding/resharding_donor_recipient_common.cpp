@@ -29,17 +29,59 @@
 
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
 #include <fmt/format.h>
+#include <initializer_list>
+#include <string>
+#include <type_traits>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/resharding/resharding_donor_service.h"
+#include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/vector_clock_mutable.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/future_util.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
@@ -320,6 +362,13 @@ void processReshardingFieldsForCollection(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const CollectionMetadata& metadata,
                                           const ReshardingFields& reshardingFields) {
+    // Persist the config time to ensure that in case of stepdown next filtering metadata refresh on
+    // the new primary will always fetch the latest information.
+    auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->isReplEnabled() || replCoord->getMemberState().primary()) {
+        VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
+    }
+
     if (reshardingFields.getState() == CoordinatorStateEnum::kAborting) {
         // The coordinator encountered an unrecoverable error, both donors and recipients should be
         // made aware.

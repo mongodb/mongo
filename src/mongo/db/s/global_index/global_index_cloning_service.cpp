@@ -29,23 +29,60 @@
 
 #include "mongo/db/s/global_index/global_index_cloning_service.h"
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <mutex>
+#include <string>
+#include <tuple>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/ops/delete.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/global_index/global_index_cloning_external_state.h"
 #include "mongo/db/s/global_index/global_index_server_parameters_gen.h"
 #include "mongo/db/s/global_index/global_index_util.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kGlobalIndex
 
@@ -437,12 +474,12 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_processBat
                _lastProcessedIdSinceStepUp = Value(next.documentKey["_id"]);
                _fetcher->setResumeId(_lastProcessedIdSinceStepUp);
 
-               _fetchedDocs.pop();
-
                _metrics->onDocumentsProcessed(1,
                                               next.documentKey.objsize() +
                                                   next.indexKeyValues.objsize(),
                                               duration_cast<Milliseconds>(timer.elapsed()));
+
+               _fetchedDocs.pop();
            })
         .until([this](const Status& status) { return !status.isOK() || _fetchedDocs.empty(); })
         .on(**executor, cancelToken)

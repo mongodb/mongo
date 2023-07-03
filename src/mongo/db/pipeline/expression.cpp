@@ -27,41 +27,77 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/expression.h"
-
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
 #include <algorithm>
-#include <boost/algorithm/string.hpp>
+#include <array>
+#include <boost/algorithm/string/case_conv.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cmath>
 #include <cstdint>
-#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <system_error>
+#include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
+// IWYU pragma: no_include <pstl/glue_algorithm_defs.h>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
+#include "mongo/base/data_range.h"
+#include "mongo/base/parse_number.h"
+#include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/hasher.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_parser_gen.h"
 #include "mongo/db/pipeline/variable_validation.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/platform/bits.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/platform/overflow_arithmetic.h"
+#include "mongo/platform/random.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/summation.h"
 
 
 namespace mongo {
@@ -85,7 +121,7 @@ Value ExpressionConstant::serializeConstant(const SerializationOptions& opts, Va
     // Other serialization policies need to include this $const in order to be unambiguous for
     // re-parsing this output later. If for example the constant was '$cashMoney' - we don't want to
     // misinterpret it as a field path when parsing.
-    return opts.serializeLiteral(Value(DOC("$const" << val)));
+    return Value(DOC("$const" << opts.serializeLiteral(val)));
 }
 
 /* --------------------------- Expression ------------------------------ */
@@ -554,7 +590,7 @@ intrusive_ptr<Expression> ExpressionAnd::optimize() {
     */
     const size_t n = pAnd->_children.size();
     // ExpressionNary::optimize() generates an ExpressionConstant for {$and:[]}.
-    verify(n > 0);
+    MONGO_verify(n > 0);
     intrusive_ptr<Expression> pLast(pAnd->_children[n - 1]);
     const ExpressionConstant* pConst = dynamic_cast<ExpressionConstant*>(pLast.get());
     if (!pConst)
@@ -788,7 +824,7 @@ Value ExpressionObjectToArray::evaluate(const Document& root, Variables* variabl
         output.push_back(keyvalue.freezeToValue());
     }
 
-    return Value(output);
+    return Value(std::move(output));
 }
 
 REGISTER_STABLE_EXPRESSION(objectToArray, ExpressionObjectToArray::parse);
@@ -1017,7 +1053,7 @@ intrusive_ptr<Expression> ExpressionCompare::parse(ExpressionContext* const expC
     intrusive_ptr<ExpressionCompare> expr = new ExpressionCompare(expCtx, op);
     ExpressionVector args = parseArguments(expCtx, bsonExpr, vps);
     expr->validateArguments(args);
-    expr->_children = args;
+    expr->_children = std::move(args);
     return expr;
 }
 
@@ -1171,7 +1207,7 @@ intrusive_ptr<Expression> ExpressionCond::parse(ExpressionContext* const expCtx,
     if (expr.type() != Object) {
         return Base::parse(expCtx, expr, vps);
     }
-    verify(expr.fieldNameStringData() == "$cond");
+    MONGO_verify(expr.fieldNameStringData() == "$cond");
 
     intrusive_ptr<ExpressionCond> ret = new ExpressionCond(expCtx);
     ret->_children.resize(3);
@@ -1918,7 +1954,7 @@ REGISTER_STABLE_EXPRESSION(dateToString, ExpressionDateToString::parse);
 intrusive_ptr<Expression> ExpressionDateToString::parse(ExpressionContext* const expCtx,
                                                         BSONElement expr,
                                                         const VariablesParseState& vps) {
-    verify(expr.fieldNameStringData() == "$dateToString");
+    MONGO_verify(expr.fieldNameStringData() == "$dateToString");
 
     uassert(18629,
             "$dateToString only supports an object as its argument",
@@ -2048,7 +2084,8 @@ Value ExpressionDateToString::evaluate(const Document& root, Variables* variable
             timeZone->formatDate(formatValue.getStringData(), date.coerceToDate())));
     }
 
-    return Value(uassertStatusOK(timeZone->formatDate(kISOFormatString, date.coerceToDate())));
+    return Value(uassertStatusOK(timeZone->formatDate(
+        timeZone->isUtcZone() ? kIsoFormatStringZ : kIsoFormatStringNonZ, date.coerceToDate())));
 }
 
 /* ----------------------- ExpressionDateDiff ---------------------------- */
@@ -2591,7 +2628,7 @@ Value ExpressionFieldPath::serialize(SerializationOptions options) const {
     auto [prefix, path] = getPrefixAndPath(_fieldPath);
     // First handles special cases for redaction of system variables. User variables will fall
     // through to the default full redaction case.
-    if (options.applyHmacToIdentifiers && prefix.length() == 2) {
+    if (options.transformIdentifiers && prefix.length() == 2) {
         if (path.getPathLength() == 1 && Variables::isBuiltin(_variable)) {
             // Nothing to redact for builtin variables.
             return Value(prefix + path.fullPath());
@@ -2675,7 +2712,7 @@ REGISTER_STABLE_EXPRESSION(filter, ExpressionFilter::parse);
 intrusive_ptr<Expression> ExpressionFilter::parse(ExpressionContext* const expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vpsIn) {
-    verify(expr.fieldNameStringData() == "$filter");
+    MONGO_verify(expr.fieldNameStringData() == "$filter");
 
     uassert(28646, "$filter only supports an object as its argument", expr.type() == Object);
 
@@ -2770,7 +2807,7 @@ Value ExpressionFilter::serialize(SerializationOptions options) const {
 
 Value ExpressionFilter::evaluate(const Document& root, Variables* variables) const {
     // We are guaranteed at parse time that this isn't using our _varId.
-    const Value inputVal = _children[_kInput]->evaluate(root, variables);
+    Value inputVal = _children[_kInput]->evaluate(root, variables);
 
     if (inputVal.nullish())
         return Value(BSONNULL);
@@ -2872,7 +2909,7 @@ REGISTER_STABLE_EXPRESSION(let, ExpressionLet::parse);
 intrusive_ptr<Expression> ExpressionLet::parse(ExpressionContext* const expCtx,
                                                BSONElement expr,
                                                const VariablesParseState& vpsIn) {
-    verify(expr.fieldNameStringData() == "$let");
+    MONGO_verify(expr.fieldNameStringData() == "$let");
 
     uassert(16874, "$let only supports an object as its argument", expr.type() == Object);
     const BSONObj args = expr.embeddedObject();
@@ -2954,8 +2991,8 @@ Value ExpressionLet::serialize(SerializationOptions options) const {
     for (VariableMap::const_iterator it = _variables.begin(), end = _variables.end(); it != end;
          ++it) {
         auto key = it->second.name;
-        if (options.applyHmacToIdentifiers) {
-            key = options.identifierHmacPolicy(key);
+        if (options.transformIdentifiers) {
+            key = options.transformIdentifiersCallback(key);
         }
         vars[key] = it->second.expression->serialize(options);
     }
@@ -2980,7 +3017,7 @@ REGISTER_STABLE_EXPRESSION(map, ExpressionMap::parse);
 intrusive_ptr<Expression> ExpressionMap::parse(ExpressionContext* const expCtx,
                                                BSONElement expr,
                                                const VariablesParseState& vpsIn) {
-    verify(expr.fieldNameStringData() == "$map");
+    MONGO_verify(expr.fieldNameStringData() == "$map");
 
     uassert(16878, "$map only supports an object as its argument", expr.type() == Object);
 
@@ -3049,7 +3086,7 @@ Value ExpressionMap::serialize(SerializationOptions options) const {
 
 Value ExpressionMap::evaluate(const Document& root, Variables* variables) const {
     // guaranteed at parse time that this isn't using our _varId
-    const Value inputVal = _children[_kInput]->evaluate(root, variables);
+    Value inputVal = _children[_kInput]->evaluate(root, variables);
     if (inputVal.nullish())
         return Value(BSONNULL);
 
@@ -3535,7 +3572,7 @@ Value ExpressionIndexOfArray::evaluate(const Document& root, Variables* variable
                           << typeName(arrayArg.getType()),
             arrayArg.isArray());
 
-    std::vector<Value> array = arrayArg.getArray();
+    const std::vector<Value>& array = arrayArg.getArray();
     auto args = evaluateAndValidateArguments(root, _children, array.size(), variables);
     for (int i = args.startIndex; i < args.endIndex; i++) {
         if (getExpressionContext()->getValueComparator().evaluate(array[i] ==
@@ -3630,7 +3667,7 @@ intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
                               << "argument is of type: " << typeName(valueArray.getType()),
                 valueArray.isArray());
 
-        auto arr = valueArray.getArray();
+        const auto& arr = valueArray.getArray();
 
         // To handle the case of duplicate values the values need to map to a vector of indecies.
         auto indexMap =
@@ -4007,7 +4044,7 @@ Value ExpressionInternalFLEBetween::serialize(SerializationOptions options) cons
     }
     return Value(Document{{kInternalFleBetween,
                            Document{{"field", _children[0]->serialize(options)},
-                                    {"server", Value(serverDerivedValues)}}}});
+                                    {"server", Value(std::move(serverDerivedValues))}}}});
 }
 
 Value ExpressionInternalFLEBetween::evaluate(const Document& root, Variables* variables) const {
@@ -4208,7 +4245,7 @@ intrusive_ptr<Expression> ExpressionOr::optimize() {
     */
     const size_t n = pOr->_children.size();
     // ExpressionNary::optimize() generates an ExpressionConstant for {$or:[]}.
-    verify(n > 0);
+    MONGO_verify(n > 0);
     intrusive_ptr<Expression> pLast(pOr->_children[n - 1]);
     const ExpressionConstant* pConst = dynamic_cast<ExpressionConstant*>(pLast.get());
     if (!pConst)
@@ -4808,7 +4845,7 @@ Value ExpressionReverseArray::evaluate(const Document& root, Variables* variable
 
     std::vector<Value> array = input.getArray();
     std::reverse(array.begin(), array.end());
-    return Value(array);
+    return Value(std::move(array));
 }
 
 REGISTER_STABLE_EXPRESSION(reverseArray, ExpressionReverseArray::parse);
@@ -4904,7 +4941,7 @@ Value ExpressionSortArray::evaluate(const Document& root, Variables* variables) 
 
     std::vector<Value> array = input.getArray();
     std::sort(array.begin(), array.end(), _sortBy);
-    return Value(array);
+    return Value(std::move(array));
 }
 
 REGISTER_STABLE_EXPRESSION(sortArray, ExpressionSortArray::parse);
@@ -5238,7 +5275,7 @@ Value ExpressionInternalFindAllValuesAtPath::evaluate(const Document& root,
         outputVals.push_back(Value(elt));
     }
 
-    return Value(outputVals);
+    return Value(std::move(outputVals));
 }
 // This expression is not part of the stable API, but can always be used. It is
 // an internal expression used only for distinct.
@@ -5708,12 +5745,12 @@ StatusWith<Value> ExpressionSubtract::apply(Value lhs, Value rhs) {
                 long long longDiff = lhs.getDate().toMillisSinceEpoch();
                 double doubleRhs = rhs.coerceToDouble();
                 // check the doubleRhs should not exceed int64 limit and result will not overflow
-                if (doubleRhs < static_cast<double>(limits::min()) ||
-                    doubleRhs >= static_cast<double>(limits::max()) ||
-                    overflow::sub(longDiff, llround(doubleRhs), &longDiff)) {
-                    return Status(ErrorCodes::Overflow, str::stream() << "date overflow");
+                if (doubleRhs >= static_cast<double>(limits::min()) &&
+                    doubleRhs < static_cast<double>(limits::max()) &&
+                    !overflow::sub(longDiff, llround(doubleRhs), &longDiff)) {
+                    return Value(Date_t::fromMillisSinceEpoch(longDiff));
                 }
-                return Value(Date_t::fromMillisSinceEpoch(longDiff));
+                return Status(ErrorCodes::Overflow, str::stream() << "date overflow");
             }
             case NumberDecimal: {
                 long long longDiff = lhs.getDate().toMillisSinceEpoch();
@@ -5908,11 +5945,12 @@ Value ExpressionSwitch::serialize(SerializationOptions options) const {
 
     if (defaultExpr()) {
         return Value(Document{{"$switch",
-                               Document{{"branches", Value(serializedBranches)},
+                               Document{{"branches", Value(std::move(serializedBranches))},
                                         {"default", defaultExpr()->serialize(options)}}}});
     }
 
-    return Value(Document{{"$switch", Document{{"branches", Value(serializedBranches)}}}});
+    return Value(
+        Document{{"$switch", Document{{"branches", Value(std::move(serializedBranches))}}}});
 }
 
 /* ------------------------- ExpressionToLower ----------------------------- */
@@ -6431,7 +6469,7 @@ Value ExpressionZip::evaluate(const Document& root, Variables* variables) const 
         output.push_back(Value(outputChild));
     }
 
-    return Value(output);
+    return Value(std::move(output));
 }
 
 boost::intrusive_ptr<Expression> ExpressionZip::optimize() {
@@ -6555,7 +6593,7 @@ public:
         table[BSONType::Date][BSONType::String] = [](ExpressionContext* const expCtx,
                                                      Value inputValue) {
             auto dateString = uassertStatusOK(
-                TimeZoneDatabase::utcZone().formatDate(kISOFormatString, inputValue.getDate()));
+                TimeZoneDatabase::utcZone().formatDate(kIsoFormatStringZ, inputValue.getDate()));
             return Value(dateString);
         };
         table[BSONType::Date][BSONType::Bool] = [](ExpressionContext* const expCtx,
@@ -7176,7 +7214,7 @@ Value ExpressionRegex::nextMatch(RegexExecutionState* regexState) const {
     MutableDocument match;
     match.addField("match", Value(m[0]));
     match.addField("idx", Value(regexState->startCodePointPos));
-    match.addField("captures", Value(captures));
+    match.addField("captures", Value(std::move(captures)));
     return match.freezeToValue();
 }
 
@@ -7375,7 +7413,7 @@ Value ExpressionRegexFindAll::evaluate(const Document& root, Variables* variable
     std::vector<Value> output;
     auto executionState = buildInitialState(root, variables);
     if (executionState.nullish()) {
-        return Value(output);
+        return Value(std::move(output));
     }
     StringData input = *(executionState.input);
     size_t totalDocSize = 0;
@@ -7417,7 +7455,7 @@ Value ExpressionRegexFindAll::evaluate(const Document& root, Variables* variable
         invariant(executionState.startCodePointPos > 0);
         invariant(executionState.startCodePointPos <= executionState.startBytePos);
     } while (static_cast<size_t>(executionState.startBytePos) < input.size());
-    return Value(output);
+    return Value(std::move(output));
 }
 
 /* -------------------------- ExpressionRegexMatch ------------------------------ */
@@ -8232,11 +8270,7 @@ Value ExpressionBitNot::evaluateNumericArg(const Value& numericArg) const {
     }
 }
 
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(bitNot,
-                                      ExpressionBitNot::parse,
-                                      AllowedWithApiStrict::kNeverInVersion1,
-                                      AllowedWithClientType::kAny,
-                                      feature_flags::gFeatureFlagBitwise);
+REGISTER_STABLE_EXPRESSION(bitNot, ExpressionBitNot::parse);
 
 const char* ExpressionBitNot::getOpName() const {
     return "$bitNot";
@@ -8244,21 +8278,9 @@ const char* ExpressionBitNot::getOpName() const {
 
 /* ------------------------- $bitAnd, $bitOr, and $bitXor ------------------------ */
 
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(bitAnd,
-                                      ExpressionBitAnd::parse,
-                                      AllowedWithApiStrict::kNeverInVersion1,
-                                      AllowedWithClientType::kAny,
-                                      feature_flags::gFeatureFlagBitwise);
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(bitOr,
-                                      ExpressionBitOr::parse,
-                                      AllowedWithApiStrict::kNeverInVersion1,
-                                      AllowedWithClientType::kAny,
-                                      feature_flags::gFeatureFlagBitwise);
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(bitXor,
-                                      ExpressionBitXor::parse,
-                                      AllowedWithApiStrict::kNeverInVersion1,
-                                      AllowedWithClientType::kAny,
-                                      feature_flags::gFeatureFlagBitwise);
+REGISTER_STABLE_EXPRESSION(bitAnd, ExpressionBitAnd::parse);
+REGISTER_STABLE_EXPRESSION(bitOr, ExpressionBitOr::parse);
+REGISTER_STABLE_EXPRESSION(bitXor, ExpressionBitXor::parse);
 
 MONGO_INITIALIZER_GROUP(BeginExpressionRegistration, ("default"), ("EndExpressionRegistration"))
 MONGO_INITIALIZER_GROUP(EndExpressionRegistration, ("BeginExpressionRegistration"), ())

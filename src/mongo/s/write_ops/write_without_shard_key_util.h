@@ -29,10 +29,19 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <utility>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/parsed_update.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 
 namespace mongo {
@@ -46,7 +55,11 @@ const BSONObj targetDocForExplain = BSON("_id"
 /**
  * Uses updateDriver to produce the document to insert. Only use when {upsert: true}.
  */
-BSONObj generateUpsertDocument(OperationContext* opCtx, const UpdateRequest& updateRequest);
+std::pair<BSONObj, BSONObj> generateUpsertDocument(
+    OperationContext* opCtx,
+    const UpdateRequest& updateRequest,
+    boost::optional<TimeseriesOptions> timeseriesOptions,
+    const StringData::ComparatorInterface* comparator);
 
 /**
  * Returns true if we can use the two phase protocol to complete a single write without shard

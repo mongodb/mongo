@@ -29,12 +29,19 @@
 
 #include "mongo/db/query/sbe_runtime_planner.h"
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/histogram_server_status_metric.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/trial_period_utils.h"
-#include "mongo/db/exec/trial_run_tracker.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <deque>
+#include <tuple>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/plan_executor_sbe.h"
+#include "mongo/db/record_id.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::sbe {
 bool BaseRuntimePlanner::fetchNextDocument(plan_ranker::CandidatePlan* candidate,
@@ -86,15 +93,17 @@ std::pair<value::SlotAccessor*, value::SlotAccessor*> BaseRuntimePlanner::prepar
     stage_builder::prepareSlotBasedExecutableTree(
         _opCtx, root, data, _cq, _collections, _yieldPolicy, preparingFromCache);
 
+    const stage_builder::PlanStageSlots& outputs = data->staticData->outputs;
+
     value::SlotAccessor* resultSlot{nullptr};
-    if (auto slot = data->outputs.getIfExists(stage_builder::PlanStageSlots::kResult); slot) {
-        resultSlot = root->getAccessor(data->ctx, *slot);
+    if (auto slot = outputs.getIfExists(stage_builder::PlanStageSlots::kResult)) {
+        resultSlot = root->getAccessor(data->env.ctx, *slot);
         tassert(4822871, "Query does not have a result slot.", resultSlot);
     }
 
     value::SlotAccessor* recordIdSlot{nullptr};
-    if (auto slot = data->outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId); slot) {
-        recordIdSlot = root->getAccessor(data->ctx, *slot);
+    if (auto slot = outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId)) {
+        recordIdSlot = root->getAccessor(data->env.ctx, *slot);
         tassert(4822872, "Query does not have a recordId slot.", recordIdSlot);
     }
 

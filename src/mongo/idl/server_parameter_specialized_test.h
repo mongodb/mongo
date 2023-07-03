@@ -29,11 +29,20 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <mutex>
+#include <string>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/platform/basic.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {

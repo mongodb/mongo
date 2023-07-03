@@ -27,17 +27,37 @@
  *    it in the license file.
  */
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <cstddef>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {
@@ -604,6 +624,49 @@ TEST_F(BucketCatalogHelpersTest, FindDocumentFromOID) {
         auto retrievedBucket = findDocFromOID(operationContext(), (*autoColl).get(), oid);
         ASSERT(retrievedBucket.isEmpty());
     }
+}
+
+TEST_F(BucketCatalogHelpersTest, FindSuitableCompressedBucketForMeasurement) {
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", true};
+
+    ASSERT_OK(createCollection(
+        operationContext(),
+        kNss.dbName(),
+        BSON("create" << kNss.coll() << "timeseries"
+                      << BSON("timeField" << _timeField << "metaField" << _metaField))));
+
+    AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IX);
+    ASSERT(autoColl->getTimeseriesOptions() && autoColl->getTimeseriesOptions()->getMetaField());
+
+    auto tsOptions = *autoColl->getTimeseriesOptions();
+
+    // control.version indicates the bucket is compressed.
+    BSONObj bucketDoc = mongo::fromjson(R"({
+            "_id":{"$oid":"62e7e6ec27c28d338ab29200"},
+            "control":{"version":2,"min":{"_id":1,"time":{"$date":"2021-08-01T11:00:00Z"},"a":1},
+                                   "max":{"_id":3,"time":{"$date":"2021-08-01T12:00:00Z"},"a":3},
+                       "closed":false},
+            "meta":1,
+            "data":{"time":{"0":{"$date":"2021-08-01T11:00:00Z"},
+                            "1":{"$date":"2021-08-01T11:00:00Z"},
+                            "2":{"$date":"2021-08-01T11:00:00Z"}},
+                    "a":{"0":1,"1":2,"2":3}}})");
+
+    // Insert bucket document into the system.buckets collection.
+    _insertIntoBucketColl(bucketDoc);
+
+    auto time = dateFromISOString("2021-08-01T11:30:00Z");
+    BSONObj docWithSuitableBucket =
+        BSON("_id" << 1 << _timeField << time.getValue() << _metaField << 1);
+
+    // Verify that we can find a suitable bucket to insert into.
+    auto result = _findSuitableBucket(operationContext(),
+                                      kNss.makeTimeseriesBucketsNamespace(),
+                                      tsOptions,
+                                      docWithSuitableBucket);
+    ASSERT_FALSE(result.isEmpty());
+    ASSERT_EQ(bucketDoc["_id"].OID(), result["_id"].OID());
 }
 
 }  // namespace

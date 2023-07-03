@@ -28,13 +28,22 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
-
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

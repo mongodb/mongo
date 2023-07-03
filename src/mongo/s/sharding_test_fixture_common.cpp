@@ -28,15 +28,33 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <fmt/format.h>
 
-#include "mongo/s/sharding_test_fixture_common.h"
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_noop_client_observer.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/executor/network_interface.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/catalog/type_changelog.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/sharding_test_fixture_common.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

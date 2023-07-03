@@ -29,15 +29,44 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <climits>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/fetcher.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/notify_sharding_event_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_cache.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/transaction/transaction_api.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -45,10 +74,14 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -519,18 +552,6 @@ public:
      */
     Status setFeatureCompatibilityVersionOnShards(OperationContext* opCtx, const BSONObj& cmdObj);
 
-    /*
-     * Rename collection metadata as part of a renameCollection operation.
-     *
-     * - Updates the FROM collection entry if the source collection is sharded
-     * - Removes the TO collection entry if the target collection was sharded
-     */
-    void renameShardedMetadata(OperationContext* opCtx,
-                               const NamespaceString& from,
-                               const NamespaceString& to,
-                               const WriteConcernOptions& writeConcern,
-                               boost::optional<CollectionType> optFromCollType);
-
     //
     // For Diagnostics
     //
@@ -565,14 +586,6 @@ public:
                               const NamespaceString& nss,
                               bool force,
                               const Timestamp& validAfter);
-
-    /**
-     * Set `onCurrentShardSince` to the same value as `history[0].validAfter` for all config.chunks
-     * entries.
-     * Only called on the FCV upgrade
-     * TODO (SERVER-72791): Remove the method once FCV 7.0 becomes last-lts.
-     */
-    void setOnCurrentShardSinceFieldOnChunks(OperationContext* opCtx);
 
     /**
      * Returns a catalog client that will always run commands locally. Can only be used on a
@@ -731,6 +744,28 @@ private:
      */
     void _setUserWriteBlockingStateOnNewShard(OperationContext* opCtx,
                                               RemoteCommandTargeter* targeter);
+
+    using FetcherDocsCallbackFn = std::function<bool(const std::vector<BSONObj>& batch)>;
+    using FetcherStatusCallbackFn = std::function<void(const Status& status)>;
+
+    /**
+     * Creates a Fetcher task for fetching documents in the given collection on the given shard.
+     * After the task is scheduled, applies 'processDocsCallback' to each fetched batch and
+     * 'processStatusCallback' to the fetch status.
+     */
+    std::unique_ptr<Fetcher> _createFetcher(OperationContext* opCtx,
+                                            std::shared_ptr<RemoteCommandTargeter> targeter,
+                                            const NamespaceString& nss,
+                                            const repl::ReadConcernLevel& readConcernLevel,
+                                            FetcherDocsCallbackFn processDocsCallback,
+                                            FetcherStatusCallbackFn processStatusCallback);
+
+    /**
+     * Gets the cluster time keys on the given shard and then saves them locally.
+     */
+    Status _pullClusterTimeKeys(OperationContext* opCtx,
+                                std::shared_ptr<RemoteCommandTargeter> targeter);
+
     /**
      * Given a vector of cluster parameters in disk format, sets them locally.
      */
@@ -822,13 +857,6 @@ private:
                                                            const ChunkType& origChunk,
                                                            const ChunkVersion& collPlacementVersion,
                                                            const std::vector<BSONObj>& splitPoints);
-
-    /**
-     * Performs a noop write locally on the current process and waits for all nodes to replicate it.
-     *
-     * TODO SERVER-75391: Remove.
-     */
-    void _performLocalNoopWriteWithWAllWriteConcern(OperationContext* opCtx, StringData msg);
 
     // The owning service context
     ServiceContext* const _serviceContext;

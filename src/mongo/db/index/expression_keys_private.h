@@ -29,19 +29,28 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <vector>
 
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 namespace mongo {
 
 class CollectionPtr;
 class CollatorInterface;
+
 struct TwoDIndexingParams;
 struct S2IndexingParams;
 
@@ -74,7 +83,7 @@ public:
                           const BSONObj& obj,
                           const TwoDIndexingParams& params,
                           KeyStringSet* keys,
-                          KeyString::Version keyStringVersion,
+                          key_string::Version keyStringVersion,
                           Ordering ordering,
                           const boost::optional<RecordId>& id = boost::none);
 
@@ -86,7 +95,7 @@ public:
                            const BSONObj& obj,
                            const fts::FTSSpec& ftsSpec,
                            KeyStringSet* keys,
-                           KeyString::Version keyStringVersion,
+                           key_string::Version keyStringVersion,
                            Ordering ordering,
                            const boost::optional<RecordId>& id = boost::none);
 
@@ -105,7 +114,7 @@ public:
                             bool isSparse,
                             const CollatorInterface* collator,
                             KeyStringSet* keys,
-                            KeyString::Version keyStringVersion,
+                            key_string::Version keyStringVersion,
                             Ordering ordering,
                             bool ignoreArraysAlongPath,
                             const boost::optional<RecordId>& id = boost::none);
@@ -130,7 +139,7 @@ public:
                           const S2IndexingParams& params,
                           KeyStringSet* keys,
                           MultikeyPaths* multikeyPaths,
-                          KeyString::Version keyStringVersion,
+                          key_string::Version keyStringVersion,
                           SortedDataIndexAccessMethod::GetKeysContext context,
                           Ordering ordering,
                           const boost::optional<RecordId>& id = boost::none);

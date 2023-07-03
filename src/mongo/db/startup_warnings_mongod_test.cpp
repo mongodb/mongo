@@ -27,14 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <fstream>  // IWYU pragma: keep
 
-#include <fstream>
-#include <ostream>
+#include <boost/move/utility_core.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/startup_warnings_mongod.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
 
 namespace {
 

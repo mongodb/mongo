@@ -27,11 +27,28 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <cstdint>
+#include <iosfwd>
+#include <iterator>
+#include <memory>
+#include <type_traits>
+
+#include <absl/container/node_hash_set.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -54,7 +71,8 @@ const auto kShardId2 = ShardId("shard2");
 const auto kShardId3 = ShardId("shard3");
 const auto kShardId4 = ShardId("shard4");
 const auto kShardId5 = ShardId("shard5");
-const NamespaceString kNamespace("TestDB", "TestColl");
+const NamespaceString kNamespace =
+    NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const KeyPattern kShardKeyPattern(BSON("x" << 1));
 
 /**

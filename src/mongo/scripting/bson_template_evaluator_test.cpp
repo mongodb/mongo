@@ -27,9 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/db/jsobj.h"
+#include <memory>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/scripting/bson_template_evaluator.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 

@@ -27,18 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <utility>
 
-#include "mongo/db/query/plan_yield_policy.h"
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/yieldable.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -182,7 +187,8 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
             if (_callbacks) {
                 _callbacks->handledWriteConflict(opCtx);
             }
-            logWriteConflictAndBackoff(attempt, "query yield", e.reason(), ""_sd);
+            logWriteConflictAndBackoff(
+                attempt, "query yield", e.reason(), NamespaceStringOrUUID(NamespaceString()));
             // Retry the yielding process.
         } catch (...) {
             // Errors other than write conflicts don't get retried, and should instead result in
@@ -263,17 +269,8 @@ void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
     }
 
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
-    ScopeGuard disposeYieldedTransactionResourcesScopeGuard([&yieldedTransactionResources] {
-        if (yieldedTransactionResources) {
-            yieldedTransactionResources->dispose();
-        }
-    });
-
-    if (!yieldedTransactionResources) {
-        // Nothing was unlocked. Recursively held locks are not the only reason locks cannot be
-        // released.
-        return;
-    }
+    ScopeGuard disposeYieldedTransactionResourcesScopeGuard(
+        [&yieldedTransactionResources] { yieldedTransactionResources.dispose(); });
 
     if (_callbacks) {
         _callbacks->duringYield(opCtx);
@@ -286,7 +283,7 @@ void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
     disposeYieldedTransactionResourcesScopeGuard.dismiss();
     try {
         restoreTransactionResourcesToOperationContext(opCtx,
-                                                      std::move(*yieldedTransactionResources));
+                                                      std::move(yieldedTransactionResources));
     } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>& ex) {
         const auto extraInfo = ex.extraInfo<CollectionUUIDMismatchInfo>();
         if (extraInfo->actualCollection()) {

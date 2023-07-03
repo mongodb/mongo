@@ -5,7 +5,7 @@
  *  requires_profiling,
  *  assumes_read_preference_unchanged,
  *  # TODO SERVER-67607: support query hash in slow query log lines.
- *  cqf_incompatible,
+ *  cqf_experimental_incompatible,
  * ]
  */
 (function() {

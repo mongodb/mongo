@@ -27,8 +27,13 @@
  *    it in the license file.
  */
 
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 
 namespace mongo::optimizer::ce {
 

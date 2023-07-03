@@ -29,13 +29,23 @@
 
 #include "mongo/s/write_ops/batched_command_response.h"
 
-#include "mongo/base/init.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/commands.h"
+#include <fmt/ostream.h>
+#include <iosfwd>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/field_parser.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/util/str.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {

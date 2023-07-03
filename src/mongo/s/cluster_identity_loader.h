@@ -29,10 +29,17 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/stdx/condition_variable.h"

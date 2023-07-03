@@ -28,32 +28,56 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/unittest/unittest.h"
-
-#include <boost/log/core.hpp>
+#include <algorithm>
+#include <boost/smart_ptr.hpp>
+#include <cstdint>
+#include <cstdlib>
+#include <exception>
 #include <fmt/format.h>
-#include <fmt/printf.h>
+#include <fmt/printf.h>  // IWYU pragma: keep
 #include <functional>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/base/init.h"
+#include <boost/exception/exception.hpp>
+#include <boost/log/core/core.hpp>
+// IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
+// IWYU pragma: no_include "boost/log/detail/locking_ptr.hpp"
+#include <boost/log/sinks/sync_frontend.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/shared_ptr.hpp>
+#include <boost/thread/exceptions.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/bson_formatter.h"
-#include "mongo/logv2/component_settings_filter.h"
+#include "mongo/logv2/domain_filter.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_capture_backend.h"
-#include "mongo/logv2/log_domain.h"
-#include "mongo/logv2/log_domain_global.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_truncation.h"
 #include "mongo/logv2/plain_formatter.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/test_info.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/signal_handlers_synchronous.h"

@@ -32,25 +32,53 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <exception>
 #include <iostream>
+#include <iterator>
+#include <limits>
+#include <map>
+#include <set>
+#include <string>
+#include <sys/types.h>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonelement_comparator_interface.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/allocator.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -170,7 +198,7 @@ FieldCompareResult compareDottedFieldNames(const string& l,
           "compareDottedFieldNames ERROR  l: {l} r: {r}  TOO MANY LOOPS",
           "l"_attr = l,
           "r"_attr = r);
-    verify(0);
+    MONGO_verify(0);
     return SAME;  // will never get here
 }
 }  // namespace mongo
@@ -290,9 +318,9 @@ public:
         }
         {
             BSONObj k = BSON("x" << 1);
-            verify(k.isFieldNamePrefixOf(BSON("x"
-                                              << "hi")));
-            verify(!k.isFieldNamePrefixOf(BSON("a" << 1)));
+            MONGO_verify(k.isFieldNamePrefixOf(BSON("x"
+                                                    << "hi")));
+            MONGO_verify(!k.isFieldNamePrefixOf(BSON("a" << 1)));
         }
     }
 };

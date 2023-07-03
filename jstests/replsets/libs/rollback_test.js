@@ -296,6 +296,10 @@ function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
         return rst.getPrimary(ReplSetTest.kDefaultTimeoutMS, kRetryIntervalMS);
     }
 
+    this.stepUpNode = function(conn) {
+        stepUp(conn);
+    };
+
     function oplogTop(conn) {
         return conn.getDB("local").oplog.rs.find().limit(1).sort({$natural: -1}).next();
     }

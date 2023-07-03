@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * agg_union_with_chunk_migrations.js
  *
@@ -17,10 +15,12 @@
  *  requires_non_retryable_writes,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');                 // for extendWorkload
-load('jstests/concurrency/fsm_workloads/agg_with_chunk_migrations.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/agg_with_chunk_migrations.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.collWithMigrations = "union_ns";
 
     $config.states.aggregate = function aggregate(db, collName, connCache) {

@@ -29,17 +29,36 @@
 
 #include <string>
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/resize_oplog_gen.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/str.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -68,11 +87,12 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const final {
         AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
-        if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::replSetResizeOplog)) {
+        if (authzSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()),
+                ActionType::replSetResizeOplog)) {
             return Status::OK();
         }
         return Status(ErrorCodes::Unauthorized, "Unauthorized");

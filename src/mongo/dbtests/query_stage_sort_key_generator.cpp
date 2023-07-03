@@ -27,17 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <memory>
+#include <utility>
+#include <vector>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/sort_key_generator.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -55,7 +72,7 @@ Value extractKeyFromKeyGenStage(SortKeyGeneratorStage* sortKeyGen, WorkingSet* w
     return wsm->metadata().getSortKey();
 }
 
-const NamespaceString kTestNss = NamespaceString("db.dummy");
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("db.dummy");
 
 /**
  * Given a JSON string 'sortSpec' representing a sort pattern, returns the corresponding sort key

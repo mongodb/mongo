@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/request_execution_context.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 

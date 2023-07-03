@@ -27,14 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <utility>
 
-#include "mongo/db/s/start_chunk_clone_request.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/s/start_chunk_clone_request.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 namespace {
@@ -187,7 +196,7 @@ void StartChunkCloneRequest::appendAsCommand(
     invariant(nss.isValid());
     invariant(fromShardConnectionString.isValid());
 
-    builder->append(kRecvChunkStart, nss.ns());
+    builder->append(kRecvChunkStart, NamespaceStringUtil::serialize(nss));
     builder->append(kParallelMigration, true);
 
     migrationId.appendToBuilder(builder, kMigrationId);

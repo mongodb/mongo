@@ -28,20 +28,48 @@
  */
 
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <system_error>
+#include <utility>
 #include <vector>
 
-#include "mongo/client/read_preference.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/initial_split_policy.h"
-#include "mongo/rpc/metadata/tracking_metadata.h"
-#include "mongo/s/balancer_configuration.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -29,13 +29,19 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/feature_compatibility_version_document_gen.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 

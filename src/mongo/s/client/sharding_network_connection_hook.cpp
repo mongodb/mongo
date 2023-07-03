@@ -29,17 +29,23 @@
 
 #include "mongo/s/client/sharding_network_connection_hook.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/wire_version.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 
@@ -48,12 +54,12 @@ namespace mongo {
 Status ShardingNetworkConnectionHook::validateHost(
     const HostAndPort& remoteHost,
     const BSONObj&,
-    const executor::RemoteCommandResponse& isMasterReply) {
-    return validateHostImpl(remoteHost, isMasterReply);
+    const executor::RemoteCommandResponse& helloReply) {
+    return validateHostImpl(remoteHost, helloReply);
 }
 
 Status ShardingNetworkConnectionHook::validateHostImpl(
-    const HostAndPort& remoteHost, const executor::RemoteCommandResponse& isMasterReply) {
+    const HostAndPort& remoteHost, const executor::RemoteCommandResponse& helloReply) {
     auto shard =
         Grid::get(getGlobalServiceContext())->shardRegistry()->getShardForHostNoReload(remoteHost);
     if (!shard) {
@@ -62,11 +68,11 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
     }
 
     long long configServerModeNumber;
-    auto status = bsonExtractIntegerField(isMasterReply.data, "configsvr", &configServerModeNumber);
+    auto status = bsonExtractIntegerField(helloReply.data, "configsvr", &configServerModeNumber);
 
     switch (status.code()) {
         case ErrorCodes::OK: {
-            // The ismaster response indicates remoteHost is a config server.
+            // The hello response indicates remoteHost is a config server.
             if (!shard->isConfig()) {
                 return {ErrorCodes::InvalidOptions,
                         str::stream() << "Surprised to discover that " << remoteHost.toString()
@@ -75,7 +81,7 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
             return Status::OK();
         }
         case ErrorCodes::NoSuchKey: {
-            // The ismaster response indicates that remoteHost is not a config server, or that
+            // The hello response indicates that remoteHost is not a config server, or that
             // the config server is running a version prior to the 3.1 development series.
             if (!shard->isConfig()) {
                 return Status::OK();
@@ -86,7 +92,7 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
                                   << " does not believe it is a config server"};
         }
         default:
-            // The ismaster response was malformed.
+            // The hello response was malformed.
             return status;
     }
 }

@@ -27,12 +27,19 @@
  *    it in the license file.
  */
 
+#include <boost/cstdint.hpp>
+#include <cstdint>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_coll_stats.h"
 #include "mongo/db/pipeline/document_source_coll_stats_gen.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/pipeline/storage_stats_spec_gen.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {
@@ -49,7 +56,7 @@ TEST_F(DocumentSourceCollStatsTest, QueryShape) {
     spec.setQueryExecStats(BSONObj());
     stage = make_intrusive<DocumentSourceCollStats>(getExpCtx(), spec);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$collStats":{"count":"?","queryExecStats":"?"}})",
+        R"({"$collStats":{"count":"?object","queryExecStats":"?object"}})",
         redact(*stage));
 
     auto latencyStats = LatencyStatsSpec();
@@ -62,8 +69,8 @@ TEST_F(DocumentSourceCollStatsTest, QueryShape) {
                 "latencyStats": {
                     "histograms": true
                 },
-                "count": "?",
-                "queryExecStats": "?"
+                "count": "?object",
+                "queryExecStats": "?object"
             }
         })",
         redact(*stage));
@@ -80,13 +87,13 @@ TEST_F(DocumentSourceCollStatsTest, QueryShape) {
                     "histograms": true
                 },
                 "storageStats": {
-                    "scale": "?",
+                    "scale": "?number",
                     "verbose": true,
                     "waitForLock": true,
                     "numericOnly": false
                 },
-                "count": "?",
-                "queryExecStats": "?"
+                "count": "?object",
+                "queryExecStats": "?object"
             }
         })",
         redact(*stage));
@@ -102,13 +109,13 @@ TEST_F(DocumentSourceCollStatsTest, QueryShape) {
                     "histograms": true
                 },
                 "storageStats": {
-                    "scale": "?",
+                    "scale": "?number",
                     "verbose": true,
                     "waitForLock": false,
                     "numericOnly": false
                 },
-                "count": "?",
-                "queryExecStats": "?"
+                "count": "?object",
+                "queryExecStats": "?object"
             }
         })",
         redact(*stage));

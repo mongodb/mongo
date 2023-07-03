@@ -29,6 +29,8 @@
 
 #include "mongo/db/op_observer/oplog_writer_transaction_proxy.h"
 
+#include <utility>
+
 namespace mongo {
 
 OplogWriterTransactionProxy::OplogWriterTransactionProxy(

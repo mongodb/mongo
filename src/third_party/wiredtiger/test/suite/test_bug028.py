@@ -29,7 +29,7 @@
 # test_bug028.py
 #   Test buffer alignment and direct I/O settings.
 
-import os
+import os, sys
 import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
@@ -82,10 +82,11 @@ class test_bug028(wttest.WiredTigerTestCase, suite_subprocess):
             config += ',data'
         if self.log_directio:
             config += ',log'
-            self.skipTest('FIXME WT-8684 skipping test of logging with direct I/O')
         config += ')'
         if self.log_directio:
             config += ',log=(enabled=true)'
+            if (sys.platform.startswith('darwin')):
+                self.skipTest('skipping test of logging with direct I/O on Darwin')
 
         homedir = 'test_bug028.' + str(run)
         os.mkdir(homedir)

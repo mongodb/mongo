@@ -29,10 +29,16 @@
 
 #pragma once
 
+#include <cstdint>
+#include <memory>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/transaction_coordinators_stats_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 

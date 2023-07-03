@@ -99,6 +99,9 @@ selector:
   # infrastructure. See SERVER-77039 for full details.
   - jstests/concurrency/fsm_workloads/map_reduce_drop.js
 
+  # TODO Undenylist (SERVER-71819).
+  - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
+
   exclude_with_any_tags:
   - assumes_balancer_off
   - requires_replication

@@ -32,52 +32,64 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/client/dbclient_connection.h"
-
-#include <algorithm>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cmath>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/authenticate.h"
-#include "mongo/client/dbclient_cursor.h"
+#include "mongo/client/dbclient_connection.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_client_session.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/json.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/s/stale_exception.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/debug_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_peer_info.h"
-#include "mongo/util/password_digest.h"
-#include "mongo/util/testing_proctor.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
 
@@ -99,28 +111,27 @@ StatusWith<bool> completeSpeculativeAuth(DBClientConnection* conn,
                                          auth::SpeculativeAuthType speculativeAuthType,
                                          std::shared_ptr<SaslClientSession> session,
                                          const MongoURI& uri,
-                                         BSONObj isMaster) {
-    auto specAuthElem = isMaster[auth::kSpeculativeAuthenticate];
+                                         BSONObj helloReply) {
+    auto specAuthElem = helloReply[auth::kSpeculativeAuthenticate];
     if (specAuthElem.eoo()) {
         return false;
     }
 
     if (speculativeAuthType == auth::SpeculativeAuthType::kNone) {
         return {ErrorCodes::BadValue,
-                str::stream() << "Unexpected isMaster." << auth::kSpeculativeAuthenticate
-                              << " reply"};
+                str::stream() << "Unexpected hello." << auth::kSpeculativeAuthenticate << " reply"};
     }
 
     if (specAuthElem.type() != Object) {
         return {ErrorCodes::BadValue,
-                str::stream() << "isMaster." << auth::kSpeculativeAuthenticate
+                str::stream() << "hello." << auth::kSpeculativeAuthenticate
                               << " reply must be an object"};
     }
 
     auto specAuth = specAuthElem.Obj();
     if (specAuth.isEmpty()) {
         return {ErrorCodes::BadValue,
-                str::stream() << "isMaster." << auth::kSpeculativeAuthenticate
+                str::stream() << "hello." << auth::kSpeculativeAuthenticate
                               << " reply must be a non-empty obejct"};
     }
 
@@ -154,7 +165,7 @@ StatusWith<bool> completeSpeculativeAuth(DBClientConnection* conn,
 }
 
 /**
- * Initializes the wire version of conn, and returns the isMaster reply.
+ * Initializes the wire version of conn, and returns the "hello" reply.
  */
 executor::RemoteCommandResponse initWireVersion(
     DBClientConnection* conn,
@@ -165,7 +176,7 @@ executor::RemoteCommandResponse initWireVersion(
     std::shared_ptr<SaslClientSession>* saslClientSession) try {
 
     BSONObjBuilder bob;
-    bob.append(conn->getApiParameters().getVersion() ? "hello" : "isMaster", 1);
+    bob.append("hello", 1);
 
     if (uri.isHelloOk()) {
         // Attach "helloOk: true" to the initial handshake to indicate that the client supports the
@@ -185,7 +196,7 @@ executor::RemoteCommandResponse initWireVersion(
     }
 
     if (getTestCommandsEnabled()) {
-        // Only include the host:port of this process in the isMaster command request if test
+        // Only include the host:port of this process in the "hello" command request if test
         // commands are enabled. mongobridge uses this field to identify the process opening a
         // connection to it.
         StringBuilder sb;
@@ -211,25 +222,24 @@ executor::RemoteCommandResponse initWireVersion(
     auto result = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", bob.obj()));
     Date_t finish{Date_t::now()};
 
-    BSONObj isMasterObj = result->getCommandReply().getOwned();
+    BSONObj helloObj = result->getCommandReply().getOwned();
 
-    auto replyWireVersion = wire_version::parseWireVersionFromHelloReply(isMasterObj);
+    auto replyWireVersion = wire_version::parseWireVersionFromHelloReply(helloObj);
     if (replyWireVersion.isOK()) {
         conn->setWireVersions(replyWireVersion.getValue().minWireVersion,
                               replyWireVersion.getValue().maxWireVersion);
     }
 
-    if (isMasterObj.hasField("saslSupportedMechs") &&
-        isMasterObj["saslSupportedMechs"].type() == Array) {
-        auto array = isMasterObj["saslSupportedMechs"].Array();
+    if (helloObj.hasField("saslSupportedMechs") && helloObj["saslSupportedMechs"].type() == Array) {
+        auto array = helloObj["saslSupportedMechs"].Array();
         for (const auto& elem : array) {
             saslMechsForAuth->push_back(elem.checkAndGetStringData().toString());
         }
     }
 
-    conn->getCompressorManager().clientFinish(isMasterObj);
+    conn->getCompressorManager().clientFinish(helloObj);
 
-    return executor::RemoteCommandResponse{std::move(isMasterObj), finish - start};
+    return executor::RemoteCommandResponse{std::move(helloObj), finish - start};
 
 } catch (...) {
     return exceptionToStatus();
@@ -287,41 +297,41 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress,
 
     auto speculativeAuthType = auth::SpeculativeAuthType::kNone;
     std::shared_ptr<SaslClientSession> saslClientSession;
-    auto swIsMasterReply = initWireVersion(
+    auto swHelloReply = initWireVersion(
         this, _applicationName, _uri, &_saslMechsForAuth, &speculativeAuthType, &saslClientSession);
-    if (!swIsMasterReply.isOK()) {
+    if (!swHelloReply.isOK()) {
         _markFailed(kSetFlag);
-        swIsMasterReply.status.addContext(
+        swHelloReply.status.addContext(
             "Connection handshake failed. Is your mongod/mongos 3.4 or older?"_sd);
-        return swIsMasterReply.status;
+        return swHelloReply.status;
     }
 
-    // Ensure that the isMaster response is "ok:1".
-    auto isMasterStatus = getStatusFromCommandResult(swIsMasterReply.data);
-    if (!isMasterStatus.isOK()) {
-        return isMasterStatus;
+    // Ensure that the "hello" response is "ok:1".
+    auto helloStatus = getStatusFromCommandResult(swHelloReply.data);
+    if (!helloStatus.isOK()) {
+        return helloStatus;
     }
 
-    auto replyWireVersion = wire_version::parseWireVersionFromHelloReply(swIsMasterReply.data);
+    auto replyWireVersion = wire_version::parseWireVersionFromHelloReply(swHelloReply.data);
     if (!replyWireVersion.isOK()) {
         return replyWireVersion.getStatus();
     }
 
     {
         // The Server Discovery and Monitoring (SDAM) specification identifies a replica set member
-        // as either (a) having a "setName" field in the isMaster response, or (b) having
-        // "isreplicaset: true" in the isMaster response.
+        // as either (a) having a "setName" field in the "hello" response, or (b) having
+        // "isreplicaset: true" in the "hello" response.
         //
         // https://github.com/mongodb/specifications/blob/c386e23724318e2fa82f4f7663d77581b755b2c3/
         // source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#type
-        const bool hasSetNameField = swIsMasterReply.data.hasField("setName");
-        const bool isReplicaSetField = swIsMasterReply.data.getBoolField("isreplicaset");
+        const bool hasSetNameField = swHelloReply.data.hasField("setName");
+        const bool isReplicaSetField = swHelloReply.data.getBoolField("isreplicaset");
         _isReplicaSetMember = hasSetNameField || isReplicaSetField;
     }
 
     {
         std::string msgField;
-        auto msgFieldExtractStatus = bsonExtractStringField(swIsMasterReply.data, "msg", &msgField);
+        auto msgFieldExtractStatus = bsonExtractStringField(swHelloReply.data, "msg", &msgField);
 
         if (msgFieldExtractStatus == ErrorCodes::NoSuchKey) {
             _isMongos = false;
@@ -345,7 +355,7 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress,
     }
 
     if (_hook) {
-        auto validationStatus = _hook(swIsMasterReply);
+        auto validationStatus = _hook(swHelloReply);
         if (!validationStatus.isOK()) {
             // Disconnect and mark failed.
             _markFailed(kReleaseSession);
@@ -355,7 +365,7 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress,
 
     {
         auto swAuth = completeSpeculativeAuth(
-            this, speculativeAuthType, saslClientSession, _uri, swIsMasterReply.data);
+            this, speculativeAuthType, saslClientSession, _uri, swHelloReply.data);
         if (!swAuth.isOK()) {
             return swAuth.getStatus();
         }
@@ -560,7 +570,6 @@ void DBClientConnection::_checkConnection() {
                 "Trying to reconnect to {connString}",
                 "Trying to reconnect",
                 "connString"_attr = toString());
-    string errmsg;
 
     auto connectStatus = connect(_serverAddress, _applicationName, _transientSSLParams);
     if (!connectStatus.isOK()) {
@@ -570,7 +579,7 @@ void DBClientConnection::_checkConnection() {
                     "Reconnect attempt to {connString} failed: {reason}",
                     "Reconnect attempt failed",
                     "connString"_attr = toString(),
-                    "error"_attr = errmsg);
+                    "error"_attr = connectStatus);
         if (connectStatus == ErrorCodes::IncompatibleCatalogManager) {
             uassertStatusOK(connectStatus);  // Will always throw
         } else {

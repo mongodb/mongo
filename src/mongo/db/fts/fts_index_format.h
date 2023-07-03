@@ -29,13 +29,20 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/fts/fts_util.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 namespace mongo {
 
@@ -49,7 +56,7 @@ public:
                         const FTSSpec& spec,
                         const BSONObj& document,
                         KeyStringSet* keys,
-                        KeyString::Version keyStringVersion,
+                        key_string::Version keyStringVersion,
                         Ordering ordering,
                         const boost::optional<RecordId>& id = boost::none);
 

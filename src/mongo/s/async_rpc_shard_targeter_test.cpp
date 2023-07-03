@@ -27,25 +27,42 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <set>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+
 #include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/async_rpc.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/s/async_rpc_shard_targeter.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_router_test_fixture.h"
-#include "mongo/s/sharding_test_fixture_common.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
-#include <cstddef>
-#include <memory>
 
 namespace mongo {
 namespace async_rpc {
@@ -298,11 +315,12 @@ DEATH_TEST_F(AsyncRPCShardingTestFixture, CannotCallOnRemoteErrorBeforeResolve, 
  * Test ShardId overload version of 'sendCommand'.
  */
 TEST_F(AsyncRPCShardingTestFixture, ShardIdOverload) {
-    const NamespaceString testNS = NamespaceString("testdb", "testcoll");
+    const NamespaceString testNS =
+        NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
     const BSONObj testFirstBatch = BSON("x" << 1);
     const FindCommandRequest findCmd = FindCommandRequest(testNS);
-    const BSONObj findReply = CursorResponse(testNS, 0LL, {testFirstBatch})
-                                  .toBSON(CursorResponse::ResponseType::InitialResponse);
+    BSONObj findReply = CursorResponse(testNS, 0LL, {testFirstBatch})
+                            .toBSON(CursorResponse::ResponseType::InitialResponse);
 
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
         findCmd, executor(), CancellationToken::uncancelable());

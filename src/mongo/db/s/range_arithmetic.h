@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 
 namespace mongo {

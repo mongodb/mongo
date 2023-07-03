@@ -28,13 +28,14 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <array>
+#include <fmt/format.h>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/rpc/check_allowed_op_query_cmd.h"
-
-#include <fmt/format.h>
-#include <string>
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

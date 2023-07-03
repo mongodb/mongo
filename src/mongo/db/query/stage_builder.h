@@ -35,9 +35,9 @@
 namespace mongo::stage_builder {
 /**
  * The StageBuilder converts a QuerySolution tree to an executable tree of PlanStage(s), with the
- * specific type defined by the 'PlanStageType' parameter.
+ * specific type defined by the 'PlanType' parameter.
  */
-template <typename PlanStageType>
+template <typename PlanType>
 class StageBuilder {
 public:
     StageBuilder(OperationContext* opCtx, const CanonicalQuery& cq, const QuerySolution& solution)
@@ -49,7 +49,7 @@ public:
      * Given a root node of a QuerySolution tree, builds and returns a corresponding executable
      * tree of PlanStages.
      */
-    virtual std::unique_ptr<PlanStageType> build(const QuerySolutionNode* root) = 0;
+    virtual PlanType build(const QuerySolutionNode* root) = 0;
 
 protected:
     OperationContext* _opCtx;

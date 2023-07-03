@@ -31,6 +31,7 @@
 
 #include <shared_mutex>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/cost_model/cost_model_gen.h"
 #include "mongo/stdx/mutex.h"
 

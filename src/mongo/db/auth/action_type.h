@@ -37,6 +37,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_type_gen.h"
 
 namespace mongo {

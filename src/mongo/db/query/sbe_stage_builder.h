@@ -30,29 +30,64 @@
 #pragma once
 
 #include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
 #include <absl/hash/hash.h>
+#include <absl/meta/type_traits.h>
 #include <absl/strings/string_view.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <functional>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <type_traits>
 #include <utility>
+#include <variant>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/trial_period_utils.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
+#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo::stage_builder {
 
 class PlanStageReqs;
 class PlanStageSlots;
+
+struct PlanStageData;
 sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
                                          const PlanStageSlots& outputs,
                                          const sbe::value::SlotVector& exclude = sbe::makeSV());
@@ -71,7 +106,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     const CanonicalQuery& cq,
                                     const MultipleCollectionAccessor& collections,
                                     PlanYieldPolicySBE* yieldPolicy,
-                                    bool preparingFromCache = false);
+                                    bool preparingFromCache);
 
 /**
  * The ParameterizedIndexScanSlots struct is used by SlotBasedStageBuilder while building the index
@@ -101,6 +136,13 @@ struct ParameterizedIndexScanSlots {
     // this holds the SingleInterval struct. Otherwise, holds the necessary slots for a fully
     // generic parameterized index scan plan.
     stdx::variant<SingleIntervalPlan, GenericPlan> slots;
+};
+
+// Holds the slots for the clustered collection scan bounds.
+struct ParameterizedClusteredScanSlots {
+    // Holds the min and max record for the bounds of a clustered collection scan.
+    boost::optional<sbe::value::SlotId> minRecord;
+    boost::optional<sbe::value::SlotId> maxRecord;
 };
 
 /**
@@ -431,7 +473,7 @@ using VariableIdToSlotMap = stdx::unordered_map<Variables::Id, sbe::value::SlotI
  */
 struct IndexBoundsEvaluationInfo {
     IndexEntry index;
-    KeyString::Version keyStringVersion;
+    key_string::Version keyStringVersion;
     Ordering ordering;
     int direction;
     std::vector<interval_evaluation_tree::IET> iets;
@@ -439,43 +481,142 @@ struct IndexBoundsEvaluationInfo {
 };
 
 /**
+ * This class holds the RuntimeEnvironment and CompileCtx for an SBE plan. The RuntimeEnvironment
+ * owns various SlotAccessors which are accessed when the SBE plan is executed. The CompileCtx is
+ * used when the SBE plan needs to be "prepared" (via the prepare() method).
+ */
+struct PlanStageEnvironment {
+    PlanStageEnvironment(std::unique_ptr<sbe::RuntimeEnvironment> runtimeEnv)
+        : runtimeEnv(runtimeEnv.get()), ctx(std::move(runtimeEnv)) {}
+
+    PlanStageEnvironment makeCopy() const {
+        return PlanStageEnvironment(runtimeEnv->makeDeepCopy());
+    }
+
+    sbe::RuntimeEnvironment* operator->() noexcept {
+        return runtimeEnv;
+    }
+
+    const sbe::RuntimeEnvironment* operator->() const noexcept {
+        return runtimeEnv;
+    }
+
+    sbe::RuntimeEnvironment& operator*() noexcept {
+        return *runtimeEnv;
+    }
+
+    const sbe::RuntimeEnvironment& operator*() const noexcept {
+        return *runtimeEnv;
+    }
+
+    sbe::RuntimeEnvironment* runtimeEnv{nullptr};
+    sbe::CompileCtx ctx;
+};
+
+/**
+ * This struct used to hold all of a PlanStageData's immutable data.
+ */
+struct PlanStageStaticData {
+    // This holds the output slots produced by SBE plan (resultSlot, recordIdSlot, etc).
+    PlanStageSlots outputs;
+
+    // Various flags copied from the CollectionScanNode. If the plan generated by the query planner
+    // did not have a CollectionScanNode, then each of these flags is initialized to its respective
+    // default value.
+    bool shouldTrackLatestOplogTimestamp{false};
+    bool shouldTrackResumeToken{false};
+    bool shouldUseTailableScan{false};
+
+    // Scan direction if this plan has a collection scan: 1 means forward; -1 means reverse.
+    int direction{1};
+
+    // True iff this plan does an SBE clustered collection scan.
+    bool doSbeClusteredCollectionScan{false};
+
+    // Iff 'doSbeClusteredCollectionScan', this holds the cluster key field name.
+    std::string clusterKeyFieldName;
+
+    // Iff 'doSbeClusteredCollectionScan', this holds the clustered collection's native collator,
+    // needed to compute scan bounds.
+    std::shared_ptr<CollatorInterface> ccCollator;
+
+    // If the query has been auto-parameterized, then the mapping from input parameter id to the
+    // id of a slot in the runtime environment is maintained here. This mapping is established
+    // during stage building and stored in the cache. When a cached plan is used for a
+    // subsequent query, this mapping is used to set the new constant value associated with each
+    // input parameter id in the runtime environment.
+    //
+    // For example, imagine an auto-parameterized query {a: <p1>, b: <p2>} is present in the SBE
+    // plan cache. Also present in the cache is this mapping:
+    //    p1 -> s3
+    //    p2 -> s4
+    //
+    // A new query {a: 5, b: 6} runs. Using this mapping, we set a value of 5 in s3 and 6 in s4.
+    InputParamToSlotMap inputParamToSlotMap;
+
+    // This Variable-to-SlotId map stores all Variables that were translated into corresponding
+    // SBE Slots. The slots are registered in the 'RuntimeEnvironment'.
+    VariableIdToSlotMap variableIdToSlotMap;
+
+    // Stores auxiliary data to restore index bounds for a cached auto-parameterized SBE plan
+    // for every index used by the plan.
+    std::vector<IndexBoundsEvaluationInfo> indexBoundsEvaluationInfos;
+
+    // Stores data to restore collection scan bounds for a cached auto-parameterized SBE plan for
+    // every clustered collection scan used by the plan.
+    std::vector<ParameterizedClusteredScanSlots> clusteredCollBoundsInfos;
+
+    // Stores all namespaces involved in the build side of a hash join plan. Needed to check if
+    // the plan should be evicted as the size of the foreign namespace changes.
+    absl::flat_hash_set<NamespaceString> foreignHashJoinCollections;
+
+    // Stores CollatorInterface to be used for this plan. Raw pointer may be stored inside data
+    // structures, so it must be kept stable.
+    std::shared_ptr<CollatorInterface> queryCollator;
+};
+
+/**
  * Some auxiliary data returned by a 'SlotBasedStageBuilder' along with a PlanStage tree root, which
  * is needed to execute the PlanStage tree.
  */
 struct PlanStageData {
+    using DebugInfoSBE = plan_cache_debug_info::DebugInfoSBE;
+
+    explicit PlanStageData(PlanStageEnvironment env,
+                           std::shared_ptr<const PlanStageStaticData> staticData)
+        : env(std::move(env)), staticData(std::move(staticData)) {}
+
     PlanStageData(PlanStageData&&) = default;
+
+    PlanStageData(const PlanStageData& other)
+        : env(other.env.makeCopy()),
+          staticData(other.staticData),
+          replanReason(other.replanReason),
+          savedStatsOnEarlyExit(std::unique_ptr<sbe::PlanStageStats>(
+              other.savedStatsOnEarlyExit ? other.savedStatsOnEarlyExit->clone() : nullptr)),
+          debugInfo(other.debugInfo) {}
+
     PlanStageData& operator=(PlanStageData&&) = default;
-
-    explicit PlanStageData(std::unique_ptr<sbe::RuntimeEnvironment> env)
-        : env(env.get()), ctx(std::move(env)) {}
-
-    PlanStageData(const PlanStageData& other) : PlanStageData(other.env->makeDeepCopy()) {
-        copyFrom(other);
-    }
 
     PlanStageData& operator=(const PlanStageData& other) {
         if (this != &other) {
-            auto envCopy = other.env->makeDeepCopy();
-            env = envCopy.get();
-            ctx = sbe::CompileCtx(std::move(envCopy));
-            copyFrom(other);
+            env = other.env.makeCopy();
+            staticData = other.staticData;
+            replanReason = other.replanReason;
+            savedStatsOnEarlyExit = std::unique_ptr<sbe::PlanStageStats>{
+                other.savedStatsOnEarlyExit ? other.savedStatsOnEarlyExit->clone() : nullptr};
+            debugInfo = other.debugInfo;
         }
         return *this;
     }
 
     std::string debugString() const;
 
-    // This holds the output slots produced by SBE plan (resultSlot, recordIdSlot, etc).
-    PlanStageSlots outputs;
+    // This field holds the RuntimeEnvironment and the CompileCtx.
+    PlanStageEnvironment env;
 
-    // The CompileCtx object owns the RuntimeEnvironment. The RuntimeEnvironment owns various
-    // SlotAccessors which are accessed when the SBE plan is executed.
-    sbe::RuntimeEnvironment* env{nullptr};
-    sbe::CompileCtx ctx;
-
-    bool shouldTrackLatestOplogTimestamp{false};
-    bool shouldTrackResumeToken{false};
-    bool shouldUseTailableScan{false};
+    // This field holds all of the immutable data that needs to accompany an SBE PlanStage tree.
+    std::shared_ptr<const PlanStageStaticData> staticData;
 
     // If this execution tree was built as a result of replanning of the cached plan, this string
     // will include the reason for replanning.
@@ -485,71 +626,20 @@ struct PlanStageData {
     // metrics, the stats are cached in here.
     std::unique_ptr<sbe::PlanStageStats> savedStatsOnEarlyExit{nullptr};
 
-    // Stores plan cache entry information used as debug information or for "explain" purpose.
-    // Note that 'debugInfo' is present only if this PlanStageData is recovered from the plan cache.
-    std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo;
-
-    // If the query has been auto-parameterized, then the mapping from input parameter id to the
-    // id of a slot in the runtime environment is maintained here. This mapping is established
-    // during stage building and stored in the cache. When a cached plan is used for a subsequent
-    // query, this mapping is used to set the new constant value associated with each input
-    // parameter id in the runtime environment.
-    //
-    // For example, imagine an auto-parameterized query {a: <p1>, b: <p2>} is present in the SBE
-    // plan cache. Also present in the cache is this mapping:
-    //    p1 -> s3
-    //    p2 -> s4
-    //
-    // A new query {a: 5, b: 6} runs. Using this mapping, we set a value of 5 in s3 and 6 in s4.
-    InputParamToSlotMap inputParamToSlotMap;
-    // This Variable-to-SlotId map stores all the Variables that were translated into corresponding
-    // SBE Slots. The slots are registered in the 'RuntimeEnvironment'.
-    VariableIdToSlotMap variableIdToSlotMap;
-
-    // Stores auxiliary data to restore index bounds for a cached auto-parameterized SBE plan for
-    // every index used by the plan.
-    std::vector<IndexBoundsEvaluationInfo> indexBoundsEvaluationInfos;
-
-    // Stores all namespaces involved in the build side of a hash join plan. Needed to check if the
-    // plan should be evicted as the size of the foreign namespace changes.
-    stdx::unordered_set<NamespaceString> foreignHashJoinCollections;
-
-    // Stores CollatorInterface to be used for this plan. Raw pointer may be stored inside data
-    // structures, so it must be kept stable.
-    std::shared_ptr<CollatorInterface> collator;
-
-private:
-    // This copy function copies data from 'other' but will not create a copy of its
-    // RuntimeEnvironment and CompileCtx.
-    void copyFrom(const PlanStageData& other) {
-        outputs = other.outputs;
-        shouldTrackLatestOplogTimestamp = other.shouldTrackLatestOplogTimestamp;
-        shouldTrackResumeToken = other.shouldTrackResumeToken;
-        shouldUseTailableScan = other.shouldUseTailableScan;
-        replanReason = other.replanReason;
-        if (other.savedStatsOnEarlyExit) {
-            savedStatsOnEarlyExit.reset(other.savedStatsOnEarlyExit->clone());
-        } else {
-            savedStatsOnEarlyExit.reset();
-        }
-        if (other.debugInfo) {
-            debugInfo = std::make_unique<plan_cache_debug_info::DebugInfoSBE>(*other.debugInfo);
-        } else {
-            debugInfo.reset();
-        }
-        inputParamToSlotMap = other.inputParamToSlotMap;
-        variableIdToSlotMap = other.variableIdToSlotMap;
-        indexBoundsEvaluationInfos = other.indexBoundsEvaluationInfos;
-        foreignHashJoinCollections = other.foreignHashJoinCollections;
-        collator = other.collator;
-    }
+    // Stores plan cache entry information used as debug information or for "explain" purpose. Note
+    // that 'debugInfo' is present only if this PlanStageData is recovered from the plan cache.
+    std::shared_ptr<const DebugInfoSBE> debugInfo;
 };
 
 /**
  * A stage builder which builds an executable tree using slot-based PlanStages.
  */
-class SlotBasedStageBuilder final : public StageBuilder<sbe::PlanStage> {
+class SlotBasedStageBuilder final
+    : public StageBuilder<std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageData>> {
 public:
+    using PlanType = std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageData>;
+    using BaseType = StageBuilder<PlanType>;
+
     static constexpr auto kResult = PlanStageSlots::kResult;
     static constexpr auto kRecordId = PlanStageSlots::kRecordId;
     static constexpr auto kReturnKey = PlanStageSlots::kReturnKey;
@@ -570,11 +660,7 @@ public:
      *
      * This method is a wrapper around 'build(const QuerySolutionNode*, const PlanStageReqs&)'.
      */
-    std::unique_ptr<sbe::PlanStage> build(const QuerySolutionNode* root) final;
-
-    PlanStageData getPlanStageData() {
-        return std::move(_data);
-    }
+    PlanType build(const QuerySolutionNode* root) final;
 
 private:
     /**
@@ -595,6 +681,9 @@ private:
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildIndexScan(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildCountScan(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildColumnScan(
@@ -691,9 +780,13 @@ private:
 
     PlanYieldPolicySBE* const _yieldPolicy{nullptr};
 
-    // Apart from generating just an execution tree, this builder will also produce some auxiliary
-    // data which is needed to execute the tree.
-    PlanStageData _data;
+    // Aside from generating the PlanStage tree, this builder also produces a few auxiliary data
+    // structures that are needed to execute the tree: the RuntimeEnvironment, the CompileCtx,
+    // and the PlanStageStaticData. Note that the PlanStageStaticData ('_data') is mutable inside
+    // SlotBasedStageBuilder, but after the 'build(const QuerySolutionNode*)' method is called the
+    // data will become immutable.
+    PlanStageEnvironment _env;
+    std::unique_ptr<PlanStageStaticData> _data;
 
     bool _buildHasStarted{false};
 

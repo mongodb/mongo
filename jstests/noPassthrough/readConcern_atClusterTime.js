@@ -4,6 +4,8 @@
 //   requires_persistence,
 //   uses_atclustertime,
 //   uses_transactions,
+//   # Tests running with experimental CQF behavior require test commands to be enabled.
+//   cqf_experimental_incompatible,
 // ]
 
 function _getClusterTime(rst) {

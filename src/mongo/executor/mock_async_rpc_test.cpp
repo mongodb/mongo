@@ -28,17 +28,27 @@
  */
 #include "mongo/executor/mock_async_rpc.h"
 
-#include <memory>
+#include <absl/container/flat_hash_set.h>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/repl/hello_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_rpc.h"
+#include "mongo/executor/async_rpc_retry_policy.h"
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/async_rpc_test_fixture.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/debugger.h"
-#include "mongo/util/optional_util.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/rpc/topology_version_gen.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::async_rpc {
 namespace {
@@ -89,6 +99,14 @@ private:
     MockType* _mock;
     ServiceContext::UniqueOperationContext _opCtx = makeOperationContext();
 };
+
+auto extractUUID(const BSONElement& element) {
+    return UUID::fromCDR(element.uuid());
+}
+
+auto getOpKeyFromCommand(const BSONObj& cmdObj) {
+    return extractUUID(cmdObj["clientOperationKey"]);
+}
 
 using SyncMockAsyncRPCRunnerTestFixture = MockAsyncRPCRunnerTestFixture<SyncMockAsyncRPCRunner>;
 using AsyncMockAsyncRPCRunnerTestFixture = MockAsyncRPCRunnerTestFixture<AsyncMockAsyncRPCRunner>;
@@ -211,7 +229,10 @@ TEST_F(SyncMockAsyncRPCRunnerTestFixture, OnCommand) {
     initializeCommand(hello);
 
     getMockRunner().onCommand([&](const RequestInfo& ri) {
-        ASSERT_BSONOBJ_EQ(hello.toBSON({}), ri._cmd);
+        // OperationKey not provided, so internally created OperationKey must be extracted to make
+        // this assertion valid
+        ASSERT_BSONOBJ_EQ(hello.toBSON(BSON("clientOperationKey" << getOpKeyFromCommand(ri._cmd))),
+                          ri._cmd);
         return expectedResultObj;
     });
     ASSERT_BSONOBJ_EQ(responseFut.get().response.toBSON(), helloReply.toBSON());
@@ -235,7 +256,8 @@ TEST_F(SyncMockAsyncRPCRunnerTestFixture, SyncMockAsyncRPCRunnerWithRetryPolicy)
     initializeCommand(hello);
 
     getMockRunner().onCommand([&](const RequestInfo& ri) {
-        ASSERT_BSONOBJ_EQ(hello.toBSON({}), ri._cmd);
+        ASSERT_BSONOBJ_EQ(hello.toBSON(BSON("clientOperationKey" << getOpKeyFromCommand(ri._cmd))),
+                          ri._cmd);
         return expectedResultObj;
     });
     auto net = getNetworkInterfaceMock();
@@ -245,7 +267,8 @@ TEST_F(SyncMockAsyncRPCRunnerTestFixture, SyncMockAsyncRPCRunnerWithRetryPolicy)
     }
 
     getMockRunner().onCommand([&](const RequestInfo& ri) {
-        ASSERT_BSONOBJ_EQ(hello.toBSON({}), ri._cmd);
+        ASSERT_BSONOBJ_EQ(hello.toBSON(BSON("clientOperationKey" << getOpKeyFromCommand(ri._cmd))),
+                          ri._cmd);
         return expectedResultObj;
     });
     ASSERT_BSONOBJ_EQ(responseFut.get().response.toBSON(), helloReply.toBSON());
@@ -460,7 +483,9 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, UnexpectedRequests) {
     ASSERT_EQ(unexpectedRequests.size(), 1);
     HelloCommand hello;
     initializeCommand(hello);
-    ASSERT_BSONOBJ_EQ(unexpectedRequests[0].cmdBSON, hello.toBSON({}));
+    ASSERT_BSONOBJ_EQ(unexpectedRequests[0].cmdBSON,
+                      hello.toBSON(BSON("clientOperationKey"
+                                        << getOpKeyFromCommand(unexpectedRequests[0].cmdBSON))));
     ASSERT_EQ(unexpectedRequests[0].dbName, "testdb"_sd);
     HostAndPort localhost = HostAndPort("localhost", serverGlobalParams.port);
     ASSERT_EQ(unexpectedRequests[0].target, localhost);

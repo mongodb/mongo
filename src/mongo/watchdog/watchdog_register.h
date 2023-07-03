@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "mongo/base/string_data.h"

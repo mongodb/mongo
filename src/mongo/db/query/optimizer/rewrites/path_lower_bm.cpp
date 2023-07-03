@@ -27,14 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include <benchmark/benchmark.h>
+#include <cstdint>
+#include <string>
+#include <utility>
 
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include <string>
+#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace optimizer {

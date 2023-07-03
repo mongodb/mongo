@@ -81,7 +81,6 @@ ERROR_ID_NO_ARRAY_ENUM = "ID0035"
 ERROR_ID_ENUM_BAD_TYPE = "ID0036"
 ERROR_ID_ENUM_BAD_INT_VAUE = "ID0037"
 ERROR_ID_ENUM_NON_UNIQUE_VALUES = "ID0038"
-ERROR_ID_ENUM_NON_CONTINUOUS_RANGE = "ID0039"
 ERROR_ID_BAD_COMMAND_NAMESPACE = "ID0041"
 ERROR_ID_FIELD_NO_COMMAND = "ID0042"
 ERROR_ID_NO_ARRAY_OF_CHAIN = "ID0043"
@@ -139,6 +138,7 @@ ERROR_ID_STRICT_AND_DISABLE_CHECK_NOT_ALLOWED = "ID0099"
 ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED = "ID0100"
 ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_VERSION = "ID0101"
 ERROR_ID_QUERY_SHAPE_INVALID_VALUE = "ID0102"
+ERROR_ID_BAD_CPP_NAMESPACE = "ID0103"
 
 
 class IDLError(Exception):
@@ -612,13 +612,6 @@ class ParserContext(object):
         self._add_error(location, ERROR_ID_ENUM_NON_UNIQUE_VALUES,
                         "Enum '%s' has duplicate values, all values must be unique" % (enum_name))
 
-    def add_enum_non_continuous_range_error(self, location, enum_name):
-        # type: (common.SourceLocation, str) -> None
-        """Add an error for an enum having duplicate values."""
-        self._add_error(location, ERROR_ID_ENUM_NON_CONTINUOUS_RANGE,
-                        ("Enum '%s' has non-continuous integer variables, enums must have a " +
-                         "continuous range of integer variables.") % (enum_name))
-
     def add_bad_command_namespace_error(self, location, command_name, command_namespace,
                                         valid_commands):
         # type: (common.SourceLocation, str, str, List[str]) -> None
@@ -996,6 +989,13 @@ class ParserContext(object):
             location, ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED,
             "Fields cannot have unsafe_dangerous_disable_extra_field_duplicate_checks = true. unsafe_dangerous_disable_extra_field_duplicate_checks on non field structs"
         )
+
+    def add_bad_cpp_namespace(self, location, namespace):
+        # type: (common.SourceLocation, str) -> None
+        self._add_error(
+            location, ERROR_ID_BAD_CPP_NAMESPACE,
+            "cpp_namespace must start with 'mongo::' or be just 'mongo', namespace '%s' is not supported"
+            % (namespace))
 
 
 def _assert_unique_error_messages():

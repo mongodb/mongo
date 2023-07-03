@@ -27,12 +27,18 @@
  *    it in the license file.
  */
 
+#include <cstddef>
 #include <fmt/format.h>
+#include <ratio>
 #include <string>
-
-#include "mongo/util/executor_stats.h"
+#include <utility>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/executor_stats.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

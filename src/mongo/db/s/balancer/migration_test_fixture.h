@@ -27,15 +27,36 @@
  *    it in the license file.
  */
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

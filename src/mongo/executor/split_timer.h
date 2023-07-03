@@ -30,12 +30,23 @@
 #pragma once
 
 #include <array>
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <fmt/format.h>
+#include <functional>
+#include <type_traits>
+#include <utility>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/timer.h"
 

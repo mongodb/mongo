@@ -27,12 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <string>
+#include <vector>
 
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/query_planner.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {

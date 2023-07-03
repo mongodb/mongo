@@ -29,8 +29,21 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <utility>
+#include <vector>
+
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 
 
 namespace mongo::optimizer {

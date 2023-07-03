@@ -29,50 +29,67 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <map>
+#include <memory>
+#include <type_traits>
+#include <utility>
+
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
+#include "mongo/db/matcher/extensions_callback.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/parsed_writes_common.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/update/update_driver.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
 class CanonicalQuery;
+class ExtensionsCallbackNoop;
+class ExtensionsCallbackReal;
 class OperationContext;
 class UpdateRequest;
 
+namespace impl {
+
 /**
- * This class takes a pointer to an UpdateRequest, and converts that request into a parsed form
- * via the parseRequest() method. A ParsedUpdate can then be used to retrieve a PlanExecutor
- * capable of executing the update.
+ * Note: this class is the base class for ParsedUpdate and ParsedUpdateForMongos. Their only
+ * difference is that ParsedUpdateForMongos uses the ExtensionsCallbackNoop and on the other hand,
+ * ParsedUpdate uses ExtensionsCallbackReal. The reason for this is that ExtensionsCallbackReal is
+ * available only on the mongod. This difference does not need to be exposed through the interface
+ * and can be hidden in the implementation.
  *
- * It is invalid to request that the UpdateStage return the prior or newly-updated version of a
- * document during a multi-update. It is also invalid to request that a ProjectionStage be
- * applied to the UpdateStage if the UpdateStage would not return any document.
- *
- * No locks need to be held during parsing.
- *
- * The query part of the update is parsed to a CanonicalQuery, and the update part is parsed
- * using the UpdateDriver.
  */
-class ParsedUpdate {
-    ParsedUpdate(const ParsedUpdate&) = delete;
-    ParsedUpdate& operator=(const ParsedUpdate&) = delete;
+class ParsedUpdateBase {
+    ParsedUpdateBase(const ParsedUpdateBase&) = delete;
+    ParsedUpdateBase& operator=(const ParsedUpdateBase&) = delete;
 
 public:
     /**
      * Constructs a parsed update.
      *
-     * The objects pointed to by "request" and "extensionsCallback" must stay in scope for the life
-     * of the constructed ParsedUpdate.
+     * The objects pointed to by "request" must stay in scope for the life of the constructed
+     * ParsedUpdate.
      */
-    ParsedUpdate(OperationContext* opCtx,
-                 const UpdateRequest* request,
-                 const ExtensionsCallback& extensionsCallback,
-                 const CollectionPtr& collection,
-                 bool forgoOpCounterIncrements = false,
-                 bool isRequestToTimeseries = false);
+    ParsedUpdateBase(OperationContext* opCtx,
+                     const UpdateRequest* request,
+                     std::unique_ptr<const ExtensionsCallback> extensionsCallback,
+                     const CollectionPtr& collection,
+                     bool forgoOpCounterIncrements = false,
+                     bool isRequestToTimeseries = false);
 
     /**
      * Parses the update request to a canonical query and an update driver. On success, the
@@ -86,17 +103,6 @@ public:
      * as a fallback if the idhack path is not available (e.g. no _id index).
      */
     Status parseQueryToCQ();
-
-    /**
-     * Parses the given filter to a CanonicalQuery. This does a direct transformation and doesn't do
-     * any special handling, e.g. for timeseries.
-     */
-    static StatusWith<std::unique_ptr<CanonicalQuery>> parseQueryToCQ(
-        OperationContext* opCtx,
-        ExpressionContext* expCtx,
-        const ExtensionsCallback& extensionsCallback,
-        const UpdateRequest& request,
-        const BSONObj& filter);
 
     /**
      * Get the raw request.
@@ -151,6 +157,13 @@ public:
     }
 
     /**
+     * Releases the ownership of the original MatchExpression.
+     */
+    std::unique_ptr<MatchExpression> releaseOriginalExpr() {
+        return std::move(_originalExpr);
+    }
+
+    /**
      * Returns true when we are performing multi updates using a residual predicate on a time-series
      * collection or when performing singleton updates on a time-series collection.
      */
@@ -198,7 +211,7 @@ private:
     std::unique_ptr<CanonicalQuery> _canonicalQuery;
 
     // Reference to an extensions callback used when parsing to a canonical query.
-    const ExtensionsCallback& _extensionsCallback;
+    std::unique_ptr<const ExtensionsCallback> _extensionsCallback;
 
     // Reference to the collection this update is being performed on.
     const CollectionPtr& _collection;
@@ -207,7 +220,62 @@ private:
     // to the bucket collection.
     std::unique_ptr<TimeseriesWritesQueryExprs> _timeseriesUpdateQueryExprs;
 
+    // The original, complete and untranslated write query expression.
+    std::unique_ptr<MatchExpression> _originalExpr = nullptr;
+
     const bool _isRequestToTimeseries;
+};
+
+template <typename T, typename... Ts>
+requires std::is_same_v<T, ExtensionsCallbackNoop> || std::is_same_v<T, ExtensionsCallbackReal>
+    std::unique_ptr<ExtensionsCallback> makeExtensionsCallback(Ts&&... args) {
+    return std::make_unique<T>(std::forward<Ts>(args)...);
+}
+
+}  // namespace impl
+
+/**
+ * This class takes a pointer to an UpdateRequest, and converts that request into a parsed form
+ * via the parseRequest() method. A ParsedUpdate can then be used to get information about the
+ * update, or to retrieve an upsert document.
+ *
+ * No locks need to be held during parsing.
+ *
+ * The query part of the update is parsed to a CanonicalQuery, and the update part is parsed
+ * using the UpdateDriver.
+ *
+ * ParsedUpdateForMongos is a ParsedUpdate that can be used in mongos.
+ */
+class ParsedUpdateForMongos : public impl::ParsedUpdateBase {
+public:
+    ParsedUpdateForMongos(OperationContext* opCtx, const UpdateRequest* request)
+        : ParsedUpdateBase(opCtx,
+                           request,
+                           impl::makeExtensionsCallback<ExtensionsCallbackNoop>(),
+                           CollectionPtr::null) {}
+};
+
+/**
+ * This class takes a pointer to an UpdateRequest, and converts that request into a parsed form
+ * via the parseRequest() method. A ParsedUpdate can then be used to retrieve a PlanExecutor
+ * capable of executing the update.
+ *
+ * It is invalid to request that the UpdateStage return the prior or newly-updated version of a
+ * document during a multi-update. It is also invalid to request that a ProjectionStage be
+ * applied to the UpdateStage if the UpdateStage would not return any document.
+ *
+ * The query part of the update is parsed to a CanonicalQuery, and the update part is parsed
+ * using the UpdateDriver.
+ *
+ * ParsedUpdate is a ParsedUpdate that can be used in mongod.
+ */
+class ParsedUpdate : public impl::ParsedUpdateBase {
+public:
+    ParsedUpdate(OperationContext* opCtx,
+                 const UpdateRequest* request,
+                 const CollectionPtr& collection,
+                 bool forgoOpCounterIncrements = false,
+                 bool isRequestToTimeseries = false);
 };
 
 }  // namespace mongo

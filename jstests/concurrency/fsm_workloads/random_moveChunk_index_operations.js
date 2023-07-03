@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Performs a series of index operations while chunk migrations are running in the background
  * and verifies that indexes are not left in an inconsistent state.
@@ -13,7 +11,7 @@
 load("jstests/concurrency/fsm_workload_helpers/chunks.js");  // for chunk helpers
 load("jstests/sharding/libs/sharded_index_util.js");  // for findInconsistentIndexesAcrossShards
 
-var $config = (function() {
+export const $config = (function() {
     function threadCollectionName(prefix, tid) {
         return prefix + tid;
     }

@@ -18,16 +18,13 @@ load('jstests/sharding/internal_txns/libs/fixture_helpers.js');
 load("jstests/sharding/libs/resharding_test_fixture.js");
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
-function InternalTransactionReshardingTest(
-    {reshardInPlace, storeFindAndModifyImagesInSideCollection}) {
-    jsTest.log(`Running resharding test with options ${
-        tojson({reshardInPlace, storeFindAndModifyImagesInSideCollection})}`);
+function InternalTransactionReshardingTest({reshardInPlace}) {
+    jsTest.log(`Running resharding test with options ${tojson({reshardInPlace})}`);
 
     const reshardingTest = new ReshardingTest({
         numDonors: 2,
         numRecipients: 1,
         reshardInPlace,
-        storeFindAndModifyImagesInSideCollection,
         oplogSize: 256,
         maxNumberOfTransactionOperationsInSingleOplogEntry: 1
     });

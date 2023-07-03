@@ -35,12 +35,12 @@ Each phase object has two keys:
 A response is a pair of values:
 
 - The source, for example "a:27017".
-  This is the address the client sent the "ismaster" command to.
-- An ismaster response, for example `{ok: 1, ismaster: true}`.
+  This is the address the client sent the "hello" command to.
+- A "hello" response, for example `{ok: 1, isWritablePrimary: true}`.
   If the response includes an electionId it is shown in extended JSON like
   `{"$oid": "000000000000000000000002"}`.
   The empty response `{}` indicates a network error
-  when attempting to call "ismaster".
+  when attempting to call "hello".
 
 In non-monitoring tests, an "outcome" represents the correct
 TopologyDescription that results from processing the responses in the phases
@@ -67,10 +67,10 @@ current TopologyDescription. It has the following keys:
 - maxWireVersion: absent or an integer.
 
 In monitoring tests, an "outcome" contains a list of SDAM events that should
-have been published by the client as a result of processing ismaster responses
+have been published by the client as a result of processing "hello" responses
 in the current phase. Any SDAM events published by the client during its
 construction (that is, prior to processing any of the responses) should be
-combined with the events published during processing of ismaster responses
+combined with the events published during processing of "hello" responses
 of the first phase of the test. A test MAY explicitly verify events published
 during client construction by providing an empty responses array for the
 first phase.
@@ -83,7 +83,7 @@ Mocking
 ~~~~~~~
 
 Drivers should be able to test their server discovery and monitoring logic
-without any network I/O, by parsing ismaster responses from the test file
+without any network I/O, by parsing "hello" responses from the test file
 and passing them into the driver code. Parts of the client and monitoring
 code may need to be mocked or subclassed to achieve this. `A reference
 implementation for PyMongo 3.x is available here

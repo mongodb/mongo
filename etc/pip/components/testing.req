@@ -25,3 +25,4 @@ mongomock == 4.1.2
 pyjwt
 selenium
 geckodriver-autoinstaller
+pipx==1.2.0

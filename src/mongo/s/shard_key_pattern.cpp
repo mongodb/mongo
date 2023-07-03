@@ -29,12 +29,20 @@
 
 #include "mongo/s/shard_key_pattern.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/field_ref_set.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/path_internal.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -222,7 +230,7 @@ std::string ShardKeyPattern::toString() const {
 }
 
 std::string ShardKeyPattern::toKeyString(const BSONObj& shardKey) {
-    KeyString::Builder ks(KeyString::Version::V1, Ordering::allAscending());
+    key_string::Builder ks(key_string::Version::V1, Ordering::allAscending());
 
     BSONObjIterator it(shardKey);
     while (auto elem = it.next()) {

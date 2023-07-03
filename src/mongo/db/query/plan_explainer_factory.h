@@ -29,13 +29,18 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
+#include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/util/duration.h"
 
 namespace mongo::plan_explainer_factory {

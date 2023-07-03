@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/platform/decimal128.h"

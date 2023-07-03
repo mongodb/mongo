@@ -15,8 +15,8 @@ extern "C" {
 
 #define ZSTD_SEEKABLE_MAXFRAMES 0x8000000U
 
-/* Limit the maximum size to avoid any potential issues storing the compressed size */
-#define ZSTD_SEEKABLE_MAX_FRAME_DECOMPRESSED_SIZE 0x80000000U
+/* Limit maximum size to avoid potential issues storing the compressed size */
+#define ZSTD_SEEKABLE_MAX_FRAME_DECOMPRESSED_SIZE 0x40000000U
 
 /*-****************************************************************************
 *  Seekable Format
@@ -48,10 +48,19 @@ typedef struct ZSTD_seekTable_s ZSTD_seekTable;
 *
 *  Use ZSTD_seekable_initCStream() to initialize a ZSTD_seekable_CStream object
 *  for a new compression operation.
-*  `maxFrameSize` indicates the size at which to automatically start a new
-*  seekable frame.  `maxFrameSize == 0` implies the default maximum size.
-*  `checksumFlag` indicates whether or not the seek table should include frame
-*  checksums on the uncompressed data for verification.
+*  - `maxFrameSize` indicates the size at which to automatically start a new
+*            seekable frame.
+*            `maxFrameSize == 0` implies the default maximum size.
+*            Smaller frame sizes allow faster decompression of small segments,
+*            since retrieving a single byte requires decompression of
+*            the full frame where the byte belongs.
+*            In general, size the frames to roughly correspond to
+*            the access granularity (when it's known).
+*            But small sizes also reduce compression ratio.
+*            Avoid really tiny frame sizes (< 1 KB),
+*            that would hurt compression ratio considerably.
+*  - `checksumFlag` indicates whether or not the seek table should include frame
+*            checksums on the uncompressed data for verification.
 *  @return : a size hint for input to provide for compression, or an error code
 *            checkable with ZSTD_isError()
 *

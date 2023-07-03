@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/process_health/fault_manager_config.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth

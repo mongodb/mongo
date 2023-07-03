@@ -32,7 +32,13 @@
 #include <functional>
 #include <tuple>
 
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/database_name.h"
 #include "mongo/rpc/op_msg.h"
 
 namespace mongo {

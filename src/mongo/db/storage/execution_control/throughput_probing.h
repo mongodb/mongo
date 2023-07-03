@@ -29,7 +29,20 @@
 
 #pragma once
 
+#include <cstdint>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/ticketholder_monitor.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/timer.h"
 
 namespace mongo::execution_control {
 namespace throughput_probing {
@@ -67,7 +80,9 @@ private:
     void _probeUp(double throughput);
     void _probeDown(double throughput);
 
-    void _setConcurrency(double concurrency);
+    void _resetConcurrency();
+    void _increaseConcurrency();
+    void _decreaseConcurrency();
 
     // This value is split between reads and writes based on the read/write ratio.
     double _stableConcurrency;

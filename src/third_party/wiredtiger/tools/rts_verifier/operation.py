@@ -506,7 +506,7 @@ class Operation:
         self.rollback = self.__extract_simple_timestamp('rollback_timestamp', line)
 
         matches = re.search('key=(\d+)', line)
-        
+
         if matches != None:
             self.key = int(matches.group(1))
         else:

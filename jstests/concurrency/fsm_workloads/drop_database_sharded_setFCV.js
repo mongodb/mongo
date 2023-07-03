@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Repeatedly creates and drops a database in concurrency with FCV changes
  *
@@ -7,15 +5,13 @@
  *   requires_sharding,
  *   # Requires all nodes to be running the latest binary.
  *   multiversion_incompatible,
- *   # TODO SERVER-75391: Re-enable this test.
- *   config_shard_incompatible,
  *  ]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/drop_database_sharded.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/drop_database_sharded.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.setFCV = function(db, collName) {
         const fcvValues = [lastLTSFCV, lastContinuousFCV, latestFCV];
         const targetFCV = fcvValues[Random.randInt(3)];

@@ -29,17 +29,42 @@
 
 #pragma once
 
-#include "mongo/util/duration.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <deque>
+#include <memory>
 #include <queue>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/update_result.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
+#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/restore_context.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/sbe_runtime_planner.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/record_id.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 class PlanExecutorSBE final : public PlanExecutor {
@@ -98,6 +123,11 @@ public:
     }
 
     long long executeDelete() override {
+        // Using SBE to execute a delete command is not yet supported.
+        MONGO_UNREACHABLE;
+    }
+
+    long long getDeleteResult() const override {
         // Using SBE to execute a delete command is not yet supported.
         MONGO_UNREACHABLE;
     }

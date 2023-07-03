@@ -28,18 +28,35 @@
  */
 
 
-#include "mongo/db/auth/action_set.h"
+#include <set>
+#include <string>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/cloner.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/clone_catalog_data_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -75,11 +92,12 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const override {
         if (!AuthorizationSession::get(opCtx->getClient())
-                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                    ActionType::internal)) {
+                 ->isAuthorizedForActionsOnResource(
+                     ResourcePattern::forClusterResource(dbName.tenantId()),
+                     ActionType::internal)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
@@ -102,17 +120,17 @@ public:
 
         const auto cloneCatalogDataRequest =
             CloneCatalogData::parse(IDLParserContext("_shardsvrCloneCatalogData"), cmdObj);
-        const auto dbname = cloneCatalogDataRequest.getCommandParameter().toString();
+        const auto dbname = cloneCatalogDataRequest.getCommandParameter().dbName();
 
         uassert(
             ErrorCodes::InvalidNamespace,
-            str::stream() << "invalid db name specified: " << dbname,
+            str::stream() << "invalid db name specified: " << dbname.toStringForErrorMsg(),
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Can't clone catalog data for " << dbname << " database",
-                dbname != DatabaseName::kAdmin.db() && dbname != DatabaseName::kConfig.db() &&
-                    dbname != DatabaseName::kLocal.db());
+                str::stream() << "Can't clone catalog data for " << dbname.toStringForErrorMsg()
+                              << " database",
+                !dbname.isAdminDB() && !dbname.isConfigDB() && !dbname.isLocalDB());
 
         auto from = cloneCatalogDataRequest.getFrom();
 
@@ -122,7 +140,9 @@ public:
 
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
         const auto shardedColls = catalogClient->getAllShardedCollectionsForDb(
-            opCtx, dbname, repl::ReadConcernLevel::kMajorityReadConcern);
+            opCtx,
+            DatabaseNameUtil::serialize(dbname),
+            repl::ReadConcernLevel::kMajorityReadConcern);
 
         DisableDocumentValidation disableValidation(opCtx);
 
@@ -130,7 +150,11 @@ public:
         std::set<std::string> clonedColls;
 
         Cloner cloner;
-        uassertStatusOK(cloner.copyDb(opCtx, dbname, from.toString(), shardedColls, &clonedColls));
+        uassertStatusOK(cloner.copyDb(opCtx,
+                                      DatabaseNameUtil::serialize(dbname),
+                                      from.toString(),
+                                      shardedColls,
+                                      &clonedColls));
         {
             BSONArrayBuilder cloneBarr = result.subarrayStart("clonedColls");
             cloneBarr.append(clonedColls);

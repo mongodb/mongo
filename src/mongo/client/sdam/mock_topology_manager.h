@@ -28,9 +28,15 @@
  */
 #pragma once
 
+#include <functional>
 #include <memory>
+#include <vector>
 
+#include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_manager.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo::sdam {
 

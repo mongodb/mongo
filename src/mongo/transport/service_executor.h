@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include <cstddef>
 #include <functional>
+#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -41,6 +43,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::transport {
 

@@ -27,17 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <ostream>
+#include <string>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
-#include "mongo/db/feature_compatibility_version_parser.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/str.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo {
@@ -99,7 +111,7 @@ public:
             auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                cmd.getDbName().db().toString(),
+                DatabaseNameUtil::serialize(cmd.getDbName()),
                 CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}),
                                                            opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));
@@ -111,12 +123,12 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            uassert(
-                ErrorCodes::Unauthorized,
-                "Unauthorized",
-                AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::setFeatureCompatibilityVersion));
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::setFeatureCompatibilityVersion));
         }
 
         bool supportsWriteConcern() const override {

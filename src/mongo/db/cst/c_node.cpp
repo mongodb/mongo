@@ -28,15 +28,22 @@
  */
 
 #include "mongo/db/cst/c_node.h"
+
+#include <algorithm>
+#include <limits>
+#include <memory>
+#include <numeric>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/overloaded_visitor.h"
-
-#include <iterator>
-#include <limits>
-#include <numeric>
-#include <type_traits>
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 namespace mongo {
 using namespace std::string_literals;
@@ -126,8 +133,8 @@ auto printValue(const T& payload) {
             [](const UserDate& userDate) {
                 return "<UserDate "s +
                     [&] {
-                        if (auto string = TimeZoneDatabase::utcZone().formatDate(
-                                "%Y-%m-%dT%H:%M:%S.%LZ", userDate);
+                        if (auto string =
+                                TimeZoneDatabase::utcZone().formatDate(kIsoFormatStringZ, userDate);
                             string.isOK())
                             return string.getValue();
                         else

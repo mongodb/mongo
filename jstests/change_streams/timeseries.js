@@ -43,12 +43,12 @@ let curNoEvents = testDB.watch([], {showExpandedEvents: true});
 
 assert.commandWorked(testDB.createCollection(
     jsTestName(),
-    {timeseries: {timeField: "ts", metaField: "meta"}}));    // on buckets ns and view ns
-coll.createIndex({ts: 1, "meta.b": 1}, {name: "dropMe"});    // on buckets ns
-coll.insertOne({_id: 1, ts: new Date(1000), meta: {a: 1}});  // on buckets ns
-coll.insertOne({_id: 1, ts: new Date(1000), meta: {a: 1}});  // on buckets ns
-coll.update({"meta.a": 1}, {$set: {"meta.b": 2}});           // on buckets ns
-coll.remove({"meta.a": 1});                                  // on buckets ns
+    {timeseries: {timeField: "ts", metaField: "meta"}}));          // on buckets ns and view ns
+coll.createIndex({ts: 1, "meta.b": 1}, {name: "dropMe"});          // on buckets ns
+coll.insertOne({_id: 1, ts: new Date(1000), meta: {a: 1}});        // on buckets ns
+coll.insertOne({_id: 1, ts: new Date(1000), meta: {a: 1}});        // on buckets ns
+coll.update({"meta.a": 1}, {$set: {"meta.b": 2}}, {multi: true});  // on buckets ns
+coll.remove({"meta.a": 1});                                        // on buckets ns
 // collMod granularity. on both buckets ns and view ns
 assert.commandWorked(testDB.runCommand({collMod: collName, timeseries: {granularity: "hours"}}));
 // collMod expiration. just on buckets ns
@@ -161,6 +161,16 @@ let expectedChanges = [
             "truncatedArrays": [],
             "disambiguatedPaths":
                 {"data._id.1": ["data", "_id", "1"], "data.ts.1": ["data", "ts", "1"]}
+        }
+    },
+    {
+        "operationType": "update",
+        "ns": {"db": dbName, "coll": bucketsCollName},
+        "updateDescription": {
+            "updatedFields": {"meta.b": 2},
+            "removedFields": [],
+            "truncatedArrays": [],
+            "disambiguatedPaths": {}
         }
     },
     {"operationType": "delete", "ns": {"db": dbName, "coll": bucketsCollName}},

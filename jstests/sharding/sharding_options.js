@@ -5,27 +5,6 @@ var baseName = "jstests_sharding_sharding_options";
 
 load('jstests/libs/command_line/test_parsed_options.js');
 
-// Move Paranoia
-jsTest.log("Testing \"moveParanoia\" command line option");
-var expectedResult = {"parsed": {"sharding": {"archiveMovedChunks": true}}};
-testGetCmdLineOptsMongod({moveParanoia: ""}, expectedResult);
-
-jsTest.log("Testing \"noMoveParanoia\" command line option");
-expectedResult = {
-    "parsed": {"sharding": {"archiveMovedChunks": false}}
-};
-testGetCmdLineOptsMongod({noMoveParanoia: ""}, expectedResult);
-
-jsTest.log("Testing \"sharding.archiveMovedChunks\" config file option");
-expectedResult = {
-    "parsed": {
-        "config": "jstests/libs/config_files/enable_paranoia.json",
-        "sharding": {"archiveMovedChunks": true}
-    }
-};
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/enable_paranoia.json"},
-                         expectedResult);
-
 // Sharding Role
 jsTest.log("Testing \"configsvr\" command line option");
 var expectedResult = {
@@ -59,27 +38,6 @@ expectedResult = {
     }
 };
 testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole_configsvr.json"},
-                         expectedResult);
-
-// Test that we preserve switches explicitly set to false in config files.  See SERVER-13439.
-jsTest.log("Testing explicitly disabled \"moveParanoia\" config file option");
-expectedResult = {
-    "parsed": {
-        "config": "jstests/libs/config_files/disable_moveparanoia.ini",
-        "sharding": {"archiveMovedChunks": false}
-    }
-};
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_moveparanoia.ini"},
-                         expectedResult);
-
-jsTest.log("Testing explicitly disabled \"noMoveParanoia\" config file option");
-expectedResult = {
-    "parsed": {
-        "config": "jstests/libs/config_files/disable_nomoveparanoia.ini",
-        "sharding": {"archiveMovedChunks": true}
-    }
-};
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_nomoveparanoia.ini"},
                          expectedResult);
 
 jsTest.log("Ensure starting a standalone with --shardsvr fails");

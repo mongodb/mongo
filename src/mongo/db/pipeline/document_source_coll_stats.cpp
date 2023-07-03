@@ -27,14 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_coll_stats.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/stats/top.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/serialization_context.h"
 #include "mongo/util/time_support.h"
 
 using boost::intrusive_ptr;
@@ -112,10 +121,9 @@ BSONObj DocumentSourceCollStats::makeStatsForNs(
     if (auto storageStats = spec.getStorageStats()) {
         // If the storageStats field exists, it must have been validated as an object when parsing.
         BSONObjBuilder storageBuilder(builder.subobjStart("storageStats"));
-        uassertStatusOKWithContext(
-            expCtx->mongoProcessInterface->appendStorageStats(
-                expCtx->opCtx, nss, *storageStats, &storageBuilder, filterObj),
-            "Unable to retrieve storageStats in $collStats stage");
+        uassertStatusOKWithContext(expCtx->mongoProcessInterface->appendStorageStats(
+                                       expCtx, nss, *storageStats, &storageBuilder, filterObj),
+                                   "Unable to retrieve storageStats in $collStats stage");
         storageBuilder.doneFast();
     }
 

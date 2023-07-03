@@ -30,12 +30,21 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/commands/shutdown_gen.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/shutdown_gen.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/ntservice.h"
 
@@ -98,7 +107,8 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forClusterResource(), ActionType::shutdown));
+                        ResourcePattern::forClusterResource(Base::request().getDbName().tenantId()),
+                        ActionType::shutdown));
         }
     };
 

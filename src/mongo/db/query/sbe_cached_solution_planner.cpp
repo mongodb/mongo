@@ -27,22 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/flat_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <map>
 
-#include "mongo/db/query/sbe_cached_solution_planner.h"
-
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
-#include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/explain.h"
+#include "mongo/db/exec/trial_period_utils.h"
+#include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/optimizer/explain_interface.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
+#include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_explainer_factory.h"
+#include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/sbe_cached_solution_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
+#include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/query/stage_builder_util.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_proxy.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -58,7 +80,8 @@ CandidatePlans CachedSolutionPlanner::plan(
         auto secondaryCollectionsInfo =
             fillOutSecondaryCollectionsInformation(_opCtx, _collections, &_cq);
 
-        for (const auto& foreignCollection : roots[0].second.foreignHashJoinCollections) {
+        for (const auto& foreignCollection :
+             roots[0].second.staticData->foreignHashJoinCollections) {
             const auto collectionInfo = secondaryCollectionsInfo.find(foreignCollection);
             tassert(6693500,
                     "Foreign collection must be present in the collections info",
@@ -100,15 +123,14 @@ CandidatePlans CachedSolutionPlanner::plan(
                                                         maxReadsBeforeReplan);
 
     tassert(6488200, "'debugInfo' should be initialized", candidate.data.stageData.debugInfo);
-    auto explainer = plan_explainer_factory::make(
-        candidate.root.get(),
-        &candidate.data.stageData,
-        candidate.solution.get(),
-        {},    /* optimizedData */
-        {},    /* rejectedCandidates */
-        false, /* isMultiPlan */
-        true,  /* isFromPlanCache */
-        std::make_unique<plan_cache_debug_info::DebugInfoSBE>(*candidate.data.stageData.debugInfo));
+    auto explainer = plan_explainer_factory::make(candidate.root.get(),
+                                                  &candidate.data.stageData,
+                                                  candidate.solution.get(),
+                                                  {},    /* optimizedData */
+                                                  {},    /* rejectedCandidates */
+                                                  false, /* isMultiPlan */
+                                                  true,  /* isFromPlanCache */
+                                                  candidate.data.stageData.debugInfo);
 
     if (!candidate.status.isOK()) {
         // On failure, fall back to replanning the whole query. We neither evict the existing cache

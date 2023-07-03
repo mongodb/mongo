@@ -28,23 +28,34 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/catalog/list_indexes.h"
-
+#include <cstddef>
 #include <list>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -154,6 +165,6 @@ std::list<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
                                                  const NamespaceStringOrUUID& nss,
                                                  ListIndexesInclude additionalInclude) {
     auto listStatus = listIndexes(opCtx, nss, additionalInclude);
-    return listStatus.isOK() ? listStatus.getValue() : std::list<BSONObj>();
+    return listStatus.isOK() ? std::move(listStatus.getValue()) : std::list<BSONObj>();
 }
 }  // namespace mongo

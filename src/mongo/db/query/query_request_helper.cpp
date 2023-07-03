@@ -27,17 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/query_request_helper.h"
-
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
 #include <memory>
+#include <string>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/dbmessage.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/tailable_mode.h"
+#include "mongo/db/server_options.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
@@ -79,6 +100,47 @@ Status validateGetMoreCollectionName(StringData collectionName) {
     if (collectionName.find('\0') != std::string::npos) {
         return Status(ErrorCodes::InvalidNamespace,
                       "Collection names cannot have embedded null characters");
+    }
+
+    return Status::OK();
+}
+
+Status validateResumeAfter(const mongo::BSONObj& resumeAfter, bool isClusteredCollection) {
+    if (resumeAfter.isEmpty()) {
+        return Status::OK();
+    }
+
+    BSONType recordIdType = resumeAfter["$recordId"].type();
+    if (mongo::resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        if (resumeAfter.nFields() > 2 ||
+            (recordIdType != BSONType::NumberLong && recordIdType != BSONType::BinData &&
+             recordIdType != BSONType::jstNULL) ||
+            (resumeAfter.nFields() == 2 &&
+             (resumeAfter["$initialSyncId"].type() != BSONType::BinData ||
+              resumeAfter["$initialSyncId"].binDataType() != BinDataType::newUUID))) {
+            return Status(ErrorCodes::BadValue,
+                          "Malformed resume token: the '_resumeAfter' object must contain"
+                          " '$recordId', of type NumberLong, BinData or jstNULL and"
+                          " optional '$initialSyncId of type BinData.");
+        }
+    } else if (resumeAfter.nFields() != 1 ||
+               (recordIdType != BSONType::NumberLong && recordIdType != BSONType::BinData &&
+                recordIdType != BSONType::jstNULL)) {
+        return Status(ErrorCodes::BadValue,
+                      "Malformed resume token: the '_resumeAfter' object must contain"
+                      " exactly one field named '$recordId', of type NumberLong, BinData "
+                      "or jstNULL.");
+    }
+
+    // Clustered collections can only accept '$_resumeAfter' parameter of type BinData. Non
+    // clustered collections should only accept '$_resumeAfter' of type Long.
+    if ((isClusteredCollection && recordIdType == BSONType::NumberLong) ||
+        (!isClusteredCollection && recordIdType == BSONType::BinData)) {
+        return Status(ErrorCodes::Error(7738600),
+                      "The '$_resumeAfter parameter must match collection type. Clustered "
+                      "collections only have BinData recordIds, and all other collections"
+                      "have Long recordId.");
     }
 
     return Status::OK();
@@ -130,17 +192,8 @@ Status validateFindCommandRequest(const FindCommandRequest& findCommand) {
             return Status(ErrorCodes::BadValue,
                           "sort must be unset or {$natural:1} if 'requestResumeToken' is enabled");
         }
-        if (!findCommand.getResumeAfter().isEmpty()) {
-            if (findCommand.getResumeAfter().nFields() != 1 ||
-                (findCommand.getResumeAfter()["$recordId"].type() != BSONType::NumberLong &&
-                 findCommand.getResumeAfter()["$recordId"].type() != BSONType::BinData &&
-                 findCommand.getResumeAfter()["$recordId"].type() != BSONType::jstNULL)) {
-                return Status(ErrorCodes::BadValue,
-                              "Malformed resume token: the '_resumeAfter' object must contain"
-                              " exactly one field named '$recordId', of type NumberLong, BinData "
-                              "or jstNULL.");
-            }
-        }
+        // The $_resumeAfter parameter is checked in 'validateResumeAfter()'.
+
     } else if (!findCommand.getResumeAfter().isEmpty()) {
         return Status(ErrorCodes::BadValue,
                       "'requestResumeToken' must be true if 'resumeAfter' is"
@@ -293,23 +346,26 @@ StatusWith<BSONObj> asAggregationCommand(const FindCommandRequest& findCommand) 
                               << " not supported in aggregation."};
     }
 
-    if (findCommand.getRequestResumeToken()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kRequestResumeTokenFieldName
-                              << " not supported in aggregation."};
-    }
+    if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        if (findCommand.getRequestResumeToken()) {
+            return {ErrorCodes::InvalidPipelineOperator,
+                    str::stream() << "Option " << FindCommandRequest::kRequestResumeTokenFieldName
+                                  << " not supported in aggregation."};
+        }
 
-    if (!findCommand.getResumeAfter().isEmpty()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kResumeAfterFieldName
-                              << " not supported in aggregation."};
+        if (!findCommand.getResumeAfter().isEmpty()) {
+            return {ErrorCodes::InvalidPipelineOperator,
+                    str::stream() << "Option " << FindCommandRequest::kResumeAfterFieldName
+                                  << " not supported in aggregation."};
+        }
     }
 
     // Now that we've successfully validated this QR, begin building the aggregation command.
-    aggregationBuilder.append("aggregate",
-                              findCommand.getNamespaceOrUUID().nss()
-                                  ? findCommand.getNamespaceOrUUID().nss()->coll()
-                                  : "");
+    tassert(ErrorCodes::BadValue,
+            "Unsupported type UUID for namspace",
+            findCommand.getNamespaceOrUUID().isNamespaceString());
+    aggregationBuilder.append("aggregate", findCommand.getNamespaceOrUUID().nss().coll());
 
     // Construct an aggregation pipeline that finds the equivalent documents to this query request.
     BSONArrayBuilder pipelineBuilder(aggregationBuilder.subarrayStart("pipeline"));
@@ -376,6 +432,17 @@ StatusWith<BSONObj> asAggregationCommand(const FindCommandRequest& findCommand) 
     }
     if (findCommand.getLet()) {
         aggregationBuilder.append(FindCommandRequest::kLetFieldName, *findCommand.getLet());
+    }
+    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        if (findCommand.getRequestResumeToken()) {
+            aggregationBuilder.append(FindCommandRequest::kRequestResumeTokenFieldName,
+                                      findCommand.getRequestResumeToken().value_or(false));
+        }
+        if (!findCommand.getResumeAfter().isEmpty()) {
+            aggregationBuilder.append(FindCommandRequest::kResumeAfterFieldName,
+                                      findCommand.getResumeAfter());
+        }
     }
     return StatusWith<BSONObj>(aggregationBuilder.obj());
 }

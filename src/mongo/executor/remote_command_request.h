@@ -29,17 +29,28 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <iosfwd>
 #include <string>
+#include <type_traits>
+#include <vector>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/executor/hedge_options_util.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace executor {
@@ -69,7 +80,8 @@ struct RemoteCommandRequestBase {
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
                              Milliseconds timeoutMillis,
-                             Options options);
+                             Options options,
+                             boost::optional<UUID> operationKey = boost::none);
 
     // Internal id of this request. Not interpreted and used for tracing purposes only.
     RequestId id;
@@ -145,7 +157,8 @@ struct RemoteCommandRequestImpl : RemoteCommandRequestBase {
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
                              Milliseconds timeoutMillis = kNoTimeout,
-                             Options options = {});
+                             Options options = {},
+                             boost::optional<UUID> operationKey = boost::none);
 
     RemoteCommandRequestImpl(const Target& theTarget,
                              const std::string& theDbName,
@@ -153,16 +166,24 @@ struct RemoteCommandRequestImpl : RemoteCommandRequestBase {
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
                              Milliseconds timeoutMillis = kNoTimeout,
-                             Options options = {});
+                             Options options = {},
+                             boost::optional<UUID> operationKey = boost::none);
 
     RemoteCommandRequestImpl(const Target& theTarget,
                              const std::string& theDbName,
                              const BSONObj& theCmdObj,
                              const BSONObj& metadataObj,
                              OperationContext* opCtx,
-                             Options options)
-        : RemoteCommandRequestImpl(
-              theTarget, theDbName, theCmdObj, metadataObj, opCtx, kNoTimeout, options) {}
+                             Options options,
+                             boost::optional<UUID> operationKey = boost::none)
+        : RemoteCommandRequestImpl(theTarget,
+                                   theDbName,
+                                   theCmdObj,
+                                   metadataObj,
+                                   opCtx,
+                                   kNoTimeout,
+                                   options,
+                                   operationKey) {}
 
 
     RemoteCommandRequestImpl(const Target& theTarget,
@@ -170,14 +191,16 @@ struct RemoteCommandRequestImpl : RemoteCommandRequestBase {
                              const BSONObj& theCmdObj,
                              OperationContext* opCtx,
                              Milliseconds timeoutMillis = kNoTimeout,
-                             Options options = {})
+                             Options options = {},
+                             boost::optional<UUID> operationKey = boost::none)
         : RemoteCommandRequestImpl(theTarget,
                                    theDbName,
                                    theCmdObj,
                                    rpc::makeEmptyMetadata(),
                                    opCtx,
                                    timeoutMillis,
-                                   options) {}
+                                   options,
+                                   operationKey) {}
 
     std::string toString() const;
 

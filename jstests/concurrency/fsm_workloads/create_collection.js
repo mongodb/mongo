@@ -1,12 +1,10 @@
-'use strict';
-
 /**
  * create_collection.js
  *
  * Repeatedly creates a collection.
  */
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.

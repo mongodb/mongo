@@ -30,6 +30,7 @@
 #pragma once
 
 #include <memory>
+#include <utility>
 
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"

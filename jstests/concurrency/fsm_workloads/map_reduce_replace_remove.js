@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * map_reduce_replace_remove.js
  *
@@ -15,10 +13,10 @@
  *   does_not_support_causal_consistency
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');          // for extendWorkload
-load('jstests/concurrency/fsm_workloads/map_reduce_replace.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/map_reduce_replace.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.remove = function remove(db, collName) {
         for (var i = 0; i < 20; ++i) {
             var res = db[collName].remove({_id: Random.randInt(this.numDocs)}, {justOne: true});

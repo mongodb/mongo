@@ -29,13 +29,23 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <functional>
 #include <initializer_list>
 #include <memory>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/test_harness_helper.h"
 
@@ -111,14 +121,14 @@ void registerSortedDataInterfaceHarnessHelperFactory(
 
 std::unique_ptr<SortedDataInterfaceHarnessHelper> newSortedDataInterfaceHarnessHelper();
 
-KeyString::Value makeKeyString(SortedDataInterface* sorted,
-                               BSONObj bsonKey,
-                               const boost::optional<RecordId>& rid = boost::none);
+key_string::Value makeKeyString(SortedDataInterface* sorted,
+                                BSONObj bsonKey,
+                                const boost::optional<RecordId>& rid = boost::none);
 
-KeyString::Value makeKeyStringForSeek(SortedDataInterface* sorted,
-                                      BSONObj bsonKey,
-                                      bool isForward,
-                                      bool inclusive);
+key_string::Value makeKeyStringForSeek(SortedDataInterface* sorted,
+                                       BSONObj bsonKey,
+                                       bool isForward,
+                                       bool inclusive);
 
 /**
  * Inserts all entries in toInsert into index.
@@ -130,13 +140,6 @@ KeyString::Value makeKeyStringForSeek(SortedDataInterface* sorted,
 void insertToIndex(OperationContext* opCtx,
                    SortedDataInterface* index,
                    std::initializer_list<IndexKeyEntry> toInsert);
-
-inline void insertToIndex(HarnessHelper* harness,
-                          SortedDataInterface* index,
-                          std::initializer_list<IndexKeyEntry> toInsert) {
-    auto client = harness->serviceContext()->makeClient("insertToIndex");
-    insertToIndex(harness->newOperationContext(client.get()).get(), index, toInsert);
-}
 
 /**
  * Removes all entries in toRemove from index.

@@ -30,6 +30,8 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <utility>
 
 #include "mongo/platform/compiler.h"
 #include "mongo/util/duration.h"

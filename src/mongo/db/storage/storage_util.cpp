@@ -28,21 +28,30 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include <string>
-
 #include <boost/filesystem/operations.hpp>
+#include <string>
+#include <utility>
 
-#include "mongo/db/storage/storage_util.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/storage/storage_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -129,7 +138,7 @@ void removeIndex(OperationContext* opCtx,
 
     // Schedule the second phase of drop to delete the data when it is no longer in use, if the
     // first phase is successfully committed.
-    opCtx->recoveryUnit()->onCommit(
+    opCtx->recoveryUnit()->onCommitForTwoPhaseDrop(
         [svcCtx = opCtx->getServiceContext(),
          recoveryUnit,
          storageEngine,
@@ -201,7 +210,7 @@ Status dropCollection(OperationContext* opCtx,
 
     // Schedule the second phase of drop to delete the data when it is no longer in use, if the
     // first phase is successfully committed.
-    opCtx->recoveryUnit()->onCommit(
+    opCtx->recoveryUnit()->onCommitForTwoPhaseDrop(
         [svcCtx = opCtx->getServiceContext(), recoveryUnit, storageEngine, nss, ident](
             OperationContext*, boost::optional<Timestamp> commitTimestamp) {
             StorageEngine::DropIdentCallback onDrop =

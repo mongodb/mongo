@@ -31,29 +31,65 @@
  * Unit tests for DocumentSource classes.
  */
 
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "cxxabi.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/stage_builder.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -63,7 +99,8 @@ using boost::intrusive_ptr;
 using std::unique_ptr;
 using std::vector;
 
-static const NamespaceString nss("unittests.documentsourcetests");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.documentsourcetests");
 static const BSONObj metaTextScore = BSON("$meta"
                                           << "textScore");
 
@@ -312,7 +349,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = std::make_unique<CollectionScan>(ctx().get(),
-                                                           readLock.getCollection(),
+                                                           &readLock.getCollection(),
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());
@@ -356,7 +393,7 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = std::make_unique<CollectionScan>(ctx().get(),
-                                                           readLock.getCollection(),
+                                                           &readLock.getCollection(),
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());
@@ -408,7 +445,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = std::make_unique<CollectionScan>(ctx().get(),
-                                                           readLock.getCollection(),
+                                                           &readLock.getCollection(),
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());
@@ -451,7 +488,7 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = std::make_unique<CollectionScan>(ctx().get(),
-                                                           readLock.getCollection(),
+                                                           &readLock.getCollection(),
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());

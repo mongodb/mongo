@@ -27,18 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
-#include <boost/optional.hpp>
 #include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 

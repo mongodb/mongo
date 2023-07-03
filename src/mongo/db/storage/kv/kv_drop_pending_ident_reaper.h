@@ -30,15 +30,22 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -118,9 +125,13 @@ public:
 
     /**
      * Clears maps of drop pending idents but does not drop idents in storage engine.
-     * Used by rollback after recovering to a stable timestamp.
+     * Used by rollback before recovering to a stable timestamp.
+     *
+     * This function is called under the same critical section as rollback-to-stable, which happens
+     * under the global exclusive lock, and has to be called prior to re-opening the catalog, which
+     * can add drop pending idents.
      */
-    void clearDropPendingState();
+    void clearDropPendingState(OperationContext* opCtx);
 
 private:
     // Contains information identifying what collection/index data to drop as well as determining

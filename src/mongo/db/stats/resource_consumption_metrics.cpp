@@ -28,14 +28,20 @@
  */
 
 
-#include <cmath>
+#include <mutex>
+#include <utility>
 
-#include "mongo/db/stats/resource_consumption_metrics.h"
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/stats/operation_resource_consumption_gen.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResourceConsumption
 

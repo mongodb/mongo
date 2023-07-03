@@ -29,19 +29,37 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
 #include <memory>
 #include <ostream>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

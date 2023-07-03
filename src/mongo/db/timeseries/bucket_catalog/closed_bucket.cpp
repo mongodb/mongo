@@ -29,19 +29,21 @@
 
 #include "mongo/db/timeseries/bucket_catalog/closed_bucket.h"
 
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/util/assert_util_core.h"
+
 namespace mongo::timeseries::bucket_catalog {
 
 ClosedBucket::~ClosedBucket() {
     if (_bucketStateRegistry) {
-        changeBucketState(
-            *_bucketStateRegistry,
-            bucketId,
-            [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-                uassert(7443900,
-                        "Expected bucket to be pending compression",
-                        input.has_value() && input->isSet(BucketStateFlag::kPendingCompression));
-                return boost::none;
-            });
+        removeDirectWrite(*_bucketStateRegistry, bucketId);
     }
 }
 
@@ -51,15 +53,12 @@ ClosedBucket::ClosedBucket(BucketStateRegistry* bsr,
                            boost::optional<uint32_t> nm)
     : bucketId{bucketId}, timeField{tf}, numMeasurements{nm}, _bucketStateRegistry{bsr} {
     invariant(_bucketStateRegistry);
-    changeBucketState(
-        *_bucketStateRegistry,
-        bucketId,
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            uassert(7443901,
-                    "Expected bucket to be in normal state",
-                    input.has_value() && !input->conflictsWithInsertion());
-            return input.value().setFlag(BucketStateFlag::kPendingCompression);
-        });
+
+    // When enabled, we skip constructing ClosedBuckets as we don't need to compress the bucket.
+    invariant(!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+        serverGlobalParams.featureCompatibility));
+
+    addDirectWrite(*_bucketStateRegistry, bucketId, /*stopTracking*/ true);
 }
 
 ClosedBucket::ClosedBucket(ClosedBucket&& other)

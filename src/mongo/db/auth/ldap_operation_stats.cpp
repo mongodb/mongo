@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <cstdint>
+#include <ratio>
 
-#include "mongo/base/error_extra_info.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/ldap_operation_stats.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"

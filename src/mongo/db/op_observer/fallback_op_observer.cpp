@@ -29,17 +29,36 @@
 
 #include "mongo/db/op_observer/fallback_op_observer.h"
 
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/views_for_database.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/views/util.h"
 #include "mongo/db/views/view_catalog_helpers.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
@@ -50,7 +69,7 @@ void FallbackOpObserver::onInserts(OperationContext* opCtx,
                                    std::vector<InsertStatement>::const_iterator last,
                                    std::vector<bool> fromMigrate,
                                    bool defaultFromMigrate,
-                                   InsertsOpStateAccumulator* opAccumulator) {
+                                   OpStateAccumulator* opAccumulator) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
@@ -85,7 +104,7 @@ void FallbackOpObserver::onInserts(OperationContext* opCtx,
         }
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
         if (opAccumulator) {
-            auto& opTimeList = opAccumulator->opTimes;
+            auto& opTimeList = opAccumulator->insertOpTimes;
             if (!opTimeList.empty() && !opTimeList.back().isNull()) {
                 for (auto it = first; it != last; it++) {
                     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
@@ -146,7 +165,7 @@ void FallbackOpObserver::onDelete(OperationContext* opCtx,
     const auto& nss = coll->ns();
     const bool inBatchedWrite = BatchedWriteContext::get(opCtx).writesAreBatched();
 
-    auto optDocKey = repl::documentKeyDecoration(opCtx);
+    auto optDocKey = documentKeyDecoration(args);
     invariant(optDocKey, nss.toStringForErrorMsg());
     auto& documentKey = optDocKey.value();
 

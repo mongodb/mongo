@@ -29,22 +29,42 @@
 
 #include "mongo/db/catalog/index_catalog_impl.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <initializer_list>
+#include <utility>
 #include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/simple_bsonelement_comparator.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/aggregated_index_usage_tracker.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/index_build_block.h"
 #include "mongo/db/catalog/index_catalog_entry_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/field_ref.h"
+#include "mongo/db/collection_index_usage_tracker.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_access_method.h"
@@ -52,36 +72,51 @@
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index/s2_bucket_access_method.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/delete.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/update/document_diff_calculator.h"
-#include "mongo/db/vector_clock.h"
+#include "mongo/db/update_index_data.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/represent_as.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
@@ -214,7 +249,7 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
                           "spec"_attr = spec);
         }
 
-        auto descriptor = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
+        auto descriptor = IndexDescriptor(_getAccessMethodName(keyPattern), spec);
 
         if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
             // TTL indexes with an invalid 'expireAfterSeconds' field cause problems in multiversion
@@ -324,7 +359,7 @@ std::unique_ptr<IndexCatalog::IndexIterator> IndexCatalogImpl::getIndexIterator(
     // the pointers to a new vector. The vector's ownership is passed to the iterator. The query
     // code path from an external client is not expected to hit this case so the cost isn't paid by
     // the important code path.
-    auto allIndexes = std::make_unique<std::vector<IndexCatalogEntry*>>();
+    auto allIndexes = std::make_unique<std::vector<const IndexCatalogEntry*>>();
 
     if (inclusionPolicy & InclusionPolicy::kReady) {
         for (auto it = _readyIndexes.begin(); it != _readyIndexes.end(); ++it) {
@@ -530,7 +565,8 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
 std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexesNoChecks(
     OperationContext* const opCtx,
     const CollectionPtr& collection,
-    const std::vector<BSONObj>& indexSpecsToBuild) const {
+    const std::vector<BSONObj>& indexSpecsToBuild,
+    bool removeInProgressIndexBuilds) const {
     std::vector<BSONObj> result;
     // Filter out ready and in-progress index builds, and any non-_id indexes if 'buildIndexes' is
     // set to false in the replica set's config.
@@ -542,12 +578,11 @@ std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexesNoChecks(
 
         // _doesSpecConflictWithExisting currently does more work than we require here: we are only
         // interested in the index already exists error.
+        auto inclusionPolicy = removeInProgressIndexBuilds
+            ? IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished
+            : IndexCatalog::InclusionPolicy::kReady;
         if (ErrorCodes::IndexAlreadyExists ==
-            _doesSpecConflictWithExisting(opCtx,
-                                          collection,
-                                          spec,
-                                          IndexCatalog::InclusionPolicy::kReady |
-                                              IndexCatalog::InclusionPolicy::kUnfinished)) {
+            _doesSpecConflictWithExisting(opCtx, collection, spec, inclusionPolicy)) {
             continue;
         }
 
@@ -576,26 +611,27 @@ std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexes(
 
 IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
                                                       Collection* collection,
-                                                      std::unique_ptr<IndexDescriptor> descriptor,
+                                                      IndexDescriptor&& descriptor,
                                                       CreateIndexEntryFlags flags) {
-    Status status = _isSpecOk(opCtx, CollectionPtr(collection), descriptor->infoObj());
+    invariant(!descriptor.getEntry());
+
+    Status status = _isSpecOk(opCtx, CollectionPtr(collection), descriptor.infoObj());
     if (!status.isOK()) {
         LOGV2_FATAL(28782,
                     "Found an invalid index",
-                    "descriptor"_attr = descriptor->infoObj(),
+                    "descriptor"_attr = descriptor.infoObj(),
                     logAttrs(collection->ns()),
                     "error"_attr = redact(status));
     }
 
     auto engine = opCtx->getServiceContext()->getStorageEngine();
     std::string ident = engine->getCatalog()->getIndexIdent(
-        opCtx, collection->getCatalogId(), descriptor->indexName());
+        opCtx, collection->getCatalogId(), descriptor.indexName());
 
     bool isReadyIndex = CreateIndexEntryFlags::kIsReady & flags;
     bool frozen = CreateIndexEntryFlags::kFrozen & flags;
     invariant(!frozen || !isReadyIndex);
 
-    auto* const descriptorPtr = descriptor.get();
     auto entry = std::make_shared<IndexCatalogEntryImpl>(
         opCtx, CollectionPtr(collection), ident, std::move(descriptor), frozen);
 
@@ -626,7 +662,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
 
     bool initFromDisk = CreateIndexEntryFlags::kInitFromDisk & flags;
     if (!initFromDisk && !UncommittedCatalogUpdates::isCreatedCollection(opCtx, collection->ns())) {
-        const std::string indexName = descriptorPtr->indexName();
+        const std::string indexName = desc->indexName();
         opCtx->recoveryUnit()->onRollback(
             [collectionDecorations = collection->getSharedDecorations(),
              indexName = std::move(indexName)](OperationContext*) {
@@ -665,7 +701,7 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
         return status;
 
     // sanity checks, etc...
-    IndexCatalogEntry* entry = indexBuildBlock.getEntry(opCtx, collection);
+    IndexCatalogEntry* entry = indexBuildBlock.getWritableEntry(opCtx, collection);
     invariant(entry);
     IndexDescriptor* descriptor = entry->descriptor();
     invariant(descriptor);
@@ -1256,22 +1292,24 @@ void IndexCatalogImpl::dropIndexes(OperationContext* opCtx,
 
     for (size_t i = 0; i < indexNamesToDrop.size(); i++) {
         string indexName = indexNamesToDrop[i];
-        const IndexDescriptor* desc = findIndexByName(
+        IndexCatalogEntry* writableEntry = getWritableEntryByName(
             opCtx,
             indexName,
             IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished |
                 IndexCatalog::InclusionPolicy::kFrozen);
-        invariant(desc);
-        LOGV2_DEBUG(20355, 1, "\t dropAllIndexes dropping: {desc}", "desc"_attr = *desc);
-        IndexCatalogEntry* entry = desc->getEntry();
-        invariant(entry);
+        invariant(writableEntry);
+        LOGV2_DEBUG(20355,
+                    1,
+                    "\t dropAllIndexes dropping: {desc}",
+                    "desc"_attr = *writableEntry->descriptor());
+
 
         // If the onDrop function creates an oplog entry, it should run first so that the drop is
         // timestamped at the same optime.
         if (onDropFn) {
-            onDropFn(desc);
+            onDropFn(writableEntry->descriptor());
         }
-        invariant(dropIndexEntry(opCtx, collection, entry).isOK());
+        invariant(dropIndexEntry(opCtx, collection, writableEntry).isOK());
     }
 
     // verify state is sane post cleaning
@@ -1308,27 +1346,12 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
         onDropFn);
 }
 
-Status IndexCatalogImpl::dropIndex(OperationContext* opCtx,
-                                   Collection* collection,
-                                   const IndexDescriptor* desc) {
-    IndexCatalogEntry* entry = desc->getEntry();
-
-    if (!entry)
-        return Status(ErrorCodes::InternalError, "cannot find index to delete");
-
-    if (!entry->isReady())
-        return Status(ErrorCodes::InternalError, "cannot delete not ready index");
-
-    return dropIndexEntry(opCtx, collection, entry);
-}
-
 Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx,
                                                          Collection* collection,
-                                                         const IndexDescriptor* desc) {
+                                                         IndexCatalogEntry* entry) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
-    IndexCatalogEntry* entry = desc->getEntry();
     const std::string indexName = entry->descriptor()->indexName();
 
     // Only indexes that aren't ready can be reset.
@@ -1375,12 +1398,12 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
     }
 
     // Update the index entry state in preparation to rebuild the index.
-    if (!released->accessMethod()) {
-        released->setAccessMethod(IndexAccessMethod::make(
-            opCtx, collection->ns(), collection->getCollectionOptions(), released.get(), ident));
+    if (!entry->accessMethod()) {
+        entry->setAccessMethod(IndexAccessMethod::make(
+            opCtx, collection->ns(), collection->getCollectionOptions(), entry, ident));
     }
 
-    released->setIsFrozen(false);
+    entry->setIsFrozen(false);
     _buildingIndexes.add(std::move(released));
 
     return Status::OK();
@@ -1388,9 +1411,7 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
 
 Status IndexCatalogImpl::dropUnfinishedIndex(OperationContext* opCtx,
                                              Collection* collection,
-                                             const IndexDescriptor* desc) {
-    IndexCatalogEntry* entry = desc->getEntry();
-
+                                             IndexCatalogEntry* entry) {
     if (!entry)
         return Status(ErrorCodes::InternalError, "cannot find index to delete");
 
@@ -1459,13 +1480,17 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
     }();
 
     invariant(released.get() == entry);
-    opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-        collection->ns(), collection->uuid(), released, collection->getSharedDecorations()));
+    // TODO SERVER-77131: Remove index catalog entry instance in commit handler.
+    opCtx->recoveryUnit()->registerChange(
+        std::make_unique<IndexRemoveChange>(collection->ns(),
+                                            collection->uuid(),
+                                            entry->shared_from_this(),
+                                            collection->getSharedDecorations()));
 
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, CollectionPtr(collection));
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
         .unregisterIndex(indexName);
-    _deleteIndexFromDisk(opCtx, collection, indexName, released);
+    _deleteIndexFromDisk(opCtx, collection, indexName, entry->shared_from_this());
 
     return Status::OK();
 }
@@ -1500,7 +1525,7 @@ void IndexCatalogImpl::setMultikeyPaths(OperationContext* const opCtx,
                                         const IndexDescriptor* desc,
                                         const KeyStringSet& multikeyMetadataKeys,
                                         const MultikeyPaths& multikeyPaths) const {
-    IndexCatalogEntry* entry = desc->getEntry();
+    const IndexCatalogEntry* entry = desc->getEntry();
     invariant(entry);
     entry->setMultikey(opCtx, coll, multikeyMetadataKeys, multikeyPaths);
 };
@@ -1616,13 +1641,56 @@ const IndexCatalogEntry* IndexCatalogImpl::getEntry(const IndexDescriptor* desc)
     return entry;
 }
 
-std::shared_ptr<const IndexCatalogEntry> IndexCatalogImpl::getEntryShared(
-    const IndexDescriptor* indexDescriptor) const {
-    return indexDescriptor->getEntry()->shared_from_this();
+IndexCatalogEntry* IndexCatalogImpl::getWritableEntryByName(OperationContext* opCtx,
+                                                            StringData name,
+                                                            InclusionPolicy inclusionPolicy) {
+    return _getWritableEntry(findIndexByName(opCtx, name, inclusionPolicy));
 }
 
-std::shared_ptr<IndexCatalogEntry> IndexCatalogImpl::getEntryShared(
-    const IndexDescriptor* indexDescriptor) {
+IndexCatalogEntry* IndexCatalogImpl::getWritableEntryByKeyPatternAndOptions(
+    OperationContext* opCtx,
+    const BSONObj& key,
+    const BSONObj& indexSpec,
+    InclusionPolicy inclusionPolicy) {
+    return _getWritableEntry(
+        findIndexByKeyPatternAndOptions(opCtx, key, indexSpec, inclusionPolicy));
+}
+
+IndexCatalogEntry* IndexCatalogImpl::_getWritableEntry(const IndexDescriptor* descriptor) {
+    if (!descriptor) {
+        return nullptr;
+    }
+
+    auto getWritableEntry = [&](auto& container) -> IndexCatalogEntry* {
+        std::shared_ptr<const IndexCatalogEntry> oldEntry = container.release(descriptor);
+
+        // This collection instance already uniquely owns this IndexCatalogEntry, return it.
+        if (oldEntry.use_count() == 1) {
+            IndexCatalogEntry* entryToReturn = const_cast<IndexCatalogEntry*>(oldEntry.get());
+            container.add(std::move(oldEntry));
+            return entryToReturn;
+        }
+
+        std::shared_ptr<IndexCatalogEntryImpl> writableEntry =
+            std::make_shared<IndexCatalogEntryImpl>(
+                *static_cast<const IndexCatalogEntryImpl*>(oldEntry.get()));
+        writableEntry->descriptor()->setEntry(writableEntry.get());
+        IndexCatalogEntry* entryToReturn = writableEntry.get();
+        container.add(std::move(writableEntry));
+        return entryToReturn;
+    };
+
+    if (descriptor->getEntry()->isReady()) {
+        return getWritableEntry(_readyIndexes);
+    } else if (descriptor->getEntry()->isFrozen()) {
+        return getWritableEntry(_frozenIndexes);
+    } else {
+        return getWritableEntry(_buildingIndexes);
+    }
+}
+
+std::shared_ptr<const IndexCatalogEntry> IndexCatalogImpl::getEntryShared(
+    const IndexDescriptor* indexDescriptor) const {
     return indexDescriptor->getEntry()->shared_from_this();
 }
 
@@ -1640,15 +1708,20 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     const std::string indexName = oldDesc->indexName();
     invariant(collection->isIndexReady(indexName));
 
-    // Delete the IndexCatalogEntry that owns this descriptor.  After deletion, 'oldDesc' is
-    // invalid and should not be dereferenced. Also, invalidate the index from the
+    // Delete the IndexCatalogEntry that owns this descriptor. After deletion, 'oldDesc' is invalid
+    // and should not be dereferenced. Also, invalidate the index from the
     // CollectionIndexUsageTrackerDecoration (shared state among Collection instances).
-    auto oldEntry = _readyIndexes.release(oldDesc);
-    invariant(oldEntry);
+    IndexCatalogEntry* writableEntry = _getWritableEntry(oldDesc);
+    invariant(writableEntry);
+    std::shared_ptr<const IndexCatalogEntry> deletedEntry =
+        _readyIndexes.release(writableEntry->descriptor());
+    invariant(writableEntry == deletedEntry.get());
+
+    // TODO SERVER-77131: Remove index catalog entry instance in commit handler.
     opCtx->recoveryUnit()->registerChange(
         std::make_unique<IndexRemoveChange>(collection->ns(),
                                             collection->uuid(),
-                                            std::move(oldEntry),
+                                            writableEntry->shared_from_this(),
                                             collection->getSharedDecorations()));
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
         .unregisterIndex(indexName);
@@ -1659,7 +1732,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 
     // Re-register this index in the index catalog with the new spec. Also, add the new index
     // to the CollectionIndexUsageTrackerDecoration (shared state among Collection instances).
-    auto newDesc = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
+    auto newDesc = IndexDescriptor(_getAccessMethodName(keyPattern), spec);
     auto newEntry = createIndexEntry(opCtx, collection, std::move(newDesc), flags);
     invariant(newEntry->isReady());
     auto desc = newEntry->descriptor();
@@ -1683,13 +1756,13 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
                                                const IndexCatalogEntry* index,
                                                const std::vector<BsonRecord>& bsonRecords,
                                                int64_t* keysInsertedOut) const {
-    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+    SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
     InsertDeleteOptions options;
     prepareInsertDeleteOptions(opCtx, coll->ns(), index->descriptor(), &options);
 
     return index->accessMethod()->insert(
-        opCtx, pooledBuilder, coll, bsonRecords, options, keysInsertedOut);
+        opCtx, pooledBuilder, coll, index, bsonRecords, options, keysInsertedOut);
 }
 
 Status IndexCatalogImpl::_indexRecords(OperationContext* opCtx,
@@ -1722,7 +1795,7 @@ Status IndexCatalogImpl::_updateRecord(OperationContext* const opCtx,
                                        const RecordId& recordId,
                                        int64_t* const keysInsertedOut,
                                        int64_t* const keysDeletedOut) const {
-    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+    SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
     InsertDeleteOptions options;
     prepareInsertDeleteOptions(opCtx, coll->ns(), index->descriptor(), &options);
@@ -1730,8 +1803,16 @@ Status IndexCatalogImpl::_updateRecord(OperationContext* const opCtx,
     int64_t keysInserted = 0;
     int64_t keysDeleted = 0;
 
-    auto status = index->accessMethod()->update(
-        opCtx, pooledBuilder, oldDoc, newDoc, recordId, coll, options, &keysInserted, &keysDeleted);
+    auto status = index->accessMethod()->update(opCtx,
+                                                pooledBuilder,
+                                                oldDoc,
+                                                newDoc,
+                                                recordId,
+                                                coll,
+                                                index,
+                                                options,
+                                                &keysInserted,
+                                                &keysDeleted);
 
     if (!status.isOK())
         return status;
@@ -1760,7 +1841,7 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
         }
     }
 
-    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+    SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
     InsertDeleteOptions options;
     prepareInsertDeleteOptions(opCtx, collection->ns(), entry->descriptor(), &options);
@@ -1768,6 +1849,7 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
     entry->accessMethod()->remove(opCtx,
                                   pooledBuilder,
                                   collection,
+                                  entry,
                                   obj,
                                   loc,
                                   logIfError,
@@ -1915,7 +1997,7 @@ void IndexCatalogImpl::unindexRecord(OperationContext* opCtx,
     for (IndexCatalogEntryContainer::const_iterator it = _readyIndexes.begin();
          it != _readyIndexes.end();
          ++it) {
-        IndexCatalogEntry* entry = it->get();
+        const IndexCatalogEntry* entry = it->get();
 
         bool logIfError = !noWarn;
         _unindexRecord(
@@ -1925,7 +2007,7 @@ void IndexCatalogImpl::unindexRecord(OperationContext* opCtx,
     for (IndexCatalogEntryContainer::const_iterator it = _buildingIndexes.begin();
          it != _buildingIndexes.end();
          ++it) {
-        IndexCatalogEntry* entry = it->get();
+        const IndexCatalogEntry* entry = it->get();
 
         // If it's a background index, we DO NOT want to log anything.
         bool logIfError = entry->isReady() ? !noWarn : false;
@@ -1938,7 +2020,7 @@ Status IndexCatalogImpl::compactIndexes(OperationContext* opCtx) const {
     for (IndexCatalogEntryContainer::const_iterator it = _readyIndexes.begin();
          it != _readyIndexes.end();
          ++it) {
-        IndexCatalogEntry* entry = it->get();
+        const IndexCatalogEntry* entry = it->get();
 
         LOGV2_DEBUG(20363,
                     1,
@@ -2004,16 +2086,14 @@ void IndexCatalogImpl::prepareInsertDeleteOptions(OperationContext* opCtx,
 void IndexCatalogImpl::indexBuildSuccess(OperationContext* opCtx,
                                          Collection* coll,
                                          IndexCatalogEntry* index) {
+    // This function can be called inside of a WriteUnitOfWork, which can still encounter a write
+    // conflict. We don't need to reset any in-memory state as a new writable collection is fetched
+    // when retrying.
     auto releasedEntry = _buildingIndexes.release(index->descriptor());
     invariant(releasedEntry.get() == index);
     _readyIndexes.add(std::move(releasedEntry));
 
-    // Wait to unset the interceptor until the index actually commits. If a write conflict is
-    // encountered and the index commit process is restated, the multikey information from the
-    // interceptor may still be needed.
-    opCtx->recoveryUnit()->onCommit([index](OperationContext*, boost::optional<Timestamp>) {
-        index->setIndexBuildInterceptor(nullptr);
-    });
+    index->setIndexBuildInterceptor(nullptr);
     index->setIsReady(true);
 }
 

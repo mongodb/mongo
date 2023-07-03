@@ -29,12 +29,29 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_monitor_stats.h"
+#include "mongo/client/sdam/election_id_set_version_pair.h"
 #include "mongo/client/sdam/sdam.h"
+#include "mongo/client/sdam/sdam_configuration.h"
+#include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/client/sdam/topology_listener.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 using namespace sdam;

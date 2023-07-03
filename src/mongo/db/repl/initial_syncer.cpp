@@ -28,53 +28,75 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <functional>
+#include <memory>
+#include <type_traits>
+#include <utility>
 
 #include "initial_syncer.h"
 
-#include <algorithm>
-#include <memory>
-#include <utility>
-
-#include "mongo/base/counter.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/bson/util/bson_extract.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/fetcher.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/all_database_cloner.h"
+#include "mongo/db/repl/collection_cloner.h"
+#include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/initial_sync_state.h"
 #include "mongo/db/repl/initial_syncer_common_stats.h"
 #include "mongo/db/repl/initial_syncer_factory.h"
-#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_batcher.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/serverless/serverless_operation_lock_registry.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/system_clock_source.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version/releases.h"
@@ -284,7 +306,7 @@ Status InitialSyncer::startup(OperationContext* opCtx,
     _clonerAttemptExec = std::make_unique<executor::ScopedTaskExecutor>(
         _clonerExec, Status(ErrorCodes::CallbackCanceled, "Initial Sync Attempt Canceled"));
     auto status = _scheduleWorkAndSaveHandle_inlock(
-        [=](const executor::TaskExecutor::CallbackArgs& args) {
+        [=, this](const executor::TaskExecutor::CallbackArgs& args) {
             _startInitialSyncAttemptCallback(args, initialSyncAttempt, initialSyncMaxAttempts);
         },
         &_startInitialSyncAttemptHandle,
@@ -577,7 +599,9 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
     const bool orderedCommit = true;
     _storage->oplogDiskLocRegister(opCtx, initialDataTimestamp, orderedCommit);
 
-    tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
+    if (ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
+        tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
+    }
     ServerlessOperationLockRegistry::recoverLocks(opCtx);
     reconstructPreparedTransactions(opCtx, repl::OplogApplication::Mode::kInitialSync);
 
@@ -681,7 +705,7 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
 
     // _scheduleWorkAndSaveHandle_inlock() is shutdown-aware.
     status = _scheduleWorkAndSaveHandle_inlock(
-        [=](const executor::TaskExecutor::CallbackArgs& args) {
+        [=, this](const executor::TaskExecutor::CallbackArgs& args) {
             _chooseSyncSourceCallback(
                 args, chooseSyncSourceAttempt, chooseSyncSourceMaxAttempts, onCompletionGuard);
         },
@@ -745,7 +769,7 @@ void InitialSyncer::_chooseSyncSourceCallback(
                     "numInitialSyncConnectAttempts"_attr = numInitialSyncConnectAttempts.load());
         auto status = _scheduleWorkAtAndSaveHandle_inlock(
             when,
-            [=](const executor::TaskExecutor::CallbackArgs& args) {
+            [=, this](const executor::TaskExecutor::CallbackArgs& args) {
                 _chooseSyncSourceCallback(args,
                                           chooseSyncSourceAttempt + 1,
                                           chooseSyncSourceMaxAttempts,
@@ -786,7 +810,7 @@ void InitialSyncer::_chooseSyncSourceCallback(
 
     // Schedule rollback ID checker.
     _rollbackChecker = std::make_unique<RollbackChecker>(*_attemptExec, _syncSource);
-    auto scheduleResult = _rollbackChecker->reset([=](const RollbackChecker::Result& result) {
+    auto scheduleResult = _rollbackChecker->reset([=, this](const RollbackChecker::Result& result) {
         return _rollbackCheckerResetCallback(result, onCompletionGuard);
     });
     status = scheduleResult.getStatus();
@@ -868,9 +892,9 @@ void InitialSyncer::_rollbackCheckerResetCallback(
     // which retries up to 'numInitialSyncOplogFindAttempts' times'.  This will fail relatively
     // quickly in the presence of network errors, allowing us to choose a different sync source.
     status = _scheduleLastOplogEntryFetcher_inlock(
-        [=](const StatusWith<mongo::Fetcher::QueryResponse>& response,
-            mongo::Fetcher::NextAction*,
-            mongo::BSONObjBuilder*) mutable {
+        [=, this](const StatusWith<mongo::Fetcher::QueryResponse>& response,
+                  mongo::Fetcher::NextAction*,
+                  mongo::BSONObjBuilder*) mutable {
             _lastOplogEntryFetcherCallbackForDefaultBeginFetchingOpTime(response,
                                                                         onCompletionGuard);
         },
@@ -947,9 +971,9 @@ Status InitialSyncer::_scheduleGetBeginFetchingOpTime_inlock(
         _syncSource,
         NamespaceString::kSessionTransactionsTableNamespace.db().toString(),
         cmd.obj(),
-        [=](const StatusWith<mongo::Fetcher::QueryResponse>& response,
-            mongo::Fetcher::NextAction*,
-            mongo::BSONObjBuilder*) mutable {
+        [=, this](const StatusWith<mongo::Fetcher::QueryResponse>& response,
+                  mongo::Fetcher::NextAction*,
+                  mongo::BSONObjBuilder*) mutable {
             _getBeginFetchingOpTimeCallback(
                 response, onCompletionGuard, defaultBeginFetchingOpTime);
         },
@@ -1019,9 +1043,9 @@ void InitialSyncer::_getBeginFetchingOpTimeCallback(
     // which retries up to 'numInitialSyncOplogFindAttempts' times'.  This will fail relatively
     // quickly in the presence of network errors, allowing us to choose a different sync source.
     status = _scheduleLastOplogEntryFetcher_inlock(
-        [=](const StatusWith<mongo::Fetcher::QueryResponse>& response,
-            mongo::Fetcher::NextAction*,
-            mongo::BSONObjBuilder*) mutable {
+        [=, this](const StatusWith<mongo::Fetcher::QueryResponse>& response,
+                  mongo::Fetcher::NextAction*,
+                  mongo::BSONObjBuilder*) mutable {
             _lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
                 response, onCompletionGuard, beginFetchingOpTime);
         },
@@ -1075,9 +1099,9 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
         _syncSource,
         NamespaceString::kServerConfigurationNamespace.db().toString(),
         queryBob.obj(),
-        [=](const StatusWith<mongo::Fetcher::QueryResponse>& response,
-            mongo::Fetcher::NextAction*,
-            mongo::BSONObjBuilder*) mutable {
+        [=, this](const StatusWith<mongo::Fetcher::QueryResponse>& response,
+                  mongo::Fetcher::NextAction*,
+                  mongo::BSONObjBuilder*) mutable {
             _fcvFetcherCallback(response, onCompletionGuard, lastOpTime, beginFetchingOpTime);
         },
         ReadPreferenceSetting::secondaryPreferredMetadata(),
@@ -1227,12 +1251,12 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         std::make_unique<OplogFetcherRestartDecisionInitialSyncer>(
             _sharedData.get(), _opts.oplogFetcherMaxFetcherRestarts),
         _dataReplicatorExternalState.get(),
-        [=](OplogFetcher::Documents::const_iterator first,
-            OplogFetcher::Documents::const_iterator last,
-            const OplogFetcher::DocumentsInfo& info) {
+        [=, this](OplogFetcher::Documents::const_iterator first,
+                  OplogFetcher::Documents::const_iterator last,
+                  const OplogFetcher::DocumentsInfo& info) {
             return _enqueueDocuments(first, last, info);
         },
-        [=](const Status& s, int rbid) { _oplogFetcherCallback(s, onCompletionGuard); },
+        [=, this](const Status& s, int rbid) { _oplogFetcherCallback(s, onCompletionGuard); },
         std::move(oplogFetcherConfig));
 
     LOGV2_DEBUG(21178,
@@ -1385,9 +1409,9 @@ void InitialSyncer::_allDatabaseClonerCallback(
     // strategy used when retrieving collection data, and avoids retrieving all the data and then
     // throwing it away due to a transient network outage.
     status = _scheduleLastOplogEntryFetcher_inlock(
-        [=](const StatusWith<mongo::Fetcher::QueryResponse>& status,
-            mongo::Fetcher::NextAction*,
-            mongo::BSONObjBuilder*) {
+        [=, this](const StatusWith<mongo::Fetcher::QueryResponse>& status,
+                  mongo::Fetcher::NextAction*,
+                  mongo::BSONObjBuilder*) {
             _lastOplogEntryFetcherCallbackForStopTimestamp(status, onCompletionGuard);
         },
         kInitialSyncerHandlesRetries);
@@ -1409,31 +1433,31 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
             if (_shouldRetryError(lock, status)) {
                 auto scheduleStatus =
                     (*_attemptExec)
-                        ->scheduleWork(
-                            [this, onCompletionGuard](executor::TaskExecutor::CallbackArgs args) {
-                                // It is not valid to schedule the retry from within this callback,
-                                // hence we schedule a lambda to schedule the retry.
-                                stdx::lock_guard<Latch> lock(_mutex);
-                                // Since the stopTimestamp is retrieved after we have done all the
-                                // work of retrieving collection data, we handle retries within this
-                                // class by retrying for
-                                // 'initialSyncTransientErrorRetryPeriodSeconds' (default 24 hours).
-                                // This is the same retry strategy used when retrieving collection
-                                // data, and avoids retrieving all the data and then throwing it
-                                // away due to a transient network outage.
-                                auto status = _scheduleLastOplogEntryFetcher_inlock(
-                                    [=](const StatusWith<mongo::Fetcher::QueryResponse>& status,
-                                        mongo::Fetcher::NextAction*,
-                                        mongo::BSONObjBuilder*) {
-                                        _lastOplogEntryFetcherCallbackForStopTimestamp(
-                                            status, onCompletionGuard);
-                                    },
-                                    kInitialSyncerHandlesRetries);
-                                if (!status.isOK()) {
-                                    onCompletionGuard->setResultAndCancelRemainingWork_inlock(
-                                        lock, status);
-                                }
-                            });
+                        ->scheduleWork([this, onCompletionGuard](
+                                           executor::TaskExecutor::CallbackArgs args) {
+                            // It is not valid to schedule the retry from within this callback,
+                            // hence we schedule a lambda to schedule the retry.
+                            stdx::lock_guard<Latch> lock(_mutex);
+                            // Since the stopTimestamp is retrieved after we have done all the
+                            // work of retrieving collection data, we handle retries within this
+                            // class by retrying for
+                            // 'initialSyncTransientErrorRetryPeriodSeconds' (default 24 hours).
+                            // This is the same retry strategy used when retrieving collection
+                            // data, and avoids retrieving all the data and then throwing it
+                            // away due to a transient network outage.
+                            auto status = _scheduleLastOplogEntryFetcher_inlock(
+                                [=, this](const StatusWith<mongo::Fetcher::QueryResponse>& status,
+                                          mongo::Fetcher::NextAction*,
+                                          mongo::BSONObjBuilder*) {
+                                    _lastOplogEntryFetcherCallbackForStopTimestamp(
+                                        status, onCompletionGuard);
+                                },
+                                kInitialSyncerHandlesRetries);
+                            if (!status.isOK()) {
+                                onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock,
+                                                                                          status);
+                            }
+                        });
                 if (scheduleStatus.isOK())
                     return;
                 // If scheduling failed, we're shutting down and cannot retry.
@@ -1569,7 +1593,7 @@ void InitialSyncer::_getNextApplierBatchCallback(
         Date_t lastAppliedWall = ops.back().getWallClockTime();
 
         auto numApplied = ops.size();
-        MultiApplier::CallbackFn onCompletionFn = [=](const Status& s) {
+        MultiApplier::CallbackFn onCompletionFn = [=, this](const Status& s) {
             return _multiApplierCallback(
                 s, {lastApplied, lastAppliedWall}, numApplied, onCompletionGuard);
         };
@@ -1611,7 +1635,9 @@ void InitialSyncer::_getNextApplierBatchCallback(
     auto when = (*_attemptExec)->now() + _opts.getApplierBatchCallbackRetryWait;
     status = _scheduleWorkAtAndSaveHandle_inlock(
         when,
-        [=](const CallbackArgs& args) { _getNextApplierBatchCallback(args, onCompletionGuard); },
+        [=, this](const CallbackArgs& args) {
+            _getNextApplierBatchCallback(args, onCompletionGuard);
+        },
         &_getNextApplierBatchHandle,
         "_getNextApplierBatchCallback");
     if (!status.isOK()) {
@@ -1722,8 +1748,10 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
     // declare the scope guard before the lock guard.
     auto result = lastApplied;
     ScopeGuard finishCallbackGuard([this, &result] {
-        auto scheduleResult = _exec->scheduleWork(
-            [=](const mongo::executor::TaskExecutor::CallbackArgs&) { _finishCallback(result); });
+        auto scheduleResult =
+            _exec->scheduleWork([=, this](const mongo::executor::TaskExecutor::CallbackArgs&) {
+                _finishCallback(result);
+            });
         if (!scheduleResult.isOK()) {
             LOGV2_WARNING(21197,
                           "Unable to schedule initial syncer completion task due to "
@@ -1811,7 +1839,7 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
     auto when = (*_attemptExec)->now() + _opts.initialSyncRetryWait;
     auto status = _scheduleWorkAtAndSaveHandle_inlock(
         when,
-        [=](const executor::TaskExecutor::CallbackArgs& args) {
+        [=, this](const executor::TaskExecutor::CallbackArgs& args) {
             _startInitialSyncAttemptCallback(
                 args, _stats.failedInitialSyncAttempts, _stats.maxFailedInitialSyncAttempts);
         },
@@ -1987,7 +2015,7 @@ void InitialSyncer::_checkApplierProgressAndScheduleGetNextApplierBatch_inlock(
     // Get another batch to apply.
     // _scheduleWorkAndSaveHandle_inlock() is shutdown-aware.
     auto status = _scheduleWorkAndSaveHandle_inlock(
-        [=](const executor::TaskExecutor::CallbackArgs& args) {
+        [=, this](const executor::TaskExecutor::CallbackArgs& args) {
             return _getNextApplierBatchCallback(args, onCompletionGuard);
         },
         &_getNextApplierBatchHandle,
@@ -2013,7 +2041,7 @@ void InitialSyncer::_scheduleRollbackCheckerCheckForRollback_inlock(
     }
 
     auto scheduleResult =
-        _rollbackChecker->checkForRollback([=](const RollbackChecker::Result& result) {
+        _rollbackChecker->checkForRollback([=, this](const RollbackChecker::Result& result) {
             _rollbackCheckerCheckForRollbackCallback(result, onCompletionGuard);
         });
 

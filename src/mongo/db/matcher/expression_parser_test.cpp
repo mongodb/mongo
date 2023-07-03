@@ -27,19 +27,36 @@
  *    it in the license file.
  */
 
+#include <boost/move/utility_core.hpp>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <string>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/unittest/unittest.h"
-
-#include "mongo/db/matcher/expression_parser.h"
-
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/json.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
-#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 

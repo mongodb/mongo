@@ -67,6 +67,7 @@ public:
 
     /**
      * Block waiting until all received messages have been read and the stream has been closed.
+     * This indicates to the server side that the client will not be sending any further messages.
      *
      * Returns the final status of the RPC associated with this stream.
      *

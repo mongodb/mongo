@@ -27,15 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
+#include <utility>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/s/grid.h"
+#include "mongo/transport/session.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/util/clock_source_mock.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace {

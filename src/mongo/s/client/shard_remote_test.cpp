@@ -27,16 +27,28 @@
  *    it in the license file.
  */
 
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <cstddef>
+#include <set>
+#include <system_error>
+#include <utility>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/db/logical_time.h"
-#include "mongo/db/query/cursor_response.h"
-#include "mongo/db/vector_clock.h"
+#include "mongo/client/remote_command_targeter_factory_mock.h"
+#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
-#include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {

@@ -28,31 +28,43 @@
  */
 
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
-#include <boost/intrusive_ptr.hpp>
-#include <boost/optional.hpp>
+#include <cstddef>
 #include <iterator>
+#include <list>
 #include <string>
+#include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/cst/c_node.h"
+#include "mongo/db/cst/compound_key.h"
 #include "mongo/db/cst/cst_match_translation.h"
 #include "mongo/db/cst/cst_pipeline_translation.h"
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
+#include "mongo/db/cst/path.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sample.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -60,9 +72,12 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 namespace mongo::cst_pipeline_translation {
 namespace {

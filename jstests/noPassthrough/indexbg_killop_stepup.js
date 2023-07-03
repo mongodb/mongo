@@ -34,10 +34,8 @@ IndexBuildTest.pauseIndexBuilds(secondary);
 let waitForCommitReadinessFP =
     configureFailPoint(primary, "hangIndexBuildAfterSignalPrimaryForCommitReadiness");
 
-const awaitIndexBuild =
-    IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {background: true}, [
-        ErrorCodes.InterruptedDueToReplStateChange
-    ]);
+const awaitIndexBuild = IndexBuildTest.startIndexBuild(
+    primary, coll.getFullName(), {a: 1}, {}, [ErrorCodes.InterruptedDueToReplStateChange]);
 
 // When the index build starts, find its op id.
 let secondaryDB = secondary.getDB(testDB.getName());

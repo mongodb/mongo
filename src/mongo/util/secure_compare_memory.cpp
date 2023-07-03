@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/secure_compare_memory.h"
 
 namespace mongo {

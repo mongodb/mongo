@@ -28,27 +28,55 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/catalog/drop_database.h"
-
 #include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -104,17 +132,19 @@ void _finishDropDatabase(OperationContext* opCtx,
         IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbName);
     }
 
+    // Testing depends on this failpoint stopping execution before the dropDatabase oplog entry is
+    // written, as well as before the in-memory state is cleared.
+    if (MONGO_unlikely(dropDatabaseHangBeforeInMemoryDrop.shouldFail())) {
+        LOGV2(20334, "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled");
+        dropDatabaseHangBeforeInMemoryDrop.pauseWhileSet(opCtx);
+    }
+
     writeConflictRetry(opCtx, "dropDatabase_database", NamespaceString(dbName), [&] {
         // We need to replicate the dropDatabase oplog entry and clear the collection catalog in the
         // same transaction. This is to prevent stepdown from interrupting between these two
         // operations and leaving this node in an inconsistent state.
         WriteUnitOfWork wunit(opCtx);
         opCtx->getServiceContext()->getOpObserver()->onDropDatabase(opCtx, dbName);
-
-        if (MONGO_unlikely(dropDatabaseHangBeforeInMemoryDrop.shouldFail())) {
-            LOGV2(20334, "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled");
-            dropDatabaseHangBeforeInMemoryDrop.pauseWhileSet(opCtx);
-        }
 
         auto databaseHolder = DatabaseHolder::get(opCtx);
         databaseHolder->dropDb(opCtx, db);
@@ -145,7 +175,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Dropping the '" << dbName.toStringForErrorMsg()
                           << "' database is prohibited.",
-            dbName.db() != DatabaseName::kAdmin.db());
+            !dbName.isAdminDB());
 
     {
         CurOp::get(opCtx)->ensureStarted();
@@ -161,8 +191,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
     // collections to drop.
     repl::OpTime latestDropPendingOpTime;
 
-    const auto tenantLockMode{boost::make_optional(
-        dbName.tenantId() && dbName.db() == DatabaseName::kConfig.db(), MODE_X)};
+    const auto tenantLockMode{
+        boost::make_optional(dbName.tenantId() && dbName.isConfigDB(), MODE_X)};
     {
         boost::optional<AutoGetDb> autoDB;
         autoDB.emplace(opCtx, dbName, MODE_X /* database lock mode*/, tenantLockMode);
@@ -204,7 +234,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                 // yielded.
                 ScopeGuard dropPendingGuardWhileUnlocked(
                     [dbName, opCtx, &dropPendingGuard, tenantLockMode] {
-                        // TODO (SERVER-71610): Fix to be interruptible or document exception.
+                        // This scope guard must succeed in acquiring locks and reverting the drop
+                        // pending state even when the failure is due to an interruption.
                         UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
                         AutoGetDb autoDB(
                             opCtx, dbName, MODE_X /* database lock mode*/, tenantLockMode);
@@ -269,7 +300,39 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
             });
         }
 
-        // Refresh the catalog so the views collection isn't present.
+        // The system.profile collection is created using an untimestamped write to the catalog when
+        // enabling profiling on a database. So we drop it untimestamped as well to avoid mixed-mode
+        // timestamp usage.
+        auto systemProfilePtr = catalog->lookupCollectionByNamespace(
+            opCtx, NamespaceString::makeSystemDotProfileNamespace(dbName));
+        if (systemProfilePtr) {
+            const Timestamp commitTs = opCtx->recoveryUnit()->getCommitTimestamp();
+            if (!commitTs.isNull()) {
+                opCtx->recoveryUnit()->clearCommitTimestamp();
+            }
+
+            // Ensure this block exits with the same commit timestamp state that it was called with.
+            ScopeGuard addCommitTimestamp([&opCtx, commitTs] {
+                if (!commitTs.isNull()) {
+                    opCtx->recoveryUnit()->setCommitTimestamp(commitTs);
+                }
+            });
+
+            const auto& nss = systemProfilePtr->ns();
+            LOGV2(7574000,
+                  "dropDatabase - dropping collection",
+                  logAttrs(dbName),
+                  "namespace"_attr = nss);
+
+            invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+            writeConflictRetry(opCtx, "dropDatabase_system.profile_collection", nss, [&] {
+                WriteUnitOfWork wunit(opCtx);
+                fassert(7574001, db->dropCollectionEvenIfSystem(opCtx, nss));
+                wunit.commit();
+            });
+        }
+
+        // Refresh the catalog so the views and profile collections aren't present.
         catalog = CollectionCatalog::get(opCtx);
 
         std::vector<NamespaceString> collectionsToDrop;
@@ -310,9 +373,9 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                 // Dropping a database on a primary replicates individual collection drops followed
                 // by a database drop oplog entry. When a secondary observes the database drop oplog
                 // entry, all of the replicated collections that were dropped must have been
-                // processed. Only non-replicated collections like `system.profile` should be left
-                // to remove. Collections with the `tmp.mr` namespace may or may not be getting
-                // replicated; be conservative and assume they are not.
+                // processed. Only non-replicated collections should be left to remove. Collections
+                // with the `tmp.mr` namespace may or may not be getting replicated; be conservative
+                // and assume they are not.
                 invariant(!nss.isReplicated() || nss.coll().startsWith("tmp.mr"));
             }
 
@@ -346,7 +409,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
     // any errors while we await the replication of any collection drops and then reacquire the
     // locks (which can throw) needed to finish the drop database.
     ScopeGuard dropPendingGuardWhileUnlocked([dbName, opCtx] {
-        // TODO (SERVER-71610): Fix to be interruptible or document exception.
+        // This scope guard must succeed in acquiring locks and reverting the drop pending state
+        // even when the failure is due to an interruption.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
 
         AutoGetDb autoDB(opCtx, dbName, MODE_IX);

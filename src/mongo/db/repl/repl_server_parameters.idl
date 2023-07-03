@@ -593,14 +593,6 @@ server_parameters:
         cpp_varname: startupRecoveryForRestore
         default: false
 
-    storeFindAndModifyImagesInSideCollection:
-        description: >-
-            Determines where document images for retryable find and modifies are to be stored.
-        set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<bool>
-        cpp_varname: gStoreFindAndModifyImagesInSideCollection
-        default: true
-
     enableReconfigRollbackCommittedWritesCheck:
         description: >-
             Enables the reconfig check to ensure that committed writes cannot be rolled back in
@@ -760,6 +752,17 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: disableTransitionFromLatestToLastContinuous
         default: true
+    
+    unsupportedSyncSource:
+        description: >-
+            **Not a supported feature**. Specifies the host/port for a node to use as a sync source.
+            It is a fatal error to specify a node that is not a part of the replica set config or to
+            specify the node itself.
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: unsupportedSyncSource
+        default: ""
+        validator: { callback: 'validateHostAndPort' }
 
 feature_flags:
     featureFlagShardMerge:
@@ -775,9 +778,8 @@ feature_flags:
         version: 6.3
         shouldBeFCVGated: true
 
-    featureFlagApplyPreparedTxnsInParallel:
-        description: when enabled, secondaries will apply prepared transactions in parallel.
-        cpp_varname: feature_flags::gApplyPreparedTxnsInParallel
-        default: true
-        version: 7.0
+    featureFlagSecondaryIndexChecksInDbCheck:
+        description: When enabled, dbCheck runs document and secondary index consistency checks in addition to replica set data consistency checks.
+        cpp_varname: feature_flags::gSecondaryIndexChecksInDbCheck
+        default: false
         shouldBeFCVGated: true

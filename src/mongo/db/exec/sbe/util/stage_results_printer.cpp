@@ -28,7 +28,16 @@
  */
 
 #include "mongo/db/exec/sbe/util/stage_results_printer.h"
-#include "mongo/platform/basic.h"
+
+#include <cstddef>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/exec/plan_stats_visitor.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
+#include "mongo/db/query/tree_walker.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::sbe {
 

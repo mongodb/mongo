@@ -27,15 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

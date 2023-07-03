@@ -29,24 +29,43 @@
 
 #include "mongo/db/initialize_operation_session_info.h"
 
+#include <boost/optional.hpp>
+#include <cstdint>
+#include <mutex>
+#include <utility>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
 OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* opCtx,
-                                                              const BSONObj& requestBody,
+                                                              const OpMsgRequest& opMsgRequest,
                                                               bool requiresAuth,
                                                               bool attachToOpCtx,
                                                               bool isReplSetMemberOrMongos) {
     auto osi = OperationSessionInfoFromClient::parse(IDLParserContext{"OperationSessionInfo"},
-                                                     requestBody);
+                                                     opMsgRequest.body);
     auto isAuthorizedForInternalClusterAction =
         AuthorizationSession::get(opCtx->getClient())
-            ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                               ActionType::internal);
+            ->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(opMsgRequest.getValidatedTenantId()),
+                ActionType::internal);
 
     if (opCtx->getClient()->isInDirectClient()) {
         uassert(50891,

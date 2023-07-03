@@ -28,24 +28,21 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/transport/transport_layer_manager.h"
-
-#include <iostream>
-#include <limits>
 #include <memory>
+#include <string>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/logv2/log.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
-#include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
-#include "mongo/util/net/ssl_types.h"
-#include "mongo/util/time_support.h"
+#include "mongo/transport/transport_layer_manager.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

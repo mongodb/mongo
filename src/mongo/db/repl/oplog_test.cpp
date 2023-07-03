@@ -28,24 +28,44 @@
  */
 
 #include <algorithm>
-#include <functional>
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
+#include <iterator>
 #include <map>
+#include <memory>
+#include <mutex>
+#include <ostream>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/lock_manager_test_help.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace repl {
@@ -217,7 +237,7 @@ OpTime _logOpNoopWithMsg(OperationContext* opCtx,
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
     oplogEntry.setNss(nss);
-    oplogEntry.setObject(BSON("msg" << nss.ns()));
+    oplogEntry.setObject(BSON("msg" << nss.ns_forTest()));
     oplogEntry.setWallClockTime(Date_t::now());
     auto opTime = logOp(opCtx, &oplogEntry);
     ASSERT_FALSE(opTime.isNull());

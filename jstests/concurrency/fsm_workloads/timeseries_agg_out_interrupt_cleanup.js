@@ -1,4 +1,3 @@
-'use strict';
 /**
  * Tests $out stage of aggregate command with time-series collections concurrently with killOp.
  * Ensures that all the temporary collections created during the aggregate command are deleted and
@@ -14,12 +13,12 @@
  *   featureFlagAggOutTimeseries
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/agg_base.js');    // for $config
-load(
-    'jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js');  // for killOpsMatchingFilter
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     const timeFieldName = 'time';
     const metaFieldName = 'tag';
     const numDocs = 100;

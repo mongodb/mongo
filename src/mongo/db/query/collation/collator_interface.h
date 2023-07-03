@@ -29,11 +29,15 @@
 
 #pragma once
 
+#include <cstddef>
+#include <memory>
 #include <string>
+#include <utility>
 
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/query/collation/collation_spec.h"
 
 namespace mongo {

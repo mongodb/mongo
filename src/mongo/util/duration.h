@@ -29,15 +29,20 @@
 
 #pragma once
 
+#include <chrono>
 #include <cstdint>
+#include <fmt/format.h>
 #include <iosfwd>
 #include <limits>
 #include <ratio>
+#include <string>
 #include <type_traits>
 
-#include <fmt/format.h>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/type_traits.h"
@@ -47,7 +52,6 @@
 namespace mongo {
 
 class BSONObj;
-
 template <typename Allocator>
 class StringBuilderImpl;
 

@@ -27,35 +27,45 @@
  *    it in the license file.
  */
 
-#include <algorithm>
+#include <exception>
 #include <fmt/format.h>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/repair.h"
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/catalog/validate_results.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/rebuild_indexes.h"
+#include "mongo/db/repair.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/storage_util.h"
-#include "mongo/db/vector_clock.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -148,7 +158,6 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const Data
 
     LOGV2(21029, "repairDatabase", logAttrs(dbName));
 
-
     opCtx->checkForInterrupt();
 
     // Close the db and invalidate all current users and caches.
@@ -168,13 +177,11 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const Data
     }
 
     try {
-        // Ensure that we don't trigger an exception when attempting to take locks.
-        // TODO (SERVER-71610): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-
         // Restore oplog Collection pointer cache.
         repl::acquireOplogCollectionForLogging(opCtx);
     } catch (...) {
+        // The only expected exception is an interrupt.
+        opCtx->checkForInterrupt();
         LOGV2_FATAL_CONTINUE(
             21031,
             "Unexpected exception encountered while reacquiring oplog collection after repair.");
@@ -207,7 +214,7 @@ Status repairCollection(OperationContext* opCtx,
     // to run an expensive collection validation.
     if (status.code() == ErrorCodes::DataModifiedByRepair) {
         invariant(StorageRepairObserver::get(opCtx->getServiceContext())->isDataInvalidated(),
-                  "Collection '{}' ({})"_format(collection->ns().toString(),
+                  "Collection '{}' ({})"_format(toStringForLogging(collection->ns()),
                                                 collection->uuid().toString()));
 
         // If we are a replica set member in standalone mode and we have unfinished indexes,

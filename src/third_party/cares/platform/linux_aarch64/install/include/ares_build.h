@@ -3,7 +3,7 @@
 #define __CARES_BUILD_H
 
 
-/* Copyright (C) 2009 by Daniel Stenberg et al
+/* Copyright (C) 2009 - 2021 by Daniel Stenberg et al
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation for any purpose and without fee is hereby granted, provided
@@ -29,7 +29,7 @@
  *
  * If you think that something actually needs to be changed, adjusted
  * or fixed in this file, then, report it on the c-ares development
- * mailing list: http://cool.haxx.se/mailman/listinfo/c-ares/
+ * mailing list: http://lists.haxx.se/listinfo/c-ares/
  *
  * This header file shall only export symbols which are 'cares' or 'CARES'
  * prefixed, otherwise public name space would be polluted.
@@ -55,6 +55,9 @@
 #  error "CARES_TYPEOF_ARES_SOCKLEN_T shall not be defined except in ares_build.h"
    Error Compilation_aborted_CARES_TYPEOF_ARES_SOCKLEN_T_already_defined
 #endif
+
+#define CARES_HAVE_ARPA_NAMESER_H 1
+#define CARES_HAVE_ARPA_NAMESER_COMPAT_H 1
 
 /* ================================================================ */
 /*  EXTERNAL INTERFACE SETTINGS FOR CONFIGURE CAPABLE SYSTEMS ONLY  */

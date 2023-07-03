@@ -29,14 +29,18 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
@@ -67,7 +71,7 @@ private:
         void pause() override;
         void resume() override;
         void stop() override;
-        Milliseconds getPeriod() override;
+        Milliseconds getPeriod() const override;
         void setPeriod(Milliseconds ms) override;
 
         enum class ExecutionStatus { NOT_SCHEDULED, RUNNING, PAUSED, CANCELED };
@@ -83,7 +87,7 @@ private:
         stdx::thread _thread;
         SharedPromise<void> _stopPromise;
 
-        Mutex _mutex = MONGO_MAKE_LATCH("PeriodicJobImpl::_mutex");
+        mutable Mutex _mutex = MONGO_MAKE_LATCH("PeriodicJobImpl::_mutex");
         stdx::condition_variable _condvar;
         /**
          * The current execution status of the job.

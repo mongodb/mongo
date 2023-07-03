@@ -34,40 +34,69 @@
     LOGV2_DEBUG_OPTIONS(                             \
         ID, DLEVEL, {logv2::LogComponent::kReplicationRollback}, MESSAGE, ##__VA_ARGS__)
 
-#include "mongo/platform/basic.h"
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/parse_number.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/catalog/collection_options_gen.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/storage/backup_block.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/platform/atomic_proxy.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
 
 #ifdef _WIN32
 #define NVALGRIND
 #endif
 
-#include <fmt/format.h>
-#include <iomanip>
-#include <memory>
-
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-
+#include <absl/container/node_hash_map.h>
 #include <boost/algorithm/string/join.hpp>
-#include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
-#include <boost/system/error_code.hpp>
+#include <boost/none.hpp>
+#include <boost/none_t.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 #include <valgrind/valgrind.h>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <wiredtiger.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <cerrno>
+#include <chrono>
+#include <cstddef>
+#include <exception>
+#include <iomanip>
+#include <memory>
+#include <mutex>
+#include <sstream>
+#include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
@@ -87,6 +116,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -97,14 +127,10 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/log_and_backoff.h"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
@@ -400,7 +426,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(OperationContext* opCtx,
         }
         ss << "),";
     }
-    if (kAddressSanitizerEnabled || kThreadSanitizerEnabled) {
+    if constexpr (kAddressSanitizerEnabled || kThreadSanitizerEnabled) {
         // For applications using WT, advancing a cursor invalidates the data/memory that cursor was
         // pointing to. WT performs the optimization of managing its own memory. The unit of memory
         // allocation is a page. Walking a cursor from one key/value to the next often lands on the
@@ -420,6 +446,12 @@ WiredTigerKVEngine::WiredTigerKVEngine(OperationContext* opCtx,
         // alleviates this by copying all returned data to its own buffer before leaving the storage
         // engine.
         ss << "debug_mode=(cursor_copy=true),";
+    }
+    if constexpr (kThreadSanitizerEnabled) {
+        // TSAN builds may take longer for certain operations, increase or disable the relevant
+        // timeouts.
+        ss << "cache_stuck_timeout_ms=600000,";
+        ss << "generation_drain_timeout_ms=0,";
     }
     if (TestingProctor::instance().isEnabled()) {
         // Enable debug write-ahead logging for all tables when testing is enabled.
@@ -1633,7 +1665,7 @@ Status WiredTigerKVEngine::createSortedDataInterface(OperationContext* opCtx,
             dps::extractElementAtPath(*storageEngineOptions, _canonicalName + ".configString")
                 .str();
     }
-    // Some unittests use a OperationContextNoop that can't support such lookups.
+
     StatusWith<std::string> result =
         WiredTigerIndex::generateCreateString(_canonicalName,
                                               _indexOptions,
@@ -1900,6 +1932,10 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
 
 void WiredTigerKVEngine::dropIdentForImport(OperationContext* opCtx, StringData ident) {
     const std::string uri = _uri(ident);
+
+    WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
+    wtRu->getSessionNoTxn()->closeAllCursors(uri);
+    _sessionCache->closeAllCursors(uri);
 
     WiredTigerSession session(_conn);
 
@@ -2719,7 +2755,13 @@ StatusWith<BSONObj> WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryRe
 }
 
 void WiredTigerKVEngine::sizeStorerPeriodicFlush() {
-    if (_sizeStorerSyncTracker.intervalHasElapsed()) {
+    bool needSyncSizeInfo = false;
+    {
+        stdx::lock_guard<Mutex> lock(_sizeStorerSyncTrackerMutex);
+        needSyncSizeInfo = _sizeStorerSyncTracker.intervalHasElapsed();
+    }
+
+    if (needSyncSizeInfo) {
         syncSizeInfo(false);
     }
 }

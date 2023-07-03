@@ -29,24 +29,56 @@
 
 #include "mongo/db/s/config/initial_split_policy.h"
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <limits>
+#include <numeric>
+#include <random>
+#include <set>
+#include <string>
+#include <type_traits>
+
 #include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
-#include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/balancer_configuration.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -106,12 +138,17 @@ ShardId selectBestShard(const ChunkDistributionMap& chunkMap,
 
     for (const auto& shard : shards) {
         auto candidateIter = chunkMap.find(shard);
+        // If limitedShardIds is provided, only pick shard in that set.
         if (bestShardIter == chunkMap.end() || candidateIter->second < bestShardIter->second) {
             bestShardIter = candidateIter;
         }
     }
 
-    invariant(bestShardIter != chunkMap.end());
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "No shards found for chunk: " << chunkRange.toString()
+                          << " in zone: " << zone,
+            bestShardIter != chunkMap.end());
+
     return bestShardIter->first;
 }
 
@@ -685,20 +722,30 @@ SamplingBasedSplitPolicy SamplingBasedSplitPolicy::make(
     const ShardKeyPattern& shardKey,
     int numInitialChunks,
     boost::optional<std::vector<TagsType>> zones,
+    boost::optional<std::vector<ShardId>> availableShardIds,
     int samplesPerChunk) {
     uassert(4952603, "samplesPerChunk should be > 0", samplesPerChunk > 0);
     return SamplingBasedSplitPolicy(
         numInitialChunks,
         zones,
-        _makePipelineDocumentSource(opCtx, nss, shardKey, numInitialChunks, samplesPerChunk));
+        _makePipelineDocumentSource(opCtx, nss, shardKey, numInitialChunks, samplesPerChunk),
+        availableShardIds);
 }
 
-SamplingBasedSplitPolicy::SamplingBasedSplitPolicy(int numInitialChunks,
-                                                   boost::optional<std::vector<TagsType>> zones,
-                                                   std::unique_ptr<SampleDocumentSource> samples)
-    : _numInitialChunks(numInitialChunks), _zones(std::move(zones)), _samples(std::move(samples)) {
+SamplingBasedSplitPolicy::SamplingBasedSplitPolicy(
+    int numInitialChunks,
+    boost::optional<std::vector<TagsType>> zones,
+    std::unique_ptr<SampleDocumentSource> samples,
+    boost::optional<std::vector<ShardId>> availableShardIds)
+    : _numInitialChunks(numInitialChunks),
+      _zones(std::move(zones)),
+      _samples(std::move(samples)),
+      _availableShardIds(std::move(availableShardIds)) {
     uassert(4952602, "numInitialChunks should be > 0", numInitialChunks > 0);
     uassert(4952604, "provided zones should not be empty", !_zones || _zones->size());
+    uassert(7679103,
+            "provided availableShardIds should not be empty",
+            !_availableShardIds || !_availableShardIds->empty());
 }
 
 BSONObjSet SamplingBasedSplitPolicy::createFirstSplitPoints(OperationContext* opCtx,
@@ -749,7 +796,12 @@ InitialSplitPolicy::ShardCollectionConfig SamplingBasedSplitPolicy::createFirstC
         }
     }
 
-    {
+    if (_availableShardIds) {
+        for (const auto& shardId : *_availableShardIds) {
+            chunkDistribution.emplace(shardId, 0);
+        }
+        zoneToShardMap.emplace("", *_availableShardIds);
+    } else {
         auto allShardIds = getAllShardIdsShuffled(opCtx);
         for (const auto& shard : allShardIds) {
             chunkDistribution.emplace(shard, 0);
@@ -909,8 +961,8 @@ InitialSplitPolicy::ShardCollectionConfig ShardDistributionSplitPolicy::createFi
 
     auto splitPoints = extractSplitPointsFromZones(shardKeyPattern, _zones);
     std::vector<ChunkType> chunks;
-    uassert(ErrorCodes::InvalidOptions,
-            "ShardDistribution without min/max is not supported.",
+    uassert(7679102,
+            "ShardDistribution without min/max must not use this split policy.",
             _shardDistribution[0].getMin());
 
     unsigned long shardDistributionIdx = 0;

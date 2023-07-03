@@ -29,41 +29,78 @@
 
 #include "mongo/db/catalog/create_collection.h"
 
-#include <fmt/printf.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <fmt/printf.h>  // IWYU pragma: keep
+#include <memory>
+#include <string>
+#include <utility>
+#include <variant>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/unique_collection_name.h"
 #include "mongo/db/catalog/virtual_collection_options.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/create_gen.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/curop.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/stats/top.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -187,14 +224,6 @@ Status _createView(OperationContext* opCtx,
                           "option not supported on a view: changeStreamPreAndPostImages");
         }
 
-        // Cannot directly create a view on a system.buckets collection, only by creating a
-        // time-series collection.
-        NamespaceString viewOnNss{nss.db(), collectionOptions.viewOn};
-        uassert(ErrorCodes::InvalidNamespace,
-                "Cannot create view on a system.buckets namespace except by creating a time-series "
-                "collection",
-                !viewOnNss.isTimeseriesBucketsCollection());
-
         _createSystemDotViewsIfNecessary(opCtx, db);
 
         WriteUnitOfWork wunit(opCtx);
@@ -253,84 +282,122 @@ Status _createDefaultTimeseriesIndex(OperationContext* opCtx, CollectionWriter& 
 }
 
 BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
-    switch (bucketVersion) {
-        case timeseries::kTimeseriesControlCompressedVersion:
-            return fromjson(fmt::sprintf(R"(
-{
-'$jsonSchema' : {
-    bsonType: 'object',
-    required: ['_id', 'control', 'data'],
-    properties: {
-        _id: {bsonType: 'objectId'},
-        control: {
-            bsonType: 'object',
-            required: ['version', 'min', 'max'],
-            properties: {
-                version: {bsonType: 'number'},
-                min: {
-                    bsonType: 'object',
-                    required: ['%s'],
-                    properties: {'%s': {bsonType: 'date'}}
-                },
-                max: {
-                    bsonType: 'object',
-                    required: ['%s'],
-                    properties: {'%s': {bsonType: 'date'}}
-                },
-                closed: {bsonType: 'bool'},
-                count: {bsonType: 'number', minimum: 1}
-            },
-            additionalProperties: false
-        },
-        data: {bsonType: 'object'},
-        meta: {}
-    },
-    additionalProperties: false
-}
-})",
-                                         timeField,
-                                         timeField,
-                                         timeField,
-                                         timeField));
-        case timeseries::kTimeseriesControlUncompressedVersion:
-            return fromjson(fmt::sprintf(R"(
-{
-'$jsonSchema' : {
-    bsonType: 'object',
-    required: ['_id', 'control', 'data'],
-    properties: {
-        _id: {bsonType: 'objectId'},
-        control: {
-            bsonType: 'object',
-            required: ['version', 'min', 'max'],
-            properties: {
-                version: {bsonType: 'number'},
-                min: {
-                    bsonType: 'object',
-                    required: ['%s'],
-                    properties: {'%s': {bsonType: 'date'}}
-                },
-                max: {
-                    bsonType: 'object',
-                    required: ['%s'],
-                    properties: {'%s': {bsonType: 'date'}}
-                },
-                closed: {bsonType: 'bool'}
+    if (bucketVersion != timeseries::kTimeseriesControlCompressedVersion &&
+        bucketVersion != timeseries::kTimeseriesControlUncompressedVersion) {
+        MONGO_UNREACHABLE;
+    }
+    // '$jsonSchema' : {
+    //     bsonType: 'object',
+    //     required: ['_id', 'control', 'data'],
+    //     properties: {
+    //         _id: {bsonType: 'objectId'},
+    //         control: {
+    //             bsonType: 'object',
+    //             required: ['version', 'min', 'max'],
+    //             properties: {
+    //                 version: {bsonType: 'number'},
+    //                 min: {
+    //                     bsonType: 'object',
+    //                     required: ['%s'],
+    //                     properties: {'%s': {bsonType: 'date'}}
+    //                 },
+    //                 max: {
+    //                     bsonType: 'object',
+    //                     required: ['%s'],
+    //                     properties: {'%s': {bsonType: 'date'}}
+    //                 },
+    //                 closed: {bsonType: 'bool'},
+    //                 count: {bsonType: 'number', minimum: 1} // only if bucketVersion ==
+    //                 timeseries::kTimeseriesControlCompressedVersion
+    //             },
+    //             additionalProperties: false // only if bucketVersion ==
+    //             timeseries::kTimeseriesControlCompressedVersion
+    //         },
+    //         data: {bsonType: 'object'},
+    //         meta: {}
+    //     },
+    //     additionalProperties: false
+    //   }
+    BSONObjBuilder validator;
+    BSONObjBuilder schema(validator.subobjStart("$jsonSchema"));
+    schema.append("bsonType", "object");
+    schema.append("required",
+                  BSON_ARRAY("_id"
+                             << "control"
+                             << "data"));
+    {
+        BSONObjBuilder properties(schema.subobjStart("properties"));
+        {
+            BSONObjBuilder _id(properties.subobjStart("_id"));
+            _id.append("bsonType", "objectId");
+            _id.done();
+        }
+        {
+            BSONObjBuilder control(properties.subobjStart("control"));
+            control.append("bsonType", "object");
+            control.append("required",
+                           BSON_ARRAY("version"
+                                      << "min"
+                                      << "max"));
+            {
+                BSONObjBuilder innerProperties(control.subobjStart("properties"));
+                {
+                    BSONObjBuilder version(innerProperties.subobjStart("version"));
+                    version.append("bsonType", "number");
+                    version.done();
+                }
+                {
+                    BSONObjBuilder min(innerProperties.subobjStart("min"));
+                    min.append("bsonType", "object");
+                    min.append("required", BSON_ARRAY(timeField));
+                    BSONObjBuilder minProperties(min.subobjStart("properties"));
+                    BSONObjBuilder timeFieldObj(minProperties.subobjStart(timeField));
+                    timeFieldObj.append("bsonType", "date");
+                    timeFieldObj.done();
+                    minProperties.done();
+                    min.done();
+                }
+
+                {
+                    BSONObjBuilder max(innerProperties.subobjStart("max"));
+                    max.append("bsonType", "object");
+                    max.append("required", BSON_ARRAY(timeField));
+                    BSONObjBuilder maxProperties(max.subobjStart("properties"));
+                    BSONObjBuilder timeFieldObj(maxProperties.subobjStart(timeField));
+                    timeFieldObj.append("bsonType", "date");
+                    timeFieldObj.done();
+                    maxProperties.done();
+                    max.done();
+                }
+                {
+                    BSONObjBuilder closed(innerProperties.subobjStart("closed"));
+                    closed.append("bsonType", "bool");
+                    closed.done();
+                }
+                if (bucketVersion == timeseries::kTimeseriesControlCompressedVersion) {
+                    BSONObjBuilder count(innerProperties.subobjStart("count"));
+                    count.append("bsonType", "number");
+                    count.append("minimum", 1);
+                    count.done();
+                }
+                innerProperties.done();
             }
-        },
-        data: {bsonType: 'object'},
-        meta: {}
-    },
-    additionalProperties: false
-}
-})",
-                                         timeField,
-                                         timeField,
-                                         timeField,
-                                         timeField));
-        default:
-            MONGO_UNREACHABLE;
-    };
+            if (bucketVersion == timeseries::kTimeseriesControlCompressedVersion) {
+                control.append("additionalProperties", false);
+            }
+            control.done();
+        }
+        {
+            BSONObjBuilder data(properties.subobjStart("data"));
+            data.append("bsonType", "object");
+            data.done();
+        }
+        properties.append("meta", BSONObj{});
+        properties.done();
+    }
+    schema.append("additionalProperties", false);
+    schema.done();
+    return validator.obj();
 }
 
 Status _createTimeseries(OperationContext* opCtx,
@@ -453,6 +520,9 @@ Status _createTimeseries(OperationContext* opCtx,
         uassertStatusOK(db->userCreateNS(opCtx, bucketsNs, bucketsOptions, createIdIndex));
 
         CollectionWriter collectionWriter(opCtx, bucketsNs);
+        collectionWriter.getWritableCollection(opCtx)->setTimeseriesBucketingParametersChanged(
+            opCtx, false);
+
         uassertStatusOK(_createDefaultTimeseriesIndex(opCtx, collectionWriter));
         wuow.commit();
         return Status::OK();
@@ -510,8 +580,10 @@ Status _createTimeseries(OperationContext* opCtx,
                 Top::get(serviceContext).collectionDropped(ns);
             });
 
-        if (MONGO_unlikely(failTimeseriesViewCreation.shouldFail(
-                [&ns](const BSONObj& data) { return data["ns"_sd].String() == ns.ns(); }))) {
+        if (MONGO_unlikely(failTimeseriesViewCreation.shouldFail([&ns](const BSONObj& data) {
+                const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns");
+                return fpNss == ns;
+            }))) {
             LOGV2(5490200,
                   "failTimeseriesViewCreation fail point enabled. Failing creation of view "
                   "definition after bucket collection was created successfully.");
@@ -790,9 +862,10 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                   "conflictingUUID"_attr = uuid,
                   "existingCollection"_attr = *currentName);
             return Status(ErrorCodes::NamespaceExists,
-                          str::stream() << "existing collection " << currentName->toString()
-                                        << " with conflicting UUID " << uuid.toString()
-                                        << " is in a drop-pending state.");
+                          str::stream()
+                              << "existing collection " << currentName->toStringForErrorMsg()
+                              << " with conflicting UUID " << uuid.toString()
+                              << " is in a drop-pending state.");
         }
 
         // In the case of oplog replay, a future command may have created or renamed a

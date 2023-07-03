@@ -27,23 +27,40 @@
  *    it in the license file.
  */
 
-#include <boost/date_time/gregorian/gregorian_types.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
-#include <boost/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <boost/date_time/gregorian/greg_date.hpp>
+#include <boost/date_time/posix_time/posix_time_duration.hpp>
+#include <boost/date_time/posix_time/ptime.hpp>
+#include <boost/date_time/time_duration.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+#include <memory>
+#include <system_error>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/sharding_router_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -80,7 +97,8 @@ protected:
             auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
             auto findCommand = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-            ASSERT_EQ(findCommand->getNamespaceOrUUID().nss()->ns(), "config.settings");
+            ASSERT_EQ(findCommand->getNamespaceOrUUID().nss(),
+                      NamespaceString::kConfigSettingsNamespace);
             ASSERT_BSONOBJ_EQ(findCommand->getFilter(), BSON("_id" << key));
 
             checkReadConcern(request.cmdObj,

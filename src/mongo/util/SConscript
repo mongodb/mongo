@@ -235,19 +235,10 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='namespace_string_util_test',
-    source=[
-        'namespace_string_util_test.cpp',
-    ],
-    LIBDEPS=[
-        'namespace_string_database_name_util',
-    ],
-)
-
-env.CppUnitTest(
-    target='database_name_util_test',
+    target='namespace_string_database_name_util_test',
     source=[
         'database_name_util_test.cpp',
+        'namespace_string_util_test.cpp',
     ],
     LIBDEPS=[
         'namespace_string_database_name_util',
@@ -503,7 +494,7 @@ env.Library(
     target="signal_handlers",
     source=[
         "signal_handlers.cpp",
-        "signal_win32.cpp",
+        "signal_win32.cpp" if env.TargetOSIs('windows') else [],
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/log_process_details",
@@ -815,6 +806,7 @@ icuEnv.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/service_context_non_d',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         'alarm',

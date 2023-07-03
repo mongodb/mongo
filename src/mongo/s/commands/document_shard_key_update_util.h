@@ -33,11 +33,18 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/util/future.h"
+#include "mongo/util/out_of_line_executor.h"
 
 namespace mongo {
 

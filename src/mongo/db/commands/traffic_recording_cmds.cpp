@@ -28,16 +28,24 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <memory>
 
-#include "mongo/db/auth/action_set.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/traffic_recorder.h"
 #include "mongo/db/traffic_recorder_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -70,8 +78,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForPrivilege(Privilege{ResourcePattern::forClusterResource(),
-                                                             ActionType::trafficRecord}));
+                        ->isAuthorizedForPrivilege(Privilege{
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::trafficRecord}));
         }
 
         NamespaceString ns() const override {
@@ -105,8 +114,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForPrivilege(Privilege{ResourcePattern::forClusterResource(),
-                                                             ActionType::trafficRecord}));
+                        ->isAuthorizedForPrivilege(Privilege{
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::trafficRecord}));
         }
 
         NamespaceString ns() const override {

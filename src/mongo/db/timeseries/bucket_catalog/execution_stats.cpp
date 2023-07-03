@@ -29,6 +29,8 @@
 
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 
 namespace mongo::timeseries::bucket_catalog {
@@ -201,7 +203,7 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
     }
 }
 
-void addCollectionExecutionStats(ExecutionStatsController stats, const ExecutionStats& collStats) {
+void addCollectionExecutionStats(ExecutionStatsController& stats, const ExecutionStats& collStats) {
     stats.incNumBucketInserts(collStats.numBucketInserts.load());
     stats.incNumBucketUpdates(collStats.numBucketUpdates.load());
     stats.incNumBucketsOpenedDueToMetadata(collStats.numBucketsOpenedDueToMetadata.load());

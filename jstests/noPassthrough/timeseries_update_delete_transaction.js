@@ -34,7 +34,10 @@ assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.
 
 session.startTransaction();
 // Time-series update in a multi-document transaction should fail.
-assert.commandFailedWithCode(sessionColl.update({[metaFieldName]: "a"}, {"$set": {"b": "a"}}),
+assert.commandFailedWithCode(session.getDatabase(jsTestName()).runCommand({
+    update: collectionName,
+    updates: [{q: {[metaFieldName]: "a"}, u: {"$set": {"b": "a"}}, multi: true}],
+}),
                              ErrorCodes.OperationNotSupportedInTransaction);
 assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 session.endSession();

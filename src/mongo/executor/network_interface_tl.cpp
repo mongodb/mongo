@@ -30,15 +30,30 @@
 
 #include "mongo/executor/network_interface_tl.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <tuple>
+#include <type_traits>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/config.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
-#include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_tl.h"
 #include "mongo/executor/hedge_options_util.h"
@@ -46,10 +61,20 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_tl_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/transport/ssl_connection_context.h"
 #include "mongo/transport/transport_layer_manager.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kASIO
@@ -64,15 +89,9 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(triggerSendRequestNetworkTimeout);
 MONGO_FAIL_POINT_DEFINE(forceConnectionNetworkTimeout);
 
-bool connHealthMetricsEnabled() {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe();
-}
-
-CounterMetric numConnectionNetworkTimeouts("operation.numConnectionNetworkTimeouts",
-                                           connHealthMetricsEnabled);
+CounterMetric numConnectionNetworkTimeouts("operation.numConnectionNetworkTimeouts");
 CounterMetric timeSpentWaitingBeforeConnectionTimeoutMillis(
-    "operation.totalTimeWaitingBeforeConnectionTimeoutMillis", connHealthMetricsEnabled);
+    "operation.totalTimeWaitingBeforeConnectionTimeoutMillis");
 
 Status appendMetadata(RemoteCommandRequestOnAny* request,
                       const std::unique_ptr<rpc::EgressMetadataHook>& hook) {
@@ -1044,12 +1063,14 @@ NetworkInterfaceTL::ExhaustCommandState::ExhaustCommandState(
 auto NetworkInterfaceTL::ExhaustCommandState::make(NetworkInterfaceTL* interface,
                                                    RemoteCommandRequestOnAny request,
                                                    const TaskExecutor::CallbackHandle& cbHandle,
-                                                   RemoteCommandOnReplyFn&& onReply) {
+                                                   RemoteCommandOnReplyFn&& onReply,
+                                                   const BatonHandle& baton) {
     auto state = std::make_shared<ExhaustCommandState>(
         interface, std::move(request), cbHandle, std::move(onReply));
     auto [promise, future] = makePromiseFuture<void>();
     state->promise = std::move(promise);
     std::move(future)
+        .thenRunOn(makeGuaranteedExecutor(baton, interface->_reactor))
         .onError([state](Status error) {
             stdx::lock_guard<Latch> lk(state->stopwatchMutex);
             state->onReplyFn(RemoteCommandOnAnyResponse(
@@ -1178,7 +1199,7 @@ Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandl
         return status;
     }
 
-    auto cmdState = ExhaustCommandState::make(this, request, cbHandle, std::move(onReply));
+    auto cmdState = ExhaustCommandState::make(this, request, cbHandle, std::move(onReply), baton);
     if (cmdState->requestOnAny.timeout != cmdState->requestOnAny.kNoTimeout) {
         cmdState->deadline = cmdState->stopwatch.start() + cmdState->requestOnAny.timeout;
     }

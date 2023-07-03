@@ -29,8 +29,22 @@
 
 #pragma once
 
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/sasl_mechanism_policies.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 

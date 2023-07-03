@@ -27,9 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
 
 #include "mongo/base/shim.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/grid.h"

@@ -29,28 +29,48 @@
 
 #include "mongo/db/repl/apply_ops.h"
 
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/client.h"
+#include <algorithm>
+#include <boost/optional.hpp>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/curop.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

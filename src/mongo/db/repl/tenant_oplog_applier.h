@@ -29,17 +29,42 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <map>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/tenant_oplog_batcher.h"
 #include "mongo/db/serverless/serverless_types_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 class ThreadPool;
@@ -127,6 +152,19 @@ private:
     void _applyOplogBatch(TenantOplogBatch* batch);
     Status _applyOplogBatchPerWorker(std::vector<ApplierOperation>* ops);
     void _checkNsAndUuidsBelongToTenant(OperationContext* opCtx, const TenantOplogBatch& batch);
+    void _writeTransactionEntryNoOp(OperationContext* opCtx,
+                                    MutableOplogEntry& noopEntry,
+                                    const OplogEntry& entry);
+    void _writeRetryableWriteEntryNoOp(OperationContext* opCtx,
+                                       MutableOplogEntry& noopEntry,
+                                       const OplogEntry& entry,
+                                       const boost::optional<MutableOplogEntry>& prePostImageEntry,
+                                       const OpTime& originalPrePostImageOpTime);
+    void _writeSessionNoOp(OperationContext* opCtx,
+                           MutableOplogEntry& noopEntry,
+                           boost::optional<SessionTxnRecord> sessionTxnRecord = boost::none,
+                           std::vector<StmtId> stmtIds = {},
+                           boost::optional<MutableOplogEntry> prePostImageEntry = boost::none);
     OpTimePair _writeNoOpEntries(OperationContext* opCtx, const TenantOplogBatch& batch);
 
     using TenantNoOpEntry = std::pair<ApplierOperation, std::vector<OplogSlot>::iterator>;

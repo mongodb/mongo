@@ -29,8 +29,23 @@
 
 #include "mongo/s/write_ops/write_op.h"
 
+#include <absl/container/flat_hash_set.h>
+#include <algorithm>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <ostream>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

@@ -29,11 +29,25 @@
 
 #pragma once
 
+#include <cstddef>
+#include <memory>
+#include <set>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/batched_delete_stage_buffer.h"
 #include "mongo/db/exec/batched_delete_stage_gen.h"
 #include "mongo/db/exec/delete_stage.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/shard_role.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 

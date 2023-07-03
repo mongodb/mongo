@@ -29,13 +29,24 @@
 
 
 #include <memory>
+#include <set>
+#include <typeindex>
+#include <vector>
 
 #include "query_rewriter.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
+#include "mongo/crypto/fle_crypto_types.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression.h"
@@ -43,9 +54,10 @@
 #include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/db/query/fle/encrypted_predicate_test_fixtures.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
-#include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 
 namespace mongo {
@@ -277,7 +289,7 @@ protected:
     std::unique_ptr<MockQueryRewriter> _mock;
     fle::ExpressionToRewriteMap _agg;
     fle::MatchTypeToRewriteMap _match;
-    NamespaceString _mockNss{"mock"_sd};
+    NamespaceString _mockNss = NamespaceString::createNamespaceString_forTest("mock"_sd);
 };
 
 #define ASSERT_MATCH_EXPRESSION_REWRITE(input, expected)                 \

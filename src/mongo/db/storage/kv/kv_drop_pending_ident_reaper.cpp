@@ -28,17 +28,32 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
-
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <mutex>
+#include <type_traits>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -239,7 +254,9 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
     }
 }
 
-void KVDropPendingIdentReaper::clearDropPendingState() {
+void KVDropPendingIdentReaper::clearDropPendingState(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isW());
+
     stdx::lock_guard<Latch> lock(_mutex);
     _dropPendingIdents.clear();
     _identToTimestamp.clear();

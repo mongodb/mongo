@@ -27,25 +27,63 @@
  *    it in the license file.
  */
 
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 #include <memory>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/crypto/hash_block.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cursor_id.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/repl/task_executor_mock.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/signed_logical_time.h"
+#include "mongo/db/time_proof_service.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
+#include "mongo/executor/task_executor_test_fixture.h"
+#include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/unittest/death_test.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/task_executor_proxy.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace {
 

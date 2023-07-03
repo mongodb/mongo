@@ -29,8 +29,16 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/all_indices_required_checker.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -38,6 +46,8 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
+#include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo::sbe {
 /**

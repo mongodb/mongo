@@ -29,9 +29,12 @@
 
 #pragma once
 
+#include <cstring>
 #include <ostream>
 #include <string>
+#include <utility>
 
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 

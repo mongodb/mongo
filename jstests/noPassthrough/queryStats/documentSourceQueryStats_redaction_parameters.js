@@ -4,16 +4,16 @@
  */
 
 load("jstests/aggregation/extras/utils.js");  // For assertAdminDBErrCodeAndErrMsgContains.
-load("jstests/libs/telemetry_utils.js");
+load("jstests/libs/query_stats_utils.js");
 
 (function() {
 "use strict";
 
-// Assert the expected telemetry key with no hmac.
-function assertTelemetryKeyWithoutHmac(telemetryKey) {
-    assert.eq(telemetryKey.filter, {"foo": {"$lte": "?number"}});
-    assert.eq(telemetryKey.sort, {"bar": -1});
-    assert.eq(telemetryKey.limit, "?number");
+// Assert the expected queryStats key with no hmac.
+function assertQueryStatsKeyWithoutHmac(queryStatsKey) {
+    assert.eq(queryStatsKey.filter, {"foo": {"$lte": "?number"}});
+    assert.eq(queryStatsKey.sort, {"bar": -1});
+    assert.eq(queryStatsKey.limit, "?number");
 }
 
 function runTest(conn) {
@@ -24,58 +24,79 @@ function runTest(conn) {
     coll.insert({foo: 1});
     coll.find({foo: {$lte: 2}}).sort({bar: -1}).limit(2).toArray();
     // Default is no hmac.
-    assertTelemetryKeyWithoutHmac(getTelemetry(conn)[0].key.queryShape);
+    assertQueryStatsKeyWithoutHmac(getQueryStatsFindCmd(conn)[0].key.queryShape);
 
     // Turning on hmac should apply hmac to all field names on all entries, even previously cached
     // ones.
-    const telemetryKey = getTelemetryRedacted(conn)[0]["key"];
-    assert.eq(telemetryKey.queryShape.filter,
+    const queryStatsKey = getQueryStatsFindCmd(conn, {transformIdentifiers: true})[0]["key"];
+    assert.eq(queryStatsKey.queryShape.filter,
               {"fNWkKfogMv6MJ77LpBcuPrO7Nq+R+7TqtD+Lgu3Umc4=": {"$lte": "?number"}});
-    assert.eq(telemetryKey.queryShape.sort, {"CDDQIXZmDehLKmQcRxtdOQjMqoNqfI2nGt2r4CgJ52o=": -1});
-    assert.eq(telemetryKey.queryShape.limit, "?number");
+    assert.eq(queryStatsKey.queryShape.sort, {"CDDQIXZmDehLKmQcRxtdOQjMqoNqfI2nGt2r4CgJ52o=": -1});
+    assert.eq(queryStatsKey.queryShape.limit, "?number");
 
     // Turning hmac back off should preserve field names on all entries, even previously cached
     // ones.
-    assertTelemetryKeyWithoutHmac(getTelemetry(conn)[0]["key"].queryShape);
+    const queryStats = getQueryStats(conn)[1]["key"];
+    assertQueryStatsKeyWithoutHmac(queryStats.queryShape);
 
-    // Explicitly set applyHmacToIdentifiers to false.
-    assertTelemetryKeyWithoutHmac(getTelemetryRedacted(conn, false)[0]["key"].queryShape);
+    // Explicitly set transformIdentifiers to false.
+    assertQueryStatsKeyWithoutHmac(
+        getQueryStatsFindCmd(conn, {transformIdentifiers: false})[0]["key"].queryShape);
 
     // Wrong parameter name throws error.
     let pipeline = [{$queryStats: {redactFields: true}}];
     assertAdminDBErrCodeAndErrMsgContains(
-        coll,
-        pipeline,
-        ErrorCodes.FailedToParse,
-        "$queryStats parameters object may only contain 'applyHmacToIdentifiers' or 'hmacKey' options. Found: redactFields");
+        coll, pipeline, 40415, "BSON field '$queryStats.redactFields' is an unknown field.");
+
+    // Wrong parameter name throws error.
+    pipeline = [{$queryStats: {algorithm: "hmac-sha-256"}}];
+    assertAdminDBErrCodeAndErrMsgContains(
+        coll, pipeline, 40415, "BSON field '$queryStats.algorithm' is an unknown field.");
 
     // Wrong parameter type throws error.
-    pipeline = [{$queryStats: {applyHmacToIdentifiers: 1}}];
+    pipeline = [{$queryStats: {transformIdentifiers: {algorithm: 1}}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
-        ErrorCodes.FailedToParse,
-        "$queryStats applyHmacToIdentifiers parameter must be boolean. Found type: double");
+        ErrorCodes.TypeMismatch,
+        "BSON field '$queryStats.transformIdentifiers.algorithm' is the wrong type 'double', expected type 'string'");
 
-    pipeline = [{$queryStats: {hmacKey: 1}}];
+    pipeline = [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256", hmacKey: 1}}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
-        ErrorCodes.FailedToParse,
-        "$queryStats hmacKey parameter must be bindata of length 32 or greater. Found type: double");
+        ErrorCodes.TypeMismatch,
+        "BSON field '$queryStats.transformIdentifiers.hmacKey' is the wrong type 'double', expected type 'binData'");
+
+    // Unsupported algorithm throws error.
+    pipeline = [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-1"}}}];
+    assertAdminDBErrCodeAndErrMsgContains(
+        coll,
+        pipeline,
+        ErrorCodes.BadValue,
+        "Enumeration value 'hmac-sha-1' for field '$queryStats.transformIdentifiers.algorithm' is not a valid value.");
+
+    // TransformIdentifiers with missing algorithm throws error.
+    pipeline = [{$queryStats: {transformIdentifiers: {}}}];
+    assertAdminDBErrCodeAndErrMsgContains(
+        coll,
+        pipeline,
+        40414,
+        "BSON field '$queryStats.transformIdentifiers.algorithm' is missing but a required field");
 
     // Parameter object with unrecognized key throws error.
-    pipeline = [{$queryStats: {applyHmacToIdentifiers: true, hmacStrategy: "on"}}];
+    pipeline =
+        [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256", hmacStrategy: "on"}}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
-        ErrorCodes.FailedToParse,
-        "$queryStats parameters object may only contain 'applyHmacToIdentifiers' or 'hmacKey' options. Found: hmacStrategy");
+        40415,
+        "BSON field '$queryStats.transformIdentifiers.hmacStrategy' is an unknown field.");
 }
 
 const conn = MongoRunner.runMongod({
     setParameter: {
-        internalQueryStatsSamplingRate: -1,
+        internalQueryStatsRateLimit: -1,
         featureFlagQueryStats: true,
     }
 });
@@ -89,8 +110,7 @@ const st = new ShardingTest({
     rs: {nodes: 1},
     mongosOptions: {
         setParameter: {
-            internalQueryStatsSamplingRate: -1,
-            featureFlagQueryStats: true,
+            internalQueryStatsRateLimit: -1,
             'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
         }
     },

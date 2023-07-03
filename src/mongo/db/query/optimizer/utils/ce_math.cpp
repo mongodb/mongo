@@ -28,8 +28,10 @@
  */
 
 #include <algorithm>   // std::sort
-#include <cmath>       // std::pow
 #include <functional>  // std::greater
+#include <limits>
+#include <type_traits>
+#include <utility>
 
 #include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/util/assert_util.h"

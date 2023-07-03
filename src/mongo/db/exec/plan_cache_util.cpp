@@ -28,7 +28,29 @@
  */
 
 #include "mongo/db/exec/plan_cache_util.h"
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <queue>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/canonical_query_encoder.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/stdx/unordered_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -68,34 +90,16 @@ void logNotCachingNoData(std::string&& solution) {
 }
 }  // namespace log_detail
 
-// TODO SERVER-75715: Remove hasSbeClusteredCollectionScan() and its calls once SBE support
-// for clustered collection scans is fully implemented. This method exists temporarily to
-// prevent caching of CC scan plans until the mentioned ticket adds parameterization for them.
-bool hasSbeClusteredCollectionScan(const QuerySolutionNode* qsn) {
-    if (qsn->getType() == STAGE_COLLSCAN &&
-        static_cast<const CollectionScanNode*>(qsn)->doSbeClusteredCollectionScan()) {
-        return true;
-    }
-    for (const std::unique_ptr<QuerySolutionNode>& child : qsn->children) {
-        if (hasSbeClusteredCollectionScan(child.get())) {
-            return true;
-        }
-    }
-    return false;
-}
-
 void updatePlanCache(OperationContext* opCtx,
                      const MultipleCollectionAccessor& collections,
                      const CanonicalQuery& query,
                      const QuerySolution& solution,
                      const sbe::PlanStage& root,
-                     const stage_builder::PlanStageData& data) {
-    // TODO SERVER-75715: remove hasSbeClusteredCollectionScan() call. This exists temporarily to
-    // prevent caching SBE clustered coll scan execution plans as they are not yet parameterized.
-    if (shouldCacheQuery(query) && collections.getMainCollection() &&
-        !hasSbeClusteredCollectionScan(solution.root())) {
-        auto key = plan_cache_key_factory::make(query, collections);
-        auto plan = std::make_unique<sbe::CachedSbePlan>(root.clone(), data);
+                     stage_builder::PlanStageData& stageData) {
+    const CollectionPtr& collection = collections.getMainCollection();
+    if (collection && shouldCacheQuery(query) && solution.isEligibleForPlanCache()) {
+        sbe::PlanCacheKey key = plan_cache_key_factory::make(query, collections);
+        auto plan = std::make_unique<sbe::CachedSbePlan>(root.clone(), stageData);
         plan->indexFilterApplied = solution.indexFilterApplied;
 
         bool shouldOmitDiagnosticInformation =
@@ -196,7 +200,7 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution
             }
             case STAGE_EQ_LOOKUP: {
                 auto eln = static_cast<const EqLookupNode*>(node);
-                auto& secondaryStats = debugInfo.secondaryStats[eln->foreignCollection.toString()];
+                auto& secondaryStats = debugInfo.secondaryStats[eln->foreignCollection];
                 if (eln->lookupStrategy == EqLookupNode::LookupStrategy::kIndexedLoopJoin) {
                     tassert(6466200, "Index join lookup should have an index entry", eln->idxEntry);
                     secondaryStats.indexesUsed.push_back(eln->idxEntry->identifier.catalogName);

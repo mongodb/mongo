@@ -27,17 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/sorted_data_interface_test_harness.h"
-
+#include <boost/move/utility_core.hpp>
 #include <memory>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/storage/sorted_data_interface_test_harness.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
 
-// Insert a key and verify that it can be unindexed.
+/**
+ * Insert a key and verify that it can be unindexed.
+ */
 void unindex(bool partial) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
@@ -50,6 +61,7 @@ void unindex(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
@@ -59,11 +71,13 @@ void unindex(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true);
@@ -77,16 +91,14 @@ void unindex(bool partial) {
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 }
-
 TEST(SortedDataInterface, Unindex) {
     unindex(false);
 }
-
 TEST(SortedDataInterface, UnindexPartial) {
     unindex(true);
 }
 
-/*
+/**
  * Insert a KeyString and verify that it can be unindexed.
  */
 void unindexKeyString(bool partial) {
@@ -103,6 +115,7 @@ void unindexKeyString(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(opCtx.get(), keyString1, true));
@@ -112,11 +125,13 @@ void unindexKeyString(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), keyString1, true);
@@ -130,16 +145,16 @@ void unindexKeyString(bool partial) {
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 }
-
 TEST(SortedDataInterface, UnindexKeyString) {
     unindexKeyString(false);
 }
-
 TEST(SortedDataInterface, UnindexKeyStringPartial) {
     unindexKeyString(true);
 }
 
-// Insert a compound key and verify that it can be unindexed.
+/**
+ * Insert a compound key and verify that it can be unindexed.
+ */
 void unindexCompoundKey(bool partial) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
@@ -152,6 +167,7 @@ void unindexCompoundKey(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(
@@ -162,11 +178,13 @@ void unindexCompoundKey(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), compoundKey1a, loc1), true);
@@ -180,16 +198,16 @@ void unindexCompoundKey(bool partial) {
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 }
-
 TEST(SortedDataInterface, UnindexCompoundKey) {
     unindexCompoundKey(false);
 }
-
 TEST(SortedDataInterface, UnindexCompoundKeyPartial) {
     unindexCompoundKey(true);
 }
 
-// Insert multiple, distinct keys and verify that they can be unindexed.
+/**
+ * Insert multiple, distinct keys and verify that they can be unindexed.
+ */
 void unindexMultipleDistinct(bool partial) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
@@ -202,6 +220,7 @@ void unindexMultipleDistinct(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
@@ -212,11 +231,13 @@ void unindexMultipleDistinct(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key2, loc2), true);
@@ -227,11 +248,13 @@ void unindexMultipleDistinct(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key3, loc3), true));
@@ -241,11 +264,13 @@ void unindexMultipleDistinct(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true);
@@ -261,16 +286,16 @@ void unindexMultipleDistinct(bool partial) {
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 }
-
 TEST(SortedDataInterface, UnindexMultipleDistinct) {
     unindexMultipleDistinct(false);
 }
-
 TEST(SortedDataInterface, UnindexMultipleDistinctPartial) {
     unindexMultipleDistinct(true);
 }
 
-// Insert the same key multiple times and verify that each occurrence can be unindexed.
+/**
+ * Insert the same key multiple times and verify that each occurrence can be unindexed.
+ */
 void unindexMultipleSameKey(bool partial) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
@@ -283,6 +308,7 @@ void unindexMultipleSameKey(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
@@ -294,11 +320,13 @@ void unindexMultipleSameKey(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc2), true);
@@ -309,11 +337,13 @@ void unindexMultipleSameKey(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(
@@ -324,11 +354,13 @@ void unindexMultipleSameKey(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true);
@@ -344,17 +376,14 @@ void unindexMultipleSameKey(bool partial) {
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 }
-
-
 TEST(SortedDataInterface, UnindexMultipleSameKey) {
     unindexMultipleSameKey(false);
 }
-
 TEST(SortedDataInterface, UnindexMultipleSameKeyPartial) {
     unindexMultipleSameKey(true);
 }
 
-/*
+/**
  * Insert the same KeyString multiple times and verify that each occurrence can be unindexed.
  */
 void unindexMultipleSameKeyString(bool partial) {
@@ -373,6 +402,7 @@ void unindexMultipleSameKeyString(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(opCtx.get(), keyStringLoc1, true));
@@ -383,11 +413,13 @@ void unindexMultipleSameKeyString(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), keyStringLoc2, true);
@@ -398,11 +430,13 @@ void unindexMultipleSameKeyString(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(opCtx.get(), keyStringLoc3, true /* allow duplicates */));
@@ -412,11 +446,13 @@ void unindexMultipleSameKeyString(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), keyStringLoc1, true);
@@ -432,17 +468,16 @@ void unindexMultipleSameKeyString(bool partial) {
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 }
-
-
 TEST(SortedDataInterface, UnindexMultipleSameKeyString) {
     unindexMultipleSameKeyString(false);
 }
-
 TEST(SortedDataInterface, UnindexMultipleSameKeyStringPartial) {
     unindexMultipleSameKeyString(true);
 }
 
-// Call unindex() on a nonexistent key and verify the result is false.
+/**
+ * Call unindex() on a nonexistent key and verify the result is false.
+ */
 void unindexEmpty(bool partial) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
@@ -455,6 +490,7 @@ void unindexEmpty(bool partial) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true);
@@ -463,16 +499,16 @@ void unindexEmpty(bool partial) {
         }
     }
 }
-
 TEST(SortedDataInterface, UnindexEmpty) {
     unindexEmpty(false);
 }
-
 TEST(SortedDataInterface, UnindexEmptyPartial) {
     unindexEmpty(true);
 }
 
-// Test partial indexing and unindexing.
+/**
+ * Test partial indexing and unindexing.
+ */
 TEST(SortedDataInterface, PartialIndex) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(
@@ -485,6 +521,7 @@ TEST(SortedDataInterface, PartialIndex) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             {
                 WriteUnitOfWork uow(opCtx.get());
@@ -520,6 +557,7 @@ TEST(SortedDataInterface, Unindex1) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(
@@ -530,11 +568,13 @@ TEST(SortedDataInterface, Unindex1) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(
@@ -546,11 +586,13 @@ TEST(SortedDataInterface, Unindex1) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(
@@ -562,12 +604,14 @@ TEST(SortedDataInterface, Unindex1) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(
@@ -590,6 +634,7 @@ TEST(SortedDataInterface, Unindex2Rollback) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(
@@ -600,11 +645,13 @@ TEST(SortedDataInterface, Unindex2Rollback) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(
@@ -616,6 +663,7 @@ TEST(SortedDataInterface, Unindex2Rollback) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }

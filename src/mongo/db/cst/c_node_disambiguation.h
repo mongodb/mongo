@@ -29,12 +29,15 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
+#include <iterator>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/c_node_validation.h"
+#include "mongo/db/cst/path.h"
+#include "mongo/platform/basic.h"
 
 /**
  * Functions which perform additional disambiguation beyond what a context free grammar can handle.

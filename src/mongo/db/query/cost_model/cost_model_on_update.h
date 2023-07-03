@@ -29,12 +29,14 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo::cost_model {
 

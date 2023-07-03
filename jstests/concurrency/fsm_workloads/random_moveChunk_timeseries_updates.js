@@ -11,14 +11,15 @@
  *  requires_fcv_51,
  * ]
  */
-'use strict';
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from 'jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_inserts.js';
+load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest' helpers.
 
 const numValues = 10;
 
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest' helpers.
-load('jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_inserts.js');
-
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.init = function(db, collName, connCache) {
         $super.states.init(db, collName);
     };
@@ -39,21 +40,26 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.states.update = function(db, collName, connCache) {
         const shardedColl = db[collName];
-        const unshardedColl = db[this.nonShardCollName];
-        const updateField = "tid" + this.tid;
+        const updateField = this.metaField + ".tid" + this.tid;
         const oldValue = Random.randInt(numValues);
 
         // Updates some measurements along the field owned by this thread in both sharded and
         // unsharded ts collections.
         jsTestLog("Executing update state on: " + collName + " on field " + updateField);
-        assertAlways.commandWorked(
-            shardedColl.update({[this.metaField]: {[updateField]: {$gte: oldValue}}},
-                               {$inc: {[this.metaField + "." + updateField]: 1}},
-                               {multi: true}));
-        assertAlways.commandWorked(
-            unshardedColl.update({[this.metaField]: {[updateField]: {$gte: oldValue}}},
-                                 {$inc: {[this.metaField + "." + updateField]: 1}},
-                                 {multi: true}));
+        assertAlways.commandWorked(shardedColl.update(
+            {[updateField]: {$gte: oldValue}}, {$inc: {[updateField]: 1}}, {multi: true}));
+    };
+
+    $config.data.validateCollection = function validate(db, collName) {
+        // Since we can't use a 'snapshot' read concern for timeseries updates, updates on the
+        // sharded collection may not see the exact same records as the non-sharded, so the
+        // validation needs to be more lenient.
+        const count = db[collName].find().itcount();
+        const countNonSharded = db[this.nonShardCollName].find().itcount();
+        assertAlways.eq(
+            count,
+            countNonSharded,
+            "Expected sharded collection to have the same number of records as unsharded");
     };
 
     $config.transitions = {
@@ -62,6 +68,15 @@ var $config = extendWorkload($config, function($config, $super) {
         update: {insert: 0.5, moveChunk: 0.1, update: 0.4},
         moveChunk: {insert: 0.4, moveChunk: 0.1, update: 0.5},
     };
+
+    // Reduced iteration and document counts to avoid timeouts.
+    $config.iterations = 20;
+
+    // Five minutes.
+    $config.data.increment = 1000 * 60 * 5;
+
+    // This should generate documents for a span of one month.
+    $config.data.numInitialDocs = 12 * 24 * 30;
 
     return $config;
 });

@@ -30,12 +30,21 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
@@ -96,6 +105,11 @@ public:
     void setShardingInitialized();
 
     /**
+     * Returns true if init() has successfully completed.
+     */
+    bool isInitialized() const;
+
+    /**
      * If the instance as which this sharding component is running (config/shard/mongos) uses
      * additional connection pools other than the default, this function will be present and can be
      * used to obtain statistics about them. Otherwise, the value will be unset.
@@ -103,31 +117,41 @@ public:
     CustomConnectionPoolStatsFn getCustomConnectionPoolStatsFn() const;
     void setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn);
 
+    /**
+     * These getter methods are safe to run only when Grid::init has been called.
+     */
     ShardingCatalogClient* catalogClient() const {
+        dassert(_isGridInitialized.load());
         return _catalogClient.get();
     }
 
     CatalogCache* catalogCache() const {
+        dassert(_isGridInitialized.load());
         return _catalogCache.get();
     }
 
     ShardRegistry* shardRegistry() const {
+        dassert(_isGridInitialized.load());
         return _shardRegistry.get();
     }
 
     ClusterCursorManager* getCursorManager() const {
+        dassert(_isGridInitialized.load());
         return _cursorManager.get();
     }
 
     executor::TaskExecutorPool* getExecutorPool() const {
+        dassert(_isGridInitialized.load());
         return _executorPool.get();
     }
 
     executor::NetworkInterface* getNetwork() {
+        dassert(_isGridInitialized.load());
         return _network;
     }
 
     BalancerConfiguration* getBalancerConfiguration() const {
+        dassert(_isGridInitialized.load());
         return _balancerConfig.get();
     }
 
@@ -158,6 +182,7 @@ private:
     executor::NetworkInterface* _network{nullptr};
 
     AtomicWord<bool> _shardingInitialized{false};
+    AtomicWord<bool> _isGridInitialized{false};
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "Grid::_mutex");
 

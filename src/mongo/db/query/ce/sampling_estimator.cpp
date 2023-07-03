@@ -29,17 +29,49 @@
 
 #include "mongo/db/query/ce/sampling_estimator.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/ce/sel_tree_utils.h"
 #include "mongo/db/query/cqf_command_utils.h"
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/node_defs.h"
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
 #include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
-#include "mongo/db/query/optimizer/utils/memo_utils.h"
+#include "mongo/db/query/optimizer/utils/physical_plan_builder.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -80,18 +112,20 @@ public:
         PhysPlanBuilder result{childResult};
 
         // Retain only output bindings without applying filters.
-        PSRExpr::visitAnyShape(node.getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
-            const auto& [key, req] = e;
-            if (const auto& boundProjName = req.getBoundProjectionName()) {
-                lowerPartialSchemaRequirement(
-                    key,
-                    PartialSchemaRequirement{
-                        boundProjName, IntervalReqExpr::makeSingularDNF(), req.getIsPerfOnly()},
-                    _phaseManager.getPathToInterval(),
-                    boost::none /*residualCE*/,
-                    result);
-            }
-        });
+        PSRExpr::visitAnyShape(
+            node.getReqMap().getRoot(),
+            [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext& ctx) {
+                const auto& [key, req] = e;
+                if (const auto& boundProjName = req.getBoundProjectionName()) {
+                    lowerPartialSchemaRequirement(
+                        key,
+                        PartialSchemaRequirement{
+                            boundProjName, IntervalReqExpr::makeSingularDNF(), req.getIsPerfOnly()},
+                        _phaseManager.getPathToInterval(),
+                        boost::none /*residualCE*/,
+                        result);
+                }
+            });
         std::swap(n, result._node);
     }
 
@@ -273,7 +307,9 @@ private:
                           ids,
                           _phaseManager.getMetadata(),
                           planAndProps._map,
-                          ScanOrder::Random};
+                          internalCascadesOptimizerSamplingCEScanStartOfColl.load()
+                              ? ScanOrder::Forward
+                              : ScanOrder::Random};
         auto sbePlan = g.optimize(planAndProps._node, slotMap, ridSlot);
         tassert(6624261, "Unexpected rid slot", !ridSlot);
 

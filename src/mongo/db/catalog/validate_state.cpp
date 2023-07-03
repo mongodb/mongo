@@ -28,22 +28,39 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <absl/container/flat_hash_map.h>
+#include <fmt/format.h>
+#include <utility>
 
-#include "mongo/db/catalog/validate_state.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/index_consistency.h"
-#include "mongo/db/catalog/validate_adaptor.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/validate_state.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/views/view.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -97,9 +114,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
                                     << "' does not exist to validate.");
         } else {
             // Uses the bucket collection in place of the time-series collection view.
-            if (!view->timeseries() ||
-                !feature_flags::gExtendValidateCommand.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+            if (!view->timeseries()) {
                 uasserted(ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view");
             }
             _nss = _nss.makeTimeseriesBucketsNamespace();
@@ -136,13 +151,14 @@ ValidateState::ValidateState(OperationContext* opCtx,
 
 bool ValidateState::shouldEnforceFastCount() const {
     if (_mode == ValidateMode::kForegroundFullEnforceFastCount) {
-        if (_nss.isOplog() || _nss.isChangeCollection()) {
+        if (_nss.isOplog() || _nss.isChangeCollection() ||
+            _nss.isChangeStreamPreImagesCollection()) {
             // Oplog writers only take a global IX lock, so the oplog can still be written to even
             // during full validation despite its collection X lock. This can cause validate to
             // incorrectly report an incorrect fast count on the oplog when run in enforceFastCount
             // mode.
-            // The oplog entries are also written to the change collections and are prone to fast
-            // count failures.
+            // The oplog entries are also written to the change collections and pre-images
+            // collections, these collections are also prone to fast count failures.
             return false;
         } else if (_nss == NamespaceString::kIndexBuildEntryNamespace) {
             // Do not enforce fast count on the 'config.system.indexBuilds' collection. This is an
@@ -188,13 +204,16 @@ void ValidateState::_yieldLocks(OperationContext* opCtx) {
 
     // Check if any of the indexes we were validating were dropped. Indexes created while
     // yielding will be ignored.
-    for (const auto& index : _indexes) {
+    for (const auto& indexIdent : _indexIdents) {
+        const IndexDescriptor* desc =
+            _collection->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
         uassert(ErrorCodes::Interrupted,
                 str::stream()
                     << "Interrupted due to: index being validated was dropped from collection: "
                     << _nss.toStringForErrorMsg() << " (" << *_uuid
-                    << "), index: " << index->descriptor()->indexName(),
-                !index->isDropped());
+                    << "), index ident: " << indexIdent,
+                desc);
+        invariant(!desc->getEntry()->isDropped());
     }
 };
 
@@ -228,7 +247,7 @@ void ValidateState::_yieldCursors(OperationContext* opCtx) {
 
 void ValidateState::initializeCursors(OperationContext* opCtx) {
     invariant(!_traverseRecordStoreCursor && !_seekRecordStoreCursor && _indexCursors.size() == 0 &&
-              _columnStoreIndexCursors.size() == 0 && _indexes.size() == 0);
+              _columnStoreIndexCursors.size() == 0 && _indexIdents.size() == 0);
 
     // Background validation reads from the last stable checkpoint instead of the latest data. This
     // allows concurrent writes to go ahead without interfering with validation's view of the data.
@@ -253,7 +272,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     uint64_t currCheckpointId = 0;
     do {
         _indexCursors.clear();
-        _indexes.clear();
+        _indexIdents.clear();
         StringSet readyDurableIndexes;
         try {
             _traverseRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
@@ -351,7 +370,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
                 continue;
             }
 
-            _indexes.push_back(indexCatalog->getEntryShared(desc));
+            _indexIdents.push_back(desc->getEntry()->getIdent());
         }
         // For foreground validation which doesn't use checkpoint cursors, the checkpoint id will
         // always be zero.

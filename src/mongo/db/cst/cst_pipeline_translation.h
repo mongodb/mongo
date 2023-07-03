@@ -29,12 +29,15 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <memory>
 
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/platform/basic.h"
 
 namespace mongo::cst_pipeline_translation {
 

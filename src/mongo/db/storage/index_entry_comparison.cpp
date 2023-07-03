@@ -26,17 +26,25 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/index_entry_comparison.h"
-
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <limits>
 #include <ostream>
 
-#include "mongo/db/jsobj.h"
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/text.h"
+#include "mongo/util/str.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
 namespace mongo {
 
@@ -112,13 +120,13 @@ int IndexEntryComparison::compare(const IndexKeyEntry& lhs, const IndexKeyEntry&
     return lhs.loc.compare(rhs.loc);  // is supposed to ignore ordering
 }
 
-KeyString::Value IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-    const IndexSeekPoint& seekPoint, KeyString::Version version, Ordering ord, bool isForward) {
+key_string::Value IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+    const IndexSeekPoint& seekPoint, key_string::Version version, Ordering ord, bool isForward) {
     const bool inclusive = seekPoint.firstExclusive < 0;
-    const auto discriminator = isForward == inclusive ? KeyString::Discriminator::kExclusiveBefore
-                                                      : KeyString::Discriminator::kExclusiveAfter;
+    const auto discriminator = isForward == inclusive ? key_string::Discriminator::kExclusiveBefore
+                                                      : key_string::Discriminator::kExclusiveAfter;
 
-    KeyString::Builder builder(version, ord, discriminator);
+    key_string::Builder builder(version, ord, discriminator);
 
     // Appends keyPrefix elements to the builder.
     if (seekPoint.prefixLen > 0) {
@@ -141,25 +149,26 @@ KeyString::Value IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
     return builder.getValueCopy();
 }
 
-KeyString::Value IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
-                                                                       KeyString::Version version,
-                                                                       Ordering ord,
-                                                                       bool isForward,
-                                                                       bool inclusive) {
+key_string::Value IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
+                                                                        key_string::Version version,
+                                                                        Ordering ord,
+                                                                        bool isForward,
+                                                                        bool inclusive) {
     return makeKeyStringFromBSONKey(bsonKey,
                                     version,
                                     ord,
                                     isForward == inclusive
-                                        ? KeyString::Discriminator::kExclusiveBefore
-                                        : KeyString::Discriminator::kExclusiveAfter);
+                                        ? key_string::Discriminator::kExclusiveBefore
+                                        : key_string::Discriminator::kExclusiveAfter);
 }
 
-KeyString::Value IndexEntryComparison::makeKeyStringFromBSONKey(const BSONObj& bsonKey,
-                                                                KeyString::Version version,
-                                                                Ordering ord,
-                                                                KeyString::Discriminator discrim) {
+key_string::Value IndexEntryComparison::makeKeyStringFromBSONKey(
+    const BSONObj& bsonKey,
+    key_string::Version version,
+    Ordering ord,
+    key_string::Discriminator discrim) {
     BSONObj finalKey = BSONObj::stripFieldNames(bsonKey);
-    KeyString::Builder builder(version, finalKey, ord, discrim);
+    key_string::Builder builder(version, finalKey, ord, discrim);
     return builder.getValueCopy();
 }
 
@@ -252,23 +261,23 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
                   sb.str());
 }
 
-Status buildDupKeyErrorStatus(const KeyString::Value& keyString,
+Status buildDupKeyErrorStatus(const key_string::Value& keyString,
                               const NamespaceString& collectionNamespace,
                               const std::string& indexName,
                               const BSONObj& keyPattern,
                               const BSONObj& indexCollation,
                               const Ordering& ordering) {
-    const BSONObj key = KeyString::toBson(
+    const BSONObj key = key_string::toBson(
         keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
 
     return buildDupKeyErrorStatus(key, collectionNamespace, indexName, keyPattern, indexCollation);
 }
 
 Status buildDupKeyErrorStatus(OperationContext* opCtx,
-                              const KeyString::Value& keyString,
+                              const key_string::Value& keyString,
                               const Ordering& ordering,
                               const IndexDescriptor* desc) {
-    const BSONObj key = KeyString::toBson(
+    const BSONObj key = key_string::toBson(
         keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
     return buildDupKeyErrorStatus(opCtx, key, desc);
 }

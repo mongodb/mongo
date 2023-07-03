@@ -27,13 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <initializer_list>
+#include <mutex>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
@@ -325,25 +333,22 @@ TEST(CurOpTest, CheckNSAgainstSerializationContext) {
         NetworkOp::dbQuery);
 
     // Test without using the expectPrefix field.
-    // TODO SERVER-74284: uncomment the below and remove the line after when command
-    // serializer/deserializer is plumbed in
-    // for (bool tenantIdFromDollarTenantOrSecurityToken : {false, true}) {
-    bool tenantIdFromDollarTenantOrSecurityToken = false;
+    for (bool tenantIdFromDollarTenantOrSecurityToken : {false, true}) {
+        SerializationContext sc = SerializationContext::stateCommandReply();
+        sc.setTenantIdSource(tenantIdFromDollarTenantOrSecurityToken);
 
-    SerializationContext sc = SerializationContext::stateCommandRequest();
-    sc.setTenantIdSource(tenantIdFromDollarTenantOrSecurityToken);
+        BSONObjBuilder builder;
+        {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            curop->reportState(&builder, sc);
+        }
+        auto bsonObj = builder.done();
 
-    BSONObjBuilder builder;
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curop->reportState(&builder, sc);
+        std::string serializedNs = tenantIdFromDollarTenantOrSecurityToken
+            ? "testDb.coll"
+            : tid.toString() + "_testDb.coll";
+        ASSERT_EQ(serializedNs, bsonObj.getField("ns").String());
     }
-    auto bsonObj = builder.done();
-
-    std::string serializedNs =
-        tenantIdFromDollarTenantOrSecurityToken ? "testDb.coll" : tid.toString() + "_testDb.coll";
-    ASSERT_EQ(serializedNs, bsonObj.getField("ns").String());
-    // }
 }
 }  // namespace
 }  // namespace mongo

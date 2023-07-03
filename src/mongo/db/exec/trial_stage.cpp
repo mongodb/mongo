@@ -27,17 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/trial_stage.h"
-
-#include <algorithm>
 #include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/exec/trial_stage.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

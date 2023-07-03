@@ -27,15 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_current_op.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -149,6 +160,42 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseTruncateOpsIfNotBoolean) {
                        ErrorCodes::FailedToParse);
 }
 
+TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseTargetAllNodesIfNotBoolean) {
+    const auto specObj = fromjson("{$currentOp:{targetAllNodes:1}}");
+    ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseTrueTargetAllNodesIfTrueLocalOps) {
+    const auto specObj = fromjson("{$currentOp:{targetAllNodes:true, localOps:true}}");
+    ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseTrueTargetAllNodesIfUnsharded) {
+    const auto specObj = fromjson("{$currentOp:{targetAllNodes:true}}");
+    ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST_F(DocumentSourceCurrentOpTest, ShouldParseAndSerializeTargetAllNodesIfSharded) {
+    const auto specObj = fromjson("{$currentOp:{targetAllNodes:true}}");
+
+    getExpCtx()->fromMongos = true;
+
+    const auto parsed =
+        DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx());
+
+    const auto currentOp = static_cast<DocumentSourceCurrentOp*>(parsed.get());
+
+    const auto expectedOutput = Document{{"$currentOp", Document{{"targetAllNodes", true}}}};
+
+    ASSERT_DOCUMENT_EQ(currentOp->serialize().getDocument(), expectedOutput);
+}
+
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIfUnrecognisedParameterSpecified) {
     const auto specObj = fromjson("{$currentOp:{foo:true}}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
@@ -159,7 +206,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIfUnrecognisedParameterSpec
 TEST_F(DocumentSourceCurrentOpTest, ShouldParseAndSerializeAllExplicitlySpecifiedArguments) {
     const auto specObj = fromjson(
         "{$currentOp:{idleConnections:false, idleSessions:false, allUsers:true, localOps:true, "
-        "truncateOps:false}}");
+        "truncateOps:false, targetAllNodes:false}}");
 
     const auto parsed =
         DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx());
@@ -171,7 +218,8 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldParseAndSerializeAllExplicitlySpecifie
                                                    {"idleSessions", false},
                                                    {"allUsers", true},
                                                    {"localOps", true},
-                                                   {"truncateOps", false}}}};
+                                                   {"truncateOps", false},
+                                                   {"targetAllNodes", false}}}};
 
     ASSERT_DOCUMENT_EQ(currentOp->serialize().getDocument(), expectedOutput);
 }
@@ -184,7 +232,8 @@ TEST_F(DocumentSourceCurrentOpTest,
                 idleConnections: true,
                 allUsers: false,
                 idleSessions: false,
-                localOps: true
+                localOps: true,
+                targetAllNodes: false
             }
         })");
     auto docSource = DocumentSourceCurrentOp::createFromBson(spec.firstElement(), getExpCtx());
@@ -192,10 +241,11 @@ TEST_F(DocumentSourceCurrentOpTest,
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$currentOp": {
-                "idleConnections": "?",
-                "idleSessions": "?",
-                "allUsers": "?",
-                "localOps": "?"
+                "idleConnections": "?bool",
+                "idleSessions": "?bool",
+                "allUsers": "?bool",
+                "localOps": "?bool",
+                "targetAllNodes": "?bool"
             }
         })",
         redact(*docSource));
@@ -221,9 +271,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldNotSerializeOmittedOptionalArgumentsWi
         DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx());
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$currentOp": {}
-        })",
+        R"({"$currentOp": {}})",
         redact(*docSource));
 }
 

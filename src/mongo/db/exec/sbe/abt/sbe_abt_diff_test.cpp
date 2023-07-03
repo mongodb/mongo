@@ -27,9 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/locker_impl.h"
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
-#include "mongo/unittest/temp_dir.h"
+#include "mongo/db/service_context.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::optimizer {
 namespace {
@@ -77,30 +89,39 @@ static bool compareResults(const std::vector<BSONObj>& expected,
 
 using TestContextFn = std::function<ServiceContext::UniqueOperationContext()>;
 
+static std::vector<BSONObj> fromjson(const std::vector<std::string>& jsonVector) {
+    std::vector<BSONObj> bsonObjs;
+    bsonObjs.reserve(jsonVector.size());
+    for (const std::string& jsonStr : jsonVector) {
+        bsonObjs.push_back(mongo::fromjson(jsonStr));
+    }
+    return bsonObjs;
+}
+
 static bool compareSBEABTAgainstExpected(const TestContextFn& fn,
                                          const std::string& pipelineStr,
-                                         const std::vector<std::string>& jsonVector,
+                                         const std::vector<BSONObj>& inputObjs,
                                          const std::vector<BSONObj>& expected) {
-    const auto& actual = runSBEAST(fn().get(), pipelineStr, jsonVector);
+    const auto& actual = runSBEAST(fn().get(), pipelineStr, inputObjs);
     return compareResults(expected, actual, true /*preserveFieldOrder*/);
 }
 
 static bool comparePipelineAgainstExpected(const TestContextFn& fn,
                                            const std::string& pipelineStr,
-                                           const std::vector<std::string>& jsonVector,
+                                           const std::vector<BSONObj>& inputObjs,
                                            const std::vector<BSONObj>& expected) {
-    const auto& actual = runPipeline(fn().get(), pipelineStr, jsonVector);
+    const auto& actual = runPipeline(fn().get(), pipelineStr, inputObjs);
     return compareResults(expected, actual, true /*preserveFieldOrder*/);
 }
 
 static bool compareSBEABTAgainstPipeline(const TestContextFn& fn,
                                          const std::string& pipelineStr,
-                                         const std::vector<std::string>& jsonVector,
+                                         const std::vector<BSONObj>& inputObjs,
                                          const bool preserveFieldOrder = true) {
-    const auto& pipelineResults = runPipeline(fn().get(), pipelineStr, jsonVector);
-    const auto& sbeResults = runSBEAST(fn().get(), pipelineStr, jsonVector);
+    const auto& pipelineResults = runPipeline(fn().get(), pipelineStr, inputObjs);
+    const auto& sbeResults = runSBEAST(fn().get(), pipelineStr, inputObjs);
 
-    std::cout << "Pipeline: " << pipelineStr << ", input size: " << jsonVector.size() << "\n";
+    std::cout << "Pipeline: " << pipelineStr << ", input size: " << inputObjs.size() << "\n";
     const bool result = compareResults(pipelineResults, sbeResults, preserveFieldOrder);
     if (result) {
         std::cout << "Success. Result count: " << pipelineResults.size() << "\n";
@@ -115,38 +136,6 @@ static bool compareSBEABTAgainstPipeline(const TestContextFn& fn,
     return result;
 }
 
-static std::vector<BSONObj> toResultSet(const std::vector<std::string>& jsonVector) {
-    std::vector<BSONObj> results;
-    for (const std::string& jsonStr : jsonVector) {
-        results.emplace_back(fromjson(jsonStr));
-    }
-    return results;
-}
-
-class TestObserver : public ServiceContext::ClientObserver {
-public:
-    TestObserver() = default;
-    ~TestObserver() = default;
-
-    void onCreateClient(Client* client) final {}
-
-    void onDestroyClient(Client* client) final {}
-
-    void onCreateOperationContext(OperationContext* opCtx) override {
-        opCtx->setLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
-    }
-
-    void onDestroyOperationContext(OperationContext* opCtx) final {}
-};
-
-const ServiceContext::ConstructorActionRegisterer clientObserverRegisterer{
-    "TestObserver",
-    [](ServiceContext* service) {
-        service->registerClientObserver(std::make_unique<TestObserver>());
-    },
-    [](ServiceContext* serviceContext) {
-    }};
-
 TEST_F(NodeSBE, DiffTestBasic) {
     const auto contextFn = [this]() {
         return makeOperationContext();
@@ -154,22 +143,22 @@ TEST_F(NodeSBE, DiffTestBasic) {
     const auto compare = [&contextFn](const std::string& pipelineStr,
                                       const std::vector<std::string>& jsonVector) {
         return compareSBEABTAgainstPipeline(
-            contextFn, pipelineStr, jsonVector, true /*preserveFieldOrder*/);
+            contextFn, pipelineStr, fromjson(jsonVector), true /*preserveFieldOrder*/);
     };
 
     ASSERT_TRUE(compareSBEABTAgainstExpected(
-        contextFn, "[]", {"{a:1, b:2, c:3}"}, toResultSet({"{ a: 1, b: 2, c: 3 }"})));
+        contextFn, "[]", fromjson({"{a:1, b:2, c:3}"}), fromjson({"{ a: 1, b: 2, c: 3 }"})));
     ASSERT_TRUE(compareSBEABTAgainstExpected(contextFn,
                                              "[{$addFields: {c: {$literal: 3}}}]",
-                                             {"{a:1, b:2}"},
-                                             toResultSet({"{ a: 1, b: 2, c: 3 }"})));
+                                             fromjson({"{a:1, b:2}"}),
+                                             fromjson({"{ a: 1, b: 2, c: 3 }"})));
 
     ASSERT_TRUE(comparePipelineAgainstExpected(
-        contextFn, "[]", {"{a:1, b:2, c:3}"}, toResultSet({"{ a: 1, b: 2, c: 3 }"})));
+        contextFn, "[]", fromjson({"{a:1, b:2, c:3}"}), fromjson({"{ a: 1, b: 2, c: 3 }"})));
     ASSERT_TRUE(comparePipelineAgainstExpected(contextFn,
                                                "[{$addFields: {c: {$literal: 3}}}]",
-                                               {"{a:1, b:2}"},
-                                               toResultSet({"{ a: 1, b: 2, c: 3 }"})));
+                                               fromjson({"{a:1, b:2}"}),
+                                               fromjson({"{ a: 1, b: 2, c: 3 }"})));
 
     ASSERT_TRUE(compare("[]", {"{a:1, b:2, c:3}"}));
     ASSERT_TRUE(compare("[{$addFields: {c: {$literal: 3}}}]", {"{a:1, b:2}"}));
@@ -182,14 +171,14 @@ TEST_F(NodeSBE, DiffTest) {
     const auto compare = [&contextFn](const std::string& pipelineStr,
                                       const std::vector<std::string>& jsonVector) {
         return compareSBEABTAgainstPipeline(
-            contextFn, pipelineStr, jsonVector, true /*preserveFieldOrder*/);
+            contextFn, pipelineStr, fromjson(jsonVector), true /*preserveFieldOrder*/);
     };
 
     // Consider checking if compare() works first.
     const auto compareUnordered = [&contextFn](const std::string& pipelineStr,
                                                const std::vector<std::string>& jsonVector) {
         return compareSBEABTAgainstPipeline(
-            contextFn, pipelineStr, jsonVector, false /*preserveFieldOrder*/);
+            contextFn, pipelineStr, fromjson(jsonVector), false /*preserveFieldOrder*/);
     };
 
     ASSERT_TRUE(compare("[]", {}));

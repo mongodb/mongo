@@ -27,28 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/none.hpp>
+#include <mutex>
+#include <utility>
 
-#include "mongo/s/query/cluster_client_cursor_impl.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
-#include <memory>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker_impl_client_observer.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/s/concurrency/locker_mongos_client_observer.h"
+#include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/router_stage_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
-
 namespace {
 
 class ClusterClientCursorImplTest : public ServiceContextTest {
 protected:
     ClusterClientCursorImplTest() {
         auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
         _opCtx = makeOperationContext();
     }
 
@@ -338,5 +347,4 @@ TEST_F(ClusterClientCursorImplTest, ShouldStoreAPIParameters) {
 }
 
 }  // namespace
-
 }  // namespace mongo

@@ -27,14 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <utility>
 
+#include <absl/container/node_hash_set.h>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/shim.h"
-#include "mongo/config.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/util/net/ssl_types.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 namespace {

@@ -1,11 +1,9 @@
-'use strict';
-
 /**
  * agg_lookup.js
  *
  * Runs a $lookup aggregation simultaneously with updates.
  */
-var $config = (function() {
+export const $config = (function() {
     const data = {numDocs: 100};
 
     const states = (function() {

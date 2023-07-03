@@ -30,15 +30,25 @@
 #pragma once
 
 #include <boost/dynamic_bitset.hpp>
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <memory>
 #include <set>
 #include <vector>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 namespace mongo {
 
@@ -57,7 +67,7 @@ public:
     BtreeKeyGenerator(std::vector<const char*> fieldNames,
                       std::vector<BSONElement> fixed,
                       bool isSparse,
-                      KeyString::Version keyStringVersion,
+                      key_string::Version keyStringVersion,
                       Ordering ordering);
 
     /**
@@ -241,9 +251,9 @@ private:
                              const CollatorInterface* collator,
                              const boost::optional<RecordId>& id) const;
 
-    KeyString::Value _buildNullKeyString() const;
+    key_string::Value _buildNullKeyString() const;
 
-    const KeyString::Version _keyStringVersion;
+    const key_string::Version _keyStringVersion;
 
     const bool _isIdIndex;
     const bool _isSparse;
@@ -255,7 +265,7 @@ private:
 
     // These are used by getKeys below.
     const std::vector<const char*> _fieldNames;
-    const KeyString::Value _nullKeyString;  // A full key with all fields null.
+    const key_string::Value _nullKeyString;  // A full key with all fields null.
 
     std::vector<BSONElement> _fixed;
 

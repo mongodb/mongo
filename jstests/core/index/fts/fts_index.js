@@ -141,7 +141,7 @@ assert.commandWorked(coll.createIndex({a: 1, b: "text", c: 1}));
 assert.eq(2, coll.getIndexes().length);
 assert.commandWorked(coll.createIndex({a: 1, b: "text", c: 1}));
 assert.eq(2, coll.getIndexes().length);
-assert.commandWorked(coll.createIndex({a: 1, b: "text", c: 1}, {background: true}));
+assert.commandWorked(coll.createIndex({a: 1, b: "text", c: 1}));
 assert.eq(2, coll.getIndexes().length);
 assert.commandFailedWithCode(coll.createIndex({a: 1, b: 1, c: "text"}),
                              ErrorCodes.CannotCreateIndex);

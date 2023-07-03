@@ -28,20 +28,39 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <cstdint>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/abt/named_slots_mock.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
+#include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::optimizer {
 namespace {
@@ -135,7 +154,7 @@ protected:
 
     // Create bindings (as above) and also create a scan node source.
     ABT createBindings(std::vector<std::pair<std::string, std::string>> bindingList) {
-        return createBindings(bindingList, _node(scanNode("scan0")), "scan0");
+        return createBindings(std::move(bindingList), _node(scanNode("scan0")), "scan0");
     }
 };
 

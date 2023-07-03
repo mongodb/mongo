@@ -57,7 +57,8 @@ public:
      * Defaults to using a namespace of "test.namespace".
      */
     ExpressionContextForTest()
-        : ExpressionContextForTest(NamespaceString{"test"_sd, "namespace"_sd}) {}
+        : ExpressionContextForTest(
+              NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd)) {}
     /**
      * If there is a global ServiceContext available, this constructor will adopt it. Otherwise, it
      * will internally create an owned QueryTestServiceContext. Similarly, if an OperationContext
@@ -109,7 +110,8 @@ public:
      * Defaults to using a namespace of "test.namespace".
      */
     ExpressionContextForTest(OperationContext* opCtx)
-        : ExpressionContextForTest(opCtx, NamespaceString{"test"_sd, "namespace"_sd}) {}
+        : ExpressionContextForTest(
+              opCtx, NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd)) {}
 
     /**
      * Constructor which sets the given OperationContext on the ExpressionContextForTest. This will
@@ -202,15 +204,11 @@ private:
     // In cases when there is a ServiceContext, if there already exists a TimeZoneDatabase
     // associated with the ServiceContext, adopt it. Otherwise, create a new one.
     void _setTimeZoneDatabase() {
-        // In some cases, e.g. the user uses an OperationContextNoop which does _not_ provide a
-        // ServiceContext to create this ExpressionContextForTest, then it shouldn't resolve any
-        // timeZoneDatabase.
-        if (auto* serviceContext = getServiceContext()) {
-            if (!TimeZoneDatabase::get(serviceContext)) {
-                TimeZoneDatabase::set(serviceContext, std::make_unique<TimeZoneDatabase>());
-            }
-            timeZoneDatabase = TimeZoneDatabase::get(serviceContext);
+        auto* serviceContext = getServiceContext();
+        if (!TimeZoneDatabase::get(serviceContext)) {
+            TimeZoneDatabase::set(serviceContext, std::make_unique<TimeZoneDatabase>());
         }
+        timeZoneDatabase = TimeZoneDatabase::get(serviceContext);
     }
 
     stdx::variant<ServiceContext*, std::unique_ptr<QueryTestServiceContext>> _serviceContext;

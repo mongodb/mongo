@@ -86,3 +86,9 @@ class InvalidMatrixSuiteError(ResmokeError):
     """Exception raised when validating a matrix suite mapping file."""
 
     pass
+
+
+class TagFileDoesNotExistError(ResmokeError):
+    """Exception raised when a tag file is passed into resmoke that does not exist."""
+
+    pass

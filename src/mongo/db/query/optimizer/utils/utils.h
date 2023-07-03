@@ -29,12 +29,37 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/query/optimizer/bool_expression.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
+#include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
 #include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/const_fold_interface.h"
 #include "mongo/db/query/optimizer/utils/physical_plan_builder.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/id_generator.h"
+#include "mongo/util/str.h"
 
 
 namespace mongo::optimizer {
@@ -331,7 +356,8 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const PartialSchemaRequirements& reqMap,
                                          const ScanDefinition& scanDef,
                                          const QueryHints& hints,
-                                         const ConstFoldFn& constFold);
+                                         const ConstFoldFn& constFold,
+                                         bool isMultiIndexPlan = false);
 
 /**
  * Computes a set of residual predicates which will be applied on top of a Scan.

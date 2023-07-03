@@ -27,13 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <utility>
 
-#include "mongo/db/query/yield_policy_callbacks_impl.h"
-
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/query/yield_policy_callbacks_impl.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -61,8 +67,8 @@ void YieldPolicyCallbacksImpl::duringYield(OperationContext* opCtx) const {
                 }
             },
             [nss](const BSONObj& config) {
-                StringData ns = config.getStringField("namespace");
-                return ns.empty() || ns == nss.ns();
+                const auto fpNss = NamespaceStringUtil::parseFailPointData(config, "namespace");
+                return fpNss.isEmpty() || fpNss == nss;
             });
     };
     failPointHang(&setYieldAllLocksHang);
@@ -71,8 +77,8 @@ void YieldPolicyCallbacksImpl::duringYield(OperationContext* opCtx) const {
     setYieldAllLocksWait.executeIf(
         [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); },
         [&](const BSONObj& config) {
-            BSONElement dataNs = config["namespace"];
-            return !dataNs || _nss.ns() == dataNs.str();
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(config, "namespace");
+            return fpNss.isEmpty() || _nss == fpNss;
         });
 }
 

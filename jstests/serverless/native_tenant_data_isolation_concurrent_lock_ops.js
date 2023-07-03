@@ -32,7 +32,6 @@ const kOtherTenant = ObjectId();
 const kDbName = 'myDb';
 const kCollName = 'myColl';
 const testDb = primary.getDB(kDbName);
-const testColl = testDb.getCollection(kCollName);
 
 /**
  * Configure a failpoint which will block two threads that will be holding locks and check
@@ -87,8 +86,8 @@ function waitForLock(nss, resource, expectedLockMode) {
             "index": {"keyPattern": {c: 1}, expireAfterSeconds: 100},
             '$tenant': eval(tenantId)
         }));
-        assert.eq(50, res.expireAfterSeconds_old);
-        assert.eq(100, res.expireAfterSeconds_new);
+        assert.eq(50, res.expireAfterSeconds_old, tojson(res));
+        assert.eq(100, res.expireAfterSeconds_new, tojson(res));
     }
 
     assert.commandWorked(testDb.createCollection(kCollName, {'$tenant': kTenant}));
@@ -100,14 +99,14 @@ function waitForLock(nss, resource, expectedLockMode) {
         indexes: [{key: {c: 1}, name: "indexA", expireAfterSeconds: 50}],
         '$tenant': kTenant
     }));
-    assert.eq(2, res.numIndexesAfter);
+    assert.eq(2, res.numIndexesAfter, tojson(res));
 
     res = assert.commandWorked(testDb.runCommand({
         createIndexes: kCollName,
         indexes: [{key: {c: 1}, name: "indexA", expireAfterSeconds: 50}],
         '$tenant': kOtherTenant
     }));
-    assert.eq(2, res.numIndexesAfter);
+    assert.eq(2, res.numIndexesAfter, tojson(res));
 
     checkConcurrentLockDifferentTenant(primary,
                                        kTenant,
@@ -208,7 +207,7 @@ function waitForLock(nss, resource, expectedLockMode) {
             indexes: [{key: {a: 1}, name: "indexA"}, {key: {b: 1}, name: "indexB"}],
             '$tenant': eval(tenantId)
         }));
-        assert.eq(3, res.numIndexesAfter);
+        assert.eq(3, res.numIndexesAfter, tojson(res));
     }
 
     assert.commandWorked(testDb.createCollection(kCollName, {'$tenant': kTenant}));
@@ -240,7 +239,7 @@ function waitForLock(nss, resource, expectedLockMode) {
 
         const validateRes = assert.commandWorked(
             db.getDB(dbName).runCommand({validate: collName, '$tenant': eval(tenantId)}));
-        assert(validateRes.valid);
+        assert(validateRes.valid, tojson(validateRes));
     }
 
     assert.commandWorked(testDb.createCollection(kCollName, {'$tenant': kTenant}));

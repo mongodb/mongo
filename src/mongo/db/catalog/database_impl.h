@@ -29,8 +29,25 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/dbcommands_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -110,7 +127,7 @@ public:
                             NamespaceString toNss,
                             bool stayTemp) const final;
 
-    static Status validateDBName(StringData dbname);
+    static Status validateDBName(const DatabaseName& dbname);
 
     const NamespaceString& getSystemViewsName() const final {
         return _viewsName;

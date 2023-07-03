@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * create_and_drop_collection.js
  *
@@ -7,7 +5,7 @@
  *
  * @tags: [requires_sharding]
  */
-var $config = (function() {
+export const $config = (function() {
     var data = {};
 
     var states = (function() {

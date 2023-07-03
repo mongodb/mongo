@@ -28,24 +28,19 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/assert_util.h"
-
-#ifndef _WIN32
-#include <cxxabi.h>
-#include <sys/file.h>
-#endif
-
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/exception/exception.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 #include <exception>
+#include <ostream>
 
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
-#include "mongo/util/debug_util.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/debugger.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace.h"

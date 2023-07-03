@@ -13,7 +13,7 @@
 #include "../wrappers/connection_wrapper.h"
 #include "../wrappers/item_wrapper.h"
 
-void
+static void
 init_wt_item(WT_ITEM &item)
 {
     item.data = nullptr;
@@ -23,7 +23,7 @@ init_wt_item(WT_ITEM &item)
     item.flags = 0;
 }
 
-int
+static int
 insert_key_value(WT_CURSOR *cursor, const char *key, const char *value)
 {
     item_wrapper item_key(key);
@@ -33,7 +33,7 @@ insert_key_value(WT_CURSOR *cursor, const char *key, const char *value)
     return cursor->insert(cursor);
 }
 
-bool
+static bool
 require_get_key_value(WT_CURSOR *cursor, const char *expected_key, const char *expected_value)
 {
     const char *key = nullptr;
@@ -49,7 +49,7 @@ require_get_key_value(WT_CURSOR *cursor, const char *expected_key, const char *e
     return keys_match && values_match;
 }
 
-bool
+static bool
 check_item(WT_ITEM *item, const char *expected)
 {
     bool match = true;
@@ -62,7 +62,7 @@ check_item(WT_ITEM *item, const char *expected)
     return match;
 }
 
-bool
+static bool
 require_get_raw_key_value(WT_CURSOR *cursor, const char *expected_key, const char *expected_value)
 {
     WT_ITEM item_key;
@@ -81,6 +81,16 @@ require_get_raw_key_value(WT_CURSOR *cursor, const char *expected_key, const cha
     return keys_match && values_match;
 }
 
+static void
+insert_sample_values(WT_CURSOR *cursor)
+{
+    REQUIRE(insert_key_value(cursor, "key1", "value1") == 0);
+    REQUIRE(insert_key_value(cursor, "key2", "value2") == 0);
+    REQUIRE(insert_key_value(cursor, "key3", "value3") == 0);
+    REQUIRE(insert_key_value(cursor, "key4", "value4") == 0);
+    REQUIRE(insert_key_value(cursor, "key5", "value5") == 0);
+}
+
 TEST_CASE("Cursor: get key and value()", "[cursor]")
 {
     ConnectionWrapper conn(DB_HOME);
@@ -95,12 +105,7 @@ TEST_CASE("Cursor: get key and value()", "[cursor]")
     WT_CURSOR *cursor = nullptr;
     REQUIRE(session->open_cursor(session, uri.c_str(), nullptr, nullptr, &cursor) == 0);
 
-    // Insert some values
-    REQUIRE(insert_key_value(cursor, "key1", "value1") == 0);
-    REQUIRE(insert_key_value(cursor, "key2", "value2") == 0);
-    REQUIRE(insert_key_value(cursor, "key3", "value3") == 0);
-    REQUIRE(insert_key_value(cursor, "key4", "value4") == 0);
-    REQUIRE(insert_key_value(cursor, "key5", "value5") == 0);
+    insert_sample_values(cursor);
 
     SECTION("Check the values using get_key() and get_value()")
     {

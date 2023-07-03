@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include <map>
 #include <vector>
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 

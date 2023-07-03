@@ -28,26 +28,38 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <exception>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/exec/delete_stage.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/exec/delete_stage.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/write_stage_common.h"
-#include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/stale_exception.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/future.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
@@ -170,10 +182,9 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     const auto ret = handlePlanStageYield(
         expCtx(),
         "DeleteStage ensureStillMatches",
-        collection()->ns().ns(),
         [&] {
             docStillMatches = write_stage_common::ensureStillMatches(
-                collection(), opCtx(), _ws, id, _params->canonicalQuery);
+                collectionPtr(), opCtx(), _ws, id, _params->canonicalQuery);
             return PlanStage::NEED_TIME;
         },
         [&] {
@@ -202,7 +213,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         auto [immediateReturnStageState, fromMigrate] = _preWriteFilter.checkIfNotWritable(
             member->doc.value(),
             "delete"_sd,
-            collection()->ns(),
+            collectionPtr()->ns(),
             [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
                 planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
                 memberFreer.dismiss();  // Keep this member around so we can retry deleting it.
@@ -226,14 +237,9 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     Snapshotted<Document> memberDoc = member->doc;
     BSONObj bsonObjDoc = memberDoc.value().toBson();
 
-    if (_params->removeSaver) {
-        uassertStatusOK(_params->removeSaver->goingToDelete(bsonObjDoc));
-    }
-
     handlePlanStageYield(
         expCtx(),
         "DeleteStage saveState",
-        collection()->ns().ns(),
         [&] {
             child()->saveState();
             return PlanStage::NEED_TIME /* unused */;
@@ -249,12 +255,11 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
             const auto ret = handlePlanStageYield(
                 expCtx(),
                 "DeleteStage deleteDocument",
-                collection()->ns().ns(),
                 [&] {
                     WriteUnitOfWork wunit(opCtx());
                     collection_internal::deleteDocument(
                         opCtx(),
-                        collection(),
+                        collectionPtr(),
                         Snapshotted(memberDoc.snapshotId(), bsonObjDoc),
                         _params->stmtId,
                         recordId,
@@ -302,35 +307,42 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         member->transitionToOwnedObj();
     }
 
-    // As restoreState may restore (recreate) cursors, cursors are tied to the transaction in
-    // which they are created, and a WriteUnitOfWork is a transaction, make sure to restore the
-    // state outside of the WriteUnitOfWork.
-    const auto restoreStateRet = handlePlanStageYield(
-        expCtx(),
-        "DeleteStage restoreState",
-        collection()->ns().ns(),
-        [&] {
-            child()->restoreState(&collection());
-            return PlanStage::NEED_TIME;
-        },
-        [&] {
-            // yieldHandler
-            // Note we don't need to retry anything in this case since the
-            // delete already was committed. However, we still need to return
-            // the deleted document (if it was requested).
-            if (_params->returnDeleted) {
-                // member->obj should refer to the deleted document.
-                invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
+    // As restoreState may restore (recreate) cursors, cursors are tied to the transaction in which
+    // they are created, and a WriteUnitOfWork is a transaction, make sure to restore the state
+    // outside of the WriteUnitOfWork.
+    //
+    // If this stage is already exhausted it won't use its children stages anymore and therefore
+    // there's no need to restore them. Avoid restoring them so that there's no possibility of
+    // requiring yielding at this point. Restoring from yield could fail due to a sharding placement
+    // change. Throwing a StaleConfig error is undesirable after a "delete one" operation has
+    // already performed a write because the router would retry.
+    if (!isEOF()) {
+        const auto restoreStateRet = handlePlanStageYield(
+            expCtx(),
+            "DeleteStage restoreState",
+            [&] {
+                child()->restoreState(&collectionPtr());
+                return PlanStage::NEED_TIME;
+            },
+            [&] {
+                // yieldHandler
+                // Note we don't need to retry anything in this case since the delete already was
+                // committed. However, we still need to return the deleted document (if it was
+                // requested).
+                if (_params->returnDeleted) {
+                    // member->obj should refer to the deleted document.
+                    invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
 
-                _idReturning = id;
-                // Keep this member around so that we can return it on
-                // the next work() call.
-                memberFreer.dismiss();
-            }
-            *out = WorkingSet::INVALID_ID;
-        });
-    if (restoreStateRet != PlanStage::NEED_TIME) {
-        return ret;
+                    _idReturning = id;
+                    // Keep this member around so that we can return it on
+                    // the next work() call.
+                    memberFreer.dismiss();
+                }
+                *out = WorkingSet::INVALID_ID;
+            });
+        if (restoreStateRet != PlanStage::NEED_TIME) {
+            return ret;
+        }
     }
 
     if (_params->returnDeleted) {
@@ -342,16 +354,24 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         return PlanStage::ADVANCED;
     }
 
-    return PlanStage::NEED_TIME;
+    return isEOF() ? PlanStage::IS_EOF : PlanStage::NEED_TIME;
 }
 
 void DeleteStage::doRestoreStateRequiresCollection() {
-    const NamespaceString& ns = collection()->ns();
+    const NamespaceString& ns = collectionPtr()->ns();
     uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Demoted from primary while removing from "
                           << ns.toStringForErrorMsg(),
             !opCtx()->writesAreReplicated() ||
                 repl::ReplicationCoordinator::get(opCtx())->canAcceptWritesFor(opCtx(), ns));
+
+    // Single deletes never yield after having already deleted one document. Otherwise restore could
+    // fail (e.g. due to a sharding placement change) and we'd fail to report in the response the
+    // already deleted documents.
+    const bool singleDeleteAndAlreadyDeleted = !_params->isMulti && _specificStats.docsDeleted > 0;
+    tassert(7711600,
+            "Single delete should never restore after having already deleted one document.",
+            !singleDeleteAndAlreadyDeleted || _params->isExplain);
 
     _preWriteFilter.restoreState();
 }

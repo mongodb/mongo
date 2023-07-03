@@ -27,19 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_internal_apply_oplog_update.h"
 #include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {
@@ -254,7 +260,7 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, RedactsCorrectly) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$_internalApplyOplogUpdate": {
-                "oplogUpdate": "?"
+                "oplogUpdate":"?object"
             }
         })",
         redact(*docSource));

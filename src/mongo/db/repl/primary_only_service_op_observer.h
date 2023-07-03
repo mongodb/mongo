@@ -29,7 +29,18 @@
 
 #pragma once
 
+#include <cstdint>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {
@@ -47,9 +58,15 @@ public:
     explicit PrimaryOnlyServiceOpObserver(ServiceContext* serviceContext);
     ~PrimaryOnlyServiceOpObserver();
 
+    NamespaceFilters getNamespaceFilters() const final {
+        return {/*update=*/NamespaceFilter::kNone, /*delete=*/NamespaceFilter::kAll};
+    }
+
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
-                       const BSONObj& doc) final;
+                       const BSONObj& doc,
+                       OplogDeleteEntryArgs* args,
+                       OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,

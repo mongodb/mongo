@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"

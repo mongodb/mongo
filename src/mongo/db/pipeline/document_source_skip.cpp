@@ -27,17 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <iterator>
+#include <limits>
+#include <list>
 
-#include "mongo/db/pipeline/document_source_skip.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -73,7 +78,7 @@ DocumentSource::GetNextResult DocumentSourceSkip::doGetNext() {
 }
 
 Value DocumentSourceSkip::serialize(SerializationOptions opts) const {
-    return Value(DOC(getSourceName() << opts.serializeLiteralValue(_nToSkip)));
+    return Value(DOC(getSourceName() << opts.serializeLiteral(_nToSkip)));
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSkip::optimize() {

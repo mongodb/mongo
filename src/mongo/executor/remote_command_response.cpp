@@ -27,16 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/executor/remote_command_response.h"
-
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/reply_interface.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 namespace executor {

@@ -31,7 +31,19 @@
 
 #include <boost/log/attributes/value_extraction.hpp>
 #include <boost/log/utility/formatting_ostream.hpp>
+#include <fmt/format.h>
+#include <functional>
+#include <string>
+#include <variant>
 
+#include <boost/cstdint.hpp>
+#include <boost/exception/exception.hpp>
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
+#include <boost/log/utility/value_ref.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/attribute_storage.h"
@@ -40,9 +52,9 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
-
-#include <fmt/format.h>
 
 namespace mongo::logv2 {
 
@@ -56,22 +68,28 @@ struct BSONValueExtractor {
     }
 
     void operator()(StringData name, CustomAttributeValue const& val) {
-        // Try to format as BSON first if available. Prefer BSONAppend if available as we might only
-        // want the value and not the whole element.
-        if (val.BSONAppend) {
-            val.BSONAppend(_builder, name);
-        } else if (val.BSONSerialize) {
-            BSONObjBuilder subObjBuilder = _builder.subobjStart(name);
-            val.BSONSerialize(subObjBuilder);
-            subObjBuilder.done();
-        } else if (val.toBSONArray) {
-            _builder.append(name, val.toBSONArray());
-        } else if (val.stringSerialize) {
-            fmt::memory_buffer buffer;
-            val.stringSerialize(buffer);
-            _builder.append(name, fmt::to_string(buffer));
-        } else {
-            _builder.append(name, val.toString());
+        try {
+            // Try to format as BSON first if available. Prefer BSONAppend if available as we might
+            // only want the value and not the whole element.
+            if (val.BSONAppend) {
+                val.BSONAppend(_builder, name);
+            } else if (val.BSONSerialize) {
+                BSONObjBuilder subObjBuilder = _builder.subobjStart(name);
+                val.BSONSerialize(subObjBuilder);
+                subObjBuilder.done();
+            } else if (val.toBSONArray) {
+                _builder.append(name, val.toBSONArray());
+            } else if (val.stringSerialize) {
+                fmt::memory_buffer buffer;
+                val.stringSerialize(buffer);
+                _builder.append(name, fmt::to_string(buffer));
+            } else {
+                _builder.append(name, val.toString());
+            }
+        } catch (...) {
+            Status s = exceptionToStatus();
+            _builder.append(name,
+                            std::string("Failed to serialize due to exception") + s.toString());
         }
     }
 

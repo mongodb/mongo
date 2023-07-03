@@ -29,16 +29,31 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <queue>
+#include <thread>
 
 #include "mongo/db/concurrency/fast_map_noalloc.h"
+#include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/ticketholder_manager.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

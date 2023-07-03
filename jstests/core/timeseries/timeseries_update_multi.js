@@ -6,9 +6,9 @@
  *   requires_multi_updates,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   requires_non_retryable_writes,
  *   featureFlagTimeseriesUpdatesSupport,
- *   # TODO (SERVER-73454): Re-enable the tests.
- *   __TEMPORARILY_DISABLED__,
+ *   featureFlagLargeBatchedOperations,
  * ]
  */
 
@@ -125,7 +125,8 @@ const doc_id_7_no_meta_int_metric = {
 const doc_id_8_array_meta = {
     _id: 8,
     [timeFieldName]: dateTime,
-    [metaFieldName]: [1, 2, 3, 4]
+    [metaFieldName]: [1, 2, 3, 4],
+    f: [4, 3, 2, 1],
 };
 
 /**
@@ -185,32 +186,35 @@ const doc_id_8_array_meta = {
 })();
 
 // Query on the metaField and modify the timeField.
-(function testMetaFieldQueryTimeFieldUpdate() {
-    testUpdate({
-        initialDocList:
-            [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric, doc_id_5_a_c_array_metric],
-        updateList: [{
-            q: {[metaFieldName]: {a: "A", b: "B"}},
-            u: {$set: {[timeFieldName]: dateTimeUpdated}},
-            multi: true,
-        }],
-        resultDocList: [
-            {
-                _id: 1,
-                [timeFieldName]: dateTimeUpdated,
-                [metaFieldName]: {a: "A", b: "B"},
-            },
-            {
-                _id: 2,
-                [timeFieldName]: dateTimeUpdated,
-                [metaFieldName]: {a: "A", b: "B"},
-                f: [{"k": "K", "v": "V"}],
-            },
-            doc_id_5_a_c_array_metric
-        ],
-        nMatched: 2,
-    });
-})();
+// Skip tests changing the shard key value in sharding.
+if (!db.getMongo().isMongos()) {
+    (function testMetaFieldQueryTimeFieldUpdate() {
+        testUpdate({
+            initialDocList:
+                [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric, doc_id_5_a_c_array_metric],
+            updateList: [{
+                q: {[metaFieldName]: {a: "A", b: "B"}},
+                u: {$set: {[timeFieldName]: dateTimeUpdated}},
+                multi: true,
+            }],
+            resultDocList: [
+                {
+                    _id: 1,
+                    [timeFieldName]: dateTimeUpdated,
+                    [metaFieldName]: {a: "A", b: "B"},
+                },
+                {
+                    _id: 2,
+                    [timeFieldName]: dateTimeUpdated,
+                    [metaFieldName]: {a: "A", b: "B"},
+                    f: [{"k": "K", "v": "V"}],
+                },
+                doc_id_5_a_c_array_metric
+            ],
+            nMatched: 2,
+        });
+    })();
+}
 
 // Query on the metaField and a metric field.
 (function testMetaFieldQueryMetricFieldMetric() {
@@ -262,40 +266,46 @@ const doc_id_8_array_meta = {
 })();
 
 // This command will fail because all time-series collections require a time field.
-(function testRemoveTimeField() {
-    testUpdate({
-        initialDocList: [doc_id_3_a_b_string_metric, doc_id_5_a_c_array_metric],
-        updateList: [{
-            q: {f: "F"},
-            u: {$unset: {[timeFieldName]: ""}},
-            multi: true,
-        }],
-        resultDocList: [
-            doc_id_3_a_b_string_metric,
-            doc_id_5_a_c_array_metric,
-        ],
-        nMatched: 0,
-        failCode: ErrorCodes.BadValue,
-    });
-})();
+// Skip tests changing the shard key value in sharding.
+if (!db.getMongo().isMongos()) {
+    (function testRemoveTimeField() {
+        testUpdate({
+            initialDocList: [doc_id_3_a_b_string_metric, doc_id_5_a_c_array_metric],
+            updateList: [{
+                q: {f: "F"},
+                u: {$unset: {[timeFieldName]: ""}},
+                multi: true,
+            }],
+            resultDocList: [
+                doc_id_3_a_b_string_metric,
+                doc_id_5_a_c_array_metric,
+            ],
+            nMatched: 0,
+            failCode: ErrorCodes.BadValue,
+        });
+    })();
+}
 
 // This command will fail because the time field must be a timestamp.
-(function testChangeTimeFieldType() {
-    testUpdate({
-        initialDocList: [doc_id_3_a_b_string_metric, doc_id_5_a_c_array_metric],
-        updateList: [{
-            q: {f: "F"},
-            u: {$set: {[timeFieldName]: "hello"}},
-            multi: true,
-        }],
-        resultDocList: [
-            doc_id_3_a_b_string_metric,
-            doc_id_5_a_c_array_metric,
-        ],
-        nMatched: 0,
-        failCode: ErrorCodes.BadValue,
-    });
-})();
+// Skip tests changing the shard key value in sharding.
+if (!db.getMongo().isMongos()) {
+    (function testChangeTimeFieldType() {
+        testUpdate({
+            initialDocList: [doc_id_3_a_b_string_metric, doc_id_5_a_c_array_metric],
+            updateList: [{
+                q: {f: "F"},
+                u: {$set: {[timeFieldName]: "hello"}},
+                multi: true,
+            }],
+            resultDocList: [
+                doc_id_3_a_b_string_metric,
+                doc_id_5_a_c_array_metric,
+            ],
+            nMatched: 0,
+            failCode: ErrorCodes.BadValue,
+        });
+    })();
+}
 
 // Query on the time field and remove the metaField.
 (function testTimeFieldQueryRemoveMetaField() {
@@ -454,6 +464,7 @@ const doc_id_8_array_meta = {
     });
 })();
 
+// Update a metric field with a positional operator.
 (function testArrayModifier() {
     testUpdate({
         initialDocList:
@@ -482,19 +493,65 @@ const doc_id_8_array_meta = {
     });
 })();
 
+// Update the meta field with a positional operator.
 (function testMetaFieldArrayModifier() {
     testUpdate({
         initialDocList: [doc_id_8_array_meta, doc_id_2_a_b_array_metric],
         updateList: [{
             q: {[metaFieldName]: {$gt: 2}},
-            u: {$set: {[metaFieldName + '.$']: 20}},
+            u: {$set: {[metaFieldName + '.$']: 20, f: 10}},
             multi: true,
         }],
         resultDocList: [
-            {_id: 8, [timeFieldName]: dateTime, [metaFieldName]: [1, 2, 20, 4]},
+            {_id: 8, [timeFieldName]: dateTime, [metaFieldName]: [1, 2, 20, 4], f: 10},
             doc_id_2_a_b_array_metric
         ],
         nMatched: 1,
+    });
+})();
+
+// Update meta and metric fields with a positional operator.
+(function testMetaAndMetricFieldArrayModifier() {
+    testUpdate({
+        initialDocList: [doc_id_8_array_meta, doc_id_2_a_b_array_metric],
+        updateList: [{
+            q: {[metaFieldName]: {$gt: 2}, f: {$gt: 2}},
+            u: {$set: {[metaFieldName + '.$']: 20, 'f.$': 10}},
+            multi: true,
+        }],
+        resultDocList: [
+            {_id: 8, [timeFieldName]: dateTime, [metaFieldName]: [20, 2, 3, 4], f: [10, 3, 2, 1]},
+            doc_id_2_a_b_array_metric
+        ],
+        nMatched: 1,
+    });
+})();
+
+// Empty query and update a metric field using a positional operator.
+(function testArrayModifierNoFilter() {
+    testUpdate({
+        initialDocList: [doc_id_3_a_b_string_metric, doc_id_5_a_c_array_metric],
+        updateList: [{
+            q: {},
+            u: {$set: {'f.$': 20}},
+            multi: true,
+        }],
+        resultDocList: [doc_id_3_a_b_string_metric, doc_id_5_a_c_array_metric],
+        failCode: ErrorCodes.BadValue,
+    });
+})();
+
+// Query on the meta field and update a metric field using a positional operator.
+(function testArrayModifierMetaFilter() {
+    testUpdate({
+        initialDocList: [doc_id_3_a_b_string_metric, doc_id_5_a_c_array_metric],
+        updateList: [{
+            q: {[metaFieldName]: {a: "A", c: "C"}},
+            u: {$set: {'f.$': 20}},
+            multi: true,
+        }],
+        resultDocList: [doc_id_3_a_b_string_metric, doc_id_5_a_c_array_metric],
+        failCode: ErrorCodes.BadValue,
     });
 })();
 
@@ -685,176 +742,178 @@ const doc_id_8_array_meta = {
  * Tests upsert with multi:true.
  */
 // Run an upsert that doesn't include an _id.
-(function testUpsertWithNoId() {
-    testUpdate({
-        initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
-        updateList: [{
-            q: {[metaFieldName]: {z: "Z"}},
-            u: {$set: {[timeFieldName]: dateTime}},
-            upsert: true,
-            multi: true,
-        }],
-        resultDocList: [
-            doc_id_1_a_b_no_metrics,
-            doc_id_2_a_b_array_metric,
-        ],
-        upsertedDoc: {[metaFieldName]: {z: "Z"}, [timeFieldName]: dateTime},
-    });
-})();
+// Skip upsert tests in sharding as the query has to be on the shard key field.
+if (!db.getMongo().isMongos()) {
+    (function testUpsertWithNoId() {
+        testUpdate({
+            initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
+            updateList: [{
+                q: {[metaFieldName]: {z: "Z"}},
+                u: {$set: {[timeFieldName]: dateTime}},
+                upsert: true,
+                multi: true,
+            }],
+            resultDocList: [
+                doc_id_1_a_b_no_metrics,
+                doc_id_2_a_b_array_metric,
+            ],
+            upsertedDoc: {[metaFieldName]: {z: "Z"}, [timeFieldName]: dateTime},
+        });
+    })();
+    // Run an upsert that includes an _id.
+    (function testUpsertWithId() {
+        testUpdate({
+            initialDocList: [doc_id_1_a_b_no_metrics],
+            updateList: [{
+                q: {_id: 100},
+                u: {$set: {[timeFieldName]: dateTime}},
+                upsert: true,
+                multi: true,
+            }],
+            resultDocList: [
+                doc_id_1_a_b_no_metrics,
+            ],
+            upsertedDoc: {_id: 100, [timeFieldName]: dateTime},
+        });
+    })();
 
-// Run an upsert that includes an _id.
-(function testUpsertWithId() {
-    testUpdate({
-        initialDocList: [doc_id_1_a_b_no_metrics],
-        updateList: [{
-            q: {_id: 100},
-            u: {$set: {[timeFieldName]: dateTime}},
-            upsert: true,
-            multi: true,
-        }],
-        resultDocList: [
-            doc_id_1_a_b_no_metrics,
-        ],
-        upsertedDoc: {_id: 100, [timeFieldName]: dateTime},
-    });
-})();
+    // Run an upsert that updates documents and skips the upsert.
+    (function testUpsertUpdatesDocs() {
+        testUpdate({
+            initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
+            updateList: [{
+                q: {[metaFieldName + ".a"]: "A"},
+                u: {$set: {f: 10}},
+                upsert: true,
+                multi: true,
+            }],
+            resultDocList: [
+                {
+                    _id: 1,
+                    [timeFieldName]: dateTime,
+                    [metaFieldName]: {a: "A", b: "B"},
+                    f: 10,
+                },
+                {
+                    _id: 2,
+                    [timeFieldName]: dateTime,
+                    [metaFieldName]: {a: "A", b: "B"},
+                    f: 10,
+                }
+            ],
+            nMatched: 2,
+        });
+    })();
 
-// Run an upsert that updates documents and skips the upsert.
-(function testUpsertUpdatesDocs() {
-    testUpdate({
-        initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
-        updateList: [{
-            q: {[metaFieldName + ".a"]: "A"},
-            u: {$set: {f: 10}},
-            upsert: true,
-            multi: true,
-        }],
-        resultDocList: [
-            {
-                _id: 1,
-                [timeFieldName]: dateTime,
-                [metaFieldName]: {a: "A", b: "B"},
+    // Run an upsert that matches documents with no-op updates and skips the upsert.
+    (function testUpsertMatchesDocs() {
+        testUpdate({
+            initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
+            updateList: [{
+                q: {[metaFieldName + ".a"]: "A"},
+                u: {$set: {[timeFieldName]: dateTime}},
+                upsert: true,
+                multi: true,
+            }],
+            resultDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
+            nMatched: 2,
+            nModified: 0,
+        });
+    })();
+
+    // Run an upsert that matches a bucket but no documents in it, and inserts the document into a
+    // bucket with the same parameters.
+    (function testUpsertIntoMatchedBucket() {
+        testUpdate({
+            initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
+            updateList: [{
+                q: {[metaFieldName]: {a: "A", b: "B"}, f: 111},
+                u: {$set: {[timeFieldName]: dateTime}},
+                upsert: true,
+                multi: true,
+            }],
+            upsertedDoc: {[metaFieldName]: {a: "A", b: "B"}, [timeFieldName]: dateTime, f: 111},
+            resultDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
+        });
+    })();
+
+    // Run an upsert that doesn't insert a time field.
+    (function testUpsertNoTimeField() {
+        testUpdate({
+            initialDocList: [doc_id_1_a_b_no_metrics],
+            updateList: [{
+                q: {[metaFieldName]: {z: "Z"}},
+                u: {$set: {f: 10}},
+                upsert: true,
+                multi: true,
+            }],
+            resultDocList: [
+                doc_id_1_a_b_no_metrics,
+            ],
+            failCode: ErrorCodes.BadValue,
+        });
+    })();
+
+    // Run an upsert where the time field is provided in the query.
+    (function testUpsertQueryOnTimeField() {
+        testUpdate({
+            initialDocList: [doc_id_1_a_b_no_metrics],
+            updateList: [{
+                q: {[timeFieldName]: dateTimeUpdated},
+                u: {$set: {f: 10}},
+                upsert: true,
+                multi: true,
+            }],
+            upsertedDoc: {
+                [timeFieldName]: dateTimeUpdated,
                 f: 10,
             },
-            {
-                _id: 2,
+            resultDocList: [
+                doc_id_1_a_b_no_metrics,
+            ],
+        });
+    })();
+
+    // Run an upsert where a document to insert is supplied by the request.
+    (function testUpsertSupplyDoc() {
+        testUpdate({
+            initialDocList: [doc_id_1_a_b_no_metrics],
+            updateList: [{
+                q: {[timeFieldName]: dateTimeUpdated},
+                u: [{$set: {f: 10}}],
+                upsert: true,
+                multi: true,
+                upsertSupplied: true,
+                c: {new: {[timeFieldName]: dateTime, f: 100}}
+            }],
+            upsertedDoc: {
                 [timeFieldName]: dateTime,
-                [metaFieldName]: {a: "A", b: "B"},
-                f: 10,
-            }
-        ],
-        nMatched: 2,
-    });
-})();
+                f: 100,
+            },
+            resultDocList: [
+                doc_id_1_a_b_no_metrics,
+            ],
+        });
+    })();
 
-// Run an upsert that matches documents with no-op updates and skips the upsert.
-(function testUpsertMatchesDocs() {
-    testUpdate({
-        initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
-        updateList: [{
-            q: {[metaFieldName + ".a"]: "A"},
-            u: {$set: {[timeFieldName]: dateTime}},
-            upsert: true,
-            multi: true,
-        }],
-        resultDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
-        nMatched: 2,
-        nModified: 0,
-    });
-})();
-
-// Run an upsert that matches a bucket but no documents in it, and inserts the document into a
-// bucket with the same parameters.
-(function testUpsertIntoMatchedBucket() {
-    testUpdate({
-        initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
-        updateList: [{
-            q: {[metaFieldName]: {a: "A", b: "B"}, f: 111},
-            u: {$set: {[timeFieldName]: dateTime}},
-            upsert: true,
-            multi: true,
-        }],
-        upsertedDoc: {[metaFieldName]: {a: "A", b: "B"}, [timeFieldName]: dateTime, f: 111},
-        resultDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
-    });
-})();
-
-// Run an upsert that doesn't insert a time field.
-(function testUpsertNoTimeField() {
-    testUpdate({
-        initialDocList: [doc_id_1_a_b_no_metrics],
-        updateList: [{
-            q: {[metaFieldName]: {z: "Z"}},
-            u: {$set: {f: 10}},
-            upsert: true,
-            multi: true,
-        }],
-        resultDocList: [
-            doc_id_1_a_b_no_metrics,
-        ],
-        failCode: ErrorCodes.BadValue,
-    });
-})();
-
-// Run an upsert where the time field is provided in the query.
-(function testUpsertQueryOnTimeField() {
-    testUpdate({
-        initialDocList: [doc_id_1_a_b_no_metrics],
-        updateList: [{
-            q: {[timeFieldName]: dateTimeUpdated},
-            u: {$set: {f: 10}},
-            upsert: true,
-            multi: true,
-        }],
-        upsertedDoc: {
-            [timeFieldName]: dateTimeUpdated,
-            f: 10,
-        },
-        resultDocList: [
-            doc_id_1_a_b_no_metrics,
-        ],
-    });
-})();
-
-// Run an upsert where a document to insert is supplied by the request.
-(function testUpsertSupplyDoc() {
-    testUpdate({
-        initialDocList: [doc_id_1_a_b_no_metrics],
-        updateList: [{
-            q: {[timeFieldName]: dateTimeUpdated},
-            u: [{$set: {f: 10}}],
-            upsert: true,
-            multi: true,
-            upsertSupplied: true,
-            c: {new: {[timeFieldName]: dateTime, f: 100}}
-        }],
-        upsertedDoc: {
-            [timeFieldName]: dateTime,
-            f: 100,
-        },
-        resultDocList: [
-            doc_id_1_a_b_no_metrics,
-        ],
-    });
-})();
-
-// Run an upsert where a document to insert is supplied by the request and does not have a time
-// field.
-(function testUpsertSupplyDocNoTimeField() {
-    testUpdate({
-        initialDocList: [doc_id_1_a_b_no_metrics],
-        updateList: [{
-            q: {[timeFieldName]: dateTimeUpdated},
-            u: [{$set: {f: 10}}],
-            upsert: true,
-            multi: true,
-            upsertSupplied: true,
-            c: {new: {[metaFieldName]: {a: "A"}, f: 100}}
-        }],
-        resultDocList: [
-            doc_id_1_a_b_no_metrics,
-        ],
-        failCode: ErrorCodes.BadValue,
-    });
-})();
+    // Run an upsert where a document to insert is supplied by the request and does not have a time
+    // field.
+    (function testUpsertSupplyDocNoTimeField() {
+        testUpdate({
+            initialDocList: [doc_id_1_a_b_no_metrics],
+            updateList: [{
+                q: {[timeFieldName]: dateTimeUpdated},
+                u: [{$set: {f: 10}}],
+                upsert: true,
+                multi: true,
+                upsertSupplied: true,
+                c: {new: {[metaFieldName]: {a: "A"}, f: 100}}
+            }],
+            resultDocList: [
+                doc_id_1_a_b_no_metrics,
+            ],
+            failCode: ErrorCodes.BadValue,
+        });
+    })();
+}
 })();

@@ -30,32 +30,84 @@
 
 #include "mongo/db/s/drop_database_coordinator.h"
 
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/smart_ptr.hpp>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/api_parameters.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/cluster_transaction_api.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/ddl_lock_manager.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/shard_metadata_util.h"
+#include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_database.h"
+#include "mongo/db/s/type_shard_database_gen.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/write_concern.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/async_rpc.h"
+#include "mongo/executor/async_rpc_util.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/database_version_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_database_cache_updates_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/pcre_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -190,7 +242,7 @@ bool isDbAlreadyDropped(OperationContext* opCtx,
 BSONObj getReasonForDropCollection(const NamespaceString& nss) {
     return BSON("command"
                 << "dropCollection fromDropDatabase"
-                << "nss" << nss.ns());
+                << "nss" << NamespaceStringUtil::serialize(nss));
 }
 
 }  // namespace
@@ -198,30 +250,28 @@ BSONObj getReasonForDropCollection(const NamespaceString& nss) {
 void DropDatabaseCoordinator::_dropShardedCollection(
     OperationContext* opCtx,
     const CollectionType& coll,
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
     const auto& nss = coll.getNss();
 
-    // Acquire the collection distributed lock in order to synchronize with an eventual ongoing
-    // moveChunk and to prevent new ones from happening.
+    // Acquire the collection DDL lock in order to synchronize with other DDL operations that
+    // didn't take the DB DDL lock
     const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
-    auto collDDLLock = DDLLockManager::get(opCtx)->lock(
-        opCtx, nss.ns(), coorName, DDLLockManager::kDefaultLockTimeout);
+    const DDLLockManager::ScopedCollectionDDLLock collDDLLock{
+        opCtx, nss, coorName, MODE_X, DDLLockManager::kDefaultLockTimeout};
 
     if (!_isPre70Compatible()) {
         ShardsvrParticipantBlock blockCRUDOperationsRequest(nss);
         blockCRUDOperationsRequest.setBlockType(
             mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
         blockCRUDOperationsRequest.setReason(getReasonForDropCollection(nss));
-        blockCRUDOperationsRequest.setAllowViews(true);
-        const auto cmdObj =
-            CommandHelpers::appendMajorityWriteConcern(blockCRUDOperationsRequest.toBSON({}))
-                .addFields(getNewSession(opCtx).toBSON());
+        async_rpc::GenericArgs args;
+        async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+        async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
+        auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
+            blockCRUDOperationsRequest, **executor, token, args);
         sharding_ddl_util::sendAuthenticatedCommandToShards(
-            opCtx,
-            nss.db().toString(),
-            cmdObj,
-            Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
-            **executor);
+            opCtx, opts, Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx));
     }
 
     // This always runs in the shard role so should use a cluster transaction to guarantee
@@ -260,17 +310,13 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss);
         unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
         unblockCRUDOperationsRequest.setReason(getReasonForDropCollection(nss));
-        unblockCRUDOperationsRequest.setAllowViews(true);
-
-        const auto cmdObj =
-            CommandHelpers::appendMajorityWriteConcern(unblockCRUDOperationsRequest.toBSON({}))
-                .addFields(getNewSession(opCtx).toBSON());
+        async_rpc::GenericArgs args;
+        async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+        async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
+        auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
+            unblockCRUDOperationsRequest, **executor, token, args);
         sharding_ddl_util::sendAuthenticatedCommandToShards(
-            opCtx,
-            nss.db().toString(),
-            cmdObj,
-            Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
-            **executor);
+            opCtx, opts, Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx));
     }
 }
 
@@ -306,7 +352,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(
             Phase::kDrop,
-            [this, executor = executor, anchor = shared_from_this()] {
+            [this, token, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -353,7 +399,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                                 2,
                                 "Completing collection drop from previous primary",
                                 logAttrs(coll.getNss()));
-                    _dropShardedCollection(opCtx, coll, executor);
+                    _dropShardedCollection(opCtx, coll, executor, token);
                 }
 
                 for (const auto& coll : allCollectionsForDb) {
@@ -367,7 +413,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     newStateDoc.setCollInfo(coll);
                     _updateStateDocument(opCtx, std::move(newStateDoc));
 
-                    _dropShardedCollection(opCtx, coll, executor);
+                    _dropShardedCollection(opCtx, coll, executor, token);
                 }
 
                 // First of all, we will get all namespaces that still have zones associated to
@@ -443,15 +489,19 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     participants.erase(
                         std::remove(participants.begin(), participants.end(), primaryShardId),
                         participants.end());
+
+                    async_rpc::GenericArgs args;
+                    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+                    async_rpc::AsyncRPCCommandHelpers::appendDbVersionIfPresent(
+                        args, *metadata().getDatabaseVersion());
                     // Drop DB on all other shards, attaching the dbVersion to the request to ensure
                     // idempotency.
+                    auto opts = std::make_shared<
+                        async_rpc::AsyncRPCOptions<ShardsvrDropDatabaseParticipant>>(
+                        dropDatabaseParticipantCmd, **executor, token, args);
                     try {
                         sharding_ddl_util::sendAuthenticatedCommandToShards(
-                            opCtx,
-                            _dbName,
-                            appendDbVersionIfPresent(cmdObj, *metadata().getDatabaseVersion()),
-                            participants,
-                            **executor);
+                            opCtx, opts, participants);
                     } catch (ExceptionFor<ErrorCodes::StaleDbVersion>&) {
                         // The DB metadata could have been removed by a network-partitioned former
                         // primary
@@ -483,7 +533,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     /* throwIfReasonDiffers */ false);
             }
         })
-        .then([this, executor = executor, anchor = shared_from_this()] {
+        .then([this, token, executor = executor, anchor = shared_from_this()] {
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
@@ -497,16 +547,15 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 FlushDatabaseCacheUpdatesWithWriteConcern flushDbCacheUpdatesCmd(
                     _dbName.toString());
                 flushDbCacheUpdatesCmd.setSyncFromConfig(true);
-                flushDbCacheUpdatesCmd.setDbName(
-                    DatabaseNameUtil::deserialize(boost::none, _dbName));
+                flushDbCacheUpdatesCmd.setDbName(DatabaseName::kAdmin);
+                async_rpc::GenericArgs args;
+                async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
 
                 IgnoreAPIParametersBlock ignoreApiParametersBlock{opCtx};
-                sharding_ddl_util::sendAuthenticatedCommandToShards(
-                    opCtx,
-                    "admin",
-                    CommandHelpers::appendMajorityWriteConcern(flushDbCacheUpdatesCmd.toBSON({})),
-                    participants,
-                    **executor);
+                auto opts = std::make_shared<
+                    async_rpc::AsyncRPCOptions<FlushDatabaseCacheUpdatesWithWriteConcern>>(
+                    flushDbCacheUpdatesCmd, **executor, token, args);
+                sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
             }
 
             ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase", _dbName);

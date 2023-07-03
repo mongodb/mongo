@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * agg_merge_when_not_matched_insert.js
  *
@@ -13,10 +11,12 @@
  *  incompatible_with_gcov,
  *]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');                 // for extendWorkload
-load('jstests/concurrency/fsm_workloads/agg_with_chunk_migrations.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/agg_with_chunk_migrations.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Set the collection to run concurrent moveChunk operations as the output collection.
     $config.data.collWithMigrations = "agg_merge_when_not_matched_insert";
     $config.data.threadRunCount = 0;

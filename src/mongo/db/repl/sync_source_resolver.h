@@ -29,18 +29,24 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <functional>
 #include <memory>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 

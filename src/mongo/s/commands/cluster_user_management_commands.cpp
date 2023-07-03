@@ -28,25 +28,42 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <fmt/format.h>
+#include <iosfwd>
+#include <memory>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/config.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/user_management_commands_parser.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/user_management_commands_common.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/write_concern_error_detail.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
@@ -139,7 +156,7 @@ public:
             auto status = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
                 opCtx,
                 Request::kCommandName,
-                cmd.getDbName().db(),
+                DatabaseNameUtil::serialize(cmd.getDbName()),
                 applyReadWriteConcern(
                     opCtx,
                     this,

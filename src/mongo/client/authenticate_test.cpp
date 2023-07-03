@@ -27,16 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <queue>
+#include <utility>
 
-#include "mongo/bson/util/bson_extract.h"
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/client/authenticate.h"
-#include "mongo/config.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/base64.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/md5.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/password_digest.h"

@@ -30,7 +30,7 @@
 #include <memory>
 #include <vector>
 
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/grpc/mock_client_context.h"
@@ -45,7 +45,7 @@
 
 namespace mongo::transport::grpc {
 
-class MockStubTest : public LockerNoopServiceContextTest {
+class MockStubTest : public ServiceContextTest {
 public:
     void setUp() override {
         _fixtures = std::make_unique<MockStubTestFixtures>();

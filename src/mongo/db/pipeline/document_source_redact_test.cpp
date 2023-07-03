@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -37,7 +39,8 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_redact.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

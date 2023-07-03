@@ -29,8 +29,13 @@
 
 #pragma once
 
+#include <cstdint>
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

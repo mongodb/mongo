@@ -29,6 +29,8 @@
 
 #include "mongo/util/thread_safety_context.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 

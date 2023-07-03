@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * findAndModify_update_queue.js
  *
@@ -11,13 +9,13 @@
  * This workload was designed to reproduce an issue similar to SERVER-18304 for update operations
  * using the findAndModify command where the old version of the document is returned.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');                  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/findAndModify_remove_queue.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/findAndModify_remove_queue.js";
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod.
 
-// For isMongod.
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');
-
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Use the workload name as the database name, since the workload name is assumed to be
     // unique.
     $config.data.uniqueDBName = 'findAndModify_update_queue';

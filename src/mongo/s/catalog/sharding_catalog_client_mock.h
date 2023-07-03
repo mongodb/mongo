@@ -29,7 +29,40 @@
 
 #pragma once
 
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/keys_collection_document_gen.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
+#include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -150,10 +183,15 @@ public:
 
     Status createDatabase(OperationContext* opCtx, StringData dbName, ShardId primaryShard);
 
-    StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
+    StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
         StringData purpose,
         const LogicalTime& newerThanThis,
+        repl::ReadConcernLevel readConcernLevel) override;
+
+    StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
+        OperationContext* opCtx,
+        StringData purpose,
         repl::ReadConcernLevel readConcernLevel) override;
 
     HistoricalPlacement getShardsThatOwnDataForCollAtClusterTime(

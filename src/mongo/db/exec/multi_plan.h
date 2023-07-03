@@ -30,16 +30,27 @@
 #pragma once
 
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+#include "mongo/base/status.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_cache_util.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_enumerator_explain_info.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
@@ -61,7 +72,7 @@ public:
      * when possible. If 'shouldCache' is false, the plan cache will never be written.
      */
     MultiPlanStage(ExpressionContext* expCtx,
-                   const CollectionPtr& collection,
+                   VariantCollectionPtrOrAcquisition collection,
                    CanonicalQuery* cq,
                    PlanCachingMode cachingMode = PlanCachingMode::AlwaysCache);
 

@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <utility>
 
 #include "mongo/executor/task_executor_pool.h"
-
-#include <algorithm>
-
-#include "mongo/executor/task_executor_pool_parameters_gen.h"
-#include "mongo/util/processinfo.h"
+#include "mongo/executor/task_executor_pool_parameters_gen.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/processinfo.h"  // IWYU pragma: keep
 
 namespace mongo {
 namespace executor {

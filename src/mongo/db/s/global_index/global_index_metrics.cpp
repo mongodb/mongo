@@ -29,8 +29,22 @@
 
 #include "mongo/db/s/global_index/global_index_metrics.h"
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <fmt/format.h>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/s/global_index/global_index_cloner_gen.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 namespace global_index {
@@ -64,7 +78,7 @@ BSONObj createOriginalCommand(const NamespaceString& nss, BSONObj keyPattern, bo
     using V = Value;
 
     return Doc{{"originatingCommand",
-                V{Doc{{"createIndexes", V{StringData{nss.toString()}}},
+                V{Doc{{"createIndexes", V{StringData{NamespaceStringUtil::serialize(nss)}}},
                       {"key", std::move(keyPattern)},
                       {"unique", V{unique}}}}}}
         .toBson();

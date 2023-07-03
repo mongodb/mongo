@@ -27,23 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/scripting/mozjs/objectwrapper.h"
-
+#include <boost/move/utility_core.hpp>
 #include <js/Array.h>
-#include <js/Conversions.h>
+#include <js/Class.h>
+#include <js/Object.h>
+#include <js/PropertySpec.h>
 #include <js/ValueArray.h>
-
 #include <jsapi.h>
+#include <new>
+#include <tuple>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <js/AllocPolicy.h>
+#include <js/CallArgs.h>
+#include <js/GCVector.h>
+#include <js/Id.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/scripting/mozjs/bson.h"
+#include "mongo/scripting/mozjs/dbref.h"
 #include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace mozjs {

@@ -29,21 +29,37 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
 #include <memory>
+#include <string>
+#include <utility>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/authenticate.h"
+#include "mongo/client/sasl_client_session.h"
+#include "mongo/db/baton.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/connection_metrics.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/message_compressor_manager.h"
+#include "mongo/transport/session.h"
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -112,10 +128,8 @@ private:
     Future<Message> _waitForResponse(boost::optional<int32_t> msgId,
                                      const BatonHandle& baton = nullptr);
     Future<void> _call(Message request, int32_t msgId, const BatonHandle& baton = nullptr);
-    BSONObj _buildIsMasterRequest(const std::string& appName,
-                                  executor::NetworkConnectionHook* hook);
-    void _parseIsMasterResponse(BSONObj request,
-                                const std::unique_ptr<rpc::ReplyInterface>& response);
+    BSONObj _buildHelloRequest(const std::string& appName, executor::NetworkConnectionHook* hook);
+    void _parseHelloResponse(BSONObj request, const std::unique_ptr<rpc::ReplyInterface>& response);
     auth::RunCommandHook _makeAuthRunCommandHook();
 
     const HostAndPort _peer;

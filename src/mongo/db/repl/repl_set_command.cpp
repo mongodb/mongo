@@ -27,21 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/repl_set_command.h"
-
+#include "mongo/base/error_codes.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 
 namespace mongo {
 namespace repl {
 
 Status ReplSetCommand::checkAuthForOperation(OperationContext* opCtx,
-                                             const DatabaseName&,
+                                             const DatabaseName& dbName,
                                              const BSONObj&) const {
     if (!AuthorizationSession::get(opCtx->getClient())
-             ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                getAuthActionSet())) {
+             ->isAuthorizedForActionsOnResource(
+                 ResourcePattern::forClusterResource(dbName.tenantId()), getAuthActionSet())) {
         return {ErrorCodes::Unauthorized, "Unauthorized"};
     }
 

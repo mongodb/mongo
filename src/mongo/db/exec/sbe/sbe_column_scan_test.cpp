@@ -31,9 +31,5 @@
  * This file contains tests for sbe::ColumnScan
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
-#include "mongo/db/storage/column_store.h"
 
 namespace mongo::sbe {}  // namespace mongo::sbe

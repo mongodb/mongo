@@ -29,9 +29,30 @@
 
 #include "mongo/db/pipeline/abt/utils.h"
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <limits>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
-#include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/bool_expression.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::optimizer {
 
@@ -74,7 +95,7 @@ ABT translateFieldRef(const FieldRef& fieldRef, ABT initial) {
             if (trailingEmptyPath) {
                 auto arrCase = make<PathArr>();
                 maybeComposePath(arrCase, result.cast<PathGet>()->getPath());
-                maybeComposePath<PathComposeA>(result, arrCase);
+                maybeComposePath<PathComposeA>(result, std::move(arrCase));
             } else {
                 result = make<PathTraverse>(PathTraverse::kSingleLevel, std::move(result));
             }

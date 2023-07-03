@@ -29,19 +29,37 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_cache_callbacks.h"
 #include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_explainer_factory.h"
+#include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 
 namespace mongo {
 /**
@@ -88,11 +106,6 @@ plan_cache_debug_info::DebugInfo buildDebugInfo(
  * information to build "PlanExplainerSBE" when recoverying the cached SBE plan from the cache.
  */
 plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution);
-
-// TODO SERVER-75715: Remove hasSbeClusteredCollectionScan() and its calls once SBE support
-// for clustered collection scans is fully implemented. This method exists temporarily to
-// prevent caching of CC scan plans until the mentioned ticket adds parameterization for them.
-bool hasSbeClusteredCollectionScan(const QuerySolutionNode* qsn);
 
 /**
  * Caches the best candidate execution plan for 'query', chosen from the given 'candidates' based on
@@ -188,13 +201,9 @@ void updatePlanCacheFromCandidates(
 
     // Store the choice we just made in the cache, if the query is of a type that is safe to
     // cache.
-    // TODO SERVER-75715: remove hasSbeClusteredCollectionScan. This exists temporarily to prevent
-    // caching SBE clustered collection scan execution plans as they are not yet parameterized.
-    bool hasSbeCCScan = false;
-    if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
-        hasSbeCCScan = hasSbeClusteredCollectionScan(winningPlan.solution.get()->root());
-    }
-    if (shouldCacheQuery(query) && canCache && !hasSbeCCScan) {
+    QuerySolution* solution = winningPlan.solution.get();
+    if (canCache && shouldCacheQuery(query) && solution->isEligibleForPlanCache()) {
+        const CollectionPtr& collection = collections.getMainCollection();
         auto rankingDecision = ranking.get();
         auto cacheClassicPlan = [&]() {
             auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfo {
@@ -206,7 +215,6 @@ void updatePlanCacheFromCandidates(
                 callbacks{query, buildDebugInfoFn};
             winningPlan.solution->cacheData->indexFilterApplied =
                 winningPlan.solution->indexFilterApplied;
-            auto& collection = collections.getMainCollection();
             auto isSensitive = CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation;
             uassertStatusOK(CollectionQueryInfo::get(collection)
                                 .getPlanCache()
@@ -272,6 +280,6 @@ void updatePlanCache(OperationContext* opCtx,
                      const CanonicalQuery& query,
                      const QuerySolution& solution,
                      const sbe::PlanStage& root,
-                     const stage_builder::PlanStageData& data);
+                     stage_builder::PlanStageData& stageData);
 }  // namespace plan_cache_util
 }  // namespace mongo

@@ -29,13 +29,22 @@
 
 #include "mongo/db/commands/server_status_metric.h"
 
+#include <cstddef>
 #include <fmt/format.h>
 #include <memory>
+#include <new>
 
+#include <absl/container/node_hash_set.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/static_immortal.h"
-#include "mongo/util/str.h"
 #include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand

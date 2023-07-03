@@ -29,7 +29,11 @@
 
 #include "mongo/db/op_observer/op_observer.h"
 
-#include "mongo/db/operation_context.h"
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 namespace {

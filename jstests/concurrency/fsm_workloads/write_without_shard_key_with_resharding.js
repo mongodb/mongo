@@ -1,22 +1,21 @@
-'use strict';
-
 /**
  * Runs updateOne, deleteOne, and findAndModify without shard key against a sharded cluster while
  * the collection reshards concurrently.
  *
  * @tags: [
- *  featureFlagUpdateOneWithoutShardKey,
- *  requires_fcv_70,
+ *  requires_fcv_71,
  *  requires_sharding,
  *  uses_transactions,
  * ]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/write_without_shard_key_base.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/write_without_shard_key_base.js";
 load("jstests/libs/feature_flag_util.js");
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.startState = "init";
 
     // reshardingMinimumOperationDurationMillis is set to 30 seconds when there are stepdowns.
@@ -85,13 +84,6 @@ var $config = extendWorkload($config, function($config, $super) {
                         return true;
                     }
                     assert(res.hasOwnProperty("code"));
-
-                    if (!FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
-                        // Expected error prior to the PointInTimeCatalogLookups project.
-                        if (res.code === ErrorCodes.SnapshotUnavailable) {
-                            return true;
-                        }
-                    }
 
                     // Race to retry.
                     if (res.code === ErrorCodes.ReshardCollectionInProgress) {

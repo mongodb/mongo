@@ -29,6 +29,8 @@
 
 #include "mongo/db/storage/ticketholder_monitor.h"
 
+#include <memory>
+
 namespace mongo {
 
 TicketHolderMonitor::TicketHolderMonitor(ServiceContext* svcCtx,

@@ -28,8 +28,19 @@
  */
 
 
-#include "mongo/unittest/unittest.h"
+#include <string>
+#include <type_traits>
+#include <utility>
 
+#include <immer/detail/util.hpp>
+#include <immer/map.hpp>
+#include <immer/map_transient.hpp>
+#include <immer/set.hpp>
+#include <immer/set_transient.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/immutable/unordered_map.h"
 #include "mongo/util/immutable/unordered_set.h"
 #include "mongo/util/string_map.h"

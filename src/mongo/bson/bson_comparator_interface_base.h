@@ -29,11 +29,17 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <cstddef>
+#include <cstdint>
 #include <initializer_list>
+#include <iterator>
 #include <map>
 #include <set>
 #include <vector>
 
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"

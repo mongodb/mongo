@@ -29,55 +29,170 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/actions_stream_policy.h"
+#include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/db/s/balancer/cluster_statistics.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_collection_gen.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
+
 /**
- * Helper class that
+ * Interface describing the interactions that the defragmentation policy can establish with the
+ * phase of the algorithm that is currently active on a collection.
+ * With the exception getType(), its methods do not guarantee thread safety.
+ */
+class DefragmentationPhase {
+public:
+    virtual ~DefragmentationPhase() {}
+
+    virtual DefragmentationPhaseEnum getType() const = 0;
+
+    virtual DefragmentationPhaseEnum getNextPhase() const = 0;
+
+    virtual boost::optional<BalancerStreamAction> popNextStreamableAction(
+        OperationContext* opCtx) = 0;
+
+    virtual boost::optional<MigrateInfo> popNextMigration(
+        OperationContext* opCtx, stdx::unordered_set<ShardId>* availableShards) = 0;
+
+    virtual void applyActionResult(OperationContext* opCtx,
+                                   const BalancerStreamAction& action,
+                                   const BalancerStreamActionResponse& response) = 0;
+
+    virtual BSONObj reportProgress() const = 0;
+
+    virtual bool isComplete() const = 0;
+
+    virtual void userAbort() = 0;
+
+protected:
+    static constexpr uint64_t kSmallChunkSizeThresholdPctg = 25;
+};
+
+/**
+ * Helper class that:
  * - stores the progress of the defragmentation algorithm on each collection
  * - generates a single sequence of action descriptors to fairly execute the defragmentation
- * algorithm across collections.
+ *   algorithm across collections
  */
 class BalancerDefragmentationPolicy : public ActionsStreamPolicy {
+    BalancerDefragmentationPolicy(const BalancerDefragmentationPolicy&) = delete;
+    BalancerDefragmentationPolicy& operator=(const BalancerDefragmentationPolicy&) = delete;
 
 public:
-    virtual ~BalancerDefragmentationPolicy() {}
+    BalancerDefragmentationPolicy(ClusterStatistics* clusterStats,
+                                  const std::function<void()>& onStateUpdated)
+        : _clusterStats(clusterStats), _onStateUpdated(onStateUpdated) {}
+
+    ~BalancerDefragmentationPolicy() {}
+
+    StringData getName() const override;
+
+    boost::optional<BalancerStreamAction> getNextStreamingAction(OperationContext* opCtx) override;
+
+    void applyActionResult(OperationContext* opCtx,
+                           const BalancerStreamAction& action,
+                           const BalancerStreamActionResponse& response) override;
 
     /**
      * Requests the execution of the defragmentation algorithm on the required collections.
      */
-    virtual void startCollectionDefragmentations(OperationContext* opCtx) = 0;
+    void startCollectionDefragmentations(OperationContext* opCtx);
 
     /**
-     * Checks if the collection is currently being defragmented, and signals the defragmentation
-     * to end if so.
+     * Checks if the collection is currently being defragmented, and signals the defragmentation to
+     * end if so.
      */
-    virtual void abortCollectionDefragmentation(OperationContext* opCtx,
-                                                const NamespaceString& nss) = 0;
+    void abortCollectionDefragmentation(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * Requests to stop the emission of any new defragmentation action request. Does not alter the
-     * persisted state of the affected collections. startCollectionDefragmentation() can be invoked
+     * persisted state of the affected collections. `startCollectionDefragmentation` can be invoked
      * on a later stage to resume the defragmentation on each item.
      */
-    virtual void interruptAllDefragmentations() = 0;
+    void interruptAllDefragmentations();
 
     /**
-     * Returns true if the specified collection is currently being defragmented.
+     * Returns `true` if the specified collection is currently being defragmented.
      */
-    virtual bool isDefragmentingCollection(const UUID& uuid) = 0;
+    bool isDefragmentingCollection(const UUID& uuid);
 
-    virtual BSONObj reportProgressOn(const UUID& uuid) = 0;
-
+    BSONObj reportProgressOn(const UUID& uuid);
 
     /**
      * Pulls the next batch of actionable chunk migration requests, given the current internal state
      * and the passed in list of available shards.
      * Every chunk migration request is then expected to be acknowledged by the balancer by issuing
-     * a call to applyActionResult() (declared in ActionsStreamPolicy)
+     * a call to `applyActionResult` (declared in `ActionsStreamPolicy`).
      */
-    virtual MigrateInfoVector selectChunksToMove(OperationContext* opCtx,
-                                                 stdx::unordered_set<ShardId>* availableShards) = 0;
+    MigrateInfoVector selectChunksToMove(OperationContext* opCtx,
+                                         stdx::unordered_set<ShardId>* availableShards);
+
+private:
+    /**
+     * Advances the defragmentation state of the specified collection to the next actionable phase
+     * (or sets the related DefragmentationPhase object to nullptr if nothing more can be done).
+     */
+    bool _advanceToNextActionablePhase(OperationContext* opCtx, const UUID& collUuid);
+
+    /**
+     * Move to the next phase and persist the phase change. This will end defragmentation if the
+     * next phase is kFinished.
+     * Must be called while holding the _stateMutex.
+     */
+    std::unique_ptr<DefragmentationPhase> _transitionPhases(OperationContext* opCtx,
+                                                            const CollectionType& coll,
+                                                            DefragmentationPhaseEnum nextPhase,
+                                                            bool shouldPersistPhase = true);
+
+    /**
+     * Builds the defragmentation phase object matching the current state of the passed
+     * collection and sets it into _defragmentationStates.
+     */
+    void _initializeCollectionState(WithLock, OperationContext* opCtx, const CollectionType& coll);
+
+    /**
+     * Write the new phase to the defragmentationPhase field in config.collections. If phase is
+     * kFinished, the field will be removed.
+     * Must be called while holding the _stateMutex.
+     */
+    void _persistPhaseUpdate(OperationContext* opCtx,
+                             DefragmentationPhaseEnum phase,
+                             const UUID& uuid);
+
+    /**
+     * Remove all datasize fields from config.chunks for the given namespace.
+     * Must be called while holding the _stateMutex.
+     */
+    void _clearDefragmentationState(OperationContext* opCtx, const UUID& uuid);
+
+    const std::string kPolicyName{"BalancerDefragmentationPolicy"};
+
+    Mutex _stateMutex = MONGO_MAKE_LATCH("BalancerChunkMergerImpl::_stateMutex");
+
+    ClusterStatistics* const _clusterStats;
+
+    const std::function<void()> _onStateUpdated;
+
+    stdx::unordered_map<UUID, std::unique_ptr<DefragmentationPhase>, UUID::Hash>
+        _defragmentationStates;
 };
+
 }  // namespace mongo

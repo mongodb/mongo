@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * agg_group_external.js
  *
@@ -8,10 +6,10 @@
  * The data passed to the $group is greater than 100MB, which should force
  * disk to be used.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/agg_base.js');    // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/agg_base.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     // use enough docs to exceed 100MB, the in-memory limit for $sort and $group
     $config.data.numDocs = 24 * 1000;
     var MB = 1024 * 1024;  // bytes

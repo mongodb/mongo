@@ -28,27 +28,47 @@
  */
 
 #include "mongo/util/namespace_string_util.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-#include <ostream>
 
 namespace mongo {
 
 std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
-                                           const SerializationContext& context,
-                                           const SerializationOptions& options) {
+                                           const SerializationContext& context) {
     if (!gMultitenancySupport)
-        return options.serializeIdentifier(ns.toString());
+        return ns.toString();
 
-    // TODO SERVER-74284: uncomment to redirect command-sepcific serialization requests
-    // if (context.getSource() == SerializationContext::Source::Command &&
-    //     context.getCallerType() == SerializationContext::CallerType::Reply)
-    //     return serializeForCommands(ns, context);
+    if (context.getSource() == SerializationContext::Source::Command &&
+        context.getCallerType() == SerializationContext::CallerType::Reply) {
+        return serializeForCommands(ns, context);
+    }
 
     // if we're not serializing a Command Reply, use the default serializing rules
-    return options.serializeIdentifier(serializeForStorage(ns, context));
+    return serializeForStorage(ns, context);
+}
+
+std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
+                                           const SerializationOptions& options,
+                                           const SerializationContext& context) {
+    return options.serializeIdentifier(serialize(ns, context));
 }
 
 std::string NamespaceStringUtil::serializeForCatalog(const NamespaceString& ns) {
@@ -65,7 +85,7 @@ std::string NamespaceStringUtil::serializeForStorage(const NamespaceString& ns,
 
 std::string NamespaceStringUtil::serializeForCommands(const NamespaceString& ns,
                                                       const SerializationContext& context) {
-    // tenantId came from either a $tenant field or security token
+    // tenantId came from either a $tenant field or security token.
     if (context.receivedNonPrefixedTenantId()) {
         switch (context.getPrefix()) {
             case SerializationContext::Prefix::ExcludePrefix:
@@ -79,6 +99,7 @@ std::string NamespaceStringUtil::serializeForCommands(const NamespaceString& ns,
         }
     }
 
+    // tenantId came from the prefix.
     switch (context.getPrefix()) {
         case SerializationContext::Prefix::ExcludePrefix:
             return ns.toString();
@@ -89,6 +110,11 @@ std::string NamespaceStringUtil::serializeForCommands(const NamespaceString& ns,
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+std::string NamespaceStringUtil::serializeForAuth(const NamespaceString& ns,
+                                                  const SerializationContext& context) {
+    return ns.toStringWithTenantId();
 }
 
 NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenantId,
@@ -105,10 +131,9 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
         return NamespaceString(boost::none, ns);
     }
 
-    // TODO SERVER-74284: uncomment to redirect command-sepcific deserialization requests
-    // if (context.getSource() == SerializationContext::Source::Command &&
-    //     context.getCallerType() == SerializationContext::CallerType::Request)
-    //     return deserializeForCommands(std::move(tenantId), ns, context);
+    if (context.getSource() == SerializationContext::Source::Command &&
+        context.getCallerType() == SerializationContext::CallerType::Request)
+        return deserializeForCommands(std::move(tenantId), ns, context);
 
     // if we're not deserializing a Command Request, use the default deserializing rules
     return deserializeForStorage(std::move(tenantId), ns, context);
@@ -128,7 +153,7 @@ NamespaceString NamespaceStringUtil::deserializeForStorage(boost::optional<Tenan
         return NamespaceString(std::move(tenantId), ns);
     }
 
-    auto nss = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(ns);
+    auto nss = parseFromStringExpectTenantIdInMultitenancyMode(ns);
     // TenantId could be prefixed, or passed in separately (or both) and namespace is always
     // constructed with the tenantId separately.
     if (tenantId != boost::none) {
@@ -150,6 +175,7 @@ NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<Tena
     // we only get here if we are processing a Command Request.  We disregard the feature flag in
     // this case, essentially letting the request dictate the state of the feature.
 
+    // We received a tenantId from $tenant or the security token.
     if (tenantId != boost::none) {
         switch (context.getPrefix()) {
             case SerializationContext::Prefix::ExcludePrefix:
@@ -157,7 +183,7 @@ NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<Tena
             case SerializationContext::Prefix::Default:
                 return NamespaceString(std::move(tenantId), ns);
             case SerializationContext::Prefix::IncludePrefix: {
-                auto nss = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(ns);
+                auto nss = parseFromStringExpectTenantIdInMultitenancyMode(ns);
                 massert(8423385,
                         str::stream() << "TenantId from $tenant or security token present as '"
                                       << tenantId->toString()
@@ -176,7 +202,8 @@ NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<Tena
         }
     }
 
-    auto nss = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(ns);
+    // We received the tenantId from the prefix.
+    auto nss = parseFromStringExpectTenantIdInMultitenancyMode(ns);
     if ((nss.dbName() != DatabaseName::kAdmin) && (nss.dbName() != DatabaseName::kLocal) &&
         (nss.dbName() != DatabaseName::kConfig)) {
         massert(8423387,
@@ -265,6 +292,45 @@ NamespaceString NamespaceStringUtil::parseNamespaceFromDoc(const DatabaseName& d
 NamespaceString NamespaceStringUtil::parseNamespaceFromResponse(const DatabaseName& dbName,
                                                                 StringData coll) {
     return parseNamespaceFromDoc(dbName, coll);
+}
+
+
+NamespaceString NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+    StringData ns) {
+
+    if (!gMultitenancySupport) {
+        return NamespaceString(boost::none, ns);
+    }
+
+    const auto tenantDelim = ns.find('_');
+    const auto collDelim = ns.find('.');
+
+    // If the first '_' is after the '.' that separates the db and coll names, the '_' is part
+    // of the coll name and is not a db prefix.
+    if (tenantDelim == std::string::npos || collDelim < tenantDelim) {
+        return NamespaceString(boost::none, ns);
+    }
+
+    auto swOID = OID::parse(ns.substr(0, tenantDelim));
+    if (!swOID.getStatus().isOK()) {
+        // If we fail to parse an OID, either the size of the substring is incorrect, or there is an
+        // invalid character. This indicates that the db has the "_" character, but it does not act
+        // as a delimeter for a tenantId prefix.
+        return NamespaceString(boost::none, ns);
+    }
+
+    const TenantId tenantId(swOID.getValue());
+    return NamespaceString(tenantId, ns.substr(tenantDelim + 1, ns.size() - 1 - tenantDelim));
+}
+
+NamespaceString NamespaceStringUtil::parseFailPointData(const BSONObj& data,
+                                                        StringData nsFieldName) {
+    const auto ns = data.getStringField(nsFieldName);
+    const auto tenantField = data.getField("$tenant");
+    const auto tenantId = tenantField.eoo()
+        ? boost::none
+        : boost::optional<TenantId>(TenantId::parseFromBSON(tenantField));
+    return NamespaceStringUtil::deserialize(tenantId, ns);
 }
 
 }  // namespace mongo

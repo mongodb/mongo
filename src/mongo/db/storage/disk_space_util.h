@@ -29,12 +29,16 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
+#include <cstdint>
 #include <string>
+
+#include "mongo/platform/basic.h"
 
 namespace mongo {
 
-int64_t getAvailableDiskSpaceBytesInDbPath();
+// This takes the dbpath as an input because storageGlobalParams.dbpath isn't always safe
+// to access; it is up to the caller to ensure that the correct path is passed and it is
+// safe to access.
+int64_t getAvailableDiskSpaceBytesInDbPath(const std::string& dbpath);
 
 }  // namespace mongo

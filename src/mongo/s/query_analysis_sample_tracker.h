@@ -29,6 +29,16 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <set>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -36,11 +46,8 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
-
-#include <boost/optional.hpp>
-#include <map>
-#include <vector>
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -57,9 +64,12 @@ public:
     public:
         CollectionSampleTracker(const NamespaceString& nss,
                                 const UUID& collUuid,
-                                double sampleRate,
+                                double samplesPerSec,
                                 const Date_t& startTime)
-            : _nss(nss), _collUuid(collUuid), _sampleRate(sampleRate), _startTime(startTime){};
+            : _nss(nss),
+              _collUuid(collUuid),
+              _samplesPerSec(samplesPerSec),
+              _startTime(startTime){};
 
         NamespaceString getNs() const {
             return _nss;
@@ -69,8 +79,8 @@ public:
             return _collUuid;
         }
 
-        void setSampleRate(double sampleRate) {
-            _sampleRate = sampleRate;
+        void setSamplesPerSecond(double samplesPerSec) {
+            _samplesPerSec = samplesPerSec;
         }
 
         void setStartTime(Date_t startTime) {
@@ -106,7 +116,7 @@ public:
         int64_t _sampledReadsBytes = 0;
         int64_t _sampledWritesCount = 0;
         int64_t _sampledWritesBytes = 0;
-        double _sampleRate;
+        double _samplesPerSec;
         Date_t _startTime;
     };
 

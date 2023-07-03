@@ -27,20 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
+#include <utility>
 
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_manager.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_mock.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/transport/session.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/util/clock_source_mock.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace {
@@ -142,12 +162,11 @@ DEATH_TEST_F(VectorClockMongoDTest, CannotTickConfigTime, "Hit a MONGO_UNREACHAB
     vc->tickConfigTime(1);
 }
 
-// TODO SERVER-60110 re-enable the following test
-// DEATH_TEST_F(VectorClockMongoDTest, CannotTickToConfigTime, "Hit a MONGO_UNREACHABLE") {
-//    auto sc = getServiceContext();
-//    auto vc = VectorClockMutable::get(sc);
-//    vc->tickConfigTimeTo(LogicalTime());
-//}
+DEATH_TEST_F(VectorClockMongoDTest, CannotTickToConfigTime, "Hit a MONGO_UNREACHABLE") {
+    auto sc = getServiceContext();
+    auto vc = VectorClockMutable::get(sc);
+    vc->tickConfigTimeTo(LogicalTime());
+}
 
 DEATH_TEST_F(VectorClockMongoDTest, CannotTickTopologyTime, "Hit a MONGO_UNREACHABLE") {
     auto sc = getServiceContext();

@@ -21,7 +21,6 @@ FUZZER_FLAGS = ['--no-big-tests']
 FUZZERTEST = '-T200s'
 ZSTREAM_TESTTIME = '-T90s'
 DECODECORPUS_TESTTIME = '-T30'
-ZSTDRTTEST = ['--test-large-data']
 
 # =============================================================================
 # Executables
@@ -38,7 +37,7 @@ testcommon_sources = [join_paths(zstd_rootdir, 'programs/datagen.c'),
 testcommon = static_library('testcommon',
   testcommon_sources,
   # needed due to use of private symbol + -fvisibility=hidden
-  objects: libzstd.extract_all_objects(recursive: false))
+  link_with: libzstd_static)
 
 testcommon_dep = declare_dependency(link_with: testcommon,
   dependencies: libzstd_deps,
@@ -66,8 +65,10 @@ fuzzer = executable('fuzzer',
   dependencies: [ testcommon_dep, thread_dep ],
   install: false)
 
-zstreamtest_sources = [join_paths(zstd_rootdir, 'tests/seqgen.c'),
-  join_paths(zstd_rootdir, 'tests/zstreamtest.c')]
+zstreamtest_sources = [
+  join_paths(zstd_rootdir, 'tests/seqgen.c'),
+  join_paths(zstd_rootdir, 'tests/zstreamtest.c'),
+  join_paths(zstd_rootdir, 'tests/external_matchfinder.c')]
 zstreamtest = executable('zstreamtest',
   zstreamtest_sources,
   include_directories: test_includes,
@@ -116,11 +117,7 @@ decodecorpus = executable('decodecorpus',
   dependencies: [ testcommon_dep, libm_dep ],
   install: false)
 
-poolTests_sources = [join_paths(zstd_rootdir, 'tests/poolTests.c'),
-  join_paths(zstd_rootdir, 'lib/common/pool.c'),
-  join_paths(zstd_rootdir, 'lib/common/threading.c'),
-  join_paths(zstd_rootdir, 'lib/common/zstd_common.c'),
-  join_paths(zstd_rootdir, 'lib/common/error_private.c')]
+poolTests_sources = [join_paths(zstd_rootdir, 'tests/poolTests.c')]
 poolTests = executable('poolTests',
   poolTests_sources,
   include_directories: test_includes,
@@ -138,24 +135,38 @@ checkTag = executable('checkTag',
 # =============================================================================
 
 if tests_supported_oses.contains(host_machine_os)
-  valgrind_prog = find_program('valgrind', ['/usr/bin/valgrind'], required: true)
+  valgrind_prog = find_program('valgrind', ['/usr/bin/valgrind'], required: false)
   valgrindTest_py = files('valgrindTest.py')
-  test('valgrindTest',
-    valgrindTest_py,
-    args: [valgrind_prog.path(), zstd, datagen, fuzzer, fullbench],
-    depends: [zstd, datagen, fuzzer, fullbench],
-    timeout: 600) # Timeout should work on HDD drive
+  if valgrind_prog.found()
+    test('valgrindTest',
+      valgrindTest_py,
+      args: [valgrind_prog.path(), zstd, datagen, fuzzer, fullbench],
+      depends: [zstd, datagen, fuzzer, fullbench],
+      timeout: 600) # Timeout should work on HDD drive
+  endif
 endif
 
 if host_machine_os != os_windows
   playTests_sh = find_program(join_paths(zstd_rootdir, 'tests/playTests.sh'), required: true)
-  test('test-zstd',
-    playTests_sh,
-    args: ZSTDRTTEST,
-    env: ['ZSTD_BIN=' + zstd.full_path(), 'DATAGEN_BIN=./datagen'],
-    depends: [datagen],
-    workdir: meson.current_build_dir(),
-    timeout: 2800) # Timeout should work on HDD drive
+
+  # add slow tests only if the meson version is new enough to support
+  # test setups with default-excluded suites
+  if meson.version().version_compare('>=0.57.0')
+    matrix = {'fast': [], 'slow': ['--test-large-data']}
+  else
+    matrix = {'fast': []}
+  endif
+
+  foreach suite, opt: matrix
+    test('test-zstd-'+suite,
+      playTests_sh,
+      args: opt,
+      env: ['ZSTD_BIN=' + zstd.full_path(), 'DATAGEN_BIN=./datagen'],
+      depends: [datagen, zstd],
+      suite: suite,
+      workdir: meson.current_build_dir(),
+      timeout: 2800) # Timeout should work on HDD drive
+  endforeach
 endif
 
 test('test-fullbench-1',
@@ -194,3 +205,11 @@ test('test-decodecorpus',
   args: ['-t', DECODECORPUS_TESTTIME],
   timeout: 60)
 test('test-poolTests', poolTests) # should be fast
+
+if meson.version().version_compare('>=0.57.0')
+  add_test_setup('fast',
+    is_default: true,
+    exclude_suites: ['slow'])
+  add_test_setup('slow',
+    exclude_suites: ['fast'])
+endif

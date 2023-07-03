@@ -28,28 +28,61 @@
  */
 
 
-#include <algorithm>
-#include <boost/optional.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
 #include <memory>
+#include <ratio>
+#include <string>
+#include <system_error>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
+#include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/thread_pool_mock.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -100,7 +133,7 @@ protected:
         CoordinatorCommitMonitor::RemainingOperationTimes remainingOperationTimes);
 
 private:
-    const NamespaceString _ns{"test.test"};
+    const NamespaceString _ns = NamespaceString::createNamespaceString_forTest("test.test");
     const std::vector<ShardId> _recipientShards = {{"shardOne"}, {"shardTwo"}};
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _futureExecutor;

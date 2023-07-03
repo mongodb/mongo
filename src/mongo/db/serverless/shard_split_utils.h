@@ -29,10 +29,29 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/sdam/topology_listener.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace serverless {

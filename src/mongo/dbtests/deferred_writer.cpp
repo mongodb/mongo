@@ -28,15 +28,39 @@
  */
 
 #include <chrono>
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <set>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/deferred_writer.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/stdx/chrono.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/service_context.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace deferred_writer_tests {
@@ -57,7 +81,8 @@ struct BSONObjCompare {
 };
 }  // namespace
 
-static const NamespaceString kTestNamespace("unittests", "deferred_writer_tests");
+static const NamespaceString kTestNamespace =
+    NamespaceString::createNamespaceString_forTest("unittests", "deferred_writer_tests");
 
 /**
  * For exception-safe code with DeferredWriter.

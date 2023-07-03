@@ -1,11 +1,9 @@
-'use strict';
-
 /**
  * reindex_writeconflict.js
  *
  * Ensures reIndex successfully handles WriteConflictExceptions.
  */
-var $config = (function() {
+export const $config = (function() {
     var states = {
         reIndex: function reIndex(db, collName) {
             var res = db[collName].reIndex();

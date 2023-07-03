@@ -29,10 +29,20 @@
 
 #include "mongo/s/cluster_identity_loader.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <mutex>
+#include <utility>
+
 #include "mongo/base/status_with.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_config_version.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -52,6 +62,11 @@ ClusterIdentityLoader* ClusterIdentityLoader::get(OperationContext* operationCon
 }
 
 OID ClusterIdentityLoader::getClusterId() {
+    // TODO SERVER-78051: Re-evaluate use of ClusterIdentityLoader for shards.
+    tassert(7800000,
+            "Unexpectedly tried to get cluster id on a non config server node",
+            serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+
     stdx::unique_lock<Latch> lk(_mutex);
     invariant(_initializationState == InitializationState::kInitialized && _lastLoadResult.isOK());
     return _lastLoadResult.getValue();

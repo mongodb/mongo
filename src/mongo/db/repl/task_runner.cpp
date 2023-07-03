@@ -28,20 +28,23 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <mutex>
+#include <utility>
 
-#include "mongo/db/repl/task_runner.h"
-
-#include <memory>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/task_runner.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/str.h"
 

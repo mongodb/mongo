@@ -30,11 +30,40 @@
 
 #pragma once
 
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/exec/delete_stage.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/exec/update_stage.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/write_stage_common.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/field_ref_set.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/ops/update_request.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/s/sharding_write_router.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_role.h"
+#include "mongo/db/update/update_driver.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -44,7 +73,7 @@ struct TimeseriesModifyParams {
           isMulti(deleteParams->isMulti),
           fromMigrate(deleteParams->fromMigrate),
           isExplain(deleteParams->isExplain),
-          returnDeleted(deleteParams->returnDeleted),
+          returnOld(deleteParams->returnDeleted),
           stmtId(deleteParams->stmtId),
           canonicalQuery(deleteParams->canonicalQuery) {}
 
@@ -53,6 +82,10 @@ struct TimeseriesModifyParams {
           isMulti(updateParams->request->isMulti()),
           fromMigrate(updateParams->request->source() == OperationSource::kFromMigrate),
           isExplain(updateParams->request->explain()),
+          returnOld(updateParams->request->shouldReturnOldDocs()),
+          returnNew(updateParams->request->shouldReturnNewDocs()),
+          allowShardKeyUpdatesWithoutFullShardKeyInQuery(
+              updateParams->request->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery()),
           canonicalQuery(updateParams->canonicalQuery),
           isFromOplogApplication(updateParams->request->isFromOplogApplication()),
           updateDriver(updateParams->driver) {
@@ -75,8 +108,14 @@ struct TimeseriesModifyParams {
     // Are we explaining a command rather than actually executing it?
     bool isExplain;
 
-    // Should we return the deleted document?
-    bool returnDeleted = false;
+    // Should we return the old measurement?
+    bool returnOld;
+
+    // Should we return the new measurement?
+    bool returnNew = false;
+
+    // Should we allow shard key updates without the full shard key in the query?
+    OptionalBool allowShardKeyUpdatesWithoutFullShardKeyInQuery;
 
     // The stmtId for this particular command.
     StmtId stmtId = kUninitializedStmtId;
@@ -108,7 +147,8 @@ public:
                           std::unique_ptr<PlanStage> child,
                           const ScopedCollectionAcquisition& coll,
                           BucketUnpacker bucketUnpacker,
-                          std::unique_ptr<MatchExpression> residualPredicate);
+                          std::unique_ptr<MatchExpression> residualPredicate,
+                          std::unique_ptr<MatchExpression> originalPredicate = nullptr);
 
     StageType stageType() const {
         return STAGE_TIMESERIES_MODIFY;
@@ -135,6 +175,23 @@ protected:
 
     void doRestoreStateRequiresCollection() final;
 
+    /**
+     * Prepares returning the old or new measurement when requested so.
+     */
+    void _prepareToReturnMeasurement(WorkingSetID& out);
+
+    /**
+     * Gets the user-level shard key paths.
+     */
+    const std::vector<std::unique_ptr<FieldRef>>& _getUserLevelShardKeyPaths(
+        const ScopedCollectionDescription& collDesc);
+
+    /**
+     * Gets immutable paths when the request is user-initiated and the timeseries collection is
+     * sharded and the request does not come from the router.
+     */
+    const std::vector<std::unique_ptr<FieldRef>>& _getImmutablePaths();
+
     // A user-initiated write is one which is not caused by oplog application and is not part of a
     // chunk migration.
     bool _isUserInitiatedUpdate;
@@ -142,6 +199,16 @@ protected:
     TimeseriesModifyParams _params;
 
     TimeseriesModifyStats _specificStats{};
+
+    // Stores the old measurement that is modified or the new measurement after update/upsert when
+    // requested to return it for the deleteOne or updateOne.
+    boost::optional<BSONObj> _measurementToReturn = boost::none;
+
+    // Original, untranslated and complete predicate.
+    std::unique_ptr<MatchExpression> _originalPredicate;
+
+    // Temporary storage for _getImmutablePaths().
+    std::vector<std::unique_ptr<FieldRef>> _immutablePaths;
 
 private:
     bool _isMultiWrite() const {
@@ -153,11 +220,10 @@ private:
     }
 
     /**
-     * Builds insert requests based on the measurements needing to be updated.
+     * Applies update and returns the updated measurements.
      */
-    std::pair<std::vector<BSONObj>, std::vector<write_ops::InsertCommandRequest>> _buildInsertOps(
-        const std::vector<BSONObj>& matchedMeasurements,
-        std::vector<BSONObj>& unchangedMeasurements);
+    std::vector<BSONObj> _applyUpdate(const std::vector<BSONObj>& matchedMeasurements,
+                                      std::vector<BSONObj>& unchangedMeasurements);
 
     /**
      * Writes the modifications to a bucket.
@@ -169,7 +235,7 @@ private:
         ScopeGuard<F>& bucketFreer,
         WorkingSetID bucketWsmId,
         std::vector<BSONObj>&& unchangedMeasurements,
-        const std::vector<BSONObj>& modifiedMeasurements,
+        std::vector<BSONObj>&& matchedMeasurements,
         bool bucketFromMigrate);
 
     /**
@@ -187,10 +253,24 @@ private:
      */
     PlanStage::StageState _getNextBucket(WorkingSetID& id);
 
-    /**
-     * Prepares returning a deleted measurement.
-     */
-    void _prepareToReturnDeletedMeasurement(WorkingSetID& out, BSONObj measurement);
+    void _checkRestrictionsOnUpdatingShardKeyAreNotViolated(
+        const ScopedCollectionDescription& collDesc, const FieldRefSet& shardKeyPaths);
+
+    void _checkUpdateChangesExistingShardKey(const BSONObj& newBucket,
+                                             const BSONObj& oldBucket,
+                                             const BSONObj& newMeasurement,
+                                             const BSONObj& oldMeasurement);
+
+    void _checkUpdateChangesReshardingKey(const ShardingWriteRouter& shardingWriteRouter,
+                                          const BSONObj& newBucket,
+                                          const BSONObj& oldBucket,
+                                          const BSONObj& newMeasurement,
+                                          const BSONObj& oldMeasurementt);
+
+    void _checkUpdateChangesShardKeyFields(const BSONObj& newBucket,
+                                           const BSONObj& oldBucket,
+                                           const BSONObj& newMeasurement,
+                                           const BSONObj& oldMeasurement);
 
     WorkingSet* _ws;
 
@@ -218,9 +298,5 @@ private:
     // A pending retry to get to after a NEED_YIELD propagation and a new storage snapshot is
     // established. This can be set when a write fails or when a fetch fails.
     WorkingSetID _retryBucketId = WorkingSet::INVALID_ID;
-
-    // Stores the deleted document when a deleteOne with returnDeleted: true is requested and we
-    // need to yield.
-    boost::optional<BSONObj> _deletedMeasurementToReturn = boost::none;
 };
 }  //  namespace mongo

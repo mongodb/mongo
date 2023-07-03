@@ -31,11 +31,23 @@
 
 #include "mongo/db/storage/disk_space_monitor.h"
 
+#include <mutex>
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/storage/disk_space_util.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
@@ -71,6 +83,7 @@ DiskSpaceMonitor* DiskSpaceMonitor::get(ServiceContext* svcCtx) {
 void DiskSpaceMonitor::_start(ServiceContext* svcCtx) {
     LOGV2(7333401, "Starting the DiskSpaceMonitor");
     invariant(!_job, "DiskSpaceMonitor is already started");
+    _dbpath = storageGlobalParams.dbpath;
     _job = svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
         "DiskSpaceMonitor",
         [this](Client* client) { _run(client); },
@@ -107,7 +120,7 @@ void DiskSpaceMonitor::takeAction(OperationContext* opCtx, int64_t availableByte
 void DiskSpaceMonitor::_run(Client* client) try {
     auto opCtx = client->makeOperationContext();
 
-    const auto availableBytes = getAvailableDiskSpaceBytesInDbPath();
+    const auto availableBytes = getAvailableDiskSpaceBytesInDbPath(_dbpath);
     LOGV2_DEBUG(7333405, 2, "Available disk space", "bytes"_attr = availableBytes);
     takeAction(opCtx.get(), availableBytes);
     monitorPasses.increment();

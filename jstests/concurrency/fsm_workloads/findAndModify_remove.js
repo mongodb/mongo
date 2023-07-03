@@ -1,12 +1,10 @@
-'use strict';
-
 /**
  * findAndModify_remove.js
  *
  * Each thread repeatedly inserts a document, and subsequently performs
  * the findAndModify command to remove it.
  */
-var $config = (function() {
+export const $config = (function() {
     var data = {shardKey: {tid: 1}};
 
     var states = (function() {

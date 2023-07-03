@@ -29,13 +29,22 @@
 
 #include "mongo/db/query/optimizer/bool_expression.h"
 
+#include <absl/container/flat_hash_map.h>
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <cmath>
 
-#include "mongo/db/query/optimizer/explain.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/utils/bool_expression_printer.h"
 #include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/inline_auto_update.h"
 
 namespace mongo::optimizer {
 namespace {
@@ -243,15 +252,19 @@ TEST(BoolExpr, BoolExprVisitorTest) {
     ASSERT_FALSE(IntBoolExpr::isDNF(intExprCNF));
 
     int max = -1;
-    IntBoolExpr::visitConjuncts(intExprCNF, [&](const IntBoolExpr::Node& conjunct, int) {
-        IntBoolExpr::visitDisjuncts(conjunct, [&](const IntBoolExpr::Node& disjunct, int) {
-            IntBoolExpr::visitAtom(disjunct, [&](const int& val) {
-                if (val > max) {
-                    max = val;
-                }
-            });
+    IntBoolExpr::visitConjuncts(
+        intExprCNF, [&](const IntBoolExpr::Node& conjunct, const IntBoolExpr::VisitorContext&) {
+            IntBoolExpr::visitDisjuncts(
+                conjunct,
+                [&](const IntBoolExpr::Node& disjunct, const IntBoolExpr::VisitorContext&) {
+                    IntBoolExpr::visitAtom(disjunct,
+                                           [&](const int& val, const IntBoolExpr::VisitorContext&) {
+                                               if (val > max) {
+                                                   max = val;
+                                               }
+                                           });
+                });
         });
-    });
     ASSERT_EQ(5, max);
 
     // Show non const visitors
@@ -261,15 +274,39 @@ TEST(BoolExpr, BoolExprVisitorTest) {
     ASSERT(IntBoolExpr::isDNF(intExprDNF));
     ASSERT_FALSE(IntBoolExpr::isCNF(intExprDNF));
 
-    IntBoolExpr::visitDisjuncts(intExprDNF, [](IntBoolExpr::Node& disjunct, int) {
-        IntBoolExpr::visitConjuncts(disjunct, [](IntBoolExpr::Node& conjunct, int) {
-            IntBoolExpr::visitAtom(conjunct, [](int& val) { val = val + 1; });
+    IntBoolExpr::visitDisjuncts(
+        intExprDNF, [](IntBoolExpr::Node& disjunct, const IntBoolExpr::VisitorContext&) {
+            IntBoolExpr::visitConjuncts(
+                disjunct, [](IntBoolExpr::Node& conjunct, const IntBoolExpr::VisitorContext&) {
+                    IntBoolExpr::visitAtom(
+                        conjunct,
+                        [](int& val, const IntBoolExpr::VisitorContext&) { val = val + 1; });
+                });
         });
-    });
 
     ASSERT_STR_EQ_AUTO(             // NOLINT
         "((2 ^ 3 ^ 4) U (5 ^ 6))",  // NOLINT (test auto-update)
         BoolExprPrinter<int>().print(intExprDNF));
+}
+
+TEST(BoolExpr, BoolExprVisitorEarlyReturnTest) {
+    IntBoolExpr::Builder b;
+    b.pushConj().pushDisj().atom(1).atom(2).atom(3).pop().pushDisj().atom(4).atom(5).pop();
+    auto intExprCNF = b.finish().get();
+
+    int visitedNodes = 0;
+    IntBoolExpr::visitConjuncts(intExprCNF,
+                                [&](const IntBoolExpr::Node& node,
+                                    const IntBoolExpr::VisitorContext& ctx) { visitedNodes++; });
+    ASSERT_EQ(2, visitedNodes);
+
+    visitedNodes = 0;
+    IntBoolExpr::visitConjuncts(
+        intExprCNF, [&](const IntBoolExpr::Node& node, const IntBoolExpr::VisitorContext& ctx) {
+            visitedNodes++;
+            ctx.returnEarly();
+        });
+    ASSERT_EQ(1, visitedNodes);
 }
 }  // namespace
 }  // namespace mongo::optimizer

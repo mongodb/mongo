@@ -27,16 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/assert_util.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <memory>
+#include <set>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
-#include "mongo/db/auth/action_type.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/bulk_write.h"
 #include "mongo/db/commands/bulk_write_common.h"
@@ -44,32 +71,72 @@
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/cursor_manager.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/fle_crud.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/ops/parsed_update.h"
+#include "mongo/db/ops/parsed_writes_common.h"
+#include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/update_result.h"
 #include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/ops/write_ops_exec_util.h"
 #include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/ops/write_ops_retryability.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/stats/top.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/log_and_backoff.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
@@ -103,10 +170,8 @@ public:
 
         for (size_t i = 0; i < writes.results.size(); ++i) {
             auto idx = firstOpIdx + i;
-            // We do not pass in a proper numErrors since it causes unwanted truncation in error
-            // message generation.
             if (auto error = write_ops_exec::generateError(
-                    opCtx, writes.results[i].getStatus(), idx, 0 /* numErrors */)) {
+                    opCtx, writes.results[i].getStatus(), idx, _numErrors)) {
                 auto replyItem = BulkWriteReplyItem(idx, error.get().getStatus());
                 _replies.emplace_back(replyItem);
                 _numErrors++;
@@ -189,8 +254,7 @@ public:
     void addErrorReply(OperationContext* opCtx,
                        BulkWriteReplyItem& replyItem,
                        const Status& status) {
-        auto error =
-            write_ops_exec::generateError(opCtx, status, replyItem.getIdx(), 0 /* numErrors */);
+        auto error = write_ops_exec::generateError(opCtx, status, replyItem.getIdx(), _numErrors);
         invariant(error);
         replyItem.setStatus(error.get().getStatus());
         replyItem.setOk(status.isOK() ? 1.0 : 0.0);
@@ -254,6 +318,65 @@ public:
         _responses.addInsertReplies(opCtx, idx, out);
     }
 
+    // Return true if the insert was done by FLE.
+    // FLE skips inserts with no encrypted fields, in which case the caller of this method
+    // is expected to fallback to its non-FLE code path.
+    bool attemptProcessFLEInsert(OperationContext* opCtx, write_ops_exec::WriteResult& out) {
+        CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+
+        // For BulkWrite, re-entry is un-expected.
+        invariant(!_currentNs.getEncryptionInformation()->getCrudProcessed().value_or(false));
+
+        std::vector<mongo::BSONObj> documents;
+        std::transform(_batch.cbegin(),
+                       _batch.cend(),
+                       std::back_inserter(documents),
+                       [](const InsertStatement& insert) { return insert.doc; });
+
+        write_ops::InsertCommandRequest request(_currentNs.getNs(), documents);
+        auto& requestBase = request.getWriteCommandRequestBase();
+        requestBase.setEncryptionInformation(_currentNs.getEncryptionInformation());
+        requestBase.setOrdered(_req.getOrdered());
+
+        write_ops::InsertCommandReply insertReply;
+
+        FLEBatchResult batchResult = processFLEInsert(opCtx, request, &insertReply);
+
+        if (batchResult == FLEBatchResult::kProcessed) {
+            size_t inserted = static_cast<size_t>(insertReply.getN());
+
+            SingleWriteResult result;
+            result.setN(1);
+
+            if (documents.size() == inserted) {
+                invariant(!insertReply.getWriteErrors().has_value());
+                out.results.reserve(inserted);
+                std::fill_n(std::back_inserter(out.results), inserted, std::move(result));
+            } else {
+                invariant(insertReply.getWriteErrors().has_value());
+                const auto& errors = insertReply.getWriteErrors().value();
+
+                out.results.reserve(inserted + errors.size());
+                std::fill_n(
+                    std::back_inserter(out.results), inserted + errors.size(), std::move(result));
+
+                for (const auto& error : errors) {
+                    out.results[error.getIndex()] = error.getStatus();
+                }
+
+                if (_req.getOrdered()) {
+                    out.canContinue = false;
+                }
+            }
+
+            if (insertReply.getRetriedStmtIds().has_value()) {
+                out.retriedStmtIds = insertReply.getRetriedStmtIds().value();
+            }
+            return true;
+        }
+        return false;
+    }
+
     // Returns true if the bulkWrite operation can continue and false if it should stop.
     bool flush(OperationContext* opCtx) {
         if (empty()) {
@@ -267,14 +390,45 @@ public:
         auto size = _batch.size();
         out.results.reserve(size);
 
-        out.canContinue = write_ops_exec::insertBatchAndHandleErrors(opCtx,
-                                                                     _currentNs.getNs(),
-                                                                     _currentNs.getCollectionUUID(),
-                                                                     _req.getOrdered(),
-                                                                     _batch,
-                                                                     &_lastOpFixer,
-                                                                     &out,
-                                                                     OperationSource::kStandard);
+        bool insertedByFLE = false;
+        if (_currentNs.getEncryptionInformation().has_value()) {
+            insertedByFLE = attemptProcessFLEInsert(opCtx, out);
+
+            if (!insertedByFLE) {
+                // It is unexpected for processFLEInsert (inside attemptProcessFLEInsert)
+                // to return kNotProcessed for multiple documents. In the case of retyrable write
+                // with FLE, we have to fallthrough to our normal code path below
+                // on !insertedByFLE, but we are past the point where that code path normally checks
+                // for checkStatementExecutedNoOplogEntryFetch (in handleInsertOp).
+                invariant(_batch.size() == 1);
+
+                auto txnParticipant = TransactionParticipant::get(opCtx);
+                invariant(_batch[0].stmtIds.size() == 1);
+                if (opCtx->isRetryableWrite() &&
+                    txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx,
+                                                                           _batch[0].stmtIds[0])) {
+                    RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+                    addRetryableWriteResult(opCtx, _firstOpIdx.get(), _batch[0].stmtIds[0]);
+                    _batch.clear();
+                    _currentNs = NamespaceInfoEntry();
+                    _firstOpIdx = boost::none;
+                    return out.canContinue;
+                }
+            }
+        }
+
+        if (!insertedByFLE) {
+            out.canContinue =
+                write_ops_exec::insertBatchAndHandleErrors(opCtx,
+                                                           _currentNs.getNs(),
+                                                           _currentNs.getCollectionUUID(),
+                                                           _req.getOrdered(),
+                                                           _batch,
+                                                           &_lastOpFixer,
+                                                           &out,
+                                                           OperationSource::kStandard);
+        }
+
         _batch.clear();
         _responses.addInsertReplies(opCtx, _firstOpIdx.get(), out);
         _currentNs = NamespaceInfoEntry();
@@ -342,7 +496,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
         recordCurOpMetrics(opCtx);
         Top::get(opCtx->getServiceContext())
             .record(opCtx,
-                    curOp->getNS(),
+                    curOp->getNSS(),
                     curOp->getLogicalOp(),
                     Top::LockType::WriteLocked,
                     durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
@@ -488,7 +642,9 @@ bool handleInsertOp(OperationContext* opCtx,
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
 
-    if (opCtx->isRetryableWrite() &&
+    // For FLE + RetryableWrite, we let FLE handle stmtIds and retryability, so we skip
+    // checkStatementExecutedNoOplogEntryFetch here.
+    if (!nsInfo[idx].getEncryptionInformation().has_value() && opCtx->isRetryableWrite() &&
         txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx, stmtId)) {
         if (!batch.flush(opCtx)) {
             return false;
@@ -636,20 +792,13 @@ bool handleUpdateOp(OperationContext* opCtx,
                                                                            false,
                                                                            updateRequest.isUpsert(),
                                                                            docFound,
-                                                                           &updateRequest);
+                                                                           updateRequest);
                     lastOpFixer.finishedOpSuccessfully();
                     responses.addUpdateReply(currentOpIdx, result, docFound, boost::none);
                     return true;
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
-                    const ExtensionsCallbackReal extensionsCallback(
-                        opCtx, &updateRequest.getNamespaceString());
-
-                    auto cq =
-                        uassertStatusOK(ParsedUpdate::parseQueryToCQ(opCtx,
-                                                                     nullptr /* expCtx */,
-                                                                     extensionsCallback,
-                                                                     updateRequest,
-                                                                     updateRequest.getQuery()));
+                    auto cq = uassertStatusOK(
+                        parseWriteQueryToCQ(opCtx, nullptr /* expCtx */, updateRequest));
                     if (!write_ops_exec::shouldRetryDuplicateKeyException(
                             updateRequest, *cq, *ex.extraInfo<DuplicateKeyErrorInfo>())) {
                         throw;
@@ -755,7 +904,7 @@ bool handleDeleteOp(OperationContext* opCtx,
         return writeConflictRetry(opCtx, "bulkWriteDelete", nsString, [&] {
             boost::optional<BSONObj> docFound;
             auto nDeleted = write_ops_exec::writeConflictRetryRemove(
-                opCtx, nsString, &deleteRequest, curOp, opDebug, inTransaction, docFound);
+                opCtx, nsString, deleteRequest, curOp, opDebug, inTransaction, docFound);
             lastOpFixer.finishedOpSuccessfully();
             responses.addDeleteReply(currentOpIdx, nDeleted, docFound, boost::none);
             return true;
@@ -919,6 +1068,9 @@ public:
                 if (!retriedStmtIds.empty()) {
                     reply.setRetriedStmtIds(std::move(retriedStmtIds));
                 }
+
+                setElectionIdandOpTime(opCtx, reply);
+
                 return reply;
             }
 
@@ -949,7 +1101,20 @@ public:
             if (!retriedStmtIds.empty()) {
                 reply.setRetriedStmtIds(std::move(retriedStmtIds));
             }
+
+            setElectionIdandOpTime(opCtx, reply);
+
             return reply;
+        }
+
+        void setElectionIdandOpTime(OperationContext* opCtx, BulkWriteCommandReply& reply) {
+            // Undocumented repl fields that mongos depends on.
+            auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
+            const auto replMode = replCoord->getReplicationMode();
+            if (replMode != repl::ReplicationCoordinator::modeNone) {
+                reply.setOpTime(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp());
+                reply.setElectionId(replCoord->getElectionId());
+            }
         }
     };
 
@@ -992,6 +1157,8 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
         }
     });
 
+    bool hasEncryptionInformation = false;
+
     // Tell mongod what the shard and database versions are. This will cause writes to fail in
     // case there is a mismatch in the mongos request provided versions and the local (shard's)
     // understanding of the version.
@@ -999,6 +1166,16 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
         // TODO (SERVER-72767, SERVER-72804, SERVER-72805): Support timeseries collections.
         OperationShardingState::setShardRole(
             opCtx, nsInfo.getNs(), nsInfo.getShardVersion(), nsInfo.getDatabaseVersion());
+
+        if (nsInfo.getEncryptionInformation().has_value()) {
+            hasEncryptionInformation = true;
+        }
+    }
+
+    if (hasEncryptionInformation) {
+        uassert(ErrorCodes::BadValue,
+                "BulkWrite with Queryable Encryption supports only a single namespace.",
+                req.getNsInfo().size() == 1);
     }
 
     for (; idx < ops.size(); ++idx) {
@@ -1020,6 +1197,12 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
             if (!batch.flush(opCtx)) {
                 break;
             }
+            if (hasEncryptionInformation) {
+                uassert(
+                    ErrorCodes::InvalidOptions,
+                    "BulkWrite update with Queryable Encryption supports only a single operation.",
+                    ops.size() == 1);
+            }
             if (!handleUpdateOp(opCtx, curOp, op.getUpdate(), req, idx, lastOpFixer, responses)) {
                 // Update write failed can no longer continue.
                 break;
@@ -1028,6 +1211,12 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
             // Flush insert ops before handling delete ops.
             if (!batch.flush(opCtx)) {
                 break;
+            }
+            if (hasEncryptionInformation) {
+                uassert(
+                    ErrorCodes::InvalidOptions,
+                    "BulkWrite delete with Queryable Encryption supports only a single operation.",
+                    ops.size() == 1);
             }
             if (!handleDeleteOp(opCtx, curOp, op.getDelete(), req, idx, lastOpFixer, responses)) {
                 // Delete write failed can no longer continue.

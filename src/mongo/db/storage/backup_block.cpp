@@ -29,12 +29,13 @@
 
 #include "mongo/db/storage/backup_block.h"
 
-#include <boost/filesystem.hpp>
+#include <boost/filesystem/path.hpp>
 #include <set>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/string_data.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_options.h"
 
 namespace mongo {

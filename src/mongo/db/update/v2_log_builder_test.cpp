@@ -29,12 +29,21 @@
 
 #include "mongo/db/update/v2_log_builder.h"
 
-#include "mongo/base/status.h"
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/json.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/safe_num.h"
 
 namespace mongo::v2_log_builder {

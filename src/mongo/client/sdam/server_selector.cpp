@@ -28,12 +28,33 @@
  */
 #include "server_selector.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
+#include <iterator>
+#include <map>
+#include <ostream>
+#include <ratio>
+#include <string>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/sdam/sdam_configuration_parameters_gen.h"
 #include "mongo/client/sdam/topology_description.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork

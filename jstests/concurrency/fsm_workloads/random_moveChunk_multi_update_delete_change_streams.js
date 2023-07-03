@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Performs a series of {multi: true} updates/deletes while moving chunks, and checks that the
  * expected change stream events are received and that no events are generated to writes on orphan
@@ -11,10 +9,10 @@
  *  uses_change_streams
  * ];
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
 

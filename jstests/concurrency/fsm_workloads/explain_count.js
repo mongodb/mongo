@@ -1,16 +1,15 @@
-'use strict';
-
 /**
  * explain_count.js
  *
  * Runs explain() and count() on a collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
-load('jstests/concurrency/fsm_workloads/explain.js');              // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/explain.js";
+
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 load('jstests/libs/analyze_plan.js');                              // for planHasStage
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     function assertNCounted(num, obj, db) {
         var stage = obj.executionStats.executionStages;
         // get sharded stage(s) if counting on mongos

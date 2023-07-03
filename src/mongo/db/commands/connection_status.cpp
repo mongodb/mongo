@@ -27,13 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <iterator>
+#include <memory>
+#include <utility>
+#include <vector>
 
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/authorization_manager.h"
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/parsed_privilege_gen.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/connection_status_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/read_through_cache.h"
 
 namespace mongo {
 
@@ -76,7 +95,7 @@ public:
             return ret;
         }
 
-        static std::vector<Privilege> expandPrivileges(AuthorizationSession* as) {
+        static std::vector<auth::ParsedPrivilege> expandPrivileges(AuthorizationSession* as) {
             // Create a unified map of resources to privileges, to avoid duplicate
             // entries in the connection status output.
             User::ResourcePrivilegeMap unified;
@@ -92,11 +111,11 @@ public:
                 }
             }
 
-            std::vector<Privilege> ret;
+            std::vector<auth::ParsedPrivilege> ret;
             std::transform(unified.cbegin(),
                            unified.cend(),
                            std::back_inserter(ret),
-                           [](const auto& it) { return it.second; });
+                           [](const auto& it) { return it.second.toParsedPrivilege(); });
             return ret;
         }
 

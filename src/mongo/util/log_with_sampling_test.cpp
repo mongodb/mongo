@@ -27,18 +27,20 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <ostream>
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/logv2/log.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/service_context.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/util/log_with_sampling.h"
-#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -58,7 +60,6 @@ namespace {
 auto scenario(bool debugLogEnabled, bool slowOp, bool forceSample) {
     static const logv2::LogComponent component = logv2::LogComponent::kDefault;
     const auto serviceContext = ServiceContext::make();
-    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     const auto client = serviceContext->makeClient("log_with_sampling_test");
     const auto opCtx = client->makeOperationContext();
 

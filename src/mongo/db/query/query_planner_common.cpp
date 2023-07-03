@@ -28,17 +28,34 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/exact_cast.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/projection_ast_path_tracking_visitor.h"
+#include "mongo/db/query/projection_ast_visitor.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/tree_walker.h"
-#include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -167,4 +184,22 @@ std::vector<FieldPath> QueryPlannerCommon::extractSortKeyMetaFieldsFromProjectio
 
     return std::move(ctx.data().metaPaths);
 }
+
+boost::optional<int> QueryPlannerCommon::determineClusteredScanDirection(
+    const CanonicalQuery& query, const QueryPlannerParams& params) {
+    if (params.clusteredInfo && query.getSortPattern() &&
+        CollatorInterface::collatorsMatch(params.clusteredCollectionCollator,
+                                          query.getCollator())) {
+        BSONObj kp = clustered_util::getSortPattern(params.clusteredInfo->getIndexSpec());
+        if (QueryPlannerCommon::providesSort(query, kp)) {
+            return 1;
+        } else if (QueryPlannerCommon::providesSort(query,
+                                                    QueryPlannerCommon::reverseSortObj(kp))) {
+            return -1;
+        }
+    }
+
+    return boost::none;
+}
+
 }  // namespace mongo

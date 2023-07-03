@@ -28,22 +28,79 @@
  */
 
 
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "cxxabi.h"
+#include <absl/container/flat_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <ratio>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
 
-#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/s/server_transaction_coordinators_metrics.h"
+#include "mongo/db/s/single_transaction_coordinator_stats.h"
+#include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
+#include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/s/transaction_coordinator_metrics_observer.h"
+#include "mongo/db/s/transaction_coordinator_structures.h"
 #include "mongo/db/s/transaction_coordinator_test_fixture.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/db/s/transaction_coordinator_util.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -62,17 +119,35 @@ const StatusWith<BSONObj> kNoSuchTransaction =
               << "No such transaction exists");
 const StatusWith<BSONObj> kOk = BSON("ok" << 1);
 const Timestamp kDummyPrepareTimestamp = Timestamp(1, 1);
+const std::vector<NamespaceString> kDummyAffectedNamespaces = {NamespaceString("test.test")};
 
-StatusWith<BSONObj> makePrepareOkResponse(const Timestamp& timestamp) {
-    return BSON("ok" << 1 << "prepareTimestamp" << timestamp);
+StatusWith<BSONObj> makePrepareOkResponse(const Timestamp& timestamp,
+                                          const std::vector<NamespaceString>& affectedNamespaces) {
+    BSONArrayBuilder namespaces;
+    for (const auto& nss : affectedNamespaces) {
+        namespaces << nss.ns();
+    }
+    return BSON("ok" << 1 << "prepareTimestamp" << timestamp << "affectedNamespaces"
+                     << namespaces.arr());
 }
 
-const StatusWith<BSONObj> kPrepareOk = makePrepareOkResponse(kDummyPrepareTimestamp);
+const StatusWith<BSONObj> kPrepareOk =
+    makePrepareOkResponse(kDummyPrepareTimestamp, kDummyAffectedNamespaces);
 const StatusWith<BSONObj> kPrepareOkNoTimestamp = BSON("ok" << 1);
 const StatusWith<BSONObj> kTxnRetryCounterTooOld =
     BSON("ok" << 0 << "code" << ErrorCodes::TxnRetryCounterTooOld << "errmsg"
               << "txnRetryCounter is too old"
               << "txnRetryCounter" << 1);
+
+template <typename NamespaceStringContainer>
+static StringSet toStringSet(const NamespaceStringContainer& namespaces) {
+    StringSet set;
+    set.reserve(namespaces.size());
+    for (const auto& nss : namespaces) {
+        set.emplace(nss.ns());
+    }
+    return set;
+}
 
 /**
  * Searches for a client matching the name and mark the operation context as killed.
@@ -112,7 +187,7 @@ protected:
 
     void assertPrepareSentAndRespondWithSuccess(const Timestamp& timestamp) {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
-                                        makePrepareOkResponse(timestamp),
+                                        makePrepareOkResponse(timestamp, kDummyAffectedNamespaces),
                                         WriteConcernOptions::Majority);
     }
 
@@ -647,6 +722,34 @@ TEST_F(TransactionCoordinatorDriverTest,
     abortFuture.get();
 }
 
+TEST_F(TransactionCoordinatorDriverTest, SendPrepareToShardsCollectsAffectedNamespaces) {
+    const auto timestamp = Timestamp(1, 1);
+
+    txn::AsyncWorkScheduler aws(getServiceContext());
+    auto future = txn::sendPrepare(getServiceContext(),
+                                   aws,
+                                   _lsid,
+                                   _txnNumberAndRetryCounter,
+                                   APIParameters(),
+                                   kTwoShardIdList);
+
+    assertCommandSentAndRespondWith(
+        PrepareTransaction::kCommandName,
+        makePrepareOkResponse(timestamp,
+                              {NamespaceString("db1.coll1"), NamespaceString("db2.coll2")}),
+        WriteConcernOptions::Majority);
+    assertCommandSentAndRespondWith(
+        PrepareTransaction::kCommandName,
+        makePrepareOkResponse(timestamp,
+                              {NamespaceString("db1.coll2"), NamespaceString("db2.coll1")}),
+        WriteConcernOptions::Majority);
+
+    auto response = future.get();
+    ASSERT_EQUALS(txn::CommitDecision::kCommit, response.decision().getDecision());
+    StringSet expectedAffectedNamespaces{"db1.coll1", "db1.coll2", "db2.coll1", "db2.coll2"};
+    ASSERT_EQUALS(expectedAffectedNamespaces, toStringSet(response.releaseAffectedNamespaces()));
+}
+
 class TransactionCoordinatorDriverPersistenceTest : public TransactionCoordinatorDriverTest {
 protected:
     void setUp() override {
@@ -665,7 +768,8 @@ protected:
         TxnNumberAndRetryCounter expectedTxnNumberAndRetryCounter,
         std::vector<ShardId> expectedParticipants,
         boost::optional<txn::CommitDecision> expectedDecision = boost::none,
-        boost::optional<Timestamp> expectedCommitTimestamp = boost::none) {
+        boost::optional<Timestamp> expectedCommitTimestamp = boost::none,
+        boost::optional<std::vector<NamespaceString>> expectedAffectedNamespaces = boost::none) {
         ASSERT(doc.getId().getSessionId());
         ASSERT_EQUALS(*doc.getId().getSessionId(), expectedLsid);
         ASSERT(doc.getId().getTxnNumber());
@@ -681,6 +785,13 @@ protected:
             ASSERT(*expectedDecision == decision->getDecision());
         } else {
             ASSERT(!decision);
+        }
+
+        ASSERT_EQUALS(expectedAffectedNamespaces.has_value(),
+                      doc.getAffectedNamespaces().has_value());
+        if (expectedAffectedNamespaces) {
+            ASSERT_EQUALS(toStringSet(*expectedAffectedNamespaces),
+                          toStringSet(*doc.getAffectedNamespaces()));
         }
 
         if (expectedCommitTimestamp) {
@@ -702,27 +813,31 @@ protected:
         assertDocumentMatches(allCoordinatorDocs[0], lsid, txnNumberAndRetryCounter, participants);
     }
 
-    void persistDecisionExpectSuccess(OperationContext* opCtx,
-                                      LogicalSessionId lsid,
-                                      TxnNumberAndRetryCounter txnNumberAndRetryCounter,
-                                      const std::vector<ShardId>& participants,
-                                      const boost::optional<Timestamp>& commitTimestamp) {
-        txn::persistDecision(*_aws,
-                             lsid,
-                             txnNumberAndRetryCounter,
-                             participants,
-                             [&] {
-                                 txn::CoordinatorCommitDecision decision;
-                                 if (commitTimestamp) {
-                                     decision.setDecision(txn::CommitDecision::kCommit);
-                                     decision.setCommitTimestamp(commitTimestamp);
-                                 } else {
-                                     decision.setDecision(txn::CommitDecision::kAbort);
-                                     decision.setAbortStatus(Status(ErrorCodes::NoSuchTransaction,
-                                                                    "Test abort status"));
-                                 }
-                                 return decision;
-                             }())
+    void persistDecisionExpectSuccess(
+        OperationContext* opCtx,
+        LogicalSessionId lsid,
+        TxnNumberAndRetryCounter txnNumberAndRetryCounter,
+        const std::vector<ShardId>& participants,
+        const boost::optional<Timestamp>& commitTimestamp,
+        const boost::optional<std::vector<NamespaceString>>& affectedNamespaces) {
+        txn::persistDecision(
+            *_aws,
+            lsid,
+            txnNumberAndRetryCounter,
+            participants,
+            [&] {
+                txn::CoordinatorCommitDecision decision;
+                if (commitTimestamp) {
+                    decision.setDecision(txn::CommitDecision::kCommit);
+                    decision.setCommitTimestamp(commitTimestamp);
+                } else {
+                    decision.setDecision(txn::CommitDecision::kAbort);
+                    decision.setAbortStatus(
+                        Status(ErrorCodes::NoSuchTransaction, "Test abort status"));
+                }
+                return decision;
+            }(),
+            kDummyAffectedNamespaces)
             .get();
 
         auto allCoordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
@@ -733,7 +848,8 @@ protected:
                                   txnNumberAndRetryCounter,
                                   participants,
                                   txn::CommitDecision::kCommit,
-                                  *commitTimestamp);
+                                  *commitTimestamp,
+                                  affectedNamespaces);
         } else {
             assertDocumentMatches(allCoordinatorDocs[0],
                                   lsid,
@@ -839,6 +955,7 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
                                  _lsid,
                                  _txnNumberAndRetryCounter,
                                  _participants,
+                                 boost::none,
                                  boost::none /* abort */);
 }
 
@@ -850,11 +967,13 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
                                  _lsid,
                                  _txnNumberAndRetryCounter,
                                  _participants,
+                                 boost::none,
                                  boost::none /* abort */);
     persistDecisionExpectSuccess(operationContext(),
                                  _lsid,
                                  _txnNumberAndRetryCounter,
                                  _participants,
+                                 boost::none,
                                  boost::none /* abort */);
 }
 
@@ -864,11 +983,17 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 
     {
         FailPointEnableBlock failpoint("hangBeforeWritingDecision");
-        future = txn::persistDecision(*_aws, _lsid, _txnNumberAndRetryCounter, _participants, [&] {
-            txn::CoordinatorCommitDecision decision(txn::CommitDecision::kCommit);
-            decision.setCommitTimestamp(_commitTimestamp);
-            return decision;
-        }());
+        future = txn::persistDecision(
+            *_aws,
+            _lsid,
+            _txnNumberAndRetryCounter,
+            _participants,
+            [&] {
+                txn::CoordinatorCommitDecision decision(txn::CommitDecision::kCommit);
+                decision.setCommitTimestamp(_commitTimestamp);
+                return decision;
+            }(),
+            kDummyAffectedNamespaces);
         failpoint->waitForTimesEntered(failpoint.initialTimesEntered() + 1);
         _aws->shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Shutdown for test"});
     }
@@ -885,7 +1010,8 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
                                  _lsid,
                                  _txnNumberAndRetryCounter,
                                  _participants,
-                                 _commitTimestamp /* commit */);
+                                 _commitTimestamp,
+                                 kDummyAffectedNamespaces /* commit */);
 }
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
@@ -896,12 +1022,14 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
                                  _lsid,
                                  _txnNumberAndRetryCounter,
                                  _participants,
-                                 _commitTimestamp /* commit */);
+                                 _commitTimestamp,
+                                 kDummyAffectedNamespaces /* commit */);
     persistDecisionExpectSuccess(operationContext(),
                                  _lsid,
                                  _txnNumberAndRetryCounter,
                                  _participants,
-                                 _commitTimestamp /* commit */);
+                                 _commitTimestamp,
+                                 kDummyAffectedNamespaces /* commit */);
 }
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest, DeleteCoordinatorDocWhenNoDocumentExistsFails) {
@@ -954,6 +1082,7 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
                                  _lsid,
                                  _txnNumberAndRetryCounter,
                                  _participants,
+                                 boost::none,
                                  boost::none /* abort */);
     deleteCoordinatorDocExpectSuccess(operationContext(), _lsid, _txnNumberAndRetryCounter);
 }
@@ -966,7 +1095,8 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
                                  _lsid,
                                  _txnNumberAndRetryCounter,
                                  _participants,
-                                 _commitTimestamp /* commit */);
+                                 _commitTimestamp,
+                                 kDummyAffectedNamespaces /* commit */);
     deleteCoordinatorDocExpectSuccess(operationContext(), _lsid, _txnNumberAndRetryCounter);
 }
 
@@ -987,16 +1117,17 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 
     // Delete the document for the first transaction and check that only the second transaction's
     // document still exists.
-    txn::persistDecision(*_aws,
-                         _lsid,
-                         txnNumberAndRetryCounter1,
-                         _participants,
-                         [&] {
-                             txn::CoordinatorCommitDecision decision(txn::CommitDecision::kAbort);
-                             decision.setAbortStatus(
-                                 Status(ErrorCodes::NoSuchTransaction, "Test abort error"));
-                             return decision;
-                         }())
+    txn::persistDecision(
+        *_aws,
+        _lsid,
+        txnNumberAndRetryCounter1,
+        _participants,
+        [&] {
+            txn::CoordinatorCommitDecision decision(txn::CommitDecision::kAbort);
+            decision.setAbortStatus(Status(ErrorCodes::NoSuchTransaction, "Test abort error"));
+            return decision;
+        }(),
+        kDummyAffectedNamespaces)
         .get();
     txn::deleteCoordinatorDoc(*_aws, _lsid, txnNumberAndRetryCounter1).get();
 
@@ -1023,16 +1154,17 @@ TEST_F(
 
     // Delete the document for the first transaction and check that only the second transaction's
     // document still exists.
-    txn::persistDecision(*_aws,
-                         _lsid,
-                         txnNumberAndRetryCounter1,
-                         _participants,
-                         [&] {
-                             txn::CoordinatorCommitDecision decision(txn::CommitDecision::kAbort);
-                             decision.setAbortStatus(
-                                 Status(ErrorCodes::NoSuchTransaction, "Test abort error"));
-                             return decision;
-                         }())
+    txn::persistDecision(
+        *_aws,
+        _lsid,
+        txnNumberAndRetryCounter1,
+        _participants,
+        [&] {
+            txn::CoordinatorCommitDecision decision(txn::CommitDecision::kAbort);
+            decision.setAbortStatus(Status(ErrorCodes::NoSuchTransaction, "Test abort error"));
+            return decision;
+        }(),
+        kDummyAffectedNamespaces)
         .get();
     txn::deleteCoordinatorDoc(*_aws, _lsid, txnNumberAndRetryCounter1).get();
 
@@ -2756,5 +2888,6 @@ TEST_F(TransactionCoordinatorMetricsTest, ClientInformationIncludedInReportState
 
     coordinator.onCompletion().get();
 }
+
 }  // namespace
 }  // namespace mongo

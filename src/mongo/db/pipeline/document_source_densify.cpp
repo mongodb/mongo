@@ -28,13 +28,30 @@
  */
 
 #include "mongo/db/pipeline/document_source_densify.h"
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <iterator>
+#include <memory>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/overloaded_visitor.h"
-#include "mongo/util/string_map.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 using boost::intrusive_ptr;
 using boost::optional;
@@ -200,7 +217,7 @@ SortPattern getSortPatternForDensify(RangeStatement rangeStatement,
         part.fieldPath = field.fullPath();
         sortParts.push_back(std::move(part));
     }
-    return SortPattern{sortParts};
+    return SortPattern{std::move(sortParts)};
 }
 
 list<intrusive_ptr<DocumentSource>> create(const intrusive_ptr<ExpressionContext>& expCtx,
@@ -337,10 +354,19 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::densifyExplicitRang
                            RangeStatement(_range.getStep(),
                                           ExplicitBounds(bounds.first, bounds.second),
                                           _range.getUnit()));
+    } else if (_current < bounds.first) {
+        // All the documents we saw were below the explicit range, so _current is below the range.
+        // Densification starts at the first bounds, so _current is no longer relevant.
+        createDocGenerator(bounds.first,
+                           RangeStatement(_range.getStep(),
+                                          ExplicitBounds(bounds.first, bounds.second),
+                                          _range.getUnit()));
+
     } else if (_current->increment(_range) >= bounds.second) {
         _densifyState = DensifyState::kDensifyDone;
         return DocumentSource::GetNextResult::makeEOF();
     } else {
+        // _current is somewhere in the middle of the range.
         auto lowerBound = _current->increment(_range);
         createDocGenerator(lowerBound,
                            RangeStatement(_range.getStep(),
@@ -647,7 +673,7 @@ Value DocumentSourceInternalDensify::serialize(SerializationOptions opts) const 
                    _partitions.end(),
                    serializedPartitionByFields.begin(),
                    [&](FieldPath field) -> Value { return Value(opts.serializeFieldPath(field)); });
-    spec[kPartitionByFieldsFieldName] = Value(serializedPartitionByFields);
+    spec[kPartitionByFieldsFieldName] = Value(std::move(serializedPartitionByFields));
     spec[kRangeFieldName] = _range.serialize(opts);
     MutableDocument out;
     out[getSourceName()] = Value(spec.freeze());

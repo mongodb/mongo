@@ -29,9 +29,10 @@
 
 #include "mongo/base/string_data.h"
 
+#include <boost/utility/string_view.hpp>
 #include <ostream>
 
-#include <boost/utility/string_view.hpp>
+#include <boost/utility/string_view_fwd.hpp>
 
 namespace mongo {
 

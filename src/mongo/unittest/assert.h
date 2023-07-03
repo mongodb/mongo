@@ -426,8 +426,8 @@ private:
                    name(),
                    aExpression,
                    bExpression,
-                   stringify::stringifyForAssert(a),
-                   stringify::stringifyForAssert(b)));
+                   stringify::invoke(a),
+                   stringify::invoke(b)));
     }
 
 public:

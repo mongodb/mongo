@@ -29,11 +29,36 @@
 
 #include "mongo/s/collection_uuid_mismatch.h"
 
+#include <memory>
+#include <mutex>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/client.h"
 #include "mongo/db/list_collections_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/async_requests_sender.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 Status populateCollectionUUIDMismatch(OperationContext* opCtx,
@@ -74,7 +99,7 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
 
     auto response =
         executeCommandAgainstDatabasePrimary(opCtx,
-                                             info->dbName().db(),
+                                             DatabaseNameUtil::serialize(info->dbName()),
                                              swDbInfo.getValue(),
                                              listCollections.toBSON({}),
                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},

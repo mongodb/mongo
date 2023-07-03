@@ -30,6 +30,9 @@
 #pragma once
 
 #include <boost/filesystem.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
 #include <string>
 
 #include "mongo/bson/timestamp.h"

@@ -28,24 +28,38 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <cstdint>
+#include <memory>
 #include <string>
+#include <utility>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/plan_cache_commands.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/canonical_query_encoder.h"
+#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/plan_cache_callbacks.h"
-#include "mongo/db/query/plan_cache_key_factory.h"
-#include "mongo/db/query/plan_ranker.h"
-#include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/sbe_plan_cache.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -67,7 +81,7 @@ PlanCache* getPlanCache(OperationContext* opCtx, const CollectionPtr& collection
 Status clear(OperationContext* opCtx,
              const CollectionPtr& collection,
              PlanCache* planCache,
-             StringData ns,
+             const NamespaceString& nss,
              const BSONObj& cmdObj) {
     invariant(planCache);
 
@@ -76,7 +90,7 @@ Status clear(OperationContext* opCtx,
     // - clear plans for single query shape when a query shape is described in the
     //   command arguments.
     if (cmdObj.hasField("query")) {
-        auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, ns, cmdObj);
+        auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, nss, cmdObj);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -112,8 +126,7 @@ Status clear(OperationContext* opCtx,
                                    version,
                                    false /*matchSecondaryCollections*/);
 
-    LOGV2_DEBUG(
-        23908, 1, "{namespace}: Cleared plan cache", "Cleared plan cache", "namespace"_attr = ns);
+    LOGV2_DEBUG(23908, 1, "{namespace}: Cleared plan cache", "Cleared plan cache", logAttrs(nss));
 
     return Status::OK();
 }
@@ -185,7 +198,7 @@ bool PlanCacheClearCommand::run(OperationContext* opCtx,
     }
 
     auto planCache = getPlanCache(opCtx, ctx.getCollection());
-    uassertStatusOK(clear(opCtx, ctx.getCollection(), planCache, nss.ns(), cmdObj));
+    uassertStatusOK(clear(opCtx, ctx.getCollection(), planCache, nss, cmdObj));
     return true;
 }
 

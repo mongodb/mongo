@@ -29,16 +29,35 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cstdint>
+#include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk_base_gen.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

@@ -29,11 +29,19 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/polymorphic_scoped.h"

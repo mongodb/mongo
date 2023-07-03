@@ -29,9 +29,18 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/future.h"
 
 namespace mongo::stats {
 using StatsPathString = std::pair<NamespaceString, std::string>;

@@ -29,8 +29,16 @@
 
 #include "mongo/db/views/util.h"
 
-#include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/server_feature_flags_gen.h"
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo::view_util {
 void validateViewDefinitionBSON(OperationContext* opCtx,
@@ -52,7 +60,7 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
 
     auto viewName = NamespaceStringUtil::deserialize(dbName.tenantId(), viewNameElem.str());
 
-    bool viewNameIsValid = NamespaceString::validCollectionComponent(viewName.ns()) &&
+    bool viewNameIsValid = NamespaceString::validCollectionComponent(viewName) &&
         NamespaceString::validDBName(viewName.dbName());
     valid &= viewNameIsValid;
 

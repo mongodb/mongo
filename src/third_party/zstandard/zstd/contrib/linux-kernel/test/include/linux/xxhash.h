@@ -2,7 +2,7 @@
  * xxHash - Extremely Fast Hash algorithm
  * Copyright (C) 2012-2016, Yann Collet.
  *
- * BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+ * BSD 2-Clause License (https://opensource.org/licenses/bsd-license.php)
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -260,7 +260,7 @@ XXH_API void xxh64_copy_state(struct xxh64_state *dst, const struct xxh64_state 
  * xxHash - Extremely Fast Hash algorithm
  * Copyright (C) 2012-2016, Yann Collet.
  *
- * BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
+ * BSD 2-Clause License (https://opensource.org/licenses/bsd-license.php)
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are

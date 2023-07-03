@@ -34,6 +34,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface.h"
 
@@ -95,8 +96,7 @@ public:
      * time-series buckets collection.
      */
     bool timeseries() const {
-        return _viewOnNss.isTimeseriesBucketsCollection() &&
-            _viewOnNss.getTimeseriesViewNamespace() == _viewNss;
+        return _viewOnNss.isTimeseriesBucketsCollection();
     }
 
     void setViewOn(const NamespaceString& viewOnNss);

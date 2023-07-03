@@ -27,18 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <iterator>
+#include <list>
+#include <utility>
 
-#include "mongo/db/pipeline/document_source_unwind.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/sort_pattern.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -250,7 +264,7 @@ Value DocumentSourceUnwind::serialize(SerializationOptions opts) const {
     return Value(DOC(
         getSourceName() << DOC(
             "path" << opts.serializeFieldPathWithPrefix(_unwindPath) << "preserveNullAndEmptyArrays"
-                   << (_preserveNullAndEmptyArrays ? opts.serializeLiteralValue(true) : Value())
+                   << (_preserveNullAndEmptyArrays ? opts.serializeLiteral(true) : Value())
                    << "includeArrayIndex"
                    << (_indexPath ? Value(opts.serializeFieldPath(*_indexPath)) : Value()))));
 }

@@ -28,16 +28,39 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/index/column_key_generator.h"
-
-#include <iomanip>
+#include <absl/container/flat_hash_map.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstring>
 #include <ostream>
+#include <queue>
+#include <sys/types.h>
 #include <vector>
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/exec/projection_executor_builder.h"
+#include "mongo/db/index/column_key_generator.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/query/projection_ast.h"
+#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/projection_policies.h"
 #include "mongo/db/storage/column_store.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decimal_counter.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/itoa.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex

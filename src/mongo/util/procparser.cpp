@@ -28,32 +28,59 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/procparser.h"
 
 #include <algorithm>
 #include <array>
 #include <boost/algorithm/string/finder.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/filesystem.hpp>
+#include <cerrno>
+#include <cstddef>
 #include <fcntl.h>
+#include <istream>
 #include <string>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <type_traits>
-#include <unistd.h>
+#include <system_error>
 
+#include <boost/algorithm/string/constants.hpp>
+// IWYU pragma: no_include "boost/algorithm/string/detail/finder.hpp"
+#include <boost/algorithm/string/find_iterator.hpp>
+#include <boost/core/addressof.hpp>
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/file_status.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/function/function_base.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/range/iterator_range_core.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include <boost/type_index/type_index_facade.hpp>
+
+#ifndef _WIN32
+#include <type_traits>
+#endif
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/pcre.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 

@@ -28,13 +28,31 @@
  */
 
 #include "range_validator.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonelement.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
-#include <unordered_map>
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace fle {

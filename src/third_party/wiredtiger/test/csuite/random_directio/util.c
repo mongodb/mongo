@@ -77,8 +77,8 @@ copy_directory_int(const char *fromdir, const char *todir, bool directio)
          */
         if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
             continue;
-        testutil_check(__wt_snprintf(fromfile, sizeof(fromfile), "%s/%s", fromdir, dp->d_name));
-        testutil_check(__wt_snprintf(tofile, sizeof(tofile), "%s/%s", todir, dp->d_name));
+        testutil_snprintf(fromfile, sizeof(fromfile), "%s/%s", fromdir, dp->d_name);
+        testutil_snprintf(tofile, sizeof(tofile), "%s/%s", todir, dp->d_name);
         if (dp->d_type == DT_DIR) {
             copy_directory_int(fromfile, tofile, directio);
             continue;
@@ -147,21 +147,6 @@ copy_directory_int(const char *fromdir, const char *todir, bool directio)
 }
 
 /*
- * clean_directory --
- *     Clean up a directory, use system to remove sub-directories too.
- */
-static void
-clean_directory(const char *todir)
-{
-    int status;
-    char buf[512];
-
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "rm -rf %s", todir));
-    if ((status = system(buf)) < 0)
-        testutil_die(status, "system: %s", buf);
-}
-
-/*
  * copy_directory --
  *     Copy a directory, using direct IO if indicated. Wrapper because the sub functions can be
  *     called recursively if there are sub-directories present.
@@ -169,6 +154,6 @@ clean_directory(const char *todir)
 void
 copy_directory(const char *fromdir, const char *todir, bool directio)
 {
-    clean_directory(todir);
+    testutil_remove(todir);
     copy_directory_int(fromdir, todir, directio);
 }

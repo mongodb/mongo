@@ -29,9 +29,14 @@
 
 #pragma once
 
+#include <vector>
+
 #include "mongo/db/query/optimizer/cascades/memo.h"
+#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node_defs.h"
+#include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 

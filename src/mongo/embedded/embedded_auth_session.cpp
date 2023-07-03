@@ -27,13 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <set>
+#include <string>
+#include <tuple>
+#include <vector>
 
 #include "mongo/base/shim.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/auth_name.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/explain_verbosity_gen.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/embedded/not_implemented.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace embedded {
@@ -86,6 +113,10 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
+    boost::optional<TenantId> getUserTenantId() const override {
+        return boost::none;
+    }
+
     bool shouldIgnoreAuthChecks() override {
         return true;
     }
@@ -120,8 +151,7 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    StatusWith<PrivilegeVector> checkAuthorizedToListCollections(StringData,
-                                                                 const BSONObj&) override {
+    StatusWith<PrivilegeVector> checkAuthorizedToListCollections(const ListCollections&) override {
         return PrivilegeVector();
     }
 
@@ -206,7 +236,7 @@ public:
         return Status::OK();
     }
 
-    bool isAuthorizedForAnyActionOnAnyResourceInDB(StringData) override {
+    bool isAuthorizedForAnyActionOnAnyResourceInDB(const DatabaseName&) override {
         return true;
     }
 

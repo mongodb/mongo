@@ -28,20 +28,58 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/topology_time_ticker.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -298,6 +336,12 @@ VectorClock::VectorTime VectorClockMongoD::recoverDirect(OperationContext* opCtx
     _advanceTime(
         {newDurableTime.clusterTime(), newDurableTime.configTime(), newDurableTime.topologyTime()});
 
+    LOGV2_DEBUG(1,
+                6011000,
+                "Recovered persisted vector clock",
+                "configTime"_attr = newDurableTime.configTime(),
+                "topologyTime"_attr = newDurableTime.topologyTime());
+
     return newDurableTime;
 }
 
@@ -448,10 +492,8 @@ void VectorClockMongoD::_tickTo(Component component, LogicalTime newTime) {
         return;
     }
 
-    if (component == Component::ConfigTime) {
-        // The ConfigTime is allowed to be tickTo on the ConfigServer and on the shard only when
-        // called from ShardingStateRecovery
-        // TODO SERVER-60110 re-add clusterRole == configServer condition like for TopologyTime
+    if (component == Component::ConfigTime &&
+        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         _advanceComponentTimeTo(component, std::move(newTime));
         return;
     }

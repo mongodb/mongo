@@ -29,15 +29,14 @@
 
 #include "mongo/crypto/jws_validator.h"
 
-#include <iostream>
 #include <string>
-#include <vector>
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/config.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"

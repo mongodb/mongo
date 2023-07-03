@@ -27,6 +27,8 @@ import subprocess
 import os
 import sys
 import pathlib
+import shutil
+import glob
 
 parser = argparse.ArgumentParser()
 
@@ -36,7 +38,10 @@ parser.add_argument('--extraction-command', type=str, action='store',
                     help="The command to use for the extraction.")
 parser.add_argument('--tarball', type=str, action='store',
                     help="The tarball to perform the extraction on.")
-
+parser.add_argument(
+    '--move-output', type=str, action='append', help=
+    "Move an extracted entry to a new location after extraction. Format is colon separated, e.g. '--move-output=file/to/move:path/to/destination'. Can accept glob like wildcards."
+)
 args = parser.parse_args()
 
 if args.change_dir:
@@ -48,17 +53,33 @@ else:
     working_dir = None
     tarball = pathlib.Path(args.tarball).as_posix()
 
+shell = os.environ.get('SHELL', '/bin/bash')
+
 if sys.platform == 'win32':
-    proc = subprocess.run(['C:/cygwin/bin/cygpath.exe', '-w', os.environ['SHELL']], text=True,
+    proc = subprocess.run(['C:/cygwin/bin/cygpath.exe', '-w', shell], text=True,
                           capture_output=True)
     bash = pathlib.Path(proc.stdout.strip())
     cmd = [bash.as_posix(), '-c', f"{args.extraction_command} {tarball}"]
 else:
-    cmd = [os.environ['SHELL'], '-c', f"{args.extraction_command} {tarball}"]
+    cmd = [shell, '-c', f"{args.extraction_command} {tarball}"]
 
 print(f"Extracting: {' '.join(cmd)}")
 proc = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                       cwd=working_dir)
 
 print(proc.stdout)
+
+if args.move_output:
+    for arg in args.move_output:
+        try:
+            src, dst = arg.split(':')
+            print(f"Moving {src} to {dst}...")
+            files_to_move = glob.glob(src, recursive=True)
+            for file in files_to_move:
+                result_dst = shutil.move(file, dst)
+                print(f"Moved {file} to {result_dst}")
+        except ValueError as exc:
+            print(f"Bad format, needs to be glob like paths in the from 'src:dst', got: {arg}")
+            raise exc
+
 sys.exit(proc.returncode)

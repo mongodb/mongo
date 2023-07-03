@@ -27,13 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <exception>
 #include <memory>
+#include <type_traits>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/address_restriction_gen.h"
-#include "mongo/db/server_options.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
 
 constexpr mongo::StringData mongo::address_restriction_detail::ClientSource::label;
 constexpr mongo::StringData mongo::address_restriction_detail::ClientSource::field;

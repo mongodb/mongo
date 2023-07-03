@@ -2,7 +2,7 @@
 """Test zstd interoperability between versions"""
 
 # ################################################################
-# Copyright (c) Yann Collet, Facebook, Inc.
+# Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
 # This source code is licensed under both the BSD-style license (found in the
@@ -23,14 +23,25 @@ from subprocess import Popen, PIPE
 repo_url = 'https://github.com/facebook/zstd.git'
 tmp_dir_name = 'tests/versionsTest'
 make_cmd = 'make'
-make_args = ['-j','CFLAGS=-O1']
+make_args = ['-j','CFLAGS=-O0']
 git_cmd = 'git'
 test_dat_src = 'README.md'
 test_dat = 'test_dat'
 head = 'vdevel'
 dict_source = 'dict_source'
-dict_files = './zstd/programs/*.c ./zstd/lib/common/*.c ./zstd/lib/compress/*.c ./zstd/lib/decompress/*.c ./zstd/lib/dictBuilder/*.c ./zstd/lib/legacy/*.c '
-dict_files += './zstd/programs/*.h ./zstd/lib/common/*.h ./zstd/lib/compress/*.h ./zstd/lib/dictBuilder/*.h ./zstd/lib/legacy/*.h'
+dict_globs = [
+    'programs/*.c',
+    'lib/common/*.c',
+    'lib/compress/*.c',
+    'lib/decompress/*.c',
+    'lib/dictBuilder/*.c',
+    'lib/legacy/*.c',
+    'programs/*.h',
+    'lib/common/*.h',
+    'lib/compress/*.h',
+    'lib/dictBuilder/*.h',
+    'lib/legacy/*.h'
+]
 
 
 def execute(command, print_output=False, print_error=True, param_shell=False):
@@ -74,59 +85,85 @@ def get_git_tags():
     return tags
 
 
-def create_dict(tag, dict_source_path):
+def dict_ok(tag, dict_name, sample):
+    if not os.path.isfile(dict_name):
+        return False
+    try:
+        cmd = ['./zstd.' + tag, '-D', dict_name]
+        with open(sample, "rb") as i:
+            subprocess.check_call(cmd, stdin=i, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    except:
+        return False
+
+
+def create_dict(tag, dict_source_path, fallback_tag=None):
     dict_name = 'dict.' + tag
     if not os.path.isfile(dict_name):
         cFiles = glob.glob(dict_source_path + "/*.c")
         hFiles = glob.glob(dict_source_path + "/*.h")
+        # Ensure the dictionary builder is deterministic
+        files = sorted(cFiles + hFiles)
         if tag == 'v0.5.0':
-            result = execute('./dictBuilder.' + tag + ' ' + ' '.join(cFiles) + ' ' + ' '.join(hFiles) + ' -o ' + dict_name, print_output=False, param_shell=True)
+            result = execute('./dictBuilder.' + tag + ' ' + ' '.join(files) + ' -o ' + dict_name, print_output=False, param_shell=True)
         else:
-            result = execute('./zstd.' + tag + ' -f --train ' + ' '.join(cFiles) + ' ' + ' '.join(hFiles) + ' -o ' + dict_name, print_output=False, param_shell=True)
-        if result == 0:
+            result = execute('./zstd.' + tag + ' -f --train ' + ' '.join(files) + ' -o ' + dict_name, print_output=False, param_shell=True)
+        if result == 0 and dict_ok(tag, dict_name, files[0]):
             print(dict_name + ' created')
+        elif fallback_tag is not None:
+            fallback_dict_name = 'dict.' + fallback_tag
+            print('creating dictionary ' + dict_name + ' failed, falling back to ' + fallback_dict_name)
+            shutil.copy(fallback_dict_name, dict_name)
         else:
-            print('ERROR: creating of ' + dict_name + ' failed')
+            raise RuntimeError('ERROR: creating of ' + dict_name + ' failed')
     else:
         print(dict_name + ' already exists')
 
 
+def zstd(tag, args, input_file, output_file):
+    """
+    Zstd compress input_file to output_file.
+    Need this helper because 0.5.0 is broken when stdout is not a TTY.
+    Throws an exception if the command returns non-zero.
+    """
+    with open(input_file, "rb") as i:
+        with open(output_file, "wb") as o:
+            cmd = ['./zstd.' + tag] + args
+            print("Running: '{}', input={}, output={}" .format(
+                ' '.join(cmd), input_file, output_file
+            ))
+            result = subprocess.run(cmd, stdin=i, stdout=o, stderr=subprocess.PIPE)
+            print("Stderr: {}".format(result.stderr.decode("ascii")))
+            result.check_returncode()
+
+
 def dict_compress_sample(tag, sample):
     dict_name = 'dict.' + tag
-    DEVNULL = open(os.devnull, 'wb')
-    if subprocess.call(['./zstd.' + tag, '-D', dict_name, '-f',   sample], stderr=DEVNULL) == 0:
-        os.rename(sample + '.zst', sample + '_01_64_' + tag + '_dictio.zst')
-    if subprocess.call(['./zstd.' + tag, '-D', dict_name, '-5f',  sample], stderr=DEVNULL) == 0:
-        os.rename(sample + '.zst', sample + '_05_64_' + tag + '_dictio.zst')
-    if subprocess.call(['./zstd.' + tag, '-D', dict_name, '-9f',  sample], stderr=DEVNULL) == 0:
-        os.rename(sample + '.zst', sample + '_09_64_' + tag + '_dictio.zst')
-    if subprocess.call(['./zstd.' + tag, '-D', dict_name, '-15f', sample], stderr=DEVNULL) == 0:
-        os.rename(sample + '.zst', sample + '_15_64_' + tag + '_dictio.zst')
-    if subprocess.call(['./zstd.' + tag, '-D', dict_name, '-18f', sample], stderr=DEVNULL) == 0:
-        os.rename(sample + '.zst', sample + '_18_64_' + tag + '_dictio.zst')
+    verbose = ['-v', '-v', '-v']
+    zstd(tag, ['-D', dict_name, '-1'] + verbose, sample, sample + '_01_64_' + tag + '_dictio.zst')
+    zstd(tag, ['-D', dict_name, '-3'], sample, sample + '_03_64_' + tag + '_dictio.zst')
+    zstd(tag, ['-D', dict_name, '-5'], sample, sample + '_05_64_' + tag + '_dictio.zst')
+    zstd(tag, ['-D', dict_name, '-9'], sample, sample + '_09_64_' + tag + '_dictio.zst')
+    zstd(tag, ['-D', dict_name, '-15'], sample, sample + '_15_64_' + tag + '_dictio.zst')
+    zstd(tag, ['-D', dict_name, '-18'], sample, sample + '_18_64_' + tag + '_dictio.zst')
     # zstdFiles = glob.glob("*.zst*")
     # print(zstdFiles)
     print(tag + " : dict compression completed")
 
 
 def compress_sample(tag, sample):
-    DEVNULL = open(os.devnull, 'wb')
-    if subprocess.call(['./zstd.' + tag, '-f',   sample], stderr=DEVNULL) == 0:
-        os.rename(sample + '.zst', sample + '_01_64_' + tag + '_nodict.zst')
-    if subprocess.call(['./zstd.' + tag, '-5f',  sample], stderr=DEVNULL) == 0:
-        os.rename(sample + '.zst', sample + '_05_64_' + tag + '_nodict.zst')
-    if subprocess.call(['./zstd.' + tag, '-9f',  sample], stderr=DEVNULL) == 0:
-        os.rename(sample + '.zst', sample + '_09_64_' + tag + '_nodict.zst')
-    if subprocess.call(['./zstd.' + tag, '-15f', sample], stderr=DEVNULL) == 0:
-        os.rename(sample + '.zst', sample + '_15_64_' + tag + '_nodict.zst')
-    if subprocess.call(['./zstd.' + tag, '-18f', sample], stderr=DEVNULL) == 0:
-        os.rename(sample + '.zst', sample + '_18_64_' + tag + '_nodict.zst')
+    zstd(tag, ['-1'], sample, sample + '_01_64_' + tag + '_nodict.zst')
+    zstd(tag, ['-3'], sample, sample + '_03_64_' + tag + '_nodict.zst')
+    zstd(tag, ['-5'], sample, sample + '_05_64_' + tag + '_nodict.zst')
+    zstd(tag, ['-9'], sample, sample + '_09_64_' + tag + '_nodict.zst')
+    zstd(tag, ['-15'], sample, sample + '_15_64_' + tag + '_nodict.zst')
+    zstd(tag, ['-18'], sample, sample + '_18_64_' + tag + '_nodict.zst')
     # zstdFiles = glob.glob("*.zst*")
     # print(zstdFiles)
     print(tag + " : compression completed")
 
 
-# http://stackoverflow.com/a/19711609/2132223
+# https://stackoverflow.com/a/19711609/2132223
 def sha1_of_file(filepath):
     with open(filepath, 'rb') as f:
         return hashlib.sha1(f.read()).hexdigest()
@@ -150,23 +187,13 @@ def decompress_zst(tag):
     dec_error = 0
     list_zst = sorted(glob.glob('*_nodict.zst'))
     for file_zst in list_zst:
-        print(file_zst, end=' ')
-        print(tag, end=' ')
+        print(file_zst + ' ' + tag)
         file_dec = file_zst + '_d64_' + tag + '.dec'
-        if tag <= 'v0.5.0':
-            params = ['./zstd.' + tag, '-df', file_zst, file_dec]
+        zstd(tag, ['-d'], file_zst, file_dec)
+        if not filecmp.cmp(file_dec, test_dat):
+            raise RuntimeError('Decompression failed: tag={} file={}'.format(tag, file_zst))
         else:
-            params = ['./zstd.' + tag, '-df', file_zst, '-o', file_dec]
-        if execute(params) == 0:
-            if not filecmp.cmp(file_dec, test_dat):
-                print('ERR !! ')
-                dec_error = 1
-            else:
-                print('OK     ')
-        else:
-            print('command does not work')
-            dec_error = 1
-    return dec_error
+            print('OK     ')
 
 
 def decompress_dict(tag):
@@ -181,22 +208,13 @@ def decompress_dict(tag):
         if tag == 'v0.6.0' and dict_tag < 'v0.6.0':
             continue
         dict_name = 'dict.' + dict_tag
-        print(file_zst + ' ' + tag + ' dict=' + dict_tag, end=' ')
+        print(file_zst + ' ' + tag + ' dict=' + dict_tag)
         file_dec = file_zst + '_d64_' + tag + '.dec'
-        if tag <= 'v0.5.0':
-            params = ['./zstd.' + tag, '-D', dict_name, '-df', file_zst, file_dec]
+        zstd(tag, ['-D', dict_name, '-d'], file_zst, file_dec)
+        if not filecmp.cmp(file_dec, test_dat):
+            raise RuntimeError('Decompression failed: tag={} file={}'.format(tag, file_zst))
         else:
-            params = ['./zstd.' + tag, '-D', dict_name, '-df', file_zst, '-o', file_dec]
-        if execute(params) == 0:
-            if not filecmp.cmp(file_dec, test_dat):
-                print('ERR !! ')
-                dec_error = 1
-            else:
-                print('OK     ')
-        else:
-            print('command does not work')
-            dec_error = 1
-    return dec_error
+            print('OK     ')
 
 
 if __name__ == '__main__':
@@ -260,32 +278,31 @@ if __name__ == '__main__':
     # copy *.c and *.h to a temporary directory ("dict_source")
     if not os.path.isdir(dict_source_path):
         os.mkdir(dict_source_path)
-        print('cp ' + dict_files + ' ' + dict_source_path)
-        execute('cp ' + dict_files + ' ' + dict_source_path, param_shell=True)
+        for dict_glob in dict_globs:
+            files = glob.glob(dict_glob, root_dir=base_dir)
+            for file in files:
+                file = os.path.join(base_dir, file)
+                print("copying " + file + " to " + dict_source_path)
+                shutil.copy(file, dict_source_path)
 
     print('-----------------------------------------------')
     print('Compress test.dat by all released zstd')
     print('-----------------------------------------------')
 
-    error_code = 0
+    create_dict(head, dict_source_path)
     for tag in tags:
         print(tag)
         if tag >= 'v0.5.0':
-            create_dict(tag, dict_source_path)
+            create_dict(tag, dict_source_path, head)
             dict_compress_sample(tag, test_dat)
             remove_duplicates()
-            error_code += decompress_dict(tag)
+            decompress_dict(tag)
         compress_sample(tag, test_dat)
         remove_duplicates()
-        error_code += decompress_zst(tag)
+        decompress_zst(tag)
 
     print('')
     print('Enumerate different compressed files')
     zstds = sorted(glob.glob('*.zst'))
     for zstd in zstds:
         print(zstd + ' : ' + repr(os.path.getsize(zstd)) + ', ' + sha1_of_file(zstd))
-
-    if error_code != 0:
-        print('======  ERROR !!!  =======')
-
-    sys.exit(error_code)

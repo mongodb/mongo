@@ -30,12 +30,18 @@
 #include "mongo/db/exec/and_hash.h"
 
 #include <memory>
+#include <utility>
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/and_common.h"
-#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/util/str.h"
+#include "mongo/util/assert_util.h"
 
 namespace {
 
@@ -179,10 +185,10 @@ PlanStage::StageState AndHashStage::doWork(WorkingSetID* out) {
     // hash map.
 
     // We should be EOF if we're not hashing results and the dataMap is empty.
-    verify(!_dataMap.empty());
+    MONGO_verify(!_dataMap.empty());
 
     // We probe _dataMap with the last child.
-    verify(_currentChild == _children.size() - 1);
+    MONGO_verify(_currentChild == _children.size() - 1);
 
     // Get the next result for the (_children.size() - 1)-th child.
     StageState childStatus = workChild(_children.size() - 1, out);
@@ -228,7 +234,7 @@ PlanStage::StageState AndHashStage::workChild(size_t childNo, WorkingSetID* out)
 }
 
 PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
-    verify(_currentChild == 0);
+    MONGO_verify(_currentChild == 0);
 
     WorkingSetID id = WorkingSet::INVALID_ID;
     StageState childStatus = workChild(0, &id);
@@ -279,7 +285,7 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
 }
 
 PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
-    verify(_currentChild > 0);
+    MONGO_verify(_currentChild > 0);
 
     WorkingSetID id = WorkingSet::INVALID_ID;
     StageState childStatus = workChild(_currentChild, &id);

@@ -28,25 +28,36 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
 
-#include "mongo/db/query/canonical_query.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/crypto/encryption_fields_gen.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/cst/cst_parser.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression_array.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/str.h"
+#include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -134,7 +145,11 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     // Make the CQ we'll hopefully return.
     auto cq = std::make_unique<CanonicalQuery>();
     cq->setExplain(baseQuery.getExplain());
-    auto swParsedFind = parsed_find_command::parse(baseQuery.getExpCtx(), std::move(findCommand));
+    auto swParsedFind = ParsedFindCommand::withExistingFilter(
+        baseQuery.getExpCtx(),
+        baseQuery.getCollator() ? baseQuery.getCollator()->clone() : nullptr,
+        root->clone(),
+        std::move(findCommand));
     if (!swParsedFind.isOK()) {
         return swParsedFind.getStatus();
     }
@@ -302,13 +317,9 @@ Status CanonicalQuery::isValidNormalized(const MatchExpression* root) {
 std::string CanonicalQuery::toString(bool forErrMsg) const {
     str::stream ss;
     if (forErrMsg) {
-        ss << "ns="
-           << _findCommand->getNamespaceOrUUID()
-                  .nss()
-                  .value_or(NamespaceString())
-                  .toStringForErrorMsg();
+        ss << "ns=" << _findCommand->getNamespaceOrUUID().toStringForErrorMsg();
     } else {
-        ss << "ns=" << _findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).ns();
+        ss << "ns=" << toStringForLogging(_findCommand->getNamespaceOrUUID());
     }
 
     if (_findCommand->getBatchSize()) {
@@ -336,13 +347,9 @@ std::string CanonicalQuery::toString(bool forErrMsg) const {
 std::string CanonicalQuery::toStringShort(bool forErrMsg) const {
     str::stream ss;
     if (forErrMsg) {
-        ss << "ns: "
-           << _findCommand->getNamespaceOrUUID()
-                  .nss()
-                  .value_or(NamespaceString())
-                  .toStringForErrorMsg();
+        ss << "ns: " << _findCommand->getNamespaceOrUUID().toStringForErrorMsg();
     } else {
-        ss << "ns: " << _findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).ns();
+        ss << "ns: " << toStringForLogging(_findCommand->getNamespaceOrUUID());
     }
 
     ss << " query: " << _findCommand->getFilter().toString()

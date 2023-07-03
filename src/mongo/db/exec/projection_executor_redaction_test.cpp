@@ -27,17 +27,29 @@
  *    it in the license file.
  */
 
+#include <functional>
+#include <memory>
+#include <string>
+
 #include "document_value/document_value_test_util.h"
+#include <boost/none.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/serialization_options.h"
-#include "mongo/unittest/inline_auto_update.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -64,11 +76,10 @@ std::string applyHmacForTest(StringData s) {
 
 TEST(Redaction, ProjectionTest) {
     SerializationOptions options;
-    options.replacementForLiteralArgs = "?";
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.applyHmacToIdentifiers = true;
+    options.transformIdentifiers = true;
 
-    options.identifierHmacPolicy = applyHmacForTest;
+    options.transformIdentifiersCallback = applyHmacForTest;
     auto redactProj = [&](std::string obj) {
         return compileProjection(fromjson(obj))->serializeTransformation(boost::none, options);
     };

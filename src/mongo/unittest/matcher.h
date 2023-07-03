@@ -30,18 +30,27 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
 #include <fmt/format.h>
+#include <functional>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <tuple>
+#include <type_traits>
 #include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/matcher_core.h"
+#include "mongo/unittest/stringify.h"
+#include "mongo/util/assert_util.h"
 
 /**
  * Defines a basic set of matchers to be used with the ASSERT_THAT macro (see
@@ -152,7 +161,7 @@ public:
     explicit RelOpBase(T v) : _v{std::move(v)} {}
 
     std::string describe() const {
-        return format(FMT_STRING("{}({})"), self().name, stringify::stringifyForAssert(_v));
+        return format(FMT_STRING("{}({})"), self().name, stringify::invoke(_v));
     }
 
     template <typename X, std::enable_if_t<stdx::is_detected_v<CanMatchOp, X>, int> = 0>

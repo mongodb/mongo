@@ -417,7 +417,7 @@ __schema_alter(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
      */
     flags = WT_BTREE_ALTER | WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY;
     if (WT_PREFIX_MATCH(uri, "file:"))
-        return (__wt_exclusive_handle_operation(session, uri, __alter_file, newcfg, flags));
+        return (__wt_execute_handle_operation(session, uri, __alter_file, newcfg, flags));
     if (WT_PREFIX_MATCH(uri, "colgroup:") || WT_PREFIX_MATCH(uri, "index:"))
         return (__alter_tree(session, uri, newcfg));
     if (WT_PREFIX_MATCH(uri, "lsm:"))
@@ -427,7 +427,7 @@ __schema_alter(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
     if (WT_PREFIX_MATCH(uri, "table:"))
         return (__alter_table(session, uri, newcfg, exclusive_refreshed));
     if (WT_PREFIX_MATCH(uri, "tier:"))
-        return (__wt_exclusive_handle_operation(session, uri, __alter_tier, newcfg, flags));
+        return (__wt_execute_handle_operation(session, uri, __alter_tier, newcfg, flags));
     if (WT_PREFIX_MATCH(uri, "tiered:"))
         return (__alter_tiered(session, uri, newcfg, flags));
     return (__wt_bad_object_type(session, uri));

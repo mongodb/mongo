@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
@@ -45,6 +46,6 @@ void disableX509Auth(ServiceContext* svcCtx);
 bool isX509AuthDisabled(ServiceContext* svcCtx);
 UserRequest getX509UserRequest(OperationContext* opCtx, UserRequest request);
 
-void doSpeculativeAuthenticate(OperationContext* opCtx, BSONObj isMaster, BSONObjBuilder* result);
+void doSpeculativeAuthenticate(OperationContext* opCtx, BSONObj helloCmd, BSONObjBuilder* result);
 
 }  // namespace mongo

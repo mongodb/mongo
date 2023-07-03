@@ -29,22 +29,33 @@
 
 #pragma once
 
-#include "mongo/util/duration.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <memory>
 #include <queue>
+#include <utility>
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/cqf_get_executor.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/sbe_runtime_planner.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/util/duration.h"
 
 namespace mongo::plan_executor_factory {
 

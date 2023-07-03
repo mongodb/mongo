@@ -27,15 +27,37 @@
  *    it in the license file.
  */
 
+#include <list>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/internal_rename_if_options_and_indexes_match_gen.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/ddl_lock_manager.h"
-#include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -71,8 +93,7 @@ public:
                 std::list<BSONObj>(originalIndexes.begin(), originalIndexes.end());
             const auto& collectionOptions = thisRequest.getCollectionOptions();
 
-            if (serverGlobalParams.clusterRole.has(ClusterRole::None) ||
-                serverGlobalParams.clusterRole.exclusivelyHasConfigRole()) {
+            if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
                 // No need to acquire additional locks in a non-sharded environment
                 _internalRun(opCtx, fromNss, toNss, indexList, collectionOptions);
                 return;
@@ -86,27 +107,21 @@ public:
              * - Serialize with sharded DDLs, ensuring no concurrent modifications of the
              * collections.
              * - Check safely if the target collection is sharded or not.
-             * Since we are not using the ShardingDDLCoordinator infrastructure we need to
-             * explicitly wait for all DDL coordinators to be recovered and to have re-acquired
-             * their DDL locks before to proceed.
-             * TODO SERVER-76463 remove call to 'waitForRecoveryCompletion'.
              */
-            ShardingDDLCoordinatorService::getService(opCtx)->waitForRecoveryCompletion(opCtx);
             static constexpr StringData lockReason{"internalRenameCollection"_sd};
-            auto ddlLockManager = DDLLockManager::get(opCtx);
-            auto fromCollDDLLock = ddlLockManager->lock(
-                opCtx, fromNss.ns(), lockReason, DDLLockManager::kDefaultLockTimeout);
+            const DDLLockManager::ScopedCollectionDDLLock fromCollDDLLock{
+                opCtx, fromNss, lockReason, MODE_X, DDLLockManager::kDefaultLockTimeout};
 
             // If we are renaming a buckets collection in the $out stage, we must acquire a lock on
             // the view namespace, instead of the buckets namespace. This lock avoids concurrent
             // modifications, since users run operations on the view and not the buckets namespace
             // and all time-series DDL operations take a lock on the view namespace.
-            auto toCollDDLLock = ddlLockManager->lock(opCtx,
-                                                      fromNss.isOutTmpBucketsCollection()
-                                                          ? toNss.getTimeseriesViewNamespace().ns()
-                                                          : toNss.ns(),
-                                                      lockReason,
-                                                      DDLLockManager::kDefaultLockTimeout);
+            const DDLLockManager::ScopedCollectionDDLLock toCollDDLLock{
+                opCtx,
+                fromNss.isOutTmpBucketsCollection() ? toNss.getTimeseriesViewNamespace() : toNss,
+                lockReason,
+                MODE_X,
+                DDLLockManager::kDefaultLockTimeout};
 
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << "cannot rename to sharded collection '"
@@ -130,7 +145,7 @@ public:
             options.dropTarget = true;
             options.stayTemp = false;
             doLocalRenameIfOptionsAndIndexesHaveNotChanged(
-                opCtx, fromNss, toNss, options, std::move(indexList), collectionOptions);
+                opCtx, fromNss, toNss, options, indexList, collectionOptions);
         }
 
         NamespaceString ns() const override {

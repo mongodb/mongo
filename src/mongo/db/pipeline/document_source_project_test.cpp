@@ -27,15 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <absl/container/flat_hash_map.h>
+#include <bitset>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <memory>
 #include <vector>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -43,7 +54,9 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -341,7 +354,7 @@ TEST_F(ProjectStageTest, CannotAddNestedDocumentExceedingDepthLimit) {
 /**
  * A default redaction strategy that generates easy to check results for testing purposes.
  */
-std::string applyHmacToIdentifiersForTest(StringData s) {
+std::string transformIdentifiersForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 

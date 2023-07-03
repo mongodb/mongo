@@ -29,14 +29,32 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
 #include <wiredtiger.h>
 
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/validate_results.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -131,23 +149,23 @@ public:
 
     virtual Status insert(
         OperationContext* opCtx,
-        const KeyString::Value& keyString,
+        const key_string::Value& keyString,
         bool dupsAllowed,
         IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff);
 
     virtual void unindex(OperationContext* opCtx,
-                         const KeyString::Value& keyString,
+                         const key_string::Value& keyString,
                          bool dupsAllowed);
 
     virtual boost::optional<RecordId> findLoc(OperationContext* opCtx,
-                                              const KeyString::Value& keyString) const override;
+                                              const key_string::Value& keyString) const override;
 
     virtual IndexValidateResults validate(OperationContext* opCtx, bool full) const;
 
     virtual bool appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* output,
                                    double scale) const;
-    virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString);
+    virtual Status dupKeyCheck(OperationContext* opCtx, const key_string::Value& keyString);
 
     virtual bool isEmpty(OperationContext* opCtx);
 
@@ -160,7 +178,7 @@ public:
     virtual Status initAsEmpty(OperationContext* opCtx);
 
     virtual void printIndexEntryMetadata(OperationContext* opCtx,
-                                         const KeyString::Value& keyString) const;
+                                         const key_string::Value& keyString) const;
 
     Status compact(OperationContext* opCtx) override;
 
@@ -194,11 +212,11 @@ public:
 
     virtual bool isDup(OperationContext* opCtx,
                        WT_CURSOR* c,
-                       const KeyString::Value& keyString) = 0;
+                       const key_string::Value& keyString) = 0;
     virtual bool unique() const = 0;
     virtual bool isTimestampSafeUniqueIdx() const = 0;
     void insertWithRecordIdInValue_forTest(OperationContext* opCtx,
-                                           const KeyString::Value& keyString,
+                                           const key_string::Value& keyString,
                                            RecordId rid) override {
         MONGO_UNREACHABLE;
     }
@@ -207,13 +225,13 @@ protected:
     virtual Status _insert(
         OperationContext* opCtx,
         WT_CURSOR* c,
-        const KeyString::Value& keyString,
+        const key_string::Value& keyString,
         bool dupsAllowed,
         IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff) = 0;
 
     virtual void _unindex(OperationContext* opCtx,
                           WT_CURSOR* c,
-                          const KeyString::Value& keyString,
+                          const key_string::Value& keyString,
                           bool dupsAllowed) = 0;
 
     void setKey(WT_CURSOR* cursor, const WT_ITEM* item);
@@ -235,14 +253,14 @@ protected:
      */
     boost::optional<RecordId> _keyExistsBounded(OperationContext* opCtx,
                                                 WT_CURSOR* c,
-                                                const KeyString::Value& keyString,
+                                                const key_string::Value& keyString,
                                                 size_t sizeWithoutRecordId);
 
     /**
      * Sets the upper bound on the passed in cursor to be the maximum value of the KeyString prefix.
      */
     void _setUpperBound(WT_CURSOR* c,
-                        const KeyString::Value& keyString,
+                        const key_string::Value& keyString,
                         size_t sizeWithoutRecordId);
 
     /**
@@ -253,18 +271,18 @@ protected:
     StatusWith<bool> _checkDups(
         OperationContext* opCtx,
         WT_CURSOR* c,
-        const KeyString::Value& keyString,
+        const key_string::Value& keyString,
         IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff);
 
     /*
      * Determines the data format version from application metadata and verifies compatibility.
      * Returns the corresponding KeyString version.
      */
-    KeyString::Version _handleVersionInfo(OperationContext* ctx,
-                                          const std::string& uri,
-                                          StringData ident,
-                                          const IndexDescriptor* desc,
-                                          bool isLogged);
+    key_string::Version _handleVersionInfo(OperationContext* ctx,
+                                           const std::string& uri,
+                                           StringData ident,
+                                           const IndexDescriptor* desc,
+                                           bool isLogged);
 
     /*
      * Attempts to repair the data format version in the index table metadata if there is a mismatch
@@ -318,23 +336,23 @@ public:
 
     bool isTimestampSafeUniqueIdx() const override;
 
-    bool isDup(OperationContext* opCtx, WT_CURSOR* c, const KeyString::Value& keyString) override;
+    bool isDup(OperationContext* opCtx, WT_CURSOR* c, const key_string::Value& keyString) override;
 
     void insertWithRecordIdInValue_forTest(OperationContext* opCtx,
-                                           const KeyString::Value& keyString,
+                                           const key_string::Value& keyString,
                                            RecordId rid) override;
 
 protected:
     Status _insert(OperationContext* opCtx,
                    WT_CURSOR* c,
-                   const KeyString::Value& keyString,
+                   const key_string::Value& keyString,
                    bool dupsAllowed,
                    IncludeDuplicateRecordId includeDuplicateRecordId =
                        IncludeDuplicateRecordId::kOff) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
-                  const KeyString::Value& keyString,
+                  const key_string::Value& keyString,
                   bool dupsAllowed) override;
 
     /**
@@ -344,7 +362,7 @@ protected:
      */
     void _unindexTimestampUnsafe(OperationContext* opCtx,
                                  WT_CURSOR* c,
-                                 const KeyString::Value& keyString,
+                                 const key_string::Value& keyString,
                                  bool dupsAllowed);
 
 private:
@@ -378,7 +396,7 @@ public:
         return false;
     }
 
-    bool isDup(OperationContext* opCtx, WT_CURSOR* c, const KeyString::Value& keyString) override {
+    bool isDup(OperationContext* opCtx, WT_CURSOR* c, const key_string::Value& keyString) override {
         // Unimplemented by _id indexes for lack of need
         MONGO_UNREACHABLE;
     }
@@ -386,14 +404,14 @@ public:
 protected:
     Status _insert(OperationContext* opCtx,
                    WT_CURSOR* c,
-                   const KeyString::Value& keyString,
+                   const key_string::Value& keyString,
                    bool dupsAllowed,
                    IncludeDuplicateRecordId includeDuplicateRecordId =
                        IncludeDuplicateRecordId::kOff) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
-                  const KeyString::Value& keyString,
+                  const key_string::Value& keyString,
                   bool dupsAllowed) override;
 
     /**
@@ -401,7 +419,7 @@ protected:
      */
     Status _checkDups(OperationContext* opCtx,
                       WT_CURSOR* c,
-                      const KeyString::Value& keyString,
+                      const key_string::Value& keyString,
                       IncludeDuplicateRecordId includeDuplicateRecordId) = delete;
 };
 
@@ -429,7 +447,7 @@ public:
         return false;
     }
 
-    bool isDup(OperationContext* opCtx, WT_CURSOR* c, const KeyString::Value& keyString) override {
+    bool isDup(OperationContext* opCtx, WT_CURSOR* c, const key_string::Value& keyString) override {
         // Unimplemented by non-unique indexes
         MONGO_UNREACHABLE;
     }
@@ -437,14 +455,14 @@ public:
 protected:
     Status _insert(OperationContext* opCtx,
                    WT_CURSOR* c,
-                   const KeyString::Value& keyString,
+                   const key_string::Value& keyString,
                    bool dupsAllowed,
                    IncludeDuplicateRecordId includeDuplicateRecordId =
                        IncludeDuplicateRecordId::kOff) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
-                  const KeyString::Value& keyString,
+                  const key_string::Value& keyString,
                   bool dupsAllowed) override;
 };
 

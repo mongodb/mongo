@@ -1,11 +1,11 @@
 /**
  * Tests to validate the input values accepted by internal query server parameters. The test
- * verfies that the system responds with the expected error code for input values that fall outside
+ * verifies that the system responds with the expected error code for input values that fall outside
  * each parameter's valid bounds, and correctly applies input values which fall within that
  * parameter's valid bounds.
  */
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled
+load("jstests/libs/optimizer_utils.js");  // For checkCascadesFeatureFlagEnabled
 
 (function() {
 "use strict";
@@ -67,6 +67,9 @@ const expectedParamDefaults = {
     internalQueryColumnScanMinNumColumnFilters: 3,
     internalQueryMaxSpoolMemoryUsageBytes: 100 * 1024 * 1024,
     internalQueryMaxSpoolDiskUsageBytes: 10 * 100 * 1024 * 1024,
+    deprioritizeUnboundedUserCollectionScans: true,
+    deprioritizeUnboundedUserIndexScans: true,
+    internalQueryDocumentSourceWriterBatchExtraReservedBytes: 0,
 };
 
 function assertDefaultParameterValues() {
@@ -261,14 +264,15 @@ assertSetParameterFails("internalQueryFLERewriteMemoryLimit", 0);
 // Need to have the CQF feature flag enabled in order to set tryBonsai or forceBonsai.
 assertSetParameterSucceeds("internalQueryFrameworkControl", "forceClassicEngine");
 assertSetParameterSucceeds("internalQueryFrameworkControl", "trySbeEngine");
-if (checkCascadesOptimizerEnabled(testDB)) {
+if (checkCascadesFeatureFlagEnabled(testDB)) {
     assertSetParameterSucceeds("internalQueryFrameworkControl", "tryBonsai");
+    assertSetParameterSucceeds("internalQueryFrameworkControl", "tryBonsaiExperimental");
     assertSetParameterSucceeds("internalQueryFrameworkControl", "forceBonsai");
 } else {
     assert.commandFailed(
         testDB.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
-    assert.commandFailed(
-        testDB.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
+    assertSetParameterSucceeds("internalQueryFrameworkControl", "tryBonsaiExperimental");
+    assertSetParameterSucceeds("internalQueryFrameworkControl", "forceBonsai");
 }
 assertSetParameterFails("internalQueryFrameworkControl", "tryCascades");
 assertSetParameterFails("internalQueryFrameworkControl", 1);
@@ -292,6 +296,18 @@ assertSetParameterFails("internalQueryMaxSpoolMemoryUsageBytes", 0);
 assertSetParameterSucceeds("internalQueryMaxSpoolDiskUsageBytes", 100);
 assertSetParameterSucceeds("internalQueryMaxSpoolDiskUsageBytes", 1);
 assertSetParameterFails("internalQueryMaxSpoolDiskUsageBytes", 0);
+
+assertSetParameterSucceeds("deprioritizeUnboundedUserCollectionScans", true);
+assertSetParameterSucceeds("deprioritizeUnboundedUserCollectionScans", false);
+assertSetParameterSucceeds("deprioritizeUnboundedUserIndexScans", true);
+assertSetParameterSucceeds("deprioritizeUnboundedUserIndexScans", false);
+
+assertSetParameterSucceeds("internalQueryDocumentSourceWriterBatchExtraReservedBytes", 10);
+assertSetParameterSucceeds("internalQueryDocumentSourceWriterBatchExtraReservedBytes",
+                           4 * 1024 * 1024);
+assertSetParameterFails("internalQueryDocumentSourceWriterBatchExtraReservedBytes", -1);
+assertSetParameterFails("internalQueryDocumentSourceWriterBatchExtraReservedBytes",
+                        9 * 1024 * 1024);
 
 MongoRunner.stopMongod(conn);
 })();

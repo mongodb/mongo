@@ -29,10 +29,18 @@
 
 #pragma once
 
+#include <cmath>
+#include <cstddef>
+#include <memory>
 #include <random>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/value_utils.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::stats {
 

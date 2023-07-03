@@ -27,16 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <set>
+#include <string>
 
-#include "mongo/base/init.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/sessions_commands_gen.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/rpc/op_msg.h"
 
 namespace mongo {
 namespace {

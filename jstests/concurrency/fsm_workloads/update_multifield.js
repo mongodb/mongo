@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * update_multifield.js
  *
@@ -10,7 +8,7 @@
 // For isMongod.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
-var $config = (function() {
+export const $config = (function() {
     function makeQuery(options) {
         var query = {};
         if (!options.multi) {

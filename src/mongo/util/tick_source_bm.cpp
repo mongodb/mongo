@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <benchmark/benchmark.h>
 
-#include "mongo/util/duration.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/tick_source.h"
-#include <benchmark/benchmark.h>
 
 
 namespace mongo {

@@ -30,9 +30,14 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <memory>
+#include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/version/releases.h"
@@ -188,9 +193,9 @@ public:
      * Appends the min and max versions in 'wireVersionInfo' to 'builder' in the format expected for
      * reporting information about the internal client.
      *
-     * Intended for use as part of performing the isMaster handshake with a remote node. When an
-     * internal clients make a connection to another node in the cluster, it includes internal
-     * client information as a parameter to the isMaster command. This parameter has the following
+     * Intended for use as part of performing the isMaster/hello handshake with a remote node. When
+     * an internal clients make a connection to another node in the cluster, it includes internal
+     * client information as a parameter to the hello command. This parameter has the following
      * format:
      *
      *    internalClient: {

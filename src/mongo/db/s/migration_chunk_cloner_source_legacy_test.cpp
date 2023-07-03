@@ -27,22 +27,100 @@
  *    it in the license file.
  */
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/catalog/capped_visibility.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_options_gen.h"
 #include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/storage/durable_catalog_entry.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/request_types/move_range_request_gen.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 namespace {
@@ -50,7 +128,7 @@ namespace {
 using executor::RemoteCommandRequest;
 using unittest::assertGet;
 
-const NamespaceString kNss("TestDB", "TestColl");
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const std::string kShardKey = "X";
 const BSONObj kShardKeyPattern{BSON(kShardKey << 1)};
 const ConnectionString kDonorConnStr =
@@ -227,6 +305,15 @@ public:
 
     void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
                                                     boost::optional<bool> setting) override {
+        MONGO_UNREACHABLE;
+    }
+
+    bool timeseriesBucketingParametersMayHaveChanged() const override {
+        return _coll->timeseriesBucketingParametersMayHaveChanged();
+    }
+
+    void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
+                                                 boost::optional<bool> value) override {
         MONGO_UNREACHABLE;
     }
 

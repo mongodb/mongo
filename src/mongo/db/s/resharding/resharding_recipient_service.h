@@ -29,6 +29,23 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <memory>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/s/resharding/resharding_data_replication.h"
@@ -36,9 +53,20 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -213,7 +241,12 @@ private:
     void _createTemporaryReshardingCollectionThenTransitionToCloning(
         const CancelableOperationContextFactory& factory);
 
-    ExecutorFuture<void> _cloneThenTransitionToApplying(
+    ExecutorFuture<void> _cloneThenTransitionToBuildingIndex(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& abortToken,
+        const CancelableOperationContextFactory& factory);
+
+    ExecutorFuture<void> _buildIndexThenTransitionToApplying(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken,
         const CancelableOperationContextFactory& factory);
@@ -245,6 +278,8 @@ private:
                                          const CancelableOperationContextFactory& factory);
 
     void _transitionToCloning(const CancelableOperationContextFactory& factory);
+
+    void _transitionToBuildingIndex(const CancelableOperationContextFactory& factory);
 
     void _transitionToApplying(const CancelableOperationContextFactory& factory);
 
@@ -292,6 +327,10 @@ private:
     //
     // Should only be called once per lifetime.
     CancellationToken _initAbortSource(const CancellationToken& stepdownToken);
+
+    // Get indexesToBuild and indexesBuilt from the index catalog, then save them in _metrics
+    void _fetchBuildIndexMetrics();
+
 
     // The primary-only service instance corresponding to the recipient instance. Not owned.
     const ReshardingRecipientService* const _recipientService;

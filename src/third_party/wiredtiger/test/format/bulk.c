@@ -93,8 +93,8 @@ table_load(TABLE *base, TABLE *table)
     memset(&sap, 0, sizeof(sap));
     wt_wrap_open_session(conn, &sap, NULL, &session);
 
-    testutil_check(__wt_snprintf(track_buf, sizeof(track_buf), "table %u %s load", table->id,
-      base == NULL ? "bulk" : "mirror"));
+    testutil_snprintf(track_buf, sizeof(track_buf), "table %u %s load", table->id,
+      base == NULL ? "bulk" : "mirror");
     trace_msg(session, "=============== %s bulk load start", table->uri);
 
     /* Optionally open the base mirror. */
@@ -209,9 +209,11 @@ table_load(TABLE *base, TABLE *table)
         /*
          * If we are loading a mirrored table, commit after each operation to ensure that we are not
          * generating excessive cache pressure and we can successfully load the same content as the
-         * base table. Otherwise, commit if we report progress.
+         * base table. If we are not using a bulk cursor, commit frequently to allow the workload to
+         * proceed. Otherwise, commit if we report progress.
          */
-        if (g.transaction_timestamps_config && (report_progress || base != NULL)) {
+        if (g.transaction_timestamps_config &&
+          (report_progress || base != NULL || (!is_bulk && keyno % 50 == 0))) {
             bulk_commit_transaction(session);
             committed_keyno = keyno;
             bulk_begin_transaction(session);
@@ -236,7 +238,7 @@ table_load(TABLE *base, TABLE *table)
         rows_current = g.transaction_timestamps_config ? committed_keyno : (keyno - 1);
         testutil_assert(rows_current > 0);
 
-        testutil_check(__wt_snprintf(config, sizeof(config), "runs.rows=%" PRIu32, rows_current));
+        testutil_snprintf(config, sizeof(config), "runs.rows=%" PRIu32, rows_current);
         config_single(table, config, false);
         config_print(false);
     }

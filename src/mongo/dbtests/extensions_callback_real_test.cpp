@@ -27,17 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+#include <memory>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/json.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/fts/fts_query.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_text.h"
+#include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {
@@ -48,7 +70,9 @@ namespace {
 
 class ExtensionsCallbackRealTest : public unittest::Test {
 public:
-    ExtensionsCallbackRealTest() : _nss("unittests.extensions_callback_real_test") {
+    ExtensionsCallbackRealTest()
+        : _nss(NamespaceString::createNamespaceString_forTest(
+              "unittests.extensions_callback_real_test")) {
         _isDesugarWhereToFunctionOn = internalQueryDesugarWhereToFunction.load();
     }
 

@@ -29,9 +29,11 @@
 
 #include "mongo/db/pipeline/window_function/window_function_sum.h"
 
+#include <cstdint>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression.h"
 
 namespace mongo {
 

@@ -29,13 +29,25 @@
 
 #include "mongo/db/query/stats/maxdiff_test_utils.h"
 
+#include <map>
+#include <memory>
+#include <ostream>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo::stats {
 
-static std::vector<std::string> convertToJSON(const std::vector<SBEValue>& input) {
-    std::vector<std::string> result;
+static std::vector<BSONObj> convertToBSON(const std::vector<SBEValue>& input) {
+    std::vector<BSONObj> result;
 
     for (size_t i = 0; i < input.size(); i++) {
         const auto [objTag, objVal] = sbe::value::makeNewObject();
@@ -49,7 +61,7 @@ static std::vector<std::string> convertToJSON(const std::vector<SBEValue>& input
 
         std::ostringstream os;
         os << std::make_pair(objTag, objVal);
-        result.push_back(os.str());
+        result.push_back(fromjson(os.str()));
     }
 
     return result;
@@ -58,7 +70,7 @@ static std::vector<std::string> convertToJSON(const std::vector<SBEValue>& input
 size_t getActualCard(OperationContext* opCtx,
                      const std::vector<SBEValue>& input,
                      const std::string& query) {
-    return mongo::optimizer::runPipeline(opCtx, query, convertToJSON(input)).size();
+    return mongo::optimizer::runPipeline(opCtx, query, convertToBSON(input)).size();
 }
 
 std::string makeMatchExpr(const SBEValue& val, optimizer::ce::EstimationType cmpOp) {

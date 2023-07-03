@@ -29,9 +29,20 @@
 
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/constants.h"
+#include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_internal.h"
 #include "mongo/logv2/log_format.h"
+#include "mongo/logv2/log_source.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo::logv2 {
 class LogDomainGlobal : public LogDomain::Internal {

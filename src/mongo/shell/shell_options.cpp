@@ -28,27 +28,43 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/shell/shell_options.h"
-
-#include <boost/filesystem/operations.hpp>
-
 #include <iostream>
+#include <map>
+#include <set>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/server_options.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/transport/message_compressor_options_client_gen.h"
 #include "mongo/transport/message_compressor_registry.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/options_parser/value.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
 
@@ -295,8 +311,7 @@ Status storeMongoShellOptions(const moe::Environment& params,
     }
 
     if (!shellGlobalParams.networkMessageCompressors.empty()) {
-        const auto ret =
-            storeMessageCompressionOptions(shellGlobalParams.networkMessageCompressors);
+        auto ret = storeMessageCompressionOptions(shellGlobalParams.networkMessageCompressors);
         if (!ret.isOK()) {
             return ret;
         }

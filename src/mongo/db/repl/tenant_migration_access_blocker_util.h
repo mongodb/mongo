@@ -29,12 +29,25 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/future.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -109,7 +122,7 @@ bool hasActiveTenantMigration(OperationContext* opCtx, const DatabaseName& dbNam
 
 /**
  * Scan config.tenantMigrationDonors and creates the necessary TenantMigrationAccessBlockers for
- * unfinished migrations.
+ * unfinished migrations. Must only be called in --serverless mode.
  */
 void recoverTenantMigrationAccessBlockers(OperationContext* opCtx);
 

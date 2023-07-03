@@ -29,6 +29,9 @@
 
 #include "mongo/db/s/range_arithmetic.h"
 
+#include <map>
+#include <utility>
+
 namespace mongo {
 namespace {
 

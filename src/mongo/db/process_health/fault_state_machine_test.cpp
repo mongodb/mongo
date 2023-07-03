@@ -27,14 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/db/process_health/fault_manager.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <memory>
+#include <ratio>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/process_health/dns_health_observer.h"
+#include "mongo/db/process_health/fault.h"
+#include "mongo/db/process_health/fault_facet.h"
+#include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/db/process_health/fault_manager_test_suite.h"
 #include "mongo/db/process_health/health_check_status.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

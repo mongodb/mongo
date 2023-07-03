@@ -27,15 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/optional.hpp>
+#include <set>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/matcher/schema/encrypt_schema_types.h"
-#include "mongo/unittest/bson_test_util.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

@@ -27,27 +27,76 @@
  *    it in the license file.
  */
 
+#include <boost/smart_ptr.hpp>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/count_command_as_aggregation_command.h"
+#include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/view_response_formatter.h"
+#include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/serialization_context.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -227,7 +276,14 @@ public:
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
         auto bodyBuilder = result->getBodyBuilder();
-        Explain::explainStages(exec.get(), collection, verbosity, BSONObj(), cmdObj, &bodyBuilder);
+        Explain::explainStages(
+            exec.get(),
+            collection,
+            verbosity,
+            BSONObj(),
+            SerializationContext::stateCommandReply(request.getSerializationContext()),
+            cmdObj,
+            &bodyBuilder);
         return Status::OK();
     }
 

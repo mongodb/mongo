@@ -29,84 +29,136 @@
 
 #include "mongo/db/repl/oplog.h"
 
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <cstdint>
+#include <memory>
 #include <set>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/capped_collection_maintenance.h"
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/catalog/coll_mod.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/drop_indexes.h"
+#include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
+#include "mongo/db/catalog/index_build_oplog_entry.h"
+#include "mongo/db/catalog/index_builds_manager.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/create_gen.h"
+#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_index.h"
-#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/update_result.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/apply_ops.h"
-#include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/dbcheck.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
-#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/random.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/catalog/type_index_catalog.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/elapsed_tracker.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/file.h"
 #include "mongo/util/namespace_string_util.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/version/releases.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -462,8 +514,14 @@ void logOplogRecords(OperationContext* opCtx,
                 hangBeforeLogOpAdvancesLastApplied.pauseWhileSet(opCtx);
             }
 
+            // As an optimization, we skip advancing the global timestamp. In this path on the
+            // primary, the caller will have already advanced the clock to at least this value when
+            // allocating the timestamp.
+            const bool advanceGlobalTimestamp = false;
+
             // Optimes on the primary should always represent consistent database states.
-            replCoord->setMyLastAppliedOpTimeAndWallTimeForward({finalOpTime, wallTime});
+            replCoord->setMyLastAppliedOpTimeAndWallTimeForward({finalOpTime, wallTime},
+                                                                advanceGlobalTimestamp);
 
             // We set the last op on the client to 'finalOpTime', because that contains the
             // timestamp of the operation that the client actually performed.
@@ -826,6 +884,20 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           // any temporarily renamed aside collections to be sorted out by the time replay is
           // complete.
           const bool allowRenameOutOfTheWay = (mode != repl::OplogApplication::Mode::kSecondary);
+
+          // Check whether there is an open but empty database where the name conflicts with the new
+          // collection's database name. It is possible for a secondary's in-memory database state
+          // to diverge from the primary's, if the primary rolls back the dropDatabase oplog entry
+          // after closing its own in-memory database state. In this case, the primary may accept
+          // creating a new database with a conflicting name to what the secondary still has open.
+          // It is okay to simply close the empty database on the secondary in this case.
+          if (auto duplicate =
+                  DatabaseHolder::get(opCtx)->getNameWithConflictingCasing(nss.dbName())) {
+              if (CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(*duplicate).size() ==
+                  0) {
+                  fassert(7727801, dropDatabaseForApplyOps(opCtx, *duplicate).isOK());
+              }
+          }
 
           Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
           if (auto idIndexElem = cmd["idIndex"]) {
@@ -2047,14 +2119,19 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         !collection ? str::stream()
                                 << "(NamespaceNotFound): Failed to apply operation due "
                                    "to missing collection ("
-                                << requestNss << ")"
+                                << requestNss.toStringForErrorMsg() << ")"
                                     : "Applied a delete which did not delete anything."s);
                 }
                 // It is legal for a delete operation on the pre-images collection to delete zero
                 // documents - pre-image collections are not guaranteed to contain the same set of
-                // documents at all times.
+                // documents at all times. The same holds for change-collections as they both rely
+                // on unreplicated deletes when "featureFlagUseUnreplicatedTruncatesForDeletions" is
+                // enabled.
+                //
+                // TODO SERVER-70591: Remove feature flag requirement in comment above.
                 if (result.nDeleted == 0 && mode == OplogApplication::Mode::kSecondary &&
-                    !requestNss.isChangeStreamPreImagesCollection()) {
+                    !requestNss.isChangeStreamPreImagesCollection() &&
+                    !requestNss.isChangeCollection()) {
                     // In FCV 4.4, each node is responsible for deleting the excess documents in
                     // capped collections. This implies that capped deletes may not be synchronized
                     // between nodes at times. When upgraded to FCV 5.0, the primary will generate
@@ -2123,7 +2200,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                 global_index::insertKey(
                     opCtx,
-                    collection,
+                    collectionAcquisition,
                     op.getObject().getObjectField(global_index::kOplogEntryIndexKeyFieldName),
                     op.getObject().getObjectField(global_index::kOplogEntryDocKeyFieldName));
 

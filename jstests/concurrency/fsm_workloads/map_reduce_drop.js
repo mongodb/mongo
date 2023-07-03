@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * map_reduce_drop.js
  *
@@ -16,7 +14,7 @@
  *   does_not_support_causal_consistency,
  * ]
  */
-var $config = (function() {
+export const $config = (function() {
     var data = {
         mapper: function mapper() {
             emit(this.key, 1);

@@ -29,11 +29,34 @@
 
 #pragma once
 
+#include <cstdint>
+#include <list>
+#include <map>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_group.h"
 #include "mongo/db/s/namespace_metadata_change_notifications.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache_loader.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
@@ -75,7 +98,8 @@ public:
      * Sets any notifications waiting for this version to arrive and invalidates the catalog cache's
      * chunk metadata for collection 'nss' so that the next caller provokes a refresh.
      */
-    void notifyOfCollectionPlacementVersionUpdate(const NamespaceString& nss) override;
+    void notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
+                                                const Timestamp& commitTime) override;
 
     SemiFuture<CollectionAndChangedChunks> getChunksSince(const NamespaceString& nss,
                                                           ChunkVersion version) override;
@@ -441,6 +465,16 @@ private:
     void _updatePersistedDbMetadata(OperationContext* opCtx, StringData dbName);
 
     /**
+     * Sends _flushRoutingTableCacheUpdates to the primary to force it to refresh its routing table
+     * for collection 'nss' and then waits for the refresh to replicate to this node. Returns a
+     * notification that can be used to wait for the refreshing flag to be set to true in the
+     * config.collections entry to provide a consistent view of config.chunks.
+     */
+    NamespaceMetadataChangeNotifications::ScopedNotification
+    _forcePrimaryCollectionRefreshAndWaitForReplication(OperationContext* opCtx,
+                                                        const NamespaceString& nss);
+
+    /**
      * Attempts to read the collection and chunk metadata since 'version' from the shard persisted
      * metadata store. Continues to retry reading the metadata until a complete diff is read
      * uninterrupted by concurrent updates.
@@ -450,7 +484,10 @@ private:
      * NamespaceNotFound error means the collection does not exist.
      */
     CollectionAndChangedChunks _getCompletePersistedMetadataForSecondarySinceVersion(
-        OperationContext* opCtx, const NamespaceString& nss, const ChunkVersion& version);
+        OperationContext* opCtx,
+        NamespaceMetadataChangeNotifications::ScopedNotification&& notif,
+        const NamespaceString& nss,
+        const ChunkVersion& version);
 
     // Loader used by the shard primary to retrieve the authoritative routing metadata from the
     // config server

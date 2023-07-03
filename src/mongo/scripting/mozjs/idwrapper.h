@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <cstdint>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 #include <jsapi.h>
 #include <string>
 

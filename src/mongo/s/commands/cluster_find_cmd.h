@@ -38,8 +38,9 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/find_request_shapifier.h"
+#include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats_find_key_generator.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -153,11 +154,11 @@ public:
                 Timer timer;
                 const auto cri =
                     uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
-                        opCtx, *findCommand->getNamespaceOrUUID().nss()));
+                        opCtx, findCommand->getNamespaceOrUUID().nss()));
                 shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
-                    findCommand->getNamespaceOrUUID().nss()->db(),
-                    *findCommand->getNamespaceOrUUID().nss(),
+                    findCommand->getNamespaceOrUUID().nss().db(),
+                    findCommand->getNamespaceOrUUID().nss(),
                     cri,
                     explainCmd,
                     ReadPreferenceSetting::get(opCtx),
@@ -186,7 +187,7 @@ public:
                 auto aggCmdOnView =
                     uassertStatusOK(query_request_helper::asAggregationCommand(*findCommand));
                 auto viewAggregationCommand =
-                    OpMsgRequest::fromDBAndBody(_dbName.db(), aggCmdOnView).body;
+                    OpMsgRequestBuilder::create(_dbName, aggCmdOnView).body;
 
                 auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                     opCtx,
@@ -213,17 +214,23 @@ public:
 
             Impl::checkCanRunHere(opCtx);
 
-            auto&& [expCtx, parsedFind] = uassertStatusOK(parsed_find_command::parse(
+            auto&& parsedFindResult = uassertStatusOK(parsed_find_command::parse(
                 opCtx,
                 _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body),
                 ExtensionsCallbackNoop(),
                 MatchExpressionParser::kAllowAllSpecialFeatures));
+            auto& expCtx = parsedFindResult.first;
+            auto& parsedFind = parsedFindResult.second;
 
             if (!_didDoFLERewrite) {
-                query_stats::registerRequest(
-                    expCtx,
-                    std::make_unique<query_stats::FindRequestShapifier>(opCtx, *parsedFind),
-                    expCtx->ns);
+                BSONObj queryShape = query_shape::extractQueryShape(
+                    *parsedFind,
+                    SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                    expCtx);
+                query_stats::registerRequest(opCtx, expCtx->ns, [&]() {
+                    return std::make_unique<query_stats::FindKeyGenerator>(
+                        expCtx, *parsedFind, std::move(queryShape));
+                });
             }
             auto cq = uassertStatusOK(CanonicalQuery::canonicalize(expCtx, std::move(parsedFind)));
 
@@ -254,7 +261,7 @@ public:
                 auto aggCmdOnView = uassertStatusOK(
                     query_request_helper::asAggregationCommand(cq->getFindCommandRequest()));
                 auto viewAggregationCommand =
-                    OpMsgRequest::fromDBAndBody(_dbName.db(), aggCmdOnView).body;
+                    OpMsgRequestBuilder::create(_dbName, aggCmdOnView).body;
 
                 auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                     opCtx,
@@ -301,11 +308,11 @@ public:
                     !findCommand->getLegacyRuntimeConstants());
 
             if (shouldDoFLERewrite(findCommand)) {
-                invariant(findCommand->getNamespaceOrUUID().nss());
+                invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
 
                 if (!findCommand->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
                     processFLEFindS(
-                        opCtx, findCommand->getNamespaceOrUUID().nss().get(), findCommand.get());
+                        opCtx, findCommand->getNamespaceOrUUID().nss(), findCommand.get());
                     _didDoFLERewrite = true;
                 }
 

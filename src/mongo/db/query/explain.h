@@ -29,11 +29,20 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/sbe_plan_cache.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo {
 
@@ -76,6 +85,7 @@ public:
                               const CollectionPtr& collection,
                               ExplainOptions::Verbosity verbosity,
                               BSONObj extraInfo,
+                              const SerializationContext& serializationContext,
                               const BSONObj& command,
                               BSONObjBuilder* out);
 
@@ -87,6 +97,7 @@ public:
                               const MultipleCollectionAccessor& collections,
                               ExplainOptions::Verbosity verbosity,
                               BSONObj extraInfo,
+                              const SerializationContext& serializationContext,
                               const BSONObj& command,
                               BSONObjBuilder* out);
 
@@ -114,6 +125,7 @@ public:
         Status executePlanStatus,
         boost::optional<PlanExplainer::PlanStatsDetails> winningPlanTrialStats,
         BSONObj extraInfo,
+        const SerializationContext& serializationContext,
         const BSONObj& command,
         BSONObjBuilder* out);
 

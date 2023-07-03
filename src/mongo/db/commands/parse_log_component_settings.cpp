@@ -27,17 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/commands/parse_log_component_settings.h"
-
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/commands/parse_log_component_settings.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

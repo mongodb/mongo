@@ -57,7 +57,7 @@ variables:
 
 # If you add anything to san_options, make sure the appropriate changes are
 # also made to SConstruct.
-# and also to the san_options in evergreen.yml
+# and also to the san_options in evergreen.yml and sanitizer.yml
 - aubsan_options: &aubsan_options
   >-
     UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
@@ -86,6 +86,21 @@ buildvariants:
     - name: server_selection_json_test_TG
       distros:
       - rhel80-large
+
+- <<: *generic_linux_compile_params
+  name: &linux-x86-dynamic-compile-future-tag-multiversion linux-x86-dynamic-compile-future-tag-multiversion
+  display_name: "Linux x86 Shared Library Compile (future git tag multiversion)"
+  modules:
+  - enterprise
+  expansions:
+    <<: *linux-x86-dynamic-compile-expansions
+    bv_future_git_tag: r100.0.0-9999
+    compile_variant: *linux-x86-dynamic-compile-future-tag-multiversion
+  depends_on:
+  - name: version_expansions_gen
+    variant: enterprise-rhel-80-64-bit-future-git-tag-multiversion-version-gen
+  tasks:
+  - name: compile_test_and_package_serial_TG
 
 - <<: *generic_linux_compile_params
   name: &linux-x86-dynamic-debug-compile-required linux-x86-dynamic-debug-compile-required  # TODO: replace with Sanitizer.

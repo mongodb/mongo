@@ -29,10 +29,18 @@
 
 #include <utility>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -63,22 +71,29 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     //
     // As we change the code to make the find and agg systems more tightly coupled, it would make
     // sense to start initializing these fields for find operations as well.
-    : ExpressionContext(opCtx,
-                        verbosity,
-                        false,  // fromMongos
-                        false,  // needsMerge
-                        findCmd.getAllowDiskUse().value_or(allowDiskUseDefault),
-                        false,  // bypassDocumentValidation
-                        false,  // isMapReduceCommand
-                        findCmd.getNamespaceOrUUID().nss().value_or(NamespaceString{}),
-                        findCmd.getLegacyRuntimeConstants(),
-                        std::move(collator),
-                        nullptr,  // mongoProcessInterface
-                        {},       // resolvedNamespaces
-                        findCmd.getNamespaceOrUUID().uuid(),
-                        findCmd.getLet(),
-                        mayDbProfile,
-                        findCmd.getSerializationContext()) {}
+    : ExpressionContext(
+          opCtx,
+          verbosity,
+          false,  // fromMongos
+          false,  // needsMerge
+          findCmd.getAllowDiskUse().value_or(allowDiskUseDefault),
+          false,  // bypassDocumentValidation
+          false,  // isMapReduceCommand
+          findCmd.getNamespaceOrUUID().isNamespaceString() ? findCmd.getNamespaceOrUUID().nss()
+                                                           : NamespaceString{},
+          findCmd.getLegacyRuntimeConstants(),
+          std::move(collator),
+          nullptr,  // mongoProcessInterface
+          {},       // resolvedNamespaces
+          [findCmd]() -> boost::optional<UUID> {
+              if (findCmd.getNamespaceOrUUID().isUUID()) {
+                  return findCmd.getNamespaceOrUUID().uuid();
+              }
+              return boost::none;
+          }(),
+          findCmd.getLet(),
+          mayDbProfile,
+          findCmd.getSerializationContext()) {}
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregateCommandRequest& request,

@@ -27,15 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <type_traits>
+#include <utility>
 
-#include "mongo/db/s/query_analysis_coordinator.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
 
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/query_analysis_coordinator.h"
+#include "mongo/db/server_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/net/hostandport.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -45,7 +73,7 @@ namespace analyze_shard_key {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisCoordinator);
-MONGO_FAIL_POINT_DEFINE(queryAnalysisCoordinatorDistributeSampleRateEqually);
+MONGO_FAIL_POINT_DEFINE(queryAnalysisCoordinatorDistributeSamplesPerSecondEqually);
 
 const auto getQueryAnalysisCoordinator =
     ServiceContext::declareDecoration<QueryAnalysisCoordinator>();
@@ -77,7 +105,7 @@ void QueryAnalysisCoordinator::onConfigurationInsert(const QueryAnalyzerDocument
         return;
     }
     auto configuration = CollectionQueryAnalyzerConfiguration{
-        doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate(), doc.getStartTime()};
+        doc.getNs(), doc.getCollectionUuid(), *doc.getSamplesPerSecond(), doc.getStartTime()};
     _configurations.emplace(doc.getNs(), std::move(configuration));
 }
 
@@ -91,11 +119,13 @@ void QueryAnalysisCoordinator::onConfigurationUpdate(const QueryAnalyzerDocument
     } else {
         auto it = _configurations.find(doc.getNs());
         if (it == _configurations.end()) {
-            auto configuration = CollectionQueryAnalyzerConfiguration{
-                doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate(), doc.getStartTime()};
+            auto configuration = CollectionQueryAnalyzerConfiguration{doc.getNs(),
+                                                                      doc.getCollectionUuid(),
+                                                                      *doc.getSamplesPerSecond(),
+                                                                      doc.getStartTime()};
             _configurations.emplace(doc.getNs(), std::move(configuration));
         } else {
-            it->second.setSampleRate(*doc.getSampleRate());
+            it->second.setSamplesPerSecond(*doc.getSamplesPerSecond());
             it->second.setStartTime(doc.getStartTime());
             // The collection could have been dropped and recreated.
             it->second.setCollectionUuid(doc.getCollectionUuid());
@@ -179,8 +209,10 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
             auto doc = QueryAnalyzerDocument::parse(IDLParserContext("QueryAnalysisCoordinator"),
                                                     cursor->next());
             invariant(doc.getMode() != QueryAnalyzerModeEnum::kOff);
-            auto configuration = CollectionQueryAnalyzerConfiguration{
-                doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate(), doc.getStartTime()};
+            auto configuration = CollectionQueryAnalyzerConfiguration{doc.getNs(),
+                                                                      doc.getCollectionUuid(),
+                                                                      *doc.getSamplesPerSecond(),
+                                                                      doc.getStartTime()};
             auto [_, inserted] = _configurations.emplace(doc.getNs(), std::move(configuration));
             invariant(inserted);
         }
@@ -279,9 +311,9 @@ QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx
     // If the coordinator doesn't yet have a full view of the query distribution or no samplers
     // have executed any queries, each sampler gets an equal ratio of the sample rates. Otherwise,
     // the ratio is weighted based on the query distribution across samplers.
-    double sampleRateRatio =
+    double samplesPerSecRatio =
         ((numWeights < numActiveSamplers) || (totalWeight == 0) ||
-         MONGO_unlikely(queryAnalysisCoordinatorDistributeSampleRateEqually.shouldFail()))
+         MONGO_unlikely(queryAnalysisCoordinatorDistributeSamplesPerSecondEqually.shouldFail()))
         ? (1.0 / numActiveSamplers)
         : (weight / totalWeight);
 
@@ -290,7 +322,7 @@ QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx
     for (const auto& [_, configuration] : _configurations) {
         configurations.emplace_back(configuration.getNs(),
                                     configuration.getCollectionUuid(),
-                                    sampleRateRatio * configuration.getSampleRate(),
+                                    samplesPerSecRatio * configuration.getSamplesPerSecond(),
                                     configuration.getStartTime());
     }
     return configurations;

@@ -11,9 +11,10 @@
 "use strict";
 load("jstests/libs/api_version_helpers.js");  // For 'APIVersionHelpers'.
 
+const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_version_new_50_language_features";
 const viewName = collName + "_view";
-const coll = db[collName];
+const coll = testDb[collName];
 coll.drop();
 assert.commandWorked(coll.insert({a: 1, date: new ISODate()}));
 
@@ -35,7 +36,7 @@ for (let pipeline of stablePipelines) {
     APIVersionHelpers.assertViewSucceedsWithAPIStrict(pipeline, viewName, collName);
 
     // Assert error is not thrown when running without apiStrict=true.
-    assert.commandWorked(db.runCommand({
+    assert.commandWorked(testDb.runCommand({
         aggregate: coll.getName(),
         pipeline: pipeline,
         apiVersion: "1",
@@ -62,12 +63,12 @@ APIVersionHelpers.assertViewSucceedsWithAPIStrict(setWindowFieldsPipeline, viewN
 
 // Creating a collection with dotted paths is allowed with apiStrict:true.
 
-assert.commandWorked(db.runCommand({
+assert.commandWorked(testDb.runCommand({
     create: 'new_50_features_validator',
     validator: {$expr: {$eq: [{$getField: {input: "$$ROOT", field: "dotted.path"}}, 2]}},
     apiVersion: "1",
     apiStrict: true
 }));
 
-assert.commandWorked(db.runCommand({drop: 'new_50_features_validator'}));
+assert.commandWorked(testDb.runCommand({drop: 'new_50_features_validator'}));
 })();

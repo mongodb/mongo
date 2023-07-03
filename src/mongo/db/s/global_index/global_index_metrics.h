@@ -29,15 +29,32 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <variant>
+
+#include <boost/none_t.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/global_index/common_types_gen.h"
 #include "mongo/db/s/global_index/global_index_cloner_gen.h"
 #include "mongo/db/s/global_index/global_index_coordinator_state_enum_placeholder.h"
 #include "mongo/db/s/global_index/global_index_cumulative_metrics.h"
 #include "mongo/db/s/global_index/global_index_metrics_field_name_provider.h"
 #include "mongo/db/s/metrics/metrics_state_holder.h"
+#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
+#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/metrics/with_phase_duration_management.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

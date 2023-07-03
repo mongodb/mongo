@@ -29,7 +29,13 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

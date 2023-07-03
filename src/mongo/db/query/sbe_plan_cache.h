@@ -29,15 +29,33 @@
 
 #pragma once
 
+#include <boost/container_hash/extensions.hpp>
 #include <boost/functional/hash.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache_key_info.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/container_size_helper.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace sbe {
@@ -147,6 +165,14 @@ public:
         return _info.toString();
     }
 
+    /**
+     * Returns the estimated size of the plan cache key in bytes.
+     */
+    uint64_t estimatedKeySizeBytes() const {
+        return sizeof(*this) + _info.keySizeInBytes() +
+            container_size_helper::estimateObjectSizeInBytes(_secondaryCollectionStates);
+    }
+
 private:
     // Contains the actual encoding of the query shape as well as the index discriminators.
     const PlanCacheKeyInfo _info;
@@ -180,7 +206,7 @@ struct PlanCachePartitioner {
 struct CachedSbePlan {
     CachedSbePlan(std::unique_ptr<sbe::PlanStage> root, stage_builder::PlanStageData data)
         : root(std::move(root)), planStageData(std::move(data)) {
-        tassert(5968206, "The RuntimeEnvironment should not be null", planStageData.env);
+        tassert(5968206, "The RuntimeEnvironment should not be null", planStageData.env.runtimeEnv);
     }
 
     std::unique_ptr<CachedSbePlan> clone() const {
@@ -205,9 +231,7 @@ struct BudgetEstimator {
      */
     size_t operator()(const sbe::PlanCacheKey& key,
                       const std::shared_ptr<const PlanCacheEntry>& entry) {
-        // TODO: SERVER-73649 include size of underlying query shape and size of int_32 key hash in
-        // total size estimation.
-        return entry->estimatedEntrySizeBytes;
+        return entry->estimatedEntrySizeBytes + key.estimatedKeySizeBytes();
     }
 };
 

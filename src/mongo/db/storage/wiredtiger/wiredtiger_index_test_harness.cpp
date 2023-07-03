@@ -27,37 +27,47 @@
  *    it in the license file.
  */
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
+#include <string>
+#include <vector>
+#include <wiredtiger.h>
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/json.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/system_clock_source.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
 
-using std::string;
-
 class WiredTigerIndexHarnessHelper final : public SortedDataInterfaceHarnessHelper {
 public:
     WiredTigerIndexHarnessHelper() : _dbpath("wt_test"), _conn(nullptr) {
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-
         const char* config = "create,cache_size=1G,";
         int ret = wiredtiger_open(_dbpath.path().c_str(), nullptr, config, &_conn);
         invariantWTOK(ret, nullptr);
@@ -73,8 +83,9 @@ public:
 
     std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface() final {
         std::string ns = "test.wt";
-        NamespaceString nss(ns);
-        OperationContextNoop opCtx(newRecoveryUnit().release());
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
+        auto opCtxHolder{newOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
 
         BSONObj spec = BSON("key" << BSON("_id" << 1) << "name"
                                   << "_id_"
@@ -90,19 +101,20 @@ public:
             kWiredTigerEngineName, "", "", nss, desc, isLogged);
         ASSERT_OK(result.getStatus());
 
-        string uri = "table:" + ns;
-        invariant(Status::OK() == WiredTigerIndex::create(&opCtx, uri, result.getValue()));
+        std::string uri = "table:" + ns;
+        invariant(Status::OK() == WiredTigerIndex::create(opCtx, uri, result.getValue()));
 
         return std::make_unique<WiredTigerIdIndex>(
-            &opCtx, uri, UUID::gen(), "" /* ident */, &desc, isLogged);
+            opCtx, uri, UUID::gen(), "" /* ident */, &desc, isLogged);
     }
 
-    std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique,
-                                                                       bool partial,
-                                                                       KeyFormat keyFormat) final {
+    std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique,
+                                                                bool partial,
+                                                                KeyFormat keyFormat) final {
         std::string ns = "test.wt";
-        NamespaceString nss(ns);
-        OperationContextNoop opCtx(newRecoveryUnit().release());
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
+        auto opCtxHolder{newOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
 
         BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
                                   << "testIndex"
@@ -124,11 +136,11 @@ public:
             kWiredTigerEngineName, "", "", nss, desc, WiredTigerUtil::useTableLogging(nss));
         ASSERT_OK(result.getStatus());
 
-        string uri = "table:" + ns;
-        invariant(Status::OK() == WiredTigerIndex::create(&opCtx, uri, result.getValue()));
+        std::string uri = "table:" + ns;
+        invariant(Status::OK() == WiredTigerIndex::create(opCtx, uri, result.getValue()));
 
         if (unique) {
-            return std::make_unique<WiredTigerIndexUnique>(&opCtx,
+            return std::make_unique<WiredTigerIndexUnique>(opCtx,
                                                            uri,
                                                            UUID::gen(),
                                                            "" /* ident */,
@@ -136,7 +148,7 @@ public:
                                                            &desc,
                                                            WiredTigerUtil::useTableLogging(nss));
         }
-        return std::make_unique<WiredTigerIndexStandard>(&opCtx,
+        return std::make_unique<WiredTigerIndexStandard>(opCtx,
                                                          uri,
                                                          UUID::gen(),
                                                          "" /* ident */,
@@ -158,12 +170,9 @@ private:
     WiredTigerOplogManager _oplogManager;
 };
 
-std::unique_ptr<SortedDataInterfaceHarnessHelper> makeWTIndexHarnessHelper() {
-    return std::make_unique<WiredTigerIndexHarnessHelper>();
-}
-
 MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {
-    mongo::registerSortedDataInterfaceHarnessHelperFactory(makeWTIndexHarnessHelper);
+    registerSortedDataInterfaceHarnessHelperFactory(
+        [] { return std::make_unique<WiredTigerIndexHarnessHelper>(); });
 }
 
 }  // namespace

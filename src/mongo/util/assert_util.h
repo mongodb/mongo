@@ -29,12 +29,27 @@
 
 #pragma once
 
+#include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/preprocessor/facilities/overload.hpp>
 #include <cstdlib>
+#include <exception>
+#include <fmt/format.h>
+#include <iterator>
+#include <memory>
 #include <string>
+#include <type_traits>
 #include <typeinfo>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/util/assert_util_core.h"  // IWYU pragma: export
@@ -556,13 +571,13 @@ bool haveTripwireAssertionsOccurred();
 void warnIfTripwireAssertionsOccurred();
 
 /**
- * verify is deprecated. It is like invariant() in debug builds and massert() in release builds.
+ * MONGO_verify is deprecated. It is like invariant() in debug builds and massert() in release
+ * builds.
  */
-#define verify(expression) MONGO_verify(expression)
-#define MONGO_verify(_Expression)                                    \
+#define MONGO_verify(expression_)                                    \
     do {                                                             \
-        if (MONGO_unlikely(!(_Expression))) {                        \
-            ::mongo::verifyFailed(#_Expression, __FILE__, __LINE__); \
+        if (MONGO_unlikely(!(expression_))) {                        \
+            ::mongo::verifyFailed(#expression_, __FILE__, __LINE__); \
         }                                                            \
     } while (false)
 

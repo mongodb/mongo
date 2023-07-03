@@ -27,32 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <memory>
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/json.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/system_clock_source.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
-
-using std::string;
 
 TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
     auto harnessHelper = newSortedDataInterfaceHarnessHelper();
@@ -63,6 +61,7 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
     // Populate data.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         WriteUnitOfWork uow(opCtx.get());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
@@ -79,6 +78,8 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
     // Cursors should always ensure they are in an active transaction when next() is called.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
         auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
 
         auto cursor = sdi->newCursor(opCtx.get());
@@ -108,6 +109,7 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
     // Populate data.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         WriteUnitOfWork uow(opCtx.get());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
@@ -124,6 +126,8 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
     // Cursors should always ensure they are in an active transaction when seek() is called.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
         auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
 
         auto cursor = sdi->newCursor(opCtx.get());

@@ -146,6 +146,15 @@ enums:
                         - { bar: "baz" }
                     baz: '"qu\\nx"'
 
+    NonContiguousIntEnum:
+        description: "An enum with non-sequential int values"
+        type: int
+        values:
+            one: 1
+            five: 5
+            ten: 10
+
+
 ##################################################################################################
 #
 # Unit test structs for a single value to ensure type validation works correctly

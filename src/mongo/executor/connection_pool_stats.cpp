@@ -27,16 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/executor/connection_pool_stats.h"
-
 #include <algorithm>
-#include <fmt/format.h>
 #include <fmt/ostream.h>
+#include <iosfwd>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
@@ -112,22 +114,17 @@ void ConnectionPoolStats::updateStatsForHost(std::string pool,
 }
 
 void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFTDC) {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    const auto isCCHMEnabled = gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe();
-
     result.appendNumber("totalInUse", static_cast<long long>(totalInUse));
     result.appendNumber("totalAvailable", static_cast<long long>(totalAvailable));
     result.appendNumber("totalLeased", static_cast<long long>(totalLeased));
     result.appendNumber("totalCreated", static_cast<long long>(totalCreated));
     result.appendNumber("totalRefreshing", static_cast<long long>(totalRefreshing));
     result.appendNumber("totalRefreshed", static_cast<long long>(totalRefreshed));
-    if (isCCHMEnabled) {
-        result.appendNumber("totalWasNeverUsed", static_cast<long long>(totalWasNeverUsed));
-        if (forFTDC) {
-            result.appendNumber("totalWasUsedOnce", static_cast<long long>(totalWasUsedOnce));
-            result.appendNumber("totalConnUsageTimeMillis",
-                                durationCount<Milliseconds>(totalConnUsageTime));
-        }
+    result.appendNumber("totalWasNeverUsed", static_cast<long long>(totalWasNeverUsed));
+    if (forFTDC) {
+        result.appendNumber("totalWasUsedOnce", static_cast<long long>(totalWasUsedOnce));
+        result.appendNumber("totalConnUsageTimeMillis",
+                            durationCount<Milliseconds>(totalConnUsageTime));
     }
 
     if (forFTDC) {
@@ -135,11 +132,9 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
         for (const auto& [pool, stats] : statsByPool) {
             BSONObjBuilder poolInfo(poolBuilder.subobjStart(pool));
             poolInfo.appendNumber("poolInUse", static_cast<long long>(stats.inUse));
-            if (isCCHMEnabled) {
-                poolInfo.appendNumber("poolWasUsedOnce", static_cast<long long>(stats.wasUsedOnce));
-                poolInfo.appendNumber("poolConnUsageTimeMillis",
-                                      durationCount<Milliseconds>(stats.connUsageTime));
-            }
+            poolInfo.appendNumber("poolWasUsedOnce", static_cast<long long>(stats.wasUsedOnce));
+            poolInfo.appendNumber("poolConnUsageTimeMillis",
+                                  durationCount<Milliseconds>(stats.connUsageTime));
             for (const auto& [host, stats] : stats.statsByHost) {
                 BSONObjBuilder hostInfo(poolInfo.subobjStart(host.toString()));
                 poolInfo.appendNumber("inUse", static_cast<long long>(stats.inUse));
@@ -166,11 +161,8 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
             poolInfo.appendNumber("poolCreated", static_cast<long long>(stats.created));
             poolInfo.appendNumber("poolRefreshing", static_cast<long long>(stats.refreshing));
             poolInfo.appendNumber("poolRefreshed", static_cast<long long>(stats.refreshed));
-            if (isCCHMEnabled) {
-                poolInfo.appendNumber("poolWasNeverUsed",
-                                      static_cast<long long>(stats.wasNeverUsed));
-                appendHistogram(poolInfo, stats.acquisitionWaitTimes, kAcquisitionWaitTimesKey);
-            }
+            poolInfo.appendNumber("poolWasNeverUsed", static_cast<long long>(stats.wasNeverUsed));
+            appendHistogram(poolInfo, stats.acquisitionWaitTimes, kAcquisitionWaitTimesKey);
 
             for (const auto& [host, stats] : stats.statsByHost) {
                 BSONObjBuilder hostInfo(poolInfo.subobjStart(host.toString()));
@@ -180,11 +172,8 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
                 hostInfo.appendNumber("created", static_cast<long long>(stats.created));
                 hostInfo.appendNumber("refreshing", static_cast<long long>(stats.refreshing));
                 hostInfo.appendNumber("refreshed", static_cast<long long>(stats.refreshed));
-                if (isCCHMEnabled) {
-                    hostInfo.appendNumber("wasNeverUsed",
-                                          static_cast<long long>(stats.wasNeverUsed));
-                    appendHistogram(hostInfo, stats.acquisitionWaitTimes, kAcquisitionWaitTimesKey);
-                }
+                hostInfo.appendNumber("wasNeverUsed", static_cast<long long>(stats.wasNeverUsed));
+                appendHistogram(hostInfo, stats.acquisitionWaitTimes, kAcquisitionWaitTimesKey);
             }
         }
     }
@@ -200,10 +189,8 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
             hostInfo.appendNumber("created", static_cast<long long>(stats.created));
             hostInfo.appendNumber("refreshing", static_cast<long long>(stats.refreshing));
             hostInfo.appendNumber("refreshed", static_cast<long long>(stats.refreshed));
-            if (isCCHMEnabled) {
-                hostInfo.appendNumber("wasNeverUsed", static_cast<long long>(stats.wasNeverUsed));
-                appendHistogram(hostInfo, stats.acquisitionWaitTimes, kAcquisitionWaitTimesKey);
-            }
+            hostInfo.appendNumber("wasNeverUsed", static_cast<long long>(stats.wasNeverUsed));
+            appendHistogram(hostInfo, stats.acquisitionWaitTimes, kAcquisitionWaitTimesKey);
         }
     }
 }

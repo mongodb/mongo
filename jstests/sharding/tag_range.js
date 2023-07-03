@@ -29,7 +29,7 @@ countTags(2, 'tag ranges were not successfully added');
 
 // remove the second range, should be left with one
 
-assert.commandWorked(st.removeTagRange('test.tag_range', {_id: 10}, {_id: 15}, 'b'));
+assert.commandWorked(st.removeTagRange('test.tag_range', {_id: 10}, {_id: 15}));
 
 countTags(1, 'tag range not removed successfully');
 
@@ -47,7 +47,7 @@ assert.commandWorked(
 assert.commandWorked(st.addTagRange('test.tag_range_dotted', {"_id.a": 5}, {"_id.a": 10}, 'c'));
 countTags(2, 'Dotted path tag range not successfully added.');
 
-assert.commandWorked(st.removeTagRange('test.tag_range_dotted', {"_id.a": 5}, {"_id.a": 10}, 'c'));
+assert.commandWorked(st.removeTagRange('test.tag_range_dotted', {"_id.a": 5}, {"_id.a": 10}));
 assert.commandFailed(st.addTagRange('test.tag_range_dotted', {"_id.b": 5}, {"_id.b": 10}, 'c'));
 countTags(1, 'Incorrectly added tag range.');
 
@@ -58,35 +58,35 @@ countTags(1, 'Incorrectly added embedded field tag range');
 // removeTagRange tests for tag ranges that do not exist
 
 // Bad namespace
-assert.commandFailed(st.removeTagRange('badns', {_id: 5}, {_id: 11}, 'a'));
+assert.commandFailed(st.removeTagRange('badns', {_id: 5}, {_id: 11}));
 countTags(1, 'Bad namespace: tag range does not exist');
 
 // Bad tag
-assert.commandWorked(st.removeTagRange('test.tag_range', {_id: 5}, {_id: 11}, 'badtag'));
+assert.commandWorked(st.removeTagRange('test.tag_range', {_id: 5}, {_id: 11}));
 countTags(1, 'Bad tag: tag range does not exist');
 
 // Bad min
-assert.commandWorked(st.removeTagRange('test.tag_range', {_id: 0}, {_id: 11}, 'a'));
+assert.commandWorked(st.removeTagRange('test.tag_range', {_id: 0}, {_id: 11}));
 countTags(1, 'Bad min: tag range does not exist');
 
 // Bad max
-assert.commandWorked(st.removeTagRange('test.tag_range', {_id: 5}, {_id: 12}, 'a'));
+assert.commandWorked(st.removeTagRange('test.tag_range', {_id: 5}, {_id: 12}));
 countTags(1, 'Bad max: tag range does not exist');
 
 // Invalid namesapce
-assert.commandFailed(st.removeTagRange(35, {_id: 5}, {_id: 11}, 'a'));
+assert.commandFailed(st.removeTagRange(35, {_id: 5}, {_id: 11}));
 countTags(1, 'Invalid namespace: tag range does not exist');
 
 // Invalid tag
-assert.commandWorked(st.removeTagRange('test.tag_range', {_id: 5}, {_id: 11}, 35));
+assert.commandWorked(st.removeTagRange('test.tag_range', {_id: 5}, {_id: 11}));
 countTags(1, 'Invalid tag: tag range does not exist');
 
 // Invalid min
-assert.commandFailed(st.removeTagRange('test.tag_range', 35, {_id: 11}, 'a'));
+assert.commandFailed(st.removeTagRange('test.tag_range', 35, {_id: 11}));
 countTags(1, 'Invalid min: tag range does not exist');
 
 // Invalid max
-assert.commandFailed(st.removeTagRange('test.tag_range', {_id: 5}, 35, 'a'));
+assert.commandFailed(st.removeTagRange('test.tag_range', {_id: 5}, 35));
 countTags(1, 'Invalid max: tag range does not exist');
 
 st.stop();

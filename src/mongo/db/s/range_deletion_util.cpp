@@ -29,33 +29,54 @@
 
 #include "mongo/db/s/range_deletion_util.h"
 
-#include <algorithm>
-#include <boost/optional.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <string>
 #include <utility>
+#include <vector>
 
-#include "mongo/db/client.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/delete_stage.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/balancer_stats_registry.h"
-#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/range_deleter_service.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/storage/remove_saver.h"
-#include "mongo/db/write_concern.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
 
@@ -104,6 +125,12 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                                 << keyPattern.toString() << "'");
     }
 
+    const auto rangeDeleterPriority = rangeDeleterHighPriority.load()
+        ? AdmissionContext::Priority::kImmediate
+        : AdmissionContext::Priority::kLow;
+
+    ScopedAdmissionPriorityForLock priority{opCtx->lockState(), rangeDeleterPriority};
+
     // Extend bounds to match the index we found
     const KeyPattern indexKeyPattern(shardKeyIdx->keyPattern());
     const auto extend = [&](const auto& key) {
@@ -124,11 +151,6 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     deleteStageParams->fromMigrate = true;
     deleteStageParams->isMulti = true;
     deleteStageParams->returnDeleted = true;
-
-    if (serverGlobalParams.moveParanoia) {
-        deleteStageParams->removeSaver =
-            std::make_unique<RemoveSaver>("moveChunk", nss.ns().toString(), "cleaning");
-    }
 
     auto exec =
         InternalPlanner::deleteWithShardKeyIndexScan(opCtx,
@@ -246,7 +268,7 @@ std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext*
     std::vector<RangeDeletionTask> tasks;
 
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    auto query = BSON(RangeDeletionTask::kNssFieldName << nss.ns());
+    auto query = BSON(RangeDeletionTask::kNssFieldName << NamespaceStringUtil::serialize(nss));
 
     store.forEach(opCtx, query, [&](const RangeDeletionTask& deletionTask) {
         tasks.push_back(std::move(deletionTask));
@@ -370,7 +392,8 @@ void snapshotRangeDeletionsForRename(OperationContext* opCtx,
     // Clear out eventual snapshots associated with the target collection: always restart from a
     // clean state in case of stepdown or primary killed.
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionForRenameNamespace);
-    store.remove(opCtx, BSON(RangeDeletionTask::kNssFieldName << toNss.ns()));
+    store.remove(opCtx,
+                 BSON(RangeDeletionTask::kNssFieldName << NamespaceStringUtil::serialize(toNss)));
 
     auto rangeDeletionTasks = getPersistentRangeDeletionTasks(opCtx, fromNss);
     for (auto& task : rangeDeletionTasks) {
@@ -388,7 +411,8 @@ void restoreRangeDeletionTasksForRename(OperationContext* opCtx, const Namespace
     PersistentTaskStore<RangeDeletionTask> rangeDeletionsStore(
         NamespaceString::kRangeDeletionNamespace);
 
-    const auto query = BSON(RangeDeletionTask::kNssFieldName << nss.ns());
+    const auto query =
+        BSON(RangeDeletionTask::kNssFieldName << NamespaceStringUtil::serialize(nss));
 
     rangeDeletionsForRenameStore.forEach(opCtx, query, [&](const RangeDeletionTask& deletionTask) {
         try {
@@ -406,8 +430,8 @@ void deleteRangeDeletionTasksForRename(OperationContext* opCtx,
     // Delete already restored snapshots associated to the target collection
     PersistentTaskStore<RangeDeletionTask> rangeDeletionsForRenameStore(
         NamespaceString::kRangeDeletionForRenameNamespace);
-    rangeDeletionsForRenameStore.remove(opCtx,
-                                        BSON(RangeDeletionTask::kNssFieldName << toNss.ns()));
+    rangeDeletionsForRenameStore.remove(
+        opCtx, BSON(RangeDeletionTask::kNssFieldName << NamespaceStringUtil::serialize(toNss)));
 }
 
 

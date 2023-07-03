@@ -29,22 +29,59 @@
 
 #pragma once
 
+#include <absl/container/inlined_vector.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include <array>
+#include <bitset>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <iterator>
+#include <limits>
 #include <memory>
+#include <set>
 #include <string>
+#include <type_traits>
 #include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/makeobj_enums.h"
 #include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/makeobj.h"
 #include "mongo/db/exec/sbe/stages/project.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/stage_types.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo::projection_ast {
 class Projection;
@@ -53,6 +90,8 @@ class Projection;
 namespace mongo::stage_builder {
 
 class PlanStageSlots;
+struct PlanStageEnvironment;
+struct PlanStageStaticData;
 
 std::unique_ptr<sbe::EExpression> makeUnaryOp(sbe::EPrimUnary::Op unaryOp,
                                               std::unique_ptr<sbe::EExpression> operand);
@@ -72,6 +111,11 @@ std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
                                                std::unique_ptr<sbe::EExpression> rhs,
                                                sbe::RuntimeEnvironment* env);
 
+std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
+                                               std::unique_ptr<sbe::EExpression> lhs,
+                                               std::unique_ptr<sbe::EExpression> rhs,
+                                               PlanStageEnvironment& env);
+
 std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
                                                std::unique_ptr<sbe::EExpression> arr,
                                                std::unique_ptr<sbe::EExpression> collator = {});
@@ -79,6 +123,10 @@ std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression>
 std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
                                                std::unique_ptr<sbe::EExpression> arr,
                                                sbe::RuntimeEnvironment* env);
+
+std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
+                                               std::unique_ptr<sbe::EExpression> arr,
+                                               PlanStageEnvironment& env);
 
 /**
  * Generates an EExpression that checks if the input expression is null or missing.
@@ -556,15 +604,14 @@ std::pair<sbe::IndexKeysInclusionSet, std::vector<std::string>> makeIndexKeyIncl
     return {std::move(indexKeyBitset), std::move(keyFieldNames)};
 }
 
-struct PlanStageData;
-
 /**
  * Common parameters to SBE stage builder functions extracted into separate class to simplify
  * argument passing. Also contains a mapping of global variable ids to slot ids.
  */
 struct StageBuilderState {
     StageBuilderState(OperationContext* opCtx,
-                      PlanStageData* data,
+                      PlanStageEnvironment& env,
+                      PlanStageStaticData* data,
                       const Variables& variables,
                       sbe::value::SlotIdGenerator* slotIdGenerator,
                       sbe::value::FrameIdGenerator* frameIdGenerator,
@@ -575,6 +622,7 @@ struct StageBuilderState {
           frameIdGenerator{frameIdGenerator},
           spoolIdGenerator{spoolIdGenerator},
           opCtx{opCtx},
+          env{env},
           data{data},
           variables{variables},
           needsMerge{needsMerge},
@@ -609,7 +657,8 @@ struct StageBuilderState {
     sbe::value::SpoolIdGenerator* const spoolIdGenerator;
 
     OperationContext* const opCtx;
-    PlanStageData* const data;
+    PlanStageEnvironment& env;
+    PlanStageStaticData* const data;
 
     const Variables& variables;
     // When the mongos splits $group stage and sends it to shards, it adds 'needsMerge'/'fromMongs'
@@ -1163,6 +1212,29 @@ inline std::vector<T> appendVectorUnique(std::vector<T> lhs, std::vector<T> rhs)
         }
     }
     return lhs;
+}
+
+inline std::pair<std::unique_ptr<key_string::Value>, std::unique_ptr<key_string::Value>>
+makeKeyStringPair(const BSONObj& lowKey,
+                  bool lowKeyInclusive,
+                  const BSONObj& highKey,
+                  bool highKeyInclusive,
+                  key_string::Version version,
+                  Ordering ordering,
+                  bool forward) {
+    // Note that 'makeKeyFromBSONKeyForSeek()' is intended to compute the "start" key for an
+    // index scan. The logic for computing a "discriminator" for an "end" key is reversed, which
+    // is why we use 'makeKeyStringFromBSONKey()' to manually specify the discriminator for the
+    // end key.
+    return {
+        std::make_unique<key_string::Value>(IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+            lowKey, version, ordering, forward, lowKeyInclusive)),
+        std::make_unique<key_string::Value>(IndexEntryComparison::makeKeyStringFromBSONKey(
+            highKey,
+            version,
+            ordering,
+            forward != highKeyInclusive ? key_string::Discriminator::kExclusiveBefore
+                                        : key_string::Discriminator::kExclusiveAfter))};
 }
 
 }  // namespace mongo::stage_builder

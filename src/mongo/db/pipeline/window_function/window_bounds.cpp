@@ -27,9 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/window_function/window_function_expression.h"
+#include <functional>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/window_function/window_bounds.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/sort_pattern.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 using boost::intrusive_ptr;
 using boost::optional;
@@ -70,7 +94,7 @@ Value serializeBound(const WindowBounds::Bound<T>& bound, SerializationOptions o
             [&](const WindowBounds::Current&) { return Value(WindowBounds::kValCurrent); },
             [&](const T& n) {
                 // If not "unbounded" or "current", n must be a literal constant
-                return opts.serializeLiteralValue(n);
+                return opts.serializeLiteral(n);
             },
         },
         bound);
@@ -239,8 +263,8 @@ void WindowBounds::serialize(MutableDocument& args, SerializationOptions opts) c
                             serializeBound(rangeBounds.upper, opts),
                         }};
                         if (rangeBounds.unit) {
-                            args[kArgUnit] = Value{
-                                opts.serializeLiteralValue(serializeTimeUnit(*rangeBounds.unit))};
+                            args[kArgUnit] =
+                                opts.serializeLiteral(serializeTimeUnit(*rangeBounds.unit));
                         }
                     },
                 },

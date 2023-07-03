@@ -29,8 +29,17 @@
 
 #include "mongo/db/pipeline/abt/abt_translate_bm_fixture.h"
 
+#include <cstddef>
+#include <string>
+
+#include <benchmark/benchmark.h>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/json.h"
+#include "mongo/bson/json.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 namespace {

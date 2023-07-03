@@ -27,28 +27,83 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/mutable/document.h"
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/oplog_writer_impl.h"
-#include "mongo/db/ops/update.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_applier_impl.h"
+#include "mongo/db/repl/oplog_applier_utils.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -212,7 +267,7 @@ protected:
     }
     int opCount() {
         return DBDirectClient(&_opCtx)
-            .find(FindCommandRequest{NamespaceString{cllNS()}})
+            .find(FindCommandRequest{NamespaceString::createNamespaceString_forTest(cllNS())})
             ->itcount();
     }
     void applyAllOperations() {
@@ -220,7 +275,8 @@ protected:
         std::vector<BSONObj> ops;
         {
             DBDirectClient db(&_opCtx);
-            auto cursor = db.find(FindCommandRequest{NamespaceString{cllNS()}});
+            auto cursor = db.find(
+                FindCommandRequest{NamespaceString::createNamespaceString_forTest(cllNS())});
             while (cursor->more()) {
                 ops.push_back(cursor->nextSafe());
             }
@@ -242,8 +298,19 @@ protected:
             // Handle the case of batched writes which generate command-type (applyOps) oplog
             // entries.
             if (entry.getOpType() == repl::OpTypeEnum::kCommand) {
-                uassertStatusOK(applyCommand_inlock(
-                    &_opCtx, ApplierOperation{&entry}, getOplogApplicationMode()));
+                std::vector<ApplierOperation> ops;
+                auto stmts = ApplyOps::extractOperations(entry);
+                for (auto& stmt : stmts) {
+                    ops.push_back(ApplierOperation(&stmt));
+                }
+                _opCtx.releaseAndReplaceRecoveryUnit();
+                uassertStatusOK(
+                    OplogApplierUtils::applyOplogBatchCommon(&_opCtx,
+                                                             &ops,
+                                                             getOplogApplicationMode(),
+                                                             true,
+                                                             true,
+                                                             &applyOplogEntryOrGroupedInserts));
             } else {
                 auto coll = acquireCollection(
                     &_opCtx, {nss(), {}, {}, AcquisitionPrerequisites::kWrite}, MODE_IX);
@@ -266,7 +333,7 @@ protected:
     }
     // These deletes don't get logged.
     void deleteAll(const char* ns) const {
-        NamespaceString nss(ns);
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         ::mongo::writeConflictRetry(&_opCtx, "deleteAll", nss, [&] {
             Lock::GlobalWrite lk(&_opCtx);
             OldClientContext ctx(&_opCtx, nss);
@@ -342,15 +409,6 @@ protected:
         b.appendElements(fromjson(json));
         return b.obj();
     }
-
-private:
-    // Disable batched deletes. We use batched writes for the delete in the Remove() case which
-    // tries to group two deletes in one applyOps. It is illegal to batch writes outside a WUOW,
-    // so we disable batching for this test.
-    // TODO SERVER-69316: When featureFlagBatchMultiDeletes is removed, we want the Remove() test
-    // to issue two different applyOps deletes, or wrap the applyOps in a WUOW.
-    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagBatchMultiDeletes",
-                                                                false};
 };
 
 
@@ -798,7 +856,7 @@ class MultiInc : public Recovering {
 public:
     std::string s() const {
         StringBuilder ss;
-        FindCommandRequest findRequest{NamespaceString{ns()}};
+        FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
         findRequest.setSort(BSON("_id" << 1));
         std::unique_ptr<DBClientCursor> cc = _client.find(std::move(findRequest));
         bool first = true;

@@ -29,13 +29,25 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/platform/visibility.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/safe_num.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace mutablebson {

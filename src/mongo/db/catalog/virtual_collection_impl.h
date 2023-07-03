@@ -29,12 +29,51 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/capped_visibility.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_options_gen.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/virtual_collection_options.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/external_record_store.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 class VirtualCollectionImpl final : public Collection {
@@ -73,8 +112,6 @@ public:
         unimplementedTasserted();
         return Status(ErrorCodes::UnknownError, "unknown");
     };
-
-    void setCommitted(bool) {}
 
     bool isInitialized() const final {
         return true;
@@ -239,6 +276,16 @@ public:
     bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const final {
         unimplementedTasserted();
         return false;
+    }
+
+    bool timeseriesBucketingParametersMayHaveChanged() const final {
+        unimplementedTasserted();
+        return false;
+    }
+
+    void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
+                                                 boost::optional<bool> value) final {
+        unimplementedTasserted();
     }
 
     bool getRequiresTimeseriesExtendedRangeSupport() const final {

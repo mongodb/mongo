@@ -10,7 +10,7 @@ t.createIndex({loc: "2dsphere"});
 //     2dsphere index with legacy coordinate pair and spherical=false.
 var indexTypes = ['2d', '2dsphere'], pointTypes = [{type: 'Point', coordinates: [0, 0]}, [0, 0]],
     sphericalOptions = [true, false], optionNames = ['minDistance', 'maxDistance'],
-    badNumbers = [-1, undefined, 'foo'];
+    badNumbers = [-1, undefined, 'foo'], unknownArg = 'foo';
 
 indexTypes.forEach(function(indexType) {
     t.drop();
@@ -100,6 +100,12 @@ indexTypes.forEach(function(indexType) {
                     command['distanceMultiplier'] = badNumber;
                     assert.commandFailed(db.runCommand(command), msg);
                 });
+
+                // Unknown argument
+                var msg = ("geoNear should've failed with unknown arg " + unknownArg);
+                var command = makeCommand(1);
+                command[unknownArg] = "unknown";
+                assert.commandFailed(db.runCommand(command), msg);
             });
         });
     });

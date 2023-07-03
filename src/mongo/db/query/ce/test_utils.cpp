@@ -29,15 +29,33 @@
 
 #include "mongo/db/query/ce/test_utils.h"
 
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <iostream>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/pipeline/abt/utils.h"
+#include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/utils/const_fold_interface.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/stats/value_utils.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo::optimizer::ce {
 namespace value = sbe::value;

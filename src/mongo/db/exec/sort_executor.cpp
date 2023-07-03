@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <exception>
+#include <system_error>
 
 #include "mongo/db/exec/sort_executor.h"
-
-#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 namespace {

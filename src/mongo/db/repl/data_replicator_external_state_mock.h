@@ -29,7 +29,32 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <functional>
+#include <memory>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
+#include "mongo/db/repl/last_vote.h"
+#include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace repl {

@@ -29,6 +29,8 @@
 
 #include "mongo/db/s/type_shard_database.h"
 
+#include "mongo/idl/idl_parser.h"
+
 namespace mongo {
 
 ShardDatabaseType::ShardDatabaseType(const BSONObj& obj) {

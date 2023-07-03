@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ################################################################
-# Copyright (c) 2021-2021, Facebook, Inc.
+# Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
 # This source code is licensed under both the BSD-style license (found in the
@@ -340,7 +340,7 @@ class PartialPreprocessor(object):
 
                 if macro2 is not None and not resolved:
                     assert ifdef and defined and op == '&&' and cmp is not None
-                    # If the statment is true, but we have a single value check, then
+                    # If the statement is true, but we have a single value check, then
                     # check the value.
                     defined_value = self._defs[macro]
                     are_ints = True
@@ -431,7 +431,7 @@ class Freestanding(object):
             external_xxhash: bool, xxh64_state: Optional[str],
             xxh64_prefix: Optional[str], rewritten_includes: [(str, str)],
             defs: [(str, Optional[str])], replaces: [(str, str)],
-            undefs: [str], excludes: [str], seds: [str],
+            undefs: [str], excludes: [str], seds: [str], spdx: bool,
     ):
         self._zstd_deps = zstd_deps
         self._mem = mem
@@ -446,6 +446,7 @@ class Freestanding(object):
         self._undefs = undefs
         self._excludes = excludes
         self._seds = seds
+        self._spdx = spdx
 
     def _dst_lib_file_paths(self):
         """
@@ -640,6 +641,27 @@ class Freestanding(object):
         for sed in self._seds:
             self._process_sed(sed)
 
+    def _process_spdx(self):
+        if not self._spdx:
+            return
+        self._log("Processing spdx")
+        SPDX_C = "// SPDX-License-Identifier: GPL-2.0+ OR BSD-3-Clause\n"
+        SPDX_H_S = "/* SPDX-License-Identifier: GPL-2.0+ OR BSD-3-Clause */\n"
+        for filepath in self._dst_lib_file_paths():
+            file = FileLines(filepath)
+            if file.lines[0] == SPDX_C or file.lines[0] == SPDX_H_S:
+                continue
+            for line in file.lines:
+                if "SPDX-License-Identifier" in line:
+                    raise RuntimeError(f"Unexpected SPDX license identifier: {file.filename} {repr(line)}")
+            if file.filename.endswith(".c"):
+                file.lines.insert(0, SPDX_C)
+            elif file.filename.endswith(".h") or file.filename.endswith(".S"):
+                file.lines.insert(0, SPDX_H_S)
+            else:
+                raise RuntimeError(f"Unexpected file extension: {file.filename}")
+            file.write()
+
 
 
     def go(self):
@@ -651,6 +673,7 @@ class Freestanding(object):
         self._rewrite_includes()
         self._replace_xxh64_prefix()
         self._process_seds()
+        self._process_spdx()
 
 
 def parse_optional_pair(defines: [str]) -> [(str, Optional[str])]:
@@ -689,8 +712,9 @@ def main(name, args):
     parser.add_argument("--xxh64-prefix", default=None, help="Alternate XXH64 function prefix (excluding _) e.g. --xxh64-prefix=xxh64")
     parser.add_argument("--rewrite-include", default=[], dest="rewritten_includes", action="append", help="Rewrite an include REGEX=NEW (e.g. '<stddef\\.h>=<linux/types.h>')")
     parser.add_argument("--sed", default=[], dest="seds", action="append", help="Apply a sed replacement. Format: `s/REGEX/FORMAT/[g]`. REGEX is a Python regex. FORMAT is a Python format string formatted by the regex dict.")
+    parser.add_argument("--spdx", action="store_true", help="Add SPDX License Identifiers")
     parser.add_argument("-D", "--define", default=[], dest="defs", action="append", help="Pre-define this macro (can be passed multiple times)")
-    parser.add_argument("-U", "--undefine", default=[], dest="undefs", action="append", help="Pre-undefine this macro (can be passed mutliple times)")
+    parser.add_argument("-U", "--undefine", default=[], dest="undefs", action="append", help="Pre-undefine this macro (can be passed multiple times)")
     parser.add_argument("-R", "--replace", default=[], dest="replaces", action="append", help="Pre-define this macro and replace the first ifndef block with its definition")
     parser.add_argument("-E", "--exclude", default=[], dest="excludes", action="append", help="Exclude all lines between 'BEGIN <EXCLUDE>' and 'END <EXCLUDE>'")
     args = parser.parse_args(args)
@@ -743,6 +767,7 @@ def main(name, args):
         args.undefs,
         args.excludes,
         args.seds,
+        args.spdx,
     ).go()
 
 if __name__ == "__main__":

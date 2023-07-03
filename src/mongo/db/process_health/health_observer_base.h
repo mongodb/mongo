@@ -28,10 +28,28 @@
  */
 #pragma once
 
-#include "mongo/db/process_health/health_observer.h"
+#include <memory>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/status.h"
 #include "mongo/db/process_health/deadline_future.h"
+#include "mongo/db/process_health/fault_manager_config.h"
+#include "mongo/db/process_health/health_check_status.h"
+#include "mongo/db/process_health/health_observer.h"
 #include "mongo/db/service_context.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/platform/random.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/tick_source.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace process_health {

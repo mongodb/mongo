@@ -30,11 +30,31 @@
 #include "mongo/bson/util/bsoncolumn.h"
 
 #include <algorithm>
+#include <array>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ref_counter.hpp>
+#include <cstdint>
+#include <cstring>
+#include <utility>
 
+#include <absl/numeric/int128.h>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/util/bsoncolumn_util.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/simple8b_type_util.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 using namespace bsoncolumn;
@@ -297,13 +317,11 @@ BSONColumn::Iterator::Iterator(boost::intrusive_ptr<ElementStorage> allocator,
 }
 
 void BSONColumn::Iterator::_initializeInterleaving() {
-    Interleaved& interleaved = _mode.emplace<Interleaved>();
-
-    interleaved.arrays = *_control == bsoncolumn::kInterleavedStartControlByte ||
-        *_control == bsoncolumn::kInterleavedStartArrayRootControlByte;
-    interleaved.rootType =
-        *_control == bsoncolumn::kInterleavedStartArrayRootControlByte ? Array : Object;
-    interleaved.referenceObj = BSONObj(_control + 1);
+    Interleaved& interleaved = _mode.emplace<Interleaved>(
+        BSONObj(_control + 1),
+        *_control == bsoncolumn::kInterleavedStartArrayRootControlByte ? Array : Object,
+        *_control == bsoncolumn::kInterleavedStartControlByte ||
+            *_control == bsoncolumn::kInterleavedStartArrayRootControlByte);
 
     BSONObjTraversal t(
         interleaved.arrays,
@@ -751,6 +769,11 @@ BSONElement BSONColumn::Iterator::DecodingState::loadDelta(ElementStorage& alloc
     lastValue = elemFn.element();
     return lastValue;
 }
+
+BSONColumn::Iterator::Interleaved::Interleaved(BSONObj refObj,
+                                               BSONType referenceObjType,
+                                               bool interleavedArrays)
+    : referenceObj(std::move(refObj)), arrays(interleavedArrays), rootType(referenceObjType) {}
 
 BSONColumn::BSONColumn(const char* buffer, size_t size)
     : _binary(buffer), _size(size), _allocator(new ElementStorage()) {

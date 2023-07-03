@@ -34,17 +34,10 @@ const outerAggTestCases = [
             const isClusteredColl =
                 listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
 
-            // When SBE is enabled, if the collection is not sharded and either not clustered or
-            // the featureFlagSbeFull is true, the shard will not create a separate pipeline to
-            // execute the inner side of a $lookup stage so there is no nested aggregate query to
-            // route. These are the cases when SBE is actually used; SBE does $lookup pushdown
-            // whereas Classic does not.
-            // TODO SERVER-75715: Remove "featureFlagSbeFull" comment reference and check, as this
-            // ticket will move SBE clustered collection support out from behind this flag. The full
-            // check should then become just "!isShardedColl && checkSBEEnabled(db)".
-            const isEligibleForSBELookupPushdown = !isShardedColl &&
-                ((!isClusteredColl && checkSBEEnabled(db)) ||
-                 checkSBEEnabled(db, ["featureFlagSbeFull"]));
+            // When SBE is used, the shard will not create a separate pipeline to execute the inner
+            // side of a $lookup stage so there is no nested aggregate query to route, because SBE
+            // does $lookup pushdown whereas Classic does not.
+            const isEligibleForSBELookupPushdown = !isShardedColl && checkSBEEnabled(db);
             return !isEligibleForSBELookupPushdown;
         }
     },

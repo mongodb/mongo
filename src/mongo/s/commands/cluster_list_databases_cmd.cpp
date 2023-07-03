@@ -27,22 +27,45 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <algorithm>
+#include <cstdint>
 #include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
 #include <vector>
 
-#include "mongo/bson/util/bson_extract.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_databases_gen.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -84,20 +107,21 @@ public:
             const bool nameOnly = cmd.getNameOnly();
 
             // { authorizedDatabases: bool } - Dynamic default based on perms.
-            const bool authorizedDatabases = ([as](const boost::optional<bool>& authDB) {
-                const bool mayListAllDatabases = as->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(), ActionType::listDatabases);
-                if (authDB) {
-                    uassert(ErrorCodes::Unauthorized,
-                            "Insufficient permissions to list all databases",
-                            authDB.value() || mayListAllDatabases);
-                    return authDB.value();
-                }
+            const bool authorizedDatabases =
+                ([as, tenantId = cmd.getDbName().tenantId()](const boost::optional<bool>& authDB) {
+                    const bool mayListAllDatabases = as->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(tenantId), ActionType::listDatabases);
+                    if (authDB) {
+                        uassert(ErrorCodes::Unauthorized,
+                                "Insufficient permissions to list all databases",
+                                authDB.value() || mayListAllDatabases);
+                        return authDB.value();
+                    }
 
-                // By default, list all databases if we can, otherwise
-                // only those we're allowed to find on.
-                return !mayListAllDatabases;
-            })(cmd.getAuthorizedDatabases());
+                    // By default, list all databases if we can, otherwise
+                    // only those we're allowed to find on.
+                    return !mayListAllDatabases;
+                })(cmd.getAuthorizedDatabases());
 
             auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
@@ -166,27 +190,29 @@ public:
             // and compute total sizes.
             long long totalSize = 0;
             std::vector<ListDatabasesReplyItem> items;
+            const auto& tenantId = cmd.getDbName().tenantId();
             for (const auto& sizeEntry : sizes) {
-                const auto& name = sizeEntry.first;
+                const auto dbname = DatabaseNameUtil::deserialize(tenantId, sizeEntry.first);
                 const long long size = sizeEntry.second;
 
                 // Skip the local database, since all shards have their own independent local
-                if (name == DatabaseName::kLocal.db())
+                if (dbname.isLocalDB()) {
                     continue;
+                }
 
-                if (authorizedDatabases && !as->isAuthorizedForAnyActionOnAnyResourceInDB(name)) {
+                if (authorizedDatabases && !as->isAuthorizedForAnyActionOnAnyResourceInDB(dbname)) {
                     // We don't have listDatabases on the cluser or find on this database.
                     continue;
                 }
 
-                ListDatabasesReplyItem item(name);
+                ListDatabasesReplyItem item(sizeEntry.first);
                 if (!nameOnly) {
                     item.setSizeOnDisk(size);
                     item.setEmpty(size == 1);
-                    item.setShards(dbShardInfo[name]->obj());
+                    item.setShards(dbShardInfo[sizeEntry.first]->obj());
 
                     uassert(ErrorCodes::BadValue,
-                            str::stream() << "Found negative 'sizeOnDisk' in: " << name,
+                            str::stream() << "Found negative 'sizeOnDisk' in: " << dbname,
                             size >= 0);
 
                     totalSize += size;

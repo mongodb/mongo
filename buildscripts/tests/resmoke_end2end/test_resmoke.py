@@ -13,7 +13,9 @@ from shutil import rmtree
 
 import yaml
 
-from buildscripts.resmokelib import core
+from buildscripts.ciconfig.evergreen import parse_evergreen_file
+from buildscripts.resmokelib import config, core, suitesconfig
+from buildscripts.resmokelib.utils.dictionary import get_dict_value
 
 # pylint: disable=unsupported-membership-test
 
@@ -64,8 +66,13 @@ class TestArchivalOnFailure(_ResmokeSelftest):
         cls.archival_file = "test_archival.txt"
 
     def test_archival_on_task_failure(self):
+        # The --originSuite argument is to trick the resmoke local invocation into passing
+        # because when we pass --taskId into resmoke it thinks that it is being ran in evergreen
+        # and cannot normally find an evergreen task associated with
+        # buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_failure.yml
         resmoke_args = [
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_failure.yml",
+            "--originSuite=resmoke_end2end_tests",
             "--taskId=123",
             "--internalParam=test_archival",
             "--repeatTests=2",
@@ -79,9 +86,14 @@ class TestArchivalOnFailure(_ResmokeSelftest):
         self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
 
     def test_archival_on_task_failure_no_passthrough(self):
+        # The --originSuite argument is to trick the resmoke local invocation into passing
+        # because when we pass --taskId into resmoke it thinks that it is being ran in evergreen
+        # and cannot normally find an evergreen task associated with
+        # buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_failure_no_passthrough.yml
         resmoke_args = [
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_failure_no_passthrough.yml",
             "--taskId=123",
+            "--originSuite=resmoke_end2end_tests",
             "--internalParam=test_archival",
             "--repeatTests=2",
             "--jobs=2",
@@ -146,9 +158,14 @@ class TestTimeout(_ResmokeSelftest):
         self.signal_resmoke()
 
     def test_task_timeout(self):
+        # The --originSuite argument is to trick the resmoke local invocation into passing
+        # because when we pass --taskId into resmoke it thinks that it is being ran in evergreen
+        # and cannot normally find an evergreen task associated with
+        # buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_timeout.yml
         resmoke_args = [
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_timeout.yml",
             "--taskId=123",
+            "--originSuite=resmoke_end2end_tests",
             "--internalParam=test_archival",
             "--internalParam=test_analysis",
             "--repeatTests=2",
@@ -163,9 +180,14 @@ class TestTimeout(_ResmokeSelftest):
         self.assert_dir_file_count(self.test_dir, self.analysis_file, analysis_pids_to_expect)
 
     def test_task_timeout_no_passthrough(self):
+        # The --originSuite argument is to trick the resmoke local invocation into passing
+        # because when we pass --taskId into resmoke it thinks that it is being ran in evergreen
+        # and cannot normally find an evergreen task associated with
+        # buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_timeout_no_passthrough.yml
         resmoke_args = [
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_task_timeout_no_passthrough.yml",
             "--taskId=123",
+            "--originSuite=resmoke_end2end_tests",
             "--internalParam=test_archival",
             "--internalParam=test_analysis",
             "--repeatTests=2",
@@ -181,9 +203,14 @@ class TestTimeout(_ResmokeSelftest):
 
     # Test scenarios where an resmoke-launched process launches resmoke.
     def test_nested_timeout(self):
+        # The --originSuite argument is to trick the resmoke local invocation into passing
+        # because when we pass --taskId into resmoke it thinks that it is being ran in evergreen
+        # and cannot normally find an evergreen task associated with
+        # buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_nested_timeout.yml
         resmoke_args = [
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_nested_timeout.yml",
             "--taskId=123",
+            "--originSuite=resmoke_end2end_tests",
             "--internalParam=test_archival",
             "--internalParam=test_analysis",
             "jstests/resmoke_selftest/end2end/timeout/nested/top_level_timeout.js",
@@ -541,3 +568,78 @@ class TestSetShellSeed(unittest.TestCase):
 
         self.assertTrue(
             len(random_seeds) > 1, msg="Resmoke generated the same random seed 10 times in a row.")
+
+
+# In resmoke we expect certain parts of the evergreen config to be a certain way
+# These tests will fail if something is not as expected and also needs to change somewhere else in resmoke
+class TestEvergreenYML(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.evg_conf = parse_evergreen_file("etc/evergreen.yml")
+        config.CONFIG_DIR = "buildscripts/resmokeconfig"
+
+    def validate_jstestfuzz_selector(self, suite_name):
+        suite_config = suitesconfig.get_suite(suite_name).get_config()
+        expected_selector = ["jstestfuzz/out/*.js"]
+        self.assertEqual(
+            suite_config["selector"]["roots"], expected_selector,
+            msg=f"The jstestfuzz selector for {suite_name} did not match 'jstestfuzz/out/*.js'")
+
+    # This test asserts that the jstestfuzz tasks uploads the the URL we expect it to
+    # If the remote url changes, also change it in the _log_local_resmoke_invocation method
+    # before fixing this test to the correct url
+    def test_jstestfuzz_download_url(self):
+        functions = self.evg_conf.functions
+        run_jstestfuzz = functions["run jstestfuzz"]
+        contains_correct_url = False
+        for item in run_jstestfuzz:
+            if item["command"] != "s3.put":
+                continue
+
+            remote_url = item["params"]["remote_file"]
+            if remote_url == "${project}/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz":
+                contains_correct_url = True
+                break
+
+        self.assertTrue(
+            contains_correct_url, msg=
+            "The 'run jstestfuzz' function in evergreen did not contain the remote_url that was expected"
+        )
+
+    # This tasks asserts that the way implicit multiversion tasks are defined has not changed
+    # If this fails, you will need to correct the _log_local_resmoke_invocation method before fixing
+    # this test
+    def test_implicit_multiversion_tasks(self):
+        multiverson_task_names = self.evg_conf.get_task_names_by_tag("multiversion")
+        implicit_multiversion_count = 0
+        for multiversion_task_name in multiverson_task_names:
+            task_config = self.evg_conf.get_task(multiversion_task_name)
+            func = task_config.find_func_command("initialize multiversion tasks")
+            if func is not None:
+                implicit_multiversion_count += 1
+
+        self.assertNotEqual(0, implicit_multiversion_count,
+                            msg="Could not find any implicit multiversion tasks in evergreen")
+
+    # This tasks asserts that the way jstestfuzz tasks are defined has not changed
+    # It also asserts that the selector for jstestfuzz tasks always points to jstestfuzz/out/*.js
+    # If this fails, you will need to correct the _log_local_resmoke_invocation method before fixing
+    # this test
+    def test_jstestfuzz_tasks(self):
+        jstestfuzz_count = 0
+        for task in self.evg_conf.tasks:
+            generate_func = task.find_func_command("generate resmoke tasks")
+            if (generate_func is None
+                    or get_dict_value(generate_func, ["vars", "is_jstestfuzz"]) != "true"):
+                continue
+
+            jstestfuzz_count += 1
+
+            multiversion_func = task.find_func_command("initialize multiversion tasks")
+            if multiversion_func is not None:
+                for subtask in multiversion_func["vars"]:
+                    self.validate_jstestfuzz_selector(subtask)
+            else:
+                self.validate_jstestfuzz_selector(task.get_suite_name())
+
+        self.assertNotEqual(0, jstestfuzz_count, msg="Could not find any jstestfuzz tasks")

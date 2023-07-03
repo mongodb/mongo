@@ -30,30 +30,66 @@
 
 #include "mongo/db/session/session_catalog_mongod.h"
 
+#include <absl/container/node_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <functional>
 #include <memory>
+#include <mutex>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/index_builds_manager.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/create_indexes_gen.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/internal_transactions_reap_service.h"
+#include "mongo/db/session/kill_sessions.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/session/session_killer.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/session/sessions_collection.h"
-#include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/transaction_router.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 

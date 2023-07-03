@@ -29,6 +29,22 @@
 
 #include "mongo/db/query/all_indices_required_checker.h"
 
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 namespace mongo {
 
 AllIndicesRequiredChecker::AllIndicesRequiredChecker(

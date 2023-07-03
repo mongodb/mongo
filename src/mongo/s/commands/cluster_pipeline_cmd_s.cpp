@@ -27,7 +27,27 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/commands/cluster_pipeline_cmd.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
 
 namespace mongo {
 namespace {
@@ -42,7 +62,9 @@ struct ClusterPipelineCommandS {
         return kApiVersions1;
     }
 
-    static void doCheckAuthorization(OperationContext* opCtx, const PrivilegeVector& privileges) {
+    static void doCheckAuthorization(OperationContext* opCtx,
+                                     const OpMsgRequest&,
+                                     const PrivilegeVector& privileges) {
         uassert(
             ErrorCodes::Unauthorized,
             "unauthorized",

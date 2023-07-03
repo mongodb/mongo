@@ -27,18 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <cstddef>
+#include <set>
 #include <vector>
 
-#include "mongo/db/pipeline/document_path_support.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/base/parse_number.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

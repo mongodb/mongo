@@ -30,11 +30,25 @@
 
 #include "mongo/db/matcher/expression_geo.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cmath>
+#include <limits>
+#include <s2cellid.h>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/geo/geoparser.h"
+#include "mongo/db/matcher/expression_geo_serializer.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/basic.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -102,73 +116,6 @@ Status GeoExpression::parseQuery(const BSONObj& obj) {
     }
 
     return Status::OK();
-}
-
-BSONObj customSerialization(const BSONObj& obj, SerializationOptions opts) {
-
-    // Ideally each sub operator ($minDistance, $maxDistance, $geometry, $box) would serialize
-    // itself, rather than GeoExpression reparse the query during serialization. However GeoMatch
-    // and GeoNearMatch don't capture the nesting of the various sub-operators. Moreover, the data
-    // members representing the suboperators do not have serialize functions. As re-parsing is
-    // therefore required to serialize GeoNear and GeoNearMatch, the compromise is to have the same
-    // class responsible for parsing (GeoExpression) also responsible for serializing.
-
-    BSONElement outerElem = obj.firstElement();
-    BSONObjBuilder bob;
-
-    // Legacy GeoNear query.
-    if (outerElem.type() == mongo::Array) {
-        BSONObjIterator it(obj);
-        while (it.more()) {
-            // In a legacy GeoNear query, the value associated with the first field ($near or
-            // $geoNear) is an array where the first two array elements represent the x and y
-            // coordinates respectively. An optional third array element denotes the $maxDistance.
-            // Alternatively, a legacy query can have a $maxDistance suboperator to make it more
-            // explicit. None of these values are enums so it is fine to treat them as literals
-            // during redaction.
-            opts.appendLiteral(&bob, it.next());
-        }
-        return bob.obj();
-    }
-    // Non-legacy geo expressions have embedded objects that have to be traversed.
-    else {
-        BSONObjIterator embedded_it(outerElem.embeddedObject());
-        StringData fieldName = outerElem.fieldNameStringData();
-        BSONObjBuilder subObj = BSONObjBuilder(bob.subobjStart(fieldName));
-
-        while (embedded_it.more()) {
-            BSONElement argElem = embedded_it.next();
-            fieldName = argElem.fieldNameStringData();
-            if (fieldName == "$geometry"_sd) {
-                if (argElem.type() == BSONType::Array) {
-                    // This would be like {$geometry: [0, 0]} which must be a point.
-                    auto asArray = argElem.Array();
-                    tassert(7539807,
-                            "Expected the point to have exactly 2 elements: an x and y.",
-                            asArray.size() == 2UL);
-                    subObj.appendArray(fieldName,
-                                       BSON_ARRAY(opts.serializeLiteral(asArray[0])
-                                                  << opts.serializeLiteral(asArray[1])));
-                } else {
-                    BSONObjBuilder nestedSubObj = BSONObjBuilder(subObj.subobjStart(fieldName));
-                    auto geometryObj = argElem.Obj();
-                    if (auto typeElt = geometryObj["type"]) {
-                        nestedSubObj.append(typeElt);
-                    }
-                    tassert(7539800, "always expect coordinates", geometryObj["coordinates"]);
-                    opts.appendLiteral(&nestedSubObj, geometryObj["coordinates"]);
-                    nestedSubObj.doneFast();
-                }
-            }
-            if (fieldName == "$maxDistance"_sd || fieldName == "$box"_sd ||
-                fieldName == "$nearSphere"_sd || fieldName == "$minDistance"_sd) {
-                opts.appendLiteral(&subObj, argElem);
-            }
-        }
-        subObj.doneFast();
-    }
-
-    return bob.obj();
 }
 
 Status GeoExpression::parseFrom(const BSONObj& obj) {
@@ -476,7 +423,7 @@ bool GeoMatchExpression::contains(const GeometryContainer& queryGeom,
     if (GeoExpression::WITHIN == queryPredicate) {
         return queryGeom.contains(*geometry);
     } else {
-        verify(GeoExpression::INTERSECT == queryPredicate);
+        MONGO_verify(GeoExpression::INTERSECT == queryPredicate);
         return queryGeom.intersects(*geometry);
     }
 }
@@ -510,7 +457,7 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
 
 BSONObj GeoMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
     if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-        return customSerialization(_rawObj, opts);
+        return geoCustomSerialization(_rawObj, opts);
     }
     BSONObjBuilder subobj;
     subobj.appendElements(_rawObj);
@@ -566,7 +513,7 @@ void GeoNearMatchExpression::debugString(StringBuilder& debug, int indentationLe
 
 BSONObj GeoNearMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
     if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-        return customSerialization(_rawObj, opts);
+        return geoCustomSerialization(_rawObj, opts);
     }
     BSONObjBuilder objBuilder;
     objBuilder.appendElements(_rawObj);

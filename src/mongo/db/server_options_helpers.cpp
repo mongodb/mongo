@@ -35,28 +35,35 @@
 #define SYSLOG_NAMES
 #include <syslog.h>
 #endif
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/operations.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
-#include <ios>
-#include <iostream>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cstddef>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/config.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/server_options.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_format.h"
 #include "mongo/logv2/log_manager.h"
-#include "mongo/transport/message_compressor_registry.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/net/sock.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl

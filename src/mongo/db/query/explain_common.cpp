@@ -27,13 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/explain_common.h"
-
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/str.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/version.h"
 
 namespace mongo::explain_common {

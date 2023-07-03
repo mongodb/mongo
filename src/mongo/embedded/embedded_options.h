@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/base/status.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"

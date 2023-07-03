@@ -29,15 +29,27 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_observer_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
-#include <set>
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -96,10 +108,10 @@ public:
     size_t getObservedMetricsCount(Role role) const;
     void reportForServerStatus(BSONObjBuilder* bob) const;
 
-    void onStarted();
-    void onSuccess();
-    void onFailure();
-    void onCanceled();
+    void onStarted(bool isSameKeyResharding);
+    void onSuccess(bool isSameKeyResharding);
+    void onFailure(bool isSameKeyResharding);
+    void onCanceled(bool isSameKeyResharding);
 
     void setLastOpEndingChunkImbalance(int64_t imbalanceCount);
 
@@ -153,6 +165,11 @@ private:
     AtomicWord<int64_t> _collectionCloningTotalLocalBatchInserts{0};
     AtomicWord<int64_t> _collectionCloningTotalLocalInsertTimeMillis{0};
     AtomicWord<int64_t> _writesToStashedCollections{0};
+
+    AtomicWord<int64_t> _countSameKeyStarted{0};
+    AtomicWord<int64_t> _countSameKeySucceeded{0};
+    AtomicWord<int64_t> _countSameKeyFailed{0};
+    AtomicWord<int64_t> _countSameKeyCancelled{0};
 };
 
 }  // namespace mongo

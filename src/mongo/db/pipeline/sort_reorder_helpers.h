@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/sort_pattern.h"
 
 namespace mongo {
 

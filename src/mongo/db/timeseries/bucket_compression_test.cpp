@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
+#include <memory>
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/timeseries/bucket_compression.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

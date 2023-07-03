@@ -28,11 +28,24 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/request_execution_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/async_request_executor.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
 #include "mongo/util/version.h"
 

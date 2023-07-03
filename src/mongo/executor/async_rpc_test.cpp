@@ -27,33 +27,60 @@
  *    it in the license file.
  */
 
+#include <absl/container/node_hash_map.h>
+#include <array>
+#include <boost/none.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstdint>
+#include <fmt/format.h>
+#include <memory>
+#include <string>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/hello_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/executor/async_rpc_retry_policy.h"
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/async_rpc_test_fixture.h"
 #include "mongo/executor/async_transaction_rpc.h"
-#include "mongo/executor/network_test_env.h"
-#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/executor/task_executor_test_fixture.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/idl/generic_args_with_types_gen.h"
 #include "mongo/rpc/topology_version_gen.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/transaction_router.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
-#include <memory>
 
-#include "mongo/logv2/log.h"
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo {
@@ -177,7 +204,9 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHelloWithGenericFields) {
     GenericReplyFieldsWithTypesUnstableV1 genericReplyUnstable;
     genericReplyUnstable.setOk(1);
     genericReplyUnstable.setDollarConfigTime(Timestamp(1, 1));
-    const LogicalTime clusterTime = LogicalTime(Timestamp(2, 3));
+    auto clusterTime = ClusterTime();
+    clusterTime.setClusterTime(LogicalTime(Timestamp(2, 3)));
+    clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
     genericReplyApiV1.setDollarClusterTime(clusterTime);
     auto configTime = Timestamp(1, 1);
     genericArgsUnstable.setDollarConfigTime(configTime);
@@ -205,7 +234,7 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHelloWithGenericFields) {
         BSONObjBuilder reply = BSONObjBuilder(helloReply.toBSON());
         reply.append("ok", 1);
         reply.append("$configTime", Timestamp(1, 1));
-        clusterTime.serializeToBSON("$clusterTime", &reply);
+        reply.append("$clusterTime", clusterTime.toBSON());
 
         return reply.obj();
     });
@@ -417,7 +446,10 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorWithGenericReplyFields) {
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     GenericReplyFieldsWithTypesV1 stableFields;
-    stableFields.setDollarClusterTime(LogicalTime(Timestamp(2, 3)));
+    auto clusterTime = ClusterTime();
+    clusterTime.setClusterTime(LogicalTime(Timestamp(2, 3)));
+    clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
+    stableFields.setDollarClusterTime(clusterTime);
     GenericReplyFieldsWithTypesUnstableV1 unstableFields;
     unstableFields.setDollarConfigTime(Timestamp(1, 1));
     unstableFields.setOk(false);
@@ -490,8 +522,7 @@ TEST_F(AsyncRPCTestFixture, WriteConcernError) {
 
     const BSONObj writeConcernError = BSON("code" << ErrorCodes::WriteConcernFailed << "errmsg"
                                                   << "mock");
-    const BSONObj resWithWriteConcernError =
-        BSON("ok" << 1 << "writeConcernError" << writeConcernError);
+    BSONObj resWithWriteConcernError = BSON("ok" << 1 << "writeConcernError" << writeConcernError);
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
@@ -533,7 +564,7 @@ TEST_F(AsyncRPCTestFixture, WriteError) {
     const BSONObj writeError = BSON("code" << ErrorCodes::DocumentValidationFailure << "errInfo"
                                            << writeErrorExtraInfo << "errmsg"
                                            << "Document failed validation");
-    const BSONObj resWithWriteError = BSON("ok" << 1 << "writeErrors" << BSON_ARRAY(writeError));
+    BSONObj resWithWriteError = BSON("ok" << 1 << "writeErrors" << BSON_ARRAY(writeError));
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
         helloCmd, getExecutorPtr(), _cancellationToken);
@@ -1202,6 +1233,102 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorAttemptedTargetMatchesActual) {
     auto targetHeardFrom = remoteErr.getTargetUsed();
     ASSERT_EQ(targetAttempted, targetHeardFrom);
     ASSERT_EQ(target, targetHeardFrom);
+}
+
+auto extractUUID(const BSONElement& element) {
+    return UUID::fromCDR(element.uuid());
+}
+
+auto getOpKeyFromCommand(const BSONObj& cmdObj) {
+    return extractUUID(cmdObj["clientOperationKey"]);
+}
+
+TEST_F(AsyncRPCTestFixture, OperationKeyIsSetByDefault) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+    auto opCtxHolder = makeOperationContext();
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
+
+    FindCommandRequest findCmd(nss);
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, getExecutorPtr(), _cancellationToken);
+    auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
+    ASSERT_DOES_NOT_THROW([&] {
+        onCommand([&](const auto& request) {
+            (void)getOpKeyFromCommand(request.cmdObj);
+            return CursorResponse(nss, 0LL, {BSON("x" << 1)})
+                .toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
+    }());
+    auto network = getNetworkInterfaceMock();
+    network->enterNetwork();
+    network->runReadyNetworkOperations();
+    network->exitNetwork();
+
+    future.get();
+}
+
+TEST_F(AsyncRPCTestFixture, UseOperationKeyWhenProvided) {
+    const auto opKey = UUID::gen();
+
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+    auto opCtxHolder = makeOperationContext();
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
+
+    FindCommandRequest findCmd(nss);
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, getExecutorPtr(), _cancellationToken);
+    // Set OperationKey via AsyncRPCOptions.
+    options->genericArgs.stable.setClientOperationKey(opKey);
+    auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
+    onCommand([&](const auto& request) {
+        ASSERT_EQ(getOpKeyFromCommand(request.cmdObj), opKey);
+        return CursorResponse(nss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+    future.get();
+}
+
+/**
+ * Checks that if cancellation occurs after TaskExecutor receives a network response, the
+ * cancellation fails and the network response fulfills the final response.
+ */
+TEST_F(AsyncRPCTestFixture, CancelAfterNetworkResponse) {
+    auto pauseAfterNetworkResponseFailPoint =
+        globalFailPointRegistry().find("pauseTaskExecutorAfterReceivesNetworkRespones");
+    pauseAfterNetworkResponseFailPoint->setMode(FailPoint::alwaysOn);
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+    auto opCtxHolder = makeOperationContext();
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
+
+    CancellationSource source;
+    CancellationToken token = source.token();
+    FindCommandRequest findCmd(nss);
+    auto options =
+        std::make_shared<AsyncRPCOptions<FindCommandRequest>>(findCmd, getExecutorPtr(), token);
+    auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
+
+    // Will pause processing response after network interface.
+    stdx::thread worker([&] {
+        onCommand([&](const auto& request) {
+            return CursorResponse(nss, 0LL, {BSON("x" << 1)})
+                .toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
+    });
+
+    // Cancel after network response received in the TaskExecutor.
+    pauseAfterNetworkResponseFailPoint->waitForTimesEntered(1);
+    source.cancel();
+    pauseAfterNetworkResponseFailPoint->setMode(FailPoint::off);
+
+    // Canceling after network response received does not change the final response and
+    // does not send killOperation.
+    CursorInitialReply res = std::move(future).get().response;
+    ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], BSON("x" << 1));
+
+    worker.join();
 }
 
 }  // namespace

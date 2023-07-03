@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/base/data_type.h"
+#include <utility>
 
-#include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_terminated.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 

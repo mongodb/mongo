@@ -67,14 +67,14 @@ main(int argc, char *argv[])
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     tablename = strchr(opts->uri, ':');
     testutil_assert(tablename != NULL);
     tablename++;
-    testutil_check(__wt_snprintf(countryuri, sizeof(countryuri), "index:%s:country", tablename));
-    testutil_check(__wt_snprintf(yearuri, sizeof(yearuri), "index:%s:year", tablename));
-    testutil_check(__wt_snprintf(joinuri, sizeof(joinuri), "join:%s", opts->uri));
+    testutil_snprintf(countryuri, sizeof(countryuri), "index:%s:country", tablename);
+    testutil_snprintf(yearuri, sizeof(yearuri), "index:%s:year", tablename);
+    testutil_snprintf(joinuri, sizeof(joinuri), "join:%s", opts->uri);
 
     testutil_check(wiredtiger_open(opts->home, NULL,
       "create,cache_size=200M,statistics=(all),statistics_log=(json,on_close,wait=1)",

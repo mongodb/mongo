@@ -1770,6 +1770,7 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateField) {
     addIndexedPath("b");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: 5, b: 6}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -1794,6 +1795,7 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingField) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_EQUALS(fromjson("{a: 6}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -1836,6 +1838,7 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingAndNonexistingFields) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: 5, c: 7, b: 6, d: 8}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -1878,6 +1881,7 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingNestedPaths) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: {b: 6, c: 7}, b: {d: 8, e: 9}}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -1920,6 +1924,7 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateNestedPaths) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{z: 0, a: {b: 6, c: 7}, b: {d: 8, e: 9}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -1956,6 +1961,7 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateDeeplyNestedPaths) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{z: 0, a: {b: {c: {d: 6, e: 7}}, f: 8}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -2004,6 +2010,7 @@ TEST_F(UpdateObjectNodeTest, ChildrenShouldBeAppliedInAlphabeticalOrder) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{z: 9, a: 5, b: 8, c: 7, d: 6}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -2037,6 +2044,7 @@ TEST_F(UpdateObjectNodeTest, CollatorShouldNotAffectUpdateOrder) {
     addIndexedPath("abc");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{abc: 5, cba: 6}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -2074,6 +2082,7 @@ TEST_F(UpdateObjectNodeTest, ApplyNoop) {
     addIndexedPath("c");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: 5, b: 6, c: 7}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -2112,6 +2121,7 @@ TEST_F(UpdateObjectNodeTest, ApplySomeChildrenNoops) {
     addIndexedPath("c");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: 5, b: 6, c: 7}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -2165,6 +2175,7 @@ TEST_F(UpdateObjectNodeTest, ApplyBlockingElementFromReplication) {
     setFromOplogApplication(true);
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: 0, b: 6}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -2218,6 +2229,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMergePositionalChild) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -2261,6 +2273,7 @@ TEST_F(UpdateObjectNodeTest, ApplyOrderMergedPositionalChild) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: {'0': 7, '1': {b: 6, c: 8}, '2': 5}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -2327,6 +2340,7 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotMergePositionalChild) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: {'0': 5, '1': 7, '2': 6}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -2364,6 +2378,7 @@ TEST_F(UpdateObjectNodeTest, ApplyPositionalChildLast) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: {'0': 6, '1': 7, '2': 5}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -2395,6 +2410,7 @@ TEST_F(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -2407,6 +2423,7 @@ TEST_F(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
     addIndexedPath("a");
     result = root.apply(getApplyParams(doc2.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc2.getObject());
     ASSERT_TRUE(doc2.isInPlaceModeEnabled());
 
@@ -2444,6 +2461,7 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}, {c: 0, d: 7}]}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -2457,6 +2475,7 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
     addIndexedPath("a");
     result = root.apply(getApplyParams(doc2.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 0}, {c: 6, d: 7}]}"), doc2.getObject());
     ASSERT_TRUE(doc2.isInPlaceModeEnabled());
 
@@ -2487,6 +2506,7 @@ TEST_F(UpdateObjectNodeTest, ApplyToArrayByIndexWithLeadingZero) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: [0, 0, 2, 0, 0]}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
@@ -2523,6 +2543,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMultipleArrayUpdates) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(
         fromjson("{a: [null, null, 2, null, null, null, null, null, null, null, 10]}"),
         doc.getObject());
@@ -2554,6 +2575,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMultipleUpdatesToDocumentInArray) {
     addIndexedPath("a");
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: [null, null, {b: 1, c: 1}]}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
@@ -2604,6 +2626,7 @@ TEST_F(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully
     mutablebson::Document doc(fromjson("{a: {b: 3, c: [1, 2, 3, 4]}}"));
     auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(getIndexAffectedFromLogEntry());
     ASSERT_BSONOBJ_EQ(fromjson("{a: {b: 5, c: [2, 3, 4]}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 

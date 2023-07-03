@@ -30,12 +30,23 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

@@ -29,6 +29,9 @@
 
 #include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
 
+#include <memory>
+#include <utility>
+
 namespace mongo::stage_builder::abt {
 
 void HolderDeleter::operator()(Holder* ptr) const {

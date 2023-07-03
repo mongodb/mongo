@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2021, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -11,6 +11,8 @@
 #define LINUX_MODULE_H
 
 #define EXPORT_SYMBOL(symbol)                                                  \
+  void* __##symbol = symbol
+#define EXPORT_SYMBOL_GPL(symbol)                                              \
   void* __##symbol = symbol
 #define MODULE_LICENSE(license)
 #define MODULE_DESCRIPTION(description)

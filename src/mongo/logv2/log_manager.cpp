@@ -27,18 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <functional>
 
-
-#include "mongo/logv2/log_manager.h"
-
-#include <boost/log/core.hpp>
-
-#include "mongo/base/init.h"
-#include "mongo/logv2/log.h"
-#include "mongo/logv2/log_detail.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_global.h"
+#include "mongo/logv2/log_domain_internal.h"
+#include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

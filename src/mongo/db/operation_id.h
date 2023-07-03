@@ -29,6 +29,12 @@
 
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <utility>
+
+#include <absl/container/node_hash_set.h>
+
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 

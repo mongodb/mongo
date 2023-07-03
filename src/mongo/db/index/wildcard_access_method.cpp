@@ -27,23 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_names.h"
-
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/storage/key_format.h"
 
 namespace mongo {
 
 WildcardAccessMethod::WildcardAccessMethod(IndexCatalogEntry* wildcardState,
                                            std::unique_ptr<SortedDataInterface> btree)
     : SortedDataIndexAccessMethod(wildcardState, std::move(btree)),
-      _keyGen(_descriptor->keyPattern(),
-              _descriptor->pathProjection(),
-              _indexCatalogEntry->getCollator(),
+      _keyGen(wildcardState->descriptor()->keyPattern(),
+              wildcardState->descriptor()->pathProjection(),
+              wildcardState->getCollator(),
               getSortedDataInterface()->getKeyStringVersion(),
               getSortedDataInterface()->getOrdering(),
               getSortedDataInterface()->rsKeyFormat()) {}
@@ -56,6 +60,7 @@ bool WildcardAccessMethod::shouldMarkIndexAsMultikey(size_t numberOfKeys,
 
 void WildcardAccessMethod::doGetKeys(OperationContext* opCtx,
                                      const CollectionPtr& collection,
+                                     const IndexCatalogEntry* entry,
                                      SharedBufferFragmentBuilder& pooledBufferBuilder,
                                      const BSONObj& obj,
                                      GetKeysContext context,

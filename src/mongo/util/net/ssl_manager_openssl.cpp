@@ -2590,7 +2590,7 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
     if (direction == ConnectionDirection::kIncoming && !params.sslClusterCAFile.empty()) {
         cafile = params.sslClusterCAFile;
     }
-    const auto status = cafile.empty() ? _setupSystemCA(context) : _setupCA(context, cafile);
+    auto status = cafile.empty() ? _setupSystemCA(context) : _setupCA(context, cafile);
     if (!status.isOK()) {
         return status;
     }

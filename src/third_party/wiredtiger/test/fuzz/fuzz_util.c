@@ -49,7 +49,7 @@ fuzzutil_generate_home_name(char *buf, int buf_len)
      * the end of the name.
      */
     pid = getpid();
-    testutil_check(__wt_snprintf(buf, buf_len, "WT_TEST_%d", pid));
+    testutil_snprintf(buf, buf_len, "WT_TEST_%d", pid);
 }
 
 /*
@@ -68,7 +68,7 @@ fuzzutil_setup(void)
 
     WT_CLEAR(home);
     fuzzutil_generate_home_name(home, HOME_BUF_SIZE);
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
     testutil_check(wiredtiger_open(home, NULL,
       "create,cache_size=5MB,statistics=(all),statistics_log=(json,on_close,wait=1)",
       &fuzz_state.conn));

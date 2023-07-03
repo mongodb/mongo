@@ -30,12 +30,21 @@
 #pragma once
 
 #include <functional>
+#include <memory>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_graph.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

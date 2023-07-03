@@ -30,6 +30,8 @@
 #pragma once
 
 #include <memory>
+#include <string>
+#include <type_traits>
 
 // This file is included by many low-level headers including status.h, so it isn't able to include
 // much without creating a cycle.

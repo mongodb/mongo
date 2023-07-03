@@ -28,18 +28,17 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/version.h"
 
-#include "mongo/config.h"
 
 #ifdef MONGO_CONFIG_SSL
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #include <openssl/crypto.h>
+#include <openssl/opensslv.h>
 #endif
 #endif
 
+#include <climits>
 #include <fmt/format.h>
 #include <sstream>
 
@@ -49,10 +48,15 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/debug_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

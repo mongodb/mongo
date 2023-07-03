@@ -27,31 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <initializer_list>
+#include <memory>
+#include <ostream>
+#include <string>
 
-#include "mongo/db/storage/record_store_test_harness.h"
-
-#include <algorithm>
-
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
-
-using std::string;
-using std::stringstream;
-using std::unique_ptr;
 
 // Insert multiple records and iterate through them in the forward direction.
 // When curr() or getNext() is called on an iterator positioned at EOF,
 // the iterator returns RecordId() and stays at EOF.
 TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -64,9 +71,9 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            stringstream ss;
+            std::stringstream ss;
             ss << "record " << i;
-            string data = ss.str();
+            std::string data = ss.str();
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
@@ -101,7 +108,7 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
 // the iterator returns RecordId() and stays at EOF.
 TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -114,9 +121,9 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            stringstream ss;
+            std::stringstream ss;
             ss << "record " << i;
-            string data = ss.str();
+            std::string data = ss.str();
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
@@ -151,7 +158,7 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
 // starting at an interior position.
 TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -164,9 +171,9 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            stringstream ss;
+            std::stringstream ss;
             ss << "record " << i;
-            string data = ss.str();
+            std::string data = ss.str();
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
@@ -202,7 +209,7 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
 // starting at an interior position.
 TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -215,9 +222,9 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            stringstream ss;
+            std::stringstream ss;
             ss << "record " << i;
-            string data = ss.str();
+            std::string data = ss.str();
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
@@ -254,7 +261,7 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
 // that the iterator remains EOF.
 TEST(RecordStoreTestHarness, RecordIteratorEOF) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -269,7 +276,7 @@ TEST(RecordStoreTestHarness, RecordIteratorEOF) {
         {
             StringBuilder sb;
             sb << "record " << i;
-            string data = sb.str();
+            std::string data = sb.str();
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
@@ -306,7 +313,7 @@ TEST(RecordStoreTestHarness, RecordIteratorEOF) {
 
         StringBuilder sb;
         sb << "record " << nToInsert + 1;
-        string data = sb.str();
+        std::string data = sb.str();
 
         WriteUnitOfWork uow(opCtx.get());
         StatusWith<RecordId> res =
@@ -325,7 +332,7 @@ TEST(RecordStoreTestHarness, RecordIteratorEOF) {
 // Test calling save and restore after each call to next
 TEST(RecordStoreTestHarness, RecordIteratorSaveRestore) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -340,7 +347,7 @@ TEST(RecordStoreTestHarness, RecordIteratorSaveRestore) {
         {
             StringBuilder sb;
             sb << "record " << i;
-            string data = sb.str();
+            std::string data = sb.str();
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
@@ -387,7 +394,7 @@ TEST(RecordStoreTestHarness, RecordIteratorSaveRestore) {
 // that next() returns the second record.
 TEST(RecordStoreTestHarness, SeekAfterEofAndContinue) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
@@ -397,7 +404,7 @@ TEST(RecordStoreTestHarness, SeekAfterEofAndContinue) {
     for (int i = 0; i < nToInsert; i++) {
         StringBuilder sb;
         sb << "record " << i;
-        string data = sb.str();
+        std::string data = sb.str();
 
         WriteUnitOfWork uow(opCtx.get());
         StatusWith<RecordId> res =
@@ -443,6 +450,7 @@ TEST(RecordStoreTestHarness, SeekExactForMissingRecordReturnsNone) {
     const auto harnessHelper{newRecordStoreHarnessHelper()};
     auto recordStore = harnessHelper->newRecordStore();
     ServiceContext::UniqueOperationContext opCtx{harnessHelper->newOperationContext()};
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     // Insert three records and remember their record ids.
     const int nToInsert = 3;
@@ -450,7 +458,7 @@ TEST(RecordStoreTestHarness, SeekExactForMissingRecordReturnsNone) {
     for (int i = 0; i < nToInsert; ++i) {
         StringBuilder sb;
         sb << "record " << i;
-        string data = sb.str();
+        std::string data = sb.str();
 
         WriteUnitOfWork uow{opCtx.get()};
         auto res =

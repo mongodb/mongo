@@ -29,9 +29,13 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
@@ -53,7 +57,7 @@ stdx::unordered_set<RoleName> getBuiltinRoleNamesForDB(const DatabaseName& dbnam
 /**
  * Adds to "privileges" the necessary privileges to do absolutely anything on the system.
  */
-void generateUniversalPrivileges(PrivilegeVector* privileges);
+void generateUniversalPrivileges(PrivilegeVector* privileges, const boost::optional<TenantId>&);
 
 /**
  * Returns whether the given role corresponds to a built-in role.

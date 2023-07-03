@@ -29,12 +29,16 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/storage_stats_spec_gen.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo {
 
@@ -94,6 +98,7 @@ namespace mongo {
 Status appendCollectionStorageStats(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const StorageStatsSpec& spec,
+                                    const SerializationContext& serializationCtx,
                                     BSONObjBuilder* builder,
                                     const boost::optional<BSONObj>& filterObj = boost::none);
 

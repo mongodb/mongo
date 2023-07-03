@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <js/TypeDecls.h>
 #include <jsapi.h>
 #include <memory>
 #include <string>

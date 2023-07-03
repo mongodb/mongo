@@ -28,13 +28,28 @@
  */
 
 
+#include <boost/core/checked_delete.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/std_fwd.hpp"
 #include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <functional>
+#include <ostream>
+#include <r1interval.h>
+#include <s2cellid.h>
+#include <s2edgeindex.h>
+#include <util/math/vector3-inl.h>
 
-#include "mongo/platform/basic.h"
+#include <boost/smart_ptr/scoped_ptr.hpp>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -97,7 +112,7 @@ void R2RegionCoverer::getCovering(const R2Region& region, vector<GeoHash>* cover
     // children they have (fewest children first), and then by the number of
     // fully contained children (fewest children first).
 
-    verify(_minLevel <= _maxLevel);
+    MONGO_verify(_minLevel <= _maxLevel);
     dassert(_candidateQueue->empty());
     dassert(_results->empty());
     _region = &region;
@@ -171,7 +186,7 @@ void R2RegionCoverer::addCandidate(Candidate* candidate) {
         return;
     }
 
-    verify(candidate->numChildren == 0);
+    MONGO_verify(candidate->numChildren == 0);
 
     // Expand children
     int numTerminals = expandChildren(candidate);

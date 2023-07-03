@@ -29,20 +29,34 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/config.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/executor/egress_tag_closer.h"
 #include "mongo/executor/egress_tag_closer_manager.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
@@ -544,6 +558,10 @@ public:
 
     const ConnectionPool* getPool() const {
         return _pool;
+    }
+
+    Options getPoolOptions() const {
+        return _pool->_options;
     }
 
     virtual void updateConnectionPoolStats([[maybe_unused]] ConnectionPoolStats* cps) const = 0;

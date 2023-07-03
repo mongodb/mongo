@@ -29,14 +29,23 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <map>
+#include <memory>
 #include <string>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_cpu_timer.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 

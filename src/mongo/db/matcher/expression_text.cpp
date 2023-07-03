@@ -27,18 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/matcher/expression_text.h"
-
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/fts/fts_util.h"
 #include "mongo/db/index/fts_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression_text.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

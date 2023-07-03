@@ -28,15 +28,24 @@
  */
 
 #include <memory>
+#include <string>
+#include <thread>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_out_of_line_executor.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_name.h"
 
 namespace mongo {
 namespace {

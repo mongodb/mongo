@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -124,7 +124,7 @@ int main(int argc, const char** argv)
     DISPLAYLEVEL(3, "Seed = %u \n", (unsigned)seed);
 
     RDG_genStdout(size, (double)probaU32/100, litProba, seed);
-    DISPLAYLEVEL(1, "\n");
+    DISPLAYLEVEL(3, "\n");
 
     return 0;
 }

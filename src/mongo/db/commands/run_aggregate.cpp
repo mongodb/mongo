@@ -29,73 +29,135 @@
 
 #include "mongo/db/commands/run_aggregate.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <functional>
+#include <iosfwd>
+#include <map>
 #include <memory>
+#include <mutex>
+#include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/external_data_source_scope_guard.h"
-#include "mongo/db/change_stream_change_collection_manager.h"
-#include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/client.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/cursor_manager.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/search_helper.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collation_spec.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/explain.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats_aggregate_key_generator.h"
+#include "mongo/db/query/query_stats_key_generator.h"
 #include "mongo/db/read_concern.h"
-#include "mongo/db/repl/oplog.h"
+#include "mongo/db/read_write_concern_provenance.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
+#include "mongo/db/stats/top.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/stale_exception.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/future.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/serialization_context.h"
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/synchronized_value.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -155,11 +217,13 @@ bool handleCursorCommand(OperationContext* opCtx,
             invariant(cursors[idx]);
 
             BSONObjBuilder cursorResult;
-            appendCursorResponseObject(cursors[idx]->cursorid(),
-                                       nsForCursor,
-                                       BSONArray(),
-                                       cursors[idx]->getExecutor()->getExecutorType(),
-                                       &cursorResult);
+            appendCursorResponseObject(
+                cursors[idx]->cursorid(),
+                nsForCursor,
+                BSONArray(),
+                cursors[idx]->getExecutor()->getExecutorType(),
+                &cursorResult,
+                SerializationContext::stateCommandReply(request.getSerializationContext()));
             cursorResult.appendBool("ok", 1);
 
             cursorsBuilder.append(cursorResult.obj());
@@ -227,7 +291,6 @@ bool handleCursorCommand(OperationContext* opCtx,
             auto&& [stats, _] =
                 explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
             LOGV2_WARNING(23799,
-                          "Aggregate command executor error: {error}, stats: {stats}, cmd: {cmd}",
                           "Aggregate command executor error",
                           "error"_attr = exception.toStatus(),
                           "stats"_attr = redact(stats),
@@ -290,7 +353,10 @@ bool handleCursorCommand(OperationContext* opCtx,
     }
 
     const CursorId cursorId = cursor ? cursor->cursorid() : 0LL;
-    responseBuilder.done(cursorId, nsForCursor);
+    responseBuilder.done(
+        cursorId,
+        nsForCursor,
+        SerializationContext::stateCommandReply(request.getSerializationContext()));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
@@ -774,7 +840,10 @@ Status runAggregate(OperationContext* opCtx,
             options.isInitialResponse = true;
             CursorResponseBuilder responseBuilder(result, options);
             responseBuilder.setWasStatementExecuted(true);
-            responseBuilder.done(0LL, origNss);
+            responseBuilder.done(
+                0LL,
+                origNss,
+                SerializationContext::stateCommandReply(request.getSerializationContext()));
             return Status::OK();
         }
     }
@@ -833,15 +902,6 @@ Status runAggregate(OperationContext* opCtx,
     auto resetContext = [&]() -> void {
         ctx.reset();
         collections.clear();
-    };
-
-    auto registerTelemetry = [&]() -> void {
-        // Register queryStats. Exclude queries against collections with encrypted fields.
-        // We still collect queryStats on collection-less aggregations.
-        if (!(ctx && ctx->getCollection() &&
-              ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
-            query_stats::registerAggRequest(request, opCtx);
-        }
     };
 
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
@@ -919,7 +979,6 @@ Status runAggregate(OperationContext* opCtx,
 
             // Obtain collection locks on the execution namespace; that is, the oplog.
             initContext(auto_get_collection::ViewMode::kViewsForbidden);
-            registerTelemetry();
             uassert(ErrorCodes::ChangeStreamNotEnabled,
                     "Change streams must be enabled before being used",
                     !isServerless ||
@@ -944,11 +1003,9 @@ Status runAggregate(OperationContext* opCtx,
             tassert(6235101,
                     "A collection-less aggregate should not take any locks",
                     ctx == boost::none);
-            registerTelemetry();
         } else {
             // This is a regular aggregation. Lock the collection or view.
             initContext(auto_get_collection::ViewMode::kViewsPermitted);
-            registerTelemetry();
             auto [collator, match] = resolveCollator(opCtx,
                                                      request.getCollation().get_value_or(BSONObj()),
                                                      collections.getMainCollection());
@@ -958,6 +1015,41 @@ Status runAggregate(OperationContext* opCtx,
                 uuid = collections.getMainCollection()->uuid();
             }
         }
+        if (request.getResumeAfter()) {
+            uassert(ErrorCodes::InvalidPipelineOperator,
+                    "$_resumeAfter is not supported on view",
+                    !ctx->getView());
+            const auto& collection = ctx->getCollection();
+            const bool isClusteredCollection = collection && collection->isClustered();
+            uassertStatusOK(query_request_helper::validateResumeAfter(*request.getResumeAfter(),
+                                                                      isClusteredCollection));
+        }
+
+        auto parsePipeline = [&](std::unique_ptr<CollatorInterface> collator) {
+            expCtx =
+                makeExpressionContext(opCtx,
+                                      request,
+                                      std::move(collator),
+                                      uuid,
+                                      collatorToUseMatchesDefault,
+                                      collections.getMainCollection()
+                                          ? collections.getMainCollection()->getCollectionOptions()
+                                          : boost::optional<CollectionOptions>(boost::none));
+
+            // If any involved collection contains extended-range data, set a flag which individual
+            // DocumentSource parsers can check.
+            collections.forEach([&](const CollectionPtr& coll) {
+                if (coll->getRequiresTimeseriesExtendedRangeSupport())
+                    expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+            });
+
+            expCtx->startExpressionCounters();
+            auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+            curOp->beginQueryPlanningTimer();
+            expCtx->stopExpressionCounters();
+
+            return std::make_pair(expCtx, std::move(pipeline));
+        };
 
         // If this is a view, resolve it by finding the underlying collection and stitching view
         // pipelines and this request's pipeline together. We then release our locks before
@@ -970,6 +1062,37 @@ Status runAggregate(OperationContext* opCtx,
         // underlying bucket collection.
         if (ctx && ctx->getView() &&
             (!liteParsedPipeline.startsWithCollStats() || ctx->getView()->timeseries())) {
+            try {
+                invariant(collatorToUse.has_value());
+                query_stats::registerRequest(opCtx, nss, [&]() {
+                    // In this path we haven't yet parsed the pipeline, but we need to do so for
+                    // query shape stats - which should track the queries before views are resolved.
+                    // Inside this callback we know we have already checked that query stats are
+                    // enabled and know that this request has not been rate limited.
+
+                    // We can't move out of collatorToUse as it's needed for runAggregateOnView().
+                    // Clone instead.
+                    auto&& [expCtx, pipeline] = parsePipeline(
+                        *collatorToUse == nullptr ? nullptr : (*collatorToUse)->clone());
+
+                    return std::make_unique<query_stats::AggregateKeyGenerator>(
+                        request,
+                        *pipeline,
+                        expCtx,
+                        pipelineInvolvedNamespaces,
+                        origNss,
+                        ctx->getCollectionType());
+                });
+            } catch (const DBException& ex) {
+                if (ex.code() == 6347902) {
+                    // TODO Handle the $$SEARCH_META case in SERVER-76087.
+                    LOGV2_WARNING(7198701,
+                                  "Failed to parse pipeline before view resolution",
+                                  "error"_attr = ex.toStatus());
+                } else {
+                    throw;
+                }
+            }
             return runAggregateOnView(opCtx,
                                       origNss,
                                       request,
@@ -989,26 +1112,9 @@ Status runAggregate(OperationContext* opCtx,
             opCtx, nss, collections.getMainCollection(), request.getCollectionUUID());
 
         invariant(collatorToUse);
-        expCtx = makeExpressionContext(opCtx,
-                                       request,
-                                       std::move(*collatorToUse),
-                                       uuid,
-                                       collatorToUseMatchesDefault,
-                                       collections.getMainCollection()
-                                           ? collections.getMainCollection()->getCollectionOptions()
-                                           : boost::optional<CollectionOptions>(boost::none));
-
-        // If any involved collection contains extended-range data, set a flag which individual
-        // DocumentSource parsers can check.
-        collections.forEach([&](const CollectionPtr& coll) {
-            if (coll->getRequiresTimeseriesExtendedRangeSupport())
-                expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
-        });
-
-        expCtx->startExpressionCounters();
-        auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
-        curOp->beginQueryPlanningTimer();
-        expCtx->stopExpressionCounters();
+        auto&& expCtxAndPipeline = parsePipeline(std::move(*collatorToUse));
+        auto expCtx = expCtxAndPipeline.first;
+        auto pipeline = std::move(expCtxAndPipeline.second);
 
         // This prevents opening a new change stream in the critical section of a serverless shard
         // split or merge operation to prevent resuming on the recipient with a resume token higher
@@ -1025,6 +1131,21 @@ Status runAggregate(OperationContext* opCtx,
         // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
         // $$USER_ROLES for the aggregation.
         expCtx->setUserRoles();
+
+        // Register query stats with the pre-optimized pipeline. Exclude queries against collections
+        // with encrypted fields. We still collect query stats on collection-less aggregations.
+        if (!(ctx && ctx->getCollection() &&
+              ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
+            query_stats::registerRequest(opCtx, nss, [&]() {
+                return std::make_unique<query_stats::AggregateKeyGenerator>(
+                    request,
+                    *pipeline,
+                    expCtx,
+                    pipelineInvolvedNamespaces,
+                    nss,
+                    ctx ? boost::make_optional(ctx->getCollectionType()) : boost::none);
+            });
+        }
 
         if (!request.getAllowDiskUse().value_or(true)) {
             allowDiskUseFalseCounter.increment();
@@ -1050,10 +1171,6 @@ Status runAggregate(OperationContext* opCtx,
                     opCtx, nss, request.getEncryptionInformation().value(), std::move(pipeline));
                 request.getEncryptionInformation()->setCrudProcessed(true);
             }
-
-            // Set the queryStatsStoreKey to none so queryStats isn't collected when we've done a
-            // FLE rewrite.
-            CurOp::get(opCtx)->debug().queryStatsStoreKeyHash = boost::none;
         }
 
         pipeline->optimizePipeline();
@@ -1201,12 +1318,14 @@ Status runAggregate(OperationContext* opCtx,
             // appropriate collection lock must be already held. Make sure it has not been released
             // yet.
             invariant(ctx);
-            Explain::explainStages(explainExecutor,
-                                   collections,
-                                   *(expCtx->explain),
-                                   BSON("optimizedPipeline" << true),
-                                   cmdObj,
-                                   &bodyBuilder);
+            Explain::explainStages(
+                explainExecutor,
+                collections,
+                *(expCtx->explain),
+                BSON("optimizedPipeline" << true),
+                SerializationContext::stateCommandReply(request.getSerializationContext()),
+                cmdObj,
+                &bodyBuilder);
         }
     } else {
         // Cursor must be specified, if explain is not.
@@ -1222,11 +1341,7 @@ Status runAggregate(OperationContext* opCtx,
         curOp->debug().setPlanSummaryMetrics(stats);
         curOp->setEndOfOpMetrics(stats.nReturned);
 
-        if (keepCursor) {
-            collectQueryStatsMongod(opCtx, pins[0]);
-        } else {
-            collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsRequestShapifier));
-        }
+        collectQueryStatsMongod(opCtx, pins[0]);
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.
@@ -1247,8 +1362,7 @@ Status runAggregate(OperationContext* opCtx,
             for (const auto& [secondaryNss, coll] : collections.getSecondaryCollections()) {
                 if (coll) {
                     PlanSummaryStats secondaryStats;
-                    planExplainer.getSecondarySummaryStats(secondaryNss.toString(),
-                                                           &secondaryStats);
+                    planExplainer.getSecondarySummaryStats(secondaryNss, &secondaryStats);
                     CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, secondaryStats);
                 }
             }

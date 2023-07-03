@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <cstdint>
+#include <memory>
+
 #include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/service_context.h"
 

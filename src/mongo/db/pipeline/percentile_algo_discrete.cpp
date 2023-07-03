@@ -28,11 +28,17 @@
  */
 
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <cmath>
+#include <limits>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/pipeline/percentile_algo_discrete.h"
-
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 using std::vector;

@@ -31,7 +31,25 @@
 
 #include "mongo/db/index/column_store_sorter.h"
 
+#include <algorithm>
 #include <boost/filesystem/operations.hpp>
+#include <compare>
+#include <cstdint>
+#include <iterator>
+#include <numeric>
+#include <type_traits>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/random.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 struct ComparisonForPathAndRid {
@@ -270,7 +288,7 @@ ColumnStoreSorter::persistDataForShutdown() {
                    std::back_inserter(ranges),
                    [](const auto it) { return it->getRange(); });
 
-    return {_spillFile->path().filename().string(), ranges};
+    return {_spillFile->path().filename().string(), std::move(ranges)};
 }
 
 /**
@@ -357,6 +375,7 @@ std::string nextFileName() {
 
 #undef MONGO_LOGV2_DEFAULT_COMPONENT
 #include "mongo/db/sorter/sorter.cpp"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 MONGO_CREATE_SORTER(mongo::ColumnStoreSorter::Key,
                     mongo::ColumnStoreSorter::Value,

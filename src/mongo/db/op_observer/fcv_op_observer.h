@@ -29,7 +29,21 @@
 
 #pragma once
 
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo {
@@ -49,13 +63,17 @@ public:
 
     // FcvOpObserver overrides.
 
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kSystem, NamespaceFilter::kSystem};
+    }
+
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator first,
                    std::vector<InsertStatement>::const_iterator last,
                    std::vector<bool> fromMigrate,
                    bool defaultFromMigrate,
-                   InsertsOpStateAccumulator* opAccumulator = nullptr) final;
+                   OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onInsertGlobalIndexKey(OperationContext* opCtx,
                                 const NamespaceString& globalIndexNss,

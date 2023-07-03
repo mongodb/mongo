@@ -28,18 +28,32 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/session/kill_sessions_local.h"
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/client.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/kill_sessions_common.h"
+#include "mongo/db/session/kill_sessions_gen.h"
+#include "mongo/db/session/kill_sessions_local.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

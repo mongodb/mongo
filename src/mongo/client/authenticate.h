@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <string>
@@ -36,6 +39,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/sasl_client_session.h"
@@ -137,7 +141,7 @@ Future<void> authenticateClient(const BSONObj& params,
  * but the __system user's credentials will be filled in automatically.
  *
  * The "mechanismHint" parameter will force authentication with a specific mechanism
- * (e.g. SCRAM-SHA-256). If it is boost::none, then an isMaster will be called to negotiate
+ * (e.g. SCRAM-SHA-256). If it is boost::none, then a "hello" will be called to negotiate
  * a SASL mechanism with the server.
  *
  * The "stepDownBehavior" parameter controls whether replication will kill the connection on
@@ -169,7 +173,7 @@ BSONObj buildAuthParams(StringData dbname,
                         StringData mechanism);
 
 /**
- * Run an isMaster exchange to negotiate a SASL mechanism for authentication.
+ * Run a "hello" exchange to negotiate a SASL mechanism for authentication.
  */
 Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
                                            const UserName& username,
@@ -196,19 +200,19 @@ enum class SpeculativeAuthType {
 };
 
 /**
- * Constructs a "speculativeAuthenticate" or "speculativeSaslStart"
- * payload for an isMaster request based on a given URI.
+ * Constructs a "speculativeAuthenticate" or "speculativeSaslStart" payload for an "hello" request
+ * based on a given URI.
  */
-SpeculativeAuthType speculateAuth(BSONObjBuilder* isMasterRequest,
+SpeculativeAuthType speculateAuth(BSONObjBuilder* helloRequestBuilder,
                                   const MongoURI& uri,
                                   std::shared_ptr<SaslClientSession>* saslClientSession);
 
 /**
- * Constructs a "speculativeAuthenticate" or "speculativeSaslStart"
- * payload for an isMaster request using internal (intracluster) authentication.
+ * Constructs a "speculativeAuthenticate" or "speculativeSaslStart" payload for an "hello" request
+ * using internal (intracluster) authentication.
  */
 SpeculativeAuthType speculateInternalAuth(const HostAndPort& remoteHost,
-                                          BSONObjBuilder* isMasterRequest,
+                                          BSONObjBuilder* helloRequestBuilder,
                                           std::shared_ptr<SaslClientSession>* saslClientSession);
 
 }  // namespace auth

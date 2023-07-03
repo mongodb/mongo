@@ -29,7 +29,17 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/type_shard_collection_gen.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

@@ -28,12 +28,12 @@
  */
 
 #pragma once
-#include "mongo/platform/basic.h"
-#include <iostream>
-
 #include <benchmark/benchmark.h>
+#include <iostream>
+#include <vector>
 
 #include "mongo/db/pipeline/percentile_algo_tdigest.h"
+#include "mongo/platform/basic.h"
 
 namespace mongo {
 

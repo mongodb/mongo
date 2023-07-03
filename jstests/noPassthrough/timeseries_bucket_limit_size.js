@@ -11,6 +11,7 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
+load("jstests/libs/feature_flag_util.js");
 
 const conn = MongoRunner.runMongod({setParameter: {timeseriesBucketMinCount: 1}});
 
@@ -18,6 +19,8 @@ const dbName = jsTestName();
 const db = conn.getDB(dbName);
 
 TimeseriesTest.run((insert) => {
+    const alwaysUseCompressedBuckets =
+        FeatureFlagUtil.isEnabled(db, "TimeseriesAlwaysUseCompressedBuckets");
     const areTimeseriesScalabilityImprovementsEnabled =
         TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db);
 
@@ -81,7 +84,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(largeValue,
                   bucketDocs[0].control.max.x,
                   'invalid control.max for x in first bucket: ' + tojson(bucketDocs[0].control));
-        assert.eq(2,
+        assert.eq(alwaysUseCompressedBuckets ? 1 : 2,
                   bucketDocs[0].control.version,
                   'unexpected control.version in first bucket: ' + tojson(bucketDocs));
 

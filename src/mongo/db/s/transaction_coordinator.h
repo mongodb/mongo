@@ -29,10 +29,31 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/s/transaction_coordinator_document_gen.h"
+#include "mongo/db/s/transaction_coordinator_futures_util.h"
+#include "mongo/db/s/transaction_coordinator_structures.h"
 #include "mongo/db/s/transaction_coordinator_util.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -189,6 +210,10 @@ private:
     // Set when the coordinator has heard back from all the participants and reached a decision, but
     // hasn't yet persisted it
     boost::optional<txn::CoordinatorCommitDecision> _decision;
+
+    // Set when the coordinator has heard back from all the participants and reached a commit
+    // decision.
+    std::vector<NamespaceString> _affectedNamespaces;
 
     // Set when the coordinator has durably persisted `_decision` to the `config.coordinators`
     // collection

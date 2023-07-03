@@ -28,22 +28,35 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "mongo/client/dbclient_cursor.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/count_scan.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/util/fail_point.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/service_context.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace QueryStageCountScan {
 
@@ -108,7 +121,8 @@ public:
     }
 
     static NamespaceString ns() {
-        return {"unittests", "QueryStageCountScanScan"};
+        return NamespaceString::createNamespaceString_forTest("unittests",
+                                                              "QueryStageCountScanScan");
     }
 
 protected:
@@ -148,7 +162,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(2, numCounted);
@@ -181,7 +195,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(5, numCounted);
@@ -214,7 +228,7 @@ public:
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(3, numCounted);
@@ -243,7 +257,7 @@ public:
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -273,7 +287,7 @@ public:
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -304,7 +318,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -336,7 +350,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -392,7 +406,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -451,7 +465,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -517,7 +531,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(7, numCounted);
@@ -551,7 +565,7 @@ public:
         params.endKeyInclusive = true;  // yes?
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(9, numCounted);
@@ -582,7 +596,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;

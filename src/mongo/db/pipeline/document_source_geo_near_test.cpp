@@ -27,17 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <vector>
 
-#include "mongo/bson/bsonmisc.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
@@ -132,14 +134,14 @@ TEST_F(DocumentSourceGeoNearTest, RedactionWithGeoJSONPoint) {
             "$geoNear": {
                 "near": "?object",
                 "distanceField": "HASH<a>",
-                "maxDistance": "?",
-                "minDistance": "?",
+                "maxDistance": "?number",
+                "minDistance": "?number",
                 "query": {
                     "HASH<foo>": {
                         "$eq": "?string"
                     }
                 },
-                "spherical": "?"
+                "spherical": "?bool"
             }
         })",
         redact(*docSource));
@@ -162,9 +164,9 @@ TEST_F(DocumentSourceGeoNearTest, RedactionWithGeoJSONLineString) {
             "$geoNear": {
                 "near": "?object",
                 "distanceField": "HASH<a>",
-                "minDistance": "?",
+                "minDistance": "?number",
                 "query": {},
-                "spherical": "?"
+                "spherical": "?bool"
             }
         })",
         redact(*docSource));
@@ -196,13 +198,23 @@ TEST_F(DocumentSourceGeoNearTest, RedactionWithLegacyCoordinates) {
                         "$gt": "?number"
                     }
                 },
-                "spherical": "?",
-                "distanceMultiplier": "?",
+                "spherical": "?bool",
+                "distanceMultiplier": "?number",
                 "includeLocs": "HASH<bar>.HASH<baz>"
             }
         })",
         redact(*docSource));
 }
+
+TEST_F(DocumentSourceGeoNearTest, FailToParseIfUnkownArg) {
+    auto stageObj = fromjson(
+        "{$geoNear: {near: {type: 'Point', coordinates: [0, 0]}, distanceField: 'distanceField', "
+        "spherical: true, blah: 'blaarghhh'}}");
+    ASSERT_THROWS_CODE(DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+}
+
 
 }  // namespace
 }  // namespace mongo

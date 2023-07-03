@@ -29,6 +29,11 @@
 
 #include "mongo/db/query/explain_version_validator.h"
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+
 namespace mongo::optimizer {
 
 Status validateOptimizerExplainVersion(const std::string& value, const boost::optional<TenantId>&) {

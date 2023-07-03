@@ -55,7 +55,7 @@ public:
         kGroupFromFirstDocument,
     };
     virtual ~TransformerInterface() = default;
-    virtual Document applyTransformation(const Document& input) = 0;
+    virtual Document applyTransformation(const Document& input) const = 0;
     virtual TransformerType getType() const = 0;
     virtual void optimize() = 0;
     virtual DepsTracker::State addDependencies(DepsTracker* deps) const = 0;

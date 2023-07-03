@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 extern int do_md5_test(void);
 

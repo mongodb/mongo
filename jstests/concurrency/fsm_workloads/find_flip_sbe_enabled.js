@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Sets the internalQueryFrameworkControl flag to "forceClassicEngine" and "trySbeEngine", and
  * asserts that find queries using the plan cache produce the correct results.
@@ -11,7 +9,7 @@
  * ]
  */
 
-var $config = (function() {
+export const $config = (function() {
     let data = {originalParamValues: {}};
 
     function getCollectionName(collName) {

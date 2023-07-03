@@ -31,33 +31,77 @@
 #include "mongo/util/options_parser/options_parser.h"
 
 #include <algorithm>
-#include <boost/filesystem.hpp>
+#include <boost/any.hpp>
+#include <boost/any/bad_any_cast.hpp>
+#include <boost/core/typeinfo.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path_traits.hpp>
+#include <boost/iostreams/categories.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
-#include <boost/iostreams/stream.hpp>
+#include <boost/iostreams/imbue.hpp>
 #include <boost/iostreams/stream_buffer.hpp>
-#include <boost/program_options.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/program_options/cmdline.hpp>
+#include <boost/program_options/errors.hpp>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/parsers.hpp>
+#include <boost/program_options/positional_options.hpp>
+#include <boost/program_options/variables_map.hpp>
+#include <boost/type_index.hpp>
+#include <boost/type_index/type_index_facade.hpp>
 #include <cerrno>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
+#include <exception>
 #include <fcntl.h>
-#include <fstream>
+#include <fstream>  // IWYU pragma: keep
+#include <iterator>
+#include <map>
+#include <memory>
+#include <stdexcept>
 #include <sys/stat.h>
-#include <sys/types.h>
-#include <yaml-cpp/yaml.h>
+#include <type_traits>
+#include <utility>
+#include <yaml-cpp/exceptions.h>
+#include <yaml-cpp/node/detail/iterator.h>
+#include <yaml-cpp/node/detail/iterator_fwd.h>
+#include <yaml-cpp/node/impl.h>
+#include <yaml-cpp/node/iterator.h>
+#include <yaml-cpp/node/node.h>
+#include <yaml-cpp/node/parse.h>
+#include <yaml-cpp/yaml.h>  // IWYU pragma: keep
+// IWYU pragma: no_include "boost/program_options/detail/parsers.hpp"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+// IWYU pragma: no_include "boost/iostreams/detail/error.hpp"
+// IWYU pragma: no_include "boost/iostreams/detail/streambuf/indirect_streambuf.hpp"
 
 #ifdef _WIN32
 #include <io.h>
 #endif
 
-#include "mongo/base/init.h"
+#include "mongo/base/data_builder.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/http_client.h"
@@ -65,10 +109,14 @@
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/options_parser/value.h"
 #include "mongo/util/shell_exec.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -736,7 +784,7 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
                 auto swExpansion = runYAMLExpansion(
                     elementVal, str::stream() << key << "." << elementKey, configExpand);
                 if (swExpansion.isOK()) {
-                    const auto status = addPair(elementKey, swExpansion.getValue());
+                    auto status = addPair(elementKey, swExpansion.getValue());
                     if (!status.isOK()) {
                         return status;
                     }
@@ -746,7 +794,7 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
                 }  // else not an expansion block.
             }
 
-            const auto status = addPair(std::move(elementKey), elementVal);
+            auto status = addPair(std::move(elementKey), elementVal);
             if (!status.isOK()) {
                 return status;
             }

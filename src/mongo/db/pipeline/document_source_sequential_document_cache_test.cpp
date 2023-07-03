@@ -27,19 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <vector>
 
-#include "mongo/bson/bson_depth.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
-#include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
@@ -85,17 +87,17 @@ TEST_F(DocumentSourceSequentialDocumentCacheTest, Redaction) {
     std::vector<Value> vals;
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$sequentialCache":{"maxSizeBytes":"?","status":"kBuilding"}})",
+        R"({"$sequentialCache":{"maxSizeBytes":"?number","status":"kBuilding"}})",
         redact(*documentCache, true, ExplainOptions::Verbosity::kQueryPlanner));
 
     cache.freeze();
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$sequentialCache":{"maxSizeBytes":"?","status":"kServing"}})",
+        R"({"$sequentialCache":{"maxSizeBytes":"?number","status":"kServing"}})",
         redact(*documentCache, true, ExplainOptions::Verbosity::kQueryPlanner));
 
     cache.abandon();
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$sequentialCache":{"maxSizeBytes":"?","status":"kAbandoned"}})",
+        R"({"$sequentialCache":{"maxSizeBytes":"?number","status":"kAbandoned"}})",
         redact(*documentCache, true, ExplainOptions::Verbosity::kQueryPlanner));
 }
 }  // namespace

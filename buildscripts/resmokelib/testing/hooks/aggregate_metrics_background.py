@@ -4,70 +4,69 @@ This hook runs continuously, but the run_aggregate_metrics_background.js file it
 internally sleep for 1 second between runs.
 """
 
-import os.path
+import pymongo
+import random
 
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib.testing.hooks import jsfile
-from buildscripts.resmokelib.testing.hooks.background_job import _BackgroundJob, _ContinuousDynamicJSTestCase
+from buildscripts.resmokelib.testing.hooks.bghook import BGHook
 
 
-class AggregateResourceConsumptionMetricsInBackground(jsfile.JSHook):
+class AggregateResourceConsumptionMetricsInBackground(BGHook):
     """A hook to run $operationMetrics stage in the background."""
-
-    IS_BACKGROUND = True
 
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize AggregateResourceConsumptionMetricsInBackground."""
+
         description = "Run background $operationMetrics on all mongods while a test is running"
-        js_filename = os.path.join("jstests", "hooks", "run_aggregate_metrics_background.js")
-        jsfile.JSHook.__init__(self, hook_logger, fixture, js_filename, description,
-                               shell_options=shell_options)
-        self._background_job = None
+        super().__init__(hook_logger, fixture, description, tests_per_cycle=None,
+                         loop_delay_ms=1000)
 
-    def before_suite(self, test_report):
-        """Start the background thread."""
-        self._background_job = _BackgroundJob("AggregateResourceConsumptionMetricsInBackground")
-        self.logger.info("Starting the background aggregate metrics thread.")
-        self._background_job.start()
+    def run_action(self):
+        """Collects $operationMetrics on all non-arbiter nodes in the fixture."""
+        for node_info in self.fixture.get_node_info():
+            conn = pymongo.MongoClient(port=node_info.port)
+            # Filter out arbiters.
+            if "arbiterOnly" in conn.admin.command({"isMaster": 1}):
+                self.logger.info(
+                    "Skipping background aggregation against test node: %s because it is an " +
+                    "arbiter and has no data.", node_info.full_name)
+                return
 
-    def after_suite(self, test_report, teardown_flag=None):
-        """Signal the background aggregate metrics thread to exit, and wait until it does."""
-        if self._background_job is None:
-            return
+            # Clear the metrics about 10% of the time.
+            clear_metrics = random.random() < 0.1
+            self.logger.info("Running $operationMetrics with {clearMetrics: %s} on host: %s",
+                             clear_metrics, node_info.full_name)
+            with conn.admin.aggregate(
+                [{"$operationMetrics": {"clearMetrics": clear_metrics}}]) as cursor:
+                for doc in cursor:
+                    try:
+                        self.verify_metrics(doc)
+                    except:
+                        self.logger.info(
+                            "caught exception while verifying that all expected fields are in the" +
+                            " metrics output: ", doc)
+                        raise
 
-        self.logger.info("Stopping the background aggregate metrics thread.")
-        self._background_job.stop()
+    def verify_metrics(self, doc):
+        """Checks whether the output from $operatiomMetrics has the schema we expect."""
 
-    def before_test(self, test, test_report):
-        """Instruct the background aggregate metrics thread to run while 'test' is also running."""
-        if self._background_job is None:
-            return
+        top_level_fields = [
+            "docBytesWritten", "docUnitsWritten", "idxEntryBytesWritten", "idxEntryUnitsWritten",
+            "totalUnitsWritten", "cpuNanos", "db", "primaryMetrics", "secondaryMetrics"
+        ]
+        read_fields = [
+            "docBytesRead", "docUnitsRead", "idxEntryBytesRead", "idxEntryUnitsRead", "keysSorted",
+            "docUnitsReturned"
+        ]
 
-        hook_test_case = _ContinuousDynamicJSTestCase.create_before_test(
-            test.logger, test, self, self._js_filename, self._shell_options)
-        hook_test_case.configure(self.fixture)
+        for key in top_level_fields:
+            assert key in doc, ("The metrics output is missing the property: " + key)
 
-        self.logger.info("Resuming the background aggregate metrics thread.")
-        self._background_job.resume(hook_test_case, test_report)
+        primary_metrics = doc["primaryMetrics"]
+        for key in read_fields:
+            assert key in primary_metrics, (
+                "The metrics output is missing the property: primaryMetrics." + key)
 
-    def after_test(self, test, test_report):  # noqa: D205,D400
-        """Instruct the background aggregate metrics thread to stop running now that 'test' has
-        finished running.
-        """
-        if self._background_job is None:
-            return
-
-        self.logger.info("Pausing the background aggregate metrics thread.")
-        self._background_job.pause()
-
-        if self._background_job.exc_info is not None:
-            if isinstance(self._background_job.exc_info[1], errors.TestFailure):
-                # If the mongo shell process running the JavaScript file exited with a non-zero
-                # return code, then we raise an errors.ServerFailure exception to cause resmoke.py's
-                # test execution to stop.
-                raise errors.ServerFailure(self._background_job.exc_info[1].args[0])
-            else:
-                self.logger.error(
-                    "Encountered an error inside the background aggregate metrics thread.",
-                    exc_info=self._background_job.exc_info)
-                raise self._background_job.exc_info[1]
+        secondary_metrics = doc["secondaryMetrics"]
+        for key in read_fields:
+            assert key in secondary_metrics, (
+                "The metrics output is missing the property: secondaryMetrics." + key)

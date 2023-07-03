@@ -28,13 +28,21 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/type_traits/decay.hpp>
 
-#include "mongo/db/query/cursor_response.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -70,7 +78,9 @@ CursorResponseBuilder::CursorResponseBuilder(rpc::ReplyBuilderInterface* replyBu
                                                                            : kBatchField));
 }
 
-void CursorResponseBuilder::done(CursorId cursorId, const NamespaceString& cursorNamespace) {
+void CursorResponseBuilder::done(CursorId cursorId,
+                                 const NamespaceString& cursorNamespace,
+                                 const SerializationContext& serializationContext) {
     invariant(_active);
 
     _batch.reset();
@@ -90,7 +100,8 @@ void CursorResponseBuilder::done(CursorId cursorId, const NamespaceString& curso
     }
 
     _cursorObject->append(kIdField, cursorId);
-    _cursorObject->append(kNsField, NamespaceStringUtil::serialize(cursorNamespace));
+    _cursorObject->append(kNsField,
+                          NamespaceStringUtil::serialize(cursorNamespace, serializationContext));
     if (_options.atClusterTime) {
         _cursorObject->append(kAtClusterTimeField, _options.atClusterTime->asTimestamp());
     }
@@ -114,10 +125,12 @@ void appendCursorResponseObject(long long cursorId,
                                 const NamespaceString& cursorNamespace,
                                 BSONArray firstBatch,
                                 boost::optional<StringData> cursorType,
-                                BSONObjBuilder* builder) {
+                                BSONObjBuilder* builder,
+                                const SerializationContext& serializationContext) {
     BSONObjBuilder cursorObj(builder->subobjStart(kCursorField));
     cursorObj.append(kIdField, cursorId);
-    cursorObj.append(kNsField, NamespaceStringUtil::serialize(cursorNamespace));
+    cursorObj.append(kNsField,
+                     NamespaceStringUtil::serialize(cursorNamespace, serializationContext));
     cursorObj.append(kBatchFieldInitial, firstBatch);
     if (cursorType) {
         cursorObj.append(kTypeField, cursorType.value());

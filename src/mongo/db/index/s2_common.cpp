@@ -29,11 +29,16 @@
 
 #include "mongo/db/index/s2_common.h"
 
-#include <cstdlib>
+#include <s2.h>
 #include <s2cellid.h>
 #include <s2regioncoverer.h>
+#include <util/math/vector3.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <memory>
+#include <ostream>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/query/collation/collator_interface.h"
 
@@ -110,9 +115,9 @@ BSONObj S2CellIdToIndexKey(const S2CellId& cellId, S2IndexVersion indexVersion) 
 
 void S2CellIdToIndexKeyStringAppend(const S2CellId& cellId,
                                     S2IndexVersion indexVersion,
-                                    const std::vector<KeyString::HeapBuilder>& keysToAdd,
-                                    std::vector<KeyString::HeapBuilder>* out,
-                                    KeyString::Version keyStringVersion,
+                                    const std::vector<key_string::HeapBuilder>& keysToAdd,
+                                    std::vector<key_string::HeapBuilder>* out,
+                                    key_string::Version keyStringVersion,
                                     Ordering ordering) {
     // The range of an unsigned long long is
     // |-----------------|------------------|

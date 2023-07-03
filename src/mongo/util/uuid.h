@@ -29,18 +29,27 @@
 
 #pragma once
 
+#include <array>
+#include <boost/preprocessor/control/iif.hpp>
+#include <compare>
+#include <cstdint>
+#include <cstring>
 #include <functional>
+#include <iosfwd>
 #include <string>
-
-#include <MurmurHash3.h>
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/murmur3.h"
 
 namespace mongo {
 
@@ -172,9 +181,7 @@ public:
      */
     struct Hash {
         std::size_t operator()(const UUID& uuid) const {
-            uint32_t hash;
-            MurmurHash3_x86_32(uuid._uuid.data(), UUID::kNumBytes, 0, &hash);
-            return hash;
+            return murmur3<sizeof(uint32_t)>(uuid.toCDR(), 0 /*seed*/);
         }
     };
 

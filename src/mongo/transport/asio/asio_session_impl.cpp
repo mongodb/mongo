@@ -99,15 +99,8 @@ Status makeCanceledStatus() {
     return {ErrorCodes::CallbackCanceled, "Operation was canceled"};
 }
 
-bool connHealthMetricsEnabled() {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe();
-}
-
-CounterMetric totalIngressTLSConnections("network.totalIngressTLSConnections",
-                                         connHealthMetricsEnabled);
-CounterMetric totalIngressTLSHandshakeTimeMillis("network.totalIngressTLSHandshakeTimeMillis",
-                                                 connHealthMetricsEnabled);
+CounterMetric totalIngressTLSConnections("network.totalIngressTLSConnections");
+CounterMetric totalIngressTLSHandshakeTimeMillis("network.totalIngressTLSHandshakeTimeMillis");
 }  // namespace
 
 

@@ -27,23 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/client.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_databases_common.h"
 #include "mongo/db/commands/list_databases_gen.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo {
 
@@ -97,21 +111,22 @@ public:
             const bool nameOnly = cmd.getNameOnly();
 
             // {authorizedDatabases: bool} - Dynamic default based on permissions.
-            const bool authorizedDatabases = ([as](const boost::optional<bool>& authDB) {
-                const bool mayListAllDatabases = as->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(), ActionType::listDatabases);
+            const bool authorizedDatabases =
+                ([as, tenantId = cmd.getDbName().tenantId()](const boost::optional<bool>& authDB) {
+                    const bool mayListAllDatabases = as->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(tenantId), ActionType::listDatabases);
 
-                if (authDB) {
-                    uassert(ErrorCodes::Unauthorized,
-                            "Insufficient permissions to list all databases",
-                            authDB.value() || mayListAllDatabases);
-                    return authDB.value();
-                }
+                    if (authDB) {
+                        uassert(ErrorCodes::Unauthorized,
+                                "Insufficient permissions to list all databases",
+                                authDB.value() || mayListAllDatabases);
+                        return authDB.value();
+                    }
 
-                // By default, list all databases if we can, otherwise
-                // only those we're allowed to find on.
-                return !mayListAllDatabases;
-            })(cmd.getAuthorizedDatabases());
+                    // By default, list all databases if we can, otherwise
+                    // only those we're allowed to find on.
+                    return !mayListAllDatabases;
+                })(cmd.getAuthorizedDatabases());
 
             // {filter: matchExpression}.
             std::unique_ptr<MatchExpression> filter = list_databases::getFilter(cmd, opCtx, ns());
@@ -137,7 +152,8 @@ public:
 
             // We need to copy the serialization context from the request to the reply object
             ListDatabasesReply reply(
-                items, SerializationContext::stateCommandReply(cmd.getSerializationContext()));
+                std::move(items),
+                SerializationContext::stateCommandReply(cmd.getSerializationContext()));
             if (!nameOnly) {
                 reply.setTotalSize(totalSize);
                 reply.setTotalSizeMb(totalSize / (1024 * 1024));

@@ -28,28 +28,69 @@
  */
 
 
-#include <algorithm>
-#include <exception>
+// IWYU pragma: no_include "cxxabi.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <initializer_list>
 #include <memory>
+#include <mutex>
+#include <ostream>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/client/async_client.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_noop_client_observer.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_stats.h"
+#include "mongo/executor/hedge_options_util.h"
 #include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_integration_fixture.h"
-#include "mongo/executor/test_network_connection_hook.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/factory.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/message.h"
 #include "mongo/rpc/topology_version_gen.h"
-#include "mongo/stdx/future.h"
-#include "mongo/unittest/integration_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -162,7 +203,7 @@ public:
     }
 
     void setUp() override {
-        startNet(std::make_unique<WaitForIsMasterHook>(this));
+        startNet(std::make_unique<WaitForHelloHook>(this));
     }
 
     // NetworkInterfaceIntegrationFixture::tearDown() shuts down the NetworkInterface. We always
@@ -256,33 +297,33 @@ public:
         return ++numCurrentOpRan;
     }
 
-    struct IsMasterData {
+    struct HelloData {
         BSONObj request;
         RemoteCommandResponse response;
     };
-    IsMasterData waitForIsMaster() {
+    HelloData waitForHello() {
         stdx::unique_lock<Latch> lk(_mutex);
-        _isMasterCond.wait(lk, [this] { return _isMasterResult != boost::none; });
+        _helloCondVar.wait(lk, [this] { return _helloResult != boost::none; });
 
-        return std::move(*_isMasterResult);
+        return std::move(*_helloResult);
     }
 
-    bool hasIsMaster() {
+    bool hasHelloResult() {
         stdx::lock_guard<Latch> lk(_mutex);
-        return _isMasterResult != boost::none;
+        return _helloResult != boost::none;
     }
 
 private:
-    class WaitForIsMasterHook : public NetworkConnectionHook {
+    class WaitForHelloHook : public NetworkConnectionHook {
     public:
-        explicit WaitForIsMasterHook(NetworkInterfaceTest* parent) : _parent(parent) {}
+        explicit WaitForHelloHook(NetworkInterfaceTest* parent) : _parent(parent) {}
 
         Status validateHost(const HostAndPort& host,
                             const BSONObj& request,
-                            const RemoteCommandResponse& isMasterReply) override {
+                            const RemoteCommandResponse& helloReply) override {
             stdx::lock_guard<Latch> lk(_parent->_mutex);
-            _parent->_isMasterResult = IsMasterData{request, isMasterReply};
-            _parent->_isMasterCond.notify_all();
+            _parent->_helloResult = HelloData{request, helloReply};
+            _parent->_helloCondVar.notify_all();
             return Status::OK();
         }
 
@@ -299,8 +340,8 @@ private:
     };
 
     Mutex _mutex = MONGO_MAKE_LATCH("NetworkInterfaceTest::_mutex");
-    stdx::condition_variable _isMasterCond;
-    boost::optional<IsMasterData> _isMasterResult;
+    stdx::condition_variable _helloCondVar;
+    boost::optional<HelloData> _helloResult;
 };
 
 class NetworkInterfaceInternalClientTest : public NetworkInterfaceTest {
@@ -331,7 +372,7 @@ TEST_F(NetworkInterfaceTest, CancelLocally) {
 
         auto deferred = runCommand(cbh, makeTestCommand(kMaxWait, makeEchoCmdObj()));
 
-        waitForIsMaster();
+        waitForHello();
 
         fpb->waitForTimesEntered(fpb.initialTimesEntered() + 1);
 
@@ -532,7 +573,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeout) {
     auto request = makeTestCommand(Milliseconds{1000}, makeSleepCmdObj());
     auto deferred = runCommand(cb, request);
 
-    waitForIsMaster();
+    waitForHello();
 
     auto result = deferred.get();
 
@@ -562,7 +603,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
 
     auto deferred = runCommand(cb, request);
 
-    waitForIsMaster();
+    waitForHello();
 
     auto result = deferred.get();
 
@@ -597,7 +638,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
 
     auto deferred = runCommand(cb, request);
 
-    waitForIsMaster();
+    waitForHello();
 
     auto result = deferred.get();
 
@@ -756,6 +797,44 @@ TEST_F(NetworkInterfaceTest, SetAlarm) {
     ASSERT_FALSE(swResult.isOK());
 }
 
+TEST_F(NetworkInterfaceTest, UseOperationKeyWhenProvided) {
+    const auto opKey = UUID::gen();
+    assertCommandOK("admin",
+                    BSON("configureFailPoint"
+                         << "failIfOperationKeyMismatch"
+                         << "mode"
+                         << "alwaysOn"
+                         << "data" << BSON("clientOperationKey" << opKey)),
+                    kNoTimeout);
+
+    ON_BLOCK_EXIT([&] {
+        assertCommandOK("admin",
+                        BSON("configureFailPoint"
+                             << "failIfOperationKeyMismatch"
+                             << "mode"
+                             << "off"),
+                        kNoTimeout);
+    });
+
+    RemoteCommandRequest::Options rcrOptions;
+    rcrOptions.hedgeOptions.isHedgeEnabled = true;
+    rcrOptions.hedgeOptions.hedgeCount = fixture().getServers().size();
+    RemoteCommandRequestOnAny rcr(fixture().getServers(),
+                                  "admin",
+                                  makeEchoCmdObj(),
+                                  BSONObj(),
+                                  nullptr,
+                                  kNoTimeout,
+                                  std::move(rcrOptions),
+                                  opKey);
+    // Only internal clients can run hedged operations.
+    resetIsInternalClient(true);
+    ON_BLOCK_EXIT([&] { resetIsInternalClient(false); });
+    auto cbh = makeCallbackHandle();
+    auto fut = runCommand(cbh, std::move(rcr));
+    fut.get();
+}
+
 class HedgeCancellationTest : public NetworkInterfaceTest {
 public:
     enum class CancellationMode { kAfterCompletion, kAfterScheduling };
@@ -911,13 +990,13 @@ TEST_F(HedgeCancellationTest, CancelAfterCompletion) {
 }
 
 TEST_F(NetworkInterfaceInternalClientTest,
-       IsMasterRequestContainsOutgoingWireVersionInternalClientInfo) {
+       HelloRequestContainsOutgoingWireVersionInternalClientInfo) {
     auto deferred = runCommand(makeCallbackHandle(), makeTestCommand(kNoTimeout, makeEchoCmdObj()));
-    auto isMasterHandshake = waitForIsMaster();
+    auto helloHandshake = waitForHello();
 
-    // Verify that the isMaster reply has the expected internalClient data.
+    // Verify that the "hello" reply has the expected internalClient data.
     auto wireSpec = WireSpec::instance().get();
-    auto internalClientElem = isMasterHandshake.request["internalClient"];
+    auto internalClientElem = helloHandshake.request["internalClient"];
     ASSERT_EQ(internalClientElem.type(), BSONType::Object);
     auto minWireVersionElem = internalClientElem.Obj()["minWireVersion"];
     auto maxWireVersionElem = internalClientElem.Obj()["maxWireVersion"];
@@ -932,14 +1011,14 @@ TEST_F(NetworkInterfaceInternalClientTest,
     assertNumOps(0u, 0u, 0u, 1u);
 }
 
-TEST_F(NetworkInterfaceTest, IsMasterRequestMissingInternalClientInfoWhenNotInternalClient) {
+TEST_F(NetworkInterfaceTest, HelloRequestMissingInternalClientInfoWhenNotInternalClient) {
     resetIsInternalClient(false);
 
     auto deferred = runCommand(makeCallbackHandle(), makeTestCommand(kNoTimeout, makeEchoCmdObj()));
-    auto isMasterHandshake = waitForIsMaster();
+    auto helloHandshake = waitForHello();
 
-    // Verify that the isMaster reply has the expected internalClient data.
-    ASSERT_FALSE(isMasterHandshake.request["internalClient"]);
+    // Verify that the "hello" reply has the expected internalClient data.
+    ASSERT_FALSE(helloHandshake.request["internalClient"]);
     // Verify that the ping op is counted as a success.
     auto res = deferred.get();
     ASSERT(res.elapsed);
@@ -1077,6 +1156,36 @@ TEST_F(NetworkInterfaceTest, StartExhaustCommandShouldStopOnFailure) {
         ASSERT_EQ(counters._success, 0);
         ASSERT_EQ(counters._failed, 1);
     }
+}
+
+TEST_F(NetworkInterfaceTest, ExhaustCommandCancelRunsOutOfLine) {
+    thread_local bool inCancellationContext = false;
+    auto pf = makePromiseFuture<bool>();
+    auto cbh = makeCallbackHandle();
+    auto callback = [&](auto&&) mutable {
+        pf.promise.emplaceValue(inCancellationContext);
+    };
+
+    auto deferred = [&] {
+        FailPointEnableBlock fpb("networkInterfaceHangCommandsAfterAcquireConn");
+
+        auto deferred = startExhaustCommand(
+            cbh, makeTestCommand(kMaxWait, makeEchoCmdObj()), std::move(callback));
+
+        waitForHello();
+
+        fpb->waitForTimesEntered(fpb.initialTimesEntered() + 1);
+
+        inCancellationContext = true;
+        net().cancelCommand(cbh);
+        inCancellationContext = false;
+        return deferred;
+    }();
+
+    auto result = deferred.getNoThrow();
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, result);
+    bool cancellationRanInline = pf.future.get();
+    ASSERT_FALSE(cancellationRanInline);
 }
 
 TEST_F(NetworkInterfaceTest, TearDownWaitsForInProgress) {

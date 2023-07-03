@@ -29,27 +29,79 @@
 
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
 
+#include <absl/container/node_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstdint>
 #include <fmt/format.h>
+#include <mutex>
+#include <tuple>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/client/dbclient_connection.h"
-#include "mongo/client/remote_command_targeter.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
@@ -347,7 +399,15 @@ bool ReshardingOplogFetcher::consume(Client* client,
             // * Parallize writing documents across multiple threads.
             // * Doing either of the above while still using the underlying message buffer of bson
             //   objects.
-            AutoGetCollection toWriteTo(opCtx, _toWriteInto, LockMode::MODE_IX);
+            const auto toWriteTo =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      _toWriteInto,
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+
             for (const BSONObj& doc : batch) {
                 WriteUnitOfWork wuow(opCtx);
                 auto nextOplog = uassertStatusOK(repl::OplogEntry::parse(doc));
@@ -356,8 +416,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
                     ReshardingDonorOplogId::parse(IDLParserContext{"OplogFetcherParsing"},
                                                   nextOplog.get_id()->getDocument().toBson());
                 Timer insertTimer;
-                uassertStatusOK(collection_internal::insertDocument(
-                    opCtx, *toWriteTo, InsertStatement{doc}, nullptr));
+                uassertStatusOK(Helpers::insert(opCtx, toWriteTo, doc));
                 wuow.commit();
 
                 _env->metrics()->onLocalInsertDuringOplogFetching(
@@ -402,8 +461,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
                     oplog.setOpTime(OplogSlot());
                     oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
 
-                    uassertStatusOK(collection_internal::insertDocument(
-                        opCtx, *toWriteTo, InsertStatement{oplog.toBSON()}, nullptr));
+                    uassertStatusOK(Helpers::insert(opCtx, toWriteTo, oplog.toBSON()));
                     wuow.commit();
 
                     // Also include synthetic oplog in the fetched count so it can match up with the

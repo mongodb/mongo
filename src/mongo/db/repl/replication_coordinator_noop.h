@@ -29,7 +29,46 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/member_data.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/split_horizon.h"
+#include "mongo/db/repl/split_prepare_session_manager.h"
+#include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
+#include "mongo/rpc/topology_version_gen.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {
@@ -124,7 +163,8 @@ public:
 
     void setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) final;
     void setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) final;
-    void setMyLastAppliedOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime) final;
+    void setMyLastAppliedOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime,
+                                                  bool advanceGlobalTimestamp) final;
     void setMyLastDurableOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime) final;
 
     void resetMyLastOpTimes() final;
@@ -355,6 +395,8 @@ public:
     virtual SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
 
     virtual bool isRetryableWrite(OperationContext* opCtx) const override;
+
+    boost::optional<UUID> getInitialSyncId(OperationContext* opCtx) override;
 
 private:
     ServiceContext* const _service;

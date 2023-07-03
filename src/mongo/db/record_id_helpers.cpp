@@ -30,17 +30,26 @@
 
 #include "mongo/db/record_id_helpers.h"
 
+#include <cstdint>
 #include <limits>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -68,7 +77,7 @@ StatusWith<RecordId> keyForOptime(const Timestamp& opTime, const KeyFormat keyFo
             return {std::move(out)};
         }
         case KeyFormat::String: {
-            KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
+            key_string::Builder keyBuilder(key_string::Version::kLatestVersion);
             keyBuilder.appendTimestamp(opTime);
             return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
         }
@@ -125,7 +134,7 @@ RecordId keyForElem(const BSONElement& elem) {
     // Intentionally discard the TypeBits since the type information will be stored in the cluster
     // key of the original document. The consequence of this behavior is that cluster key values
     // that compare similarly, but are of different types may not be used concurrently.
-    KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
+    key_string::Builder keyBuilder(key_string::Version::kLatestVersion);
     keyBuilder.appendBSONElement(elem);
     return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
 }
@@ -135,13 +144,13 @@ RecordId keyForObj(const BSONObj& obj) {
 }
 
 RecordId keyForOID(OID oid) {
-    KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
+    key_string::Builder keyBuilder(key_string::Version::kLatestVersion);
     keyBuilder.appendOID(oid);
     return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
 }
 
 RecordId keyForDate(Date_t date) {
-    KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
+    key_string::Builder keyBuilder(key_string::Version::kLatestVersion);
     keyBuilder.appendDate(date);
     return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
 }
@@ -150,7 +159,7 @@ void appendToBSONAs(const RecordId& rid, BSONObjBuilder* builder, StringData fie
     rid.withFormat([&](RecordId::Null) { builder->appendNull(fieldName); },
                    [&](int64_t val) { builder->append(fieldName, val); },
                    [&](const char* str, int len) {
-                       KeyString::appendSingleFieldToBSONAs(str, len, fieldName, builder);
+                       key_string::appendSingleFieldToBSONAs(str, len, fieldName, builder);
                    });
 }
 

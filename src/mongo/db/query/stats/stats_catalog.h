@@ -29,11 +29,19 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/collection_statistics.h"
 #include "mongo/db/query/stats/stats_cache.h"
 #include "mongo/db/query/stats/stats_cache_loader.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo::stats {

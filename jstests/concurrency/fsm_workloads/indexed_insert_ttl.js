@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * indexed_insert_ttl.js
  *
@@ -12,7 +10,7 @@
 
 load('jstests/concurrency/fsm_workload_helpers/balancer.js');
 
-var $config = (function() {
+export const $config = (function() {
     var states = {
         init: function init(db, collName) {
             var res = db[collName].insert({indexed_insert_ttl: new ISODate(), first: true});

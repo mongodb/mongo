@@ -31,32 +31,47 @@
  * This file contains tests for mongo/db/commands/index_filter_commands.h
  */
 
-#include "mongo/db/commands/index_filter_commands.h"
-
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <cstddef>
+#include <fmt/format.h>
+#include <functional>
 #include <memory>
+#include <utility>
+#include <variant>
+#include <vector>
 
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/commands/index_filter_commands.h"
 #include "mongo/db/exec/plan_cache_util.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/json.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_cache_callbacks.h"
+#include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
-#include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/query/sbe_plan_cache.h"
-#include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/clock_source.h"
 
-using namespace mongo;
-
+namespace mongo {
 namespace {
-
-using std::string;
-using std::unique_ptr;
-using std::vector;
 
 class IndexFilterCommandsTest : public unittest::Test {
 protected:
@@ -205,14 +220,14 @@ protected:
     /**
      * Utility function to get list of index filters from the query settings.
      */
-    vector<BSONObj> getFilters() {
+    std::vector<BSONObj> getFilters() {
         BSONObjBuilder bob;
         ASSERT_OK(ListFilters::list(_querySettings, &bob));
         BSONObj resultObj = bob.obj();
         BSONElement filtersElt = resultObj.getField("filters");
         ASSERT_EQUALS(filtersElt.type(), mongo::Array);
-        vector<BSONElement> filtersEltArray = filtersElt.Array();
-        vector<BSONObj> filters;
+        std::vector<BSONElement> filtersEltArray = filtersElt.Array();
+        std::vector<BSONObj> filters;
         for (auto&& elt : filtersEltArray) {
             ASSERT_TRUE(elt.isABSONObj());
             BSONObj obj = elt.Obj();
@@ -317,7 +332,9 @@ private:
         // matter to the tests.
         auto cacheData = std::make_unique<sbe::CachedSbePlan>(
             std::make_unique<sbe::CoScanStage>(PlanNodeId{}),
-            stage_builder::PlanStageData{std::make_unique<sbe::RuntimeEnvironment>()});
+            stage_builder::PlanStageData(
+                stage_builder::PlanStageEnvironment(std::make_unique<sbe::RuntimeEnvironment>()),
+                std::make_unique<stage_builder::PlanStageStaticData>()));
         auto decision = createDecision(1U);
         auto querySolution = std::make_unique<QuerySolution>();
 
@@ -360,7 +377,7 @@ const NamespaceString IndexFilterCommandsTest::_nss(
  */
 
 TEST_F(IndexFilterCommandsTest, ListFiltersEmpty) {
-    vector<BSONObj> filters = getFilters();
+    std::vector<BSONObj> filters = getFilters();
     ASSERT_TRUE(filters.empty());
 }
 
@@ -388,7 +405,7 @@ TEST_F(IndexFilterCommandsTest, ClearNonexistentIndexFilter) {
     std::string clearCmdObject{"{query: {b: 1}}"};
 
     ASSERT_OK(setIndexFilter(setCmdObject));
-    vector<BSONObj> filters = getFilters();
+    std::vector<BSONObj> filters = getFilters();
     ASSERT_EQUALS(filters.size(), 1U);
 
     // Clear nonexistent index filter.
@@ -440,7 +457,7 @@ TEST_F(IndexFilterCommandsTest, SetAndClearFilters) {
             indexes: [{a: 1}]})");
 
     size_t expectedNumFilters = 1;
-    vector<BSONObj> filters = getFilters();
+    std::vector<BSONObj> filters = getFilters();
     ASSERT_EQ(expectedNumFilters, filters.size());
 
     // Query shape should not exist in plan cache after index filter is updated.
@@ -518,7 +535,7 @@ TEST_F(IndexFilterCommandsTest, SetAndClearFiltersCollation) {
               collation: {locale: 'mock_reverse_string'},
               indexes: [{a: 1}]})");
 
-    vector<BSONObj> filters = getFilters();
+    std::vector<BSONObj> filters = getFilters();
     ASSERT_EQUALS(filters.size(), 1U);
     ASSERT_BSONOBJ_EQ(filters[0].getObjectField("query"), fromjson("{a: 'foo'}"));
     ASSERT_BSONOBJ_EQ(filters[0].getObjectField("sort"), fromjson("{}"));
@@ -571,4 +588,6 @@ TEST_F(IndexFilterCommandsTest, SetFilterAcceptsIndexNames) {
     ASSERT_BSONOBJ_EQ(indexes[0].embeddedObject(), fromjson("{a: 1}"));
     ASSERT_EQUALS(indexes[1].valueStringData(), "a_1:rev");
 }
+
 }  // namespace
+}  // namespace mongo

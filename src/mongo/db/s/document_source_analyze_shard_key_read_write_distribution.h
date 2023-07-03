@@ -29,10 +29,43 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/document_source_analyze_shard_key_read_write_distribution_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/s/analyze_shard_key_util.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -51,9 +84,6 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << kStageName << " is not supported on a multitenant replica set",
                     !gMultitenancySupport);
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << kStageName << " is not supported on a configsvr mongod",
-                    !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
             uassert(6875700,
                     str::stream() << kStageName
                                   << " must take a nested object but found: " << specElem,

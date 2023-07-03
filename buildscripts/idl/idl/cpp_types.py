@@ -531,27 +531,28 @@ def _call_method_or_global_function(expression, ast_type, should_shapify=False):
     shape_options = ''
     if should_shapify:
         shape_options = 'options'
-        if serialization_context != '':
-            shape_options = ', ' + shape_options
 
     short_method_name = writer.get_method_name(method_name)
     if writer.is_function(method_name):
         if ast_type.deserialize_with_tenant:
             serialization_context = ', ' + serialization_context
+        if should_shapify:
+            shape_options = ', ' + shape_options
+
         return common.template_args(
-            '${method_name}(${expression}${serialization_context}${shape_options})',
+            '${method_name}(${expression}${shape_options}${serialization_context})',
             expression=expression,
             method_name=method_name,
-            serialization_context=serialization_context,
             shape_options=shape_options,
+            serialization_context=serialization_context,
         )
 
     return common.template_args(
-        '${expression}.${method_name}(${serialization_context}${shape_options})',
+        '${expression}.${method_name}(${shape_options}${serialization_context})',
         expression=expression,
         method_name=short_method_name,
-        serialization_context=serialization_context,
         shape_options=shape_options,
+        serialization_context=serialization_context,
     )
 
 

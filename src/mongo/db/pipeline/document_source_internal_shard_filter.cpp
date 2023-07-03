@@ -28,12 +28,20 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <iterator>
+#include <list>
+#include <utility>
 
-#include "mongo/db/pipeline/document_source_internal_shard_filter.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util_core.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

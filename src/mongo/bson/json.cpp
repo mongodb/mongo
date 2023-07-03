@@ -32,18 +32,29 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
+#include <exception>
 #include <fmt/format.h>
+#include <limits>
+#include <memory>
+#include <ostream>
+#include <type_traits>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/logv2/log.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/platform/strtoll.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 

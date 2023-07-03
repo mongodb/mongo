@@ -220,7 +220,7 @@ __wt_realloc_aligned(
           (p == NULL && bytes_allocated == 0) ||
             (p != NULL && (bytes_allocated_ret == NULL || bytes_allocated != 0)));
         WT_ASSERT(session, bytes_to_allocate != 0);
-        WT_ASSERT(session, bytes_allocated < bytes_to_allocate);
+        WT_ASSERT(session, bytes_allocated <= bytes_to_allocate);
 
         /*
          * We are going to allocate an aligned buffer. When we do this repeatedly, the allocator is

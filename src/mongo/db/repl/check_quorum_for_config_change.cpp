@@ -28,19 +28,33 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <memory>
+#include <string>
 
-#include "mongo/db/repl/check_quorum_for_config_change.h"
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/repl/check_quorum_for_config_change.h"
+#include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/member_id.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
-#include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication

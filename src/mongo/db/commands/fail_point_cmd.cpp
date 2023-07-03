@@ -27,15 +27,24 @@
  *    it in the license file.
  */
 
-#include <vector>
+#include <memory>
+#include <string>
 
-#include "mongo/base/init.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/wait_for_fail_point_gen.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {

@@ -27,12 +27,17 @@
  *    it in the license file.
  */
 
+#include <fmt/format.h>
+
 #include "mongo/transport/grpc/util.h"
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_util.h"
+#include "mongo/util/testing_proctor.h"
 
-namespace mongo::transport::grpc {
+using namespace fmt::literals;
+
+namespace mongo::transport::grpc::util {
 
 ::grpc::SslServerCredentialsOptions::PemKeyCertPair parsePEMKeyFile(StringData filePath) {
 
@@ -45,4 +50,52 @@ namespace mongo::transport::grpc {
     return certPair;
 }
 
-}  // namespace mongo::transport::grpc
+ErrorCodes::Error statusToErrorCode(::grpc::StatusCode statusCode) {
+    switch (statusCode) {
+        case ::grpc::OK:
+            return ErrorCodes::OK;
+        case ::grpc::UNAUTHENTICATED:
+            return ErrorCodes::AuthenticationFailed;
+        case ::grpc::CANCELLED:
+            return ErrorCodes::CallbackCanceled;
+        case ::grpc::INVALID_ARGUMENT:
+            return ErrorCodes::BadValue;
+        case ::grpc::DEADLINE_EXCEEDED:
+            return ErrorCodes::ExceededTimeLimit;
+        case ::grpc::FAILED_PRECONDITION:
+            return ErrorCodes::RPCProtocolNegotiationFailed;
+        case ::grpc::UNIMPLEMENTED:
+            return ErrorCodes::NotImplemented;
+        case ::grpc::INTERNAL:
+            return ErrorCodes::InternalError;
+        case ::grpc::UNAVAILABLE:
+            return ErrorCodes::HostUnreachable;
+        case ::grpc::PERMISSION_DENIED:
+            return ErrorCodes::Unauthorized;
+        case ::grpc::RESOURCE_EXHAUSTED:
+            return ErrorCodes::ResourceExhausted;
+        default:
+            return ErrorCodes::UnknownError;
+    }
+}
+
+::grpc::StatusCode errorToStatusCode(ErrorCodes::Error errorCode) {
+    switch (errorCode) {
+        case ErrorCodes::OK:
+            return ::grpc::OK;
+        case ErrorCodes::UnknownError:
+            return ::grpc::UNKNOWN;
+        case ErrorCodes::InterruptedAtShutdown:
+        case ErrorCodes::ShutdownInProgress:
+            return ::grpc::UNAVAILABLE;
+        case ErrorCodes::CallbackCanceled:
+        case ErrorCodes::ClientMarkedKilled:
+            return ::grpc::CANCELLED;
+        default:
+            invariant(TestingProctor::instance().isEnabled(),
+                      "No known conversion for MongoDB error code: "_format(errorCode));
+            return ::grpc::UNKNOWN;
+    }
+}
+
+}  // namespace mongo::transport::grpc::util

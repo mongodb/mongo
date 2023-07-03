@@ -29,12 +29,10 @@
 
 #include "mongo/db/s/config/index_on_config.h"
 
-#include "mongo/db/catalog/index_builds_manager.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/index_builds_coordinator.h"
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/db/s/sharding_util.h"
-#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util_core.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -44,7 +42,7 @@ Status createIndexOnConfigCollection(OperationContext* opCtx,
                                      const NamespaceString& ns,
                                      const BSONObj& keys,
                                      bool unique) {
-    invariant(ns.db() == DatabaseName::kConfig.db() || ns.db() == DatabaseName::kAdmin.db());
+    invariant(ns.isConfigDB() || ns.isAdminDB());
 
     return sharding_util::createIndexOnCollection(opCtx, ns, keys, unique);
 }

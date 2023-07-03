@@ -29,29 +29,28 @@
 
 #include "mongo/db/clientcursor.h"
 
-#include <ctime>
+#include <boost/cstdint.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <iosfwd>
+#include <mutex>
+#include <ratio>
 #include <string>
-#include <vector>
 
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/external_data_source_scope_guard.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/cursor_server_params.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/query/explain.h"
+#include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_stats.h"
-#include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/background.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 
@@ -125,9 +124,8 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _planCacheKey(CurOp::get(operationUsingCursor)->debug().planCacheKey),
       _queryHash(CurOp::get(operationUsingCursor)->debug().queryHash),
       _queryStatsStoreKeyHash(CurOp::get(operationUsingCursor)->debug().queryStatsStoreKeyHash),
-      _queryStatsStoreKey(CurOp::get(operationUsingCursor)->debug().queryStatsStoreKey),
-      _queryStatsRequestShapifier(
-          std::move(CurOp::get(operationUsingCursor)->debug().queryStatsRequestShapifier)),
+      _queryStatsKeyGenerator(
+          std::move(CurOp::get(operationUsingCursor)->debug().queryStatsKeyGenerator)),
       _shouldOmitDiagnosticInformation(
           CurOp::get(operationUsingCursor)->debug().shouldOmitDiagnosticInformation),
       _opKey(operationUsingCursor->getOperationKey()) {
@@ -164,9 +162,9 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
     if (_queryStatsStoreKeyHash && opCtx) {
         query_stats::writeQueryStats(opCtx,
                                      _queryStatsStoreKeyHash,
-                                     _queryStatsStoreKey,
-                                     std::move(_queryStatsRequestShapifier),
+                                     std::move(_queryStatsKeyGenerator),
                                      _metrics.executionTime.value_or(Microseconds{0}).count(),
+                                     _firstResponseExecutionTime.value_or(Microseconds{0}).count(),
                                      _metrics.nreturned.value_or(0));
     }
 
@@ -402,17 +400,17 @@ void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCur
 }
 
 void collectQueryStatsMongod(OperationContext* opCtx,
-                             std::unique_ptr<query_stats::RequestShapifier> requestShapifier) {
+                             std::unique_ptr<query_stats::KeyGenerator> keyGenerator) {
     // If we haven't registered a cursor to prepare for getMore requests, we record
-    // telemetry directly.
+    // query stats directly.
     auto& opDebug = CurOp::get(opCtx)->debug();
-    query_stats::writeQueryStats(
-        opCtx,
-        opDebug.queryStatsStoreKeyHash,
-        opDebug.queryStatsStoreKey,
-        std::move(requestShapifier),
-        opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count(),
-        opDebug.additiveMetrics.nreturned.value_or(0));
+    int64_t execTime = opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count();
+    query_stats::writeQueryStats(opCtx,
+                                 opDebug.queryStatsStoreKeyHash,
+                                 std::move(keyGenerator),
+                                 execTime,
+                                 execTime,
+                                 opDebug.additiveMetrics.nreturned.value_or(0));
 }
 
 }  // namespace mongo

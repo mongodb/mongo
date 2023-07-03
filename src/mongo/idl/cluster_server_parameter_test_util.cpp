@@ -29,6 +29,30 @@
 
 #include "mongo/idl/cluster_server_parameter_test_util.h"
 
+#include <boost/move/utility_core.hpp>
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/idl/cluster_server_parameter_gen.h"
+#include "mongo/idl/cluster_server_parameter_test_gen.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 namespace mongo {
 namespace cluster_server_parameter_test_util {
 
@@ -100,9 +124,12 @@ void remove(const boost::optional<TenantId>& tenantId) {
     uassertStatusOK(response.toStatus());
 }
 
-BSONObj makeClusterParametersDoc(const LogicalTime& cpTime, int intValue, StringData strValue) {
+BSONObj makeClusterParametersDoc(const LogicalTime& cpTime,
+                                 int intValue,
+                                 StringData strValue,
+                                 StringData parameterName) {
     ClusterServerParameter csp;
-    csp.set_id(kCSPTest);
+    csp.set_id(parameterName);
     csp.setClusterParameterTime(cpTime);
 
     ClusterServerParameterTest cspt;

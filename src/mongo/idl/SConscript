@@ -102,6 +102,7 @@ env.CppUnitTest(
         'cluster_server_parameter_common_test.cpp',
         'cluster_server_parameter_initializer_test.cpp',
         'cluster_server_parameter_op_observer_test.cpp',
+        'cluster_server_parameter_refresher_test.cpp',
         'cluster_server_parameter_test_util.cpp',
         'cluster_server_parameter_test.idl',
     ],
@@ -123,6 +124,7 @@ env.CppUnitTest(
         'cluster_server_parameter_common',
         'cluster_server_parameter_initializer',
         'cluster_server_parameter_op_observer',
+        'cluster_server_parameter_refresher',
     ],
 )
 
@@ -138,6 +140,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/session/logical_session_id',
         '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/rpc/metadata_impersonated_user',
         '$BUILD_DIR/mongo/s/common_s',
     ],
 )

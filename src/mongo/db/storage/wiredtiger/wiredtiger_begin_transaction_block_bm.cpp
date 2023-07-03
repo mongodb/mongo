@@ -27,23 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
+#include <memory>
+#include <ostream>
+#include <string>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <wiredtiger.h>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/recovery_unit_test_harness.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
@@ -70,49 +78,34 @@ private:
     WT_CONNECTION* _conn;
 };
 
-class WiredTigerTestHelper {
+class WiredTigerTestHelper : public ScopedGlobalServiceContextForTest {
 public:
     WiredTigerTestHelper()
-        : _dbpath("wt_test"),
-          _connection(_dbpath.path(), ""),
-          _sessionCache(_connection.getConnection(), &_clockSource) {
-        setGlobalServiceContext(ServiceContext::make());
-        _opCtx.reset(newOperationContext());
-        auto ru = WiredTigerRecoveryUnit::get(_opCtx.get());
+        : _threadClient(getServiceContext()), _opCtxHolder(_threadClient->makeOperationContext()) {
+        _opCtxHolder->setRecoveryUnit(
+            std::make_unique<WiredTigerRecoveryUnit>(&_sessionCache, &_oplogManager),
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        auto ru = WiredTigerRecoveryUnit::get(_opCtxHolder.get());
         _wtSession = ru->getSession()->getSession();
         invariant(wtRCToStatus(_wtSession->create(_wtSession, "table:mytable", nullptr), _wtSession)
                       .isOK());
         ru->abandonSnapshot();
     }
 
-    WiredTigerSessionCache* getSessionCache() {
-        return &_sessionCache;
-    }
-
-    WiredTigerOplogManager* getOplogManager() {
-        return &_oplogManager;
-    }
-
     WT_SESSION* wtSession() const {
         return _wtSession;
     }
 
-    OperationContext* newOperationContext() {
-        return new OperationContextNoop(
-            new WiredTigerRecoveryUnit(getSessionCache(), &_oplogManager));
-    }
-
-    OperationContext* getOperationContext() const {
-        return _opCtx.get();
-    }
-
 private:
-    unittest::TempDir _dbpath;
-    WiredTigerConnection _connection;
+    unittest::TempDir _dbpath{"wt_test"};
+    WiredTigerConnection _connection{_dbpath.path(), ""};
     ClockSourceMock _clockSource;
-    WiredTigerSessionCache _sessionCache;
+    WiredTigerSessionCache _sessionCache{_connection.getConnection(), &_clockSource};
     WiredTigerOplogManager _oplogManager;
-    std::unique_ptr<OperationContext> _opCtx;
+
+    ThreadClient _threadClient;
+    ServiceContext::UniqueOperationContext _opCtxHolder;
+
     WT_SESSION* _wtSession;
 };
 
@@ -122,8 +115,6 @@ void BM_WiredTigerBeginTxnBlock(benchmark::State& state) {
         WiredTigerBeginTxnBlock beginTxn(helper.wtSession(), nullptr);
     }
 }
-
-using mongo::WiredTigerBeginTxnBlock;
 
 template <PrepareConflictBehavior behavior, RoundUpPreparedTimestamps round>
 void BM_WiredTigerBeginTxnBlockWithArgs(benchmark::State& state) {
@@ -136,7 +127,6 @@ void BM_WiredTigerBeginTxnBlockWithArgs(benchmark::State& state) {
                                          RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce);
     }
 }
-
 
 void BM_setTimestamp(benchmark::State& state) {
     WiredTigerTestHelper helper;
@@ -165,7 +155,6 @@ BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
 BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
                    PrepareConflictBehavior::kIgnoreConflictsAllowWrites,
                    RoundUpPreparedTimestamps::kRound);
-
 BENCHMARK(BM_setTimestamp);
 
 }  // namespace

@@ -27,12 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/would_change_owning_shard_exception.h"
 
-#include "mongo/base/init.h"
-#include "mongo/util/assert_util.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 
 namespace mongo {
 namespace {
@@ -42,6 +45,7 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(WouldChangeOwningShardInfo);
 constexpr StringData kPreImage = "preImage"_sd;
 constexpr StringData kPostImage = "postImage"_sd;
 constexpr StringData kShouldUpsert = "shouldUpsert"_sd;
+constexpr StringData kUserPostImage = "userPostImage"_sd;
 
 }  // namespace
 
@@ -49,6 +53,9 @@ void WouldChangeOwningShardInfo::serialize(BSONObjBuilder* bob) const {
     bob->append(kPreImage, _preImage);
     bob->append(kPostImage, _postImage);
     bob->append(kShouldUpsert, _shouldUpsert);
+    if (_userPostImage) {
+        bob->append(kUserPostImage, *_userPostImage);
+    }
 }
 
 std::shared_ptr<const ErrorExtraInfo> WouldChangeOwningShardInfo::parse(const BSONObj& obj) {
@@ -56,11 +63,14 @@ std::shared_ptr<const ErrorExtraInfo> WouldChangeOwningShardInfo::parse(const BS
 }
 
 WouldChangeOwningShardInfo WouldChangeOwningShardInfo::parseFromCommandError(const BSONObj& obj) {
-    return WouldChangeOwningShardInfo(obj[kPreImage].Obj().getOwned(),
-                                      obj[kPostImage].Obj().getOwned(),
-                                      obj[kShouldUpsert].Bool(),
-                                      boost::none,
-                                      boost::none);
+    return WouldChangeOwningShardInfo(
+        obj[kPreImage].Obj().getOwned(),
+        obj[kPostImage].Obj().getOwned(),
+        obj[kShouldUpsert].Bool(),
+        boost::none,
+        boost::none,
+        obj.hasField(kUserPostImage) ? boost::make_optional(obj[kUserPostImage].Obj().getOwned())
+                                     : boost::none);
 }
 
 }  // namespace mongo

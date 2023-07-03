@@ -27,11 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
-#include "mongo/db/jsobj.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace repl {

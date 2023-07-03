@@ -27,7 +27,25 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <cstddef>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/match_details.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo::projection_executor_utils {
 bool applyProjectionToOneField(projection_executor::ProjectionExecutor* executor,
@@ -128,7 +146,7 @@ Value applyFindSliceProjectionToArray(const std::vector<Value>& array,
                 : elem);
     }
 
-    return Value{output};
+    return Value{std::move(output)};
 }
 
 /**

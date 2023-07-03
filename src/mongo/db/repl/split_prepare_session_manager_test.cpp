@@ -27,13 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/repl/split_prepare_session_manager.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/internal_session_pool.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace repl {

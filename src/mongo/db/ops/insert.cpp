@@ -29,17 +29,30 @@
 
 #include "mongo/db/ops/insert.h"
 
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/query/dbref.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/util/fail_point.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -206,13 +219,6 @@ Status userAllowedCreateNS(OperationContext* opCtx, const NamespaceString& ns) {
     if (!NamespaceString::validCollectionName(ns.coll())) {
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "Invalid collection name: " << ns.coll());
-    }
-
-    if (serverGlobalParams.clusterRole.exclusivelyHasConfigRole() && !ns.isOnInternalDb()) {
-        return Status(ErrorCodes::InvalidNamespace,
-                      str::stream()
-                          << "Can't create user databases on a dedicated --configsvr instance "
-                          << ns.toStringForErrorMsg());
     }
 
     if (ns.isSystemDotProfile()) {

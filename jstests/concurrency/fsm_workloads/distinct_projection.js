@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * distinct_projection.js
  *
@@ -7,10 +5,10 @@
  * The indexed field contains unique values.
  * Each thread operates on a separate collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/distinct.js');    // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/distinct.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.prefix = 'distinct_projection_fsm';
 
     $config.states.distinct = function distinct(db, collName) {

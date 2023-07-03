@@ -31,19 +31,33 @@
 
 #include <cstddef>
 #include <functional>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace repl {

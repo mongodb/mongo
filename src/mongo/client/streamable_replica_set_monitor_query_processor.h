@@ -29,7 +29,10 @@
 #pragma once
 
 #include "mongo/client/sdam/sdam.h"
+#include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/client/sdam/topology_listener.h"
 #include "mongo/client/streamable_replica_set_monitor.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 class StreamableReplicaSetMonitor::StreamableReplicaSetMonitorQueryProcessor final

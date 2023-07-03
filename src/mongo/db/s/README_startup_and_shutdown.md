@@ -70,6 +70,9 @@ If mongos does not support `hello`, the `helloOk` flag is ignored. A new driver 
 not see "helloOk: true" in the response and must continue to send `isMaster` on this connection. Old
 drivers will not specify this flag at all, so the behavior remains the same.
 
+When mongos establishes outgoing connections to mongod nodes in the cluster, it always uses `hello`
+rather than `isMaster`.
+
 #### Code references
 * [isMaster command](https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/s/commands/cluster_is_master_cmd.cpp#L248) for mongos.
 * [hello command](https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/s/commands/cluster_is_master_cmd.cpp#L64) for mongos.

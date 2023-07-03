@@ -71,9 +71,9 @@ key_init(TABLE *table, void *arg)
 
     /* Backward compatibility, built the correct path to the saved key-length file. */
     if (ntables == 0)
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", g.home_key));
+        testutil_snprintf(buf, sizeof(buf), "%s", g.home_key);
     else
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.%u", g.home_key, table->id));
+        testutil_snprintf(buf, sizeof(buf), "%s.%u", g.home_key, table->id);
 
     /*
      * The key is a variable length item with a leading 10-digit value. Since we have to be able

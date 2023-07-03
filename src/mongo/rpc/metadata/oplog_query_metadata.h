@@ -29,6 +29,11 @@
 
 #pragma once
 
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/repl/optime.h"
 

@@ -27,10 +27,27 @@
  *    it in the license file.
  */
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <cstdint>
+#include <memory>
+#include <vector>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/read_preference.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
@@ -38,13 +55,22 @@
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/random.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -82,7 +108,8 @@ protected:
     ReadWriteConcernDefaultsLookupMock _lookupMock;
 };
 
-const NamespaceString kNamespace("TestDB.TestColl");
+const NamespaceString kNamespace =
+    NamespaceString::createNamespaceString_forTest("TestDB.TestColl");
 const KeyPattern kKeyPattern(BSON("x" << 1));
 
 TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {

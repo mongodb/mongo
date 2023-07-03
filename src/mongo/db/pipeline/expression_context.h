@@ -29,15 +29,29 @@
 
 #pragma once
 
+#include <absl/container/node_hash_set.h>
 #include <boost/intrusive_ptr.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -45,16 +59,27 @@
 #include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/tailable_mode.h"
+#include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/serialization_context.h"
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 
@@ -112,7 +137,7 @@ public:
 
         boost::intrusive_ptr<ExpressionContext> _expCtx;
 
-        std::unique_ptr<CollatorInterface> _originalCollator;
+        std::shared_ptr<CollatorInterface> _originalCollator;
     };
 
     /**
@@ -221,6 +246,10 @@ public:
         return _collator.get();
     }
 
+    std::shared_ptr<CollatorInterface> getCollatorShared() const {
+        return _collator;
+    }
+
     /**
      * Whether to track timing information and "work" counts in the agg layer.
      */
@@ -247,7 +276,7 @@ public:
      * Use with caution - '_collator' is used in the context of a Pipeline, and it is illegal
      * to change the collation once a Pipeline has been parsed with this ExpressionContext.
      */
-    void setCollator(std::unique_ptr<CollatorInterface> collator) {
+    void setCollator(std::shared_ptr<CollatorInterface> collator) {
         _collator = std::move(collator);
 
         // Document/Value comparisons must be aware of the collation.
@@ -468,6 +497,7 @@ public:
     SerializationContext serializationCtxt;
 
     // If known, the UUID of the execution namespace for this aggregation command.
+    // TODO(SERVER-78226): Replace `ns` and `uuid` with a type which can express "nss and uuid".
     boost::optional<UUID> uuid;
 
     std::string tempDir;  // Defaults to empty to prevent external sorting in mongos.
@@ -535,9 +565,9 @@ public:
     bool exprDeprectedForApiV1 = false;
 
     // Tracks whether the collator to use for the aggregation matches the default collation of the
-    // collection or view. For collectionless aggregates this is set to 'kNoDefaultCollation'.
-    enum class CollationMatchesDefault { kNoDefault, kYes, kNo };
-    CollationMatchesDefault collationMatchesDefault = CollationMatchesDefault::kNoDefault;
+    // collection or view.
+    enum class CollationMatchesDefault { kYes, kNo };
+    CollationMatchesDefault collationMatchesDefault = CollationMatchesDefault::kYes;
 
     // When non-empty, contains the unmodified user provided aggregation command.
     BSONObj originalAggregateCommand;
@@ -576,6 +606,39 @@ public:
     // are ineligible will still not be cached.
     bool forcePlanCache = false;
 
+    // This is state that is to be shared between the DocumentInternalSearchMongotRemote and
+    // DocumentInternalSearchIdLookup stages (these stages are the result of desugaring $search)
+    // during runtime.
+    class SharedSearchState {
+    public:
+        SharedSearchState() {}
+
+        long long getDocsReturnedByIdLookup() const {
+            return _docsReturnedByIdLookup;
+        }
+
+        /**
+         * Sets the value of _docsReturnedByIdLookup to 0.
+         */
+        void resetDocsReturnedByIdLookup() {
+            _docsReturnedByIdLookup = 0;
+        }
+
+        /**
+         * Increments the value of _docsReturnedByIdLookup by 1.
+         */
+        void incrementDocsReturnedByIdLookup() {
+            _docsReturnedByIdLookup++;
+        }
+
+    private:
+        // When there is an extractable limit in the query, DocumentInternalSearchMongotRemote sends
+        // a getMore to mongot that specifies how many more documents it needs to fulfill that
+        // limit, and it incorporates the amount of documents returned by the
+        // DocumentInternalSearchIdLookup stage into that value.
+        long long _docsReturnedByIdLookup = 0;
+    } sharedSearchState;
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 
@@ -586,7 +649,7 @@ protected:
     void checkForInterruptSlow();
 
     // Collator used for comparisons.
-    std::unique_ptr<CollatorInterface> _collator;
+    std::shared_ptr<CollatorInterface> _collator;
 
     // Used for all comparisons of Document/Value during execution of the aggregation operation.
     // Must not be changed after parsing a Pipeline with this ExpressionContext.

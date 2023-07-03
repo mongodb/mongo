@@ -29,21 +29,43 @@
 
 #include "mongo/db/matcher/expression_algo.h"
 
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <iterator>
+#include <set>
+#include <type_traits>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <s2cellid.h>
+
 #include "mongo/base/checked_cast.h"
-#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -1050,7 +1072,8 @@ bool isOnlyDependentOnImpl(E&& expr,
     pathsDepsCopy.insert(exprDepsTracker.fields.begin(), exprDepsTracker.fields.end());
 
     return pathsDeps ==
-        DepsTracker::simplifyDependencies(pathsDepsCopy, DepsTracker::TruncateToRootLevel::no);
+        DepsTracker::simplifyDependencies(std::move(pathsDepsCopy),
+                                          DepsTracker::TruncateToRootLevel::no);
 }
 
 bool isOnlyDependentOn(MatchExpression& expr,

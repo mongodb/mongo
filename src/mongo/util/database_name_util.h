@@ -29,6 +29,11 @@
 
 #pragma once
 
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/serialization_context.h"
@@ -58,13 +63,6 @@ public:
      */
     static std::string serialize(const DatabaseName& dbName,
                                  const SerializationContext& context = SerializationContext());
-
-    // TODO SERVER-74284: Privatize the worker functions
-    static std::string serializeForStorage(
-        const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
-
-    static std::string serializeForCommands(
-        const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
 
     /**
      *
@@ -108,7 +106,21 @@ public:
                                     StringData db,
                                     const SerializationContext& context = SerializationContext());
 
-    // TODO SERVER-74284: Privatize the worker functions
+    /**
+     * To be used only by the storage catalog.
+     */
+    static DatabaseName deserializeForCatalog(
+        StringData db, const SerializationContext& context = SerializationContext());
+
+private:
+    static DatabaseName parseFromStringExpectTenantIdInMultitenancyMode(StringData dbName);
+
+    static std::string serializeForStorage(
+        const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
+
+    static std::string serializeForCommands(
+        const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
+
     static DatabaseName deserializeForStorage(
         boost::optional<TenantId> tenantId,
         StringData db,
@@ -118,15 +130,6 @@ public:
         boost::optional<TenantId> tenantId,
         StringData db,
         const SerializationContext& context = SerializationContext());
-
-    /**
-     * To be used only by the storage catalog.
-     */
-    static DatabaseName deserializeForCatalog(
-        StringData db, const SerializationContext& context = SerializationContext());
-
-private:
-    static DatabaseName parseDbNameFromStringExpectTenantIdInMultitenancyMode(StringData dbName);
 };
 
 }  // namespace mongo

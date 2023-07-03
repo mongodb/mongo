@@ -84,17 +84,6 @@ NSS_CONSTANT(kMigrationCoordinatorsNamespace, DatabaseName::kConfig, "migrationC
 // Namespace for storing the persisted state of migration recipients.
 NSS_CONSTANT(kMigrationRecipientsNamespace, DatabaseName::kConfig, "migrationRecipients"_sd)
 
-// Namespace for storing the persisted state of movePrimary operation recipients.
-NSS_CONSTANT(kMovePrimaryRecipientNamespace, DatabaseName::kConfig, "movePrimaryRecipients"_sd)
-
-// Namespace for storing the oplog applier progress of movePrimary operations at recipient.
-NSS_CONSTANT(kMovePrimaryApplierProgressNamespace,
-             DatabaseName::kConfig,
-             "movePrimaryRecipients.applierProgress"_sd)
-
-// Namespace for storing the persisted state of movePrimary operation donors.
-NSS_CONSTANT(kMovePrimaryDonorNamespace, DatabaseName::kConfig, "movePrimaryDonors"_sd)
-
 // Namespace for storing the persisted state of tenant migration donors.
 NSS_CONSTANT(kTenantMigrationDonorsNamespace, DatabaseName::kConfig, "tenantMigrationDonors"_sd)
 
@@ -285,3 +274,8 @@ NSS_CONSTANT(kConfigVersionNamespace, DatabaseName::kConfig, "version"_sd)
 
 // Namespace used for storing mongos info on the CSRS.
 NSS_CONSTANT(kConfigMongosNamespace, DatabaseName::kConfig, "mongos"_sd)
+
+// Namespace used for oplog truncate after point.
+NSS_CONSTANT(kDefaultOplogTruncateAfterPointNamespace,
+             DatabaseName::kLocal,
+             "replset.oplogTruncateAfterPoint"_sd)

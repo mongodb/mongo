@@ -27,29 +27,58 @@
  *    it in the license file.
  */
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <system_error>
+#include <tuple>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/stdx/future.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -104,10 +133,10 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
             auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
             // Ensure the query is correct
-            ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                      CollectionType::ConfigNS);
-            ASSERT_BSONOBJ_EQ(query->getFilter(),
-                              BSON(CollectionType::kNssFieldName << expectedColl.getNss().ns()));
+            ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
+            ASSERT_BSONOBJ_EQ(
+                query->getFilter(),
+                BSON(CollectionType::kNssFieldName << expectedColl.getNss().ns_forTest()));
             ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
             ASSERT_EQ(query->getLimit().value(), 1);
 
@@ -178,8 +207,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  NamespaceString::kConfigDatabasesNamespace);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigDatabasesNamespace);
         ASSERT_BSONOBJ_EQ(query->getFilter(),
                           BSON(DatabaseType::kNameFieldName << expectedDb.getName()));
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
@@ -310,8 +338,7 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  NamespaceString::kConfigsvrShardsNamespace);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigsvrShardsNamespace);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().has_value());
@@ -391,7 +418,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
     auto future = launchAsync([this, &chunksQuery, newOpTime, &collEpoch, &collTimestamp] {
         OpTime opTime;
 
-        const auto chunks =
+        auto chunks =
             assertGet(catalogClient()->getChunks(operationContext(),
                                                  chunksQuery,
                                                  BSON(ChunkType::lastmod() << -1),
@@ -414,8 +441,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
             auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
             auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-            ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                      ChunkType::ConfigNS);
+            ASSERT_EQ(query->getNamespaceOrUUID().nss(), ChunkType::ConfigNS);
             ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
             ASSERT_BSONOBJ_EQ(query->getSort(), BSON(ChunkType::lastmod() << -1));
             ASSERT_EQ(query->getLimit().value(), 1);
@@ -459,7 +485,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForUUIDNoSortNoLimit) {
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
     auto future = launchAsync([this, &chunksQuery, &collEpoch, &collTimestamp] {
-        const auto chunks =
+        auto chunks =
             assertGet(catalogClient()->getChunks(operationContext(),
                                                  chunksQuery,
                                                  BSONObj(),
@@ -480,8 +506,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForUUIDNoSortNoLimit) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  ChunkType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), ChunkType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().has_value());
@@ -801,8 +826,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  CollectionType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
 
@@ -859,8 +883,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  CollectionType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
         {
             BSONObjBuilder b;
             b.appendRegex(CollectionType::kNssFieldName, "^test\\.");
@@ -902,8 +925,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  CollectionType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
         {
             BSONObjBuilder b;
             b.appendRegex(CollectionType::kNssFieldName, "^test\\.");
@@ -941,8 +963,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  NamespaceString::kConfigDatabasesNamespace);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigDatabasesNamespace);
         ASSERT_BSONOBJ_EQ(query->getFilter(),
                           BSON(DatabaseType::kPrimaryFieldName << dbt1.getPrimary()));
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
@@ -1012,8 +1033,7 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollection) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  TagsType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), TagsType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSON(TagsType::ns("TestDB.TestColl")));
         ASSERT_BSONOBJ_EQ(query->getSort(), BSON(TagsType::min() << 1));
 
@@ -1209,10 +1229,10 @@ TEST_F(ShardingCatalogClientTest, GetNewKeys) {
     repl::ReadConcernLevel readConcernLevel(repl::ReadConcernLevel::kMajorityReadConcern);
 
     auto future = launchAsync([this, purpose, currentTime, readConcernLevel] {
-        auto status =
-            catalogClient()->getNewKeys(operationContext(), purpose, currentTime, readConcernLevel);
-        ASSERT_OK(status.getStatus());
-        return status.getValue();
+        auto swKeys = catalogClient()->getNewInternalKeys(
+            operationContext(), purpose, currentTime, readConcernLevel);
+        ASSERT_OK(swKeys.getStatus());
+        return swKeys.getValue();
     });
 
     LogicalTime dummyTime(Timestamp(9876, 5432));
@@ -1237,8 +1257,7 @@ TEST_F(ShardingCatalogClientTest, GetNewKeys) {
             fromjson("{purpose: 'none',"
                      "expiresAt: {$gt: {$timestamp: {t: 1234, i: 5678}}}}"));
 
-        ASSERT_EQ(NamespaceString::kKeysCollectionNamespace,
-                  query->getNamespaceOrUUID().nss().value_or(NamespaceString()));
+        ASSERT_EQ(NamespaceString::kKeysCollectionNamespace, query->getNamespaceOrUUID().nss());
         ASSERT_BSONOBJ_EQ(expectedQuery, query->getFilter());
         ASSERT_BSONOBJ_EQ(BSON("expiresAt" << 1), query->getSort());
         ASSERT_FALSE(query->getLimit().has_value());
@@ -1274,10 +1293,10 @@ TEST_F(ShardingCatalogClientTest, GetNewKeysWithEmptyCollection) {
     repl::ReadConcernLevel readConcernLevel(repl::ReadConcernLevel::kMajorityReadConcern);
 
     auto future = launchAsync([this, purpose, currentTime, readConcernLevel] {
-        auto status =
-            catalogClient()->getNewKeys(operationContext(), purpose, currentTime, readConcernLevel);
-        ASSERT_OK(status.getStatus());
-        return status.getValue();
+        auto swKeys = catalogClient()->getNewInternalKeys(
+            operationContext(), purpose, currentTime, readConcernLevel);
+        ASSERT_OK(swKeys.getStatus());
+        return swKeys.getValue();
     });
 
     onFindCommand([this](const RemoteCommandRequest& request) {
@@ -1291,8 +1310,7 @@ TEST_F(ShardingCatalogClientTest, GetNewKeysWithEmptyCollection) {
             fromjson("{purpose: 'none',"
                      "expiresAt: {$gt: {$timestamp: {t: 1234, i: 5678}}}}"));
 
-        ASSERT_EQ(NamespaceString::kKeysCollectionNamespace,
-                  query->getNamespaceOrUUID().nss().value_or(NamespaceString()));
+        ASSERT_EQ(NamespaceString::kKeysCollectionNamespace, query->getNamespaceOrUUID().nss());
         ASSERT_BSONOBJ_EQ(expectedQuery, query->getFilter());
         ASSERT_BSONOBJ_EQ(BSON("expiresAt" << 1), query->getSort());
         ASSERT_FALSE(query->getLimit().has_value());

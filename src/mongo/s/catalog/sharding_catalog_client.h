@@ -29,21 +29,44 @@
 
 #pragma once
 
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/keys_collection_document_gen.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_index_catalog.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/index_version.h"
 #include "mongo/s/request_types/placement_history_commands_gen.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -52,13 +75,16 @@ class BSONArrayBuilder;
 class BSONObj;
 class BSONObjBuilder;
 class ChunkType;
+
 class CollectionType;
 class ConnectionString;
+
 class DatabaseType;
 class LogicalTime;
 class OperationContext;
 class ShardKeyPattern;
 class TagsType;
+
 class VersionType;
 
 namespace executor {
@@ -286,13 +312,20 @@ public:
                                                      repl::ReadConcernLevel readConcern) = 0;
 
     /**
-     * Returns keys for the given purpose and with an expiresAt value greater than newerThanThis.
+     * Returns internal keys for the given purpose and have an expiresAt value greater than
+     * newerThanThis.
      */
-    virtual StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
+    virtual StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
         StringData purpose,
         const LogicalTime& newerThanThis,
         repl::ReadConcernLevel readConcernLevel) = 0;
+
+    /**
+     * Returns all external (i.e. validation-only) keys for the given purpose.
+     */
+    virtual StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
+        OperationContext* opCtx, StringData purpose, repl::ReadConcernLevel readConcernLevel) = 0;
 
     /**
      * Directly inserts a document in the specified namespace on the config server. The document

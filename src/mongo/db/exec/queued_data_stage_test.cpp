@@ -33,15 +33,21 @@
 
 #include "mongo/db/exec/queued_data_stage.h"
 
-#include <boost/optional.hpp>
+#include <cstddef>
 #include <memory>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/tree_walker.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 
 using namespace mongo;
 

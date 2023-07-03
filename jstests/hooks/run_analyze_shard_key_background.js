@@ -153,9 +153,15 @@ function getLatestSampleQueryDocument() {
  * of the resulting metrics.
  */
 function analyzeShardKey(ns, shardKey, indexKey) {
-    jsTest.log(`Analyzing shard keys ${tojsononeline({ns, shardKey, indexKey})}`);
-
-    const res = conn.adminCommand({analyzeShardKey: ns, key: shardKey});
+    const cmdObj = {analyzeShardKey: ns, key: shardKey};
+    const rand = Math.random();
+    if (rand < 0.25) {
+        cmdObj.sampleRate = Math.random() * 0.5 + 0.5;
+    } else if (rand < 0.5) {
+        cmdObj.sampleSize = NumberLong(AnalyzeShardKeyUtil.getRandInteger(1000, 10000));
+    }
+    jsTest.log(`Analyzing shard keys ${tojsononeline({shardKey, indexKey, cmdObj})}`);
+    const res = conn.adminCommand(cmdObj);
 
     if (res.code == ErrorCodes.BadValue || res.code == ErrorCodes.IllegalOperation ||
         res.code == ErrorCodes.NamespaceNotFound ||
@@ -214,15 +220,27 @@ function analyzeShardKey(ns, shardKey, indexKey) {
               `shard key values got deleted while the command was running. ${tojsononeline(res)}`);
         return res;
     }
+    if (res.code == 7826501) {
+        print(`Failed to analyze the shard key because $collStats indicates that the collection ` +
+              `is empty. ${tojsononeline(res)}`);
+        return res;
+    }
+    if (res.code == 7826505) {
+        print(`Failed to analyze the shard key because the collection becomes empty during the ` +
+              `step for calculating the monotonicity metrics. ${tojsononeline(res)}`);
+        return res;
+    }
+    if (res.code == 7826506 || res.code == 7826507) {
+        print(`Failed to analyze the shard key because the collection becomes empty during the ` +
+              `step for calculating the cardinality and frequency metrics. ${tojsononeline(res)}`);
+        return res;
+    }
 
     assert.commandWorked(res);
     jsTest.log(`Finished analyzing the shard key: ${tojsononeline(res)}`);
 
-    // The response should only contain the "numDocs" field if it also contains the fields about the
-    // characteristics of the shard key (e.g. "numDistinctValues" and "mostCommonValues") since the
-    // number of documents is just a supporting metric for those metrics.
-    if (res.hasOwnProperty("numDocs")) {
-        AnalyzeShardKeyUtil.assertContainKeyCharacteristicsMetrics(res);
+    if (res.hasOwnProperty("keyCharacteristics")) {
+        AnalyzeShardKeyUtil.validateKeyCharacteristicsMetrics(res.keyCharacteristics);
     } else {
         AnalyzeShardKeyUtil.assertNotContainKeyCharacteristicsMetrics(res);
     }

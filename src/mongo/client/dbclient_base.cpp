@@ -32,45 +32,55 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/client/dbclient_base.h"
-
-#include <algorithm>
+#include <boost/cstdint.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <limits>
+#include <ostream>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/bson/util/builder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
-#include "mongo/client/constants.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/config.h"
+#include "mongo/client/internal_auth.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/api_parameters_gen.h"
-#include "mongo/db/auth/validated_tenancy_scope.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/json.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cursor_id.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/kill_cursors_gen.h"
-#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
-#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_options.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
@@ -302,11 +312,11 @@ BSONObj DBClientBase::_countCmd(const NamespaceStringOrUUID nsOrUuid,
                                 int skip,
                                 boost::optional<BSONObj> readConcernObj) {
     BSONObjBuilder b;
-    if (nsOrUuid.uuid()) {
-        const auto uuid = *nsOrUuid.uuid();
+    if (nsOrUuid.isUUID()) {
+        const auto uuid = nsOrUuid.uuid();
         uuid.appendToBuilder(&b, "count");
     } else {
-        b.append("count", (*nsOrUuid.nss()).coll());
+        b.append("count", nsOrUuid.nss().coll());
     }
     b.append("query", query);
     if (limit)
@@ -453,7 +463,7 @@ void DBClientBase::logout(const string& dbname, BSONObj& info) {
 
 bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
     BSONObjBuilder bob;
-    bob.append(_apiParameters.getVersion() ? "hello" : "ismaster", 1);
+    bob.append("hello", 1);
     if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
         WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
     }
@@ -462,8 +472,7 @@ bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
     if (info == nullptr)
         info = &o;
     bool ok = runCommand(DatabaseName::kAdmin, bob.obj(), *info);
-    isPrimary =
-        info->getField(_apiParameters.getVersion() ? "isWritablePrimary" : "ismaster").trueValue();
+    isPrimary = info->getField("isWritablePrimary").trueValue();
     return ok;
 }
 
@@ -473,7 +482,7 @@ bool DBClientBase::createCollection(const NamespaceString& nss,
                                     int max,
                                     BSONObj* info,
                                     boost::optional<BSONObj> writeConcernObj) {
-    verify(!capped || size);
+    MONGO_verify(!capped || size);
     BSONObj o;
     if (info == nullptr)
         info = &o;
@@ -751,11 +760,11 @@ namespace {
  */
 BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid, bool includeBuildUUIDs) {
     BSONObjBuilder bob;
-    if (nsOrUuid.nss()) {
-        bob.append("listIndexes", (*nsOrUuid.nss()).coll());
+    if (nsOrUuid.isNamespaceString()) {
+        bob.append("listIndexes", nsOrUuid.nss().coll());
         bob.append("cursor", BSONObj());
     } else {
-        const auto uuid = (*nsOrUuid.uuid());
+        const auto& uuid = nsOrUuid.uuid();
         uuid.appendToBuilder(&bob, "listIndexes");
         bob.append("cursor", BSONObj());
     }
@@ -796,8 +805,8 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
         if (id != 0) {
             const auto cursorNs =
                 NamespaceStringUtil::deserialize(dbName.tenantId(), cursorObj["ns"].String());
-            if (nsOrUuid.nss()) {
-                invariant((*nsOrUuid.nss()) == cursorNs);
+            if (nsOrUuid.isNamespaceString()) {
+                invariant(nsOrUuid.nss() == cursorNs);
             }
             unique_ptr<DBClientCursor> cursor = getMore(cursorNs, id);
             while (cursor->more()) {
@@ -815,7 +824,7 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
 
     // "NamespaceNotFound" is an error for UUID but returns an empty list for NamespaceString; this
     // matches the behavior for other commands such as 'find' and 'count'.
-    if (nsOrUuid.nss() && status.code() == ErrorCodes::NamespaceNotFound) {
+    if (nsOrUuid.isNamespaceString() && status.code() == ErrorCodes::NamespaceNotFound) {
         return specs;
     }
     uassertStatusOK(status.withContext(str::stream() << "listIndexes failed: " << res));

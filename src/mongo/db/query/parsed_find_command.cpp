@@ -29,16 +29,31 @@
 
 #include "mongo/db/query/parsed_find_command.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
-namespace mongo::parsed_find_command {
+namespace mongo {
 
 namespace {
 /**
@@ -58,22 +73,6 @@ bool hasNodeInSubtree(const MatchExpression* root,
     return false;
 }
 
-SortPattern initSortPattern(const std::unique_ptr<FindCommandRequest>& findCommand,
-                            const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    // A $natural sort is really a hint, and should be handled as such. Furthermore, the downstream
-    // sort handling code may not expect a $natural sort.
-    //
-    // We have already validated that if there is a $natural sort and a hint, that the hint
-    // also specifies $natural with the same direction. Therefore, it is safe to clear the $natural
-    // sort and rewrite it as a $natural hint.
-    if (findCommand->getSort()[query_request_helper::kNaturalSortField]) {
-        findCommand->setHint(findCommand->getSort().getOwned());
-        findCommand->setSort(BSONObj{});
-    }
-
-    return {findCommand->getSort(), expCtx};
-}
-
 std::unique_ptr<CollatorInterface> resolveCollator(
     OperationContext* opCtx, const std::unique_ptr<FindCommandRequest>& findCommand) {
     if (!findCommand->getCollation().isEmpty()) {
@@ -83,6 +82,89 @@ std::unique_ptr<CollatorInterface> resolveCollator(
     }
     return nullptr;
 }
+
+/**
+ * Helper for building 'out.' If there is a projection, parse it and add any metadata dependencies
+ * it induces.
+ *
+ * Throws exceptions if there is an error parsing the projection.
+ */
+void setProjection(ParsedFindCommand* out,
+                   const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                   const std::unique_ptr<FindCommandRequest>& findCommand,
+                   const ProjectionPolicies& policies) {
+    if (!findCommand->getProjection().isEmpty()) {
+        out->savedProjectionPolicies.emplace(policies);
+        out->proj.emplace(projection_ast::parseAndAnalyze(expCtx,
+                                                          findCommand->getProjection(),
+                                                          out->filter.get(),
+                                                          findCommand->getFilter(),
+                                                          policies));
+
+        // This will throw if any of the projection's dependencies are unavailable.
+        DepsTracker{out->unavailableMetadata}.requestMetadata(out->proj->metadataDeps());
+    }
+}
+
+/**
+ * Helper for building 'out.' If there is a sort, parse it and add any metadata dependencies it
+ * induces.
+ *
+ * Throws exceptions if there is an error parsing the sort pattern.
+ */
+void setSort(ParsedFindCommand* out,
+             const boost::intrusive_ptr<ExpressionContext>& expCtx,
+             const std::unique_ptr<FindCommandRequest>& findCommand) {
+    if (!findCommand->getSort().isEmpty()) {
+        // A $natural sort is really a hint, and should be handled as such. Furthermore, the
+        // downstream sort handling code may not expect a $natural sort.
+        //
+        // We have already validated that if there is a $natural sort and a hint, that the hint
+        // also specifies $natural with the same direction. Therefore, it is safe to clear the
+        // $natural sort and rewrite it as a $natural hint.
+        if (findCommand->getSort()[query_request_helper::kNaturalSortField]) {
+            findCommand->setHint(findCommand->getSort().getOwned());
+            findCommand->setSort(BSONObj{});
+        }
+        out->sort.emplace(findCommand->getSort(), expCtx);
+    }
+}
+
+/**
+ * Helper for building 'out.' If there is a sort, parse it and add any metadata dependencies it
+ * induces.
+ */
+Status setSortAndProjection(ParsedFindCommand* out,
+                            const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            const std::unique_ptr<FindCommandRequest>& findCommand,
+                            const ProjectionPolicies& policies) {
+    try {
+        setProjection(out, expCtx, findCommand, policies);
+        setSort(out, expCtx, findCommand);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+
+    return Status::OK();
+}
+
+/**
+ * Helper for building 'out.' Sets 'out->filter' and validates that it is well formed. In the
+ * process, also populates 'out->unavailableMetadata.'
+ */
+Status setFilter(ParsedFindCommand* out,
+                 std::unique_ptr<MatchExpression> filter,
+                 const std::unique_ptr<FindCommandRequest>& findCommand) {
+    // Verify the filter follows certain rules like there must be at most one text clause.
+    auto swMeta = parsed_find_command::isValid(filter.get(), *findCommand);
+    if (!swMeta.isOK()) {
+        return swMeta.getStatus();
+    }
+    out->unavailableMetadata = swMeta.getValue();
+    out->filter = std::move(filter);
+    return Status::OK();
+}
+
 
 StatusWith<std::unique_ptr<ParsedFindCommand>> parseWithValidatedCollator(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -104,42 +186,18 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> parseWithValidatedCollator(
         return statusWithMatcher.getStatus();
     }
 
-    out->filter = std::move(statusWithMatcher.getValue());
     // Stop counting expressions after they have been parsed to exclude expressions created
     // during optimization and other processing steps.
     expCtx->stopExpressionCounters();
 
-    // Verify the filter follows certain rules like there must be at most one text clause.
-    auto swMeta = isValid(out->filter.get(), *findCommand);
-    if (!swMeta.isOK()) {
-        return swMeta.getStatus();
-    }
-    out->unavailableMetadata = swMeta.getValue();
-
-    // Validate the projection if there is one.
-    if (!findCommand->getProjection().isEmpty()) {
-        try {
-            out->savedProjectionPolicies.emplace(projectionPolicies);
-            out->proj.emplace(projection_ast::parseAndAnalyze(expCtx,
-                                                              findCommand->getProjection(),
-                                                              out->filter.get(),
-                                                              findCommand->getFilter(),
-                                                              projectionPolicies));
-
-            // Fail if any of the projection's dependencies are unavailable.
-            DepsTracker{out->unavailableMetadata}.requestMetadata(out->proj->metadataDeps());
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
+    if (auto status = setFilter(out.get(), std::move(statusWithMatcher.getValue()), findCommand);
+        !status.isOK()) {
+        return status;
     }
 
-    // If there is a sort, parse it and add any metadata dependencies it induces.
-    if (!findCommand->getSort().isEmpty()) {
-        try {
-            out->sort.emplace(initSortPattern(findCommand, expCtx));
-        } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
+    if (auto status = setSortAndProjection(out.get(), expCtx, findCommand, projectionPolicies);
+        !status.isOK()) {
+        return status;
     }
 
     out->findCommandRequest = std::move(findCommand);
@@ -148,6 +206,26 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> parseWithValidatedCollator(
 
 }  // namespace
 
+StatusWith<std::unique_ptr<ParsedFindCommand>> ParsedFindCommand::withExistingFilter(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::unique_ptr<CollatorInterface> collator,
+    std::unique_ptr<MatchExpression> filter,
+    std::unique_ptr<FindCommandRequest> findCommandRequest) {
+    auto out = std::make_unique<ParsedFindCommand>();
+    out->collator = std::move(collator);
+    if (auto status = setFilter(out.get(), std::move(filter), findCommandRequest); !status.isOK()) {
+        return status;
+    }
+    if (auto status = setSortAndProjection(
+            out.get(), expCtx, findCommandRequest, ProjectionPolicies::findProjectionPolicies());
+        !status.isOK()) {
+        return status;
+    }
+    out->findCommandRequest = std::move(findCommandRequest);
+    return std::move(out);
+}
+
+namespace parsed_find_command {
 StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
                                         const FindCommandRequest& findCommand) {
     QueryMetadataBitSet unavailableMetadata{};
@@ -257,7 +335,7 @@ parse(OperationContext* opCtx,
       MatchExpressionParser::AllowedFeatureSet allowedFeatures,
       const ProjectionPolicies& projectionPolicies) {
     // Make the expCtx.
-    invariant(findCommand->getNamespaceOrUUID().nss());
+    invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, *findCommand, resolveCollator(opCtx, findCommand), true /* mayDbProfile */);
     auto swResult = parseWithValidatedCollator(
@@ -285,4 +363,5 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> parse(
     return parseWithValidatedCollator(
         expCtx, std::move(findCommand), extensionsCallback, allowedFeatures, projectionPolicies);
 }
-}  // namespace mongo::parsed_find_command
+}  // namespace parsed_find_command
+}  // namespace mongo

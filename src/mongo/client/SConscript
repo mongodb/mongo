@@ -85,7 +85,7 @@ saslClientSource = [
     'sasl_client_conversation.cpp',
     'sasl_client_session.cpp',
     'sasl_oidc_client_conversation.cpp',
-    'sasl_oidc_client_params.idl',
+    'sasl_oidc_client_types.idl',
     'sasl_plain_client_conversation.cpp',
     'sasl_scram_client_conversation.cpp',
 ]

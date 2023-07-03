@@ -1,12 +1,21 @@
 load("jstests/libs/analyze_plan.js");
 
 /**
- * Utility for checking if the query optimizer is enabled.
+ * Utility for checking if the Cascades optimizer code path is enabled (checks framework control).
  */
 function checkCascadesOptimizerEnabled(theDB) {
-    const param = theDB.adminCommand({getParameter: 1, featureFlagCommonQueryFramework: 1});
-    return param.hasOwnProperty("featureFlagCommonQueryFramework") &&
-        param.featureFlagCommonQueryFramework.value;
+    const val = theDB.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1})
+                    .internalQueryFrameworkControl;
+    return val == "tryBonsai" || val == "tryBonsaiExperimental" || val == "forceBonsai";
+}
+
+/**
+ * Utility for checking if the Cascades optimizer feature flag is on.
+ */
+function checkCascadesFeatureFlagEnabled(theDB) {
+    const featureFlag = theDB.adminCommand({getParameter: 1, featureFlagCommonQueryFramework: 1});
+    return featureFlag.hasOwnProperty("featureFlagCommonQueryFramework") &&
+        featureFlag.featureFlagCommonQueryFramework.value;
 }
 
 /**

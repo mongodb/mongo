@@ -29,7 +29,20 @@
 
 #pragma once
 
+#include <cmath>
+#include <limits>
+#include <string>
+#include <utility>
+
 #include "expression.h"
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_visitor.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

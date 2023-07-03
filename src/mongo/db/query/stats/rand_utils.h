@@ -29,9 +29,17 @@
 
 #pragma once
 
+#include <cstddef>
+#include <map>
+#include <memory>
 #include <random>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/value_utils.h"
 
 namespace mongo::stats {

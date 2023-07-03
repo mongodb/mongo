@@ -27,20 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/transport/message_compressor_registry.h"
-
+#include <algorithm>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <memory>
+#include <ostream>
+#include <utility>
 
-#include "mongo/base/init.h"
+#include <absl/container/flat_hash_map.h>
+// IWYU pragma: no_include "boost/algorithm/string/detail/classification.hpp"
+#include <boost/core/addressof.hpp>
+#include <boost/function/function_base.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/type_index/type_index_facade.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/transport/message_compressor_noop.h"
-#include "mongo/transport/message_compressor_snappy.h"
-#include "mongo/transport/message_compressor_zlib.h"
-#include "mongo/transport/message_compressor_zstd.h"
-#include "mongo/util/options_parser/option_section.h"
+#include "mongo/transport/message_compressor_registry.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {

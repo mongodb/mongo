@@ -29,15 +29,28 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <climits>  // For UINT_MAX
+#include <functional>
+#include <limits>
+#include <string>
+#include <thread>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/concurrency/lock_manager.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_stats.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -57,7 +70,7 @@ class Locker {
 public:
     using LockTimeoutCallback = std::function<void()>;
 
-    virtual ~Locker();
+    virtual ~Locker() = default;
 
     /**
      * Returns true if this is an instance of LockerNoop. Because LockerNoop doesn't implement many
@@ -163,7 +176,7 @@ public:
     /**
      * Decrements the reference count on the global lock.  If the reference count on the
      * global lock hits zero, the transaction is over, and unlockGlobal unlocks all other locks
-     * except for RESOURCE_MUTEX locks.
+     * except for RESOURCE_MUTEX and RESOURCE_DDL_* locks.
      *
      * @return true if this is the last endTransaction call (i.e., the global lock was
      *          released); false if there are still references on the global lock. This value
@@ -389,8 +402,8 @@ public:
     virtual bool canSaveLockState() = 0;
 
     /**
-     * Retrieves all locks held by this transaction, other than RESOURCE_MUTEX locks, and what mode
-     * they're held in.
+     * Retrieves all locks held by this transaction, other than RESOURCE_MUTEX and RESOURCE_DDL_*
+     * locks, and what mode they're held in.
      *
      * Unlocks all locks held by this transaction, and stores them in 'stateOut'. This functionality
      * is used for yielding, which is voluntary/cooperative lock release and reacquisition in order

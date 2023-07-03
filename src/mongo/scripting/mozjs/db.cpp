@@ -27,21 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/scripting/mozjs/db.h"
-
+#include <js/RootingAPI.h>
 #include <js/ValueArray.h>
+#include <jsapi.h>
 #include <jsfriendapi.h>
+#include <string>
 
+#include <js/CallArgs.h>
+#include <js/TypeDecls.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/scripting/mozjs/db.h"
+#include "mongo/scripting/mozjs/dbcollection.h"
 #include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
+#include "mongo/scripting/mozjs/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace mozjs {

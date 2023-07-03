@@ -28,11 +28,27 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
 #include <cmath>
+#include <initializer_list>
+#include <iterator>
+#include <limits>
 #include <memory>
+#include <queue>
+#include <string>
+#include <utility>
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
@@ -42,10 +58,18 @@
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/random.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -1745,12 +1769,9 @@ Value parseAndSerializeAccumExpr(
     std::function<boost::intrusive_ptr<Expression>(
         ExpressionContext* expCtx, BSONElement, const VariablesParseState&)> func) {
     SerializationOptions options;
-    // TODO SERVER-75399 Use only 'literalPolicy.'
-    std::string replacementChar = "?";
-    options.replacementForLiteralArgs = replacementChar;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.applyHmacToIdentifiers = true;
-    options.identifierHmacPolicy = applyHmacForTest;
+    options.transformIdentifiers = true;
+    options.transformIdentifiersCallback = applyHmacForTest;
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto expr = func(expCtx.get(), obj.firstElement(), expCtx->variablesParseState);
     return expr->serialize(options);
@@ -1761,12 +1782,9 @@ Document parseAndSerializeAccum(
     std::function<AccumulationExpression(
         ExpressionContext* const expCtx, BSONElement, VariablesParseState)> func) {
     SerializationOptions options;
-    // TODO SERVER-75399 Use only 'literalPolicy.'
-    std::string replacementChar = "?";
-    options.replacementForLiteralArgs = replacementChar;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.applyHmacToIdentifiers = true;
-    options.identifierHmacPolicy = applyHmacForTest;
+    options.transformIdentifiers = true;
+    options.transformIdentifiersCallback = applyHmacForTest;
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     VariablesParseState vps = expCtx->variablesParseState;
 
@@ -1792,14 +1810,14 @@ TEST(Accumulators, SerializeWithRedaction) {
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
         R"({
             "$accumulator": {
-                "init": "?",
+                "init": "?string",
                 "initArgs": "[]",
-                "accumulate": "?",
+                "accumulate": "?string",
                 "accumulateArgs": [
                     "$HASH<a>",
                     "$HASH<b>"
                 ],
-                "merge": "?",
+                "merge": "?string",
                 "lang": "js"
             }
         })",
@@ -1814,12 +1832,7 @@ TEST(Accumulators, SerializeWithRedaction) {
         R"({
             "$topN": {
                 "n": "?number",
-                "output": {
-                    "HASH<output>": "$HASH<output>",
-                    "HASH<sortFields>": [
-                        "$HASH<sortKey>"
-                    ]
-                },
+                "output": "$HASH<output>",
                 "sortBy": {
                     "HASH<sortKey>": 1
                 }
@@ -1873,12 +1886,7 @@ TEST(Accumulators, SerializeWithRedaction) {
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
         R"({
             "$top": {
-                "output": {
-                    "HASH<output>": "$HASH<b>",
-                    "HASH<sortFields>": [
-                        "$HASH<sales>"
-                    ]
-                },
+                "output": "$HASH<b>",
                 "sortBy": {
                     "HASH<sales>": 1
                 }
@@ -1917,7 +1925,7 @@ TEST(Accumulators, SerializeWithRedaction) {
     actual = parseAndSerializeAccum(internalJsReduce.firstElement(),
                                     &AccumulatorInternalJsReduce::parseInternalJsReduce);
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
-        R"({"$_internalJsReduce":{"data":"$HASH<emits>","eval":"?"}})",
+        R"({"$_internalJsReduce":{"data":"$HASH<emits>","eval":"?string"}})",
         actual);
 }
 

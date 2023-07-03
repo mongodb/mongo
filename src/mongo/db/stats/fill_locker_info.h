@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/locker.h"
 
 namespace mongo {

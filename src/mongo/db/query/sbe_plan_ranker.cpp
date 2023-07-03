@@ -27,9 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo::sbe::plan_ranker {
 namespace {

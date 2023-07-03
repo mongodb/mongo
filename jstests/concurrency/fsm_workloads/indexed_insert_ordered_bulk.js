@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * indexed_insert_ordered_bulk.js
  *
@@ -8,10 +6,10 @@
  *
  * Uses an ordered, bulk operation to perform the inserts.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
-load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_base.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.indexedField = 'indexed_insert_ordered_bulk';
     $config.data.shardKey = {};
     $config.data.shardKey[$config.data.indexedField] = 1;

@@ -29,21 +29,56 @@
 
 #include "mongo/db/s/collection_sharding_runtime.h"
 
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <tuple>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/sbe_plan_cache.h"
-#include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/stale_exception.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -537,7 +572,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 void CollectionShardingRuntime::appendShardVersion(BSONObjBuilder* builder) const {
     auto optCollDescr = getCurrentMetadataIfKnown();
     if (optCollDescr) {
-        BSONObjBuilder versionBuilder(builder->subobjStart(_nss.ns()));
+        BSONObjBuilder versionBuilder(builder->subobjStart(NamespaceStringUtil::serialize(_nss)));
         versionBuilder.appendTimestamp("placementVersion",
                                        optCollDescr->getShardPlacementVersion().toLong());
         versionBuilder.append("timestamp", optCollDescr->getShardPlacementVersion().getTimestamp());

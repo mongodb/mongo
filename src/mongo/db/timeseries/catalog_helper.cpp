@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/none.hpp>
+#include <memory>
 
-#include "mongo/db/timeseries/catalog_helper.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/timeseries/catalog_helper.h"
 
 namespace mongo {
 

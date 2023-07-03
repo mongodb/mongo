@@ -29,15 +29,24 @@
 
 #pragma once
 
-#include "mongo/util/functional.h"
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/s/sharding_index_catalog_cache.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

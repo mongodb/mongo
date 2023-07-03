@@ -1,11 +1,9 @@
-'use strict';
-
 /**
  * update_rename.js
  *
  * Each thread does a $rename to cause documents to jump between indexes.
  */
-var $config = (function() {
+export const $config = (function() {
     var fieldNames = ['update_rename_x', 'update_rename_y', 'update_rename_z'];
 
     function choose(array) {

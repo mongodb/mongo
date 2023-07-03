@@ -28,11 +28,31 @@
  */
 #pragma once
 
+#include <deque>
 #include <memory>
+#include <mutex>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/baton.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::executor {
 

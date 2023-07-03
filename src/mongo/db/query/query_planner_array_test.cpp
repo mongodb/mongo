@@ -27,12 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <vector>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/query/query_planner.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace {
 
@@ -2110,13 +2118,13 @@ TEST_F(QueryPlannerTest, CanHoistNegatedPredFromElemMatchIntoSiblingOrWithMultik
         "{fetch: {filter: {arr: {$elemMatch: {a: {$ne: 1}, b: {$in: [2, 3]}}}},"
         "node: {"
         "  or: {nodes: ["
-        "    {fetch: {filter: {a: {$ne: 1}},"
+        "    {fetch: {filter: {'arr.a': {$ne: 1}},"
         "     node: {ixscan: {pattern: {'arr.a': 1, 'arr.b': 1, c: 1, d: 1},"
         "     bounds: {'arr.a': [['MinKey', 1, true, false], [1, 'MaxKey', false, true]],"
         "              'arr.b': [[2, 2, true, true], [3, 3, true, true]],"
         "              c: [[4, 4, true, true]],"
         "              d: [[5, 5, true, true]]}}}}},"
-        "    {fetch: {filter: {a: {$ne: 1}},"
+        "    {fetch: {filter: {'arr.a': {$ne: 1}},"
         "     node: {ixscan: {pattern: {'arr.a': 1, 'arr.b': 1, c: 1, d: 1},"
         "     bounds: {'arr.a': [['MinKey', 1, true, false],[1, 'MaxKey', false, true]],"
         "              'arr.b': [[2, 2, true, true], [3, 3, true, true]],"

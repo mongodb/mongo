@@ -1,6 +1,6 @@
 # Linters
 # Note: These versions are checked by python modules in buildscripts/linter/
-GitPython ~= 3.1.7
+GitPython ~= 3.1.31
 mypy ~= 0.942
 pydocstyle == 6.1.1
 pylint == 2.7.2

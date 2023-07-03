@@ -28,46 +28,98 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <mutex>
+#include <tuple>
+#include <vector>
 
-#include "mongo/db/s/sharding_initialization_mongod.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/catalog_shard_feature_flag_gen.h"
+#include "mongo/db/client.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/keys_collection_client.h"
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/update_result.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
+#include "mongo/db/s/sharding_initialization_mongod.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_factory.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_initialization.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -361,7 +413,7 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
                              "queryableBackupMode. If not in queryableBackupMode, you can edit "
                              "the shardIdentity document by starting the server *without* "
                              "--shardsvr, manually updating the shardIdentity document in the "
-                          << NamespaceString::kServerConfigurationNamespace.toString()
+                          << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg()
                           << " collection, and restarting the server with --shardsvr.",
             serverGlobalParams.overrideShardIdentity.isEmpty());
 
@@ -438,7 +490,6 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
     const auto& configSvrConnStr = shardIdentity.getConfigsvrConnectionString();
 
     auto const shardingState = ShardingState::get(opCtx);
-    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     hangDuringShardingInitialization.pauseWhileSet();
 
@@ -454,6 +505,7 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
 
         // If run on a config server, we may not know our connection string yet.
         if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
             auto prevConfigsvrConnStr = shardRegistry->getConfigServerConnectionString();
             uassert(
                 40373,
@@ -570,8 +622,6 @@ void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCt
 
     const auto service = opCtx->getServiceContext();
 
-    ShardingInitializationMongoD::get(opCtx)->installReplicaSetChangeListener(service);
-
     auto configCS = []() -> boost::optional<ConnectionString> {
         if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
             // When the config server can operate as a shard, it sets up a ShardRemote for the
@@ -600,6 +650,8 @@ void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCt
     }
 
     initializeGlobalShardingStateForMongoD(opCtx, configCS);
+
+    ShardingInitializationMongoD::get(opCtx)->installReplicaSetChangeListener(service);
 
     // ShardLocal to use for explicitly local commands on the config server.
     auto localConfigShard = Grid::get(opCtx)->shardRegistry()->createLocalConfigShard();
@@ -706,8 +758,6 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
     OperationContext* opCtx, const ShardIdentity& shardIdentity) {
     auto const service = opCtx->getServiceContext();
 
-    installReplicaSetChangeListener(service);
-
     // Determine primary/secondary/standalone state in order to properly initialize sharding
     // components.
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -727,6 +777,24 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
 
         initializeGlobalShardingStateForMongoD(opCtx,
                                                {shardIdentity.getConfigsvrConnectionString()});
+
+        installReplicaSetChangeListener(service);
+
+        // Reset the shard register config connection string in case it missed the replica set
+        // monitor notification. Config server does not need to do this since it gets the connection
+        // string directly from the replication coordinator.
+        auto configShardConnStr = Grid::get(opCtx->getServiceContext())
+                                      ->shardRegistry()
+                                      ->getConfigServerConnectionString();
+        if (configShardConnStr.type() == ConnectionString::ConnectionType::kReplicaSet) {
+            ConnectionString rsMonitorConfigConnStr(
+                ReplicaSetMonitor::get(configShardConnStr.getSetName())->getServerAddress(),
+                ConnectionString::ConnectionType::kReplicaSet);
+            Grid::get(opCtx->getServiceContext())
+                ->shardRegistry()
+                ->updateReplSetHosts(rsMonitorConfigConnStr,
+                                     ShardRegistry::ConnectionStringUpdateType::kConfirmed);
+        }
 
         CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
 

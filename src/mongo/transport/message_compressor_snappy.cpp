@@ -27,16 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <memory>
+#include <snappy.h>
+#include <string>
 
-#include "mongo/base/data_range_cursor.h"
-#include "mongo/base/init.h"
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/message_compressor_snappy.h"
-
-#include <snappy.h>
 
 namespace mongo {
 

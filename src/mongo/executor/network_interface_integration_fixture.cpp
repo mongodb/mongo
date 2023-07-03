@@ -28,10 +28,19 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+// IWYU pragma: no_include "cxxabi.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
 #include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -39,10 +48,15 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/future.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future_impl.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kASIO
 

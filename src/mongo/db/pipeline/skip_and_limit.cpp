@@ -27,12 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <list>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/exact_cast.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
+#include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/platform/overflow_arithmetic.h"
 
 namespace mongo {

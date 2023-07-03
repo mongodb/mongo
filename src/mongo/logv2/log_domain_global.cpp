@@ -30,24 +30,49 @@
 
 #include "log_domain_global.h"
 
-#include "mongo/config.h"
+#include <boost/core/null_deleter.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstdint>
+#include <iosfwd>
+#include <utility>
+#include <vector>
+
+#include <boost/exception/exception.hpp>
+#include <boost/log/core/core.hpp>
+// IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
+// IWYU pragma: no_include "boost/log/detail/locking_ptr.hpp"
+#include <boost/log/keywords/facility.hpp>
+#include <boost/log/keywords/use_impl.hpp>
+#include <boost/log/sinks/attribute_mapping.hpp>
+#include <boost/log/sinks/syslog_backend.hpp>
+#include <boost/log/sinks/syslog_constants.hpp>
+#include <boost/log/sinks/text_ostream_backend.hpp>
+#include <boost/log/sinks/unlocked_frontend.hpp>
+#include <boost/parameter/keyword.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/make_shared_object.hpp>
+#include <boost/smart_ptr/shared_ptr.hpp>
+#include <boost/thread/exceptions.hpp>
+
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/logv2/attributes.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/composite_backend.h"
 #include "mongo/logv2/console.h"
 #include "mongo/logv2/file_rotate_sink.h"
 #include "mongo/logv2/json_formatter.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_source.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/plain_formatter.h"
+#include "mongo/logv2/ramlog.h"
 #include "mongo/logv2/ramlog_sink.h"
-#include "mongo/logv2/shared_access_fstream.h"
 #include "mongo/logv2/tagged_severity_filter.h"
-#include "mongo/logv2/text_formatter.h"
 #include "mongo/logv2/uassert_sink.h"
-
-#include <boost/core/null_deleter.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/log/core.hpp>
-#include <boost/log/sinks.hpp>
+#include "mongo/util/assert_util_core.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

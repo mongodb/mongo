@@ -33,7 +33,7 @@
 
 #include <dlfcn.h>
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
 
 namespace mongo {

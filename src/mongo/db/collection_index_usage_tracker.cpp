@@ -30,10 +30,14 @@
 
 #include "mongo/db/collection_index_usage_tracker.h"
 
-#include <atomic>
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 

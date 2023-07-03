@@ -27,24 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/crypto/fle_crypto.h"
-
 #include <algorithm>
-#include <boost/algorithm/string/replace.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
+#include <boost/multiprecision/number.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <climits>
 #include <cstdint>
+#include <initializer_list>
 #include <iostream>
+#include <iterator>
 #include <limits>
-#include <sstream>
 #include <stack>
 #include <string>
 #include <tuple>
 #include <vector>
 
 #include "mongo/base/data_range.h"
-#include "mongo/base/data_type_validated.h"
 #include "mongo/base/error_codes.h"
+#include "mongo/base/secure_allocator.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -52,21 +58,24 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/crypto/aead_encryption.h"
+#include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/crypto/fle_fields_util.h"
 #include "mongo/crypto/symmetric_crypto.h"
-#include "mongo/db/matcher/schema/encrypt_schema_gen.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/shell/kms_gen.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/time_support.h"

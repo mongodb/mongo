@@ -28,34 +28,61 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/mirror_maestro.h"
-
-#include "mongo/rpc/get_status_from_command_result.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
 #include <cmath>
-#include <cstdlib>
+#include <memory>
+#include <mutex>
+#include <string>
 #include <utility>
+#include <vector>
 
-#include <fmt/format.h>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/client.h"
 #include "mongo/db/client_out_of_line_executor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/mirror_maestro.h"
 #include "mongo/db/mirror_maestro_gen.h"
 #include "mongo/db/mirroring_sampler.h"
-#include "mongo/db/repl/hello_response.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/topology_version_observer.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/executor/connection_pool.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/platform/random.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -399,6 +426,10 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
         // Limit the maxTimeMS
         bob.append("maxTimeMS", params.getMaxTimeMS());
 
+        if (invocation->ns().tenantId()) {
+            invocation->ns().tenantId()->serializeToBSON("$tenant", &bob);
+        }
+
         // Indicate that this is a mirrored read.
         bob.append("mirrored", true);
 
@@ -563,6 +594,7 @@ void MirrorMaestroImpl::shutdown() noexcept {
 
     if (_executor) {
         _executor->shutdown();
+        _executor->join();
     }
 
     // Set _initGuard.liveness to kShutdown

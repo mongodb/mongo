@@ -27,14 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/concurrency/locker_impl_client_observer.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/store_possible_cursor.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -49,7 +59,7 @@ class StorePossibleCursorTest : public ServiceContextTest {
 protected:
     StorePossibleCursorTest() : _manager(&_clockSourceMock) {
         auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
         _opCtx = makeOperationContext();
     }
 
@@ -85,7 +95,8 @@ TEST_F(StorePossibleCursorTest, ReturnsValidCursorResponse) {
 
     auto parsedOutgoingResponse = CursorResponse::parseFromBSON(outgoingCursorResponse.getValue());
     ASSERT_OK(parsedOutgoingResponse.getStatus());
-    ASSERT_EQ(nss.toString(), parsedOutgoingResponse.getValue().getNSS().toString());
+    ASSERT_EQ(nss.toString_forTest(),
+              parsedOutgoingResponse.getValue().getNSS().toString_forTest());
     ASSERT_EQ(0U, parsedOutgoingResponse.getValue().getCursorId());
     ASSERT_EQ(2U, parsedOutgoingResponse.getValue().getBatch().size());
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), parsedOutgoingResponse.getValue().getBatch()[0]);

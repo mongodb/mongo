@@ -27,19 +27,37 @@
  *    it in the license file.
  */
 
+#include <functional>
+#include <initializer_list>
+#include <set>
+#include <utility>
+#include <variant>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/db/query/fle/encrypted_predicate_test_fixtures.h"
 #include "mongo/db/query/fle/range_predicate.h"
-#include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo::fle {
 namespace {

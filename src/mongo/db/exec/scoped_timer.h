@@ -31,7 +31,9 @@
 
 #include "mongo/stdx/variant.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/system_tick_source.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -55,10 +57,10 @@ public:
 private:
     // Reference to the counter that we are incrementing with the elapsed time.
     Nanoseconds* const _counter;
-    TickSource* _tickSource = nullptr;
-    ClockSource* _clockSource = nullptr;
+    TickSource* _tickSource;
+    ClockSource* _clockSource;
 
     Date_t _startCS;
-    TickSource::Tick _startTS = 0;
+    TickSource::Tick _startTS;
 };
 }  // namespace mongo

@@ -27,10 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <absl/container/inlined_vector.h>
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/makeobj.h"
+#include "mongo/db/exec/sbe/stages/project.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::sbe {
 class MkObjStageTest : public PlanStageTestFixture {

@@ -115,6 +115,7 @@ env.Library(
         'shell_options_storage',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/client/sasl_client',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
 )
@@ -210,8 +211,9 @@ if get_option('ssl') == 'on':
                 # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
                 '-Wno-unknown-warning-option',
                 '-Wno-class-memaccess',
+                # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
+                '-Wno-deprecated',
             ], )
-
         scriptingEnv.InjectMozJS()
 
         scriptingEnv.Library(
@@ -274,6 +276,7 @@ if not has_option('noshell') and jsEngine:
             "$BUILD_DIR/mongo/db/query/command_request_response",
             "$BUILD_DIR/mongo/db/query/query_request",
             "$BUILD_DIR/mongo/db/server_base",
+            "$BUILD_DIR/mongo/db/service_context_non_d",
             "$BUILD_DIR/mongo/db/session/logical_session_id_helpers",
             "$BUILD_DIR/mongo/db/storage/duplicate_key_error_info",
             "$BUILD_DIR/mongo/db/traffic_reader",
@@ -319,7 +322,6 @@ if not has_option('noshell') and jsEngine:
             # library to inject a static or mongo initializer to mongo,
             # please add that library as a private libdep of
             # mongo_initializers.
-            "$BUILD_DIR/mongo/db/concurrency/lock_manager",
             "$BUILD_DIR/mongo/s/write_ops/batch_write_types",
             "$BUILD_DIR/mongo/transport/transport_layer",
             "$BUILD_DIR/mongo/util/net/ssl_manager",

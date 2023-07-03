@@ -29,7 +29,25 @@
 
 #include "mongo/db/commands/bulk_write_common.h"
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/commands/bulk_write_crud_op.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace bulk_write_common {
@@ -37,6 +55,12 @@ namespace bulk_write_common {
 void validateRequest(const BulkWriteCommandRequest& req, bool isRetryableWrite) {
     const auto& ops = req.getOps();
     const auto& nsInfos = req.getNsInfo();
+
+    uassert(ErrorCodes::InvalidLength,
+            str::stream() << "Write batch sizes must be between 1 and "
+                          << write_ops::kMaxWriteBatchSize << ". Got " << ops.size()
+                          << " operations.",
+            ops.size() != 0 && ops.size() <= write_ops::kMaxWriteBatchSize);
 
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "May not specify both stmtId and stmtIds in bulkWrite command. Got "
@@ -57,8 +81,8 @@ void validateRequest(const BulkWriteCommandRequest& req, bool isRetryableWrite) 
     // Validate the namespaces in nsInfo.
     for (const auto& nsInfo : nsInfos) {
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid namespace specified for bulkWrite: '" << nsInfo.getNs()
-                              << "'",
+                str::stream() << "Invalid namespace specified for bulkWrite: '"
+                              << nsInfo.getNs().toStringForErrorMsg() << "'",
                 nsInfo.getNs().isValid());
     }
 
@@ -147,6 +171,16 @@ int32_t getStatementId(const BulkWriteCommandRequest& req, size_t currentOpIdx) 
 
     int32_t firstStmtId = stmtId ? *stmtId : 0;
     return firstStmtId + currentOpIdx;
+}
+
+NamespaceInfoEntry getFLENamespaceInfoEntry(const BSONObj& bulkWrite) {
+    BulkWriteCommandRequest bulk =
+        BulkWriteCommandRequest::parse(IDLParserContext("bulkWrite"), bulkWrite);
+    const std::vector<NamespaceInfoEntry>& nss = bulk.getNsInfo();
+    uassert(ErrorCodes::BadValue,
+            "BulkWrite with Queryable Encryption supports only a single namespace",
+            nss.size() == 1);
+    return nss[0];
 }
 
 }  // namespace bulk_write_common

@@ -31,6 +31,7 @@
 
 #include <algorithm>
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/util/ctype.h"
 
 namespace mongo {

@@ -29,9 +29,17 @@
 
 #include "mongo/executor/connection_pool_test_fixture.h"
 
-#include "mongo/util/assert_util.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <functional>
 #include <memory>
+#include <type_traits>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util.h"
 
 
 namespace mongo {

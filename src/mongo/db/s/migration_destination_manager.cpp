@@ -28,33 +28,58 @@
  */
 
 
-#include "mongo/db/s/migration_batch_fetcher.h"
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/s/migration_destination_manager.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <array>
 #include <list>
+#include <mutex>
+#include <ratio>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/ops/update_result.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/migration_batch_fetcher.h"
+#include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -68,32 +93,54 @@
 #include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/storage/remove_saver.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_block_bypass.h"
+#include "mongo/db/write_concern.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_index_catalog.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog_cache_loader.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/index_version.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/stdx/chrono.h"
+#include "mongo/s/sharding_index_catalog_cache.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/producer_consumer_queue.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangMigrationRecipientBeforeWaitingNoIndexBuildInProgress);
 
 const auto getMigrationDestinationManager =
     ServiceContext::declareDecoration<MigrationDestinationManager>();
@@ -262,7 +309,7 @@ bool opReplicatedEnough(OperationContext* opCtx,
  */
 BSONObj createMigrateCloneRequest(const NamespaceString& nss, const MigrationSessionId& sessionId) {
     BSONObjBuilder builder;
-    builder.append("_migrateClone", nss.ns());
+    builder.append("_migrateClone", NamespaceStringUtil::serialize(nss));
     sessionId.append(&builder);
     return builder.obj();
 }
@@ -274,7 +321,7 @@ BSONObj createMigrateCloneRequest(const NamespaceString& nss, const MigrationSes
  */
 BSONObj createTransferModsRequest(const NamespaceString& nss, const MigrationSessionId& sessionId) {
     BSONObjBuilder builder;
-    builder.append("_transferMods", nss.ns());
+    builder.append("_transferMods", NamespaceStringUtil::serialize(nss));
     sessionId.append(&builder);
     return builder.obj();
 }
@@ -336,6 +383,7 @@ MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep3);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep4);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep5);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep6);
+MONGO_FAIL_POINT_DEFINE(migrateThreadHangAfterSteadyTransition);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep7);
 
 MONGO_FAIL_POINT_DEFINE(failMigrationOnRecipient);
@@ -436,7 +484,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
         b.append("sessionId", _sessionId->toString());
     }
 
-    b.append("ns", _nss.ns());
+    b.append("ns", NamespaceStringUtil::serialize(_nss));
     b.append("from", _fromShardConnString.toString());
     b.append("fromShardId", _fromShard.toString());
     b.append("min", _min);
@@ -826,8 +874,8 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     // Do not hold any locks while issuing remote calls.
     invariant(!opCtx->lockState()->isLocked());
 
-    auto cmd = nssOrUUID.nss() ? BSON("listIndexes" << nssOrUUID.nss()->coll())
-                               : BSON("listIndexes" << *nssOrUUID.uuid());
+    auto cmd = nssOrUUID.isNamespaceString() ? BSON("listIndexes" << nssOrUUID.nss().coll())
+                                             : BSON("listIndexes" << nssOrUUID.uuid());
     if (cri) {
         cmd = appendShardVersion(cmd, cri->getShardVersion(fromShardId));
     }
@@ -870,9 +918,9 @@ MigrationDestinationManager::getCollectionOptions(OperationContext* opCtx,
 
     BSONObj fromOptions;
 
-    auto cmd = nssOrUUID.nss()
-        ? BSON("listCollections" << 1 << "filter" << BSON("name" << nssOrUUID.nss()->coll()))
-        : BSON("listCollections" << 1 << "filter" << BSON("info.uuid" << *nssOrUUID.uuid()));
+    auto cmd = nssOrUUID.isNamespaceString()
+        ? BSON("listCollections" << 1 << "filter" << BSON("name" << nssOrUUID.nss().coll()))
+        : BSON("listCollections" << 1 << "filter" << BSON("info.uuid" << nssOrUUID.uuid()));
     if (cm) {
         cmd = appendDbVersionIfPresent(cmd, cm->dbVersion());
     }
@@ -939,10 +987,7 @@ void MigrationDestinationManager::_dropLocalIndexesIfNecessary(
         if (auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
             const auto& metadata = *optMetadata;
             if (metadata.isSharded()) {
-                auto chunks = metadata.getChunks();
-                if (chunks.empty()) {
-                    return true;
-                }
+                return !metadata.currentShardHasAnyChunks();
             }
         }
         return false;
@@ -1006,12 +1051,28 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
                     collection->uuid() == collectionOptionsAndIndexes.uuid);
         };
 
-        // Gets the missing indexes and checks if the collection is empty (auto-healing is
-        // possible).
+        bool isFirstMigration = [&] {
+            AutoGetCollection collection(opCtx, nss, MODE_IS);
+            const auto scopedCsr =
+                CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+            if (auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
+                const auto& metadata = *optMetadata;
+                return metadata.isSharded() && !metadata.currentShardHasAnyChunks();
+            }
+            return false;
+        }();
+
+        // Check if there are missing indexes on the recipient shard from the donor.
+        // If it is the first migration, do not consider in-progress index builds. Otherwise,
+        // consider in-progress index builds as ready. Then, if there are missing indexes and the
+        // collection is not empty, fail the migration. On the other hand, if the collection is
+        // empty, wait for index builds to finish if it is the first migration.
+        bool waitForInProgressIndexBuildCompletion = false;
+
         auto checkEmptyOrGetMissingIndexesFromDonor = [&](const CollectionPtr& collection) {
             auto indexCatalog = collection->getIndexCatalog();
             auto indexSpecs = indexCatalog->removeExistingIndexesNoChecks(
-                opCtx, collection, collectionOptionsAndIndexes.indexSpecs);
+                opCtx, collection, collectionOptionsAndIndexes.indexSpecs, !isFirstMigration);
             if (!indexSpecs.empty()) {
                 // Only allow indexes to be copied if the collection does not have any documents.
                 uassert(ErrorCodes::CannotCreateCollection,
@@ -1020,6 +1081,10 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
                             << "collection is not empty. Non-trivial "
                             << "index creation should be scheduled manually",
                         collection->isEmpty(opCtx));
+
+                // If it is the first migration, mark waitForInProgressIndexBuildCompletion as true
+                // to wait for index builds to be finished after releasing the locks.
+                waitForInProgressIndexBuildCompletion = isFirstMigration;
             }
             return indexSpecs;
         };
@@ -1035,6 +1100,19 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
                     return;
                 }
             }
+        }
+
+        // Before taking the exclusive database lock for cloning the remaining indexes, wait for
+        // index builds to finish if it is the first migration.
+        if (waitForInProgressIndexBuildCompletion) {
+            if (MONGO_unlikely(
+                    hangMigrationRecipientBeforeWaitingNoIndexBuildInProgress.shouldFail())) {
+                LOGV2(7677900, "Hanging before waiting for in-progress index builds to finish");
+                hangMigrationRecipientBeforeWaitingNoIndexBuildInProgress.pauseWhileSet();
+            }
+
+            IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(
+                opCtx, collectionOptionsAndIndexes.uuid);
         }
 
         // Take the exclusive database lock if the collection does not exist or indexes are missing
@@ -1181,8 +1259,15 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
     boost::optional<Timer> timeInCriticalSection;
 
     if (!skipToCritSecTaken) {
-        timing.emplace(
-            outerOpCtx, "to", _nss.ns(), _min, _max, 8 /* steps */, &_errmsg, _toShard, _fromShard);
+        timing.emplace(outerOpCtx,
+                       "to",
+                       NamespaceStringUtil::serialize(_nss),
+                       _min,
+                       _max,
+                       8 /* steps */,
+                       &_errmsg,
+                       _toShard,
+                       _fromShard);
 
         LOGV2(
             22000,
@@ -1253,13 +1338,17 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                                                         range,
                                                         rangeDeletionWaitDeadline);
 
-            if (!status.isOK()) {
+            if (!status.isOK() && status != ErrorCodes::ExceededTimeLimit) {
                 _setStateFail(redact(status.toString()));
                 return;
             }
 
-            uassert(ErrorCodes::ExceededTimeLimit,
-                    "Exceeded deadline waiting for overlapping range deletion to finish",
+            uassert(
+                ErrorCodes::ExceededTimeLimit,
+                "Migration failed because the orphans cleanup routine didn't clear yet a portion "
+                "of the range being migrated that was previously owned by the recipient "
+                "shard.",
+                status != ErrorCodes::ExceededTimeLimit &&
                     outerOpCtx->getServiceContext()->getFastClockSource()->now() <
                         rangeDeletionWaitDeadline);
 
@@ -1501,6 +1590,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         {
             // 6. Wait for commit
             _setState(kSteady);
+            migrateThreadHangAfterSteadyTransition.pauseWhileSet();
 
             bool transferAfterCommit = false;
             while (getState() == kSteady || getState() == kCommitStart) {
@@ -1528,7 +1618,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 
                 auto mods = res.response;
 
-                if (mods["size"].number() > 0 && _applyMigrateOp(opCtx, mods)) {
+                if (mods["size"].number() > 0) {
+                    (void)_applyMigrateOp(opCtx, mods);
                     lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
                     continue;
                 }
@@ -1674,11 +1765,6 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
 
     // Deleted documents
     if (xfer["deleted"].isABSONObj()) {
-        boost::optional<RemoveSaver> rs;
-        if (serverGlobalParams.moveParanoia) {
-            rs.emplace("moveChunk", _nss.ns().toString(), "removedDuring");
-        }
-
         BSONObjIterator i(xfer["deleted"].Obj());
         while (i.more()) {
             totalDocs++;
@@ -1705,10 +1791,6 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
                     }
                     continue;
                 }
-            }
-
-            if (rs) {
-                uassertStatusOK(rs->goingToDelete(fullObj));
             }
 
             writeConflictRetry(opCtx, "transferModsDeletes", _nss, [&] {

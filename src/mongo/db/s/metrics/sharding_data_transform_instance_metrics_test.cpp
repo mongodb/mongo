@@ -27,13 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <fmt/format.h>
+#include <functional>
+#include <utility>
+#include <vector>
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_test_fixture.h"
-#include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -349,23 +360,51 @@ TEST_F(ShardingDataTransformInstanceMetricsTest,
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, OnStartedIncrementsCumulativeMetrics) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
     createMetricsAndAssertIncrementsCumulativeMetricsField(
-        [](auto metrics) { metrics->onStarted(); }, Section::kRoot, "countStarted");
+        [](auto metrics) { metrics->onStarted(false /*isSameKeyResharding*/); },
+        Section::kRoot,
+        "countStarted");
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onStarted(true /*isSameKeyResharding*/); },
+        Section::kRoot,
+        "countSameKeyStarted");
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, OnSuccessIncrementsCumulativeMetrics) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
     createMetricsAndAssertIncrementsCumulativeMetricsField(
-        [](auto metrics) { metrics->onSuccess(); }, Section::kRoot, "countSucceeded");
+        [](auto metrics) { metrics->onSuccess(false /*isSameKeyResharding*/); },
+        Section::kRoot,
+        "countSucceeded");
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onSuccess(true /*isSameKeyResharding*/); },
+        Section::kRoot,
+        "countSameKeySucceeded");
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, OnFailureIncrementsCumulativeMetrics) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
     createMetricsAndAssertIncrementsCumulativeMetricsField(
-        [](auto metrics) { metrics->onFailure(); }, Section::kRoot, "countFailed");
+        [](auto metrics) { metrics->onFailure(false /*isSameKeyResharding*/); },
+        Section::kRoot,
+        "countFailed");
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onFailure(true /*isSameKeyResharding*/); },
+        Section::kRoot,
+        "countSameKeyFailed");
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, OnCanceledIncrementsCumulativeMetrics) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
     createMetricsAndAssertIncrementsCumulativeMetricsField(
-        [](auto metrics) { metrics->onCanceled(); }, Section::kRoot, "countCanceled");
+        [](auto metrics) { metrics->onCanceled(false /*isSameKeyResharding*/); },
+        Section::kRoot,
+        "countCanceled");
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onCanceled(true /*isSameKeyResharding*/); },
+        Section::kRoot,
+        "countSameKeyCanceled");
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, SetChunkImbalanceIncrementsCumulativeMetrics) {

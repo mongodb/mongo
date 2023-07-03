@@ -1,24 +1,20 @@
-'use strict';
-
 /**
  * Runs updateOne, deleteOne, and findAndModify without shard key against a sharded cluster.
  *
  * @tags: [
- *  featureFlagUpdateOneWithoutShardKey,
- *  requires_fcv_70,
+ *  requires_fcv_71,
  *  requires_sharding,
  *  uses_transactions,
  * ]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
 // This workload does not make use of random moveChunks, but other workloads that extend this base
 // workload may.
-load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');  // for $config
 load('jstests/concurrency/fsm_workload_helpers/balancer.js');
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 10;
     $config.iterations = 50;
     $config.startState = "init";  // Inherited from random_moveChunk_base.js.
@@ -108,6 +104,13 @@ var $config = extendWorkload($config, function($config, $super) {
         // Used for validation after running the write operation.
         const containsMatchedDocs = db[collName].findOne(query) != null;
 
+        jsTestLog("updateOne state running with the following parameters: \n" +
+                  "query: " + tojson(query) + "\n" +
+                  "updateType: " + updateType + "\n" +
+                  "doShardKeyUpdate: " + doShardKeyUpdate + "\n" +
+                  "doUpsert: " + doUpsert + "\n" +
+                  "containsMatchedDocs: " + containsMatchedDocs);
+
         let res;
         try {
             if (updateType === 0 /* Update operator document */) {
@@ -180,6 +183,8 @@ var $config = extendWorkload($config, function($config, $super) {
             ErrorCodes.IncompleteTransactionHistory,
             ErrorCodes.NoSuchTransaction,
             ErrorCodes.StaleConfig,
+            ErrorCodes.ShardCannotRefreshDueToLocksHeld,
+            ErrorCodes.WriteConflict
         ];
 
         // If we're running in a stepdown suite, then attempting to update the shard key may
@@ -212,10 +217,12 @@ var $config = extendWorkload($config, function($config, $super) {
                 }
 
                 // This is a possible transient transaction error issue that could occur with
-                // concurrent moveChunks and transactions (if we happen to run a
+                // concurrent moveChunks and/or reshardings and transactions (if we happen to run a
                 // WouldChangeOwningShard update).
                 if (res.code === ErrorCodes.LockTimeout || res.code === ErrorCodes.StaleConfig ||
-                    res.code === ErrorCodes.ConflictingOperationInProgress) {
+                    res.code === ErrorCodes.ConflictingOperationInProgress ||
+                    res.code === ErrorCodes.ShardCannotRefreshDueToLocksHeld ||
+                    res.code == ErrorCodes.WriteConflict) {
                     if (!msg.includes(otherErrorsInChangeShardKeyMsg)) {
                         return false;
                     }
@@ -280,6 +287,15 @@ var $config = extendWorkload($config, function($config, $super) {
             const updateType = this.generateRandomInt(0, 2);
             const doShardKeyUpdate = this.generateRandomInt(0, 1);
             const doUpsert = this.generateRandomBool();
+
+            jsTestLog("findAndModifyUpdate state running with the following parameters: \n" +
+                      "query: " + tojson(query) + "\n" +
+                      "updateType: " + updateType + "\n" +
+                      "doShardKeyUpdate: " + doShardKeyUpdate + "\n" +
+                      "doUpsert: " + doUpsert + "\n" +
+                      "doSort: " + doSort + "\n" +
+                      "containsMatchedDocs: " + containsMatchedDocs);
+
             const cmdObj = {
                 findAndModify: collName,
                 query: query,
@@ -345,6 +361,12 @@ var $config = extendWorkload($config, function($config, $super) {
             if (doSort) {
                 cmdObj.sort = sortVal;
             }
+
+            jsTestLog("findAndModifyDelete state running with the following parameters: \n" +
+                      "query: " + tojson(query) + "\n" +
+                      "numMatchedDocsBefore: " + numMatchedDocsBefore + "\n" +
+                      "containsMatchedDocs: " + containsMatchedDocs);
+
             res = assert.commandWorked(db.runCommand(cmdObj));
 
             const numMatchedDocsAfter = db[collName].find(query).itcount();
@@ -370,6 +392,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.updateOne = function updateOne(db, collName, connCache) {
         jsTestLog("Running updateOne state");
         this.generateAndRunRandomUpdateOp(db, collName);
+        jsTestLog("Finished updateOne state");
     };
 
     $config.states.deleteOne = function deleteOne(db, collName, connCache) {
@@ -379,6 +402,10 @@ var $config = extendWorkload($config, function($config, $super) {
         // Used for validation after running the write operation.
         const containsMatchedDocs = db[collName].findOne(query) != null;
         const numMatchedDocsBefore = db[collName].find(query).itcount();
+
+        jsTestLog("deleteOne state running with query: " + tojson(query) + "\n" +
+                  "containsMatchedDocs: " + containsMatchedDocs + "\n" +
+                  "numMatchedDocsBefore: " + numMatchedDocsBefore);
 
         let res = assert.commandWorked(db[collName].deleteOne(query));
 
@@ -393,11 +420,13 @@ var $config = extendWorkload($config, function($config, $super) {
             // The count should both be 0.
             assert.eq(numMatchedDocsAfter, numMatchedDocsBefore);
         }
+        jsTestLog("Finished deleteOne state");
     };
 
     $config.states.findAndModify = function findAndModify(db, collName, connCache) {
         jsTestLog("Running findAndModify state");
         this.generateAndRunRandomFindAndModifyOp(db, collName);
+        jsTestLog("Finished findAndModify state");
     };
 
     $config.setup = function setup(db, collName, cluster) {

@@ -29,16 +29,25 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <functional>
+#include <memory>
+#include <utility>
+#include <vector>
+
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelementvalue.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/simple8b_builder.h"
 #include "mongo/platform/int128.h"
-
-#include <deque>
-#include <memory>
-#include <vector>
 
 namespace mongo {
 

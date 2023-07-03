@@ -28,21 +28,31 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <functional>
+#include <list>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/executor/remote_command_response.h"
+#include "mongo/db/baton.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/task_executor_proxy.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 

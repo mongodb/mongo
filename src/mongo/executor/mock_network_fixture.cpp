@@ -28,13 +28,18 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/executor/mock_network_fixture.h"
+#include <list>
 
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/executor/mock_network_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/intrusive_counter.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -61,7 +66,7 @@ bool MockNetwork::_allExpectationsSatisfied() const {
     });
 }
 
-void MockNetwork::_runUntilIdle() {
+void MockNetwork::runUntilIdle() {
     executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
     do {
         // The main responsibility of the mock network is to host incoming requests and scheduled
@@ -130,7 +135,7 @@ void MockNetwork::runUntilExpectationsSatisfied() {
     // network is idle, the extra threads may be running and will schedule new requests. As a
     // result, the current best practice is to busy-loop to prepare for that.
     while (!_allExpectationsSatisfied()) {
-        _runUntilIdle();
+        runUntilIdle();
     }
 }
 
@@ -144,7 +149,7 @@ void MockNetwork::runUntil(Date_t target) {
             _net->runUntil(target);
         }
         // Run until idle.
-        _runUntilIdle();
+        runUntilIdle();
     }
     LOGV2_DEBUG(5015403, 1, "mock reached time", "target"_attr = target);
 }

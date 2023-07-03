@@ -28,25 +28,39 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <boost/none.hpp>
+#include <exception>
 
-#include "mongo/db/repl/isself.h"
-
-#include <boost/algorithm/string.hpp>
-
-#include "mongo/base/init.h"
-#include "mongo/bson/util/builder.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/dbclient_connection.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/commands.h"
+#include "mongo/client/internal_auth.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/repl/isself.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/cidr.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 
 #if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__sun) || \
     defined(__OpenBSD__)
@@ -57,18 +71,18 @@
 #error isself needs to be implemented for this platform
 #endif
 
+#ifndef _WIN32
+#include <netinet/in.h>
+#include <sys/socket.h>
+#endif
 
 #ifdef FASTPATH_UNIX
 #include <ifaddrs.h>
 #include <netdb.h>
 
-#ifdef __FreeBSD__
-#include <netinet/in.h>
-#endif
-
 #elif defined(_WIN32)
 #include <Ws2tcpip.h>
-#include <boost/asio/detail/socket_ops.hpp>
+#include <boost/asio/detail/socket_ops.hpp>  // IWYU pragma: keep
 #include <boost/system/error_code.hpp>
 #include <iphlpapi.h>
 #include <winsock2.h>
@@ -267,11 +281,11 @@ bool isSelfSlowPath(const HostAndPort& hostAndPort,
         double timeoutSeconds = static_cast<double>(durationCount<Milliseconds>(timeout)) / 1000.0;
         conn.setSoTimeout(timeoutSeconds);
 
-        // We need to avoid the isMaster call triggered by a normal connect, which would
-        // cause a deadlock. 'isSelf' is called by the Replication Coordinator when validating
-        // a replica set configuration document, but the 'isMaster' command requires a lock on the
-        // replication coordinator to execute. As such we call we call 'connectSocketOnly', which
-        // does not call 'isMaster'.
+        // We need to avoid the "hello" call triggered by a normal connect, which would cause a
+        // deadlock. 'isSelf' is called by the Replication Coordinator when validating a replica set
+        // configuration document, but the "hello" command requires a lock on the replication
+        // coordinator to execute. As such we call we call 'connectSocketOnly', which does not call
+        // "hello".
         auto connectSocketResult = conn.connectSocketOnly(hostAndPort, boost::none);
         if (!connectSocketResult.isOK()) {
             LOGV2(4834700,

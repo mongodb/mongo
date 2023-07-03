@@ -32,8 +32,11 @@
 #include <memory>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
 
 namespace mongo {

@@ -29,10 +29,34 @@
 
 #pragma once
 
+#include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstring>
+#include <initializer_list>
+#include <iosfwd>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/data_range.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/value_internal.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/safe_num.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -448,7 +472,7 @@ public:
         values.reserve(vec.size());
         for_each(
             vec.begin(), vec.end(), ([&](const ImplicitValue& val) { values.push_back(val); }));
-        return Value(values);
+        return Value(std::move(values));
     }
 
     /**
@@ -470,12 +494,12 @@ public:
 namespace mongo {
 
 inline size_t Value::getArrayLength() const {
-    verify(getType() == Array);
+    MONGO_verify(getType() == Array);
     return getArray().size();
 }
 
 inline StringData Value::getStringData() const {
-    verify(getType() == String);
+    MONGO_verify(getType() == String);
     return getRawData();
 }
 
@@ -484,36 +508,36 @@ inline StringData Value::getRawData() const {
 }
 
 inline std::string Value::getString() const {
-    verify(getType() == String);
+    MONGO_verify(getType() == String);
     return _storage.getString().toString();
 }
 
 inline OID Value::getOid() const {
-    verify(getType() == jstOID);
+    MONGO_verify(getType() == jstOID);
     return OID(_storage.oid);
 }
 
 inline bool Value::getBool() const {
-    verify(getType() == Bool);
+    MONGO_verify(getType() == Bool);
     return _storage.boolValue;
 }
 
 inline Date_t Value::getDate() const {
-    verify(getType() == Date);
+    MONGO_verify(getType() == Date);
     return Date_t::fromMillisSinceEpoch(_storage.dateValue);
 }
 
 inline Timestamp Value::getTimestamp() const {
-    verify(getType() == bsonTimestamp);
+    MONGO_verify(getType() == bsonTimestamp);
     return Timestamp(_storage.timestampValue);
 }
 
 inline const char* Value::getRegex() const {
-    verify(getType() == RegEx);
+    MONGO_verify(getType() == RegEx);
     return _storage.getString().rawData();  // this is known to be NUL terminated
 }
 inline const char* Value::getRegexFlags() const {
-    verify(getType() == RegEx);
+    MONGO_verify(getType() == RegEx);
     const char* pattern = _storage.getString().rawData();  // this is known to be NUL terminated
     const char* flags = pattern + strlen(pattern) + 1;     // first byte after pattern's NUL
     dassert(flags + strlen(flags) == pattern + _storage.getString().size());
@@ -521,16 +545,16 @@ inline const char* Value::getRegexFlags() const {
 }
 
 inline std::string Value::getSymbol() const {
-    verify(getType() == Symbol);
+    MONGO_verify(getType() == Symbol);
     return _storage.getString().toString();
 }
 inline std::string Value::getCode() const {
-    verify(getType() == Code);
+    MONGO_verify(getType() == Code);
     return _storage.getString().toString();
 }
 
 inline int Value::getInt() const {
-    verify(getType() == NumberInt);
+    MONGO_verify(getType() == NumberInt);
     return _storage.intValue;
 }
 
@@ -539,18 +563,18 @@ inline long long Value::getLong() const {
     if (type == NumberInt)
         return _storage.intValue;
 
-    verify(type == NumberLong);
+    MONGO_verify(type == NumberLong);
     return _storage.longValue;
 }
 
 inline UUID Value::getUuid() const {
-    verify(_storage.binDataType() == BinDataType::newUUID);
+    MONGO_verify(_storage.binDataType() == BinDataType::newUUID);
     auto stringData = _storage.getString();
     return UUID::fromCDR({stringData.rawData(), stringData.size()});
 }
 
 inline BSONBinData Value::getBinData() const {
-    verify(getType() == BinData);
+    MONGO_verify(getType() == BinData);
     auto stringData = _storage.getString();
     return BSONBinData(stringData.rawData(), stringData.size(), _storage.binDataType());
 }

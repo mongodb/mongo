@@ -68,7 +68,7 @@ rw_start(u_int readers, u_int writers)
     for (i = 0; i < writers; ++i) {
         if (i == 0 || multiple_files) {
             run_info[i].name = dmalloc(64);
-            testutil_check(__wt_snprintf(run_info[i].name, 64, FNAME, (int)i));
+            testutil_snprintf(run_info[i].name, 64, FNAME, (int)i);
 
             /* Vary by orders of magnitude */
             if (vary_nops)
@@ -90,7 +90,7 @@ rw_start(u_int readers, u_int writers)
             run_info[offset].name = dmalloc(64);
             /* Have readers read from tables with writes. */
             name_index = i % writers;
-            testutil_check(__wt_snprintf(run_info[offset].name, 64, FNAME, (int)name_index));
+            testutil_snprintf(run_info[offset].name, 64, FNAME, (int)name_index);
 
             /* Vary by orders of magnitude */
             if (vary_nops)
@@ -159,7 +159,7 @@ reader_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 
     keyno = __wt_random(&s->rnd) % nkeys + 1;
     if (ftype == ROW) {
-        testutil_check(__wt_snprintf_len_set(keybuf, sizeof(keybuf), &len, "%017" PRIu64, keyno));
+        testutil_snprintf_len_set(keybuf, sizeof(keybuf), &len, "%017" PRIu64, keyno);
         key->data = keybuf;
         key->size = (uint32_t)len;
         cursor->set_key(cursor, key);
@@ -233,7 +233,7 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 
     keyno = __wt_random(&s->rnd) % nkeys + 1;
     if (ftype == ROW) {
-        testutil_check(__wt_snprintf_len_set(keybuf, sizeof(keybuf), &len, "%017" PRIu64, keyno));
+        testutil_snprintf_len_set(keybuf, sizeof(keybuf), &len, "%017" PRIu64, keyno);
         key->data = keybuf;
         key->size = (uint32_t)len;
         cursor->set_key(cursor, key);
@@ -249,8 +249,7 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
         if (ftype == FIX)
             cursor->set_value(cursor, 0x10);
         else {
-            testutil_check(
-              __wt_snprintf_len_set(valuebuf, sizeof(valuebuf), &len, "XXX %37" PRIu64, keyno));
+            testutil_snprintf_len_set(valuebuf, sizeof(valuebuf), &len, "XXX %37" PRIu64, keyno);
             value->size = (uint32_t)len;
             cursor->set_value(cursor, value);
         }

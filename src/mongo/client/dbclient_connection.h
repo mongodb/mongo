@@ -29,19 +29,32 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <functional>
+#include <map>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
 
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/authenticate.h"
+#include "mongo/client/client_api_version_parameters_gen.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/index_spec.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
@@ -52,8 +65,13 @@
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_options.h"
+#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -74,13 +92,13 @@ class DBClientCursor;
 class DBClientConnection : public DBClientBase {
 public:
     /**
-     * A hook used to validate the reply of an 'isMaster' command during connection. If the hook
+     * A hook used to validate the reply of a "hello" command during connection. If the hook
      * returns a non-OK Status, the DBClientConnection object will disconnect from the remote
      * server. This function must not throw - it can only indicate failure by returning a non-OK
      * status.
      */
     using HandshakeValidationHook =
-        std::function<Status(const executor::RemoteCommandResponse& isMasterReply)>;
+        std::function<Status(const executor::RemoteCommandResponse& helloReply)>;
 
     /**
        @param _autoReconnect if true, automatically reconnect on a connection failure
@@ -123,8 +141,8 @@ public:
                            boost::optional<TransientSSLParams> transientSSLParams);
 
     /**
-     * This version of connect does not run 'isMaster' after creating a TCP connection to the
-     * remote host. This method should be used only when calling 'isMaster' would create a deadlock,
+     * This version of connect does not run "hello" after creating a TCP connection to the
+     * remote host. This method should be used only when calling "hello" would create a deadlock,
      * such as in 'isSelf'.
      *
      * @param server The server to connect to.

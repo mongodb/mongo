@@ -30,13 +30,14 @@
 #pragma once
 
 #include <algorithm>  // for min
+#include <boost/preprocessor/control/iif.hpp>
 #include <cstring>
+#include <fmt/format.h>
 #include <iosfwd>
 #include <limits>
 #include <stdexcept>
 #include <string>
-
-#include <fmt/format.h>
+#include <type_traits>
 
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/type_traits.h"

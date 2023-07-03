@@ -30,8 +30,26 @@
 #include "mongo/db/exec/timeseries/bucket_spec.h"
 
 #include <algorithm>
+#include <boost/cstdint.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <s2cellid.h>
+#include <vector>
 
-#include "mongo/bson/util/bsoncolumn.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
@@ -39,13 +57,20 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/rewrite_expr.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

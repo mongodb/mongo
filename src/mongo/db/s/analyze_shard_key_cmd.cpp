@@ -27,16 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/analyze_shard_key_cmd_util.h"
-#include "mongo/db/s/shard_key_index_util.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -46,15 +62,7 @@ namespace analyze_shard_key {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(analyzeShardKeySkipCalcalutingKeyCharactericsMetrics);
-MONGO_FAIL_POINT_DEFINE(analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics);
-
-const std::string kOrphanDocsWarningMessage = "If \"" +
-    KeyCharacteristicsMetrics::kNumOrphanDocsFieldName + "\" is large relative to \"" +
-    KeyCharacteristicsMetrics::kNumDocsFieldName +
-    "\", you may want to rerun the command at some other time to get more accurate \"" +
-    KeyCharacteristicsMetrics::kNumDistinctValuesFieldName + "\" and \"" +
-    KeyCharacteristicsMetrics::kMostCommonValuesFieldName + "\" metrics.";
+MONGO_FAIL_POINT_DEFINE(analyzeShardKeyFailBeforeMetricsCalculation);
 
 class AnalyzeShardKeyCmd : public TypedCommand<AnalyzeShardKeyCmd> {
 public:
@@ -72,41 +80,74 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "analyzeShardKey command is not supported on a multitenant replica set",
                     !gMultitenancySupport);
-            uassert(ErrorCodes::IllegalOperation,
-                    "analyzeShardKey command is not supported on a configsvr mongod",
-                    !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "Cannot skip analyzing all metrics",
+                    request().getAnalyzeKeyCharacteristics() ||
+                        request().getAnalyzeReadWriteDistribution());
+            uassert(ErrorCodes::InvalidOptions,
+                    "Cannot specify both 'sampleRate' and 'sampleSize'",
+                    !request().getSampleRate() || !request().getSampleSize());
 
             const auto& nss = ns();
             const auto& key = request().getKey();
             uassertStatusOK(validateNamespace(nss));
             const auto collUuid = uassertStatusOK(validateCollectionOptions(opCtx, nss));
 
-            LOGV2(6875001, "Start analyzing shard key", logAttrs(nss), "shardKey"_attr = key);
+            if (MONGO_unlikely(analyzeShardKeyFailBeforeMetricsCalculation.shouldFail())) {
+                uasserted(
+                    ErrorCodes::InternalError,
+                    "Failing analyzeShardKey command before metrics calculation via a fail point");
+            }
+
+            const auto analyzeShardKeyId = UUID::gen();
+            LOGV2(7790010,
+                  "Start analyzing shard key",
+                  logAttrs(nss),
+                  "analyzeShardKeyId"_attr = analyzeShardKeyId,
+                  "shardKey"_attr = key);
 
             Response response;
 
             // Calculate metrics about the characteristics of the shard key.
-            if (!MONGO_unlikely(
-                    analyzeShardKeySkipCalcalutingKeyCharactericsMetrics.shouldFail())) {
+            if (request().getAnalyzeKeyCharacteristics()) {
                 auto keyCharacteristics = analyze_shard_key::calculateKeyCharacteristicsMetrics(
-                    opCtx, nss, collUuid, key);
-                response.setKeyCharacteristics(keyCharacteristics);
-                if (response.getNumOrphanDocs()) {
-                    response.setNote(StringData(kOrphanDocsWarningMessage));
+                    opCtx,
+                    analyzeShardKeyId,
+                    nss,
+                    collUuid,
+                    key,
+                    request().getSampleRate(),
+                    request().getSampleSize());
+                if (!keyCharacteristics) {
+                    // No calculation was performed. By design this must be because the shard key
+                    // does not have a supporting index. If the command is not requesting the
+                    // metrics about the read and write distribution, there are no metrics to
+                    // return to the user. So throw an error here.
+                    uassert(
+                        ErrorCodes::IllegalOperation,
+                        "Cannot analyze the characteristics of a shard key that does not have a "
+                        "supporting index",
+                        request().getAnalyzeReadWriteDistribution());
                 }
+                response.setKeyCharacteristics(keyCharacteristics);
             }
 
             // Calculate metrics about the read and write distribution from sampled queries. Query
             // sampling is not supported on multitenant replica sets.
-            if (!gMultitenancySupport &&
-                !MONGO_unlikely(
-                    analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics.shouldFail())) {
+            if (request().getAnalyzeReadWriteDistribution()) {
                 auto [readDistribution, writeDistribution] =
                     analyze_shard_key::calculateReadWriteDistributionMetrics(
-                        opCtx, nss, collUuid, key);
+                        opCtx, analyzeShardKeyId, nss, collUuid, key);
                 response.setReadDistribution(readDistribution);
                 response.setWriteDistribution(writeDistribution);
             }
+
+            LOGV2(7790011,
+                  "Finished analyzing shard key",
+                  logAttrs(nss),
+                  "analyzeShardKeyId"_attr = analyzeShardKeyId,
+                  "shardKey"_attr = key);
 
             return response;
         }

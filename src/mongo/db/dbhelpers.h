@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/update_result.h"
 #include "mongo/db/record_id.h"
@@ -159,6 +163,13 @@ struct Helpers {
                        const BSONObj& filter,
                        const BSONObj& updateMod,
                        bool fromMigrate = false);
+
+    /**
+     * Inserts document 'doc' into collection 'coll'.
+     */
+    static Status insert(OperationContext* opCtx,
+                         const ScopedCollectionAcquisition& coll,
+                         const BSONObj& doc);
 
     // TODO: this should be somewhere else probably
     /* Takes object o, and returns a new object with the

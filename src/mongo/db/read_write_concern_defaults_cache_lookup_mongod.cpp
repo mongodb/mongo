@@ -30,11 +30,27 @@
 
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
 
+#include <boost/move/utility_core.hpp>
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/server_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

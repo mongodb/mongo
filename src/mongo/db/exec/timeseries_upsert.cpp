@@ -28,10 +28,50 @@
  */
 
 #include "mongo/db/exec/timeseries_upsert.h"
+
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
+#include "mongo/db/update/update_driver.h"
 #include "mongo/db/update/update_util.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/uuid.h"
+
+namespace {
+
+const char idFieldName[] = "_id";
+const mongo::FieldRef idFieldRef(idFieldName);
+
+}  // namespace
+
 
 namespace mongo {
 
@@ -42,6 +82,7 @@ TimeseriesUpsertStage::TimeseriesUpsertStage(ExpressionContext* expCtx,
                                              const ScopedCollectionAcquisition& coll,
                                              BucketUnpacker bucketUnpacker,
                                              std::unique_ptr<MatchExpression> residualPredicate,
+                                             std::unique_ptr<MatchExpression> originalPredicate,
                                              const UpdateRequest& request)
     : TimeseriesModifyStage(expCtx,
                             std::move(params),
@@ -49,7 +90,8 @@ TimeseriesUpsertStage::TimeseriesUpsertStage(ExpressionContext* expCtx,
                             std::move(child),
                             coll,
                             std::move(bucketUnpacker),
-                            std::move(residualPredicate)),
+                            std::move(residualPredicate),
+                            std::move(originalPredicate)),
       _request(request) {
     // We should never create this stage for a non-upsert request.
     tassert(7655100, "request must be an upsert", _params.isUpdate && _request.isUpsert());
@@ -92,47 +134,92 @@ PlanStage::StageState TimeseriesUpsertStage::doWork(WorkingSetID* out) {
     // We should always be EOF at this point.
     tassert(7655101, "must be at EOF if we performed an upsert", isEOF());
 
-    // If we don't need to return the inserted document, we're done.
-    return PlanStage::IS_EOF;
+    if (!_params.returnNew) {
+        // If we don't need to return the inserted document, we're done.
+        return PlanStage::IS_EOF;
+    }
+
+    // If we want to return the document we just inserted, create it as a WorkingSetMember.
+    _measurementToReturn = _specificStats.objInserted;
+    _prepareToReturnMeasurement(*out);
+    return PlanStage::ADVANCED;
 }
 
-void TimeseriesUpsertStage::_performInsert(BSONObj newDocument) {
-    auto insertOp = timeseries::makeInsertsToNewBuckets({newDocument},
-                                                        collection()->ns(),
-                                                        *collection()->getTimeseriesOptions(),
-                                                        collection()->getDefaultCollator());
+void TimeseriesUpsertStage::_performInsert(BSONObj newMeasurement) {
+    if (_isUserInitiatedUpdate) {
+        const auto& acq = collectionAcquisition();
+        if (const auto& collDesc = acq.getShardingDescription(); collDesc.isSharded()) {
+            auto newBucket =
+                timeseries::makeBucketDocument({newMeasurement},
+                                               acq.nss(),
+                                               *collectionPtr()->getTimeseriesOptions(),
+                                               collectionPtr()->getDefaultCollator());
 
-    writeConflictRetry(opCtx(), "TimeseriesUpsert", collection()->ns(), [&] {
-        timeseries::performAtomicWrites(opCtx(),
-                                        collection(),
-                                        RecordId{},
-                                        boost::none,
-                                        insertOp,
-                                        _params.fromMigrate,
-                                        _params.stmtId);
+            //  The shard key fields may not have arrays at any point along their paths.
+            update::assertPathsNotArray(mutablebson::Document{newBucket},
+                                        collDesc.getKeyPatternFields());
+
+            const auto& collFilter = acq.getShardingFilter();
+            invariant(collFilter);
+
+            auto newShardKey = collDesc.getShardKeyPattern().extractShardKeyFromDoc(newBucket);
+            if (!collFilter->keyBelongsToMe(newShardKey)) {
+                // An attempt to upsert a document with a shard key value that belongs on
+                // another shard must either be a retryable write or inside a transaction. An
+                // upsert without a transaction number is legal if
+                // gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi is enabled because
+                // mongos will be able to start an internal transaction to handle the
+                // wouldChangeOwningShard error thrown below.
+                if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    uassert(ErrorCodes::IllegalOperation,
+                            "The upsert document could not be inserted onto the shard targeted "
+                            "by the query, since its shard key belongs on a different shard. "
+                            "Cross-shard upserts are only allowed when running in a "
+                            "transaction or with retryWrites: true.",
+                            opCtx()->getTxnNumber());
+                }
+                uasserted(WouldChangeOwningShardInfo(_originalPredicate->serialize(),
+                                                     newBucket,
+                                                     true,  // upsert
+                                                     acq.nss(),
+                                                     acq.uuid(),
+                                                     newMeasurement),
+                          "The document we are inserting belongs on a different shard");
+            }
+        }
+    }
+    writeConflictRetry(opCtx(), "TimeseriesUpsert", collectionPtr()->ns(), [&] {
+        timeseries::performAtomicWritesForUpdate(opCtx(),
+                                                 collectionPtr(),
+                                                 RecordId{},
+                                                 boost::none,
+                                                 {newMeasurement},
+                                                 _params.fromMigrate,
+                                                 _params.stmtId);
     });
 }
 
+
 BSONObj TimeseriesUpsertStage::_produceNewDocumentForInsert() {
-    FieldRefSet immutablePaths;
+    // Initialize immutable paths based on the shard key field(s).
+    _getImmutablePaths();
+
     mutablebson::Document doc;
 
     if (_request.shouldUpsertSuppliedDocument()) {
-        update::generateNewDocumentFromSuppliedDoc(opCtx(), immutablePaths, &_request, doc);
+        update::generateNewDocumentFromSuppliedDoc(opCtx(), _immutablePaths, &_request, doc);
     } else {
-        // Generate the match expression with which to fill in the new document. We use the original
-        // query on the request rather than our parsed canonical query because we want the complete,
-        // un-translated query for this.
-        MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-            MatchExpressionParser::kAllowAllSpecialFeatures &
-            ~MatchExpressionParser::AllowedFeatures::kExpr;
-        auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(
-            _request.getQuery(), expCtx(), ExtensionsCallbackNoop(), allowedFeatures));
+        // When populating the document from the query for replacement updates, we should include
+        // the _id field. However, we don't want to block _id from being set/updated, so only
+        // include it in 'immutablePaths' for this step.
+        _immutablePaths.emplace_back(std::make_unique<FieldRef>(idFieldName));
+        uassertStatusOK(_params.updateDriver->populateDocumentWithQueryFields(
+            *_originalPredicate, _immutablePaths, doc));
+        _immutablePaths.pop_back();
 
-        uassertStatusOK(
-            _params.updateDriver->populateDocumentWithQueryFields(*matchExpr, immutablePaths, doc));
-
-        update::generateNewDocumentFromUpdateOp(opCtx(), immutablePaths, _params.updateDriver, doc);
+        update::generateNewDocumentFromUpdateOp(
+            opCtx(), _immutablePaths, _params.updateDriver, doc);
     }
 
     update::ensureIdFieldIsFirst(&doc, true);

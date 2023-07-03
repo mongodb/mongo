@@ -29,14 +29,31 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <set>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/platform/basic.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/uuid.h"
 
@@ -126,14 +143,14 @@ boost::optional<UUID> getOrGenerateSampleId(OperationContext* opCtx,
         const auto isInternalClient = !opCtx->getClient()->session() ||
             (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
         uassert(ErrorCodes::InvalidOptions,
-                "Cannot specify 'sampleRate' since it is an internal field",
+                "Cannot specify 'sampleId' since it is an internal field",
                 !request.getSampleId() || isInternalClient ||
                     TestingProctor::instance().isEnabled());
         return request.getSampleId();
     }
     if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         uassert(ErrorCodes::InvalidOptions,
-                "Cannot specify 'sampleRate' since it is an internal field",
+                "Cannot specify 'sampleId' since it is an internal field",
                 !request.getSampleId());
         return QueryAnalysisSampler::get(opCtx).tryGenerateSampleId(opCtx, nss, cmdName);
     }

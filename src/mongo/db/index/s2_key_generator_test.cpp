@@ -27,21 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/index/expression_keys_private.h"
-
 #include <algorithm>
-#include <s2.h>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <ostream>
+#include <string>
+#include <util/math/mathutil.h>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/s2_common.h"
-#include "mongo/db/json.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -55,7 +70,7 @@ std::string dumpKeyset(const KeyStringSet& keyStrings) {
     std::stringstream ss;
     ss << "[ ";
     for (auto& keyString : keyStrings) {
-        auto key = KeyString::toBson(keyString, Ordering::make(BSONObj()));
+        auto key = key_string::toBson(keyString, Ordering::make(BSONObj()));
         ss << key.toString() << " ";
     }
     ss << "]";
@@ -108,7 +123,7 @@ void assertMultikeyPathsEqual(const MultikeyPaths& expectedMultikeyPaths,
 }
 
 struct S2KeyGeneratorTest : public unittest::Test {
-    SharedBufferFragmentBuilder allocator{KeyString::HeapBuilder::kHeapAllocatorDefaultBytes};
+    SharedBufferFragmentBuilder allocator{key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
 
     long long getCellID(int x, int y, bool multiPoint = false) {
         BSONObj obj;
@@ -137,12 +152,12 @@ struct S2KeyGeneratorTest : public unittest::Test {
                                          params,
                                          &keys,
                                          multikeyPaths,
-                                         KeyString::Version::kLatestVersion,
+                                         key_string::Version::kLatestVersion,
                                          SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                          Ordering::make(BSONObj()));
 
         ASSERT_EQUALS(1U, keys.size());
-        auto key = KeyString::toBson(*keys.begin(), Ordering::make(BSONObj()));
+        auto key = key_string::toBson(*keys.begin(), Ordering::make(BSONObj()));
         return key.firstElement().Long();
     }
 };
@@ -166,22 +181,22 @@ TEST_F(S2KeyGeneratorTest, GetS2KeysFromSubobjectWithArrayOfGeoAndNonGeoSubobjec
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
-                                      BSON("" << 1 << "" << getCellID(0, 0)),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(KeyString::Version::kLatestVersion,
-                                      BSON("" << 1 << "" << getCellID(3, 3)),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(KeyString::Version::kLatestVersion,
-                                      BSON("" << 2 << "" << getCellID(0, 0)),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString4(KeyString::Version::kLatestVersion,
-                                      BSON("" << 2 << "" << getCellID(3, 3)),
-                                      Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
+                                       BSON("" << 1 << "" << getCellID(0, 0)),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(key_string::Version::kLatestVersion,
+                                       BSON("" << 1 << "" << getCellID(3, 3)),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       BSON("" << 2 << "" << getCellID(0, 0)),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString4(key_string::Version::kLatestVersion,
+                                       BSON("" << 2 << "" << getCellID(3, 3)),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{
         keyString1.release(), keyString2.release(), keyString3.release(), keyString4.release()};
 
@@ -208,19 +223,19 @@ TEST_F(S2KeyGeneratorTest, GetS2KeysFromArrayOfNonGeoSubobjectsWithArrayValues) 
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
-                                      BSON("" << 1 << "" << getCellID(0, 0)),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(KeyString::Version::kLatestVersion,
-                                      BSON("" << 2 << "" << getCellID(0, 0)),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(KeyString::Version::kLatestVersion,
-                                      BSON("" << 3 << "" << getCellID(0, 0)),
-                                      Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
+                                       BSON("" << 1 << "" << getCellID(0, 0)),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(key_string::Version::kLatestVersion,
+                                       BSON("" << 2 << "" << getCellID(0, 0)),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       BSON("" << 3 << "" << getCellID(0, 0)),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
 
     ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
@@ -244,20 +259,20 @@ TEST_F(S2KeyGeneratorTest, GetS2KeysFromMultiPointInGeoField) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     const bool multiPoint = true;
-    KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
-                                      BSON("" << 1 << "" << getCellID(0, 0, multiPoint)),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(KeyString::Version::kLatestVersion,
-                                      BSON("" << 1 << "" << getCellID(1, 0, multiPoint)),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(KeyString::Version::kLatestVersion,
-                                      BSON("" << 1 << "" << getCellID(1, 1, multiPoint)),
-                                      Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
+                                       BSON("" << 1 << "" << getCellID(0, 0, multiPoint)),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(key_string::Version::kLatestVersion,
+                                       BSON("" << 1 << "" << getCellID(1, 0, multiPoint)),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       BSON("" << 1 << "" << getCellID(1, 1, multiPoint)),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release(), keyString3.release()};
 
     ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
@@ -280,14 +295,14 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldAfterGeoField) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     BSON("" << getCellID(0, 0) << ""
-                                             << "gnirts"),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      BSON("" << getCellID(0, 0) << ""
+                                              << "gnirts"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
     ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
@@ -311,15 +326,15 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldBeforeGeoField) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     BSON(""
-                                          << "gnirts"
-                                          << "" << getCellID(0, 0)),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      BSON(""
+                                           << "gnirts"
+                                           << "" << getCellID(0, 0)),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
     ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
@@ -343,16 +358,16 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToAllNonGeoStringFields) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     BSON(""
-                                          << "gnirts"
-                                          << "" << getCellID(0, 0) << ""
-                                          << "2gnirts"),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      BSON(""
+                                           << "gnirts"
+                                           << "" << getCellID(0, 0) << ""
+                                           << "2gnirts"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
     ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
@@ -377,14 +392,14 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldWithMultiplePathCo
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     BSON("" << getCellID(0, 0) << ""
-                                             << "gnirts"),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      BSON("" << getCellID(0, 0) << ""
+                                              << "gnirts"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
     ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
@@ -408,18 +423,18 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToStringsInArray) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
-                                      BSON("" << getCellID(0, 0) << ""
-                                              << "gnirts"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(KeyString::Version::kLatestVersion,
-                                      BSON("" << getCellID(0, 0) << ""
-                                              << "2gnirts"),
-                                      Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
+                                       BSON("" << getCellID(0, 0) << ""
+                                               << "gnirts"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(key_string::Version::kLatestVersion,
+                                       BSON("" << getCellID(0, 0) << ""
+                                               << "2gnirts"),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString1.release(), keyString2.release()};
 
     ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
@@ -443,34 +458,34 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToStringsInAllArrays) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
-                                      BSON("" << getCellID(0, 0) << ""
-                                              << "gnirts"
-                                              << ""
-                                              << "cba"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString2(KeyString::Version::kLatestVersion,
-                                      BSON("" << getCellID(0, 0) << ""
-                                              << "gnirts"
-                                              << ""
-                                              << "fed"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString3(KeyString::Version::kLatestVersion,
-                                      BSON("" << getCellID(0, 0) << ""
-                                              << "2gnirts"
-                                              << ""
-                                              << "cba"),
-                                      Ordering::make(BSONObj()));
-    KeyString::HeapBuilder keyString4(KeyString::Version::kLatestVersion,
-                                      BSON("" << getCellID(0, 0) << ""
-                                              << "2gnirts"
-                                              << ""
-                                              << "fed"),
-                                      Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
+                                       BSON("" << getCellID(0, 0) << ""
+                                               << "gnirts"
+                                               << ""
+                                               << "cba"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString2(key_string::Version::kLatestVersion,
+                                       BSON("" << getCellID(0, 0) << ""
+                                               << "gnirts"
+                                               << ""
+                                               << "fed"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString3(key_string::Version::kLatestVersion,
+                                       BSON("" << getCellID(0, 0) << ""
+                                               << "2gnirts"
+                                               << ""
+                                               << "cba"),
+                                       Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString4(key_string::Version::kLatestVersion,
+                                       BSON("" << getCellID(0, 0) << ""
+                                               << "2gnirts"
+                                               << ""
+                                               << "fed"),
+                                       Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{
         keyString1.release(), keyString2.release(), keyString3.release(), keyString4.release()};
 
@@ -494,13 +509,13 @@ TEST_F(S2KeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     BSON("" << getCellID(0, 0) << "" << 5),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      BSON("" << getCellID(0, 0) << "" << 5),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
     ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
@@ -524,15 +539,15 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToStringsInNestedObjects) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     BSON("" << getCellID(0, 0) << ""
-                                             << BSON("c"
-                                                     << "gnirts")),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      BSON("" << getCellID(0, 0) << ""
+                                              << BSON("c"
+                                                      << "gnirts")),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
     ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
@@ -556,14 +571,14 @@ TEST_F(S2KeyGeneratorTest, NoCollation) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     BSON("" << getCellID(0, 0) << ""
-                                             << "string"),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      BSON("" << getCellID(0, 0) << ""
+                                              << "string"),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
     ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
@@ -587,13 +602,13 @@ TEST_F(S2KeyGeneratorTest, EmptyArrayForLeadingFieldIsConsideredMultikey) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     BSON("" << BSONUndefined << "" << getCellID(0, 0)),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      BSON("" << BSONUndefined << "" << getCellID(0, 0)),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
     ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
@@ -616,13 +631,13 @@ TEST_F(S2KeyGeneratorTest, EmptyArrayForTrailingFieldIsConsideredMultikey) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     BSON("" << getCellID(0, 0) << "" << BSONUndefined),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      BSON("" << getCellID(0, 0) << "" << BSONUndefined),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
     ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
@@ -645,13 +660,13 @@ TEST_F(S2KeyGeneratorTest, SingleElementTrailingArrayIsConsideredMultikey) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     BSON("" << 99 << "" << getCellID(0, 0)),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      BSON("" << 99 << "" << getCellID(0, 0)),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
     ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));
@@ -674,13 +689,13 @@ TEST_F(S2KeyGeneratorTest, MidPathSingleElementArrayIsConsideredMultikey) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     BSON("" << 99 << "" << getCellID(0, 0)),
-                                     Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      BSON("" << 99 << "" << getCellID(0, 0)),
+                                      Ordering::make(BSONObj()));
     KeyStringSet expectedKeys{keyString.release()};
 
     ASSERT_TRUE(areKeysetsEqual(expectedKeys, actualKeys));

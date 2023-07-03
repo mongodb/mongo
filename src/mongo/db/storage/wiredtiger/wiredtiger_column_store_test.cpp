@@ -27,28 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/base/init.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/json.h"
-#include "mongo/db/storage/sorted_data_interface_test_harness.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/storage/wiredtiger/wiredtiger_column_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/hex.h"
 
 namespace mongo {
 namespace {
-
-using std::string;
 
 TEST(WiredTigerColumnStoreTest, MakeKey) {
     std::string out = WiredTigerColumnStore::makeKey_ForTest("a.b", 66 /* RowId */);

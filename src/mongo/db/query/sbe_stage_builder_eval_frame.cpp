@@ -28,11 +28,19 @@
  */
 
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
-#include "mongo/db/query/optimizer/node.h"
+
+#include <absl/container/node_hash_map.h>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::stage_builder {
 
@@ -56,7 +64,7 @@ std::unique_ptr<sbe::EExpression> EvalExpr::extractExpr(optimizer::SlotVarMap& v
 }
 
 std::unique_ptr<sbe::EExpression> EvalExpr::extractExpr(StageBuilderState& state) {
-    return extractExpr(state.slotVarMap, *state.data->env);
+    return extractExpr(state.slotVarMap, *state.env);
 }
 
 abt::HolderPtr EvalExpr::extractABT(optimizer::SlotVarMap& varMap) {

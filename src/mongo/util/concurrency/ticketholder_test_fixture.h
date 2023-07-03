@@ -29,10 +29,22 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {

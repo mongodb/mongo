@@ -28,35 +28,68 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/index_builds_coordinator_mongod.h"
-
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
+#include <functional>
+#include <mutex>
+#include <string>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/active_index_builds.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/index_build_entry_gen.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/index_build_entry_helpers.h"
+#include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/scoped_counter.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -195,12 +228,12 @@ IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod()
         });
 }
 
-void IndexBuildsCoordinatorMongod::shutdown(OperationContext* opCtx) {
+void IndexBuildsCoordinatorMongod::shutdown(OperationContext*) {
     // Stop new scheduling.
     _threadPool.shutdown();
 
     // Wait for all active builds to stop.
-    waitForAllIndexBuildsToStopForShutdown(opCtx);
+    activeIndexBuilds.waitForAllIndexBuildsToStopForShutdown();
 
     // Wait for active threads to finish.
     _threadPool.join();
@@ -246,6 +279,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                                                IndexBuildProtocol protocol,
                                                IndexBuildOptions indexBuildOptions,
                                                const boost::optional<ResumeIndexInfo>& resumeInfo) {
+    _waitIfNewIndexBuildsBlocked(opCtx, collectionUUID, specs, buildUUID);
+
     const NamespaceStringOrUUID nssOrUuid{dbName, collectionUUID};
 
     auto writeBlockState = GlobalUserWriteBlockState::get(opCtx);
@@ -421,7 +456,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                           startPromise = std::move(startPromise),
                           startTimestamp,
                           shardVersion = oss.getShardVersion(nss),
-                          dbVersion = oss.getDbVersion(DatabaseNameUtil::serialize(dbName)),
+                          dbVersion = oss.getDbVersion(dbName),
                           resumeInfo,
                           impersonatedClientAttrs = std::move(impersonatedClientAttrs),
                           forwardableOpMetadata =
@@ -681,29 +716,17 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
 }
 
 void IndexBuildsCoordinatorMongod::_signalPrimaryForAbortAndWaitForExternalAbort(
-    OperationContext* opCtx, ReplIndexBuildState* replState, const Status& abortStatus) {
-
+    OperationContext* opCtx, ReplIndexBuildState* replState) {
     hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort.pauseWhileSet(opCtx);
 
+    const auto abortStatus = replState->getAbortStatus();
     LOGV2(7419402,
           "Index build: signaling primary to abort index build",
           "buildUUID"_attr = replState->buildUUID,
           logAttrs(replState->dbName),
           "collectionUUID"_attr = replState->collectionUUID,
           "reason"_attr = abortStatus);
-    const auto transitionedToWaitForAbort = replState->requestAbortFromPrimary(abortStatus);
-
-    if (!transitionedToWaitForAbort) {
-        // The index build has likely been aborted externally (e.g. its underlying collection was
-        // dropped), and it's in the midst of tearing down. There's nothing else to do here.
-        LOGV2(7530800,
-              "Index build: the build is already in aborted state; not signaling primary to abort",
-              "buildUUID"_attr = replState->buildUUID,
-              "db"_attr = replState->dbName,
-              "collectionUUID"_attr = replState->collectionUUID,
-              "reason"_attr = abortStatus);
-        return;
-    }
+    replState->requestAbortFromPrimary();
 
     hangIndexBuildBeforeSignalingPrimaryForAbort.pauseWhileSet(opCtx);
 
@@ -769,8 +792,10 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForAbortAndWaitForExternalAbort
         }
         // The promise was fullfilled before waiting.
         return;
-    } catch (const DBException& ex) {
-        if (ex.code() == ErrorCodes::IndexBuildAborted) {
+    } catch (const DBException&) {
+        // External aborts must wait for the builder thread, so we cannot be in an already aborted
+        // state.
+        if (replState->isExternalAbort()) {
             // The build was aborted, and the opCtx interrupted, before the thread checked the
             // future.
             return;

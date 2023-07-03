@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/elapsed_tracker.h"
-
 #include "mongo/util/clock_source.h"
 
 namespace mongo {
@@ -45,16 +42,16 @@ ElapsedTracker::ElapsedTracker(ClockSource* cs,
       _last(cs->now()) {}
 
 bool ElapsedTracker::intervalHasElapsed() {
-    if (_pings.addAndFetch(1) >= _hitsBetweenMarks) {
-        _pings.store(0);
-        _last.store(_clock->now());
+    if (++_pings >= _hitsBetweenMarks) {
+        _pings = 0;
+        _last = _clock->now();
         return true;
     }
 
     const auto now = _clock->now();
-    if (now - _last.load() > _msBetweenMarks) {
-        _pings.store(0);
-        _last.store(now);
+    if (now - _last > _msBetweenMarks) {
+        _pings = 0;
+        _last = now;
         return true;
     }
 
@@ -62,8 +59,8 @@ bool ElapsedTracker::intervalHasElapsed() {
 }
 
 void ElapsedTracker::resetLastTime() {
-    _pings.store(0);
-    _last.store(_clock->now());
+    _pings = 0;
+    _last = _clock->now();
 }
 
 }  // namespace mongo

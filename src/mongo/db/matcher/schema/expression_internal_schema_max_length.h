@@ -29,7 +29,16 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <utility>
+
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_str_length.h"
 
 namespace mongo {

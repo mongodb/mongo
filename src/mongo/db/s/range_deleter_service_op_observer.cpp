@@ -29,21 +29,45 @@
 
 #include "mongo/db/s/range_deleter_service_op_observer.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <string>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/cursor_manager.h"
-#include "mongo/db/persistent_task_store.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/future.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
 
 namespace mongo {
 namespace {
 // Small hack used to be able to retrieve the full removed document in the `onDelete` method
-const auto deletedDocumentDecoration = OperationContext::declareDecoration<BSONObj>();
+const auto deletedDocumentDecoration = OplogDeleteEntryArgs::declareDecoration<BSONObj>();
 void registerTaskWithOngoingQueriesOnOpLogEntryCommit(OperationContext* opCtx,
                                                       const RangeDeletionTask& rdt) {
 
@@ -93,7 +117,7 @@ void RangeDeleterServiceOpObserver::onInserts(OperationContext* opCtx,
                                               std::vector<InsertStatement>::const_iterator end,
                                               std::vector<bool> fromMigrate,
                                               bool defaultFromMigrate,
-                                              InsertsOpStateAccumulator* opAccumulator) {
+                                              OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
         for (auto it = begin; it != end; ++it) {
             auto deletionTask = RangeDeletionTask::parse(
@@ -131,9 +155,11 @@ void RangeDeleterServiceOpObserver::onUpdate(OperationContext* opCtx,
 
 void RangeDeleterServiceOpObserver::aboutToDelete(OperationContext* opCtx,
                                                   const CollectionPtr& coll,
-                                                  BSONObj const& doc) {
+                                                  BSONObj const& doc,
+                                                  OplogDeleteEntryArgs* args,
+                                                  OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
-        deletedDocumentDecoration(opCtx) = doc;
+        deletedDocumentDecoration(args) = doc;
     }
 }
 
@@ -143,19 +169,21 @@ void RangeDeleterServiceOpObserver::onDelete(OperationContext* opCtx,
                                              const OplogDeleteEntryArgs& args,
                                              OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
-        const auto& deletedDoc = deletedDocumentDecoration(opCtx);
-
-        auto deletionTask =
-            RangeDeletionTask::parse(IDLParserContext("RangeDeleterServiceOpObserver"), deletedDoc);
-        try {
-            RangeDeleterService::get(opCtx)->deregisterTask(deletionTask.getCollectionUuid(),
-                                                            deletionTask.getRange());
-        } catch (const DBException& ex) {
-            dassert(ex.code() == ErrorCodes::NotYetInitialized,
-                    str::stream() << "No error different from `NotYetInitialized` is expected "
-                                     "to be propagated to the range deleter observer. Got error: "
-                                  << ex.toStatus());
-        }
+        opCtx->recoveryUnit()->onCommit([deletedDoc = std::move(deletedDocumentDecoration(args))](
+                                            OperationContext* opCtx, boost::optional<Timestamp>) {
+            auto deletionTask = RangeDeletionTask::parse(
+                IDLParserContext("RangeDeleterServiceOpObserver"), deletedDoc);
+            try {
+                RangeDeleterService::get(opCtx)->deregisterTask(deletionTask.getCollectionUuid(),
+                                                                deletionTask.getRange());
+            } catch (const DBException& ex) {
+                dassert(ex.code() == ErrorCodes::NotYetInitialized,
+                        str::stream()
+                            << "No error different from `NotYetInitialized` is expected "
+                               "to be propagated to the range deleter observer. Got error: "
+                            << ex.toStatus());
+            }
+        });
     }
 }
 

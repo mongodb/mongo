@@ -27,19 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <ratio>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/jsobj.h"
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/keys_collection_manager.h"
+#include "mongo/db/keys_collection_manager_gen.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/s/grid.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -416,7 +440,8 @@ TEST_F(KeysManagerDirectTest, CacheExternalKeyBasic) {
     // Refresh immediately to prevent a refresh from discovering the inserted keys.
     keyManager()->refreshNow(operationContext());
 
-    ExternalKeysCollectionDocument externalKey1(OID::gen(), 1, kMigrationId1);
+    ExternalKeysCollectionDocument externalKey1(OID::gen(), 1);
+    externalKey1.setMigrationId(kMigrationId1);
     externalKey1.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
     ASSERT_OK(insertToConfigCollection(operationContext(),
@@ -453,7 +478,8 @@ TEST_F(KeysManagerDirectTest, WillNotCacheExternalKeyWhenMonitoringIsStopped) {
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, internalKey.toBSON()));
 
-    ExternalKeysCollectionDocument externalKey1(OID::gen(), 1, kMigrationId1);
+    ExternalKeysCollectionDocument externalKey1(OID::gen(), 1);
+    externalKey1.setMigrationId(kMigrationId1);
     externalKey1.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
     ASSERT_OK(insertToConfigCollection(operationContext(),
@@ -471,7 +497,8 @@ TEST_F(KeysManagerDirectTest, WillNotCacheExternalKeyWhenMonitoringIsStopped) {
 
     keyManager()->stopMonitoring();
 
-    ExternalKeysCollectionDocument externalKey2(OID::gen(), 1, kMigrationId2);
+    ExternalKeysCollectionDocument externalKey2(OID::gen(), 1);
+    externalKey2.setMigrationId(kMigrationId2);
     externalKey2.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
 

@@ -60,12 +60,13 @@ static const char *const uri = "table:main";
  * completely idle, and when running a light workload. The latter is expressed as a fraction of the
  * total number of condition variable sleeps; the former is a constant.
  */
-#if defined(__NetBSD__) || defined(_WIN32)
+#if defined(__NetBSD__) || defined(_WIN32) || defined(__APPLE__)
 /*
  * NetBSD should never generate spurious wakeups, but does: see https://gnats.netbsd.org/56275.
  * Windows can also generate spurious wakeups:
  * https://docs.microsoft.com/en-us/windows/win32/sync/condition-variables These values allow the
- * test to complete in spite of that.
+ * test to complete in spite of that. MacOS can run more slowly which limits writes being coalesced
+ * for the log causing more resets.
  */
 #define CV_RESET_THRESHOLD_IDLE 20
 #define CV_RESET_THRESHOLD_DENOM 10
@@ -198,12 +199,11 @@ main(int argc, char *argv[])
      * Set up all the directory names.
      */
     testutil_work_dir_from_path(home, HOME_SIZE, working_dir);
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
     __wt_random_init(&rnd);
     for (i = 0; i < dbs; ++i) {
-        testutil_check(
-          __wt_snprintf(hometmp, HOME_SIZE, "%s%c%s.%d", home, DIR_DELIM, HOME_BASE, i));
-        testutil_make_work_dir(hometmp);
+        testutil_snprintf(hometmp, HOME_SIZE, "%s%c%s.%d", home, DIR_DELIM, HOME_BASE, i);
+        testutil_recreate_dir(hometmp);
         /*
          * Open each database. Rotate different configurations among them. Open a session and
          * statistics cursor. If writing data, create the table and open a data cursor.

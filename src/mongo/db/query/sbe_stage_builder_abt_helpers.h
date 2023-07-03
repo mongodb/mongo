@@ -29,7 +29,22 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 
 

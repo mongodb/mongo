@@ -29,14 +29,45 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/fetcher.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_rs.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
+#include "mongo/db/repl/tenant_migration_pem_payload_gen.h"
+#include "mongo/db/repl/tenant_migration_state_machine_gen.h"
+#include "mongo/db/serverless/serverless_types_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

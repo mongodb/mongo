@@ -27,9 +27,18 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <iterator>
+#include <numeric>
+#include <set>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::optimizer::algebra {
 

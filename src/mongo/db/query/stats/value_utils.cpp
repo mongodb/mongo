@@ -29,7 +29,18 @@
 
 #include "mongo/db/query/stats/value_utils.h"
 
-#include "mongo/db/query/stats/scalar_histogram.h"
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <iosfwd>
+#include <type_traits>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo::stats {
 namespace value = sbe::value;

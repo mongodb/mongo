@@ -28,18 +28,45 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/planner_wildcard_helpers.h"
-
+#include <absl/container/node_hash_set.h>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/optional.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <iterator>
+#include <set>
+#include <utility>
 #include <vector>
 
-#include "mongo/bson/util/builder.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor_utils.h"
-#include "mongo/db/index/wildcard_key_generator.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/interval.h"
+#include "mongo/db/query/planner_wildcard_helpers.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -688,12 +715,12 @@ void finalizeWildcardIndexScanConfiguration(
     index->wildcardFieldPos++;
 
     // If the wildcard field is "$_path", the index is used to answer query only on the non-wildcard
-    // prefix of a compound wildcard index. The bounds for both "$_path" fields should be
-    // "[MinKey, MaxKey]". Because the wildcard field can generate multiple keys for one single
-    // document, we should also instruct the IXSCAN to dedup keys.
+    // prefix of a compound wildcard index. The bounds for the "$_path" field should scan all
+    // string values and 'MinKey'. The bounds for the generic wildcard field should scan all values
+    // with bounds, "[MinKey, MaxKey]". Because the wildcard field can generate multiple keys for
+    // one single document, we should also instruct the IXSCAN to dedup keys.
     if (wildcardFieldName == "$_path"_sd) {
-        bounds->fields[index->wildcardFieldPos - 1].intervals.push_back(
-            IndexBoundsBuilder::allValues());
+        bounds->fields[index->wildcardFieldPos - 1].intervals = makeAllValuesForPath();
         bounds->fields[index->wildcardFieldPos].intervals.push_back(
             IndexBoundsBuilder::allValues());
         bounds->fields[index->wildcardFieldPos].name = "$_path";
@@ -772,6 +799,110 @@ BSONElement getWildcardField(const IndexEntry& index) {
     }
 
     return wildcardElt;
+}
+
+std::vector<Interval> makeAllValuesForPath() {
+    std::vector<Interval> intervals;
+
+    // Generating a [MinKey, MinKey] point interval. We use 'MinKey' as the "$_path" key value for
+    // documents that don't have any wildcard field.
+    BSONObjBuilder minKeyBob;
+    minKeyBob.appendMinKey("");
+    intervals.push_back(IndexBoundsBuilder::makePointInterval(minKeyBob.obj()));
+
+    // Generating a all-value index bounds for only string type, because "$_path" with a string
+    // value tracks the wildcard path.
+    BSONObjBuilder allStringBob;
+    allStringBob.appendMinForType("", BSONType::String);
+    allStringBob.appendMaxForType("", BSONType::String);
+    intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        allStringBob.obj(), BoundInclusion::kIncludeStartKeyOnly));
+
+    return intervals;
+}
+
+bool expandWildcardFieldBounds(std::vector<std::unique_ptr<QuerySolutionNode>>& ixscanNodes) {
+    // Check if the index is a CWI and its wildcard field was expanded to a specific field.
+    auto isCompoundWildcardIndexToExpand = [](const IndexScanNode* idxNode) {
+        const IndexEntry& index = idxNode->index;
+        BSONElement elt = index.keyPattern.firstElement();
+        if (index.type == INDEX_WILDCARD && elt.fieldNameStringData() != "$_path"_sd &&
+            index.keyPattern.nFields() > 2 &&
+            idxNode->bounds.fields[index.wildcardFieldPos].name != "$_path") {
+            return true;
+        }
+        return false;
+    };
+    // Expand the CWI's index bounds to include all keys for the '$_path' field and the wildcard
+    // field.
+    auto expandIndexBoundsForCWI = [](IndexScanNode* idxNode) {
+        IndexEntry& index = idxNode->index;
+        idxNode->bounds.fields[index.wildcardFieldPos - 1].intervals = makeAllValuesForPath();
+        idxNode->bounds.fields[index.wildcardFieldPos].intervals =
+            std::vector<Interval>{IndexBoundsBuilder::allValues()};
+        idxNode->bounds.fields[index.wildcardFieldPos - 1].name = "$_path";
+        if (!idxNode->iets.empty()) {
+            tassert(7842600,
+                    "The size of iets must be the same as in the index bounds",
+                    idxNode->iets.size() == idxNode->bounds.fields.size());
+            idxNode->iets[index.wildcardFieldPos - 1] =
+                interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
+                    idxNode->bounds.fields[index.wildcardFieldPos - 1]);
+            idxNode->iets[index.wildcardFieldPos] =
+                interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
+                    idxNode->bounds.fields[index.wildcardFieldPos]);
+        }
+        index.multikeyPaths[index.wildcardFieldPos] = MultikeyComponents();
+        idxNode->shouldDedup = true;
+
+        // Reverse the index bounds of the wildcard field.
+        size_t idx = 0;
+        for (auto elem : index.keyPattern) {
+            if (idx == index.wildcardFieldPos) {
+                if (elem.number() < 0) {
+                    idxNode->bounds.fields[index.wildcardFieldPos].reverse();
+                }
+            }
+            idx++;
+        }
+    };
+
+    // Expand the index bounds of certain compound wildcard indexes in order to avoid missing any
+    // documents for $or queries.
+    for (auto&& node : ixscanNodes) {
+        // This expanding logic is only for $or queries with the assumption that there're only FETCH
+        // and IXSCAN under OR to expand.
+        if (STAGE_FETCH == node->getType()) {
+            QuerySolutionNode* child = node->children[0].get();
+            if (STAGE_IXSCAN == child->getType()) {
+                IndexScanNode* idxNode = dynamic_cast<IndexScanNode*>(child);
+                tassert(7767201, "There must be an IndexScanNode under the FetchNode", idxNode);
+                if (isCompoundWildcardIndexToExpand(idxNode)) {
+                    if ((!node->filter || !idxNode->filter)) {
+                        expandIndexBoundsForCWI(idxNode);
+                    } else {
+                        return false;
+                    }
+                }
+            }
+        } else if (STAGE_IXSCAN == node->getType()) {
+            IndexScanNode* idxNode = static_cast<IndexScanNode*>(node.get());
+            if (isCompoundWildcardIndexToExpand(idxNode)) {
+                if (!idxNode->filter) {
+                    // It's not safe to include/expand the index bounds if there's no filter in
+                    // the IndexScanNode and no FetchNode above the IndexScanNode. Therefore,
+                    // in order to prevent missing any document in any predicate of the $or query,
+                    // we should abandon the query plan using such compound wildcard index.
+                    return false;
+                } else {
+                    // We can expand the CWI because there's a filter making sure the returning
+                    // documents match the predicate.
+                    expandIndexBoundsForCWI(idxNode);
+                }
+            }
+        }
+    }
+    return true;
 }
 }  // namespace wildcard_planning
 }  // namespace mongo

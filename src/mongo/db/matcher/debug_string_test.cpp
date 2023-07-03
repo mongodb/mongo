@@ -27,34 +27,50 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <s2cellid.h>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
-#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/expression_text.h"
-#include "mongo/db/matcher/expression_where.h"
-#include "mongo/db/matcher/expression_where_base.h"
-#include "mongo/db/matcher/matcher.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_type.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_eq.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/index_tag.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/golden_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/golden_test_base.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 

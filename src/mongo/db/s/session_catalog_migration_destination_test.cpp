@@ -27,39 +27,72 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <fmt/format.h>
 #include <memory>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/initialize_operation_session_info.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration.h"
 #include "mongo/db/s/session_catalog_migration_destination.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
-#include "mongo/db/s/sharding_statistics.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_catalog_mongod.h"
-#include "mongo/db/session/session_txn_record_gen.h"
-#include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -248,7 +281,15 @@ public:
             Client::initThread("test-insert-thread");
             auto innerOpCtx = Client::getCurrent()->makeOperationContext();
 
-            initializeOperationSessionInfo(innerOpCtx.get(), insertBuilder.obj(), true, true, true);
+            auto opMsgRequest = OpMsgRequestBuilder::create(
+                DatabaseName::createDatabaseName_forTest(boost::none, "test_unused_dbname"),
+                insertBuilder.obj(),
+                BSONObj());
+            initializeOperationSessionInfo(innerOpCtx.get(),
+                                           opMsgRequest,
+                                           true /* requiresAuth */,
+                                           true /* attachToOpCtx */,
+                                           true /* isReplSetMemberOrMongos */);
             auto mongoDSessionCatalog = MongoDSessionCatalog::get(innerOpCtx.get());
             auto sessionTxnState = mongoDSessionCatalog->checkOutSession(innerOpCtx.get());
             auto txnParticipant = TransactionParticipant::get(innerOpCtx.get());

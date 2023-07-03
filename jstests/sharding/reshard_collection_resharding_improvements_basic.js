@@ -2,7 +2,7 @@
  * Tests for basic functionality of the resharding improvements feature.
  *
  * @tags: [
- *  require_fcv_71,
+ *  requires_fcv_71,
  *  featureFlagReshardingImprovements
  * ]
  */
@@ -28,8 +28,21 @@ const testShardDistribution = (mongos) => {
         return;
     }
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+    /**
+     * Failure cases.
+     */
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
+
+    jsTest.log("reshardCollection cmd should fail when shardDistribution has duplicate shardId.");
+    assert.commandFailedWithCode(mongos.adminCommand({
+        reshardCollection: ns,
+        key: {newKey: 1},
+        shardDistribution: [
+            {shard: st.shard0.shardName, min: {newKey: MinKey}},
+            {shard: st.shard0.shardName, max: {newKey: MaxKey}}
+        ]
+    }),
+                                 ErrorCodes.InvalidOptions);
 
     jsTest.log("reshardCollection cmd should fail when shardDistribution is missing min or max.");
     assert.commandFailedWithCode(mongos.adminCommand({
@@ -100,15 +113,19 @@ const testShardDistribution = (mongos) => {
         ]
     }),
                                  ErrorCodes.ShardNotFound);
+    mongos.getDB(kDbName)[collName].drop();
 
+    /**
+     * Success cases go below.
+     */
     jsTest.log("reshardCollection cmd should succeed with shardDistribution parameter.");
-    // TODO(SERVER-76791): This should work after supporting non-explicit form of shardDistribution.
-    assert.commandFailedWithCode(mongos.adminCommand({
+    reshardCmdTest.assertReshardCollOk({
         reshardCollection: ns,
         key: {newKey: 1},
+        numInitialChunks: 2,
         shardDistribution: [{shard: st.shard0.shardName}, {shard: st.shard1.shardName}]
-    }),
-                                 ErrorCodes.InvalidOptions);
+    },
+                                       2);
     reshardCmdTest.assertReshardCollOk(
         {
             reshardCollection: ns,
@@ -125,6 +142,118 @@ const testShardDistribution = (mongos) => {
         ]);
 };
 
+const testForceRedistribution = (mongos) => {
+    if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
+        jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled");
+        return;
+    }
+
+    jsTest.log(
+        "When forceRedistribution is not set to true, same-key resharding should have no effect");
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {oldKey: 1}, numInitialChunks: 2}, 1);
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {oldKey: 1}, numInitialChunks: 2, forceRedistribution: false},
+        1);
+
+    jsTest.log("When forceRedistribution is true, same-key resharding should take effect");
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {oldKey: 1}, numInitialChunks: 2, forceRedistribution: true},
+        2);
+
+    // Create a sharded collection with 2 zones, then force same-key resharding without specifying
+    // zones and the resharding should use existing 2 zones
+    jsTest.log("When zones is not provided, use existing zones on the collection");
+    const additionalSetup = function(test) {
+        const st = test._st;
+        const ns = test._ns;
+        const zoneName1 = 'z1';
+        const zoneName2 = 'z2';
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName1}));
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName2}));
+        assert.commandWorked(
+            st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: zoneName2}));
+        assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
+        assert.commandWorked(st.s.adminCommand(
+            {updateZoneKeyRange: ns, min: {oldKey: MinKey}, max: {oldKey: 0}, zone: zoneName1}));
+        assert.commandWorked(st.s.adminCommand(
+            {updateZoneKeyRange: ns, min: {oldKey: 0}, max: {oldKey: MaxKey}, zone: zoneName2}));
+    };
+
+    reshardCmdTest.assertReshardCollOk(
+        {
+            reshardCollection: ns,
+            key: {oldKey: 1},
+            forceRedistribution: true,
+            shardDistribution: [
+                {shard: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: -1}},
+                {shard: st.shard0.shardName, min: {oldKey: -1}, max: {oldKey: 1}},
+                {shard: st.shard1.shardName, min: {oldKey: 1}, max: {oldKey: MaxKey}}
+            ]
+        },
+        4,
+        [
+            {recipientShardId: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: -1}},
+            {recipientShardId: st.shard0.shardName, min: {oldKey: -1}, max: {oldKey: 0}},
+            {recipientShardId: st.shard0.shardName, min: {oldKey: 0}, max: {oldKey: 1}},
+            {recipientShardId: st.shard1.shardName, min: {oldKey: 1}, max: {oldKey: MaxKey}}
+        ],
+        [
+            {zone: "z1", min: {oldKey: MinKey}, max: {oldKey: 0}},
+            {zone: "z2", min: {oldKey: 0}, max: {oldKey: MaxKey}}
+        ],
+        additionalSetup);
+    jsTest.log("When empty zones is provided, should discard the existing zones.");
+    reshardCmdTest.assertReshardCollOk(
+        {
+            reshardCollection: ns,
+            key: {oldKey: 1},
+            forceRedistribution: true,
+            zones: [],
+            shardDistribution: [
+                {shard: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: -1}},
+                {shard: st.shard0.shardName, min: {oldKey: -1}, max: {oldKey: 1}},
+                {shard: st.shard1.shardName, min: {oldKey: 1}, max: {oldKey: MaxKey}}
+            ]
+        },
+        3,
+        [
+            {recipientShardId: st.shard0.shardName, min: {oldKey: MinKey}, max: {oldKey: -1}},
+            {recipientShardId: st.shard0.shardName, min: {oldKey: -1}, max: {oldKey: 1}},
+            {recipientShardId: st.shard1.shardName, min: {oldKey: 1}, max: {oldKey: MaxKey}}
+        ],
+        [],
+        additionalSetup);
+};
+
+const testReshardingWithIndex = (mongos) => {
+    if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
+        jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled");
+        return;
+    }
+
+    jsTest.log(
+        "When there is no index on the new shard-key, we should create one during resharding.");
+
+    const additionalSetup = function(test) {
+        assert.commandWorked(
+            test._mongos.getDB(test._dbName).getCollection(test._collName).createIndex({
+                oldKey: 1
+            }));
+    };
+
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 2},
+        2,
+        undefined,
+        undefined,
+        additionalSetup);
+};
+
 testShardDistribution(mongos);
+testForceRedistribution(mongos);
+testReshardingWithIndex(mongos);
 st.stop();
 })();

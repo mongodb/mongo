@@ -29,8 +29,20 @@
 
 #pragma once
 
+#include <functional>
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/containers.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer {
 

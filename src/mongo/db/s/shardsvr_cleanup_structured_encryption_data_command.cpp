@@ -28,17 +28,39 @@
  */
 
 
+#include <memory>
+#include <set>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/fle2_cleanup_gen.h"
+#include "mongo/db/commands/fle2_compact.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/cleanup_structured_encryption_data_coordinator.h"
 #include "mongo/db/s/cleanup_structured_encryption_data_coordinator_gen.h"
-#include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/db/s/sharding_ddl_coordinator_gen.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -116,6 +138,7 @@ public:
 
             AutoGetCollection ecocColl(opCtx, namespaces.ecocNss, MODE_IX);
             AutoGetCollection ecocTempColl(opCtx, namespaces.ecocRenameNss, MODE_IX);
+            AutoGetCollection escDeletesColl(opCtx, namespaces.escDeletesNss, MODE_IX);
 
             CleanupStructuredEncryptionDataState cleanup;
 
@@ -125,12 +148,16 @@ public:
             if (ecocTempColl.getCollection()) {
                 cleanup.setEcocRenameUuid(ecocTempColl->uuid());
             }
+            if (escDeletesColl.getCollection()) {
+                cleanup.setEscDeletesUuid(escDeletesColl->uuid());
+            }
 
             cleanup.setShardingDDLCoordinatorMetadata(
                 {{nss, DDLCoordinatorTypeEnum::kCleanupStructuredEncryptionData}});
             cleanup.setEscNss(namespaces.escNss);
             cleanup.setEcocNss(namespaces.ecocNss);
             cleanup.setEcocRenameNss(namespaces.ecocRenameNss);
+            cleanup.setEscDeletesNss(namespaces.escDeletesNss);
             cleanup.setCleanupTokens(req.getCleanupTokens().getOwned());
 
             return cleanup;
@@ -148,8 +175,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
 

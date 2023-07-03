@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

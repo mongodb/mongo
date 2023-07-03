@@ -13,6 +13,7 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
+load("jstests/libs/feature_flag_util.js");
 
 TimeseriesTest.run((insert) => {
     const collNamePrefix = 'timeseries_bucket_limit_count_';
@@ -70,9 +71,15 @@ TimeseriesTest.run((insert) => {
         assert.eq(bucketMaxCount - 1,
                   bucketDocs[0].control.max.x,
                   'invalid control.max for x in first bucket: ' + tojson(bucketDocs));
-        assert.eq(2,
-                  bucketDocs[0].control.version,
-                  'unexpected control.version in first bucket: ' + tojson(bucketDocs));
+        if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
+            assert.eq(1,
+                      bucketDocs[0].control.version,
+                      'unexpected control.version in first bucket: ' + tojson(bucketDocs));
+        } else {
+            assert.eq(2,
+                      bucketDocs[0].control.version,
+                      'unexpected control.version in first bucket: ' + tojson(bucketDocs));
+        }
         assert(!bucketDocs[0].control.hasOwnProperty("closed"),
                'unexpected control.closed in first bucket: ' + tojson(bucketDocs));
 

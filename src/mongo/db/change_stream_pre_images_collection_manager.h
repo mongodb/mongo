@@ -30,16 +30,25 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
 
-#include "mongo/db/change_stream_pre_images_truncate_markers.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/change_stream_pre_images_truncate_manager.h"
+#include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
+#include "mongo/db/client.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrent_shared_values_map.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 /**
@@ -168,6 +177,8 @@ private:
 
     /**
      * Common logic for removing expired pre-images with a collection scan.
+     *
+     * Returns the number of pre-image documents removed.
      */
     size_t _deleteExpiredPreImagesWithCollScanCommon(
         OperationContext* opCtx,
@@ -176,13 +187,17 @@ private:
         Timestamp maxRecordIdTimestamp);
 
     /**
-     * Removes expired pre-images in a single tenant enviornment.
+     * Removes expired pre-images in a single tenant environment.
+     *
+     * Returns the number of pre-image documents removed.
      */
     size_t _deleteExpiredPreImagesWithCollScan(OperationContext* opCtx,
                                                Date_t currentTimeForTimeBasedExpiration);
 
     /**
      * Removes expired pre-images for the tenant with 'tenantId'.
+     *
+     * Returns the number of pre-image documents removed.
      */
     size_t _deleteExpiredPreImagesWithCollScanForTenants(OperationContext* opCtx,
                                                          const TenantId& tenantId,
@@ -190,10 +205,13 @@ private:
 
     /**
      * Removes expired pre-images with truncate. Suitable for both serverless and single tenant
-     * enviornments. 'tenantId' is boost::none in a single tenant enviornment.
+     * environments. 'tenantId' is boost::none in a single tenant environment.
      *
-     * Performs lazy initialisation of truncate markers upon creation of the tenant's pre-images
-     * collection upon startup.
+     * If 'tenantId' is not yet registered with the '_truncateManager', performs lazy registration
+     * and initialisation of the tenant's corresponding truncate markers before removing expired
+     * pre-images.
+     *
+     * Returns the number of pre-image documents removed.
      */
     size_t _deleteExpiredPreImagesWithTruncate(OperationContext* opCtx,
                                                boost::optional<TenantId> tenantId);
@@ -201,21 +219,9 @@ private:
     PurgingJobStats _purgingJobStats;
 
     /**
-     * A map which represents the truncate markers for an entire "config.system.preimages"
-     * collection.
+     * Manages truncate markers and truncation across tenants. Treats a single tenant environment
+     * the same as a multi-tenant environment, but with only one tenant of TenantId boost::none.
      */
-    using PreImagesCollectionTruncateMap =
-        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerCollection, UUID::Hash>;
-
-    using TenantToPreImagesCollectionTruncateMap =
-        ConcurrentSharedValuesMap<boost::optional<TenantId>, PreImagesCollectionTruncateMap>;
-
-    /**
-     * Maps a 'tenantId' to its corresponding 'config.system.preimages'
-     * PreImagesCollectionTruncateMap.
-     *
-     * In a single-tenant environment, 'tenantId' is boost::none.
-     */
-    TenantToPreImagesCollectionTruncateMap _tenantTruncateMarkersMap;
+    PreImagesTruncateManager _truncateManager;
 };
 }  // namespace mongo

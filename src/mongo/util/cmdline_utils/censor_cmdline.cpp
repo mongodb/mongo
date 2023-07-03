@@ -29,10 +29,23 @@
 
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <cstring>
 #include <set>
 #include <string>
 
-#include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/options_parser/option_description.h"
+#include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/str.h"
 

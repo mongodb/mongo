@@ -27,16 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/document_source_merge_spec.h"
-
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
+#include "mongo/db/pipeline/document_source_merge_spec.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 using namespace fmt::literals;

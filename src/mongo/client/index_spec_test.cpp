@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/client/index_spec.h"
-
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 #define ASSERT_UASSERTS(STATEMENT) ASSERT_THROWS(STATEMENT, AssertionException)
 

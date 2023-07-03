@@ -28,8 +28,19 @@
  */
 
 #include "mongo/db/process_health/state_machine.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none_t.hpp>
+#include <boost/optional.hpp>
+#include <string>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 

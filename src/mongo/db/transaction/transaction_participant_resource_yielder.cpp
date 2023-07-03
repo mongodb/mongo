@@ -29,6 +29,7 @@
 
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
 
+#include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/transaction/transaction_participant.h"

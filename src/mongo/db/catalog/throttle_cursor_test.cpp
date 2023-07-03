@@ -27,16 +27,38 @@
  *    it in the license file.
  */
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/catalog/validate_gen.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -52,10 +74,10 @@ private:
     void tearDown() override;
 
 protected:
-    const KeyString::Value kMinKeyString = KeyString::Builder{KeyString::Version::kLatestVersion,
-                                                              kMinBSONKey,
-                                                              KeyString::ALL_ASCENDING}
-                                               .getValueCopy();
+    const key_string::Value kMinKeyString = key_string::Builder{key_string::Version::kLatestVersion,
+                                                                kMinBSONKey,
+                                                                key_string::ALL_ASCENDING}
+                                                .getValueCopy();
 
     explicit ThrottleCursorTest(Milliseconds clockIncrement = Milliseconds{kTickDelay})
         : CatalogTestFixture(Options{}.useMockClock(true, clockIncrement)) {}

@@ -27,25 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/fail_point.h"
-
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <chrono>
 #include <fmt/format.h>
-
 #include <limits>
-#include <memory>
+#include <new>
 #include <random>
+#include <thread>
 
-#include "mongo/base/init.h"
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_server_parameter_gen.h"
-#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -249,7 +260,7 @@ StatusWith<FailPoint::ModeOptions> FailPoint::parseBSON(const BSONObj& obj) {
         uassert(7302300,
                 "$tenant should only be provided once, at the command level.",
                 !data.hasField("$tenant"));
-        if (obj.hasField("$tenant") && data.hasField("namespace")) {
+        if (obj.hasField("$tenant")) {
             data = data.addField(obj.getField("$tenant"));
         }
     }

@@ -28,42 +28,69 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/scripting/mozjs/implscope.h"
-
-#include <iostream>
-#include <memory>
-
-#include <js/CharacterEncoding.h>
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <js/CallArgs.h>
+#include <js/Class.h>
 #include <js/CompilationAndEvaluation.h>
+#include <js/CompileOptions.h>
+#include <js/Context.h>
 #include <js/ContextOptions.h>
+#include <js/ErrorReport.h>
+#include <js/Exception.h>
+#include <js/GCAPI.h>
+#include <js/GCVector.h>
 #include <js/Initialization.h>
 #include <js/Modules.h>
 #include <js/Object.h>
 #include <js/Promise.h>
+#include <js/Realm.h>
+#include <js/RootingAPI.h>
 #include <js/SourceText.h>
 #include <js/TypeDecls.h>
+#include <js/Value.h>
 #include <js/friend/ErrorMessages.h>
 #include <jsapi.h>
 #include <jscustomallocator.h>
 #include <jsfriendapi.h>
-
-#include <boost/filesystem.hpp>
+#include <jspubtd.h>
+#include <mozilla/Utf8.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <iostream>
+#include <memory>
+#include <mutex>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/config.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/operation_context.h"
+#include "mongo/logv2/constants.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_truncation.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/stack_locator.h"
+#include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/jsexception.h"
+#include "mongo/scripting/mozjs/exception.h"
+#include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -29,6 +29,12 @@
 
 #pragma once
 
+#include <js/CallArgs.h>
+#include <js/Class.h>
+#include <js/Id.h>
+#include <js/PropertySpec.h>
+#include <js/TracingAPI.h>
+#include <js/TypeDecls.h>
 #include <jsapi.h>
 
 namespace mongo {

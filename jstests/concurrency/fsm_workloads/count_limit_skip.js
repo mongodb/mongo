@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * count_limit_skip.js
  *
@@ -10,11 +8,11 @@
  * and then inserts 'modulus * countPerNum' documents. [250, 1000]
  * Each thread inserts docs into a unique collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/count.js');       // for $config
-load("jstests/libs/fixture_helpers.js");                  // For isMongos.
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/count.js";
+load("jstests/libs/fixture_helpers.js");  // For isMongos.
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.prefix = 'count_fsm_q_l_s';
 
     $config.data.getCount = function getCount(db, predicate) {

@@ -27,15 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -61,11 +78,11 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const override {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                  ActionType::fsync)) {
+        if (!as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::fsync)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 

@@ -31,7 +31,10 @@
 
 #include <iosfwd>
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/mutable/const_element.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/element.h"
 
 namespace mongo {
 

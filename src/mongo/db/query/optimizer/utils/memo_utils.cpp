@@ -29,8 +29,30 @@
 
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
+#include "mongo/db/query/optimizer/cascades/memo_defs.h"
+#include "mongo/db/query/optimizer/containers.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/util/assert_util.h"
 
 
 namespace mongo::optimizer {
@@ -406,6 +428,11 @@ public:
             const auto& nodeInfo =
                 (altIndex == 0) ? *result._nodeInfo : result._rejectedNodeInfo.at(altIndex - 1);
             const ABT& node = nodeInfo._node;
+            if (nodeInfo._cost.isInfinite()) {
+                // Skip the node with infinity cost as that indicates the failure of physical plan
+                // optimization.
+                continue;
+            }
 
             MemoPhysicalPlanExtractor instance(memo,
                                                metadata,

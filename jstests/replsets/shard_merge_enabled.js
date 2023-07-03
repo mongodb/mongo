@@ -10,7 +10,7 @@ import {
 load("jstests/libs/fail_point_util.js");
 
 function runTest(downgradeFCV) {
-    const rst = new ReplSetTest({nodes: 1});
+    const rst = new ReplSetTest({nodes: 1, serverless: true});
     rst.startSet();
     rst.initiate();
 

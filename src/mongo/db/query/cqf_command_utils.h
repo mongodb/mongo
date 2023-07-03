@@ -29,10 +29,20 @@
 
 #pragma once
 
+#include <iostream>
+#include <string>
+
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_internal_inhibit_optimization.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -46,7 +56,10 @@ namespace optimizer {
  * should set 'eligible' to false.
  */
 struct ABTUnsupportedDocumentSourceVisitorContext : public DocumentSourceVisitorContextBase {
+    ABTUnsupportedDocumentSourceVisitorContext(QueryFrameworkControlEnum controlEnum)
+        : frameworkControl(controlEnum) {}
     bool eligible{true};
+    const QueryFrameworkControlEnum frameworkControl;
 };
 }  // namespace optimizer
 

@@ -27,10 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
-
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -38,6 +40,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -199,11 +202,18 @@ Status ShardingCatalogClientMock::createDatabase(OperationContext* opCtx,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientMock::getNewKeys(
+StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientMock::getNewInternalKeys(
     OperationContext* opCtx,
     StringData purpose,
     const LogicalTime& newerThanThis,
     repl::ReadConcernLevel readConcernLevel) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
+StatusWith<std::vector<ExternalKeysCollectionDocument>>
+ShardingCatalogClientMock::getAllExternalKeys(OperationContext* opCtx,
+                                              StringData purpose,
+                                              repl::ReadConcernLevel readConcernLevel) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

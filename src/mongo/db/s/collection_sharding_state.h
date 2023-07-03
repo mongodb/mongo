@@ -29,10 +29,21 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/service_context.h"
+#include "mongo/s/index_version.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
 
 namespace mongo {

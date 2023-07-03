@@ -29,14 +29,26 @@
 
 #include "mongo/db/index/expression_params.h"
 
+#include <memory>
 #include <s2.h>
+#include <utility>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/geo/geoconstants.h"
+#include "mongo/db/geo/hash.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

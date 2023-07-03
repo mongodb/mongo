@@ -27,13 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/fast_clock_source_factory.h"
-
 #include <memory>
 
 #include "mongo/util/background_thread_clock_source.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/fast_clock_source_factory.h"
 #include "mongo/util/system_clock_source.h"
 
 namespace mongo {

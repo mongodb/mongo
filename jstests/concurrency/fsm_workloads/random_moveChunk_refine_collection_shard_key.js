@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Performs updates in transactions without the shard key while chunks are being moved. This
  * includes multi=true updates and multi=false updates with exact _id queries.
@@ -11,10 +9,10 @@
  *  uses_transactions,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
 

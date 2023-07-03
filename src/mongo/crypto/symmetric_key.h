@@ -29,12 +29,19 @@
 
 #pragma once
 
-#include <MurmurHash3.h>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/secure_allocator.h"
+#include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/murmur3.h"
 
 namespace mongo {
 class Status;
@@ -74,9 +81,7 @@ public:
     struct Hash {
         std::size_t operator()(const SymmetricKeyId& keyid) const {
             auto rep = keyid.toString();
-            uint32_t hash;
-            MurmurHash3_x86_32(rep.data(), rep.size(), 0, &hash);
-            return hash;
+            return murmur3<sizeof(uint32_t)>(StringData{rep}, 0 /*seed*/);
         }
     };
 

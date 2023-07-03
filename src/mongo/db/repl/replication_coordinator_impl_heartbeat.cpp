@@ -36,37 +36,76 @@
 #define LOGV2_FOR_SHARD_SPLIT(ID, DLEVEL, MESSAGE, ...) \
     LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kTenantMigration}, MESSAGE, ##__VA_ARGS__)
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
-#include <functional>
+#include <boost/smart_ptr.hpp>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/global_settings.h"
-#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/delayable_timeout_callback.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/member_id.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_metrics.h"
+#include "mongo/db/repl/replication_metrics_gen.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/tenant_migration_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/db/repl/vote_requester.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/storage/control/journal_flusher.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -123,7 +162,7 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::Call
     const RemoteCommandRequest request(
         target, "admin", heartbeatObj, BSON(rpc::kReplSetMetadataFieldName << 1), nullptr, timeout);
     const executor::TaskExecutor::RemoteCommandCallbackFn callback =
-        [=](const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
+        [=, this](const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
             return _handleHeartbeatResponse(cbData, replSetName);
         };
 
@@ -149,7 +188,7 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget_inlock(const HostAnd
                          "when"_attr = when);
     _trackHeartbeatHandle_inlock(
         _replExecutor->scheduleWorkAt(when,
-                                      [=, replSetName = std::move(replSetName)](
+                                      [=, this, replSetName = std::move(replSetName)](
                                           const executor::TaskExecutor::CallbackArgs& cbData) {
                                           _doMemberHeartbeat(cbData, target, replSetName);
                                       }),
@@ -354,7 +393,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             if (mem && mem->isNewlyAdded()) {
                 const auto memId = mem->getId();
                 auto status = _replExecutor->scheduleWork(
-                    [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+                    [=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
                         _reconfigToRemoveNewlyAddedField(
                             cbData, memId, _rsConfig.getConfigVersionAndTerm());
                     });
@@ -445,7 +484,8 @@ stdx::unique_lock<Latch> ReplicationCoordinatorImpl::_handleHeartbeatResponseAct
                                    "Scheduling priority takeover",
                                    "when"_attr = _priorityTakeoverWhen);
                 _priorityTakeoverCbh = _scheduleWorkAt(
-                    _priorityTakeoverWhen, [=](const mongo::executor::TaskExecutor::CallbackArgs&) {
+                    _priorityTakeoverWhen,
+                    [=, this](const mongo::executor::TaskExecutor::CallbackArgs&) {
                         _startElectSelfIfEligibleV1(StartElectionReasonEnum::kPriorityTakeover);
                     });
             }
@@ -462,7 +502,8 @@ stdx::unique_lock<Latch> ReplicationCoordinatorImpl::_handleHeartbeatResponseAct
                                    "Scheduling catchup takeover",
                                    "when"_attr = _catchupTakeoverWhen);
                 _catchupTakeoverCbh = _scheduleWorkAt(
-                    _catchupTakeoverWhen, [=](const mongo::executor::TaskExecutor::CallbackArgs&) {
+                    _catchupTakeoverWhen,
+                    [=, this](const mongo::executor::TaskExecutor::CallbackArgs&) {
                         _startElectSelfIfEligibleV1(StartElectionReasonEnum::kCatchupTakeover);
                     });
             }
@@ -512,7 +553,7 @@ executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_stepDownStart()
     }
 
     _replExecutor
-        ->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& cbData) {
+        ->scheduleWork([=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
             _stepDownFinish(cbData, finishEvent);
         })
         .status_with_transitional_ignore();
@@ -658,7 +699,7 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
               _rsConfig.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm() ||
               _selfIndex < 0);
     _replExecutor
-        ->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& cbData) {
+        ->scheduleWork([=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
             const auto [swConfig, isSplitRecipientConfig] = _resolveConfigToApply(newConfig);
             if (!swConfig.isOK()) {
                 LOGV2_WARNING(
@@ -679,24 +720,24 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
             }
 
             LOGV2(8423366, "Waiting for oplog buffer to drain before applying recipient config.");
-            _drainForShardSplit().getAsync(
-                [this,
-                 resolvedConfig = swConfig.getValue(),
-                 replExecutor = _replExecutor.get(),
-                 isSplitRecipientConfig = isSplitRecipientConfig](Status status) {
-                    if (!status.isOK()) {
-                        stdx::lock_guard<Latch> lg(_mutex);
-                        _setConfigState_inlock(!_rsConfig.isInitialized() ? kConfigUninitialized
-                                                                          : kConfigSteady);
-                        return;
-                    }
+            _drainForShardSplit().getAsync([this,
+                                            resolvedConfig = swConfig.getValue(),
+                                            replExecutor = _replExecutor.get(),
+                                            isSplitRecipientConfig =
+                                                isSplitRecipientConfig](Status status) {
+                if (!status.isOK()) {
+                    stdx::lock_guard<Latch> lg(_mutex);
+                    _setConfigState_inlock(!_rsConfig.isInitialized() ? kConfigUninitialized
+                                                                      : kConfigSteady);
+                    return;
+                }
 
-                    replExecutor
-                        ->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& cbData) {
-                            _heartbeatReconfigStore(cbData, resolvedConfig, isSplitRecipientConfig);
-                        })
-                        .status_with_transitional_ignore();
-                });
+                replExecutor
+                    ->scheduleWork([=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
+                        _heartbeatReconfigStore(cbData, resolvedConfig, isSplitRecipientConfig);
+                    })
+                    .status_with_transitional_ignore();
+            });
         })
         .status_with_transitional_ignore();
 }
@@ -938,7 +979,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
                              "_heartbeatReconfigFinish until fail point is disabled");
         _replExecutor
             ->scheduleWorkAt(_replExecutor->now() + Milliseconds{10},
-                             [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+                             [=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
                                  _heartbeatReconfigFinish(
                                      cbData, newConfig, myIndex, isSplitRecipientConfig);
                              })
@@ -963,7 +1004,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             // Wait for the election to complete and the node's Role to be set to follower.
             _replExecutor
                 ->onEvent(electionFinishedEvent,
-                          [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+                          [=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
                               _heartbeatReconfigFinish(
                                   cbData, newConfig, myIndex, isSplitRecipientConfig);
                           })

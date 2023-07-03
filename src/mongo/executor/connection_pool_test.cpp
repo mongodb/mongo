@@ -27,24 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/executor/connection_pool_test_fixture.h"
-
-#include "mongo/util/duration.h"
-#include "mongo/util/net/hostandport.h"
 #include <algorithm>
+#include <array>
+#include <boost/smart_ptr.hpp>
 #include <memory>
 #include <random>
+#include <ratio>
+#include <set>
 #include <stack>
 #include <tuple>
+#include <type_traits>
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/connection_pool_stats.h"
-#include "mongo/stdx/future.h"
+#include "mongo/executor/connection_pool_test_fixture.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/executor_test_util.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -90,6 +96,12 @@ protected:
 
     void doneWith(ConnectionPool::ConnectionHandle& conn) {
         dynamic_cast<ConnectionImpl*>(conn.get())->indicateSuccess();
+
+        ExecutorFuture(_executor).getAsync([conn = std::move(conn)](auto) {});
+    }
+
+    void doneWithError(ConnectionPool::ConnectionHandle& conn, Status error) {
+        dynamic_cast<ConnectionImpl*>(conn.get())->indicateFailure(error);
 
         ExecutorFuture(_executor).getAsync([conn = std::move(conn)](auto) {});
     }
@@ -437,6 +449,159 @@ TEST_F(ConnectionPoolTest, FailedConnDifferentConn) {
     ASSERT(conn1Id);
     ASSERT(conn2Id);
     ASSERT_NE(conn1Id, conn2Id);
+}
+
+/**
+ * Verify that a connection returned with an error indicating the remote
+ * is unavailable drops current generation connections to that remote.
+ */
+TEST_F(ConnectionPoolTest, FailedHostDropsConns) {
+    auto pool = makePool();
+
+    ASSERT_EQ(pool->getNumConnectionsPerHost(HostAndPort()), 0U);
+
+    constexpr size_t kSize = 100;
+    std::vector<ConnectionPool::ConnectionHandle> connections;
+    std::vector<unittest::ThreadAssertionMonitor> monitors(kSize);
+
+    // Ensure that no matter how we leave the test, we mark any
+    // checked out connections as OK before implicity returning them
+    // to the pool by destroying the 'connections' vector. Otherwise,
+    // this test would cause an invariant failure instead of a normal
+    // test failure if it fails, which would be confusing.
+    auto drainConnPool = [&] {
+        while (!connections.empty()) {
+            try {
+                ConnectionPool::ConnectionHandle conn = std::move(connections.back());
+                connections.pop_back();
+                doneWith(conn);
+            } catch (...) {
+            }
+        }
+    };
+    const ScopeGuard guard(drainConnPool);
+
+    auto now = Date_t::now();
+    PoolImpl::setNow(now);
+
+    // Check out kSize connections from the pool.
+    for (size_t i = 0; i != kSize; ++i) {
+        ConnectionImpl::pushSetup(Status::OK());
+        auto cb = [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+            monitors[i].exec([&]() {
+                ASSERT(swConn.isOK());
+                connections.push_back(std::move(swConn.getValue()));
+                monitors[i].notifyDone();
+            });
+        };
+        auto timeout = Milliseconds(5000);
+        auto errorCode = ErrorCodes::NetworkInterfaceExceededTimeLimit;
+
+        pool->get_forTest(HostAndPort(), timeout, errorCode, cb);
+    }
+
+    for (auto& monitor : monitors) {
+        monitor.wait();
+    }
+
+    ASSERT_EQ(pool->getNumConnectionsPerHost(HostAndPort()), kSize);
+
+    // Return one connection with a network error.
+    ConnectionPool::ConnectionHandle conn = std::move(connections.back());
+    connections.pop_back();
+    doneWithError(conn, {ErrorCodes::HostUnreachable, "error"});
+
+    // We should still have all of the connections open, minus the one we just returned with an
+    // error.
+    ASSERT_EQ(pool->getNumConnectionsPerHost(HostAndPort()), kSize - 1);
+
+    // Put the remaining connections back.
+    drainConnPool();
+
+    // They should all be discarded since the host should be marked as down
+    // due to the connection returned with a network error.
+    ASSERT_EQ(pool->getNumConnectionsPerHost(HostAndPort()), 0);
+}
+
+/**
+ * Verify that a connection returned with an error that does _not_ indicate
+ * the remote is unavailable does _not_ drop current generation connections to that remote.
+ */
+TEST_F(ConnectionPoolTest, OtherErrorsDontDropConns) {
+    auto pool = makePool();
+
+    ASSERT_EQ(pool->getNumConnectionsPerHost(HostAndPort()), 0U);
+
+    constexpr size_t kSize = 100;
+    std::vector<ConnectionPool::ConnectionHandle> connections;
+
+    // Ensure that no matter how we leave the test, we mark any
+    // checked out connections as OK before implicity returning them
+    // to the pool by destroying the 'connections' vector. Otherwise,
+    // this test would cause an invariant failure instead of a normal
+    // test failure if it fails, which would be confusing.
+    auto drainConnPool = [&] {
+        while (!connections.empty()) {
+            try {
+                ConnectionPool::ConnectionHandle conn = std::move(connections.back());
+                connections.pop_back();
+                doneWith(conn);
+            } catch (...) {
+            }
+        }
+    };
+    const ScopeGuard guard(drainConnPool);
+
+    auto now = Date_t::now();
+    PoolImpl::setNow(now);
+
+    auto checkOutConnections = [&] {
+        std::vector<unittest::ThreadAssertionMonitor> monitors(kSize);
+        for (size_t i = 0; i != kSize; ++i) {
+            ConnectionImpl::pushSetup(Status::OK());
+            auto cb = [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                monitors[i].exec([&]() {
+                    ASSERT(swConn.isOK());
+                    connections.push_back(std::move(swConn.getValue()));
+                    monitors[i].notifyDone();
+                });
+            };
+            auto timeout = Milliseconds(5000);
+            auto errorCode = ErrorCodes::NetworkInterfaceExceededTimeLimit;
+
+            pool->get_forTest(HostAndPort(), timeout, errorCode, cb);
+        }
+
+        for (auto& monitor : monitors) {
+            monitor.wait();
+        }
+
+        ASSERT_EQ(pool->getNumConnectionsPerHost(HostAndPort()), kSize);
+    };
+
+    // All three types of error that shouldn't result in us dropping connections - a non-network
+    // error; a network timeout error, and a network error that we can isolate to a specific
+    // connection.
+    std::array<ErrorCodes::Error, 3> errors = {
+        ErrorCodes::InternalError, ErrorCodes::NetworkTimeout, ErrorCodes::ConnectionError};
+    for (size_t i = 0; i < errors.size(); ++i) {
+        // Check out kSize connections from the pool.
+        checkOutConnections();
+        // Return one connection with a non-network error.
+        ConnectionPool::ConnectionHandle conn = std::move(connections.back());
+        connections.pop_back();
+        doneWithError(conn, {errors[i], "error"});
+
+        // We should still have all of the connections open, minus the one we just returned with an
+        // error.
+        ASSERT_EQ(pool->getNumConnectionsPerHost(HostAndPort()), kSize - 1);
+
+        // Put the remaining connections back.
+        drainConnPool();
+
+        // They should all still be open.
+        ASSERT_EQ(pool->getNumConnectionsPerHost(HostAndPort()), kSize - 1);
+    }
 }
 
 /**

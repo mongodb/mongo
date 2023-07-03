@@ -28,20 +28,40 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <fmt/format.h>
 #include <iterator>
+#include <list>
+#include <string>
+#include <utility>
 
-#include "mongo/client/connection_pool.h"
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_connection.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/dbclient_mockcursor.h"
-#include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_mock.h"
 #include "mongo/db/repl/oplog_interface_remote.h"
 #include "mongo/db/repl/roll_back_local_operations.h"
+#include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -352,8 +372,7 @@ void checkRemoteIterator(int numNetworkFailures, bool expectedToSucceed) {
     };
 
     auto localOperation = makeOpAndRecordId(1);
-    OplogInterfaceRemote remoteOplogMock(
-        HostAndPort("229w43rd", 10036), getConnection, "somecollection", 0);
+    OplogInterfaceRemote remoteOplogMock(HostAndPort("229w43rd", 10036), getConnection, 0);
 
     auto result = Status::OK();
 

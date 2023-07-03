@@ -27,9 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/flat_hash_map.h>
+#include <boost/container/small_vector.hpp>
+#include <boost/optional.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <algorithm>
+#include <array>
+#include <boost/preprocessor/control/iif.hpp>
+#include <iterator>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/exec/add_fields_projection_executor.h"
+#include "mongo/db/exec/inclusion_projection_executor.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
@@ -39,9 +56,20 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/window_function/window_function_exec.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sort_pattern.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/base64.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 using boost::intrusive_ptr;
 using boost::optional;
@@ -261,7 +289,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     }
 
     if (!combined.empty()) {
-        result.push_back(DocumentSourceSort::create(expCtx, SortPattern{combined}));
+        result.push_back(DocumentSourceSort::create(expCtx, SortPattern{std::move(combined)}));
     }
 
     // $_internalSetWindowFields
@@ -315,14 +343,14 @@ Value DocumentSourceInternalSetWindowFields::serialize(SerializationOptions opts
         MutableDocument md;
 
         for (auto&& [fieldName, function] : _executableOutputs) {
-            md[opts.serializeFieldPathFromString(fieldName)] = opts.serializeLiteralValue(
+            md[opts.serializeFieldPathFromString(fieldName)] = opts.serializeLiteral(
                 static_cast<long long>(_memoryTracker[fieldName].maxMemoryBytes()));
         }
 
         out["maxFunctionMemoryUsageBytes"] = Value(md.freezeToValue());
         out["maxTotalMemoryUsageBytes"] =
-            opts.serializeLiteralValue(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
-        out["usedDisk"] = opts.serializeLiteralValue(_iterator.usedDisk());
+            opts.serializeLiteral(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
+        out["usedDisk"] = opts.serializeLiteral(_iterator.usedDisk());
     }
 
     return Value(out.freezeToValue());

@@ -29,14 +29,31 @@
 
 #include "mongo/db/s/active_migrations_registry.h"
 
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <fmt/format.h>
+#include <mutex>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_destination_manager.h"
-#include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 
@@ -282,7 +299,7 @@ Status ActiveMigrationsRegistry::ActiveMoveChunkState::constructErrorStatus() co
         "'{}{}' for namespace {} to shard {}",
         (args.getMin() ? "min: " + args.getMin()->toString() + " - " : ""),
         (args.getMax() ? "max: " + args.getMax()->toString() : ""),
-        args.getCommandParameter().ns(),
+        args.getCommandParameter().toStringForErrorMsg(),
         args.getToShard().toString());
     return {ErrorCodes::ConflictingOperationInProgress, std::move(errMsg)};
 }

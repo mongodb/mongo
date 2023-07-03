@@ -28,9 +28,10 @@
  */
 
 #include "mongo/db/repl/dbcheck_idl.h"
+
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 
 namespace mongo {

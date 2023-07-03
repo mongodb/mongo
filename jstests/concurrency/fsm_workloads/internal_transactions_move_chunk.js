@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Runs insert, update, delete and findAndModify commands against a sharded collection inside
  * single-shard and cross-shard internal transactions using all the available client session
@@ -14,10 +12,12 @@
  *  does_not_support_config_fuzzer,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/internal_transactions_sharded.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/internal_transactions_sharded.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.transitions = {
         init: {
             moveChunk: 0.2,

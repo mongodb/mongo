@@ -29,8 +29,11 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 
+#include "mongo/base/status_with.h"
+#include "mongo/s/query/cluster_query_result.h"
 #include "mongo/s/query/router_exec_stage.h"
 #include "mongo/util/string_map.h"
 

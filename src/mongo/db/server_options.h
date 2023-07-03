@@ -29,6 +29,18 @@
 
 #pragma once
 
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <ctime>
+#include <string>
+#include <variant>
+#include <vector>
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/cluster_role.h"
@@ -36,6 +48,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/version/releases.h"
 
@@ -79,7 +92,6 @@ struct ServerGlobalParams {
     AtomicWord<int> slowMS{100};           // --time in ms that is "slow"
     AtomicWord<double> sampleRate{1.0};    // --samplerate rate at which to sample slow queries
     int defaultLocalThresholdMillis = 15;  // --localThreshold in ms to consider a node local
-    bool moveParanoia = false;             // for move chunk paranoia
 
     bool noUnixSocket = false;    // --nounixsocket
     bool doFork = false;          // --fork

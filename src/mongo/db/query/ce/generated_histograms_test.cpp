@@ -27,14 +27,23 @@
  *    it in the license file.
  */
 
-#include <string>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <tuple>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
 #include "mongo/db/query/ce/test_utils.h"
+#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/stats/array_histogram.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/stats/scalar_histogram.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::optimizer::ce {
 namespace {

@@ -28,11 +28,21 @@
  */
 
 #include "mongo/db/concurrency/resource_catalog.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
+
 class ResourceCatalogTest : public unittest::Test {
 public:
     void setUp() {
@@ -100,6 +110,11 @@ TEST_F(ResourceCatalogTest, RemoveTest) {
     ASSERT_EQ(boost::none, resource);
 }
 
+TEST_F(ResourceCatalogTest, ResourceMutexTest) {
+    auto rid = catalog.newResourceIdForMutex("TestLabel");
+    ASSERT_EQ("TestLabel", *catalog.name(rid));
+}
+
 TEST_F(ResourceCatalogTest, CollisionTest) {
     // firstCollection and secondCollection map to the same ResourceId.
     catalog.add(firstResourceId, firstCollection);
@@ -153,5 +168,6 @@ DEATH_TEST_F(ResourceCatalogTest, AddDatabaseInvalidResourceType, "invariant") {
 DEATH_TEST_F(ResourceCatalogTest, AddCollectionInvalidResourceType, "invariant") {
     catalog.add({RESOURCE_GLOBAL, 0}, NamespaceString::createNamespaceString_forTest("db.coll"));
 }
+
 }  // namespace
 }  // namespace mongo

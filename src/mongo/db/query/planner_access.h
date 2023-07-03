@@ -29,15 +29,27 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <memory>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/record_id_bound.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -101,12 +113,17 @@ namespace mongo {
 class QueryPlannerAccess {
 public:
     /**
-     * Return a CollectionScanNode that scans as requested in 'query'.
+     * Return a CollectionScanNode that scans as requested in 'query'. The function will return a
+     * collection scan with 'root' as the filter. This was needed to support rooted $OR queries that
+     * use this helper to build clustered collection scans. In this case, the 'root' will be the
+     * child branch of the $OR expression. In all other cases 'root' should be the 'root' of
+     * 'query'.
      */
     static std::unique_ptr<QuerySolutionNode> makeCollectionScan(const CanonicalQuery& query,
                                                                  bool tailable,
                                                                  const QueryPlannerParams& params,
-                                                                 int direction);
+                                                                 int direction,
+                                                                 const MatchExpression* root);
 
     /**
      * Return a plan that uses the provided index as a proxy for a collection scan.
@@ -126,7 +143,7 @@ public:
                                                             const BSONObj& endKey);
 
     /**
-     * Consructs a data access plan for 'query' which answers the predicate contained in 'root'.
+     * Constructs a data access plan for 'query' which answers the predicate contained in 'root'.
      * Assumes the presence of the passed in indices. Planning behavior is controlled by the
      * settings in 'params'.
      */
@@ -135,6 +152,68 @@ public:
         std::unique_ptr<MatchExpression> root,
         const std::vector<IndexEntry>& indices,
         const QueryPlannerParams& params);
+
+    /**
+     * Helper method that checks to see if min() or max() were provided along with the query. If so,
+     * adjusts the collection scan bounds to fit the constraints.
+     *
+     * This method is shared by QO planner and QE SBE cached plan variable bind, which must get the
+     * same answers for the output args (hence sharing one implementation instead of creating a
+     * separate parallel one).
+     *
+     * Arguments
+     *   (in) query - current query
+     *   (in) direction - 'query's scan direction: 1: forward; -1: reverse
+     *   (in) queryCollator - 'query's collator
+     *   (in) ccCollator - clustered collection's collator
+     *   (out) minRecord - scan start bound
+     *   (out) maxRecord - scan end bound
+     *   (out) boundInclusion - whether to exclude 'maxRecord' because it was specified by the 'max'
+     *     keyword
+     */
+    static void handleRIDRangeMinMax(const CanonicalQuery& query,
+                                     int direction,
+                                     const CollatorInterface* queryCollator,
+                                     const CollatorInterface* ccCollator,
+                                     boost::optional<RecordIdBound>& minRecord,
+                                     boost::optional<RecordIdBound>& maxRecord,
+                                     CollectionScanParams::ScanBoundInclusion& boundInclusion);
+
+    /**
+     * Helper method to add an RID range to collection scans. If the query solution tree contains a
+     * collection scan node with a suitable comparison predicate on '_id', we add a minRecord and
+     * maxRecord on the collection node.
+     *
+     * This method is shared by QO planner and QE SBE cached plan variable bind, which must get the
+     * same answers for the output args (hence sharing one implementation instead of creating a
+     * separate parallel one).
+     *
+     * Returns true if the MatchExpression is a comparison against the cluster key which either:
+     * 1) is guaranteed to exclude values of the cluster key which are affected by collation or
+     * 2) may return values of the cluster key which are affected by collation, but the query and
+     *    collection collations match.
+     * Otherwise, returns false.
+     *
+     * For example, assuming the cluster key is "_id":
+     * Given {a: {$eq: 2}}, we return false, because the comparison is not against the cluster key.
+     * Given {_id: {$gte: 5}}, we return true, because this comparison against the cluster key
+     *    excludes keys which are affected by collations.
+     * Given {_id: {$eq: "str"}}, we return true only if the query and collection collations match.
+     *
+     * Arguments
+     *   (in) conjunct - current query's match expression (or subexpression in recursive calls)
+     *   (in) queryCollator - current query's collator
+     *   (in) ccCollator - clustered collection's collator
+     *   (in) clusterKeyFieldName - only "_id" is officially supported, but this may change someday
+     *   (out) minRecord - scan start bound
+     *   (out) maxRecord - scan end bound
+     */
+    [[nodiscard]] static bool handleRIDRangeScan(const MatchExpression* conjunct,
+                                                 const CollatorInterface* queryCollator,
+                                                 const CollatorInterface* ccCollator,
+                                                 const StringData& clusterKeyFieldName,
+                                                 boost::optional<RecordIdBound>& minRecord,
+                                                 boost::optional<RecordIdBound>& maxRecord);
 
 private:
     /**
@@ -315,6 +394,10 @@ private:
      * of index scans.  As such, the processing for AND and OR is almost identical.
      *
      * Does not take ownership of 'root' but may remove children from it.
+     *
+     * If 'inArrayOperator' is true, then 'root' will be left unmodified.
+     * If 'inArrayOperator' is false, then the children of 'root' that are processed will be removed
+     * from 'root'.
      */
     static bool processIndexScans(const CanonicalQuery& query,
                                   MatchExpression* root,

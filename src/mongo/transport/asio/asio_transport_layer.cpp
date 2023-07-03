@@ -483,7 +483,7 @@ public:
         // Then, if the numeric (IP address) lookup failed, we fall back to DNS or return the error
         // from the resolver.
         return _resolve(peer, flags | Resolver::numeric_host, enableIPv6)
-            .onError([=](Status) { return _resolve(peer, flags, enableIPv6); })
+            .onError([=, this](Status) { return _resolve(peer, flags, enableIPv6); })
             .getNoThrow();
     }
 
@@ -495,9 +495,8 @@ public:
         // We follow the same numeric -> hostname fallback procedure as the synchronous resolver
         // function for setting resolver flags (see above).
         const auto flags = Resolver::numeric_service;
-        return _asyncResolve(peer, flags | Resolver::numeric_host, enableIPv6).onError([=](Status) {
-            return _asyncResolve(peer, flags, enableIPv6);
-        });
+        return _asyncResolve(peer, flags | Resolver::numeric_host, enableIPv6)
+            .onError([=, this](Status) { return _asyncResolve(peer, flags, enableIPv6); });
     }
 
     void cancel() {
@@ -1329,23 +1328,16 @@ std::vector<std::pair<SockAddr, int>> AsioTransportLayer::getListenerSocketBackl
 }
 
 void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
-        bob->append("listenerProcessingTime", _listenerProcessingTime.load().toBSON());
-    }
+    bob->append("listenerProcessingTime", _listenerProcessingTime.load().toBSON());
 }
 
 void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder& bob) const {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
-        BSONArrayBuilder queueDepthsArrayBuilder(
-            bob.subarrayStart("listenerSocketBacklogQueueDepths"));
-        for (const auto& record : _acceptorRecords) {
-            BSONObjBuilder{queueDepthsArrayBuilder.subobjStart()}.append(
-                record->address.toString(), record->backlogQueueDepth.load());
-        }
-        queueDepthsArrayBuilder.done();
+    BSONArrayBuilder queueDepthsArrayBuilder(bob.subarrayStart("listenerSocketBacklogQueueDepths"));
+    for (const auto& record : _acceptorRecords) {
+        BSONObjBuilder{queueDepthsArrayBuilder.subobjStart()}.append(
+            record->address.toString(), record->backlogQueueDepth.load());
     }
+    queueDepthsArrayBuilder.done();
 }
 
 void AsioTransportLayer::_runListener() noexcept {

@@ -27,8 +27,11 @@
  *    it in the license file.
  */
 
+#include <iostream>
+
 #include "mongo/db/exec/sbe/sbe_unittest.h"
-#include "mongo/logv2/log.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -29,7 +29,24 @@
 
 #include "mongo/db/pipeline/change_stream_document_diff_parser.h"
 
+#include <cstddef>
+#include <list>
+#include <memory>
+#include <string>
+#include <utility>
+#include <variant>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 using doc_diff::ArrayDiffReader;

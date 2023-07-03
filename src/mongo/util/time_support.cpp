@@ -27,29 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/time_support.h"
-
-#include <cstdint>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/compile.h>
+#include <fmt/format.h>
+#include <sys/types.h>
+// IWYU pragma: no_include "bits/types/struct_tm.h"
 #include <cstdio>
-#include <iostream>
+#include <cstring>
 #include <string>
 
-#include <fmt/compile.h>
-
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #if defined(_WIN32)
+#include <mmsystem.h>
+
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/timer.h"
-#include <mmsystem.h>
 #elif defined(__linux__)
 #include <ctime>
 #elif defined(__APPLE__)
@@ -716,8 +721,8 @@ std::string Date_t::toString() const {
 
 time_t Date_t::toTimeT() const {
     const auto secs = millis / 1000;
-    verify(secs >= std::numeric_limits<time_t>::min());
-    verify(secs <= std::numeric_limits<time_t>::max());
+    MONGO_verify(secs >= std::numeric_limits<time_t>::min());
+    MONGO_verify(secs <= std::numeric_limits<time_t>::max());
     return secs;
 }
 

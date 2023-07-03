@@ -27,28 +27,35 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <bitset>
+#include <vector>
 
-#include "mongo/db/exec/exclusion_projection_executor.h"
-
-#include <iostream>
-#include <iterator>
-#include <string>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/projection_parser.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/record_id.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo::projection_executor {
 namespace {

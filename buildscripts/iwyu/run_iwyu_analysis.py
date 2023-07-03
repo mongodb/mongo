@@ -160,7 +160,7 @@ SHUTDOWN_FLAG = False
 CLANG_INCLUDES = None
 IWYU_OPTIONS = [val for pair in zip(['-Xiwyu'] * len(IWYU_OPTIONS), IWYU_OPTIONS) for val in pair]
 if NO_INCLUDES:
-    NO_INCLUDE_REGEX = re.compile(r'^\s*#include\s+\"(' + '|'.join(NO_INCLUDES) + ')\"')
+    NO_INCLUDE_REGEX = re.compile(r'^\s*#include\s+[\",<](' + '|'.join(NO_INCLUDES) + ')[\",>]')
 if KEEP_INCLUDES:
     KEEP_INCLUDE_REGEX = re.compile(r'^\s*#include\s+(' + '|'.join(KEEP_INCLUDES) + ')')
 CHANGED_FILES_REGEX = re.compile(r"^The\sfull\sinclude-list\sfor\s(.+):$", re.MULTILINE)
@@ -232,7 +232,7 @@ def copy_error_state(cmd_entry: CompileCommand, test_dir: str,
     return error_state_dir
 
 
-def calc_hash_of_file(file: str) -> str:
+def calc_hash_of_file(file: str) -> Optional[str]:
     """
     Calculate the hash of a file. Use mtime as well.
 
@@ -247,7 +247,11 @@ def calc_hash_of_file(file: str) -> str:
         if file in mtime_hash_lookup and os.path.getmtime(file) == mtime_hash_lookup[file]['mtime']:
             return mtime_hash_lookup[file]['hash']
         else:
-            hash_val = hashlib.md5(open(file, 'rb').read()).hexdigest()
+            try:
+                hash_val = hashlib.md5(open(file, 'rb').read()).hexdigest()
+            except FileNotFoundError:
+                return None
+
             mtime_hash_lookup[file] = {'mtime': os.path.getmtime(file), 'hash': hash_val}
             return hash_val
 
@@ -261,6 +265,8 @@ def find_no_include(line: str, lines: List[str], output_lines: List[str]) -> boo
     """
 
     no_include_header_found = False
+    if "// IWYU pragma: keep" in line:
+        return no_include_header_found
     no_include_header = re.findall(NO_INCLUDE_REGEX, line)
 
     if no_include_header:
@@ -332,6 +338,8 @@ def recalc_hashes(deps: List[str], change_dir: Optional[str] = None) -> Dict[str
             orig_dep = dep
             dep = os.path.join(change_dir, dep)
         dep_hash = calc_hash_of_file(dep)
+        if dep_hash is None:
+            continue
         if change_dir:
             dep = orig_dep
         full_hash.update(dep_hash.encode('utf-8'))

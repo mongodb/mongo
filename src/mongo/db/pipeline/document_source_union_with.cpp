@@ -28,19 +28,37 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <absl/container/flat_hash_map.h>
+#include <boost/preprocessor/control/iif.hpp>
 #include <iterator>
 
-#include "mongo/db/commands/test_commands_enabled.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_union_with_gen.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/views/resolved_view.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -75,7 +93,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
     opts.validator = validatorCallback;
 
     return Pipeline::makePipelineFromViewDefinition(
-        expCtx->copyForSubPipeline(expCtx->ns, resolvedNs.uuid), resolvedNs, currentPipeline, opts);
+        expCtx->copyForSubPipeline(expCtx->ns, resolvedNs.uuid),
+        resolvedNs,
+        std::move(currentPipeline),
+        opts);
 }
 
 }  // namespace
@@ -235,7 +256,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
             _pipeline = buildPipelineFromViewDefinition(
                 pExpCtx,
                 ExpressionContext::ResolvedNamespace{e->getNamespace(), e->getPipeline()},
-                serializedPipe);
+                std::move(serializedPipe));
             logShardedViewFound(e);
             return doGetNext();
         }

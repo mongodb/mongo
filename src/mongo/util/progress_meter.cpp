@@ -28,11 +28,13 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <ctime>
+#include <ostream>
 
-#include "mongo/util/progress_meter.h"
-
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/progress_meter.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -28,15 +28,24 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/s/move_timing_helper.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <exception>
+#include <mutex>
 
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -27,27 +27,35 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/subplan.h"
-
+#include <boost/move/utility_core.hpp>
+#include <functional>
 #include <memory>
+#include <ostream>
+#include <utility>
 #include <vector>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_cache_util.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/exec/subplan.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/planner_access.h"
-#include "mongo/db/query/planner_analysis.h"
-#include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -58,7 +66,7 @@ using std::vector;
 const char* SubplanStage::kStageType = "SUBPLAN";
 
 SubplanStage::SubplanStage(ExpressionContext* expCtx,
-                           const CollectionPtr& collection,
+                           VariantCollectionPtrOrAcquisition collection,
                            WorkingSet* ws,
                            const QueryPlannerParams& params,
                            CanonicalQuery* cq)
@@ -188,7 +196,7 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     // Plan each branch of the $or.
     auto subplanningStatus = QueryPlanner::planSubqueries(
-        expCtx()->opCtx, getSolutionCachedData, collection(), *_query, _plannerParams);
+        expCtx()->opCtx, getSolutionCachedData, collectionPtr(), *_query, _plannerParams);
     if (!subplanningStatus.isOK()) {
         return choosePlanWholeQuery(yieldPolicy);
     }

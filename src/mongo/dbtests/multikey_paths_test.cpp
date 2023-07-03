@@ -27,17 +27,49 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <ostream>
+#include <string>
+#include <vector>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_calculator.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/shared_buffer.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -53,7 +85,8 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
  */
 class MultikeyPathsTest : public unittest::Test {
 public:
-    MultikeyPathsTest() : _nss("unittests.multikey_paths") {}
+    MultikeyPathsTest()
+        : _nss(NamespaceString::createNamespaceString_forTest("unittests.multikey_paths")) {}
 
     void setUp() final {
         AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);

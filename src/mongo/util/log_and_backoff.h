@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+
 #include "mongo/base/string_data.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_severity.h"

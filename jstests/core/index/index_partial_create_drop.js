@@ -77,8 +77,7 @@ assert.commandWorked(coll.dropIndex({x: 1}));
 assert.eq(1, coll.getIndexes().length);
 
 // Create partial index in background.
-assert.commandWorked(
-    coll.createIndex({x: 1}, {background: true, partialFilterExpression: {a: {$lt: 5}}}));
+assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {a: {$lt: 5}}}));
 assert.eq(5, getNumKeys("x_1"));
 assert.commandWorked(coll.dropIndex({x: 1}));
 assert.eq(1, coll.getIndexes().length);

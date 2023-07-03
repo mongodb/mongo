@@ -29,8 +29,16 @@
 
 #include "mongo/db/query/lru_key_value.h"
 
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include <memory>
+#include <ostream>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 using namespace mongo;
 
@@ -295,10 +303,10 @@ TEST(LRUKeyValueTest, IterationTest) {
     cache.add(2, std::make_shared<int>(2));
 
     auto i = cache.begin();
-    ASSERT_EQUALS(i->first, 2);
+    ASSERT_EQUALS(*i->first, 2);
     ASSERT_EQUALS(*i->second, 2);
     ++i;
-    ASSERT_EQUALS(i->first, 1);
+    ASSERT_EQUALS(*i->first, 1);
     ASSERT_EQUALS(*i->second, 1);
     ++i;
     ASSERT(i == cache.end());

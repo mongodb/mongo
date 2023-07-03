@@ -28,44 +28,96 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <numeric>
+#include <string>
+#include <system_error>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/commands.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/keys_collection_document_gen.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
-#include "mongo/db/s/type_shard_identity.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
-#include "mongo/idl/cluster_server_parameter_common.h"
-#include "mongo/idl/cluster_server_parameter_gen.h"
-#include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/db/time_proof_service.h"
+#include "mongo/db/wire_version.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/rpc/metadata.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_changelog.h"
-#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -107,6 +159,7 @@ protected:
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())
             ->onShardingInitialization(operationContext(), true);
+        WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
 
         _skipShardingEventNotificationFP =
             globalFailPointRegistry().find("shardingCatalogManagerSkipNotifyClusterOnNewDatabases");
@@ -115,27 +168,28 @@ protected:
 
     void tearDown() override {
         _skipShardingEventNotificationFP->setMode(FailPoint::off);
+        WaitForMajorityService::get(getServiceContext()).shutDown();
         TransactionCoordinatorService::get(operationContext())->onStepDown();
         ConfigServerTestFixture::tearDown();
     }
 
     /**
-     * addShard validates the host as a shard. It calls "isMaster" on the host to determine what
+     * addShard validates the host as a shard. It calls "hello" on the host to determine what
      * kind of host it is -- mongos, regular mongod, config mongod -- and whether the replica set
-     * details are correct. "isMasterResponse" defines the response of the "isMaster" request and
+     * details are correct. "helloResponse" defines the response of the "hello" request and
      * should be a command response BSONObj, or a failed Status.
      *
      * ShardingTestFixture::expectGetShards() should be called before this function, otherwise
-     * addShard will never reach the isMaster command -- a find query is called first.
+     * addShard will never reach the "hello" command -- a find query is called first.
      */
-    void expectIsMaster(const HostAndPort& target, StatusWith<BSONObj> isMasterResponse) {
-        onCommandForAddShard([&, target, isMasterResponse](const RemoteCommandRequest& request) {
+    void expectHello(const HostAndPort& target, StatusWith<BSONObj> helloResponse) {
+        onCommandForAddShard([&, target, helloResponse](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, target);
             ASSERT_EQ(request.dbname, "admin");
-            ASSERT_BSONOBJ_EQ(request.cmdObj, BSON("isMaster" << 1));
+            ASSERT_BSONOBJ_EQ(request.cmdObj, BSON("hello" << 1));
             ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
 
-            return isMasterResponse;
+            return helloResponse;
         });
     }
 
@@ -376,7 +430,7 @@ protected:
                 dbnamesOnTarget.erase(it);
                 ASSERT_BSONOBJ_EQ(request.cmdObj,
                                   BSON("find" << NamespaceString::kClusterParametersNamespace.coll()
-                                              << "maxTimeMS" << 30000 << "readConcern"
+                                              << "maxTimeMS" << 60000 << "readConcern"
                                               << BSON("level"
                                                       << "majority")));
                 auto cursorRes =
@@ -390,6 +444,27 @@ protected:
                 return cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse);
             });
         }
+    }
+
+    void expectClusterTimeKeysPullRequest(const HostAndPort& target) {
+        onCommandForAddShard([&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, target);
+            ASSERT_BSONOBJ_EQ(request.cmdObj,
+                              BSON("find" << NamespaceString::kKeysCollectionNamespace.coll()
+                                          << "maxTimeMS" << 60000 << "readConcern"
+                                          << BSON("level"
+                                                  << "local")));
+
+            KeysCollectionDocument key(1);
+            key.setKeysCollectionDocumentBase(
+                {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+            auto cursorRes = CursorResponse(
+                NamespaceString::createNamespaceString_forTest(
+                    request.dbname, NamespaceString::kKeysCollectionNamespace.coll()),
+                0,
+                {key.toBSON()});
+            return cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
     }
 
     /**
@@ -645,9 +720,9 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(
@@ -660,6 +735,9 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
 
     expectCollectionDrop(
         shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+
+    // The shard receives a find to pull all clusterTime keys from the new shard.
+    expectClusterTimeKeysPullRequest(shardTarget);
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -733,9 +811,9 @@ TEST_F(AddShardTest, StandaloneBasicPushSuccess) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(
@@ -748,6 +826,9 @@ TEST_F(AddShardTest, StandaloneBasicPushSuccess) {
 
     expectCollectionDrop(
         shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+
+    // The shard receives a find to pull all clusterTime keys from the new shard.
+    expectClusterTimeKeysPullRequest(shardTarget);
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -815,9 +896,9 @@ TEST_F(AddShardTest, StandaloneMultitenantPullSuccess) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(
@@ -830,6 +911,9 @@ TEST_F(AddShardTest, StandaloneMultitenantPullSuccess) {
 
     expectCollectionDrop(
         shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+
+    // The shard receives a find to pull all clusterTime keys from the new shard.
+    expectClusterTimeKeysPullRequest(shardTarget);
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -919,9 +1003,9 @@ TEST_F(AddShardTest, StandaloneMultitenantPushSuccess) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(
@@ -934,6 +1018,9 @@ TEST_F(AddShardTest, StandaloneMultitenantPushSuccess) {
 
     expectCollectionDrop(
         shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+
+    // The shard receives a find to pull all clusterTime keys from the new shard.
+    expectClusterTimeKeysPullRequest(shardTarget);
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -1010,9 +1097,9 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(
@@ -1025,6 +1112,9 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
 
     expectCollectionDrop(
         shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+
+    // The shard receives a find to pull all clusterTime keys from the new shard.
+    expectClusterTimeKeysPullRequest(shardTarget);
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -1114,7 +1204,7 @@ TEST_F(AddShardTest, UnreachableHost) {
     });
 
     Status hostUnreachableStatus = Status(ErrorCodes::HostUnreachable, "host unreachable");
-    expectIsMaster(shardTarget, hostUnreachableStatus);
+    expectHello(shardTarget, hostUnreachableStatus);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -1139,9 +1229,9 @@ TEST_F(AddShardTest, AddMongosAsShard) {
         ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
     });
 
-    expectIsMaster(shardTarget,
-                   BSON("msg"
-                        << "isdbgrid"));
+    expectHello(shardTarget,
+                BSON("msg"
+                     << "isdbgrid"));
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -1167,10 +1257,10 @@ TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
         ASSERT_STRING_CONTAINS(status.getStatus().reason(), "use replica set url format");
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "myOtherSet"
                                         << "maxWireVersion" << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -1197,9 +1287,9 @@ TEST_F(AddShardTest, AddStandaloneHostShardAsReplicaSet) {
         ASSERT_STRING_CONTAINS(status.getStatus().reason(), "host did not return a set name");
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -1226,10 +1316,10 @@ TEST_F(AddShardTest, ReplicaSetMistmatchedReplicaSetName) {
         ASSERT_STRING_CONTAINS(status.getStatus().reason(), "does not match the actual set name");
     });
 
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "myOtherSet"
                                         << "maxWireVersion" << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -1258,10 +1348,10 @@ TEST_F(AddShardTest, ShardIsCSRSConfigServer) {
     });
 
     BSONObj commandResponse =
-        BSON("ok" << 1 << "ismaster" << true << "setName"
+        BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                   << "config"
                   << "configsvr" << true << "maxWireVersion" << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -1291,11 +1381,11 @@ TEST_F(AddShardTest, ReplicaSetMissingHostsProvidedInSeedList) {
 
     BSONArrayBuilder hosts;
     hosts.append("host1:12345");
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "mySet"
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -1326,11 +1416,11 @@ TEST_F(AddShardTest, AddShardWithNameConfigFails) {
     BSONArrayBuilder hosts;
     hosts.append("host1:12345");
     hosts.append("host2:12345");
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "mySet"
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
 }
@@ -1372,11 +1462,11 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
     BSONArrayBuilder hosts;
     hosts.append("host1:12345");
     hosts.append("host2:12345");
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "mySet"
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     expectListDatabases(shardTarget, {BSON("name" << existingDB.getName())});
 
@@ -1415,17 +1505,20 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     BSONArrayBuilder hosts;
     hosts.append("host1:12345");
     hosts.append("host2:12345");
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "mySet"
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
 
     expectCollectionDrop(
         shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+
+    // The shard receives a find to pull all clusterTime keys from the new shard.
+    expectClusterTimeKeysPullRequest(shardTarget);
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -1487,16 +1580,17 @@ TEST_F(AddShardTest, SuccessfullyAddConfigShard) {
     BSONArrayBuilder hosts;
     hosts.append("host1:12345");
     hosts.append("host2:12345");
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "mySet"
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
 
-    expectCollectionDrop(shardTarget, NamespaceString("config", "system.sessions"));
+    expectCollectionDrop(
+        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
 
     // Should not run _addShard command, touch user_writes_critical_sections, setParameter, setFCV
 
@@ -1546,17 +1640,20 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     BSONArrayBuilder hosts;
     hosts.append("host1:12345");
     hosts.append("host2:12345");
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
+    BSONObj commandResponse = BSON("ok" << 1 << "isWritablePrimary" << true << "setName"
                                         << "mySet"
                                         << "hosts" << hosts.arr() << "maxWireVersion"
                                         << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
+    expectHello(shardTarget, commandResponse);
 
     // Get databases list from new shard
     expectListDatabases(shardTarget, std::vector<BSONObj>{BSON("name" << discoveredDB.getName())});
 
     expectCollectionDrop(
         shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+
+    // The shard receives a find to pull all clusterTime keys from the new shard.
+    expectClusterTimeKeysPullRequest(shardTarget);
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);

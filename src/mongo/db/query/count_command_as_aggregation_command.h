@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/count_command_gen.h"

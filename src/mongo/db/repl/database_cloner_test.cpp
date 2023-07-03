@@ -27,19 +27,35 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <map>
 
-#include "mongo/db/clientcursor.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/initial_sync_cloner_test_fixture.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {
@@ -345,7 +361,7 @@ TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
         {BSON("ok" << 0 << "errmsg"
                    << "fake message"
                    << "code" << ErrorCodes::CursorNotFound),
-         createCursorResponse(_dbName.db() + ".b", BSON_ARRAY(idIndexSpec))});
+         createCursorResponse(_dbName.toString_forTest() + ".b", BSON_ARRAY(idIndexSpec))});
     auto cloner = makeDatabaseCloner();
     auto status = cloner->run();
     ASSERT_NOT_OK(status);
@@ -380,8 +396,8 @@ TEST_F(DatabaseClonerTest, CreateCollections) {
     _mockServer->setCommandReply("count", {createCountResponse(0), createCountResponse(0)});
     _mockServer->setCommandReply(
         "listIndexes",
-        {createCursorResponse(_dbName.db() + ".a", BSON_ARRAY(idIndexSpec)),
-         createCursorResponse(_dbName.db() + ".b", BSON_ARRAY(idIndexSpec))});
+        {createCursorResponse(_dbName.toString_forTest() + ".a", BSON_ARRAY(idIndexSpec)),
+         createCursorResponse(_dbName.toString_forTest() + ".b", BSON_ARRAY(idIndexSpec))});
     auto cloner = makeDatabaseCloner();
     auto status = cloner->run();
     ASSERT_OK(status);
@@ -427,8 +443,9 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
     _mockServer->setCommandReply("count", {createCountResponse(0), createCountResponse(0)});
     _mockServer->setCommandReply(
         "listIndexes",
-        {createCursorResponse(_dbName.db() + ".a", BSON_ARRAY(idIndexSpec << extraIndexSpec)),
-         createCursorResponse(_dbName.db() + ".b", BSON_ARRAY(idIndexSpec))});
+        {createCursorResponse(_dbName.toString_forTest() + ".a",
+                              BSON_ARRAY(idIndexSpec << extraIndexSpec)),
+         createCursorResponse(_dbName.toString_forTest() + ".b", BSON_ARRAY(idIndexSpec))});
     auto cloner = makeDatabaseCloner();
 
     auto collClonerBeforeFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
@@ -436,11 +453,13 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
     auto timesEntered = collClonerBeforeFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
-        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" + _dbName.db() + ".a'}"));
+        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" +
+                 _dbName.toString_forTest() + ".a'}"));
     collClonerAfterFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
-        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" + _dbName.db() + ".a'}"));
+        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" +
+                 _dbName.toString_forTest() + ".a'}"));
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
@@ -472,7 +491,8 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
     timesEntered = collClonerBeforeFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
-        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" + _dbName.db() + ".b'}"));
+        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" +
+                 _dbName.toString_forTest() + ".b'}"));
     collClonerAfterFailPoint->setMode(FailPoint::off);
 
     // Wait for the failpoint to be reached

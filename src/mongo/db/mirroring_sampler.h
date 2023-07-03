@@ -29,8 +29,10 @@
 
 #pragma once
 
+#include <cstdlib>
 #include <functional>
 #include <memory>
+#include <new>
 #include <vector>
 
 #include "mongo/db/repl/hello_response.h"
@@ -100,7 +102,7 @@ public:
      * Return all eligible hosts from a HelloResponse that we should mirror to.
      */
     std::vector<HostAndPort> getRawMirroringTargets(
-        const std::shared_ptr<const repl::HelloResponse>& isMaster) noexcept;
+        const std::shared_ptr<const repl::HelloResponse>& helloResponse) noexcept;
 
     /**
      * Approximate use of the MirroringSampler for testing.
@@ -108,7 +110,7 @@ public:
      * In practice, we call constituent functions in sequence to pessimistically spare work.
      */
     static std::vector<HostAndPort> getMirroringTargets(
-        const std::shared_ptr<const repl::HelloResponse>& isMaster,
+        const std::shared_ptr<const repl::HelloResponse>& helloResponse,
         double ratio,
         RandomFunc rnd = defaultRandomFunc(),
         int rndMax = defaultRandomMax()) noexcept;

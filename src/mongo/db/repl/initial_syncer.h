@@ -30,17 +30,25 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <iosfwd>
 #include <memory>
+#include <mutex>
+#include <string>
+#include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/client/dbclient_connection.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/callback_completion_guard.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/initial_sync_shared_data.h"
@@ -48,17 +56,25 @@
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rollback_checker.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/executor/scoped_task_executor.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {

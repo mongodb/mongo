@@ -29,6 +29,8 @@
 
 #include "mongo/util/options_parser/startup_options.h"
 
+#include <memory>
+
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 

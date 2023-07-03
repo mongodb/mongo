@@ -29,17 +29,33 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
 #include <iosfwd>
+#include <string>
 #include <tuple>
+#include <utility>
+#include <variant>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 
@@ -89,24 +105,24 @@ inline bool operator!=(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) {
 }
 
 /**
- * Represents KeyString struct containing a KeyString::Value and its RecordId
+ * Represents KeyString struct containing a key_string::Value and its RecordId
  */
 struct KeyStringEntry {
-    KeyStringEntry(KeyString::Value ks, RecordId id) : keyString(ks), loc(std::move(id)) {
+    KeyStringEntry(key_string::Value ks, RecordId id) : keyString(ks), loc(std::move(id)) {
         if (!kDebugBuild) {
             return;
         }
         loc.withFormat(
             [](RecordId::Null n) { invariant(false); },
             [&](int64_t rid) {
-                invariant(loc == KeyString::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize()));
+                invariant(loc == key_string::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize()));
             },
             [&](const char* str, int size) {
-                invariant(loc == KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
+                invariant(loc == key_string::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()));
             });
     }
 
-    KeyString::Value keyString;
+    key_string::Value keyString;
     RecordId loc;
 };
 
@@ -217,10 +233,10 @@ public:
      * entries in an index is to support storage engines that require comparators that take
      * arguments of the same type.
      */
-    static KeyString::Value makeKeyStringFromSeekPointForSeek(const IndexSeekPoint& seekPoint,
-                                                              KeyString::Version version,
-                                                              Ordering ord,
-                                                              bool isForward);
+    static key_string::Value makeKeyStringFromSeekPointForSeek(const IndexSeekPoint& seekPoint,
+                                                               key_string::Version version,
+                                                               Ordering ord,
+                                                               bool isForward);
 
     /**
      * Encodes the BSON Key into a KeyString object to pass in to SortedDataInterface::seek().
@@ -247,24 +263,24 @@ public:
      * (which is less than bsonKey). WT's search_near() could land either on the previous key or the
      * bsonKey. WT will selectively call prev() if it's on bsonKey.
      */
-    static KeyString::Value makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
-                                                            KeyString::Version version,
-                                                            Ordering ord,
-                                                            bool isForward,
-                                                            bool inclusive);
+    static key_string::Value makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
+                                                             key_string::Version version,
+                                                             Ordering ord,
+                                                             bool isForward,
+                                                             bool inclusive);
 
     /**
      * Encodes the BSON Key into a KeyString object to pass in to SortedDataInterface::seek()
      * or SortedDataInterface::setEndPosition().
      *
      * This funcition is similar to IndexEntryComparison::makeKeyStringFromBSONKeyForSeek()
-     * but allows you to pick your own KeyString::Discriminator based on wether or not the
+     * but allows you to pick your own key_string::Discriminator based on wether or not the
      * resulting KeyString is for the start key or end key of a seek.
      */
-    static KeyString::Value makeKeyStringFromBSONKey(const BSONObj& bsonKey,
-                                                     KeyString::Version version,
-                                                     Ordering ord,
-                                                     KeyString::Discriminator discrim);
+    static key_string::Value makeKeyStringFromBSONKey(const BSONObj& bsonKey,
+                                                      key_string::Version version,
+                                                      Ordering ord,
+                                                      key_string::Discriminator discrim);
 
 private:
     // Ordering is used in comparison() to compare BSONElements
@@ -283,7 +299,7 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
                               DuplicateKeyErrorInfo::FoundValue&& foundValue = stdx::monostate{},
                               boost::optional<RecordId> duplicateRid = boost::none);
 
-Status buildDupKeyErrorStatus(const KeyString::Value& keyString,
+Status buildDupKeyErrorStatus(const key_string::Value& keyString,
                               const NamespaceString& collectionNamespace,
                               const std::string& indexName,
                               const BSONObj& keyPattern,
@@ -295,7 +311,7 @@ Status buildDupKeyErrorStatus(OperationContext* opCtx,
                               const IndexDescriptor* desc);
 
 Status buildDupKeyErrorStatus(OperationContext* opCtx,
-                              const KeyString::Value& keyString,
+                              const key_string::Value& keyString,
                               const Ordering& ordering,
                               const IndexDescriptor* desc);
 

@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/base64.h"
-
-#include "mongo/util/assert_util.h"
-
+#include <algorithm>
 #include <array>
 #include <cstdint>
-#include <iostream>
+#include <iterator>
+#include <limits>
+
+#include <fmt/format.h>
+
+#include "mongo/util/assert_util.h"
+#include "mongo/util/base64.h"
 
 namespace mongo::base64_detail {
 namespace {

@@ -29,14 +29,20 @@
 
 #include "mongo/db/exec/sbe/values/sbe_pattern_value_cmp.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
-#include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::sbe::value {
 namespace {

@@ -27,19 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <algorithm>
+#include <cstddef>
 #include <string>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/index_build_entry_gen.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 

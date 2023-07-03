@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Perform CRUD operations, some of which may implicitly create collections. Also perform index
  * creations which may implicitly create collections. Performs these in parallel with collection-
@@ -8,13 +6,13 @@
  * @tags: [
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
-load('jstests/concurrency/fsm_workloads/CRUD_and_commands.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/CRUD_and_commands.js";
 
 // TODO(SERVER-46971) combine with CRUD_and_commands.js and remove `local` readConcern.
 TestData.defaultTransactionReadConcernLevel = "local";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     const origStates = Object.keys($config.states);
     $config.states = Object.extend({
         createIndex: function createIndex(db, collName) {

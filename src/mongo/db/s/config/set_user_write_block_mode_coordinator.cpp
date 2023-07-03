@@ -28,21 +28,43 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <tuple>
+#include <utility>
 
-#include "mongo/db/s/config/set_user_write_block_mode_coordinator.h"
-
-#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/commands/set_user_write_block_mode_gen.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/config/set_user_write_block_mode_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/write_concern.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/future_impl.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -73,12 +95,13 @@ void sendSetUserWriteBlockModeCmdToAllShards(OperationContext* opCtx,
     const auto shardsvrSetUserWriteBlockModeCmd =
         makeShardsvrSetUserWriteBlockModeCommand(block, phase);
 
-    sharding_util::sendCommandToShards(opCtx,
-                                       shardsvrSetUserWriteBlockModeCmd.getDbName().db(),
-                                       CommandHelpers::appendMajorityWriteConcern(
-                                           shardsvrSetUserWriteBlockModeCmd.toBSON(osi.toBSON())),
-                                       allShards,
-                                       executor);
+    sharding_util::sendCommandToShards(
+        opCtx,
+        DatabaseNameUtil::serialize(shardsvrSetUserWriteBlockModeCmd.getDbName()),
+        CommandHelpers::appendMajorityWriteConcern(
+            shardsvrSetUserWriteBlockModeCmd.toBSON(osi.toBSON())),
+        allShards,
+        executor);
 }
 
 }  // namespace

@@ -30,11 +30,12 @@
 #include "mongo/util/hex.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <fmt/format.h>
-#include <iterator>
 #include <string>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 
 namespace mongo {
@@ -110,7 +111,7 @@ std::string decode(StringData s) {
 }  // namespace hexblob
 
 std::string hexdump(StringData data) {
-    verify(data.size() < 1000000);
+    MONGO_verify(data.size() < 1000000);
     std::string out;
     out.reserve(3 * data.size());
     char sep = 0;

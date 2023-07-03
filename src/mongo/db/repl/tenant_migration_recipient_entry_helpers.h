@@ -32,6 +32,7 @@
 namespace mongo {
 
 class OperationContext;
+
 class TenantMigrationRecipientDocument;
 class Status;
 class UUID;

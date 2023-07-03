@@ -30,33 +30,65 @@
 
 #include "mongo/s/commands/cluster_write_cmd.h"
 
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <tuple>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/base/error_codes.h"
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/db/catalog/document_validation.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/resource_yielder.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/transaction/transaction_api.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/inline_executor.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/write_concern_error_detail.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/batched_upsert_detail.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -230,6 +262,7 @@ struct UpdateShardKeyResult {
 UpdateShardKeyResult handleWouldChangeOwningShardErrorTransaction(
     OperationContext* opCtx,
     BatchedCommandRequest* request,
+    const NamespaceString& nss,
     BatchedCommandResponse* response,
     const WouldChangeOwningShardInfo& changeInfo) {
     // Shared state for the transaction API use below.
@@ -241,7 +274,7 @@ UpdateShardKeyResult handleWouldChangeOwningShardErrorTransaction(
         NamespaceString nss;
         bool updatedShardKey{false};
     };
-    auto sharedBlock = std::make_shared<SharedBlock>(changeInfo, request->getNS());
+    auto sharedBlock = std::make_shared<SharedBlock>(changeInfo, nss);
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
     auto txn = txn_api::SyncTransactionWithRetries(
@@ -302,6 +335,7 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
 
 bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
                                                         BatchedCommandRequest* request,
+                                                        const NamespaceString& nss,
                                                         BatchedCommandResponse* response,
                                                         BatchWriteExecStats stats) {
     auto txnRouter = TransactionRouter::get(opCtx);
@@ -319,7 +353,7 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
             serverGlobalParams.featureCompatibility)) {
         if (txnRouter) {
             auto updateResult = handleWouldChangeOwningShardErrorTransaction(
-                opCtx, request, response, *wouldChangeOwningShardErrorInfo);
+                opCtx, request, nss, response, *wouldChangeOwningShardErrorInfo);
             updatedShardKey = updateResult.updatedShardKey;
             upsertedId = std::move(updateResult.upsertedId);
         } else {
@@ -360,7 +394,7 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
                 // Clear the error details from the response object before sending the write again
                 response->unsetErrDetails();
 
-                cluster::write(opCtx, *request, &stats, response);
+                cluster::write(opCtx, *request, nullptr /* nss */, &stats, response);
                 wouldChangeOwningShardErrorInfo = getWouldChangeOwningShardErrorInfo(
                     opCtx, *request, response, !isRetryableWrite);
                 if (!wouldChangeOwningShardErrorInfo)
@@ -371,11 +405,19 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
                 // insert a new one.
                 updatedShardKey = wouldChangeOwningShardErrorInfo &&
                     documentShardKeyUpdateUtil::updateShardKeyForDocumentLegacy(
-                                      opCtx, request->getNS(), *wouldChangeOwningShardErrorInfo);
+                                      opCtx, nss, *wouldChangeOwningShardErrorInfo);
 
                 // If the operation was an upsert, record the _id of the new document.
                 if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
-                    upsertedId = wouldChangeOwningShardErrorInfo->getPostImage()["_id"].wrap();
+                    // For timeseries collections, the 'userPostImage' is returned back
+                    // through WouldChangeOwningShardInfo from the old shard as well and it should
+                    // be returned to the user instead of the post-image.
+                    auto postImage = [&] {
+                        return wouldChangeOwningShardErrorInfo->getUserPostImage()
+                            ? *wouldChangeOwningShardErrorInfo->getUserPostImage()
+                            : wouldChangeOwningShardErrorInfo->getPostImage();
+                    }();
+                    upsertedId = postImage["_id"].wrap();
                 }
 
                 // Commit the transaction
@@ -416,11 +458,20 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
             try {
                 // Delete the original document and insert the new one
                 updatedShardKey = documentShardKeyUpdateUtil::updateShardKeyForDocumentLegacy(
-                    opCtx, request->getNS(), *wouldChangeOwningShardErrorInfo);
+                    opCtx, nss, *wouldChangeOwningShardErrorInfo);
 
                 // If the operation was an upsert, record the _id of the new document.
                 if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
-                    upsertedId = wouldChangeOwningShardErrorInfo->getPostImage()["_id"].wrap();
+                    // For timeseries collections, the 'userPostImage' is returned back
+                    // through WouldChangeOwningShardInfo from the old shard as well and it should
+                    // be returned to the user instead of the post-image.
+                    auto postImage = [&] {
+                        return wouldChangeOwningShardErrorInfo->getUserPostImage()
+                            ? *wouldChangeOwningShardErrorInfo->getUserPostImage()
+                            : wouldChangeOwningShardErrorInfo->getPostImage();
+                    }();
+
+                    upsertedId = postImage["_id"].wrap();
                 }
             } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
                 Status status = ex->getKeyPattern().hasField("_id")
@@ -531,12 +582,15 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
         batchedRequest.unsetWriteConcern();
     }
 
-    cluster::write(opCtx, batchedRequest, &stats, &response);
+    // Record the namespace that the write must be run on. It may differ from the request if this is
+    // a timeseries collection.
+    NamespaceString nss = batchedRequest.getNS();
+    cluster::write(opCtx, batchedRequest, &nss, &stats, &response);
 
     bool updatedShardKey = false;
     if (_batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Update) {
         updatedShardKey =
-            handleWouldChangeOwningShardError(opCtx, &batchedRequest, &response, stats);
+            handleWouldChangeOwningShardError(opCtx, &batchedRequest, nss, &response, stats);
     }
 
     // Populate the 'NotPrimaryErrorTracker' object based on the write response

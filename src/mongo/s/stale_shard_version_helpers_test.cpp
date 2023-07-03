@@ -27,12 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/logv2/log.h"
+#include <boost/none.hpp>
+#include <boost/smart_ptr.hpp>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/index_version.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/stale_shard_version_helpers.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

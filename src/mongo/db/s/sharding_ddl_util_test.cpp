@@ -27,21 +27,42 @@
  *    it in the license file.
  */
 
+#include <boost/cstdint.hpp>
+#include <cstdint>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/dbclient_base.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
-#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -195,117 +216,6 @@ TEST_F(ShardingDDLUtilTest, SerializeErrorStatusTooBig) {
     ASSERT(!deserialized.extraInfo());
 }
 
-// Test that config.collection document and config.chunks documents are properly updated from source
-// to destination collection metadata
-TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
-    auto opCtx = operationContext();
-    DBDirectClient client(opCtx);
-
-    const NamespaceString fromNss = NamespaceString::createNamespaceString_forTest("test.from");
-    const auto fromCollQuery = BSON(CollectionType::kNssFieldName << fromNss.ns_forTest());
-
-    const auto toCollQuery = BSON(CollectionType::kNssFieldName << kToNss.ns_forTest());
-
-    const Timestamp collTimestamp(1);
-    const auto collUUID = UUID::gen();
-
-    // Initialize FROM collection chunks
-    const auto fromEpoch = OID::gen();
-    const int nChunks = 10;
-    std::vector<ChunkType> chunks;
-    for (int i = 0; i < nChunks; i++) {
-        ChunkVersion chunkVersion({fromEpoch, collTimestamp}, {1, uint32_t(i)});
-        ChunkType chunk;
-        chunk.setName(OID::gen());
-        chunk.setCollectionUUID(collUUID);
-        chunk.setVersion(chunkVersion);
-        chunk.setShard(shard0.getName());
-        chunk.setOnCurrentShardSince(Timestamp(1, i));
-        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shard0.getName())});
-        chunk.setMin(BSON("a" << i));
-        chunk.setMax(BSON("a" << i + 1));
-        chunks.push_back(chunk);
-    }
-
-    setupCollection(fromNss, KeyPattern(BSON("x" << 1)), chunks);
-
-    // Initialize TO collection chunks
-    std::vector<ChunkType> originalToChunks;
-    const auto toEpoch = OID::gen();
-    const auto toUUID = UUID::gen();
-    for (int i = 0; i < nChunks; i++) {
-        ChunkVersion chunkVersion({toEpoch, Timestamp(2)}, {1, uint32_t(i)});
-        ChunkType chunk;
-        chunk.setName(OID::gen());
-        chunk.setCollectionUUID(toUUID);
-        chunk.setVersion(chunkVersion);
-        chunk.setShard(shard0.getName());
-        chunk.setOnCurrentShardSince(Timestamp(1, i));
-        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shard0.getName())});
-        chunk.setMin(BSON("a" << i));
-        chunk.setMax(BSON("a" << i + 1));
-        originalToChunks.push_back(chunk);
-    }
-    setupCollection(kToNss, KeyPattern(BSON("x" << 1)), originalToChunks);
-
-    // Get FROM collection document and chunks
-    auto fromDoc = client.findOne(CollectionType::ConfigNS, fromCollQuery);
-    CollectionType fromCollection(fromDoc);
-
-    FindCommandRequest fromChunksRequest{ChunkType::ConfigNS};
-    fromChunksRequest.setFilter(BSON(ChunkType::collectionUUID << collUUID));
-    fromChunksRequest.setSort(BSON("_id" << 1));
-
-    std::vector<BSONObj> fromChunks;
-    findN(client, std::move(fromChunksRequest), nChunks, fromChunks);
-
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto catalogClient = Grid::get(opCtx)->catalogClient();
-    auto fromCollType = catalogClient->getCollection(opCtx, fromNss);
-    // Perform the metadata rename
-    sharding_ddl_util::shardedRenameMetadata(opCtx,
-                                             configShard,
-                                             catalogClient,
-                                             fromCollType,
-                                             kToNss,
-                                             ShardingCatalogClient::kMajorityWriteConcern);
-
-    // Check that the FROM config.collections entry has been deleted
-    ASSERT(client.findOne(CollectionType::ConfigNS, fromCollQuery).isEmpty());
-
-    // Get TO collection document and chunks
-    auto toDoc = client.findOne(CollectionType::ConfigNS, toCollQuery);
-    CollectionType toCollection(toDoc);
-
-    FindCommandRequest toChunksRequest{ChunkType::ConfigNS};
-    toChunksRequest.setFilter(BSON(ChunkType::collectionUUID << collUUID));
-    toChunksRequest.setSort(BSON("_id" << 1));
-
-    std::vector<BSONObj> toChunks;
-    findN(client, std::move(toChunksRequest), nChunks, toChunks);
-
-    // Check that original epoch/timestamp are changed in config.collections entry
-    ASSERT(fromCollection.getEpoch() != toCollection.getEpoch());
-    ASSERT(fromCollection.getTimestamp() != toCollection.getTimestamp());
-
-    // Check that no other CollectionType field has been changed
-    auto fromUnchangedFields = fromDoc.removeField(CollectionType::kNssFieldName)
-                                   .removeField(CollectionType::kEpochFieldName)
-                                   .removeField(CollectionType::kTimestampFieldName);
-    auto toUnchangedFields = toDoc.removeField(CollectionType::kNssFieldName)
-                                 .removeField(CollectionType::kEpochFieldName)
-                                 .removeField(CollectionType::kTimestampFieldName);
-    ASSERT_EQ(fromUnchangedFields.woCompare(toUnchangedFields), 0);
-
-    // Check that chunk documents remain unchanged
-    for (int i = 0; i < nChunks; i++) {
-        auto fromChunkDoc = fromChunks[i];
-        auto toChunkDoc = toChunks[i];
-
-        ASSERT_EQ(fromChunkDoc.woCompare(toChunkDoc), 0);
-    }
-}
-
 // Test all combinations of rename acceptable preconditions:
 // (1) Namespace of target collection is not too long
 // (2) Target collection doesn't exist and doesn't have no associated tags
@@ -350,7 +260,7 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
 
     // Check that an exception is thrown if the namespace of the target collection is too long
     const NamespaceString tooLongNss =
-        NamespaceString::createNamespaceString_forTest(longEnoughNss.toString() + 'x');
+        NamespaceString::createNamespaceString_forTest(longEnoughNss.toString_forTest() + 'x');
     ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
                            opCtx, true /* sourceIsSharded */, tooLongNss, false /* dropTarget */),
                        AssertionException,

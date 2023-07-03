@@ -29,11 +29,17 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <string>
 #include <vector>
+// IWYU pragma: no_include <ctype.h>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/idl/unittest_import_gen.h"
+#include "mongo/util/ctype.h"  // IWYU pragma: keep
 
 namespace mongo {
 namespace idl {

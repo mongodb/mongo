@@ -27,25 +27,53 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/delete_stage.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/queued_data_stage.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/transaction_resources.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace QueryStageDelete {
 
-static const NamespaceString nss("unittests.QueryStageDelete");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageDelete");
 
 //
 // Stage-specific tests.
@@ -83,13 +111,13 @@ public:
         params.tailable = false;
 
         std::unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), &collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
-                verify(member->hasRecordId());
+                MONGO_verify(member->hasRecordId());
                 out->push_back(member->recordId);
             }
         }
@@ -149,8 +177,7 @@ public:
             std::move(deleteStageParams),
             &ws,
             coll,
-            new CollectionScan(
-                _expCtx.get(), coll.getCollectionPtr(), collScanParams, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), &coll, collScanParams, &ws, nullptr));
 
         const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage.getSpecificStats());
 

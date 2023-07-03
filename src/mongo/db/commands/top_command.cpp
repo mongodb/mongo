@@ -27,18 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
 
-#include "mongo/base/init.h"
-#include "mongo/db/auth/action_set.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/stdx/type_traits.h"
 
 namespace {
 
@@ -65,11 +72,11 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const override {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                  ActionType::top)) {
+        if (!as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::top)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 

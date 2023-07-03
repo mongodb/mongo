@@ -27,14 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cmath>
+#include <memory>
 
-#include "mongo/db/pipeline/granularity_rounder.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/pipeline/granularity_rounder.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 

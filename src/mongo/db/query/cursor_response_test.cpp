@@ -27,15 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <initializer_list>
 
-#include "mongo/db/query/cursor_response.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
-#include "mongo/rpc/op_msg_rpc_impls.h"
-
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 
@@ -51,7 +62,7 @@ TEST(CursorResponseTest, parseFromBSONFirstBatch) {
 
     CursorResponse response = std::move(result.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
@@ -67,7 +78,7 @@ TEST(CursorResponseTest, parseFromBSONNextBatch) {
 
     CursorResponse response = std::move(result.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
@@ -83,7 +94,7 @@ TEST(CursorResponseTest, parseFromBSONCursorIdZero) {
 
     CursorResponse response = std::move(result.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(0));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
@@ -99,7 +110,7 @@ TEST(CursorResponseTest, parseFromBSONEmptyBatch) {
 
     CursorResponse response = std::move(result.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 0U);
 }
 
@@ -195,7 +206,7 @@ TEST(CursorResponseTest, parseFromBSONPartialResultsReturnedField) {
 
     CursorResponse response = std::move(result.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
@@ -223,7 +234,7 @@ TEST(CursorResponseTest, parseFromBSONVarsFieldCorrect) {
 
     CursorResponse response = std::move(result.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
@@ -251,7 +262,7 @@ TEST(CursorResponseTest, parseFromBSONMultipleVars) {
 
     CursorResponse response = std::move(result.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
@@ -274,7 +285,9 @@ TEST(CursorResponseTest, roundTripThroughCursorResponseBuilderWithPartialResults
     CursorResponseBuilder crb(&builder, options);
     crb.append(testDoc);
     crb.setPartialResultsReturned(true);
-    crb.done(CursorId(123), NamespaceString::createNamespaceString_forTest(boost::none, "db.coll"));
+    crb.done(CursorId(123),
+             NamespaceString::createNamespaceString_forTest(boost::none, "db.coll"),
+             SerializationContext::stateCommandReply());
 
     // Confirm that the resulting BSONObj response matches the expected body.
     auto msg = builder.done();
@@ -288,7 +301,7 @@ TEST(CursorResponseTest, roundTripThroughCursorResponseBuilderWithPartialResults
     // Confirm the CursorReponse parsed from CursorResponseBuilder output has the correct content.
     CursorResponse response = std::move(swCursorResponse.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 1U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], testDoc);
     ASSERT_EQ(response.getPartialResultsReturned(), true);
@@ -317,22 +330,22 @@ TEST(CursorResponseTest,
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
     for (bool flagStatus : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                   flagStatus);
-
         rpc::OpMsgReplyBuilder builder;
         BSONObj okStatus = BSON("ok" << 1);
         BSONObj testDoc = BSON("_id" << 1);
+        auto scReply = SerializationContext::stateCommandReply();
+        scReply.setTenantIdSource(flagStatus /*nonPrefixedTenantId*/);
+
         BSONObj expectedBody =
             BSON("cursor" << BSON("firstBatch" << BSON_ARRAY(testDoc) << "partialResultsReturned"
                                                << true << "id" << CursorId(123) << "ns"
-                                               << NamespaceStringUtil::serialize(nss)));
+                                               << NamespaceStringUtil::serialize(nss, scReply)));
 
         // Use CursorResponseBuilder to serialize the cursor response to OpMsgReplyBuilder.
         CursorResponseBuilder crb(&builder, options);
         crb.append(testDoc);
         crb.setPartialResultsReturned(true);
-        crb.done(CursorId(123), nss);
+        crb.done(CursorId(123), nss, scReply);
 
         // Confirm that the resulting BSONObj response matches the expected body.
         auto msg = builder.done();
@@ -355,7 +368,7 @@ TEST(CursorResponseTest,
         ASSERT_EQ(response.getPartialResultsReturned(), true);
 
         // Re-serialize a BSONObj response from the CursorResponse.
-        auto cursorResBSON = response.toBSONAsInitialResponse();
+        auto cursorResBSON = response.toBSONAsInitialResponse(scReply);
 
         // Confirm that the BSON serialized by the CursorResponse is the same as that serialized by
         // the CursorResponseBuilder. Field ordering differs between the two, so compare
@@ -510,7 +523,7 @@ TEST(CursorResponseTest, serializePostBatchResumeToken) {
     ASSERT_OK(reparsed.getStatus());
     CursorResponse reparsedResponse = std::move(reparsed.getValue());
     ASSERT_EQ(reparsedResponse.getCursorId(), CursorId(123));
-    ASSERT_EQ(reparsedResponse.getNSS().ns(), "db.coll");
+    ASSERT_EQ(reparsedResponse.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(reparsedResponse.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(*reparsedResponse.getPostBatchResumeToken(), postBatchResumeToken);
 }

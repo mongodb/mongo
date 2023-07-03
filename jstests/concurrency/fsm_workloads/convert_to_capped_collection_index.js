@@ -15,10 +15,12 @@
  *
  * @tags: [requires_collstats, requires_capped]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');                    // for extendWorkload
-load('jstests/concurrency/fsm_workloads/convert_to_capped_collection.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/convert_to_capped_collection.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.convertToCapped = function convertToCapped(db, collName) {
         assertWhenOwnDB.commandWorked(db[this.threadCollName].createIndex({i: 1, rand: 1}));
         assertWhenOwnDB.eq(2, db[this.threadCollName].getIndexes().length);

@@ -27,19 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/client/sasl_scram_client_conversation.h"
-
 #include <boost/algorithm/string/replace.hpp>
+#include <cstdint>
+#include <deque>
+#include <memory>
 
+#include <boost/iterator/iterator_traits.hpp>
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
-#include "mongo/client/scram_client_cache.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/client/sasl_scram_client_conversation.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
-#include "mongo/util/password_digest.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
 namespace mongo {
 

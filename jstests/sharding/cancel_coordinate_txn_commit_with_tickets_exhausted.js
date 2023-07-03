@@ -27,6 +27,7 @@
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallelTester.js');
 load("jstests/sharding/libs/create_sharded_collection_util.js");
+load("jstests/libs/auto_retry_transaction_in_sharding.js");  // For withTxnAndAutoRetryOnMongos.
 
 const kNumWriteTickets = 10;
 const st = new ShardingTest({
@@ -85,10 +86,10 @@ const sessionCollection = session.getDatabase(dbName).getCollection(collName);
 // transactionThread won't need to persist a topology time. The scenario reported in SERVER-60685
 // depended on the TransactionCoordinator being interrupted while persisting the participant list
 // which happens after waiting for the topology time to become durable.
-session.startTransaction();
-assert.commandWorked(sessionCollection.insert({key: 400}));
-assert.commandWorked(sessionCollection.insert({key: -400}));
-assert.commandWorked(session.commitTransaction_forTesting());
+withTxnAndAutoRetryOnMongos(session, () => {
+    assert.commandWorked(sessionCollection.insert({key: 400}));
+    assert.commandWorked(sessionCollection.insert({key: -400}));
+});
 
 const hangWithLockDuringBatchRemoveFp = configureFailPoint(txnCoordinator, failpointName);
 

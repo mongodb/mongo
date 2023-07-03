@@ -29,12 +29,34 @@
 
 #include "mongo/crypto/fle_crypto.h"
 
-#include <algorithm>
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/cstdint.hpp>
+#include <boost/exception/exception.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
+#include <boost/multiprecision/cpp_int/bitwise.hpp>
+#include <boost/multiprecision/cpp_int/comparison.hpp>
+#include <boost/multiprecision/cpp_int/divide.hpp>
+#include <boost/multiprecision/cpp_int/limits.hpp>
+#include <boost/multiprecision/cpp_int/literals.hpp>
+#include <boost/multiprecision/cpp_int/multiply.hpp>
+#include <boost/optional.hpp>
+// IWYU pragma: no_include "boost/multiprecision/detail/default_ops.hpp"
+// IWYU pragma: no_include "boost/multiprecision/detail/integer_ops.hpp"
+// IWYU pragma: no_include "boost/multiprecision/detail/no_et_ops.hpp"
+// IWYU pragma: no_include "boost/multiprecision/detail/number_base.hpp"
+// IWYU pragma: no_include "boost/multiprecision/detail/number_compare.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/multiprecision/number.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <functional>
-#include <iomanip>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -42,12 +64,10 @@
 #include <string>
 #include <tuple>
 #include <type_traits>
-#include <unordered_map>
 #include <variant>
 #include <vector>
 
 extern "C" {
-#include <mc-fle2-payload-iev-private.h>
 #include <mongocrypt-buffer-private.h>
 #include <mongocrypt.h>
 }
@@ -75,18 +95,22 @@ extern "C" {
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_fields_util.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/crypto/symmetric_key.h"
-#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/bits.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/random.h"
-#include "mongo/shell/kms_gen.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -4032,7 +4056,8 @@ BSONObj EncryptionInformationHelpers::encryptionInformationSerialize(
     EncryptionInformation ei;
     ei.setType(kEncryptionInformationSchemaVersion);
 
-    ei.setSchema(BSON(nss.toString() << encryptedFields));
+    // Do not include tenant id in nss in the schema as the command request has "$tenant".
+    ei.setSchema(BSON(nss.serializeWithoutTenantPrefix_UNSAFE() << encryptedFields));
 
     return ei.toBSON();
 }
@@ -4041,7 +4066,8 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
     const NamespaceString& nss, const EncryptionInformation& ei) {
     BSONObj schema = ei.getSchema();
 
-    auto element = schema.getField(nss.toString());
+    // Do not include tenant id in nss in the schema as the command request has "$tenant".
+    auto element = schema.getField(nss.serializeWithoutTenantPrefix_UNSAFE());
 
     uassert(6371205,
             "Expected an object for schema in EncryptionInformation",
@@ -4995,7 +5021,7 @@ PrfBlock FLEUtil::prf(ConstDataRange key, uint64_t value) {
 void FLEUtil::checkEFCForECC(const EncryptedFieldConfig& efc) {
     uassert(7568300,
             str::stream()
-                << "Queryable Encryption version 2 collections nust not contain the eccCollection"
+                << "Queryable Encryption version 2 collections must not contain the eccCollection"
                 << " in EncryptedFieldConfig",
             !efc.getEccCollection());
 }

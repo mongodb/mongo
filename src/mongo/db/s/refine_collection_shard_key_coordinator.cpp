@@ -30,17 +30,48 @@
 
 #include "mongo/db/s/refine_collection_shard_key_coordinator.h"
 
-#include "mongo/db/catalog/collection_uuid_mismatch.h"
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -56,10 +87,11 @@ void notifyChangeStreamsOnRefineCollectionShardKeyComplete(OperationContext* opC
                                                            const UUID& collUUID) {
 
     const std::string oMessage = str::stream()
-        << "Refine shard key for collection " << collNss << " with " << shardKey.toString();
+        << "Refine shard key for collection " << NamespaceStringUtil::serialize(collNss) << " with "
+        << shardKey.toString();
 
     BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("refineCollectionShardKey", collNss.ns());
+    cmdBuilder.append("refineCollectionShardKey", NamespaceStringUtil::serialize(collNss));
     cmdBuilder.append("shardKey", shardKey.toBSON());
     cmdBuilder.append("oldShardKey", oldShardKey.toBSON());
 

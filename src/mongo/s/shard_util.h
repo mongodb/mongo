@@ -29,12 +29,23 @@
 
 #pragma once
 
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <string>
 #include <vector>
 
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 

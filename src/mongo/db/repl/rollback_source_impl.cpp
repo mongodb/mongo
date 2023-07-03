@@ -27,14 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
+#include <list>
+#include <memory>
 
-#include "mongo/db/repl/rollback_source_impl.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/jsobj.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_base.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/replication_auth.h"
+#include "mongo/db/repl/rollback_source_impl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -43,12 +55,8 @@ namespace repl {
 
 RollbackSourceImpl::RollbackSourceImpl(GetConnectionFn getConnection,
                                        const HostAndPort& source,
-                                       StringData collectionName,
                                        int batchSize)
-    : _getConnection(getConnection),
-      _source(source),
-      _collectionName(collectionName),
-      _oplog(source, getConnection, collectionName, batchSize) {}
+    : _getConnection(getConnection), _source(source), _oplog(source, getConnection, batchSize) {}
 
 const OplogInterface& RollbackSourceImpl::getOplog() const {
     return _oplog;
@@ -66,7 +74,7 @@ int RollbackSourceImpl::getRollbackId() const {
 }
 
 BSONObj RollbackSourceImpl::getLastOperation() const {
-    FindCommandRequest findCmd{NamespaceString{_collectionName}};
+    FindCommandRequest findCmd{NamespaceString::kRsOplogNamespace};
     findCmd.setSort(BSON("$natural" << -1));
     findCmd.setReadConcern(ReadConcernArgs::kLocal);
     return _getConnection()->findOne(std::move(findCmd),

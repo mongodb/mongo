@@ -3,6 +3,8 @@
 
 The comparison is computed by scanning though `base_version_dirs` and `incremented_version_dirs` looking for all configs and setParameters in each tree.
 It then compares these looking for additions, removals, and deltas.  Finally it outputs a summary to the console.
+
+This comparison does not currently support nested properties is as it does only simple string comparison on key:property pairs - see build_diff_fn as a means of extending the comparison capability in the future.
 """
 
 import argparse
@@ -95,7 +97,7 @@ class ComputeDiffsFromIncrementedVersionHandler:
             # present in the base version properties, but not in the incremented version properties,
             # which means they were removed in the incremented version
             in_both_prop = self.properties_diff.removed.pop(compare_key)
-            changed_properties = self.calc_diff(yaml_val, in_both_prop)
+            changed_properties = self.calc_diff(in_both_prop, yaml_val)
 
             if len(changed_properties) > 0:
                 self.properties_diff.modified[compare_key] = changed_properties
@@ -248,7 +250,7 @@ class TestBuildBasePropertiesForComparisonHandler(unittest.TestCase):
                 short_name: networkMessageCompressors
                 default: 'snappy,zstd,zlib' 
         """
-        yaml_obj = yaml.load(document)
+        yaml_obj = yaml.load(document, Loader=yaml.FullLoader)
 
         fixture = BuildBasePropertiesForComparisonHandler(ComparisonType.SERVER_PARAMETERS)
         fixture.handle(yaml_obj, filename)
@@ -271,7 +273,7 @@ class TestBuildBasePropertiesForComparisonHandler(unittest.TestCase):
               cpp_namespace: "mongo"
         """
 
-        yaml_obj = yaml.load(document)
+        yaml_obj = yaml.load(document, Loader=yaml.FullLoader)
 
         fixture = BuildBasePropertiesForComparisonHandler(ComparisonType.SERVER_PARAMETERS)
         fixture.handle(yaml_obj, filename)
@@ -321,7 +323,7 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
                 default: 'zlib' 
         """
 
-        inc_yaml_obj = yaml.load(document)
+        inc_yaml_obj = yaml.load(document, Loader=yaml.FullLoader)
 
         inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.CONFIGS, {},
                                                                 self.config_diff_function)
@@ -367,7 +369,7 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
                 default: 'snappy,zstd,zlib' 
         """
 
-        inc_yaml_obj = yaml.load(document)
+        inc_yaml_obj = yaml.load(document, Loader=yaml.FullLoader)
 
         inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.CONFIGS, {},
                                                                 self.config_diff_function)
@@ -400,7 +402,7 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
         def get_base_data():
             return {("ok", "test.yaml"): {"yes": "no"}, ("also_ok", "blah.yaml"): {"no": "yes"}}
 
-        inc_yaml_obj = yaml.load(document)
+        inc_yaml_obj = yaml.load(document, Loader=yaml.FullLoader)
 
         inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.CONFIGS,
                                                                 get_base_data(),
@@ -430,7 +432,64 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
         self.assertTrue(len(properties_diffs.added) == 0)
         self.assertTrue(len(properties_diffs.modified) == 0)
 
-    def test_modified_works_correctly(self):
+    def test_empty_modified_works_correctly(self):
+        filename = "test.yaml"
+        document = """
+            server_parameters:
+              testOptions:
+                description: "Cluster server parameter for change stream options"
+                set_at: cluster
+                cpp_class:
+                  name: ChangeStreamOptionsParameter
+                  override_set: true
+                  override_validate: true
+
+              testParameter:
+                description: "Some parameter"
+                set_at: cluster
+                cpp_class:
+                  name: ChangeStreamOptionsParameter
+                  override_set: true
+                  override_validate: true
+
+            configs:
+              "asdf":
+                description: 'Comma-separated list of compressors to use for network messages'
+                source: [ cli, ini, yaml ]
+                arg_vartype: String
+                short_name: networkMessageCompressors
+                default: 'snappy,zstd,zlib' 
+
+              "zxcv":
+                description: 'Comma-separated list of compressors to use for network messages'
+                source: [ cli, ini, yaml ]
+                arg_vartype: String
+                short_name: networkMessageCompressors
+                default: 'snappy,zstd,zlib' 
+        """
+        inc_yaml_obj = yaml.load(document, Loader=yaml.FullLoader)
+
+        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.CONFIGS, {},
+                                                                build_diff_fn(['default']))
+        inc_fixture.handle(inc_yaml_obj, filename)
+
+        properties_diffs = inc_fixture.properties_diff
+
+        self.assertIsNotNone(properties_diffs.added.get(("asdf", filename)))
+        self.assertTrue(len(properties_diffs.removed) == 0)
+        self.assertTrue(len(properties_diffs.modified) == 0)
+
+        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.SERVER_PARAMETERS,
+                                                                {}, build_diff_fn(['set_at']))
+        inc_fixture.handle(inc_yaml_obj, filename)
+
+        properties_diffs = inc_fixture.properties_diff
+
+        self.assertIsNotNone(properties_diffs.added.get(("testOptions", filename)))
+        self.assertTrue(len(properties_diffs.removed) == 0)
+        self.assertTrue(len(properties_diffs.modified) == 0)
+
+    def test_not_modified_between_yamls_reports_correctly(self):
         filename = "test.yaml"
         document = """
             server_parameters:
@@ -466,27 +525,147 @@ class TestComputeDiffsFromIncrementedVersionHandler(unittest.TestCase):
                 default: 'snappy,zstd,zlib' 
         """
 
-        inc_yaml_obj = yaml.load(document)
+        document_inc = document
 
-        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.CONFIGS, {},
-                                                                build_diff_fn(['default']))
-        inc_fixture.handle(inc_yaml_obj, filename)
+        document_yaml = yaml.load(document, Loader=yaml.FullLoader)
+        document_inc_yaml = yaml.load(document_inc, Loader=yaml.FullLoader)
 
-        properties_diffs = inc_fixture.properties_diff
+        diff_fn = build_diff_fn(_COMPARE_FIELDS_CONFIGS)
 
-        self.assertIsNotNone(properties_diffs.added.get(("asdf", filename)))
-        self.assertTrue(len(properties_diffs.removed) == 0)
-        self.assertTrue(len(properties_diffs.modified) == 0)
+        config_base_properties_handler = BuildBasePropertiesForComparisonHandler(
+            ComparisonType.CONFIGS)
+        config_base_properties_handler.handle(document_yaml, filename)
 
-        inc_fixture = ComputeDiffsFromIncrementedVersionHandler(ComparisonType.SERVER_PARAMETERS,
-                                                                {}, build_diff_fn(['set_at']))
-        inc_fixture.handle(inc_yaml_obj, filename)
+        config_inc_properties_handler = ComputeDiffsFromIncrementedVersionHandler(
+            ComparisonType.CONFIGS, config_base_properties_handler.properties, diff_fn)
+        config_inc_properties_handler.handle(document_inc_yaml, filename)
 
-        properties_diffs = inc_fixture.properties_diff
+        property_diff = config_inc_properties_handler.properties_diff
 
-        self.assertIsNotNone(properties_diffs.added.get(("testOptions", filename)))
-        self.assertTrue(len(properties_diffs.removed) == 0)
-        self.assertTrue(len(properties_diffs.modified) == 0)
+        self.assertEqual(0, len(property_diff.modified))
+
+        diff_fn = build_diff_fn(_COMPARE_FIELDS_SERVER_PARAMETERS)
+
+        sp_base_properties_handler = BuildBasePropertiesForComparisonHandler(
+            ComparisonType.SERVER_PARAMETERS)
+        sp_base_properties_handler.handle(document_yaml, filename)
+
+        sp_inc_properties_handler = ComputeDiffsFromIncrementedVersionHandler(
+            ComparisonType.SERVER_PARAMETERS, sp_base_properties_handler.properties, diff_fn)
+        sp_inc_properties_handler.handle(document_inc_yaml, filename)
+
+        property_diff = sp_inc_properties_handler.properties_diff
+
+        self.assertEqual(0, len(property_diff.modified))
+
+    def test_modified_between_yamls_reports_correctly(self):
+        filename = "test.yaml"
+        document = """
+            server_parameters:
+              testOptions:
+                description: "Cluster server parameter for change stream options"
+                set_at: cluster
+                cpp_class:
+                  name: ChangeStreamOptionsParameter
+                  override_set: true
+                  override_validate: true
+
+              testParameter:
+                description: "Some parameter"
+                set_at: cluster
+                cpp_class:
+                  name: ChangeStreamOptionsParameter
+                  override_set: true
+                  override_validate: true
+
+            configs:
+              "asdf":
+                description: 'Comma-separated list of compressors to use for network messages'
+                source: [ cli, ini, yaml ]
+                arg_vartype: String
+                short_name: networkMessageCompressors
+                default: 'snappy,zstd,zlib' 
+
+              "zxcv":
+                description: 'Comma-separated list of compressors to use for network messages'
+                source: [ cli, ini, yaml ]
+                arg_vartype: String
+                short_name: networkMessageCompressors
+                default: 'snappy,zstd,zlib' 
+        """
+
+        document_inc = """
+            server_parameters:
+              testOptions:
+                description: "Cluster server parameter for change stream options"
+                set_at: runtime
+                cpp_class:
+                  name: ChangeStreamOptionsParameter
+                  override_set: true
+                  override_validate: true
+
+              testParameter:
+                description: "Some parameter"
+                set_at: cluster
+                cpp_class:
+                  name: ChangeStreamOptionsParameter
+                  override_set: true
+                  override_validate: true
+
+            configs:
+              "asdf":
+                description: 'Comma-separated list of compressors to use for network messages'
+                source: [ cli, ini, yaml ]
+                arg_vartype: int
+                short_name: networkMessageCompressors
+                default: 'snappy,zstd,zlib' 
+
+              "zxcv":
+                description: 'Comma-separated list of compressors to use for network messages'
+                source: [ cli, ini, yaml ]
+                arg_vartype: String
+                short_name: networkMessageCompressors
+                default: 'snappy,zstd,zlib' 
+        """
+
+        document_yaml = yaml.load(document, Loader=yaml.FullLoader)
+        document_inc_yaml = yaml.load(document_inc, Loader=yaml.FullLoader)
+
+        diff_fn = build_diff_fn(_COMPARE_FIELDS_CONFIGS)
+
+        config_base_properties_handler = BuildBasePropertiesForComparisonHandler(
+            ComparisonType.CONFIGS)
+        config_base_properties_handler.handle(document_yaml, filename)
+
+        config_inc_properties_handler = ComputeDiffsFromIncrementedVersionHandler(
+            ComparisonType.CONFIGS, config_base_properties_handler.properties, diff_fn)
+        config_inc_properties_handler.handle(document_inc_yaml, filename)
+
+        property_diff = config_inc_properties_handler.properties_diff
+
+        self.assertEqual(
+            property_diff.modified.get(("asdf", filename)).get("arg_vartype").base, "String")
+        self.assertEqual(
+            property_diff.modified.get(("asdf", filename)).get("arg_vartype").inc, "int")
+        self.assertIsNone(property_diff.modified.get(("zxcv", filename)))
+
+        diff_fn = build_diff_fn(_COMPARE_FIELDS_SERVER_PARAMETERS)
+
+        sp_base_properties_handler = BuildBasePropertiesForComparisonHandler(
+            ComparisonType.SERVER_PARAMETERS)
+        sp_base_properties_handler.handle(document_yaml, filename)
+
+        sp_inc_properties_handler = ComputeDiffsFromIncrementedVersionHandler(
+            ComparisonType.SERVER_PARAMETERS, sp_base_properties_handler.properties, diff_fn)
+        sp_inc_properties_handler.handle(document_inc_yaml, filename)
+
+        property_diff = sp_inc_properties_handler.properties_diff
+
+        self.assertEqual(
+            property_diff.modified.get(("testOptions", filename)).get("set_at").base, "cluster")
+        self.assertEqual(
+            property_diff.modified.get(("testOptions", filename)).get("set_at").inc, "runtime")
+        self.assertIsNone(property_diff.modified.get(("testParameter", filename)))
 
 
 class TestPropertiesDiffFunction(unittest.TestCase):

@@ -28,14 +28,29 @@
  */
 #pragma once
 
-#include "mongo/unittest/unittest.h"
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <mutex>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/baton.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/platform/random.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 
 namespace mongo {

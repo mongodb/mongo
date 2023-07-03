@@ -31,6 +31,7 @@
 
 #include <string>
 
+#include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/background.h"
 
@@ -62,8 +63,8 @@ private:
      */
     bool _deleteExcessDocuments();
 
-    std::string _name =
-        std::string("OplogCapMaintainerThread-") + NamespaceString::kRsOplogNamespace.toString();
+    std::string _name = std::string("OplogCapMaintainerThread-") +
+        toStringForLogging(NamespaceString::kRsOplogNamespace);
 };
 
 }  // namespace mongo

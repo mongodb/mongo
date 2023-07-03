@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/base/error_extra_info.h"
-
-#include "mongo/base/init.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

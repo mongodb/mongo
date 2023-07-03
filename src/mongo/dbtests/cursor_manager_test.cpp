@@ -27,29 +27,63 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <algorithm>
-
 #include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <fmt/format.h>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <utility>
+#include <vector>
 
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/cursor_server_params.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -788,8 +822,8 @@ TEST_F(CursorManagerTestCustomOpCtx,
     // Add a cursor for kTestNss.
     auto pinned = makeCursor(opCtx.get());
     // Get cursors for a different NamespaceString.
-    auto cursorsForNamespace =
-        useCursorManager()->getCursorIdsForNamespace(NamespaceString("somerandom.nss"));
+    auto cursorsForNamespace = useCursorManager()->getCursorIdsForNamespace(
+        NamespaceString::createNamespaceString_forTest("somerandom.nss"));
     ASSERT_EQUALS(cursorsForNamespace.size(), 0ull);
 }
 

@@ -28,19 +28,25 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
 
-#include "mongo/db/audit.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/get_cluster_parameter_invocation.h"
-#include "mongo/idl/cluster_server_parameter_gen.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/service_context.h"
 #include "mongo/idl/cluster_server_parameter_refresher.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -90,7 +96,8 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Not authorized to retrieve cluster parameters",
                     authzSession->isAuthorizedForPrivilege(Privilege{
-                        ResourcePattern::forClusterResource(), ActionType::getClusterParameter}));
+                        ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                        ActionType::getClusterParameter}));
         }
 
         NamespaceString ns() const override {

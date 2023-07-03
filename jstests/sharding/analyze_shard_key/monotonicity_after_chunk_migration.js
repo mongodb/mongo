@@ -9,16 +9,7 @@
 
 load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 
-const st = new ShardingTest({
-    shards: 2,
-    rs: {
-        nodes: 1,
-        setParameter: {
-            "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-                tojson({mode: "alwaysOn"})
-        }
-    }
-});
+const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 const dbName = "testDb";
 const collName = "testColl";
@@ -51,8 +42,14 @@ const isClusteredColl =
     listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
 const expectedType = isClusteredColl ? "unknown" : "monotonic";
 
-const res0 = assert.commandWorked(st.s.adminCommand({analyzeShardKey: ns, key: {x: 1}}));
-assert.eq(res0.monotonicity.type, expectedType, res0);
+const res0 = assert.commandWorked(st.s.adminCommand({
+    analyzeShardKey: ns,
+    key: {x: 1},
+    // Skip calculating the read and write distribution metrics since there are not needed by
+    // this test.
+    readWriteDistribution: false
+}));
+assert.eq(res0.keyCharacteristics.monotonicity.type, expectedType, res0);
 
 // Make the collection have the following chunks:
 // shard0: [MinKey, -1000] (10000 documents)
@@ -63,8 +60,14 @@ assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: -1000}, to: st.
 // If mongos forwards the command to shard1 instead of shard0 (primary shard), the monotonicity
 // check will find that the documents [0, 2000] were inserted before the documents [-1000, 0] and
 // return that the shard key is not monotonically changing.
-const res1 = assert.commandWorked(st.s.adminCommand({analyzeShardKey: ns, key: {x: 1}}));
-assert.eq(res1.monotonicity.type, expectedType, res1);
+const res1 = assert.commandWorked(st.s.adminCommand({
+    analyzeShardKey: ns,
+    key: {x: 1},
+    // Skip calculating the read and write distribution metrics since there are not needed by
+    // this test.
+    readWriteDistribution: false
+}));
+assert.eq(res1.keyCharacteristics.monotonicity.type, expectedType, res1);
 
 st.stop();
 })();

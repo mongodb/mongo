@@ -27,53 +27,97 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/status_with.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/collection_yield_restore.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/exec/update_stage.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/fle_crud.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
+#include "mongo/db/ops/parsed_writes_common.h"
+#include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
 #include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/ops/write_ops_retryability.h"
-#include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/explain.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
+#include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/update/update_util.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/analyze_shard_key_common_gen.h"
+#include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
 #include "mongo/util/log_and_backoff.h"
+#include "mongo/util/serialization_context.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -82,41 +126,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(failAllFindAndModify);
 MONGO_FAIL_POINT_DEFINE(hangBeforeFindAndModifyPerformsUpdate);
-
-/**
- * If the operation succeeded, then returns either a document to return to the client, or
- * boost::none if no matching document to update/remove was found. If the operation failed, throws.
- */
-boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
-                                         const write_ops::FindAndModifyCommandRequest& request,
-                                         PlanExecutor* exec,
-                                         bool isRemove) {
-    BSONObj value;
-    PlanExecutor::ExecState state;
-    try {
-        state = exec->getNext(&value, nullptr);
-    } catch (DBException& exception) {
-        auto&& explainer = exec->getPlanExplainer();
-        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
-        LOGV2_WARNING(
-            23802,
-            "Plan executor error during findAndModify: {error}, stats: {stats}, cmd: {cmd}",
-            "Plan executor error during findAndModify",
-            "error"_attr = exception.toStatus(),
-            "stats"_attr = redact(stats),
-            "cmd"_attr = request.toBSON(BSONObj() /* commandPassthroughFields */));
-
-        exception.addContext("Plan executor error during findAndModify");
-        throw;
-    }
-
-    if (PlanExecutor::ADVANCED == state) {
-        return {std::move(value)};
-    }
-
-    invariant(state == PlanExecutor::IS_EOF);
-    return boost::none;
-}
 
 void validate(const write_ops::FindAndModifyCommandRequest& request) {
     uassert(ErrorCodes::FailedToParse,
@@ -206,7 +215,7 @@ void recordStatsForTopCommand(OperationContext* opCtx) {
     auto curOp = CurOp::get(opCtx);
     Top::get(opCtx->getClient()->getServiceContext())
         .record(opCtx,
-                curOp->getNS(),
+                curOp->getNSS(),
                 curOp->getLogicalOp(),
                 Top::LockType::WriteLocked,
                 durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
@@ -318,8 +327,7 @@ void CmdFindAndModify::Invocation::doCheckAuthorization(OperationContext* opCtx)
         actions.addAction(ActionType::bypassDocumentValidation);
     }
 
-    ResourcePattern resource(
-        CommandHelpers::resourcePatternForNamespace(request.getNamespace().toString()));
+    ResourcePattern resource(CommandHelpers::resourcePatternForNamespace(request.getNamespace()));
     uassert(17138,
             "Invalid target namespace " + resource.toString(),
             resource.isExactNamespacePattern());
@@ -386,7 +394,13 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(
-            exec.get(), collection.getCollectionPtr(), verbosity, BSONObj(), cmdObj, &bodyBuilder);
+            exec.get(),
+            collection.getCollectionPtr(),
+            verbosity,
+            BSONObj(),
+            SerializationContext::stateCommandReply(request.getSerializationContext()),
+            cmdObj,
+            &bodyBuilder);
     } else {
         auto updateRequest = UpdateRequest();
         updateRequest.setNamespaceString(nss);
@@ -402,10 +416,15 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
                 DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
+        if (isTimeseries) {
+            timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
+        }
 
-        const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest.getNamespaceString());
-        ParsedUpdate parsedUpdate(
-            opCtx, &updateRequest, extensionsCallback, collection.getCollectionPtr());
+        ParsedUpdate parsedUpdate(opCtx,
+                                  &updateRequest,
+                                  collection.getCollectionPtr(),
+                                  false /*forgoOpCounterIncrements*/,
+                                  isTimeseries);
         uassertStatusOK(parsedUpdate.parseRequest());
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
@@ -416,7 +435,13 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(
-            exec.get(), collection.getCollectionPtr(), verbosity, BSONObj(), cmdObj, &bodyBuilder);
+            exec.get(),
+            collection.getCollectionPtr(),
+            verbosity,
+            BSONObj(),
+            SerializationContext::stateCommandReply(request.getSerializationContext()),
+            cmdObj,
+            &bodyBuilder);
     }
 }
 
@@ -442,8 +467,8 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     CmdFindAndModify::collectMetrics(req);
 
     auto disableDocumentValidation = req.getBypassDocumentValidation().value_or(false);
-    auto fleCrudProcessed =
-        write_ops_exec::getFleCrudProcessed(opCtx, req.getEncryptionInformation());
+    auto fleCrudProcessed = write_ops_exec::getFleCrudProcessed(
+        opCtx, req.getEncryptionInformation(), nsString.tenantId());
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
                                                                       disableDocumentValidation);
@@ -505,7 +530,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
             }
             boost::optional<BSONObj> docFound;
             write_ops_exec::writeConflictRetryRemove(
-                opCtx, nsString, &deleteRequest, curOp, opDebug, inTransaction, docFound);
+                opCtx, nsString, deleteRequest, curOp, opDebug, inTransaction, docFound);
             recordStatsForTopCommand(opCtx);
             return buildResponse(boost::none, true /* isRemove */, docFound);
         } else {
@@ -544,20 +569,13 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                                                                  req.getRemove().value_or(false),
                                                                  req.getUpsert().value_or(false),
                                                                  docFound,
-                                                                 &updateRequest);
+                                                                 updateRequest);
                     recordStatsForTopCommand(opCtx);
                     return buildResponse(updateResult, req.getRemove().value_or(false), docFound);
 
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
-                    const ExtensionsCallbackReal extensionsCallback(
-                        opCtx, &updateRequest.getNamespaceString());
-
-                    auto cq =
-                        uassertStatusOK(ParsedUpdate::parseQueryToCQ(opCtx,
-                                                                     nullptr /* expCtx */,
-                                                                     extensionsCallback,
-                                                                     updateRequest,
-                                                                     updateRequest.getQuery()));
+                    auto cq = uassertStatusOK(
+                        parseWriteQueryToCQ(opCtx, nullptr /* expCtx */, updateRequest));
                     if (!write_ops_exec::shouldRetryDuplicateKeyException(
                             updateRequest, *cq, *ex.extraInfo<DuplicateKeyErrorInfo>())) {
                         throw;

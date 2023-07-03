@@ -29,6 +29,11 @@
 
 #pragma once
 
+#include <js/TypeDecls.h>
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
 
 namespace mongo {

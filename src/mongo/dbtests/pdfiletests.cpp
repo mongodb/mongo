@@ -27,12 +27,37 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/json.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace PdfileTests {
@@ -52,7 +77,7 @@ public:
 
 protected:
     static NamespaceString nss() {
-        return NamespaceString("unittests.pdfiletests.Insert");
+        return NamespaceString::createNamespaceString_forTest("unittests.pdfiletests.Insert");
     }
     CollectionPtr collection() {
         return CollectionPtr(

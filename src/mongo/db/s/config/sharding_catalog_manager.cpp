@@ -29,50 +29,108 @@
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 
+#include <absl/container/node_hash_map.h>
 #include <algorithm>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <iterator>
+#include <mutex>
 #include <tuple>
 #include <vector>
 
-#include "mongo/db/auth/authorization_session_impl.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/coll_mod.h"
+#include "mongo/db/catalog/collection_options_gen.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/config/placement_history_cleaner.h"
 #include "mongo/db/s/sharding_util.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/session/logical_session_cache.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/executor/connection_pool_stats.h"
+#include "mongo/executor/inline_executor.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/log_and_backoff.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -531,8 +589,8 @@ void setInitializationTimeOnPlacementHistory(
             NamespaceString::kConfigsvrPlacementHistoryNamespace);
         write_ops::DeleteOpEntry entryDelMarker;
         entryDelMarker.setQ(
-            BSON(NamespacePlacementType::kNssFieldName
-                 << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns()));
+            BSON(NamespacePlacementType::kNssFieldName << NamespaceStringUtil::serialize(
+                     ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker)));
         entryDelMarker.setMulti(true);
         deleteRequest.setDeletes({entryDelMarker});
 
@@ -1102,7 +1160,7 @@ boost::optional<BSONObj> ShardingCatalogManager::findOneConfigDocumentInTxn(
 BSONObj ShardingCatalogManager::findOneConfigDocument(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       const BSONObj& query) {
-    invariant(nss.dbName().db() == DatabaseName::kConfig.db());
+    invariant(nss.isConfigDB());
 
     FindCommandRequest findCommand(nss);
     findCommand.setFilter(query);
@@ -1410,8 +1468,8 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
              << BSON("$max"
                      << "$" + NamespacePlacementType::kTimestampFieldName)));
     pipeline.addStage<DocumentSourceMatch>(BSON(
-        "_id" << BSON(
-            "$ne" << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns())));
+        "_id" << BSON("$ne" << NamespaceStringUtil::serialize(
+                          ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker))));
 
     auto aggRequest = pipeline.buildAsAggregateCommandRequest();
 
@@ -1432,7 +1490,8 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
 
             const auto minTimeToPreserve = std::min(timeOfMostRecentDoc, earliestClusterTime);
             stmt.setQ(BSON(NamespacePlacementType::kNssFieldName
-                           << nss.ns() << NamespacePlacementType::kTimestampFieldName
+                           << NamespaceStringUtil::serialize(nss)
+                           << NamespacePlacementType::kTimestampFieldName
                            << BSON("$lt" << minTimeToPreserve)));
             stmt.setMulti(true);
             deleteStatements.emplace_back(std::move(stmt));
@@ -1462,24 +1521,6 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
         Shard::RetryPolicy::kIdempotent));
 
     LOGV2_DEBUG(7068808, 2, "Cleaning up placement history - done deleting entries");
-}
-
-void ShardingCatalogManager::_performLocalNoopWriteWithWAllWriteConcern(OperationContext* opCtx,
-                                                                        StringData msg) {
-    tenant_migration_access_blocker::performNoopWrite(opCtx, msg);
-
-    auto allMembersWriteConcern =
-        WriteConcernOptions(repl::ReplSetConfig::kConfigAllWriteConcernName,
-                            WriteConcernOptions::SyncMode::NONE,
-                            // Defaults to no timeout if none was set.
-                            opCtx->getWriteConcern().wTimeout);
-
-    const auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
-    auto awaitReplicationResult = repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
-        opCtx, replClient.getLastOp(), allMembersWriteConcern);
-    uassertStatusOKWithContext(awaitReplicationResult.status,
-                               str::stream() << "Waiting for replication of noop with message: \""
-                                             << msg << "\" failed");
 }
 
 }  // namespace mongo

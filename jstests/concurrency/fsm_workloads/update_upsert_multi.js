@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * update_upsert_multi.js
  *
@@ -11,7 +9,7 @@
  *
  * @tags: [requires_non_retryable_writes]
  */
-var $config = (function() {
+export const $config = (function() {
     var states = {
         insert: function insert(db, collName) {
             var query, update, options;

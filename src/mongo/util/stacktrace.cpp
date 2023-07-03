@@ -30,10 +30,21 @@
 
 #include "mongo/util/stacktrace.h"
 
+#include <algorithm>
+#include <iterator>
+
+#include <fmt/format.h>
+
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_truncation.h"
 #include "mongo/util/ctype.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl

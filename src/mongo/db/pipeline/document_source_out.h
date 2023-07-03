@@ -29,8 +29,49 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+#include <list>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_out_gen.h"
 #include "mongo/db/pipeline/document_source_writer.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 /**
@@ -51,9 +92,14 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        bool allowShardedForeignCollection(NamespaceString nss,
-                                           bool inMultiDocumentTransaction) const final {
-            return _foreignNss != nss;
+        Status checkShardedForeignCollAllowed(NamespaceString nss,
+                                              bool inMultiDocumentTransaction) const final {
+            if (_foreignNss != nss) {
+                return Status::OK();
+            }
+
+            return Status(ErrorCodes::NamespaceCannotBeSharded,
+                          "$out to a sharded collection is not allowed");
         }
 
         bool allowedToPassthroughFromMongos() const final {

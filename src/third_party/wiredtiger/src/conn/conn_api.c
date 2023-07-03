@@ -2344,6 +2344,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
      * Fail points are also defined in this list and will occur randomly when enabled.
      */
     static const WT_NAME_FLAG stress_types[] = {
+      {"aggressive_stash_free", WT_TIMING_STRESS_AGGRESSIVE_STASH_FREE},
       {"aggressive_sweep", WT_TIMING_STRESS_AGGRESSIVE_SWEEP},
       {"backup_rename", WT_TIMING_STRESS_BACKUP_RENAME},
       {"checkpoint_evict_page", WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE},
@@ -2359,8 +2360,10 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
       {"history_store_checkpoint_delay", WT_TIMING_STRESS_HS_CHECKPOINT_DELAY},
       {"history_store_search", WT_TIMING_STRESS_HS_SEARCH},
       {"history_store_sweep_race", WT_TIMING_STRESS_HS_SWEEP},
+      {"prefix_compare", WT_TIMING_STRESS_PREFIX_COMPARE},
       {"prepare_checkpoint_delay", WT_TIMING_STRESS_PREPARE_CHECKPOINT_DELAY},
-      {"prepare_resolution", WT_TIMING_STRESS_PREPARE_RESOLUTION},
+      {"prepare_resolution_1", WT_TIMING_STRESS_PREPARE_RESOLUTION_1},
+      {"prepare_resolution_2", WT_TIMING_STRESS_PREPARE_RESOLUTION_2},
       {"sleep_before_read_overflow_onpage", WT_TIMING_STRESS_SLEEP_BEFORE_READ_OVERFLOW_ONPAGE},
       {"split_1", WT_TIMING_STRESS_SPLIT_1}, {"split_2", WT_TIMING_STRESS_SPLIT_2},
       {"split_3", WT_TIMING_STRESS_SPLIT_3}, {"split_4", WT_TIMING_STRESS_SPLIT_4},
@@ -2993,6 +2996,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
         } else
             WT_ERR_NOTFOUND_OK(ret, false);
     }
+
+    WT_ERR(__wt_config_gets(session, cfg, "generation_drain_timeout_ms", &cval));
+    conn->gen_drain_timeout_ms = (uint64_t)cval.val;
 
     WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
     conn->mmap = cval.val != 0;

@@ -46,9 +46,4 @@ bool ClusterRole::has(const ClusterRole& other) const {
 bool ClusterRole::exclusivelyHasShardRole() {
     return _value == ClusterRole::ShardServer;
 }
-
-bool ClusterRole::exclusivelyHasConfigRole() {
-    return _value == ClusterRole::ConfigServer &&
-        !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup();
-}
 }  // namespace mongo

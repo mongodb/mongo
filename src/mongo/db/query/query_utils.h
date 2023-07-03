@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/sort_pattern.h"
 
 namespace mongo {
 /**
@@ -56,14 +57,4 @@ bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery
  * planning can be short-circuited as it is already known that the query is ineligible for SBE.
  */
 bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery* cq);
-
-/**
- * Checks if the given query can be executed with the SBE engine based on the query solution.
- *
- * This method determines whether the query may be compatible with SBE based on the query solution
- * (such as ineligible plan stages). It should be used in conjunction with the higher level
- * isQuerySbeCompatible() check to ensure that all aspects of the query are validated for
- * compatibility.
- */
-bool isQueryPlanSbeCompatible(const QuerySolution* root);
 }  // namespace mongo

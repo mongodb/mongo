@@ -32,27 +32,39 @@
  * the DBClientReplicaSet talks to, so the tests only covers the client side logic.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "mongo/base/init.h"
+#include <absl/container/node_hash_map.h>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/replica_set_monitor_protocol_test_util.h"
+#include "mongo/client/sdam/mock_topology_manager.h"
 #include "mongo/client/streamable_replica_set_monitor_for_testing.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/member_id.h"
+#include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/service_context.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/rpc/reply_interface.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {

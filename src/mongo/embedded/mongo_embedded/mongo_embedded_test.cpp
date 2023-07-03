@@ -27,42 +27,50 @@
  *    it in the license file.
  */
 
-
-#include "mongo_embedded/mongo_embedded.h"
-
+#include <cstring>
+#include <iostream>
 #include <memory>
 #include <set>
-#include <yaml-cpp/yaml.h>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo_embedded/mongo_embedded.h"
+#include <yaml-cpp/emitter.h>
+#include <yaml-cpp/emittermanip.h>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/json.h"
 #include "mongo/db/server_options.h"
 #include "mongo/embedded/mongo_embedded/mongo_embedded_test_gen.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/value.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/signal_handlers_synchronous.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
 namespace moe = mongo::optionenvironment;
 
 mongo_embedded_v1_lib* global_lib_handle;
 
 namespace {
-
 
 auto& getGlobalTempDir() {
     static std::unique_ptr<mongo::unittest::TempDir> globalTempDir;
@@ -564,6 +572,7 @@ TEST_F(MongodbCAPITest, CreateMultipleDBs) {
     ASSERT_EQUALS(mongo_embedded_v1_status_get_error(status.get()),
                   MONGO_EMBEDDED_V1_ERROR_DB_MAX_OPEN);
 }
+
 }  // namespace
 
 // Define main function as an entry to these tests.

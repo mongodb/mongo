@@ -28,7 +28,15 @@
  */
 #pragma once
 
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/session/logical_session_id.h"
 
 namespace mongo {
 
@@ -45,13 +53,17 @@ public:
     RangeDeleterServiceOpObserver();
     ~RangeDeleterServiceOpObserver();
 
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kConfig, NamespaceFilter::kConfig};
+    }
+
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
                    std::vector<bool> fromMigrate,
                    bool defaultFromMigrate,
-                   InsertsOpStateAccumulator* opAccumulator = nullptr) override;
+                   OpStateAccumulator* opAccumulator = nullptr) override;
 
     void onUpdate(OperationContext* opCtx,
                   const OplogUpdateEntryArgs& args,
@@ -59,7 +71,9 @@ public:
 
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
-                       const BSONObj& doc) override;
+                       const BSONObj& doc,
+                       OplogDeleteEntryArgs* args,
+                       OpStateAccumulator* opAccumulator = nullptr) override;
 
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,

@@ -29,7 +29,23 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <fmt/format.h>
+#include <utility>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -87,69 +103,16 @@ bool isMemberOfClearedSet(BucketStateRegistry& registry, WithLock lock, Bucket* 
     return false;
 }
 
-boost::optional<BucketState> changeBucketStateHelper(
-    BucketStateRegistry& registry,
-    WithLock lock,
-    const BucketId& bucketId,
-    const BucketStateRegistry::StateChangeFn& change) {
+void markIndividualBucketCleared(BucketStateRegistry& registry,
+                                 WithLock catalogLock,
+                                 const BucketId& bucketId) {
     auto it = registry.bucketStates.find(bucketId);
-    const boost::optional<BucketState> initial =
-        (it == registry.bucketStates.end()) ? boost::none : boost::make_optional(it->second);
-    const boost::optional<BucketState> target = change(initial, registry.currentEra);
-
-    // If we are initiating or finishing a direct write, we need to advance the era. This allows us
-    // to synchronize with reopening attempts that do not directly observe a state with the
-    // kPendingDirectWrite flag set, but which nevertheless may be trying to reopen a stale bucket.
-    if ((target.has_value() && target.value().isSet(BucketStateFlag::kPendingDirectWrite) &&
-         (!initial.has_value() || !initial.value().isSet(BucketStateFlag::kPendingDirectWrite))) ||
-        (initial.has_value() && initial.value().isSet(BucketStateFlag::kPendingDirectWrite) &&
-         (!target.has_value() || !target.value().isSet(BucketStateFlag::kPendingDirectWrite)))) {
-        ++registry.currentEra;
+    if (it == registry.bucketStates.end() ||
+        stdx::holds_alternative<DirectWriteCounter>(it->second)) {
+        return;
     }
-
-    // If initial and target are not both set, then we are either initializing or erasing the state.
-    if (!target.has_value()) {
-        if (initial.has_value()) {
-            registry.bucketStates.erase(it);
-        }
-        return boost::none;
-    } else if (!initial.has_value()) {
-        registry.bucketStates.emplace(bucketId, target.value());
-        return target;
-    }
-
-    // At this point we can now assume that both initial and target are set.
-
-    // We cannot prepare a bucket that isn't eligible for insertions. We expect to attempt this when
-    // we try to prepare a batch on a bucket that's been recently cleared.
-    if (!initial.value().isPrepared() && target.value().isPrepared() &&
-        initial.value().conflictsWithInsertion()) {
-        return initial;
-    }
-
-    // We cannot transition from a prepared state to pending compression, as that would indicate a
-    // programmer error.
-    invariant(!initial.value().isPrepared() ||
-              !target.value().isSet(BucketStateFlag::kPendingCompression));
-
-    it->second = target.value();
-
-    return target;
-}
-
-boost::optional<BucketState> markIndividualBucketCleared(BucketStateRegistry& registry,
-                                                         WithLock lock,
-                                                         const BucketId& bucketId) {
-    return changeBucketStateHelper(
-        registry,
-        lock,
-        bucketId,
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            if (!input.has_value()) {
-                return boost::none;
-            }
-            return input.value().setFlag(BucketStateFlag::kCleared);
-        });
+    it->second = (isBucketStatePrepared(it->second)) ? BucketState::kPreparedAndCleared
+                                                     : BucketState::kCleared;
 }
 }  // namespace
 
@@ -191,39 +154,229 @@ std::uint64_t getClearedSetsCount(const BucketStateRegistry& registry) {
     return registry.clearedSets.size();
 }
 
-boost::optional<BucketState> getBucketState(BucketStateRegistry& registry, Bucket* bucket) {
+boost::optional<stdx::variant<BucketState, DirectWriteCounter>> getBucketState(
+    BucketStateRegistry& registry, Bucket* bucket) {
     stdx::lock_guard catalogLock{registry.mutex};
+
     // If the bucket has been cleared, we will set the bucket state accordingly to reflect that.
     if (isMemberOfClearedSet(registry, catalogLock, bucket)) {
-        return markIndividualBucketCleared(registry, catalogLock, bucket->bucketId);
+        markIndividualBucketCleared(registry, catalogLock, bucket->bucketId);
     }
+
     auto it = registry.bucketStates.find(bucket->bucketId);
-    return it != registry.bucketStates.end() ? boost::make_optional(it->second) : boost::none;
+    if (it == registry.bucketStates.end()) {
+        return boost::none;
+    }
+
+    return it->second;
 }
 
-boost::optional<BucketState> getBucketState(const BucketStateRegistry& registry,
-                                            const BucketId& bucketId) {
+boost::optional<stdx::variant<BucketState, DirectWriteCounter>> getBucketState(
+    BucketStateRegistry& registry, const BucketId& bucketId) {
+    stdx::lock_guard catalogLock{registry.mutex};
+
+    auto it = registry.bucketStates.find(bucketId);
+    if (it == registry.bucketStates.end()) {
+        return boost::none;
+    }
+
+    return it->second;
+}
+
+bool isBucketStateCleared(stdx::variant<BucketState, DirectWriteCounter>& state) {
+    if (auto* bucketState = stdx::get_if<BucketState>(&state)) {
+        return *bucketState == BucketState::kCleared ||
+            *bucketState == BucketState::kPreparedAndCleared;
+    }
+    return false;
+}
+
+bool isBucketStatePrepared(stdx::variant<BucketState, DirectWriteCounter>& state) {
+    if (auto* bucketState = stdx::get_if<BucketState>(&state)) {
+        return *bucketState == BucketState::kPrepared ||
+            *bucketState == BucketState::kPreparedAndCleared;
+    }
+    return false;
+}
+
+bool conflictsWithReopening(stdx::variant<BucketState, DirectWriteCounter>& state) {
+    return stdx::holds_alternative<DirectWriteCounter>(state);
+}
+
+bool conflictsWithInsertions(stdx::variant<BucketState, DirectWriteCounter>& state) {
+    return conflictsWithReopening(state) || isBucketStateCleared(state);
+}
+
+Status initializeBucketState(BucketStateRegistry& registry,
+                             const BucketId& bucketId,
+                             Bucket* bucket,
+                             boost::optional<BucketStateRegistry::Era> targetEra) {
+    stdx::lock_guard catalogLock{registry.mutex};
+
+    // Returns a WriteConflict error if the target Era is older than the registry Era or if the
+    // 'bucket' is cleared.
+    if (targetEra.has_value() && targetEra < registry.currentEra) {
+        return {ErrorCodes::WriteConflict, "Bucket may be stale"};
+    } else if (bucket && isMemberOfClearedSet(registry, catalogLock, bucket)) {
+        markIndividualBucketCleared(registry, catalogLock, bucketId);
+        return {ErrorCodes::WriteConflict, "Bucket may be stale"};
+    }
+
+    auto it = registry.bucketStates.find(bucketId);
+    if (it == registry.bucketStates.end()) {
+        registry.bucketStates.emplace(bucketId, BucketState::kNormal);
+        return Status::OK();
+    } else if (conflictsWithReopening(it->second)) {
+        // If the bucket is cleared or we are currently performing direct writes on it we cannot
+        // initialize the bucket to a normal state.
+        return {ErrorCodes::WriteConflict,
+                "Bucket initialization failed: conflict with an exisiting bucket"};
+    }
+
+    invariant(!isBucketStatePrepared(it->second));
+    it->second = BucketState::kNormal;
+
+    return Status::OK();
+}
+
+StateChangeSucessful prepareBucketState(BucketStateRegistry& registry,
+                                        const BucketId& bucketId,
+                                        Bucket* bucket) {
+    stdx::lock_guard catalogLock{registry.mutex};
+
+    if (bucket && isMemberOfClearedSet(registry, catalogLock, bucket)) {
+        markIndividualBucketCleared(registry, catalogLock, bucketId);
+        return StateChangeSucessful::kNo;
+    }
+
+    auto it = registry.bucketStates.find(bucketId);
+    invariant(it != registry.bucketStates.end());
+
+    // We cannot update the bucket if it is in a cleared state or has a pending direct write.
+    if (conflictsWithInsertions(it->second)) {
+        return StateChangeSucessful::kNo;
+    }
+
+    // We cannot prepare an already prepared bucket.
+    invariant(!isBucketStatePrepared(it->second));
+
+    it->second = BucketState::kPrepared;
+    return StateChangeSucessful::kYes;
+}
+
+StateChangeSucessful unprepareBucketState(BucketStateRegistry& registry,
+                                          const BucketId& bucketId,
+                                          Bucket* bucket) {
+    stdx::lock_guard catalogLock{registry.mutex};
+
+    if (bucket && isMemberOfClearedSet(registry, catalogLock, bucket)) {
+        markIndividualBucketCleared(registry, catalogLock, bucketId);
+        return StateChangeSucessful::kNo;
+    }
+
+    auto it = registry.bucketStates.find(bucketId);
+    invariant(it != registry.bucketStates.end() &&
+              stdx::holds_alternative<BucketState>(it->second));
+    invariant(isBucketStatePrepared(it->second));
+
+    auto bucketState = stdx::get<BucketState>(it->second);
+    // There is also a chance the state got cleared, in which case we should keep the state as
+    // 'kCleared'.
+    it->second = (bucketState == BucketState::kPreparedAndCleared) ? BucketState::kCleared
+                                                                   : BucketState::kNormal;
+    return StateChangeSucessful::kYes;
+}
+
+stdx::variant<BucketState, DirectWriteCounter> addDirectWrite(BucketStateRegistry& registry,
+                                                              const BucketId& bucketId,
+                                                              bool stopTracking) {
+    stdx::lock_guard catalogLock{registry.mutex};
+
+    auto it = registry.bucketStates.find(bucketId);
+    DirectWriteCounter newDirectWriteCount = 1;
+    if (it == registry.bucketStates.end()) {
+        // If we are initiating a direct write, we need to advance the era. This allows us to
+        // synchronize with reopening attempts that do not directly observe a state with direct
+        // write counter, but which nevertheless may be trying to reopen a stale bucket.
+        ++registry.currentEra;
+
+        // We can perform direct writes on buckets not being tracked by the registry. Tracked by a
+        // negative value to signify we must delete the state from the 'registry' when the counter
+        // reaches 0.
+        newDirectWriteCount *= -1;
+        registry.bucketStates.emplace(bucketId, newDirectWriteCount);
+        return newDirectWriteCount;
+    } else if (auto* directWriteCount = stdx::get_if<DirectWriteCounter>(&it->second)) {
+        if (*directWriteCount > 0) {
+            newDirectWriteCount = *directWriteCount + 1;
+        } else {
+            newDirectWriteCount = *directWriteCount - 1;
+        }
+    } else if (isBucketStatePrepared(it->second)) {
+        // Cannot perform direct writes on prepared buckets.
+        return it->second;
+    }
+
+    // Convert the direct write counter to a negative value so we can interpret it as an untracked
+    // state when the counter goes to 0.
+    if (stopTracking && newDirectWriteCount > 0) {
+        newDirectWriteCount *= -1;
+    }
+    it->second = newDirectWriteCount;
+    return it->second;
+}
+
+void removeDirectWrite(BucketStateRegistry& registry, const BucketId& bucketId) {
+    stdx::lock_guard catalogLock{registry.mutex};
+
+    auto it = registry.bucketStates.find(bucketId);
+    invariant(it != registry.bucketStates.end() &&
+              stdx::holds_alternative<DirectWriteCounter>(it->second));
+
+    bool removingFinalDirectWrite = true;
+    auto directWriteCount = stdx::get<DirectWriteCounter>(it->second);
+    if (directWriteCount == 1) {
+        it->second = BucketState::kCleared;
+    } else if (directWriteCount == -1) {
+        registry.bucketStates.erase(it);
+    } else {
+        removingFinalDirectWrite = false;
+        directWriteCount = (directWriteCount > 0) ? directWriteCount - 1 : directWriteCount + 1;
+        it->second = directWriteCount;
+    }
+
+    if (removingFinalDirectWrite) {
+        // If we are finishing a direct write, we need to advance the era. This allows us to
+        // synchronize with reopening attempts that do not directly observe a state with direct
+        // write counter, but which nevertheless may be trying to reopen a stale bucket.
+        ++registry.currentEra;
+    }
+}
+
+void clearBucketState(BucketStateRegistry& registry, const BucketId& bucketId) {
+    stdx::lock_guard catalogLock{registry.mutex};
+    markIndividualBucketCleared(registry, catalogLock, bucketId);
+}
+
+void stopTrackingBucketState(BucketStateRegistry& registry, const BucketId& bucketId) {
     stdx::lock_guard catalogLock{registry.mutex};
     auto it = registry.bucketStates.find(bucketId);
-    return it != registry.bucketStates.end() ? boost::make_optional(it->second) : boost::none;
-}
-
-boost::optional<BucketState> changeBucketState(BucketStateRegistry& registry,
-                                               Bucket* bucket,
-                                               const BucketStateRegistry::StateChangeFn& change) {
-    stdx::lock_guard catalogLock{registry.mutex};
-    if (isMemberOfClearedSet(registry, catalogLock, bucket)) {
-        return markIndividualBucketCleared(registry, catalogLock, bucket->bucketId);
+    if (it == registry.bucketStates.end()) {
+        return;
     }
 
-    return changeBucketStateHelper(registry, catalogLock, bucket->bucketId, change);
-}
-
-boost::optional<BucketState> changeBucketState(BucketStateRegistry& registry,
-                                               const BucketId& bucketId,
-                                               const BucketStateRegistry::StateChangeFn& change) {
-    stdx::lock_guard catalogLock{registry.mutex};
-    return changeBucketStateHelper(registry, catalogLock, bucketId, change);
+    if (conflictsWithReopening(it->second)) {
+        // We cannot release the bucket state of pending direct writes.
+        auto directWriteCount = stdx::get<DirectWriteCounter>(it->second);
+        if (directWriteCount > 0) {
+            // A negative value signals the immediate removal of the bucket state after the
+            // completion of the direct writes.
+            directWriteCount *= -1;
+        }
+        it->second = directWriteCount;
+    } else {
+        registry.bucketStates.erase(it);
+    }
 }
 
 void appendStats(const BucketStateRegistry& registry, BSONObjBuilder& base) {
@@ -237,6 +390,31 @@ void appendStats(const BucketStateRegistry& registry, BSONObjBuilder& base) {
                          static_cast<long long>(registry.bucketsPerEra.size()));
     builder.appendNumber("trackedClearOperations",
                          static_cast<long long>(registry.clearedSets.size()));
+}
+
+std::string bucketStateToString(const stdx::variant<BucketState, DirectWriteCounter>& state) {
+    if (auto* directWriteCount = stdx::get_if<DirectWriteCounter>(&state)) {
+        return fmt::format("{{type: DirectWrite, value: {}}}", *directWriteCount);
+    }
+
+    auto bucketState = stdx::get<BucketState>(state);
+    switch (bucketState) {
+        case BucketState::kNormal: {
+            return "{{type: BucketState, value: kNormal}}";
+        }
+        case BucketState::kPrepared: {
+            return "{{type: BucketState, value: kPrepared}}";
+        }
+        case BucketState::kCleared: {
+            return "{{type: BucketState, value: kCleared}}";
+        }
+        case BucketState::kPreparedAndCleared: {
+            return "{{type: BucketState, value: kPreparedAndCleared}}";
+        }
+        default: {
+            MONGO_UNREACHABLE;
+        }
+    }
 }
 
 }  // namespace mongo::timeseries::bucket_catalog

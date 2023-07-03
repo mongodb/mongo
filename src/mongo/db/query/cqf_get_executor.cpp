@@ -29,37 +29,100 @@
 
 #include "mongo/db/query/cqf_get_executor.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <string>
+#include <tuple>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/abt/canonical_query_translation.h"
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
 #include "mongo/db/pipeline/abt/utils.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/ce/heuristic_estimator.h"
 #include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/ce/sampling_estimator.h"
 #include "mongo/db/query/ce_mode_parameter.h"
+#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/cost_model/cost_estimator_impl.h"
 #include "mongo/db/query/cost_model/cost_model_gen.h"
 #include "mongo/db/query/cost_model/cost_model_manager.h"
 #include "mongo/db/query/cost_model/on_coefficients_change_updater_impl.h"
 #include "mongo/db/query/cqf_command_utils.h"
-#include "mongo/db/query/explain_version_validator.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/optimizer/cascades/interfaces.h"
+#include "mongo/db/query/optimizer/cascades/memo.h"
+#include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
+#include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/const_fold_interface.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/stats/collection_statistics_impl.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+#include "mongo/util/synchronized_value.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -306,11 +369,17 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
         OPTIMIZER_DEBUG_LOG(6264802, 5, "Lowered SBE plan", "plan"_attr = p.print(*sbePlan.get()));
     }
 
-    stage_builder::PlanStageData data{std::move(runtimeEnvironment)};
-    data.outputs.set(stage_builder::PlanStageSlots::kResult, slotMap.begin()->second);
+    stage_builder::PlanStageSlots outputs;
+    outputs.set(stage_builder::PlanStageSlots::kResult, slotMap.begin()->second);
     if (requireRID) {
-        data.outputs.set(stage_builder::PlanStageSlots::kRecordId, *ridSlot);
+        outputs.set(stage_builder::PlanStageSlots::kRecordId, *ridSlot);
     }
+
+    auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
+    staticData->outputs = std::move(outputs);
+
+    stage_builder::PlanStageData data(
+        stage_builder::PlanStageEnvironment(std::move(runtimeEnvironment)), std::move(staticData));
 
     sbePlan->attachToOperationContext(opCtx);
     if (needsExplain || expCtx->mayDbProfile) {
@@ -353,7 +422,7 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
         abtPrinter = std::make_unique<ABTPrinter>(std::move(toExplain), explainVersion);
     }
 
-    sbePlan->prepare(data.ctx);
+    sbePlan->prepare(data.env.ctx);
     CurOp::get(opCtx)->stopQueryPlanningTimer();
 
     return {opCtx,

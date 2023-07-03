@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include <cstdint>
+
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {

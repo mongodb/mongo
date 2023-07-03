@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * compact.js
  *
@@ -11,13 +9,13 @@
  * with wiredTiger LSM variants. Bypass this command for the wiredTiger LSM variant
  * until a fix is available for WT-2523.
  *
- * @tags: [does_not_support_wiredtiger_lsm, requires_compact]
+ * @tags: [does_not_support_wiredtiger_lsm, incompatible_with_macos, requires_compact]
  */
 
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeral
 load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         nDocumentsToInsert: 1000,
         nIndexes: 3 + 1,   // The number of indexes created in createIndexes + 1 for { _id: 1 }

@@ -1,21 +1,20 @@
-'use strict';
-
 /**
  * Runs updateOne, deleteOne, and findAndModify without shard key against a sharded cluster while
  * concurrently refining the collection's shard key.
  *
  * @tags: [
- *  featureFlagUpdateOneWithoutShardKey,
- *  requires_fcv_70,
+ *  requires_fcv_71,
  *  requires_sharding,
  *  uses_transactions,
  * ]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/write_without_shard_key_base.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/write_without_shard_key_base.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.startState = "init";
 
     // Use a CountDownLatch as if it were a std::atomic<long long> shared between all of the

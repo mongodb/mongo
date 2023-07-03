@@ -27,50 +27,61 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <ctime>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstring>
 #include <memory>
-#include <sstream>
 #include <string>
+#include <wiredtiger.h>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/json.h"
+#include "mongo/bson/mutable/damage_vector.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
-using std::string;
-using std::stringstream;
-using std::unique_ptr;
-
 namespace {
+
 TEST(WiredTigerRecordStoreTest, StorageSizeStatisticsDisabled) {
     WiredTigerHarnessHelper harnessHelper("statistics=(none)");
-    unique_ptr<RecordStore> rs(harnessHelper.newRecordStore("a.b"));
+    std::unique_ptr<RecordStore> rs(harnessHelper.newRecordStore("a.b"));
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
     ASSERT_THROWS(rs->storageSize(opCtx.get()), AssertionException);
 }
 
 TEST(WiredTigerRecordStoreTest, SizeStorer1) {
-    unique_ptr<WiredTigerHarnessHelper> harnessHelper(new WiredTigerHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<WiredTigerHarnessHelper> harnessHelper(new WiredTigerHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
-    string ident = rs->getIdent();
-    string uri = checked_cast<WiredTigerRecordStore*>(rs.get())->getURI();
+    std::string ident = rs->getIdent();
+    std::string uri = checked_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
-    string indexUri = WiredTigerKVEngine::kTableUriPrefix + "myindex";
+    std::string indexUri = WiredTigerKVEngine::kTableUriPrefix + "myindex";
     WiredTigerSizeStorer ss(harnessHelper->conn(), indexUri);
     checked_cast<WiredTigerRecordStore*>(rs.get())->setSizeStorer(&ss);
 
@@ -78,6 +89,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             for (int i = 0; i < N; i++) {
@@ -90,6 +102,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(N, rs->numRecords(opCtx.get()));
     }
 
@@ -103,6 +116,8 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
         WiredTigerRecordStore::Params params;
         params.nss = NamespaceString::createNamespaceString_forTest("a.b");
         params.ident = ident;
@@ -123,11 +138,14 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(N, rs->numRecords(opCtx.get()));
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
         WiredTigerRecoveryUnit* ru = checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
 
         {
@@ -196,6 +214,7 @@ TEST_F(SizeStorerUpdateTest, Basic) {
 
 TEST_F(SizeStorerUpdateTest, DataSizeModification) {
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     RecordId recordId;
     {
@@ -252,6 +271,8 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
 // properly flushed to disk.
 TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
     // Do an op for which the sizeInfo is persisted, for safety so we don't check against 0.
     {
         WriteUnitOfWork uow(opCtx.get());

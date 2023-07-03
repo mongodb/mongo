@@ -33,6 +33,7 @@
 namespace mongo {
 
 class CursorInitialReply;
+
 /**
  * Function used by the IDL parser to validate that a response has exactly one cursor type field.
  */

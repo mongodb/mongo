@@ -27,13 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <string>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 namespace repl {
@@ -49,7 +58,7 @@ BSONObj ClonerUtils::makeTenantDatabaseFilter(StringData prefix) {
 
 BSONObj ClonerUtils::buildMajorityWaitRequest(Timestamp operationTime) {
     BSONObjBuilder bob;
-    bob.append("find", NamespaceString::kSystemReplSetNamespace.toString());
+    bob.append("find", NamespaceStringUtil::serialize(NamespaceString::kSystemReplSetNamespace));
     bob.append("filter", BSONObj());
     ReadConcernArgs readConcern(LogicalTime(operationTime), ReadConcernLevel::kMajorityReadConcern);
     readConcern.appendInfo(&bob);

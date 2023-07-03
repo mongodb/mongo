@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * findAndModify_upsert_collscan.js
  *
@@ -10,10 +8,10 @@
  *
  * Forces 'sort' to perform a collection scan by using $natural.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');            // for extendWorkload
-load('jstests/concurrency/fsm_workloads/findAndModify_upsert.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/findAndModify_upsert.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.sort = {$natural: 1};
 
     return $config;

@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
 #include <string>
 #include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/matcher/matcher_type_set.h"
+#include "mongo/platform/basic.h"
 
 /**
  * Functions which perform additional validation beyond what a context free grammar can handle.

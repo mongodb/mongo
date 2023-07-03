@@ -29,13 +29,31 @@
 
 #include "mongo/bson/util/bsoncolumnbuilder.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/bsoncolumn_util.h"
+#include <absl/numeric/int128.h>
+#include <algorithm>
+#include <array>
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <cstring>
+#include <iterator>
+#include <memory>
+#include <queue>
+#include <tuple>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/util/bsoncolumn_util.h"
 #include "mongo/bson/util/simple8b.h"
 #include "mongo/bson/util/simple8b_type_util.h"
-
-#include <memory>
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 using namespace bsoncolumn;

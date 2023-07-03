@@ -1,6 +1,7 @@
 // Verifies that snapshot readConcern on mongos is not gated by the enableTestCommands flag.
 //
-// @tags: [requires_sharding]
+// Tests running with experimental CQF behavior require test commands to be enabled.
+// @tags: [requires_sharding, cqf_experimental_incompatible]
 (function() {
 "use strict";
 

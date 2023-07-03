@@ -29,10 +29,13 @@
 
 #include "mongo/db/commands/server_status_metric.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

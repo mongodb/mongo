@@ -31,8 +31,14 @@
 
 #include <fmt/format.h>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/data_builder.h"
+#include "mongo/base/data_range_cursor.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

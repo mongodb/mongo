@@ -27,10 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {
@@ -86,13 +96,14 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortLimit) {
 
     auto serialized = pipeline->serializeToBson();
 
-    // $match and $sort are now before $_internalUnpackBucket, with a new $limit added after the
-    // stage.
-    ASSERT_EQ(4, serialized.size());
+    // $match and $sort are now before $_internalUnpackBucket, with a new $limit added before and
+    // after the stage.
+    ASSERT_EQ(5, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {meta: {$gt: 2}}}"), serialized[0]);
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {'meta.a': 1, 'meta.b': -1}}"), serialized[1]);
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[2]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[3]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[2]);
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[3]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[4]);
 }
 
 }  // namespace

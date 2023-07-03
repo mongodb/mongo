@@ -28,6 +28,18 @@
  */
 
 #include "mongo/db/pipeline/abt/field_map_builder.h"
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <map>
+#include <set>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
 
 

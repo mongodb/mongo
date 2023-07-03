@@ -29,11 +29,21 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <utility>
+
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
+#include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 

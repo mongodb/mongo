@@ -27,16 +27,43 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/query/cost_model/cost_model_gen.h"
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/cascades/logical_props_derivation.h"
-#include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
+#include "mongo/db/query/optimizer/cascades/memo.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
+#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/inline_auto_update.h"
 
 using namespace mongo::optimizer::unit_test_abt_literals;
 
@@ -2133,6 +2160,150 @@ TEST(LogicalRewriter, RelaxComposeM) {
         "|       {}\n"
         "Scan [c1, {root}]\n",
         optimized);
+}
+
+TEST(LogicalRewriter, UnboundCandidateIndexInSingleIndexScan) {
+    auto prefixId = PrefixId::createForTests();
+
+    // Construct a query which tests "b" = 1 and "c" = 2.
+    ABT rootNode = NodeBuilder{}
+                       .root("root")
+                       .filter(_evalf(_get("b", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
+                       .filter(_evalf(_get("c", _traverse1(_cmp("Eq", "2"_cint64))), "root"_var))
+                       .finish(_scan("root", "c1"));
+
+    // We have one index with 2 fields: "a", "b"
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
+        prefixId,
+        {{{"c1",
+           createScanDef(
+               {},
+               {{"index1",
+                 IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = std::move(rootNode);
+    phaseManager.optimize(optimized);
+
+    const RIDIntersectNode& ridIntersectNode =
+        *optimized.cast<RootNode>()->getChild().cast<RIDIntersectNode>();
+
+    // As opposed to the test 'DiscardUnboundCandidateIndexInMultiIndexScan', the 'indexNode' should
+    // still keep its unbound candidate indexes as it is not a multi-index plan.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Sargable [Index]\n"
+        "|   |   requirements: \n"
+        "|   |       {{{root, 'PathGet [b] PathIdentity []', {{{=Const [1]}}}}}}\n"
+        "|   candidateIndexes: \n"
+        "|       candidateId: 1, index1, {'<indexKey> 1': evalTemp_6}, {Unbound, Unbound}, "
+        "{{{<fully open>}}}}, \n"
+        "|           residualReqs: \n"
+        "|               {{{evalTemp_6, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: 0}}}\n"
+        "Scan [c1, {root}]\n",
+        ridIntersectNode.getLeftChild());
+
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Sargable [Seek]\n"
+        "|   |   requirements: \n"
+        "|   |       {{{root, 'PathGet [c] PathTraverse [1] PathIdentity []', {{{=Const [2]}}}}}}\n"
+        "|   scanParams: \n"
+        "|       {'c': evalTemp_7}\n"
+        "|           residualReqs: \n"
+        "|               {{{evalTemp_7, 'PathTraverse [1] PathIdentity []', {{{=Const [2]}}}, "
+        "entryIndex: 0}}}\n"
+        "Scan [c1, {root}]\n",
+        ridIntersectNode.getRightChild());
+}
+
+/**
+ * A walker to check if all the sargable nodes have empty candidate index.
+ */
+class CheckEmptyCandidateIndexTransport {
+public:
+    bool transport(const SargableNode& node, bool childResult, bool bindResult, bool refResult) {
+        ++_visitedSargableNodes;
+        return node.getCandidateIndexes().empty();
+    }
+
+    template <typename T, typename... Ts>
+    bool transport(const T& node, Ts&&... childResults) {
+        return (all(childResults) && ...);
+    }
+
+    /**
+     * Returns true if all the SargableNodes in the ABT 'n' have no candidate index.
+     */
+    bool check(const ABT& n) {
+        return algebra::transport<false>(n, *this);
+    }
+
+    size_t visitedSargableNodes() {
+        return _visitedSargableNodes;
+    }
+
+private:
+    bool all(bool r) {
+        return r;
+    }
+
+    bool all(const std::vector<bool>& r) {
+        return std::all_of(r.begin(), r.end(), [](bool e) { return e; });
+    }
+
+    size_t _visitedSargableNodes = 0;
+};
+
+TEST(LogicalRewriter, DiscardUnboundCandidateIndexInMultiIndexScan) {
+    auto prefixId = PrefixId::createForTests();
+
+    // Construct a query which tests "b" = 1, "c" = 2, "b1" = 3, "c1" = 4
+    ABT rootNode = NodeBuilder{}
+                       .root("root")
+                       .filter(_evalf(_get("b1", _traverse1(_cmp("Eq", "3"_cint64))), "root"_var))
+                       .filter(_evalf(_get("c1", _traverse1(_cmp("Eq", "4"_cint64))), "root"_var))
+                       .filter(_evalf(_get("b", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
+                       .filter(_evalf(_get("c", _traverse1(_cmp("Eq", "2"_cint64))), "root"_var))
+                       .finish(_scan("root", "c1"));
+
+    // We have 2 indexes with 2 fields for each: ("a", "b") and ("a1", "b1")
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
+        prefixId,
+        {{{"c1",
+           createScanDef(
+               {},
+               {{"index1",
+                 IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}},
+                {"index2",
+                 IndexDefinition{{{makeNonMultikeyIndexPath("a1"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("b1"), CollationOp::Ascending}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = std::move(rootNode);
+    phaseManager.getHints()._keepRejectedPlans = true;
+    const auto& plans =
+        phaseManager.optimizeNoAssert(std::move(optimized), true /* includeRejected */);
+
+    // Check if all the unbound candidate indexes are discarded during SargableSplit rewrites.
+    CheckEmptyCandidateIndexTransport transport;
+    for (const PlanAndProps& plan : plans) {
+        ASSERT_TRUE(transport.check(plan._node));
+    }
+    ASSERT_GT(transport.visitedSargableNodes(), 0);
 }
 
 TEST(LogicalRewriter, SargableNodeRIN) {

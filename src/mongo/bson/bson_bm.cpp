@@ -28,13 +28,26 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
+#include <cstddef>
+#include <cstdint>
+#include <fmt/format.h>
+#include <string>
+#include <utility>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util_core.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

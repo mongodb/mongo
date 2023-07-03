@@ -29,11 +29,16 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

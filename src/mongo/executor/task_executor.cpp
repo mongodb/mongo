@@ -26,17 +26,28 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
-#include "mongo/platform/mutex.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <string>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
 
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future_impl.h"
 
 namespace mongo {
 namespace executor {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(pauseTaskExecutorAfterReceivesNetworkRespones);
 MONGO_FAIL_POINT_DEFINE(pauseScheduleCallWithCancelTokenUntilCanceled);
+
+}  // namespace
 
 /**
  * Provides exclusive access to an underlying Promise at set-time, guaranteeing that the Promise
@@ -73,11 +84,11 @@ private:
     AtomicWord<bool> _completed;
 };
 
-template <typename T>
+namespace {
+
 Status wrapCallbackHandleWithCancelToken(
     const std::shared_ptr<TaskExecutor> executor,
     const StatusWith<TaskExecutor::CallbackHandle> swCallbackHandle,
-    std::shared_ptr<ExclusivePromiseAccess<T>> promise,
     const CancellationToken& token) {
     if (!swCallbackHandle.isOK()) {
         return swCallbackHandle.getStatus();
@@ -85,11 +96,9 @@ Status wrapCallbackHandleWithCancelToken(
 
     token.onCancel()
         .unsafeToInlineFuture()
-        .then(
-            [executor, promise, callbackHandle = std::move(swCallbackHandle.getValue())]() mutable {
-                executor->cancel(callbackHandle);
-                promise->setError(TaskExecutor::kCallbackCanceledErrorStatus);
-            })
+        .then([executor, callbackHandle = std::move(swCallbackHandle.getValue())]() mutable {
+            executor->cancel(callbackHandle);
+        })
         .getAsync([](auto) {});
     return Status::OK();
 }
@@ -132,6 +141,7 @@ ExecutorFuture<Response> wrapScheduleCallWithCancelTokenAndFuture(
                 // canceled). Errors from the remote host will be contained in the response.
                 exclusivePromiseAccess->setError(status);
             }
+            pauseTaskExecutorAfterReceivesNetworkRespones.pauseWhileSet();
         }
     };
 
@@ -148,7 +158,6 @@ ExecutorFuture<Response> wrapScheduleCallWithCancelTokenAndFuture(
     auto scheduleStatus = wrapCallbackHandleWithCancelToken(
         executor,
         std::forward<ScheduleFn>(schedule)(request, std::move(signalPromiseOnCompletion), baton),
-        exclusivePromiseAccess,
         token);
 
     if (!scheduleStatus.isOK()) {
@@ -213,8 +222,8 @@ ExecutorFuture<void> TaskExecutor::sleepUntil(Date_t when, const CancellationTok
         when, [alarmState](const auto& args) mutable { alarmState->signal(args.status); });
 
     // Handle cancellation via the input CancellationToken.
-    auto scheduleStatus = wrapCallbackHandleWithCancelToken(
-        shared_from_this(), std::move(cbHandle), exclusivePromiseAccess, token);
+    auto scheduleStatus =
+        wrapCallbackHandleWithCancelToken(shared_from_this(), std::move(cbHandle), token);
 
     if (!scheduleStatus.isOK()) {
         // If scheduleStatus is not okay, then the callback passed to scheduleWorkAt should never

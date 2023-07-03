@@ -29,9 +29,13 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <cstddef>
 #include <queue>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/s/query/cluster_query_result.h"
 #include "mongo/s/query/router_exec_stage.h"
 

@@ -27,17 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <functional>
+#include <string>
+#include <vector>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace ExpressionTests {
@@ -233,8 +248,8 @@ TEST(FieldPath, ScalarVariableWithDottedFieldPathOptimizesToConstantMissingValue
 
 TEST(FieldPath, SerializeWithRedaction) {
     SerializationOptions options;
-    options.identifierHmacPolicy = applyHmacForTest;
-    options.applyHmacToIdentifiers = true;
+    options.transformIdentifiersCallback = applyHmacForTest;
+    options.transformIdentifiers = true;
 
     auto expCtx = ExpressionContextForTest{};
     intrusive_ptr<Expression> expression =

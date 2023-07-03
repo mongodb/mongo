@@ -28,10 +28,25 @@
  */
 #include "mongo/transport/ingress_handshake_metrics.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -41,17 +56,11 @@ namespace {
 const auto getIngressHandshakeMetricsDecoration =
     Session::declareDecoration<IngressHandshakeMetrics>();
 
-bool connHealthMetricsEnabled() {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe();
-}
-
 bool connHealthMetricsLoggingEnabled() {
     return gEnableDetailedConnectionHealthMetricLogLines;
 }
 
-CounterMetric totalTimeToFirstNonAuthCommandMillis("network.totalTimeToFirstNonAuthCommandMillis",
-                                                   connHealthMetricsEnabled);
+CounterMetric totalTimeToFirstNonAuthCommandMillis("network.totalTimeToFirstNonAuthCommandMillis");
 }  // namespace
 
 IngressHandshakeMetrics& IngressHandshakeMetrics::get(Session& session) {
@@ -59,9 +68,6 @@ IngressHandshakeMetrics& IngressHandshakeMetrics::get(Session& session) {
 }
 
 void IngressHandshakeMetrics::onSessionStarted(TickSource* tickSource) {
-    if (!connHealthMetricsEnabled())
-        return;
-
     invariant(!_tickSource);
     invariant(!_sessionStartedTicks);
 
@@ -70,7 +76,7 @@ void IngressHandshakeMetrics::onSessionStarted(TickSource* tickSource) {
 }
 
 void IngressHandshakeMetrics::onCommandReceived(const Command* command) {
-    if (MONGO_likely(_firstNonAuthCommandTicks || !connHealthMetricsEnabled()))
+    if (MONGO_likely(_firstNonAuthCommandTicks))
         return;
 
     invariant(_sessionStartedTicks);
@@ -105,7 +111,7 @@ void IngressHandshakeMetrics::onCommandReceived(const Command* command) {
 
 void IngressHandshakeMetrics::onCommandProcessed(const Command* command,
                                                  rpc::ReplyBuilderInterface* response) {
-    if (MONGO_likely(_firstNonAuthCommandTicks || _helloSucceeded || !connHealthMetricsEnabled()))
+    if (MONGO_likely(_firstNonAuthCommandTicks || _helloSucceeded))
         return;
 
     if (command->handshakeRole() != Command::HandshakeRole::kHello)
@@ -123,8 +129,7 @@ void IngressHandshakeMetrics::onCommandProcessed(const Command* command,
 
 void IngressHandshakeMetrics::onResponseSent(Milliseconds processingDuration,
                                              Milliseconds sendingDuration) {
-    if (MONGO_likely(_helloSucceeded || !_helloReceivedTime) || !connHealthMetricsEnabled() ||
-        !connHealthMetricsLoggingEnabled())
+    if (MONGO_likely(_helloSucceeded || !_helloReceivedTime) || !connHealthMetricsLoggingEnabled())
         return;
 
     LOGV2(6724100,

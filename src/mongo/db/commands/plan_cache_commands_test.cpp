@@ -27,13 +27,19 @@
  *    it in the license file.
  */
 
+#include <utility>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/commands/plan_cache_commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
@@ -49,48 +55,46 @@ PlanCacheKey makeClassicKey(const CanonicalQuery& cq) {
 TEST(PlanCacheCommandsTest, CannotCanonicalizeWithMissingQueryField) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
-    ASSERT_NOT_OK(plan_cache_commands::canonicalize(opCtx.get(), nss.ns_forTest(), fromjson("{}"))
-                      .getStatus());
+    ASSERT_NOT_OK(plan_cache_commands::canonicalize(opCtx.get(), nss, fromjson("{}")).getStatus());
 }
 
 TEST(PlanCacheCommandsTest, CannotCanonicalizeWhenQueryFieldIsNotObject) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     ASSERT_NOT_OK(
-        plan_cache_commands::canonicalize(opCtx.get(), nss.ns_forTest(), fromjson("{query: 1}"))
-            .getStatus());
+        plan_cache_commands::canonicalize(opCtx.get(), nss, fromjson("{query: 1}")).getStatus());
 }
 
 TEST(PlanCacheCommandsTest, CannotCanonicalizeWhenSortFieldIsNotObject) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
-    ASSERT_NOT_OK(plan_cache_commands::canonicalize(
-                      opCtx.get(), nss.ns_forTest(), fromjson("{query: {}, sort: 1}"))
-                      .getStatus());
+    ASSERT_NOT_OK(
+        plan_cache_commands::canonicalize(opCtx.get(), nss, fromjson("{query: {}, sort: 1}"))
+            .getStatus());
 }
 
 TEST(PlanCacheCommandsTest, CannotCanonicalizeWhenProjectionFieldIsNotObject) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
-    ASSERT_NOT_OK(plan_cache_commands::canonicalize(
-                      opCtx.get(), nss.ns_forTest(), fromjson("{query: {}, projection: 1}"))
-                      .getStatus());
+    ASSERT_NOT_OK(
+        plan_cache_commands::canonicalize(opCtx.get(), nss, fromjson("{query: {}, projection: 1}"))
+            .getStatus());
 }
 
 TEST(PlanCacheCommandsTest, CannotCanonicalizeWhenCollationFieldIsNotObject) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
-    ASSERT_NOT_OK(plan_cache_commands::canonicalize(
-                      opCtx.get(), nss.ns_forTest(), fromjson("{query: {}, collation: 1}"))
-                      .getStatus());
+    ASSERT_NOT_OK(
+        plan_cache_commands::canonicalize(opCtx.get(), nss, fromjson("{query: {}, collation: 1}"))
+            .getStatus());
 }
 
 TEST(PlanCacheCommandsTest, CannotCanonicalizeWhenSortObjectIsMalformed) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
-    ASSERT_NOT_OK(plan_cache_commands::canonicalize(
-                      opCtx.get(), nss.ns_forTest(), fromjson("{query: {}, sort: {a: 0}}"))
-                      .getStatus());
+    ASSERT_NOT_OK(
+        plan_cache_commands::canonicalize(opCtx.get(), nss, fromjson("{query: {}, sort: {a: 0}}"))
+            .getStatus());
 }
 
 TEST(PlanCacheCommandsTest, CanCanonicalizeWithValidQuery) {
@@ -98,14 +102,14 @@ TEST(PlanCacheCommandsTest, CanCanonicalizeWithValidQuery) {
 
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
-    auto statusWithCQ = plan_cache_commands::canonicalize(
-        opCtx.get(), nss.ns_forTest(), fromjson("{query: {a: 1, b: 1}}"));
+    auto statusWithCQ =
+        plan_cache_commands::canonicalize(opCtx.get(), nss, fromjson("{query: {a: 1, b: 1}}"));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> query = std::move(statusWithCQ.getValue());
 
     // Equivalent query should generate same key.
-    statusWithCQ = plan_cache_commands::canonicalize(
-        opCtx.get(), nss.ns_forTest(), fromjson("{query: {b: 3, a: 4}}"));
+    statusWithCQ =
+        plan_cache_commands::canonicalize(opCtx.get(), nss, fromjson("{query: {b: 3, a: 4}}"));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> equivQuery = std::move(statusWithCQ.getValue());
     ASSERT_EQUALS(makeClassicKey(*query), makeClassicKey(*equivQuery));
@@ -116,14 +120,14 @@ TEST(PlanCacheCommandsTest, SortQueryResultsInDifferentPlanCacheKeyFromUnsorted)
 
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
-    auto statusWithCQ = plan_cache_commands::canonicalize(
-        opCtx.get(), nss.ns_forTest(), fromjson("{query: {a: 1, b: 1}}"));
+    auto statusWithCQ =
+        plan_cache_commands::canonicalize(opCtx.get(), nss, fromjson("{query: {a: 1, b: 1}}"));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> query = std::move(statusWithCQ.getValue());
 
     // Sort query should generate different key from unsorted query.
     statusWithCQ = plan_cache_commands::canonicalize(
-        opCtx.get(), nss.ns_forTest(), fromjson("{query: {a: 1, b: 1}, sort: {a: 1, b: 1}}"));
+        opCtx.get(), nss, fromjson("{query: {a: 1, b: 1}, sort: {a: 1, b: 1}}"));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> sortQuery = std::move(statusWithCQ.getValue());
     ASSERT_NOT_EQUALS(makeClassicKey(*query), makeClassicKey(*sortQuery));
@@ -136,13 +140,13 @@ TEST(PlanCacheCommandsTest, SortsAreProperlyDelimitedInPlanCacheKey) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     auto statusWithCQ = plan_cache_commands::canonicalize(
-        opCtx.get(), nss.ns_forTest(), fromjson("{query: {a: 1, b: 1}, sort: {a: 1, b: 1}}"));
+        opCtx.get(), nss, fromjson("{query: {a: 1, b: 1}, sort: {a: 1, b: 1}}"));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> sortQuery1 = std::move(statusWithCQ.getValue());
 
     // Confirm sort arguments are properly delimited (SERVER-17158)
     statusWithCQ = plan_cache_commands::canonicalize(
-        opCtx.get(), nss.ns_forTest(), fromjson("{query: {a: 1, b: 1}, sort: {aab: 1}}"));
+        opCtx.get(), nss, fromjson("{query: {a: 1, b: 1}, sort: {aab: 1}}"));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> sortQuery2 = std::move(statusWithCQ.getValue());
     ASSERT_NOT_EQUALS(makeClassicKey(*sortQuery1), makeClassicKey(*sortQuery2));
@@ -153,15 +157,13 @@ TEST(PlanCacheCommandsTest, ProjectQueryResultsInDifferentPlanCacheKeyFromUnproj
 
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
-    auto statusWithCQ = plan_cache_commands::canonicalize(
-        opCtx.get(), nss.ns_forTest(), fromjson("{query: {a: 1, b: 1}}"));
+    auto statusWithCQ =
+        plan_cache_commands::canonicalize(opCtx.get(), nss, fromjson("{query: {a: 1, b: 1}}"));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> query = std::move(statusWithCQ.getValue());
 
     statusWithCQ = plan_cache_commands::canonicalize(
-        opCtx.get(),
-        nss.ns_forTest(),
-        fromjson("{query: {a: 1, b: 1}, projection: {_id: 0, a: 1}}"));
+        opCtx.get(), nss, fromjson("{query: {a: 1, b: 1}, projection: {_id: 0, a: 1}}"));
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> projectionQuery = std::move(statusWithCQ.getValue());
     ASSERT_NOT_EQUALS(makeClassicKey(*query), makeClassicKey(*projectionQuery));

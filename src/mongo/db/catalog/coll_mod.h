@@ -29,8 +29,11 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/coll_mod_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 
 namespace mongo {

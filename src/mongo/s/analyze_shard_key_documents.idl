@@ -124,7 +124,7 @@ structs:
                   by an analyzeShardKey command."
     strict: false
     fields:
-      commandId:
+      analyzeShardKeyId:
         type: uuid
         description: "The unique id for the command that generated this split point."
       splitPointId:

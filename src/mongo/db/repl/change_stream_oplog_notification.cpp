@@ -29,12 +29,30 @@
 
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 
+#include <boost/move/utility_core.hpp>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

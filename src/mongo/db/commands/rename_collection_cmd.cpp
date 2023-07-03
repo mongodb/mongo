@@ -28,25 +28,27 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <iosfwd>
+#include <memory>
+#include <string>
+#include <variant>
 
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/index_catalog.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/rename_collection.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rename_collection_common.h"
 #include "mongo/db/commands/rename_collection_gen.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/ops/insert.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -120,9 +122,7 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
             uassertStatusOK(rename_collection::checkAuthForRenameCollectionCommand(
-                opCtx->getClient(),
-                DatabaseNameUtil::serializeForAuth(request().getDbName()),
-                request().toBSON(BSONObj())));
+                opCtx->getClient(), request()));
         }
     };
 

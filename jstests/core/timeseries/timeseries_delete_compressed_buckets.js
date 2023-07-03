@@ -13,6 +13,14 @@
 (function() {
 "use strict";
 
+load("jstests/libs/feature_flag_util.js");
+
+// TODO SERVER-77454: Investigate re-enabling this.
+if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
+    jsTestLog("Skipping test as the always use compressed buckets feature is enabled");
+    return;
+}
+
 const timeFieldName = "time";
 const metaFieldName = "tag";
 const dateTime = ISODate("2021-07-12T16:00:00Z");

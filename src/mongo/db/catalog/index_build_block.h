@@ -29,7 +29,21 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_build_interceptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/resumable_index_builds_gen.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -95,7 +109,7 @@ public:
      */
     const IndexCatalogEntry* getEntry(OperationContext* opCtx,
                                       const CollectionPtr& collection) const;
-    IndexCatalogEntry* getEntry(OperationContext* opCtx, Collection* collection);
+    IndexCatalogEntry* getWritableEntry(OperationContext* opCtx, Collection* collection);
 
     /**
      * Returns the name of the index managed by this index builder.

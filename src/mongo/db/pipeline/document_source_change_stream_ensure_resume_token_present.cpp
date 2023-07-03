@@ -27,13 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <utility>
 
-#include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_start_after_invalidate_info.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -136,7 +146,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent
         const auto extraInfo = ex.extraInfo<ChangeStreamStartAfterInvalidateInfo>();
         tassert(5779200, "Missing ChangeStreamStartAfterInvalidationInfo on exception", extraInfo);
 
-        const DocumentSource::GetNextResult nextInput =
+        DocumentSource::GetNextResult nextInput =
             Document::fromBsonWithMetaData(extraInfo->getStartAfterInvalidateEvent());
 
         _resumeStatus =
@@ -158,12 +168,12 @@ Value DocumentSourceChangeStreamEnsureResumeTokenPresent::serialize(
     if (opts.verbosity) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
         sub.append("stage"_sd, kStageName);
-        opts.serializeLiteralValue(ResumeToken(_tokenFromClient).toDocument())
+        opts.serializeLiteral(ResumeToken(_tokenFromClient).toDocument())
             .addToBsonObj(&sub, "resumeToken"_sd);
         sub.done();
     } else {
         BSONObjBuilder sub(builder.subobjStart(kStageName));
-        opts.serializeLiteralValue(ResumeToken(_tokenFromClient).toDocument())
+        opts.serializeLiteral(ResumeToken(_tokenFromClient).toDocument())
             .addToBsonObj(&sub, "resumeToken"_sd);
         sub.done();
     }

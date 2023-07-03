@@ -30,36 +30,101 @@
 
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <functional>
+#include <mutex>
+#include <tuple>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/async_remote_command_targeter_adapter.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/config.h"
+#include "mongo/client/remote_command_retry_scheduler.h"
+#include "mongo/client/remote_command_targeter_rs.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db//shard_role.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_write_path.h"
-#include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
+#include "mongo/db/catalog/local_oplog_info.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/keys_collection_document_gen.h"
+#include "mongo/db/keys_collection_util.h"
+#include "mongo/db/ops/update_result.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/tenant_migration_statistics.h"
+#include "mongo/db/repl/tenant_migration_util.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/executor/async_rpc.h"
+#include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/executor/async_rpc_retry_policy.h"
+#include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/connection_pool.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_options.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
@@ -74,6 +139,7 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingAbortingIndexBuildsStat
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingDataSyncState);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeFetchingKeys);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeStoringExternalClusterTimeKeyDocs);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeWaitingForKeysToReplicate);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeMarkingStateGarbageCollectable);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorAfterMarkingStateGarbageCollectable);
@@ -1138,32 +1204,34 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                            std::make_shared<std::vector<ExternalKeysCollectionDocument>>();
                        auto fetchStatus = std::make_shared<boost::optional<Status>>();
 
-                       auto fetcherCallback =
-                           [this, self = shared_from_this(), fetchStatus, keyDocs](
-                               const Fetcher::QueryResponseStatus& dataStatus,
-                               Fetcher::NextAction* nextAction,
-                               BSONObjBuilder* getMoreBob) {
-                               // Throw out any accumulated results on error
-                               if (!dataStatus.isOK()) {
-                                   *fetchStatus = dataStatus.getStatus();
-                                   keyDocs->clear();
-                                   return;
-                               }
+                       auto fetcherCallback = [this,
+                                               self = shared_from_this(),
+                                               fetchStatus,
+                                               keyDocs](
+                                                  const Fetcher::QueryResponseStatus& dataStatus,
+                                                  Fetcher::NextAction* nextAction,
+                                                  BSONObjBuilder* getMoreBob) {
+                           // Throw out any accumulated results on error
+                           if (!dataStatus.isOK()) {
+                               *fetchStatus = dataStatus.getStatus();
+                               keyDocs->clear();
+                               return;
+                           }
 
-                               const auto& data = dataStatus.getValue();
-                               for (const BSONObj& doc : data.documents) {
-                                   keyDocs->push_back(
-                                       tenant_migration_util::makeExternalClusterTimeKeyDoc(
-                                           _migrationUuid, doc.getOwned()));
-                               }
-                               *fetchStatus = Status::OK();
+                           const auto& data = dataStatus.getValue();
+                           for (const BSONObj& doc : data.documents) {
+                               keyDocs->push_back(
+                                   keys_collection_util::makeExternalClusterTimeKeyDoc(
+                                       doc.getOwned(), _migrationUuid, boost::none /* expireAt */));
+                           }
+                           *fetchStatus = Status::OK();
 
-                               if (!getMoreBob) {
-                                   return;
-                               }
-                               getMoreBob->append("getMore", data.cursorId);
-                               getMoreBob->append("collection", data.nss.coll());
-                           };
+                           if (!getMoreBob) {
+                               return;
+                           }
+                           getMoreBob->append("getMore", data.cursorId);
+                           getMoreBob->append("collection", data.nss.coll());
+                       };
 
                        auto fetcher = std::make_shared<Fetcher>(
                            _recipientCmdExecutor.get(),
@@ -1218,8 +1286,11 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                    .then([this, self = shared_from_this(), executor, token](auto keyDocs) {
                        checkForTokenInterrupt(token);
 
-                       return tenant_migration_util::storeExternalClusterTimeKeyDocs(
-                           std::move(keyDocs));
+                       auto opCtx = cc().makeOperationContext();
+                       pauseTenantMigrationDonorBeforeStoringExternalClusterTimeKeyDocs
+                           .pauseWhileSet(opCtx.get());
+                       return keys_collection_util::storeExternalClusterTimeKeyDocs(
+                           opCtx.get(), std::move(keyDocs));
                    })
                    .then([this, self = shared_from_this(), token](repl::OpTime lastKeyOpTime) {
                        pauseTenantMigrationDonorBeforeWaitingForKeysToReplicate.pauseWhileSet();

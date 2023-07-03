@@ -27,16 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
+#include <absl/container/inlined_vector.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <set>
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/exec/sbe/stages/hash_lookup.h"
-#include "mongo/db/exec/sbe/stages/stage_visitors.h"
-
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/stages/hash_lookup.h"
+#include "mongo/db/exec/sbe/stages/stage_visitors.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -211,9 +235,9 @@ void HashLookupStage::reset() {
     _bufferIt = 0;
 }
 
-std::pair<RecordId, KeyString::TypeBits> HashLookupStage::serializeKeyForRecordStore(
+std::pair<RecordId, key_string::TypeBits> HashLookupStage::serializeKeyForRecordStore(
     const value::MaterializedRow& key) const {
-    KeyString::Builder kb{KeyString::Version::kLatestVersion};
+    key_string::Builder kb{key_string::Version::kLatestVersion};
     return encodeKeyString(kb, key);
 }
 
@@ -340,7 +364,7 @@ void HashLookupStage::spillBufferedValueToDisk(OperationContext* opCtx,
 size_t HashLookupStage::bufferValueOrSpill(value::MaterializedRow& value) {
     size_t bufferIndex = _valueId;
     const long long newMemUsage = _computedTotalMemUsage + size_estimator::estimate(value);
-    if (newMemUsage <= _memoryUseInBytesBeforeSpill) {
+    if (!hasSpilledBufToDisk() && newMemUsage <= _memoryUseInBytesBeforeSpill) {
         _buffer.emplace_back(std::move(value));
         _computedTotalMemUsage = newMemUsage;
     } else {

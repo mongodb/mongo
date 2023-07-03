@@ -30,13 +30,19 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
+#include <string>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -73,7 +79,9 @@ public:
     /**
      * Given a duplicate key, insert it into the key constraint table.
      */
-    Status recordKey(OperationContext* opCtx, const KeyString::Value& key);
+    Status recordKey(OperationContext* opCtx,
+                     const IndexCatalogEntry* indexCatalogEntry,
+                     const key_string::Value& key);
 
     /**
      * Returns Status::OK if all previously recorded duplicate key constraint violations have been
@@ -82,15 +90,14 @@ public:
      *
      * Must not be in a WriteUnitOfWork.
      */
-    Status checkConstraints(OperationContext* opCtx) const;
+    Status checkConstraints(OperationContext* opCtx,
+                            const IndexCatalogEntry* indexCatalogEntry) const;
 
     std::string getTableIdent() const {
         return _keyConstraintsTable->rs()->getIdent();
     }
 
 private:
-    const IndexCatalogEntry* _indexCatalogEntry;
-
     AtomicWord<long long> _duplicateCounter{0};
 
     // This temporary record store is owned by the duplicate key tracker and dropped along with it.

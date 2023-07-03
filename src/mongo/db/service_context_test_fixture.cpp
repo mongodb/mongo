@@ -27,18 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/service_context_test_fixture.h"
 
-#include <memory>
+#include <utility>
 
 #include "mongo/client/replica_set_monitor_manager.h"
-#include "mongo/db/client.h"
-#include "mongo/db/op_observer/op_observer_registry.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/diagnostic_info.h"
 
 namespace mongo {
 
@@ -49,15 +43,8 @@ ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest() {
         clkSource.reset();
     }
 
-    auto serviceContext = [] {
-        auto serviceContext = ServiceContext::make();
-        auto serviceContextPtr = serviceContext.get();
-        setGlobalServiceContext(std::move(serviceContext));
-        return serviceContextPtr;
-    }();
-
-    auto observerRegistry = std::make_unique<OpObserverRegistry>();
-    serviceContext->setOpObserver(std::move(observerRegistry));
+    auto serviceContext = ServiceContext::make();
+    setGlobalServiceContext(std::move(serviceContext));
 }
 
 ScopedGlobalServiceContextForTest::~ScopedGlobalServiceContextForTest() {

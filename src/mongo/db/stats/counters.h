@@ -29,16 +29,31 @@
 
 #pragma once
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
 #include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/basic.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/aligned.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

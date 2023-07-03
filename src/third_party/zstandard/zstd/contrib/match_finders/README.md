@@ -14,7 +14,7 @@
  * files would be small relative to the size of the file. 
  * 
  * Various 'diffing' algorithms utilize this notion of edit distance and 
- * the corrensponding concept of a minimal edit script between two 
+ * the corresponding concept of a minimal edit script between two 
  * sequences to identify the regions within two files where they differ. 
  * The core algorithm used in this match finder is described in: 
  * 
@@ -28,12 +28,12 @@
  * 
  * Note: after some experimentation, this approach proved to not provide enough 
  * utility to justify the additional CPU used in finding matches. The one area
- * where this approach consistenly outperforms Zstandard even on level 19 is 
- * when compressing small files (<10 KB) using a equally small dictionary that 
+ * where this approach consistently outperforms Zstandard even on level 19 is 
+ * when compressing small files (<10 KB) using an equally small dictionary that 
  * is very similar to the source file. For the use case that this was intended,
  * (large similar files) this approach by itself took 5-10X longer than zstd-19 and 
  * generally resulted in 2-3X larger files. The core advantage that zstd-19 has 
- * over this appraoch for match finding is the overlapping matches. This approach 
+ * over this approach for match finding is the overlapping matches. This approach 
  * cannot find any. 
  * 
  * I'm leaving this in the contrib section in case this ever becomes interesting 

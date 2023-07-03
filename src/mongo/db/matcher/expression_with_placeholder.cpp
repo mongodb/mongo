@@ -27,14 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/optional.hpp>
+#include <cstddef>
+#include <new>
 
-#include "mongo/db/matcher/expression_with_placeholder.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/expression_path.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/static_immortal.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

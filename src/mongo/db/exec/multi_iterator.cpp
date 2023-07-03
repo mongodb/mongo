@@ -27,14 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/exec/multi_iterator.h"
-
-#include <memory>
-
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -46,7 +51,7 @@ const char* MultiIteratorStage::kStageType = "MULTI_ITERATOR";
 
 MultiIteratorStage::MultiIteratorStage(ExpressionContext* expCtx,
                                        WorkingSet* ws,
-                                       const CollectionPtr& collection)
+                                       VariantCollectionPtrOrAcquisition collection)
     : RequiresCollectionStage(kStageType, expCtx, collection), _ws(ws) {}
 
 void MultiIteratorStage::addIterator(unique_ptr<RecordCursor> it) {
@@ -59,7 +64,6 @@ PlanStage::StageState MultiIteratorStage::doWork(WorkingSetID* out) {
     const auto ret = handlePlanStageYield(
         expCtx(),
         "MultiIteratorStage",
-        collection()->ns().ns(),
         [&] {
             while (!_iterators.empty()) {
                 record = _iterators.back()->next();

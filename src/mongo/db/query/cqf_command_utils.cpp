@@ -29,11 +29,30 @@
 
 #include "mongo/db/query/cqf_command_utils.h"
 
+#include <memory>
+#include <set>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <s2cellid.h>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/add_fields_projection_executor.h"
 #include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
+#include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
-#include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
@@ -42,6 +61,7 @@
 #include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/matcher/expression_text_noop.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -66,76 +86,41 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
-#include "mongo/db/pipeline/abt/agg_expression_visitor.h"
-#include "mongo/db/pipeline/abt/document_source_visitor.h"
-#include "mongo/db/pipeline/abt/match_expression_visitor.h"
-#include "mongo/db/pipeline/abt/utils.h"
+#include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/accumulator_percentile.h"
-#include "mongo/db/pipeline/document_source_bucket_auto.h"
-#include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
-#include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
-#include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
-#include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
-#include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
-#include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
-#include "mongo/db/pipeline/document_source_change_stream_transform.h"
-#include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
-#include "mongo/db/pipeline/document_source_coll_stats.h"
-#include "mongo/db/pipeline/document_source_current_op.h"
-#include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/document_source_densify.h"
-#include "mongo/db/pipeline/document_source_exchange.h"
-#include "mongo/db/pipeline/document_source_facet.h"
-#include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
-#include "mongo/db/pipeline/document_source_geo_near.h"
-#include "mongo/db/pipeline/document_source_geo_near_cursor.h"
-#include "mongo/db/pipeline/document_source_graph_lookup.h"
-#include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_index_stats.h"
-#include "mongo/db/pipeline/document_source_internal_all_collection_stats.h"
-#include "mongo/db/pipeline/document_source_internal_apply_oplog_update.h"
-#include "mongo/db/pipeline/document_source_internal_compute_geo_near_distance.h"
-#include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
-#include "mongo/db/pipeline/document_source_internal_inhibit_optimization.h"
-#include "mongo/db/pipeline/document_source_internal_shard_filter.h"
-#include "mongo/db/pipeline/document_source_internal_split_pipeline.h"
-#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/document_source_list_cached_and_active_users.h"
-#include "mongo/db/pipeline/document_source_list_catalog.h"
-#include "mongo/db/pipeline/document_source_list_local_sessions.h"
-#include "mongo/db/pipeline/document_source_list_sessions.h"
-#include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_merge.h"
-#include "mongo/db/pipeline/document_source_operation_metrics.h"
-#include "mongo/db/pipeline/document_source_out.h"
-#include "mongo/db/pipeline/document_source_plan_cache_stats.h"
-#include "mongo/db/pipeline/document_source_query_stats.h"
-#include "mongo/db/pipeline/document_source_queue.h"
-#include "mongo/db/pipeline/document_source_redact.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
-#include "mongo/db/pipeline/document_source_sample.h"
-#include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
-#include "mongo/db/pipeline/document_source_sequential_document_cache.h"
-#include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
-#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
-#include "mongo/db/pipeline/document_source_skip.h"
-#include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/document_source_streaming_group.h"
-#include "mongo/db/pipeline/document_source_tee_consumer.h"
-#include "mongo/db/pipeline/document_source_union_with.h"
-#include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_visitor.h"
+#include "mongo/db/pipeline/expression_walker.h"
+#include "mongo/db/pipeline/group_from_first_document_transformation.h"
+#include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry_mongod.h"
 #include "mongo/db/pipeline/visitors/document_source_walker.h"
+#include "mongo/db/pipeline/visitors/transformer_interface_visitor.h"
 #include "mongo/db/pipeline/visitors/transformer_interface_walker.h"
+#include "mongo/db/query/ce_mode_parameter.h"
 #include "mongo/db/query/expression_walker.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/tree_walker.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/query/document_source_merge_cursors.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 namespace mongo {
@@ -151,7 +136,8 @@ namespace {
  */
 class ABTMatchExpressionVisitor : public MatchExpressionConstVisitor {
 public:
-    ABTMatchExpressionVisitor(bool& eligible) : _eligible(eligible) {}
+    ABTMatchExpressionVisitor(bool& eligible, QueryFrameworkControlEnum frameworkControl)
+        : _eligible(eligible), _frameworkControl(frameworkControl) {}
 
     void visit(const LTEMatchExpression* expr) override {
         assertSupportedPathExpression(expr);
@@ -380,11 +366,20 @@ private:
     }
 
     void assertSupportedPathExpression(const PathMatchExpression* expr) {
-        if (FieldRef(expr->path()).hasNumericPathComponents())
+        const auto fieldRef = FieldRef(expr->path());
+        if (fieldRef.hasNumericPathComponents())
             _eligible = false;
+
+        // In M2, match expressions which compare against _id should fall back because they could
+        // use the _id index.
+        if (!fieldRef.empty() && fieldRef.getPart(0) == "_id" &&
+            _frameworkControl == QueryFrameworkControlEnum::kTryBonsai) {
+            _eligible = false;
+        }
     }
 
     bool& _eligible;
+    const QueryFrameworkControlEnum _frameworkControl;
 };
 
 class ABTUnsupportedAggExpressionVisitor : public ExpressionConstVisitor {
@@ -1053,77 +1048,100 @@ private:
 template <class RequestType>
 bool isEligibleCommon(const RequestType& request,
                       OperationContext* opCtx,
-                      const CollectionPtr& collection) {
+                      const CollectionPtr& collection,
+                      QueryFrameworkControlEnum frameworkControl) {
+    //
+    // Check unsupported command options.
+    //
+
     // The FindCommandRequest defaults some parameters to BSONObj() instead of boost::none.
-    auto noneOrDefaultEmpty = [&](auto param) {
+    auto hasParam = [&](auto param) {
         if constexpr (std::is_same_v<decltype(param), boost::optional<BSONObj>>) {
             return param && !param->isEmpty();
         } else {
             return !param.isEmpty();
         }
     };
-    const bool unsupportedCmdOption = noneOrDefaultEmpty(request.getCollation()) ||
-        noneOrDefaultEmpty(request.getLet()) || request.getLegacyRuntimeConstants();
-
-    bool unsupportedIndexType = [&]() {
-        if (!collection)
-            return false;
-
-        const IndexCatalog& indexCatalog = *collection->getIndexCatalog();
-        auto indexIterator =
-            indexCatalog.getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
-
-        while (indexIterator->more()) {
-            const IndexDescriptor& descriptor = *indexIterator->next()->descriptor();
-            if (descriptor.hidden()) {
-                // An index that is hidden will not be considered by the optimizer, so we don't need
-                // to check its eligibility further.
-                continue;
-            }
-
-            if (descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
-                descriptor.isPartial() || descriptor.isSparse() ||
-                descriptor.getIndexType() != IndexType::INDEX_BTREE ||
-                !descriptor.collation().isEmpty()) {
-                return true;
-            }
-        }
+    if (hasParam(request.getCollation()) || hasParam(request.getLet()) ||
+        hasParam(request.getResumeAfter()) || request.getRequestResumeToken() ||
+        request.getLegacyRuntimeConstants()) {
         return false;
-    }();
+    }
 
-    bool unsupportedCollectionType = [&]() {
-        if (!collection)
-            return false;
+    // In M2, we should fall back on any index hint that is not a $natural hint.
+    auto hasIndexHint = [&](auto param) {
+        if constexpr (std::is_same_v<decltype(param), boost::optional<BSONObj>>) {
+            return param && !param->isEmpty() &&
+                param->firstElementFieldNameStringData() != "$natural"_sd;
+        } else {
+            return !param.isEmpty() && param.firstElementFieldNameStringData() != "$natural"_sd;
+        }
+    };
+    if (frameworkControl == QueryFrameworkControlEnum::kTryBonsai &&
+        hasIndexHint(request.getHint())) {
+        return false;
+    }
 
-        if (collection->isClustered() || !collection->getCollectionOptions().collation.isEmpty() ||
-            collection->getTimeseriesOptions() || collection->isCapped()) {
-            return true;
+    //
+    // Check unsupported index types.
+    //
+
+    if (!collection)
+        return true;
+
+    const IndexCatalog& indexCatalog = *collection->getIndexCatalog();
+    auto indexIterator =
+        indexCatalog.getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+
+    while (indexIterator->more()) {
+        const IndexDescriptor& descriptor = *indexIterator->next()->descriptor();
+        if (descriptor.hidden()) {
+            // An index that is hidden will not be considered by the optimizer, so we don't need
+            // to check its eligibility further.
+            continue;
         }
 
-        return false;
-    }();
+        // In M2, we should fall back on any non-hidden, non-_id index.
+        if (!descriptor.isIdIndex() && frameworkControl == QueryFrameworkControlEnum::kTryBonsai) {
+            return false;
+        }
 
-    return !unsupportedCmdOption && !unsupportedIndexType && !unsupportedCollectionType &&
-        !storageGlobalParams.noTableScan.load();
+        if (descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
+            descriptor.isPartial() || descriptor.isSparse() ||
+            descriptor.getIndexType() != IndexType::INDEX_BTREE ||
+            !descriptor.collation().isEmpty()) {
+            return false;
+        }
+    }
+
+    //
+    // Check unsupported collection types.
+    //
+
+    if (collection->isClustered() || !collection->getCollectionOptions().collation.isEmpty() ||
+        collection->getTimeseriesOptions() || collection->isCapped()) {
+        return false;
+    }
+
+    // Check notablescan.
+    return !storageGlobalParams.noTableScan.load();
 }
 
-boost::optional<bool> shouldForceEligibility() {
+boost::optional<bool> shouldForceEligibility(QueryFrameworkControlEnum frameworkControl) {
     // We don't need to consult the feature flag here, since the framework control knob can only
     // be set to enable bonsai if featureFlagCommonQueryFramework is enabled.
-    auto queryControl = ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
-        "internalQueryFrameworkControl");
-
     LOGV2_DEBUG(7325101,
                 4,
                 "internalQueryFrameworkControl={knob}",
                 "logging internalQueryFrameworkControl",
-                "knob"_attr = QueryFrameworkControl_serializer(queryControl->_data.get()));
+                "knob"_attr = QueryFrameworkControl_serializer(frameworkControl));
 
-    switch (queryControl->_data.get()) {
+    switch (frameworkControl) {
         case QueryFrameworkControlEnum::kForceClassicEngine:
         case QueryFrameworkControlEnum::kTrySbeEngine:
             return false;
         case QueryFrameworkControlEnum::kTryBonsai:
+        case QueryFrameworkControlEnum::kTryBonsaiExperimental:
             // Return boost::none to indicate that we should not force eligibility of bonsai nor the
             // classic engine.
             return boost::none;
@@ -1134,18 +1152,20 @@ boost::optional<bool> shouldForceEligibility() {
     MONGO_UNREACHABLE;
 }
 
-bool isEligibleForBonsai(ServiceContext* serviceCtx, const Pipeline& pipeline) {
-    ABTUnsupportedDocumentSourceVisitorContext visitorCtx;
+bool isEligibleForBonsai(ServiceContext* serviceCtx,
+                         const Pipeline& pipeline,
+                         QueryFrameworkControlEnum frameworkControl) {
+    ABTUnsupportedDocumentSourceVisitorContext visitorCtx{frameworkControl};
     auto& reg = getDocumentSourceVisitorRegistry(serviceCtx);
     DocumentSourceWalker walker(reg, &visitorCtx);
     walker.walk(pipeline);
     return visitorCtx.eligible;
 }
 
-bool isEligibleForBonsai(const CanonicalQuery& cq) {
+bool isEligibleForBonsai(const CanonicalQuery& cq, QueryFrameworkControlEnum frameworkControl) {
     auto expression = cq.root();
     bool eligible = true;
-    ABTMatchExpressionVisitor visitor(eligible);
+    ABTMatchExpressionVisitor visitor(eligible, frameworkControl);
     MatchExpressionWalker walker(nullptr /*preVisitor*/, nullptr /*inVisitor*/, &visitor);
     tree_walker::walk<true, MatchExpression>(expression, &walker);
 
@@ -1170,17 +1190,23 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
                          const Pipeline& pipeline,
                          OperationContext* opCtx,
                          const CollectionPtr& collection) {
-    if (auto forceBonsai = shouldForceEligibility(); forceBonsai.has_value()) {
+    auto frameworkControl = ServerParameterSet::getNodeParameterSet()
+                                ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
+                                ->_data.get();
+
+    if (auto forceBonsai = shouldForceEligibility(frameworkControl); forceBonsai.has_value()) {
         return *forceBonsai;
     }
 
     // Explain is not currently supported but is allowed if the failpoint is set
     // for testing purposes.
+    // TODO SERVER-77719: eventually explain should be permitted by default with tryBonsai, but we
+    // will still want to fall back on explain commands with tryBonsaiExperimental.
     if (!MONGO_unlikely(enableExplainInBonsai.shouldFail()) && request.getExplain()) {
         return false;
     }
 
-    bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection) &&
+    bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection, frameworkControl) &&
         !request.getRequestReshardingResumeToken().has_value() && !request.getExchange();
 
     // Early return to avoid unnecessary work of walking the input pipeline.
@@ -1188,45 +1214,60 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
         return false;
     }
 
-    return isEligibleForBonsai(opCtx->getServiceContext(), pipeline);
+    return isEligibleForBonsai(opCtx->getServiceContext(), pipeline, frameworkControl);
 }
 
 bool isEligibleForBonsai(const CanonicalQuery& cq,
                          OperationContext* opCtx,
                          const CollectionPtr& collection) {
-    if (auto forceBonsai = shouldForceEligibility(); forceBonsai.has_value()) {
+    auto frameworkControl = ServerParameterSet::getNodeParameterSet()
+                                ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
+                                ->_data.get();
+    if (auto forceBonsai = shouldForceEligibility(frameworkControl); forceBonsai.has_value()) {
         return *forceBonsai;
+    }
+
+    if (!cq.useCqfIfEligible()) {
+        return false;
     }
 
     // Explain is not currently supported but is allowed if the failpoint is set
     // for testing purposes.
+    // TODO SERVER-77719: eventually explain should be permitted by default with tryBonsai, but we
+    // will still want to fall back on explain commands with tryBonsaiExperimental.
     if (!MONGO_unlikely(enableExplainInBonsai.shouldFail()) && cq.getExplain()) {
         return false;
     }
 
     auto request = cq.getFindCommandRequest();
-    bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection) &&
+    bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection, frameworkControl) &&
         request.getSort().isEmpty() && request.getMin().isEmpty() && request.getMax().isEmpty() &&
         !request.getReturnKey() && !request.getSingleBatch() && !request.getTailable() &&
         !request.getSkip() && !request.getLimit() && !request.getNoCursorTimeout() &&
-        !request.getRequestResumeToken() && !request.getAllowPartialResults() &&
-        !request.getAllowSpeculativeMajorityRead() && !request.getAwaitData() &&
-        !request.getReadOnce() && !request.getShowRecordId() && !request.getTerm();
+        !request.getAllowPartialResults() && !request.getAllowSpeculativeMajorityRead() &&
+        !request.getAwaitData() && !request.getReadOnce() && !request.getShowRecordId() &&
+        !request.getTerm();
 
     // Early return to avoid unnecessary work of walking the input expression.
-    if (!commandOptionsEligible || !cq.useCqfIfEligible()) {
+    if (!commandOptionsEligible) {
         return false;
     }
 
-    return isEligibleForBonsai(cq);
+    return isEligibleForBonsai(cq, frameworkControl);
 }
 
 bool isEligibleForBonsai_forTesting(const CanonicalQuery& cq) {
-    return isEligibleForBonsai(cq);
+    auto frameworkControl = ServerParameterSet::getNodeParameterSet()
+                                ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
+                                ->_data.get();
+    return isEligibleForBonsai(cq, frameworkControl);
 }
 
 bool isEligibleForBonsai_forTesting(ServiceContext* serviceCtx, const Pipeline& pipeline) {
-    return isEligibleForBonsai(serviceCtx, pipeline);
+    auto frameworkControl = ServerParameterSet::getNodeParameterSet()
+                                ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
+                                ->_data.get();
+    return isEligibleForBonsai(serviceCtx, pipeline, frameworkControl);
 }
 
 }  // namespace mongo
@@ -1239,7 +1280,7 @@ void visit(ABTUnsupportedDocumentSourceVisitorContext* ctx, const T&) {
 }
 
 void visit(ABTUnsupportedDocumentSourceVisitorContext* ctx, const DocumentSourceMatch& source) {
-    ABTMatchExpressionVisitor visitor(ctx->eligible);
+    ABTMatchExpressionVisitor visitor(ctx->eligible, ctx->frameworkControl);
     MatchExpressionWalker walker(nullptr, nullptr, &visitor);
     tree_walker::walk<true, MatchExpression>(source.getMatchExpression(), &walker);
 }

@@ -29,33 +29,57 @@
 
 #include "mongo/db/mongod_main.h"
 
+#include <algorithm>
 #include <boost/filesystem/operations.hpp>
-#include <boost/optional.hpp>
 #include <csignal>
-#include <fstream>
+#include <cstdint>
+#include <cstdlib>
+#include <ctime>
+#include <exception>
+#include <fstream>  // IWYU pragma: keep
+#include <functional>
 #include <iostream>
-#include <limits>
 #include <memory>
+#include <mutex>
+#include <ratio>
+#include <set>
 #include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/init.h"
+#include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/connpool.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_op_observer.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/sasl_options.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_impl.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_write_path.h"
-#include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/catalog/health_log.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/catalog/health_log_interface.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/change_collection_expired_documents_remover.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
@@ -64,6 +88,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
 #include "mongo/db/commands/fsync.h"
@@ -72,34 +98,33 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/free_mon/free_mon_mongod.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/global_settings.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
-#include "mongo/db/index_names.h"
 #include "mongo/db/initialize_server_global_state.h"
-#include "mongo/db/introspect.h"
-#include "mongo/db/json.h"
 #include "mongo/db/keys_collection_client_direct.h"
-#include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
+#include "mongo/db/keys_collection_manager_gen.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_session_cache_factory_mongod.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mirror_maestro.h"
 #include "mongo/db/mongod_options.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/fallback_op_observer.h"
 #include "mongo/db/op_observer/fcv_op_observer.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_impl.h"
@@ -109,17 +134,20 @@
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
 #include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
-#include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_settings_manager.h"
 #include "mongo/db/query/stats/stats_cache_loader_impl.h"
 #include "mongo/db/query/stats/stats_catalog.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
+#include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/initial_syncer_factory.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/primary_only_service_op_observer.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
@@ -129,26 +157,29 @@
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/shard_merge_recipient_op_observer.h"
 #include "mongo/db/repl/shard_merge_recipient_service.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_donor_op_observer.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_op_observer.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
+#include "mongo/db/repl/tenant_migration_util.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
+#include "mongo/db/request_execution_context.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/migration_util.h"
-#include "mongo/db/s/move_primary/move_primary_donor_service.h"
-#include "mongo/db/s/move_primary/move_primary_recipient_service.h"
-#include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
-#include "mongo/db/s/query_analysis_op_observer.h"
+#include "mongo/db/s/query_analysis_op_observer_configsvr.h"
+#include "mongo/db/s/query_analysis_op_observer_rs.h"
+#include "mongo/db/s/query_analysis_op_observer_shardsvr.h"
 #include "mongo/db/s/rename_collection_participant_service.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
@@ -157,23 +188,20 @@
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
-#include "mongo/db/s/sharding_state_recovery.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/serverless/shard_split_donor_op_observer.h"
 #include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_mongod.h"
-#include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/logical_session_cache.h"
-#include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_killer.h"
 #include "mongo/db/set_change_stream_state_coordinator.h"
 #include "mongo/db/startup_recovery.h"
 #include "mongo/db/startup_warnings_mongod.h"
-#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/disk_space_monitor.h"
@@ -187,6 +215,7 @@
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/timeseries/timeseries_op_observer.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
@@ -196,32 +225,51 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/idl/cluster_server_parameter_initializer.h"
 #include "mongo/idl/cluster_server_parameter_op_observer.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/s/catalog/sharding_catalog_client_impl.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/analyze_shard_key_role.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/stdx/future.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
+#include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/exception_filter_win32.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/debugger.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/fail_point.h"
@@ -231,27 +279,19 @@
 #include "mongo/util/net/private/ssl_expiration.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/ntservice.h"
+#include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/options_parser/value.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/sequence_util.h"
 #include "mongo/util/signal_handlers.h"
-#include "mongo/util/stacktrace.h"
-#include "mongo/util/text.h"
+#include "mongo/util/str.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+#include "mongo/util/thread_safety_context.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
 #include "mongo/watchdog/watchdog_mongod.h"
-
-#ifdef MONGO_CONFIG_SSL
-#include "mongo/util/net/ssl_options.h"
-#endif
-
-#if !defined(_WIN32)
-#include <sys/file.h>
-#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -384,19 +424,19 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
         services.push_back(std::make_unique<ShardingDDLCoordinatorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingDonorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingRecipientService>(serviceContext));
-        services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
-        services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
-        services.push_back(std::make_unique<MovePrimaryDonorService>(serviceContext));
-        services.push_back(std::make_unique<MovePrimaryRecipientService>(serviceContext));
         if (getGlobalReplSettings().isServerless()) {
+            services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
+            services.push_back(
+                std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
             services.push_back(std::make_unique<repl::ShardMergeRecipientService>(serviceContext));
         }
     }
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-        services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
-        services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
         if (getGlobalReplSettings().isServerless()) {
+            services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
+            services.push_back(
+                std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
             services.push_back(std::make_unique<ShardSplitDonorService>(serviceContext));
             services.push_back(std::make_unique<repl::ShardMergeRecipientService>(serviceContext));
         }
@@ -763,15 +803,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
         startFreeMonitoring(serviceContext);
 
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-            // Note: For replica sets, ShardingStateRecovery happens on transition to primary.
-            if (!replCoord->isReplEnabled()) {
-                if (ShardingState::get(startupOpCtx.get())->enabled()) {
-                    uassertStatusOK(ShardingStateRecovery_DEPRECATED::recover(startupOpCtx.get()));
-                }
-            }
-        }
-
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             initializeGlobalShardingStateForConfigServerIfNeeded(startupOpCtx.get());
 
@@ -779,10 +810,16 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             initializeShardingAwarenessIfNeededAndLoadGlobalSettings(startupOpCtx.get());
         }
 
-        if (serverGlobalParams.clusterRole.has(ClusterRole::None) &&
-            replSettings.usingReplSets()) {  // standalone replica set
-            // The keys client must use local read concern if the storage engine can't support
-            // majority read concern.
+        if (replSettings.usingReplSets() &&
+            (serverGlobalParams.clusterRole.has(ClusterRole::None) ||
+             !Grid::get(startupOpCtx.get())->isShardingInitialized())) {
+            // If this is a mongod in a standalone replica set or a shardsvr replica set that has
+            // not initialized its sharding identity, start up the cluster time keys manager with a
+            // local/direct keys client. The keys client must use local read concern if the storage
+            // engine can't support majority read concern. If this is a mongod in a configsvr or
+            // shardsvr replica set that has initialized its sharding identity, the keys manager is
+            // by design initialized separately with a sharded keys client when the sharding state
+            // is initialized.
             auto keysClientMustUseLocalReads =
                 !serviceContext->getStorageEngine()->supportsReadConcernMajority();
             auto keysCollectionClient =
@@ -795,7 +832,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
             LogicalTimeValidator::set(startupOpCtx->getServiceContext(),
                                       std::make_unique<LogicalTimeValidator>(keyManager));
+        }
 
+        if (replSettings.usingReplSets() && serverGlobalParams.clusterRole.has(ClusterRole::None)) {
             ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(serviceContext)->startup();
         }
 
@@ -938,6 +977,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     auto catalog = std::make_unique<stats::StatsCatalog>(serviceContext, std::move(cacheLoader));
     stats::StatsCatalog::set(serviceContext, std::move(catalog));
 
+    // Startup options are written to the audit log at the end of startup so that cluster server
+    // parameters are guaranteed to have been initialized from disk at this point.
+    audit::logStartupOptions(Client::getCurrent(), serverGlobalParams.parsedOpts);
+
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore
     startupOpCtx.reset();
@@ -965,10 +1008,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     if (!initialize_server_global_state::writePidFile()) {
         quickExit(ExitCode::fail);
     }
-
-    // Startup options are written to the audit log at the end of startup so that cluster server
-    // parameters are guaranteed to have been initialized from disk at this point.
-    audit::logStartupOptions(Client::getCurrent(), serverGlobalParams.parsedOpts);
 
     serviceContext->notifyStartupComplete();
 
@@ -1270,19 +1309,24 @@ void setUpObservers(ServiceContext* serviceContext) {
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         DurableHistoryRegistry::get(serviceContext)
             ->registerPin(std::make_unique<ReshardingHistoryHook>());
-        opObserverRegistry->addObserver(std::make_unique<OpObserverShardingImpl>(
+        opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>(
             std::make_unique<OplogWriterTransactionProxy>(std::make_unique<OplogWriterImpl>())));
         opObserverRegistry->addObserver(std::make_unique<MigrationChunkClonerSourceOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
-        opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationDonorOpObserver>());
-        opObserverRegistry->addObserver(
-            std::make_unique<repl::TenantMigrationRecipientOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<UserWriteBlockModeOpObserver>());
         if (getGlobalReplSettings().isServerless()) {
+            opObserverRegistry->addObserver(
+                std::make_unique<repl::TenantMigrationDonorOpObserver>());
+            opObserverRegistry->addObserver(
+                std::make_unique<repl::TenantMigrationRecipientOpObserver>());
             opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::ShardMergeRecipientOpObserver>());
+        }
+        if (!gMultitenancySupport) {
+            opObserverRegistry->addObserver(
+                std::make_unique<analyze_shard_key::QueryAnalysisOpObserverShardSvr>());
         }
     }
 
@@ -1294,19 +1338,30 @@ void setUpObservers(ServiceContext* serviceContext) {
 
         opObserverRegistry->addObserver(std::make_unique<ConfigServerOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
+        if (!gMultitenancySupport) {
+            opObserverRegistry->addObserver(
+                std::make_unique<analyze_shard_key::QueryAnalysisOpObserverConfigSvr>());
+        }
     }
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         opObserverRegistry->addObserver(
             std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
-        opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationDonorOpObserver>());
-        opObserverRegistry->addObserver(
-            std::make_unique<repl::TenantMigrationRecipientOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<UserWriteBlockModeOpObserver>());
         if (getGlobalReplSettings().isServerless()) {
+            opObserverRegistry->addObserver(
+                std::make_unique<repl::TenantMigrationDonorOpObserver>());
+            opObserverRegistry->addObserver(
+                std::make_unique<repl::TenantMigrationRecipientOpObserver>());
             opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::ShardMergeRecipientOpObserver>());
+        }
+
+        auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
+        if (!gMultitenancySupport && replCoord && replCoord->isReplEnabled()) {
+            opObserverRegistry->addObserver(
+                std::make_unique<analyze_shard_key::QueryAnalysisOpObserverRS>());
         }
     }
 
@@ -1317,7 +1372,6 @@ void setUpObservers(ServiceContext* serviceContext) {
         std::make_unique<repl::PrimaryOnlyServiceOpObserver>(serviceContext));
     opObserverRegistry->addObserver(std::make_unique<FcvOpObserver>());
     opObserverRegistry->addObserver(std::make_unique<ClusterServerParameterOpObserver>());
-    opObserverRegistry->addObserver(std::make_unique<analyze_shard_key::QueryAnalysisOpObserver>());
 
     setupFreeMonitoringOpObserver(opObserverRegistry.get());
 
@@ -1557,7 +1611,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     LOGV2_OPTIONS(4784918, {LogComponent::kNetwork}, "Shutting down the ReplicaSetMonitor");
     ReplicaSetMonitor::shutdown();
 
-    if (auto sr = Grid::get(serviceContext)->shardRegistry()) {
+    auto sr = Grid::get(serviceContext)->isInitialized()
+        ? Grid::get(serviceContext)->shardRegistry()
+        : nullptr;
+    if (sr) {
         LOGV2_OPTIONS(4784919, {LogComponent::kSharding}, "Shutting down the shard registry");
         sr->shutdown();
     }
@@ -1574,7 +1631,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         validator->shutDown();
     }
 
-    if (auto pool = Grid::get(serviceContext)->getExecutorPool()) {
+    auto pool = Grid::get(serviceContext)->isInitialized()
+        ? Grid::get(serviceContext)->getExecutorPool()
+        : nullptr;
+    if (pool) {
         LOGV2_OPTIONS(6773200, {LogComponent::kSharding}, "Shutting down the ExecutorPool");
         pool->shutdownAndJoin();
     }
@@ -1678,6 +1738,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 int mongod_main(int argc, char* argv[]) {
     ThreadSafetyContext::getThreadSafetyContext()->forbidMultiThreading();
 
+    waitForDebugger();
+
     registerShutdownTask(shutdownTask);
 
     setupSignalHandlers();
@@ -1764,6 +1826,8 @@ int mongod_main(int argc, char* argv[]) {
     if (change_stream_serverless_helpers::canInitializeServices()) {
         ChangeStreamChangeCollectionManager::create(service);
     }
+
+    query_settings::QuerySettingsManager::create(service);
 
 #if defined(_WIN32)
     if (ntservice::shouldStartService()) {

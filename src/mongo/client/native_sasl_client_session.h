@@ -28,6 +28,11 @@
  */
 
 
+#include <memory>
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/client/sasl_client_session.h"
 
 namespace mongo {

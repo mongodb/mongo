@@ -27,12 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <bitset>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

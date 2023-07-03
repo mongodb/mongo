@@ -28,24 +28,42 @@
  */
 
 
-#include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <mutex>
+#include <string>
+#include <type_traits>
 
-#include "mongo/db/catalog/index_builds_manager.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_builds_manager.h"
 #include "mongo/db/catalog/index_repair.h"
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/progress_meter.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -282,9 +300,9 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
 
     if (recordsRemoved > 0) {
         StorageRepairObserver::get(opCtx->getServiceContext())
-            ->invalidatingModification(str::stream()
-                                       << "Moved " << recordsRemoved
-                                       << " records to lost and found: " << lostAndFoundNss.ns());
+            ->invalidatingModification(str::stream() << "Moved " << recordsRemoved
+                                                     << " records to lost and found: "
+                                                     << toStringForLogging(lostAndFoundNss));
 
         LOGV2(3956200,
               "Moved records to lost and found.",

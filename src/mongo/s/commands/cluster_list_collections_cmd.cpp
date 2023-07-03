@@ -28,16 +28,57 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/element.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/list_collections_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/explain_verbosity_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/async_requests_sender.h"
+#include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/query/store_possible_cursor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/read_through_cache.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -110,7 +151,7 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     // DB resource grants all non-system collections, so filter out system collections. This is done
     // inside the $or, since some system collections might be granted specific privileges.
     if (authzSession->isAuthorizedForAnyActionOnResource(
-            ResourcePattern::forDatabaseName(DatabaseNameUtil::serializeForAuth(dbName)))) {
+            ResourcePattern::forDatabaseName(dbName))) {
         mutablebson::Element systemCollectionsFilter = rewrittenCmdObj.makeElementObject(
             "", BSON("name" << BSON("$regex" << BSONRegEx("^(?!system\\.)"))));
         uassertStatusOK(newFilterOr.pushBack(systemCollectionsFilter));
@@ -119,9 +160,9 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     // system_buckets DB resource grants all system_buckets.* collections so create a filter to
     // include them
     if (authzSession->isAuthorizedForAnyActionOnResource(
-            ResourcePattern::forAnySystemBucketsInDatabase(
-                DatabaseNameUtil::serializeForAuth(dbName))) ||
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnySystemBuckets())) {
+            ResourcePattern::forAnySystemBucketsInDatabase(dbName)) ||
+        authzSession->isAuthorizedForAnyActionOnResource(
+            ResourcePattern::forAnySystemBuckets(dbName.tenantId()))) {
         mutablebson::Element systemCollectionsFilter = rewrittenCmdObj.makeElementObject(
             "", BSON("name" << BSON("$regex" << BSONRegEx("^system\\.buckets\\."))));
         uassertStatusOK(newFilterOr.pushBack(systemCollectionsFilter));
@@ -132,14 +173,12 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     if (auto authUser = authzSession->getAuthenticatedUser()) {
         for (const auto& [resource, privilege] : authUser.value()->getPrivileges()) {
             if (resource.isCollectionPattern() ||
-                (resource.isExactNamespacePattern() &&
-                 resource.databaseToMatch() == DatabaseNameUtil::serializeForAuth(dbName))) {
+                (resource.isExactNamespacePattern() && resource.dbNameToMatch() == dbName)) {
                 collectionNames.emplace(resource.collectionToMatch().toString());
             }
 
             if (resource.isAnySystemBucketsCollectionInAnyDB() ||
-                (resource.isExactSystemBucketsCollection() &&
-                 resource.databaseToMatch() == DatabaseNameUtil::serializeForAuth(dbName))) {
+                (resource.isExactSystemBucketsCollection() && resource.dbNameToMatch() == dbName)) {
                 collectionNames.emplace(systemBucketsDot + resource.collectionToMatch().toString());
             }
         }
@@ -214,7 +253,10 @@ public:
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const final {
         auto* authzSession = AuthorizationSession::get(opCtx->getClient());
-        return authzSession->checkAuthorizedToListCollections(dbName.db(), cmdObj).getStatus();
+        const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
+        IDLParserContext ctxt("ListCollection", apiStrict, dbName.tenantId());
+        auto request = ListCollections::parse(ctxt, cmdObj);
+        return authzSession->checkAuthorizedToListCollections(request).getStatus();
     }
 
     bool runWithRequestParser(OperationContext* opCtx,
@@ -252,8 +294,7 @@ public:
             // Use the original command object rather than the rewritten one to preserve whether
             // 'authorizedCollections' field is set.
             uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                ->checkAuthorizedToListCollections(
-                                    DatabaseNameUtil::serializeForAuth(dbName), cmdObj)));
+                                ->checkAuthorizedToListCollections(requestParser.request())));
     }
 
     void validateResult(const BSONObj& result) final {

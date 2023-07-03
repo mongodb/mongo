@@ -27,17 +27,46 @@
  *    it in the license file.
  */
 
+#include <algorithm>
 #include <benchmark/benchmark.h>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <vector>
 
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/bson_scan.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_bm_fixture.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
-
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/intrusive_counter.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -48,21 +77,20 @@ std::string debugPrint(const T* sbeElement) {
     return sbeElement ? sbe::DebugPrinter{}.print(sbeElement->debugPrint()) : nullptr;
 }
 
-const NamespaceString kNss{"test.bm"};
+const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.bm");
 
 class SbeExpressionBenchmarkFixture : public ExpressionBenchmarkFixture {
 public:
-    SbeExpressionBenchmarkFixture() : _planStageData(std::make_unique<sbe::RuntimeEnvironment>()) {
-        _inputSlotId = _planStageData.env->registerSlot(
+    SbeExpressionBenchmarkFixture() : _env(std::make_unique<sbe::RuntimeEnvironment>()) {
+        _inputSlotId = _env->registerSlot(
             "input"_sd, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator);
         _timeZoneDB = std::make_unique<TimeZoneDatabase>();
-        _planStageData.env->registerSlot(
-            "timeZoneDB"_sd,
-            sbe::value::TypeTags::timeZoneDB,
-            sbe::value::bitcastFrom<TimeZoneDatabase*>(_timeZoneDB.get()),
-            false,
-            &_slotIdGenerator);
-        _inputSlotAccessor = _planStageData.env->getAccessor(_inputSlotId);
+        _env->registerSlot("timeZoneDB"_sd,
+                           sbe::value::TypeTags::timeZoneDB,
+                           sbe::value::bitcastFrom<TimeZoneDatabase*>(_timeZoneDB.get()),
+                           false,
+                           &_slotIdGenerator);
+        _inputSlotAccessor = _env->getAccessor(_inputSlotId);
     }
 
     void benchmarkExpression(BSONObj expressionSpec,
@@ -97,7 +125,8 @@ public:
 
         stage_builder::StageBuilderState state{
             opCtx.get(),
-            &_planStageData,
+            _env,
+            _planStageData.get(),
             _variables,
             &_slotIdGenerator,
             &_frameIdGenerator,
@@ -113,17 +142,17 @@ public:
                     "sbe expression benchmark PlanStage",
                     "stage"_attr = debugPrint(stage.get()));
 
-        auto expr = evalExpr.extractExpr(state.slotVarMap, *_planStageData.env);
+        auto expr = evalExpr.extractExpr(state.slotVarMap, *_env);
         LOGV2_DEBUG(6979802,
                     1,
                     "sbe expression benchmark EExpression",
                     "expression"_attr = debugPrint(expr.get()));
 
         stage->attachToOperationContext(opCtx.get());
-        stage->prepare(_planStageData.ctx);
+        stage->prepare(_env.ctx);
 
-        _planStageData.ctx.root = stage.get();
-        sbe::vm::CodeFragment code = expr->compileDirect(_planStageData.ctx);
+        _env.ctx.root = stage.get();
+        sbe::vm::CodeFragment code = expr->compileDirect(_env.ctx);
         sbe::vm::ByteCode vm;
         stage->open(/*reopen =*/false);
         for (auto keepRunning : benchmarkState) {
@@ -154,7 +183,8 @@ private:
         }
     }
 
-    stage_builder::PlanStageData _planStageData;
+    stage_builder::PlanStageEnvironment _env;
+    std::unique_ptr<stage_builder::PlanStageStaticData> _planStageData;
     Variables _variables;
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;

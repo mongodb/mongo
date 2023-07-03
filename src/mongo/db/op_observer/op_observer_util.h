@@ -29,11 +29,23 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <utility>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/s/sharding_write_router.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
 
-namespace mongo::repl {
+namespace mongo {
 
 // Common fail points for logOp() and logInsertOps().
 extern FailPoint addDestinedRecipient;
@@ -63,11 +75,20 @@ private:
  * Returns a DocumentKey constructed from the shard key fields, if the collection is sharded,
  * and the _id field, of the given document.
  */
-DocumentKey getDocumentKey(OperationContext* opCtx, const CollectionPtr& coll, BSONObj const& doc);
+DocumentKey getDocumentKey(const CollectionPtr& coll, BSONObj const& doc);
 
 /**
  * Provides access to the DocumentKey attached to this OperationContext.
  */
-extern const OperationContext::Decoration<boost::optional<repl::DocumentKey>> documentKeyDecoration;
+extern const OplogDeleteEntryArgs::Decoration<boost::optional<DocumentKey>> documentKeyDecoration;
 
-}  // namespace mongo::repl
+/**
+ * Provides access to the ShardingWriteRouter attached to the op accumulator.
+ * The ShardingWriteRouter instance is created in OpObserverImpl and subsequently
+ * destroyed in MigrationChunkClonerSourceOpObserver.
+ *
+ */
+extern const OpStateAccumulator::Decoration<std::unique_ptr<ShardingWriteRouter>>
+    shardingWriteRouterOpStateAccumulatorDecoration;
+
+}  // namespace mongo

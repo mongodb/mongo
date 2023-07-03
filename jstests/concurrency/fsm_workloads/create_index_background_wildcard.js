@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Executes the create_index_background.js workload, but with a wildcard index.
  *
@@ -8,10 +6,10 @@
  *   creates_background_indexes
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');               // For extendWorkload.
-load('jstests/concurrency/fsm_workloads/create_index_background.js');  // For $config.
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/create_index_background.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.getIndexSpec = function() {
         return {"$**": 1};
     };

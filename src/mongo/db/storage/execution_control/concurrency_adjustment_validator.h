@@ -30,7 +30,10 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <string>
 
+#include "mongo/base/status.h"
 #include "mongo/db/tenant_id.h"
 
 namespace mongo {

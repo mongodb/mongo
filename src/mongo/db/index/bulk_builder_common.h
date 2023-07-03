@@ -69,13 +69,14 @@ template <class T>
 class BulkBuilderCommon : public IndexAccessMethod::BulkBuilder {
 
 public:
-    using KeyHandlerFn = std::function<Status(const KeyString::Value&)>;
+    using KeyHandlerFn = std::function<Status(const key_string::Value&)>;
     using RecordIdHandlerFn = std::function<Status(const RecordId&)>;
     BulkBuilderCommon(int64_t numKeys, std::string message, std::string indexName)
         : _keysInserted(numKeys), _progressMessage(message), _indexName(indexName){};
 
     Status commit(OperationContext* opCtx,
                   const CollectionPtr& collection,
+                  const IndexCatalogEntry* entry,
                   bool dupsAllowed,
                   int32_t yieldIterations,
                   const KeyHandlerFn& onDuplicateKeyInserted,
@@ -83,7 +84,7 @@ public:
 
         Timer timer;
 
-        auto builder = static_cast<T*>(this)->setUpBulkInserter(opCtx, dupsAllowed);
+        auto builder = static_cast<T*>(this)->setUpBulkInserter(opCtx, entry, dupsAllowed);
         auto it = static_cast<T*>(this)->finalizeSort();
 
         ProgressMeterHolder pm;
@@ -131,7 +132,7 @@ public:
             bool isDup;
             try {
                 isDup = static_cast<T*>(this)->duplicateCheck(
-                    opCtx, data, dupsAllowed, onDuplicateRecord);
+                    opCtx, entry, data, dupsAllowed, onDuplicateRecord);
             } catch (DBException& e) {
                 return e.toStatus();
             }
@@ -161,7 +162,7 @@ public:
 
             // Yield locks every 'yieldIterations' key insertions.
             if (yieldIterations > 0 && (++iterations % yieldIterations == 0)) {
-                yield(opCtx, &collection, _ns);
+                entry = yield(opCtx, collection, _ns, entry);
             }
 
             {

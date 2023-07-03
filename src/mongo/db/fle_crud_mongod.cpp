@@ -27,46 +27,73 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status.h"
-#include "mongo/db/fle_crud.h"
-
+#include <cstdint>
+#include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_crypto_types.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/crypto/fle_stats_gen.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_gen.h"
-#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/fle/query_rewriter_interface.h"
 #include "mongo/db/query/fle/server_rewrite.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/resource_yielder.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/transaction/transaction_participant.h"
-#include "mongo/db/transaction/transaction_participant_resource_yielder.h"
 #include "mongo/executor/inline_executor.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/idl/idl_parser.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/transaction_router_resource_yielder.h"
-#include "mongo/s/write_ops/batch_write_exec.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -221,7 +248,7 @@ private:
         // Check for interruption so we can be killed
         _opCtx->checkForInterrupt();
 
-        KeyString::Builder builder(KeyString::Version::kLatestVersion);
+        key_string::Builder builder(key_string::Version::kLatestVersion);
         builder.appendBinData(BSONBinData(block.data(), block.size(), BinDataType::BinDataGeneral));
         auto recordId = RecordId(builder.getBuffer(), builder.getSize());
 
@@ -289,11 +316,12 @@ private:
         // Check for interruption so we can be killed
         _opCtx->checkForInterrupt();
 
-        KeyString::Builder kb(
-            _sdi->getKeyStringVersion(), _sdi->getOrdering(), KeyString::Discriminator::kInclusive);
+        key_string::Builder kb(_sdi->getKeyStringVersion(),
+                               _sdi->getOrdering(),
+                               key_string::Discriminator::kInclusive);
 
         kb.appendBinData(BSONBinData(block.data(), block.size(), BinDataGeneral));
-        KeyString::Value id(kb.getValueCopy());
+        key_string::Value id(kb.getValueCopy());
 
         incrementRead();
 
@@ -304,13 +332,13 @@ private:
 
         // Seek will almost always give us a document, it just may not be a document we were
         // looking for. We need to check if seeked to the document we want
-        auto sizeWithoutRecordId = KeyString::sizeWithoutRecordIdLongAtEnd(
+        auto sizeWithoutRecordId = key_string::sizeWithoutRecordIdLongAtEnd(
             ksEntry->keyString.getBuffer(), ksEntry->keyString.getSize());
 
-        if (KeyString::compare(ksEntry->keyString.getBuffer(),
-                               id.getBuffer(),
-                               sizeWithoutRecordId,
-                               id.getSize()) == 0) {
+        if (key_string::compare(ksEntry->keyString.getBuffer(),
+                                id.getBuffer(),
+                                sizeWithoutRecordId,
+                                id.getSize()) == 0) {
 
             // Get the document from the base collection
             return _cursor->seekExact(ksEntry->loc);
@@ -531,14 +559,15 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
                 opCtx, kIdIndexName, IndexCatalog::InclusionPolicy::kReady);
             if (!indexDescriptor) {
                 uasserted(ErrorCodes::IndexNotFound,
-                          str::stream() << "Index not found, ns:" << nsOrUUID.toString()
+                          str::stream() << "Index not found, ns:" << toStringForLogging(nsOrUUID)
                                         << ", index: " << kIdIndexName);
             }
 
             if (indexDescriptor->isPartial()) {
                 uasserted(ErrorCodes::IndexOptionsConflict,
-                          str::stream() << "Partial index is not allowed for this operation, ns:"
-                                        << nsOrUUID.toString() << ", index: " << kIdIndexName);
+                          str::stream()
+                              << "Partial index is not allowed for this operation, ns:"
+                              << toStringForLogging(nsOrUUID) << ", index: " << kIdIndexName);
             }
 
             auto indexCatalogEntry = indexDescriptor->getEntry()->shared_from_this();

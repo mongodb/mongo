@@ -27,16 +27,46 @@
  *    it in the license file.
  */
 
+#include <absl/container/node_hash_map.h>
+#include <cstddef>
+#include <functional>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/query/ce/heuristic_estimator.h"
 #include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/ce/test_utils.h"
+#include "mongo/db/query/optimizer/cascades/interfaces.h"
+#include "mongo/db/query/optimizer/cascades/memo.h"
+#include "mongo/db/query/optimizer/containers.h"
+#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
+#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/query/stats/collection_statistics.h"
 #include "mongo/db/query/stats/collection_statistics_mock.h"
 #include "mongo/db/query/util/named_enum.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
 #include "mongo/util/system_tick_source.h"
+#include "mongo/util/tick_source.h"
 
 namespace mongo::optimizer::ce {
 /**

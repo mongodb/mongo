@@ -27,10 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/executor/hedging_metrics.h"
 #include "mongo/s/balancer_configuration.h"

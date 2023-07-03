@@ -28,7 +28,7 @@
 
 global:
   cpp_namespace: mongo::analyze_shard_key
-  
+
 imports:
   - "mongo/db/basic_types.idl"
   - "mongo/s/analyze_shard_key_documents.idl"
@@ -36,13 +36,15 @@ imports:
 structs:
   DocumentSourceListSampledQueriesSpec:
     description: Specification for a $listSampledQueries stage.
-    strict: false 
+    strict: false
+    query_shape_component: true
     fields:
       namespace:
         description: The namespace to return sampled queries for. If unspecified,
                      all sampled queries will be returned.
         type: namespacestring
         optional: true
+        query_shape: custom
 
   DocumentSourceListSampledQueriesResponse:
     description: The document that a $listSampledQueries stage outputs.

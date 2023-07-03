@@ -29,15 +29,24 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <queue>
+#include <string>
 
+#include "mongo/base/status.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_all_indices_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
@@ -57,7 +66,7 @@ class PlanYieldPolicy;
 class CachedPlanStage final : public RequiresAllIndicesStage {
 public:
     CachedPlanStage(ExpressionContext* expCtx,
-                    const CollectionPtr& collection,
+                    VariantCollectionPtrOrAcquisition collection,
                     WorkingSet* ws,
                     CanonicalQuery* cq,
                     const QueryPlannerParams& params,

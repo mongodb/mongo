@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Perform snapshot reads that span a find and a getmore concurrently with CRUD operations. The
  * snapshot reads and CRUD operations will all contend for locks on db and collName. Since the
@@ -11,7 +9,8 @@
  */
 
 load('jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js');
-var $config = (function() {
+
+export const $config = (function() {
     const data = {numIds: 100, numDocsToInsertPerThread: 5, valueToBeInserted: 1, batchSize: 50};
 
     const states = {
@@ -106,7 +105,7 @@ var $config = (function() {
         },
 
         createIndex: function createIndex(db, collName) {
-            db[collName].createIndex({value: 1}, {background: true});
+            db[collName].createIndex({value: 1});
         },
 
         dropIndex: function dropIndex(db, collName) {

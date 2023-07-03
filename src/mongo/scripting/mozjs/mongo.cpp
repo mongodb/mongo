@@ -29,33 +29,65 @@
 
 #include "mongo/scripting/mozjs/mongo.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <initializer_list>
 #include <js/Object.h>
+#include <js/PropertyDescriptor.h>
 #include <memory>
+#include <string>
+#include <utility>
 
-#include "mongo/bson/simple_bsonelement_comparator.h"
+#include <js/CallArgs.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TracingAPI.h>
+#include <js/TypeDecls.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_base.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/dbclient_rs.h"
-#include "mongo/client/global_conn_pool.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/client/sasl_oidc_client_conversation.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/session/logical_session_id.h"
-#include "mongo/db/session/logical_session_id_helpers.h"
-#include "mongo/scripting/dbdirectclient_factory.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/cursor.h"
+#include "mongo/scripting/mozjs/cursor_handle.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
+#include "mongo/scripting/mozjs/numberlong.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/session.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace mozjs {
@@ -445,7 +477,7 @@ void MongoBase::Functions::cursorHandleFromId::call(JSContext* cx, JS::CallArgs 
     JS::RootedObject c(cx);
     scope->getProto<CursorHandleInfo>().newObject(&c);
 
-    setCursorHandle(scope, c, NamespaceString(ns), cursorId, args);
+    setCursorHandle(scope, c, NamespaceString::createNamespaceString_forTest(ns), cursorId, args);
 
     args.rval().setObjectOrNull(c);
 }
@@ -658,9 +690,10 @@ void MongoBase::Functions::_setOIDCIdPAuthCallback::call(JSContext* cx, JS::Call
     // the function as a string, stash it into a lambda, and execute it directly when needed.
     std::string stringifiedFn = ValueWriter(cx, args.get(0)).toString();
     SaslOIDCClientConversation::setOIDCIdPAuthCallback(
-        [=](StringData userName, StringData idpEndpoint) {
+        [=](StringData userName, StringData idpEndpoint, StringData userCode) {
             auto* jsScope = getGlobalScriptEngine()->newScope();
-            BSONObj authInfo = BSON("userName" << userName << "activationEndpoint" << idpEndpoint);
+            BSONObj authInfo = BSON("userName" << userName << "userCode" << userCode
+                                               << "activationEndpoint" << idpEndpoint);
             ScriptingFunction function = jsScope->createFunction(stringifiedFn.c_str());
             jsScope->invoke(function, nullptr, &authInfo);
         });

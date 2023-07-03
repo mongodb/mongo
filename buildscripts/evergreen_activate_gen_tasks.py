@@ -26,6 +26,7 @@ LOGGER = structlog.getLogger(__name__)
 EVG_CONFIG_FILE = "./.evergreen.yml"
 BURN_IN_TAGS = "burn_in_tags"
 BURN_IN_TESTS = "burn_in_tests"
+BURN_IN_VARIANT_SUFFIX = "generated-by-burn-in-tags"
 
 
 class EvgExpansions(BaseModel):
@@ -35,13 +36,11 @@ class EvgExpansions(BaseModel):
     build_id: ID of build being run.
     version_id: ID of version being run.
     task_name: Name of task creating the generated configuration.
-    burn_in_tag_buildvariants: Buildvariants to run burn_in_tags on.
     """
 
     build_id: str
     version_id: str
     task_name: str
-    burn_in_tag_buildvariants: Optional[str] = None
 
     @classmethod
     def from_yaml_file(cls, path: str) -> "EvgExpansions":
@@ -53,13 +52,6 @@ class EvgExpansions(BaseModel):
         """Get the task being generated."""
         return remove_gen_suffix(self.task_name)
 
-    @property
-    def burn_in_tag_buildvariants_list(self) -> List[str]:
-        """Get the list of burn_in_tags buildvariants."""
-        if self.burn_in_tag_buildvariants is None:
-            return []
-        return self.burn_in_tag_buildvariants.split()
-
 
 def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
     """
@@ -70,16 +62,12 @@ def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
     """
     if expansions.task == BURN_IN_TAGS:
         version = evg_api.version_by_id(expansions.version_id)
-        for base_build_variant in expansions.burn_in_tag_buildvariants_list:
-            build_variant = f"{base_build_variant}-required"
-            try:
-                build_id = version.build_variants_map[build_variant]
-            except KeyError:
-                LOGGER.warning(
-                    "It is likely nothing to burn_in, so burn_in_tags build variant"
-                    " was not generated. Skipping...", build_variant=build_variant)
-                continue
-
+        burn_in_build_variants = [
+            variant for variant in version.build_variants_map.keys()
+            if variant.endswith(BURN_IN_VARIANT_SUFFIX)
+        ]
+        for build_variant in burn_in_build_variants:
+            build_id = version.build_variants_map[build_variant]
             task_list = evg_api.tasks_by_build(build_id)
 
             for task in task_list:

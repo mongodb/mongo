@@ -29,18 +29,56 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/dbclient_connection.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/fetcher.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/oplog_fetcher.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/tenant_all_database_cloner.h"
+#include "mongo/db/repl/tenant_migration_pem_payload_gen.h"
+#include "mongo/db/repl/tenant_migration_shared_data.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/tenant_oplog_applier.h"
+#include "mongo/db/service_context.h"
+#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_options.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -51,6 +89,7 @@ class ServiceContext;
 
 namespace repl {
 class OplogBufferCollection;
+
 /**
  * TenantMigrationRecipientService is a primary only service to handle
  * data copy portion of a multitenant migration on recipient side.

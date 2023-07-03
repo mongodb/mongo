@@ -28,20 +28,41 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <utility>
 
-#include "mongo/db/repl/session_update_tracker.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/session/session.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/session_update_tracker.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_txn_record_gen.h"
-#include "mongo/db/transaction/transaction_participant_gen.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

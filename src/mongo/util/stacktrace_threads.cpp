@@ -32,33 +32,50 @@
 
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
 
-#include <array>
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
 #include <atomic>
-#include <boost/filesystem.hpp>
+#include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <cerrno>
 #include <csignal>
+#include <cstddef>
 #include <cstdint>
-#include <cstdlib>
+#include <cstring>
 #include <ctime>
-#include <dirent.h>
-#include <fcntl.h>
 #include <fmt/format.h>
+#include <map>
+#include <memory>
+#include <set>
 #include <string>
-#include <sys/stat.h>
-#include <sys/syscall.h>
-#include <unistd.h>
+#include <utility>
 #include <vector>
+// IWYU pragma: no_include <syscall.h>
+// IWYU pragma: no_include "bits/types/siginfo_t.h"
 
 #include "mongo/base/parse_number.h"
+#include "mongo/base/static_assert.h"
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
-#include "mongo/config.h"
+#include "mongo/bson/oid.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace_somap.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

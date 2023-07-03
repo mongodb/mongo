@@ -163,6 +163,8 @@ static const char *list[] = {
   "runs.threads",
   "timer=",
   "runs.timer",
+  "timing_stress_aggressive_stash_free=",
+  "stress.aggressive_stash_free",
   "timing_stress_aggressive_sweep=",
   "stress.aggressive_sweep",
   "timing_stress_checkpoint=",
@@ -219,7 +221,7 @@ config_compat(const char **origp)
 
     for (p = list; *p != NULL; p += 2)
         if (strncmp(orig, *p, (size_t)((equalp - orig) + 1)) == 0) {
-            testutil_check(__wt_snprintf(conv, sizeof(conv), "%s%s", *++p, equalp));
+            testutil_snprintf(conv, sizeof(conv), "%s%s", *++p, equalp);
             *origp = conv;
             break;
         }

@@ -27,15 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <list>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/json.h"
-#include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_impl.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/db/query/query_planner_test_lib.h"
+#include "mongo/db/query/query_solution.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace {
 using namespace mongo;
@@ -169,7 +186,7 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfASingleLookup) {
     ASSERT(!cq->pipeline().empty());
     auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), secondaryCollMap);
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
-        "{eq_lookup: {foreignCollection: '" + kSecondaryNamespace.toString() +
+        "{eq_lookup: {foreignCollection: '" + kSecondaryNamespace.toString_forTest() +
             "', joinFieldLocal: 'x', joinFieldForeign: 'y', joinField: 'out', "
             "strategy: 'NestedLoopJoin', node: "
             "{cscan: {dir:1, filter: {x:1}}}}}",
@@ -198,11 +215,11 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoLookups) {
     ASSERT(!cq->pipeline().empty());
     auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), secondaryCollMap);
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
-        "{eq_lookup: {foreignCollection: '" + kSecondaryNamespace.toString() +
+        "{eq_lookup: {foreignCollection: '" + kSecondaryNamespace.toString_forTest() +
             "', joinFieldLocal: 'a', joinFieldForeign: 'b', joinField: 'c', "
             "strategy: 'NestedLoopJoin', node: "
             "{eq_lookup: {foreignCollection: '" +
-            kSecondaryNamespace.toString() +
+            kSecondaryNamespace.toString_forTest() +
             "', joinFieldLocal: 'x', joinFieldForeign: 'y', joinField: 'out',"
             "strategy: 'NestedLoopJoin', node: {cscan: {dir:1, filter: {x:1}}}}}}}",
         solution->root()))
@@ -234,12 +251,12 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoLookupsAndTwoGroups) {
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         "{group: {key: {_id: '$c'}, accs: [{count: {$min: '$count'}}], node: "
         "{eq_lookup: {foreignCollection: '" +
-            kSecondaryNamespace.toString() +
+            kSecondaryNamespace.toString_forTest() +
             "', joinFieldLocal: 'a', joinFieldForeign: 'b', joinField: 'c', "
             "strategy: 'NestedLoopJoin', node: "
             "{group: {key: {_id: '$out'}, accs: [{count: {$sum: '$x'}}], node: "
             "{eq_lookup: {foreignCollection: '" +
-            kSecondaryNamespace.toString() +
+            kSecondaryNamespace.toString_forTest() +
             "', joinFieldLocal: 'x', joinFieldForeign: 'y', joinField: 'out',"
             "strategy: 'NestedLoopJoin', node: "
             "{cscan: {dir:1, filter: {x:1}}}}}}}}}}}",

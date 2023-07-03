@@ -8,7 +8,7 @@
  * - Insert a document into the new collection.
  * - Create an index on the new collection.
  *
- * @tags: [requires_v4_0, DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE]
+ * @tags: [requires_v4_0]
  */
 
 (function() {
@@ -34,8 +34,12 @@ const versions = [
     {binVersion: '4.4', featureCompatibilityVersion: '4.4', testCollection: 'four_four'},
     {binVersion: '5.0', featureCompatibilityVersion: '5.0', testCollection: 'five_zero'},
     {binVersion: '6.0', featureCompatibilityVersion: '6.0', testCollection: 'six_zero'},
-    {binVersion: 'last-lts', testCollection: 'last_lts'},
-    {binVersion: 'last-continuous', testCollection: 'last_continuous'},
+    {binVersion: 'last-lts', featureCompatibilityVersion: lastLTSFCV, testCollection: 'last_lts'},
+    {
+        binVersion: 'last-continuous',
+        featureCompatibilityVersion: lastContinuousFCV,
+        testCollection: 'last_continuous'
+    },
     {binVersion: 'latest', featureCompatibilityVersion: latestFCV, testCollection: 'latest'},
 ];
 

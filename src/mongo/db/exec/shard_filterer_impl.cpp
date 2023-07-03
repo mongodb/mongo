@@ -27,12 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
+#include <vector>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
-
-#include "mongo/db/exec/filter.h"
-#include "mongo/db/matcher/matchable.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

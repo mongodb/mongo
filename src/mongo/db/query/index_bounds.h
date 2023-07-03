@@ -29,9 +29,12 @@
 
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/db/storage/index_entry_comparison.h"

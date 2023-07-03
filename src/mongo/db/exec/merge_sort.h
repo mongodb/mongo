@@ -30,17 +30,26 @@
 #pragma once
 
 #include <list>
+#include <memory>
 #include <queue>
 #include <vector>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
 class CollatorInterface;
+
 // External params for the merge sort stage.  Declared below.
 class MergeSortStageParams;
 

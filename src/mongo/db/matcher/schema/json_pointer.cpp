@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <utility>
 
 #include "mongo/db/matcher/schema/json_pointer.h"
-
-#include "mongo/bson/bsontypes.h"
 #include "mongo/util/assert_util.h"
 
 namespace {

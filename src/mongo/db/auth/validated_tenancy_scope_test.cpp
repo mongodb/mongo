@@ -27,18 +27,42 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <memory>
+#include <set>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/auth_name.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/security_token_gen.h"
+#include "mongo/db/auth/user.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
-#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/client.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -50,7 +74,7 @@ public:
     static void grantUseTenant(Client& client) {
         User user(UserRequest(UserName("useTenant"_sd, "admin"_sd), boost::none));
         user.setPrivileges(
-            {Privilege(ResourcePattern::forClusterResource(), ActionType::useTenant)});
+            {Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useTenant)});
         auto* as = dynamic_cast<AuthorizationSessionImpl*>(AuthorizationSession::get(client));
         if (as->_authenticatedUser != boost::none) {
             as->logoutAllDatabases(&client, "AuthorizationSessionImplTestHelper"_sd);

@@ -30,10 +30,15 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <memory>
 
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {

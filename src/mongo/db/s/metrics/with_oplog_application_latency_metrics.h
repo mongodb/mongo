@@ -41,6 +41,9 @@ public:
     template <typename... Args>
     WithOplogApplicationLatencyMetrics(Args&&... args) : Base{std::forward<Args>(args)...} {}
 
+    WithOplogApplicationLatencyMetrics(const WithOplogApplicationLatencyMetrics<Base>& other) =
+        default;
+
     void onBatchRetrievedDuringOplogFetching(Milliseconds elapsed) {
         _oplogFetchingTotalRemoteBatchesRetrieved.fetchAndAdd(1);
         _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis.fetchAndAdd(

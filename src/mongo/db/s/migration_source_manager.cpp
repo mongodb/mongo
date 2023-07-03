@@ -29,36 +29,84 @@
 
 #include "mongo/db/s/migration_source_manager.h"
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <mutex>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <vector>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/read_concern.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/auto_split_vector.h"
 #include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/s/commit_chunk_migration_gen.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_coordinator.h"
+#include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/type_shard_collection.h"
+#include "mongo/db/s/type_shard_collection_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
-#include "mongo/db/vector_clock.h"
-#include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog_cache_loader.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 
@@ -171,7 +219,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                           << _args.getToShard())),
       _moveTimingHelper(_opCtx,
                         "from",
-                        _args.getCommandParameter().ns(),
+                        NamespaceStringUtil::serialize(_args.getCommandParameter()),
                         _args.getMin(),
                         _args.getMax(),
                         6,  // Total number of steps
@@ -305,7 +353,7 @@ void MigrationSourceManager::startClone() {
     uassertStatusOK(ShardingLogging::get(_opCtx)->logChangeChecked(
         _opCtx,
         "moveChunk.start",
-        nss().ns(),
+        NamespaceStringUtil::serialize(nss()),
         BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from" << _args.getFromShard()
                    << "to" << _args.getToShard()),
         ShardingCatalogClient::kMajorityWriteConcern));
@@ -400,16 +448,13 @@ void MigrationSourceManager::enterCriticalSection() {
     if (!metadata.getChunkManager()->getVersion(_args.getToShard()).isSet()) {
         migrationutil::notifyChangeStreamsOnRecipientFirstChunk(
             _opCtx, nss(), _args.getFromShard(), _args.getToShard(), _collectionUUID);
-    }
 
-    // Mark the shard as running critical operation, which requires recovery on crash.
-    //
-    // NOTE: The 'migrateChunkToNewShard' oplog message written by the above call to
-    // 'notifyChangeStreamsOnRecipientFirstChunk' depends on this majority write to carry its local
-    // write to majority committed.
-    // TODO (SERVER-60110): Remove once 7.0 becomes last LTS.
-    uassertStatusOKWithContext(ShardingStateRecovery_DEPRECATED::startMetadataOp(_opCtx),
-                               "Start metadata op");
+        // Wait for the above 'migrateChunkToNewShard' oplog message to be majority acknowledged.
+        WriteConcernResult ignoreResult;
+        auto latestOpTime = repl::ReplClientInfo::forClient(_opCtx->getClient()).getLastOp();
+        uassertStatusOK(waitForWriteConcern(
+            _opCtx, latestOpTime, WriteConcerns::kMajorityWriteConcernNoTimeout, &ignoreResult));
+    }
 
     LOGV2_DEBUG_OPTIONS(4817402,
                         2,
@@ -430,7 +475,7 @@ void MigrationSourceManager::enterCriticalSection() {
     uassertStatusOKWithContext(
         shardmetadatautil::updateShardCollectionsEntry(
             _opCtx,
-            BSON(ShardCollectionType::kNssFieldName << nss().ns()),
+            BSON(ShardCollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss())),
             BSON("$inc" << BSON(ShardCollectionType::kEnterCriticalSectionCounterFieldName << 1)),
             false /*upsert*/),
         "Persist critical section signal for secondaries");
@@ -620,7 +665,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     ShardingLogging::get(_opCtx)->logChange(
         _opCtx,
         "moveChunk.commit",
-        nss().ns(),
+        NamespaceStringUtil::serialize(nss()),
         BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from" << _args.getFromShard()
                    << "to" << _args.getToShard() << "counts" << *_recipientCloneCounts),
         ShardingCatalogClient::kMajorityWriteConcern);
@@ -663,7 +708,7 @@ void MigrationSourceManager::_cleanupOnError() noexcept {
     ShardingLogging::get(_opCtx)->logChange(
         _opCtx,
         "moveChunk.error",
-        _args.getCommandParameter().ns(),
+        NamespaceStringUtil::serialize(_args.getCommandParameter()),
         BSON("min" << *_args.getMin() << "max" << *_args.getMax() << "from" << _args.getFromShard()
                    << "to" << _args.getToShard()),
         ShardingCatalogClient::kMajorityWriteConcern);
@@ -761,24 +806,15 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
             if (_state >= kCriticalSection && _state <= kCommittingOnConfig) {
                 _stats.totalCriticalSectionTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
 
-                // NOTE: The order of the operations below is important and the comments explain the
-                // reasoning behind it.
-                //
                 // Wait for the updates to the cache of the routing table to be fully written to
-                // disk before clearing the 'minOpTime recovery' document. This way, we ensure that
-                // all nodes from a shard, which donated a chunk will always be at the placement
-                // version of the last migration it performed.
+                // disk. This way, we ensure that all nodes from a shard which donated a chunk will
+                // always be at the placement version of the last migration it performed.
                 //
                 // If the metadata is not persisted before clearing the 'inMigration' flag below, it
                 // is possible that the persisted metadata is rolled back after step down, but the
                 // write which cleared the 'inMigration' flag is not, a secondary node will report
                 // itself at an older placement version.
                 CatalogCacheLoader::get(newOpCtx).waitForCollectionFlush(newOpCtx, nss());
-
-                // Clear the 'minOpTime recovery' document so that the next time a node from this
-                // shard becomes a primary, it won't have to recover the config server optime.
-                // TODO (SERVER-60110): Remove once 7.0 becomes last LTS.
-                ShardingStateRecovery_DEPRECATED::endMetadataOp(newOpCtx);
             }
             if (completeMigration) {
                 // This can be called on an exception path after the OperationContext has been

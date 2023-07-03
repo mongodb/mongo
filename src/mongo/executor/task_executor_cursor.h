@@ -29,21 +29,35 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <functional>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_cursor_parameters_gen.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 
 namespace mongo {
 namespace executor {
@@ -74,20 +88,28 @@ public:
         // If false, we will fetch the next batch when the current batch is exhausted and
         // 'getNext()' is invoked.
         bool preFetchNextBatch{true};
+
+        // This function, if specified, may modify a getMore request to include additional
+        // information.
+        std::function<void(BSONObjBuilder& bob)> getMoreAugmentationWriter;
+
         Options() {}
     };
 
     /**
-     * Construct the cursor with a RemoteCommandRequest wrapping the initial command
+     * Construct the cursor with a RemoteCommandRequest wrapping the initial command.
+     *
+     * Doesn't retry the command if we fail to establish the cursor. To create a TaskExecutorCursor
+     * with the option to retry the initial command, see `makeTaskExecutorCursor`below.
      *
      * One value is carried over in successive calls to getMore/killCursor:
      *
      * opCtx - The Logical Session Id from the initial command is carried over in all later stages.
      *         NOTE - the actual command must not include the lsid
      */
-    explicit TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> executor,
-                                const RemoteCommandRequest& rcr,
-                                Options&& options = {});
+    TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> executor,
+                       const RemoteCommandRequest& rcr,
+                       Options options = {});
 
     /**
      * Construct the cursor from a cursor response from a previously executed RemoteCommandRequest.
@@ -175,7 +197,7 @@ private:
     void _runRemoteCommand(const RemoteCommandRequest& rcr);
 
     /**
-     * Gets the next batch with interruptibility via the opCtx
+     * Gets the next batch with interruptibility via the opCtx.
      */
     void _getNextBatch(OperationContext* opCtx);
 
@@ -249,6 +271,30 @@ private:
     // Cursors built from the responses returned alongside the results for this cursor.
     std::vector<TaskExecutorCursor> _additionalCursors;
 };
+
+// Make a new TaskExecutorCursor using the provided executor, RCR, and options. If we fail to create
+// the cursor, the retryPolicy can inspect the error and make a decision as to whether we should
+// retry. If we do retry, the error is swallowed and another attempt is made. If we don't retry,
+// this function throws the error we failed with.
+inline TaskExecutorCursor makeTaskExecutorCursor(
+    OperationContext* opCtx,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    const RemoteCommandRequest& rcr,
+    TaskExecutorCursor::Options options = {},
+    std::function<bool(Status)> retryPolicy = nullptr) {
+    for (;;) {
+        try {
+            TaskExecutorCursor tec(executor, rcr, options);
+            tec.populateCursor(opCtx);
+            return tec;
+        } catch (const DBException& ex) {
+            bool shouldRetry = retryPolicy && retryPolicy(ex.toStatus());
+            if (!shouldRetry) {
+                throw;
+            }
+        }
+    }
+}
 
 }  // namespace executor
 }  // namespace mongo

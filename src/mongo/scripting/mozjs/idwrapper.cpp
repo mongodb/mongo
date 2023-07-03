@@ -27,12 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <js/Id.h>
+#include <js/String.h>
 
-#include "mongo/scripting/mozjs/idwrapper.h"
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/scripting/mozjs/exception.h"
+#include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
 #include "mongo/util/assert_util.h"
 

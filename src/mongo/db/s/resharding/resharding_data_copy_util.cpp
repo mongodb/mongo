@@ -29,28 +29,62 @@
 
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 
+#include <boost/cstdint.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstdint>
+#include <mutex>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/session_catalog_migration.h"
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/shard_role.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/s/index_version.h"
+#include "mongo/s/sharding_index_catalog_cache.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 namespace mongo::resharding::data_copy {
 
@@ -237,11 +271,14 @@ int insertBatch(OperationContext* opCtx,
                 const NamespaceString& nss,
                 std::vector<InsertStatement>& batch) {
     return writeConflictRetry(opCtx, "resharding::data_copy::insertBatch", nss, [&] {
-        AutoGetCollection outputColl(opCtx, nss, MODE_IX);
+        const auto outputColl = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Collection '" << nss.toStringForErrorMsg()
                               << "' did not already exist",
-                outputColl);
+                outputColl.exists());
 
         int numBytes = 0;
         WriteUnitOfWork wuow(opCtx);
@@ -258,7 +295,7 @@ int insertBatch(OperationContext* opCtx,
         }
 
         uassertStatusOK(collection_internal::insertDocuments(
-            opCtx, *outputColl, batch.begin(), batch.end(), nullptr));
+            opCtx, outputColl.getCollectionPtr(), batch.begin(), batch.end(), nullptr));
         wuow.commit();
 
         return numBytes;

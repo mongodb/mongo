@@ -29,19 +29,36 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <map>
 #include <set>
+#include <string>
+#include <tuple>
+#include <utility>
 #include <variant>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

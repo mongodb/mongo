@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <mutex>
+#include <utility>
+
+#include <absl/container/node_hash_set.h>
 
 #include "mongo/db/server_recovery.h"
-
-#include "mongo/db/namespace_string.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace {

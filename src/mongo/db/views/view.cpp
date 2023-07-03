@@ -27,13 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/views/view.h"
-
 #include <memory>
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/views/view.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 

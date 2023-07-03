@@ -29,9 +29,13 @@
 
 #pragma once
 
+#include <functional>
+
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace repl {

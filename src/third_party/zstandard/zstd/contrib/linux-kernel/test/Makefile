@@ -1,5 +1,5 @@
 # ################################################################
-# Copyright (c) Facebook, Inc.
+# Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
 # This source code is licensed under both the BSD-style license (found in the
@@ -45,4 +45,5 @@ clean:
 	$(RM) -f $(LINUX_ZSTDLIB)/*.o
 	$(RM) -f $(LINUX_ZSTDLIB)/**/*.o
 	$(RM) -f *.o *.a
+	$(RM) -f static_test
 	$(RM) -f test

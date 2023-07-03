@@ -29,9 +29,20 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/ttl_collection_cache.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/background.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

@@ -28,9 +28,23 @@
  */
 
 #include "mongo/db/serverless/shard_split_test_utils.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/tenant_migration_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
-#include "mongo/db/serverless/shard_split_state_machine_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

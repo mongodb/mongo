@@ -29,7 +29,15 @@
 
 #pragma once
 
+#include <cstdint>
+#include <deque>
+
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/time_support.h"
 
 /**
  * Implementation of truncate markers for Change Collections. Respects the requirement of always
@@ -51,6 +59,14 @@ public:
     // The last entry is necessary for correctness of the change collection. This method will shift
     // the last entry size and count to the next partial marker.
     void expirePartialMarker(OperationContext* opCtx, const Collection* changeCollection);
+
+    // Performs post initialisation work. The constructor doesn't specify the highest element seen,
+    // so we must update it after initialisation.
+    void performPostInitialisation(OperationContext* opCtx,
+                                   const RecordId& highestRecordId,
+                                   Date_t highestWallTime) {
+        updateCurrentMarker(opCtx, 0, highestRecordId, highestWallTime, 0);
+    }
 
 private:
     bool _hasExcessMarkers(OperationContext* opCtx) const override;

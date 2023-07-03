@@ -70,6 +70,13 @@ var EncryptedClient = class {
     }
 
     /**
+     * Creates a session on the encryptedClient.
+     */
+    startSession() {
+        return this._edb.getMongo().startSession();
+    }
+
+    /**
      * Return an encrypted database
      *
      * @returns Database

@@ -27,6 +27,25 @@
  *    it in the license file.
  */
 
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/makeobj_enums.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/bson_scan.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
@@ -44,13 +63,19 @@
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
 #include "mongo/db/exec/sbe/stages/spool.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/id_generator.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::sbe {
 
@@ -171,8 +196,11 @@ TEST_F(PlanSizeTest, SimpleIndexScanStage) {
 
 TEST_F(PlanSizeTest, GenericIndexScanStage) {
     auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
-    GenericIndexScanStageParams params{
-        makeE<EVariable>(generateSlotId()), {}, 1, KeyString::Version{0}, Ordering::allAscending()};
+    GenericIndexScanStageParams params{makeE<EVariable>(generateSlotId()),
+                                       {},
+                                       1,
+                                       key_string::Version{0},
+                                       Ordering::allAscending()};
     auto stage = makeS<GenericIndexScanStage>(collUuid,
                                               StringData(),
                                               std::move(params),

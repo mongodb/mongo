@@ -28,22 +28,36 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/flow_control.h"
-
-#include <algorithm>
+#include <absl/container/node_hash_map.h>
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
 #include <limits>
+#include <mutex>
+#include <string>
+#include <utility>
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/repl/member_data.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/flow_control_parameters_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/background.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage

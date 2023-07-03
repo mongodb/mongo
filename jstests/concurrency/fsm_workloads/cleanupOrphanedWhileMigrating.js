@@ -1,16 +1,16 @@
-'use strict';
-
 /**
  * Performs range deletions while chunks are being moved.
  *
  * @tags: [requires_sharding, assumes_balancer_on, antithesis_incompatible]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/sharded_base_partitioned.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/sharded_base_partitioned.js";
 load('jstests/concurrency/fsm_workload_helpers/balancer.js');
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
 

@@ -29,9 +29,13 @@
 
 #pragma once
 
+#include <functional>
+
 #include "mongo/db/query/optimizer/bool_expression.h"
+#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
 
 namespace mongo::optimizer::ce {
 /**

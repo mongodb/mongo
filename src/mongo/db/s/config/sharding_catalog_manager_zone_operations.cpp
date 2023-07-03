@@ -28,25 +28,46 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "mongo/db/s/config/sharding_catalog_manager.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -70,13 +91,14 @@ Status checkForOverlappingZonedKeyRange(OperationContext* opCtx,
                                         const KeyPattern& shardKeyPattern) {
     DistributionStatus chunkDist(nss, ShardToChunksMap{});
 
-    auto tagStatus = configServer->exhaustiveFindOnConfig(opCtx,
-                                                          kConfigPrimarySelector,
-                                                          repl::ReadConcernLevel::kLocalReadConcern,
-                                                          TagsType::ConfigNS,
-                                                          BSON(TagsType::ns(nss.ns().toString())),
-                                                          BSONObj(),
-                                                          0);
+    auto tagStatus = configServer->exhaustiveFindOnConfig(
+        opCtx,
+        kConfigPrimarySelector,
+        repl::ReadConcernLevel::kLocalReadConcern,
+        TagsType::ConfigNS,
+        BSON(TagsType::ns(NamespaceStringUtil::serialize(nss))),
+        BSONObj(),
+        0);
     if (!tagStatus.isOK()) {
         return tagStatus.getStatus();
     }
@@ -126,7 +148,8 @@ ChunkRange includeFullShardKey(OperationContext* opCtx,
                                               kConfigPrimarySelector,
                                               repl::ReadConcernLevel::kLocalReadConcern,
                                               CollectionType::ConfigNS,
-                                              BSON(CollectionType::kNssFieldName << nss.ns()),
+                                              BSON(CollectionType::kNssFieldName
+                                                   << NamespaceStringUtil::serialize(nss)),
                                               BSONObj(),
                                               1))
                               .docs;
@@ -354,7 +377,7 @@ void ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
     }
 
     BSONObjBuilder updateBuilder;
-    updateBuilder.append(TagsType::ns(), nss.ns());
+    updateBuilder.append(TagsType::ns(), NamespaceStringUtil::serialize(nss));
     updateBuilder.append(TagsType::min(), actualRange.getMin());
     updateBuilder.append(TagsType::max(), actualRange.getMax());
     updateBuilder.append(TagsType::tag(), zoneName);
@@ -362,7 +385,8 @@ void ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
     uassertStatusOK(_localCatalogClient->updateConfigDocument(
         opCtx,
         TagsType::ConfigNS,
-        BSON(TagsType::ns(nss.ns().toString()) << TagsType::min(actualRange.getMin())),
+        BSON(TagsType::ns(NamespaceStringUtil::serialize(nss))
+             << TagsType::min(actualRange.getMin())),
         updateBuilder.obj(),
         true,
         kNoWaitWriteConcern));
@@ -384,7 +408,7 @@ void ShardingCatalogManager::removeKeyRangeFromZone(OperationContext* opCtx,
     }
 
     BSONObjBuilder removeBuilder;
-    removeBuilder.append(TagsType::ns(), nss.ns());
+    removeBuilder.append(TagsType::ns(), NamespaceStringUtil::serialize(nss));
     removeBuilder.append(TagsType::min(), actualRange.getMin());
     removeBuilder.append(TagsType::max(), actualRange.getMax());
 

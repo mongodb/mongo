@@ -27,22 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/icu.h"
-
+#include <cstddef>
+#include <cstdint>
 #include <memory>
-#include <unicode/localpointer.h>
-#include <unicode/putil.h>
-#include <unicode/uiter.h>
-#include <unicode/unistr.h>
 #include <unicode/usprep.h>
 #include <unicode/ustring.h>
 #include <unicode/utypes.h>
 #include <vector>
 
-#include "mongo/base/init.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <unicode/umachine.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/icu.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

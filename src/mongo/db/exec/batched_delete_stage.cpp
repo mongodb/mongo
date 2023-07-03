@@ -28,25 +28,50 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
+#include <exception>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/exec/batched_delete_stage.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/curop.h"
+#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/exec/batched_delete_stage.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/write_stage_common.h"
-#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/service_context.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/stale_exception.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
@@ -114,7 +139,8 @@ struct BatchedDeletesSSS : ServerStatusSection {
 } batchedDeletesSSS;
 
 // Wrapper for write_stage_common::ensureStillMatches() which also updates the 'refetchesDueToYield'
-// serverStatus metric.
+// serverStatus metric. As with ensureStillMatches, if false is returned, the WoringSetMember
+// referenced by 'id' is no longer valid, and must not be used except for freeing the WSM.
 bool ensureStillMatchesAndUpdateStats(const CollectionPtr& collection,
                                       OperationContext* opCtx,
                                       WorkingSet* ws,
@@ -146,6 +172,8 @@ BatchedDeleteStage::BatchedDeleteStage(
     tassert(6303800,
             "batched deletions only support multi-document deletions (multi: true)",
             _params->isMulti);
+    // TODO SERVER-66279 remove the following tassert once the range-deleter will be using batched
+    // deletions since it's the only component expected to delete with `fromMigrate=true`
     tassert(6303801,
             "batched deletions do not support the 'fromMigrate' parameter",
             !_params->fromMigrate);
@@ -247,7 +275,6 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
     handlePlanStageYield(
         expCtx(),
         "BatchedDeleteStage saveState",
-        collection()->ns().ns(),
         [&] {
             child()->saveState();
             return PlanStage::NEED_TIME /* unused */;
@@ -267,7 +294,6 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
         const auto ret = handlePlanStageYield(
             expCtx(),
             "BatchedDeleteStage::_deleteBatch",
-            collection()->ns().ns(),
             [&] {
                 timeInBatch =
                     _commitBatch(out, &recordsToSkip, &docsDeleted, &bytesDeleted, &bufferOffset);
@@ -340,24 +366,40 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
         }
 
         auto workingSetMemberID = _stagedDeletesBuffer.at(*bufferOffset);
-
-        // The PlanExecutor YieldPolicy may change snapshots between calls to 'doWork()'.
-        // Different documents may have different snapshots.
-        bool docStillMatches = ensureStillMatchesAndUpdateStats(
-            collection(), opCtx(), _ws, workingSetMemberID, _params->canonicalQuery);
-
         WorkingSetMember* member = _ws->get(workingSetMemberID);
+        bool writeToOrphan = _params->fromMigrate;
 
-        // Determine whether the document being deleted is owned by this shard, and the action
-        // to undertake if it isn't.
-        bool writeToOrphan = false;
-        auto action = _preWriteFilter.computeActionAndLogSpecialCases(
-            member->doc.value(), "batched delete"_sd, collection()->ns());
-        if (!docStillMatches || action == write_stage_common::PreWriteFilter::Action::kSkip) {
-            recordsToSkip->insert(workingSetMemberID);
-            continue;
+        // The assumption is that fromMigrate implies the documents cannot change, and there is no
+        // need to ensure they still match.
+        if (!_params->fromMigrate) {
+            using write_stage_common::PreWriteFilter;
+            // Warning: on Action::kSkip, the WSM's underlaying document is no longer valid.
+            const PreWriteFilter::Action action = [&]() {
+                // The PlanExecutor YieldPolicy may change snapshots between calls to 'doWork()'.
+                // Different documents may have different snapshots.
+                const bool docStillMatches = ensureStillMatchesAndUpdateStats(
+                    collectionPtr(), opCtx(), _ws, workingSetMemberID, _params->canonicalQuery);
+
+                // Warning: if docStillMatches is false, the WSM's underlaying Document/BSONObj is
+                // no longer valid.
+                if (!docStillMatches) {
+                    return PreWriteFilter::Action::kSkip;
+                }
+                // Determine whether the document being deleted is owned by this shard, and the
+                // action to undertake if it isn't.
+                return _preWriteFilter.computeActionAndLogSpecialCases(
+                    member->doc.value(), "batched delete"_sd, collectionPtr()->ns());
+            }();
+
+            // Skip the document, as it either no longer exists, or has been filtered by the
+            // PreWriteFilter.
+            if (PreWriteFilter::Action::kSkip == action) {
+                recordsToSkip->insert(workingSetMemberID);
+                continue;
+            }
+
+            writeToOrphan = action == PreWriteFilter::Action::kWriteAsFromMigrate;
         }
-        writeToOrphan = action == write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate;
 
         auto retryableWrite = write_stage_common::isRetryableWrite(opCtx());
         Snapshotted<Document> memberDoc = member->doc;
@@ -378,12 +420,12 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
 
         collection_internal::deleteDocument(
             opCtx(),
-            collection(),
+            collectionPtr(),
             Snapshotted(memberDoc.snapshotId(), bsonObjDoc),
             _params->stmtId,
             member->recordId,
             _params->opDebug,
-            _params->fromMigrate || writeToOrphan,
+            writeToOrphan,
             false,
             _params->returnDeleted ? collection_internal::StoreDeletedDoc::On
                                    : collection_internal::StoreDeletedDoc::Off,
@@ -404,9 +446,9 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
                 // committed + the number of documents deleted in the current unit of work.
 
                 // Assume nDocs is positive.
-                return data.hasField("sleepMs") && data.hasField("ns") &&
-                    data.getStringField("ns") == collection()->ns().toString() &&
-                    data.hasField("nDocs") &&
+                const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
+                return data.hasField("sleepMs") && !fpNss.isEmpty() &&
+                    collectionPtr()->ns() == fpNss && data.hasField("nDocs") &&
                     _specificStats.docsDeleted + *docsDeleted >=
                     static_cast<unsigned int>(data.getIntField("nDocs"));
             });
@@ -474,9 +516,8 @@ PlanStage::StageState BatchedDeleteStage::_tryRestoreState(WorkingSetID* out) {
     return handlePlanStageYield(
         expCtx(),
         "BatchedDeleteStage::_tryRestoreState",
-        collection()->ns().ns(),
         [&] {
-            child()->restoreState(&collection());
+            child()->restoreState(&collectionPtr());
             return PlanStage::NEED_TIME;
         },
         [&] {

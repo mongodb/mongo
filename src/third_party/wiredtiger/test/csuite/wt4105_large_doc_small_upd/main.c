@@ -95,7 +95,7 @@ main(int argc, char *argv[])
     memset(opts, 0, sizeof(*opts));
     opts->table_type = TABLE_ROW;
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, &event_handler,
       "create,cache_size=1G,statistics_log=(json,wait=1),statistics=(all),statistics_log=(json,on_"
@@ -103,10 +103,10 @@ main(int argc, char *argv[])
       &opts->conn));
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
+    testutil_snprintf(tableconf, sizeof(tableconf),
       "key_format=%s,value_format=u,leaf_key_max=64M,leaf_value_max=64M,leaf_page_max=32k,memory_"
       "page_max=1M",
-      opts->table_type == TABLE_ROW ? "Q" : "r"));
+      opts->table_type == TABLE_ROW ? "Q" : "r");
     testutil_check(session->create(session, uri, tableconf));
 
     testutil_check(session->open_cursor(session, uri, NULL, NULL, &c));

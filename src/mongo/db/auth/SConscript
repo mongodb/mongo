@@ -81,6 +81,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/op_observer/op_observer',
         '$BUILD_DIR/mongo/db/op_observer/op_observer_util',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'auth',
     ],
 )
@@ -95,6 +96,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
+        '$BUILD_DIR/mongo/db/server_base',
         'auth',
         'authentication_restriction',
         'authprivilege',
@@ -144,6 +146,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'auth',
         'auth_options',
         'authprivilege',
@@ -258,8 +261,8 @@ env.Library(
         'action_type.cpp',
         'action_type.idl',
         'authorization_contract.cpp',
+        'parsed_privilege.idl',
         'privilege.cpp',
-        'privilege_parser.cpp',
         'resource_pattern.cpp',
     ],
     LIBDEPS_PRIVATE=[
@@ -267,6 +270,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 
@@ -555,6 +559,7 @@ env.CppUnitTest(
         'builtin_roles_test.cpp',
         'oauth_discovery_factory_test.cpp',
         'privilege_parser_test.cpp',
+        'resource_pattern_search_list_test.cpp',
         'restriction_test.cpp',
         'sasl_authentication_session_test.cpp',
         'sasl_mechanism_registry_test.cpp',
@@ -573,7 +578,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/oplog_interface_local',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/util/net/mock_http_client',

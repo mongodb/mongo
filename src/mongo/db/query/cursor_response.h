@@ -29,14 +29,29 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/cursor_id.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo {
 
@@ -117,7 +132,10 @@ public:
      * Call this after successfully appending all fields that will be part of this response.
      * After calling, you may not call any more methods on this object.
      */
-    void done(CursorId cursorId, const NamespaceString& cursorNamespace);
+    void done(CursorId cursorId,
+              const NamespaceString& cursorNamespace,
+              const SerializationContext& serializationContext =
+                  SerializationContext::stateCommandReply());
 
     /**
      * Call this if the response should not contain cursor information. It will completely remove
@@ -154,11 +172,13 @@ private:
  *
  * This function is deprecated.  Prefer CursorResponseBuilder or CursorResponse::toBSON() instead.
  */
-void appendCursorResponseObject(long long cursorId,
-                                const NamespaceString& cursorNamespace,
-                                BSONArray firstBatch,
-                                boost::optional<StringData> cursorType,
-                                BSONObjBuilder* builder);
+void appendCursorResponseObject(
+    long long cursorId,
+    const NamespaceString& cursorNamespace,
+    BSONArray firstBatch,
+    boost::optional<StringData> cursorType,
+    BSONObjBuilder* builder,
+    const SerializationContext& serializationContext = SerializationContext::stateCommandReply());
 
 /**
  * Builds a getMore response object from the provided cursor identifiers and "nextBatch",

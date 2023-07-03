@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/change_stream_options_gen.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Perform CRUD operations, some of which may implicitly create collections, in parallel with
  * collection-dropping operations.
@@ -7,7 +5,7 @@
  * @tags: [
  * ]
  */
-var $config = (function() {
+export const $config = (function() {
     const data = {numIds: 10, docValue: "mydoc"};
 
     const states = {

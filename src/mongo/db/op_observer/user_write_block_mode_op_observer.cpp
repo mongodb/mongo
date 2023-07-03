@@ -27,18 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <set>
+#include <utility>
 
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection_operation_source.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
-
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace {
 
-const auto documentIdDecoration = OperationContext::declareDecoration<BSONObj>();
+const auto documentIdDecoration = OplogDeleteEntryArgs::declareDecoration<BSONObj>();
 
 bool isStandaloneOrPrimary(OperationContext* opCtx, const NamespaceString& nss) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -53,7 +65,7 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
                                              std::vector<InsertStatement>::const_iterator last,
                                              std::vector<bool> fromMigrate,
                                              bool defaultFromMigrate,
-                                             InsertsOpStateAccumulator* opAccumulator) {
+                                             OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
 
     if (!defaultFromMigrate) {
@@ -134,9 +146,11 @@ void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
 
 void UserWriteBlockModeOpObserver::aboutToDelete(OperationContext* opCtx,
                                                  const CollectionPtr& coll,
-                                                 BSONObj const& doc) {
+                                                 BSONObj const& doc,
+                                                 OplogDeleteEntryArgs* args,
+                                                 OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kUserWritesCriticalSectionsNamespace) {
-        documentIdDecoration(opCtx) = doc;
+        documentIdDecoration(args) = doc;
     }
 }
 
@@ -152,7 +166,7 @@ void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
 
     if (nss == NamespaceString::kUserWritesCriticalSectionsNamespace &&
         !user_writes_recoverable_critical_section_util::inRecoveryMode(opCtx)) {
-        auto& documentId = documentIdDecoration(opCtx);
+        auto& documentId = documentIdDecoration(args);
         invariant(!documentId.isEmpty());
 
         const auto& deletedDoc = documentId;

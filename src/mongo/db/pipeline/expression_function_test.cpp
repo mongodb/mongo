@@ -27,12 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <functional>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/expression_function.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/framework.h"
+#include "mongo/util/str.h"
+
 namespace mongo {
 
 namespace {
@@ -46,13 +54,10 @@ std::string applyHmacForTest(StringData s) {
 
 
 TEST(ExpressionFunction, SerializeAndRedactArgs) {
-
     SerializationOptions options;
-    std::string replacementChar = "?";
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.replacementForLiteralArgs = replacementChar;
-    options.applyHmacToIdentifiers = true;
-    options.identifierHmacPolicy = applyHmacForTest;
+    options.transformIdentifiers = true;
+    options.transformIdentifiersCallback = applyHmacForTest;
 
     auto expCtx = ExpressionContextForTest();
     auto expr = BSON("$function" << BSON("body"

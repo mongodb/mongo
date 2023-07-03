@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * profile_command.js
  *
@@ -13,7 +11,7 @@
  * ]
  */
 
-var $config = (function() {
+export const $config = (function() {
     const data = {
         numDocs: 1000,
         checkProfileResult: function(result) {

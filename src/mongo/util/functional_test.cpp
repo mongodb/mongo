@@ -29,7 +29,12 @@
 
 #include "mongo/util/functional.h"
 
-#include "mongo/unittest/unittest.h"
+#include <string>
+
+#include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 /**
  * Note that tests in this file are deliberately outside the mongodb namespace to ensure that

@@ -29,14 +29,29 @@
 
 #pragma once
 
+#include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <functional>
 #include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
 class BSONObj;
+
 using executor::RemoteCommandResponse;
 
 namespace test {
@@ -335,12 +350,14 @@ public:
     // Advance time to the target. Run network operations and process requests along the way.
     void runUntil(Date_t targetTime);
 
+    // Run until both the executor and the network are idle. Otherwise, it hangs forever.
+    void runUntilIdle();
+
     // Run until both the executor and the network are idle and all expectations are satisfied.
     // Otherwise, it hangs forever.
     void runUntilExpectationsSatisfied();
 
 private:
-    void _runUntilIdle();
     bool _allExpectationsSatisfied() const;
 
     std::vector<std::unique_ptr<Expectation>> _expectations;

@@ -29,24 +29,24 @@
 
 // NOTE: This file *must not* depend on any mongo symbols.
 
-#include "mongo/platform/basic.h"
+#include <mutex>
 
-#include "mongo/config.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/exit_code.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
 
-// This will probably get us _exit on non-unistd platforms like Windows.
-#include <cstdlib>
-
 // NOTE: Header only dependencies are OK in this library.
 #include "mongo/stdx/mutex.h"  // IWYU pragma: keep
 
 #if !defined(__has_include)
 #define __has_include(x) 0
+#endif
+
+#if !defined(__has_feature)
+#define __has_feature(x) 0
 #endif
 
 #if __has_feature(address_sanitizer)

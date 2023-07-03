@@ -27,18 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <iostream>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/json.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/service_context.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/timer.h"
 
 namespace MatcherTests {
@@ -54,7 +75,7 @@ public:
     virtual ~CollectionBase() {}
 };
 
-const NamespaceString kTestNss = NamespaceString("db.dummy");
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("db.dummy");
 
 template <typename M>
 class Basic {
@@ -226,7 +247,8 @@ public:
     void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        const NamespaceString nss("unittests.matchertests");
+        const NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest("unittests.matchertests");
         AutoGetCollectionForReadCommand ctx(&opCtx, nss);
 
         const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(

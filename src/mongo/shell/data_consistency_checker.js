@@ -122,6 +122,35 @@ var {DataConsistencyChecker} = (function() {
     }
 
     class DataConsistencyChecker {
+        /**
+         * This function serves as a wrapper for the various comparison functions we use in the data
+         * consistency checker. In particular, through
+         * 'TestData.ignoreFieldOrderForDataConsistency', it becomes possible to ignore field
+         * ordering when comparing documents (i.e. the documents {a: 1, b: 2} and {b: 2, a: 1} will
+         * be equal when field ordering is ignored). This is useful for versions of MongoDB that
+         * don't support field ordering like 4.2.
+         * @param a The first document
+         * @param b The second document
+         * @param checkType Whether to ignore differences in types when comparing documents. For
+         *     example, NumberLong(1) and NumberInt(1) are equal when types are ignored.
+         * @returns a boolean when checkType is true and an integer otherwise.
+         */
+        static bsonCompareFunction(a, b, checkType = true) {
+            if (TestData && TestData.ignoreFieldOrderForDataConsistency) {
+                // When the bsonCompareFunction is invoked with checkType, a boolean return value is
+                // expected. For that reason we compare the unordered compare result with 0.
+                if (checkType) {
+                    return bsonUnorderedFieldsCompare(a, b) == 0;
+                }
+                return bsonUnorderedFieldsCompare(a, b);
+            }
+
+            if (checkType) {
+                return bsonBinaryEqual(a, b);
+            }
+            return bsonWoCompare(a, b);
+        }
+
         static getDiff(cursor1, cursor2) {
             const docsWithDifferentContents = [];
             const docsMissingOnFirst = [];
@@ -134,7 +163,7 @@ var {DataConsistencyChecker} = (function() {
                 const doc1 = cursor1.peekNext();
                 const doc2 = cursor2.peekNext();
 
-                if (bsonBinaryEqual(doc1, doc2)) {
+                if (this.bsonCompareFunction(doc1, doc2)) {
                     // The same document was found from both cursor1 and cursor2 so we just move
                     // on to the next document for both cursors.
                     cursor1.next();
@@ -142,7 +171,8 @@ var {DataConsistencyChecker} = (function() {
                     continue;
                 }
 
-                const ordering = bsonWoCompare({_: doc1._id}, {_: doc2._id});
+                const ordering =
+                    this.bsonCompareFunction({_: doc1._id}, {_: doc2._id}, false /* checkType */);
                 if (ordering === 0) {
                     // The documents have the same _id but have different contents.
                     docsWithDifferentContents.push({first: doc1, second: doc2});
@@ -195,7 +225,8 @@ var {DataConsistencyChecker} = (function() {
                 if (!map1.hasOwnProperty(spec.name)) {
                     indexesMissingOnFirst.push(spec);
                 } else {
-                    const ordering = bsonWoCompare(map1[spec.name], spec);
+                    const ordering =
+                        this.bsonCompareFunction(map1[spec.name], spec, false /* checkType */);
                     if (ordering != 0) {
                         indexesWithDifferentSpecs.push({first: map1[spec.name], second: spec});
                     }
@@ -454,7 +485,7 @@ var {DataConsistencyChecker} = (function() {
                             delete syncingInfo.idIndex.ns;
                         }
 
-                        if (!bsonBinaryEqual(syncingInfo, sourceInfo)) {
+                        if (!this.bsonCompareFunction(syncingInfo, sourceInfo)) {
                             prettyPrint(
                                 `the two nodes have different attributes for the collection or view ${
                                     dbName}.${syncingInfo.name}`);

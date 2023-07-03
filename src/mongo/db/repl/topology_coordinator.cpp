@@ -36,31 +36,45 @@
         ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
 
 #include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/db/repl/topology_coordinator_gen.h"
 
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 #include <limits>
+#include <ostream>
+#include <ratio>
 #include <string>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/audit.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/mongod_options.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/repl_set_config_params_gen.h"
+#include "mongo/db/repl/topology_coordinator_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
@@ -265,8 +279,23 @@ void TopologyCoordinator::_setSyncSource(HostAndPort newSyncSource,
 HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
                                                      const OpTime& lastOpTimeFetched,
                                                      ReadPreference readPreference) {
+    // If we are not a member of the current replica set configuration, no sync source is valid.
+    if (_selfIndex == -1) {
+        LOGV2_DEBUG(
+            21778, 1, "Cannot sync from any members because we are not in the replica set config");
+        return HostAndPort();
+    }
+
+    // Check to see if we should choose a sync source because 'unsupportedSyncSource' was
+    // set.
+    auto maybeSyncSource = _chooseSyncSourceUnsupportedSyncSourceParameter(now);
+    if (maybeSyncSource) {
+        _setSyncSource(*maybeSyncSource, now, false /* fromReplSetSyncFrom */);
+        return _syncSource;
+    }
+
     // Check to see if we should choose a sync source because the 'replSetSyncFrom' command was set.
-    auto maybeSyncSource = _chooseSyncSourceReplSetSyncFrom(now);
+    maybeSyncSource = _chooseSyncSourceReplSetSyncFrom(now);
     if (maybeSyncSource) {
         // If we have a forced sync source via 'replSetSyncFrom', set the _replSetSyncFromSet flag
         // to true.
@@ -524,9 +553,7 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
 }
 
 boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceReplSetSyncFrom(Date_t now) {
-    if (_selfIndex == -1) {
-        return boost::none;
-    }
+    invariant(_selfIndex != -1, "Unexpectedly not in the replica set config");
 
     if (_forceSyncSourceIndex == -1) {
         return boost::none;
@@ -542,13 +569,43 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceReplSetSyncFr
     return syncSource;
 }
 
-boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialChecks(Date_t now) {
-    // If we are not a member of the current replica set configuration, no sync source is valid.
-    if (_selfIndex == -1) {
-        LOGV2_DEBUG(
-            21778, 1, "Cannot sync from any members because we are not in the replica set config");
-        return HostAndPort();
+boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceUnsupportedSyncSourceParameter(
+    Date_t now) {
+    invariant(_selfIndex != -1, "Unexpectedly not in the replica set config");
+
+    auto syncSourceStr = repl::unsupportedSyncSource;
+    if (syncSourceStr.empty()) {
+        return boost::none;
     }
+    auto syncSource = HostAndPort(syncSourceStr);
+    const int syncSourceIndex = _rsConfig.findMemberIndexByHostAndPort(syncSource);
+    if (syncSourceIndex < 0) {
+        LOGV2_FATAL(
+            7785600,
+            "Selecting node specified in 'unsupportedSyncSource' parameter failed due to host "
+            "and port not in replica set config.",
+            "unsupportedSyncSource"_attr = syncSourceStr);
+    }
+
+    if (_selfIndex == syncSourceIndex) {
+        LOGV2_FATAL(
+            7785601,
+            "Node specified in 'unsupportedSyncSource' parameter is self: cannot select self as "
+            "a sync source",
+            "unsupportedSyncSource"_attr = syncSourceStr);
+    }
+
+    LOGV2(7785602,
+          "Choosing sync source candidate specified by 'unsupportedSyncSource' parameter",
+          "syncSource"_attr = syncSourceStr,
+          "syncsourceobj"_attr = syncSource);
+    std::string msg(str::stream() << "syncing from: " << syncSourceStr << " by request");
+    setMyHeartbeatMessage(now, msg);
+    return syncSource;
+}
+
+boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialChecks(Date_t now) {
+    invariant(_selfIndex != -1, "Unexpectedly not in the replica set config");
 
     if (auto sfp = forceSyncSourceCandidate.scoped(); MONGO_unlikely(sfp.isActive())) {
         const auto& data = sfp.getData();
@@ -700,6 +757,13 @@ void TopologyCoordinator::prepareSyncFromResponse(const HostAndPort& target,
     }
     if (_selfIndex == _currentPrimaryIndex) {
         *result = Status(ErrorCodes::NotSecondary, "primaries don't sync");
+        return;
+    }
+
+    if (!repl::unsupportedSyncSource.empty()) {
+        *result =
+            Status(ErrorCodes::IllegalOperation,
+                   "replSetSyncFrom may not be used when 'unsupportedSyncSource' parameter is set");
         return;
     }
 
@@ -3132,6 +3196,13 @@ TopologyCoordinator::_shouldChangeSyncSourceInitialChecks(const HostAndPort& cur
         return {ChangeSyncSourceDecision::kNo, -1};
     }
 
+    if (!repl::unsupportedSyncSource.empty()) {
+        LOGV2(7785604,
+              "Not choosing new sync source because sync source is forced via "
+              "'unsupportedSyncSource' parameter");
+        return {ChangeSyncSourceDecision::kNo, -1};
+    }
+
     // If the user requested a sync source change, return kYes.
     if (_forceSyncSourceIndex != -1) {
         LOGV2(21829,
@@ -3318,10 +3389,11 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
     // If we find an eligible sync source that is significantly closer than our current sync source,
     // return true.
 
-    // Do not re-evaluate our sync source if it was set via the replSetSyncFrom command or the
-    // forceSyncSourceCandidate failpoint.
+    // Do not re-evaluate our sync source if it was set via the replSetSyncFrom command, the
+    // forceSyncSourceCandidate failpoint, or the 'unsupportedSyncSource' server parameter.
     auto sfp = forceSyncSourceCandidate.scoped();
-    if (_replSetSyncFromSet || MONGO_unlikely(sfp.isActive())) {
+    if (_replSetSyncFromSet || MONGO_unlikely(sfp.isActive()) ||
+        !repl::unsupportedSyncSource.empty()) {
         return false;
     }
 

@@ -26,9 +26,18 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -51,7 +60,7 @@ TEST_F(DocumentSourceDocumentsTest, DocumentsStageRedactsCorrectly) {
     ASSERT(unwindStage);
     auto generatedField = unwindStage->getUnwindPath();
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        "{$queue: '?'}",
+        R"({"$queue":"?array<?object>"})",
         redact(*docSourcesVec[0]));
 
 

@@ -27,18 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <cstring>
+#include <set>
 
-#include "mongo/db/exec/sbe/stages/scan.h"
-
-#include "mongo/config.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/client.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/stages/scan.h"
+#include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/trial_run_tracker.h"
-#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -81,22 +101,15 @@ ScanStage::ScanStage(UUID collectionUuid,
       _minRecordIdSlot(minRecordIdSlot),
       _maxRecordIdSlot(maxRecordIdSlot),
       _forward(forward),
+      _useRandomCursor(useRandomCursor),
       _collUuid(collectionUuid),
       _scanCallbacks(std::move(scanCallbacks)),
-      _useRandomCursor(useRandomCursor),
       _excludeScanEndRecordId(excludeScanEndRecordId),
       _lowPriority(lowPriority) {
     invariant(_scanFieldNames.size() == _scanFieldSlots.size());
     invariant(!_seekRecordIdSlot || _forward);
     // We cannot use a random cursor if we are seeking or requesting a reverse scan.
     invariant(!_useRandomCursor || (!_seekRecordIdSlot && _forward));
-
-    // Initialize _fieldsBloomFilter.
-    for (size_t idx = 0; idx < _scanFieldNames.size(); ++idx) {
-        const char* str = _scanFieldNames[idx].c_str();
-        auto len = _scanFieldNames[idx].size();
-        _fieldsBloomFilter.insert(str, len);
-    }
 }
 
 std::unique_ptr<PlanStage> ScanStage::clone() const {
@@ -108,7 +121,7 @@ std::unique_ptr<PlanStage> ScanStage::clone() const {
                                        _indexKeySlot,
                                        _indexKeyPatternSlot,
                                        _oplogTsSlot,
-                                       _scanFieldNames,
+                                       _scanFieldNames.getUnderlyingVector(),
                                        _scanFieldSlots,
                                        _seekRecordIdSlot,
                                        _minRecordIdSlot,
@@ -124,14 +137,6 @@ std::unique_ptr<PlanStage> ScanStage::clone() const {
 }
 
 void ScanStage::prepare(CompileCtx& ctx) {
-    if (_recordSlot) {
-        _recordAccessor = std::make_unique<value::OwnedValueAccessor>();
-    }
-
-    if (_recordIdSlot) {
-        _recordIdAccessor = std::make_unique<value::OwnedValueAccessor>();
-    }
-
     _scanFieldAccessors.resize(_scanFieldNames.size());
     for (size_t idx = 0; idx < _scanFieldNames.size(); ++idx) {
         auto accessorPtr = &_scanFieldAccessors[idx];
@@ -145,26 +150,6 @@ void ScanStage::prepare(CompileCtx& ctx) {
             // Oplog scans only: cache a pointer to the "ts" field accessor for fast access.
             _tsFieldAccessor = accessorPtr;
         }
-
-        const size_t offset =
-            computeFieldMaskOffset(_scanFieldNames[idx].c_str(), _scanFieldNames[idx].size());
-        _maskOffsetToFieldAccessors[offset] = stdx::visit(
-            OverloadedVisitor{
-                [&](stdx::monostate _) -> FieldAccessorVariant {
-                    return std::make_pair(StringData{_scanFieldNames[idx]}, accessorPtr);
-                },
-                [&](std::pair<StringData, value::OwnedValueAccessor*> pair)
-                    -> FieldAccessorVariant {
-                    StringMap<value::OwnedValueAccessor*> map;
-                    map.emplace(pair.first, pair.second);
-                    map.emplace(_scanFieldNames[idx], accessorPtr);
-                    return map;
-                },
-                [&](StringMap<value::OwnedValueAccessor*> map) -> FieldAccessorVariant {
-                    map.emplace(_scanFieldNames[idx], accessorPtr);
-                    return std::move(map);
-                }},
-            std::move(_maskOffsetToFieldAccessors[offset]));
     }
 
     if (_seekRecordIdSlot) {
@@ -200,16 +185,16 @@ void ScanStage::prepare(CompileCtx& ctx) {
     }
 
     tassert(5709600, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
-    std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid);
+    _coll.acquireCollection(_opCtx, _collUuid);
 }
 
 value::SlotAccessor* ScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
     if (_recordSlot && *_recordSlot == slot) {
-        return _recordAccessor.get();
+        return &_recordAccessor;
     }
 
     if (_recordIdSlot && *_recordIdSlot == slot) {
-        return _recordIdAccessor.get();
+        return &_recordIdAccessor;
     }
 
     if (_oplogTsSlot && *_oplogTsSlot == slot) {
@@ -226,9 +211,8 @@ value::SlotAccessor* ScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot)
 void ScanStage::doSaveState(bool relinquishCursor) {
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     if (slotsAccessible()) {
-        if (_recordAccessor &&
-            _recordAccessor->getViewOfValue().first != value::TypeTags::Nothing) {
-            auto [tag, val] = _recordAccessor->getViewOfValue();
+        if (_recordSlot && _recordAccessor.getViewOfValue().first != value::TypeTags::Nothing) {
+            auto [tag, val] = _recordAccessor.getViewOfValue();
             tassert(5975900, "expected scan to produce bson", tag == value::TypeTags::bsonObject);
 
             auto* raw = value::bitcastTo<const char*>(val);
@@ -240,15 +224,15 @@ void ScanStage::doSaveState(bool relinquishCursor) {
 #endif
 
     if (relinquishCursor) {
-        if (_recordAccessor) {
-            prepareForYielding(*_recordAccessor, slotsAccessible());
+        if (_recordSlot) {
+            prepareForYielding(_recordAccessor, slotsAccessible());
         }
-        if (_recordIdAccessor) {
+        if (_recordIdSlot) {
             // TODO: SERVER-72054
             // RecordId are currently (incorrectly) accessed after EOF, therefore we must treat them
             // as always accessible rather than invalidate them when slots are disabled. We should
             // use slotsAccessible() instead of true, once the bug is fixed.
-            prepareForYielding(*_recordIdAccessor, true);
+            prepareForYielding(_recordIdAccessor, true);
         }
         for (auto& accessor : _scanFieldAccessors) {
             prepareForYielding(accessor, slotsAccessible());
@@ -256,7 +240,7 @@ void ScanStage::doSaveState(bool relinquishCursor) {
     }
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-    if (!_recordAccessor || !slotsAccessible()) {
+    if (!_recordSlot || !slotsAccessible()) {
         _lastReturned.clear();
     }
 #endif
@@ -278,12 +262,11 @@ void ScanStage::doRestoreState(bool relinquishCursor) {
     invariant(!_coll);
 
     // If this stage has not been prepared, then yield recovery is a no-op.
-    if (!_collName) {
+    if (!_coll.getCollName()) {
         return;
     }
 
-    tassert(5777408, "Catalog epoch should be initialized", _catalogEpoch);
-    _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+    _coll.restoreCollection(_opCtx, _collUuid);
 
     if (auto cursor = getActiveCursor(); cursor != nullptr) {
         if (relinquishCursor) {
@@ -294,7 +277,7 @@ void ScanStage::doRestoreState(bool relinquishCursor) {
                 str::stream()
                     << "CollectionScan died due to position in capped collection being deleted. ",
                 couldRestore);
-        } else if (_coll->isCapped()) {
+        } else if (_coll.getPtr()->isCapped()) {
             // We cannot check for capped position lost here, as it requires us to reposition the
             // cursor, which would free the underlying value and break the contract of
             // restoreState(fullSave=false). So we defer the capped collection position lost check
@@ -309,8 +292,8 @@ void ScanStage::doRestoreState(bool relinquishCursor) {
     }
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-    if (_recordAccessor && !_lastReturned.empty()) {
-        auto [tag, val] = _recordAccessor->getViewOfValue();
+    if (_recordSlot && !_lastReturned.empty()) {
+        auto [tag, val] = _recordAccessor.getViewOfValue();
         tassert(5975901, "expected scan to produce bson", tag == value::TypeTags::bsonObject);
 
         auto* raw = value::bitcastTo<const char*>(val);
@@ -334,8 +317,8 @@ void ScanStage::doDetachFromOperationContext() {
 }
 
 void ScanStage::doAttachToOperationContext(OperationContext* opCtx) {
-    if (_lowPriority && _open && opCtx->getClient()->isFromUserConnection() &&
-        opCtx->lockState()->shouldWaitForTicket()) {
+    if (_lowPriority && _open && gDeprioritizeUnboundedUserCollectionScans.load() &&
+        opCtx->getClient()->isFromUserConnection() && opCtx->lockState()->shouldWaitForTicket()) {
         _priority.emplace(opCtx->lockState(), AdmissionContext::Priority::kLow);
     }
     if (auto cursor = getActiveCursor()) {
@@ -393,7 +376,7 @@ void ScanStage::scanResetState(bool reOpen) {
         if (!reOpen ||
             (!_seekRecordIdAccessor &&
              (_forward ? !_minRecordIdAccessor : !_maxRecordIdAccessor))) {
-            _cursor = _coll->getCursor(_opCtx, _forward);
+            _cursor = _coll.getPtr()->getCursor(_opCtx, _forward);
         }
         if (_seekRecordIdAccessor) {
             setSeekRecordId();
@@ -406,7 +389,7 @@ void ScanStage::scanResetState(bool reOpen) {
             }
         }
     } else {
-        _randomCursor = _coll->getRecordStore()->getRandomCursor(_opCtx);
+        _randomCursor = _coll.getPtr()->getRecordStore()->getRandomCursor(_opCtx);
     }
 
     _firstGetNext = true;
@@ -432,35 +415,26 @@ void ScanStage::open(bool reOpen) {
     // first time ever, or this stage is being opened for the first time after calling close().
     tassert(5071004, "first open to ScanStage but reOpen=true", !reOpen && !_open);
     tassert(5071005, "ScanStage is not open but has a cursor", !getActiveCursor());
-    tassert(5777401, "Collection name should be initialized", _collName);
-    tassert(5777402, "Catalog epoch should be initialized", _catalogEpoch);
 
     // We need to re-acquire '_coll' in this case and make some validity checks (the collection has
     // not been dropped, renamed, etc).
-    _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+    _coll.restoreCollection(_opCtx, _collUuid);
 
     tassert(5959701, "restoreCollection() unexpectedly returned null in ScanStage", _coll);
 
     if (_scanCallbacks.scanOpenCallback) {
-        _scanCallbacks.scanOpenCallback(_opCtx, _coll);
+        _scanCallbacks.scanOpenCallback(_opCtx, _coll.getPtr());
     }
 
     scanResetState(reOpen);
     _open = true;
 }
 
-value::OwnedValueAccessor* ScanStage::getFieldAccessor(StringData name, size_t offset) const {
-    return stdx::visit(
-        OverloadedVisitor{
-            [](const stdx::monostate& _) -> value::OwnedValueAccessor* { return nullptr; },
-            [&](const std::pair<StringData, value::OwnedValueAccessor*> pair) {
-                return (pair.first == name) ? pair.second : nullptr;
-            },
-            [&](const StringMap<value::OwnedValueAccessor*>& map) {
-                auto it = map.find(name);
-                return it == map.end() ? nullptr : it->second;
-            }},
-        _maskOffsetToFieldAccessors[offset]);
+value::OwnedValueAccessor* ScanStage::getFieldAccessor(StringData name) {
+    if (size_t pos = _scanFieldNames.findPos(name); pos != IndexedStringVector::npos) {
+        return &_scanFieldAccessors[pos];
+    }
+    return nullptr;
 }
 
 PlanState ScanStage::getNext() {
@@ -471,8 +445,8 @@ PlanState ScanStage::getNext() {
         return trackPlanState(PlanState::IS_EOF);
     }
 
-    if (_lowPriority && !_priority && _opCtx->getClient()->isFromUserConnection() &&
-        _opCtx->lockState()->shouldWaitForTicket()) {
+    if (_lowPriority && !_priority && gDeprioritizeUnboundedUserCollectionScans.load() &&
+        _opCtx->getClient()->isFromUserConnection() && _opCtx->lockState()->shouldWaitForTicket()) {
         _priority.emplace(_opCtx->lockState(), AdmissionContext::Priority::kLow);
     }
 
@@ -550,13 +524,13 @@ PlanState ScanStage::getNext() {
         // Only check the index key for corruption if this getNext() call did seekExact(), as that
         // expects the '_seekRecordId' to be found, but it was not.
         if (doSeekExact && _scanCallbacks.indexKeyCorruptionCheckCallback) {
-            tassert(5777400, "Collection name should be initialized", _collName);
+            tassert(5777400, "Collection name should be initialized", _coll.getCollName());
             _scanCallbacks.indexKeyCorruptionCheckCallback(_opCtx,
                                                            _snapshotIdAccessor,
                                                            _indexKeyAccessor,
                                                            _indexKeyPatternAccessor,
                                                            _seekRecordId,
-                                                           *_collName);
+                                                           *_coll.getCollName());
         }
         _priority.reset();
         return trackPlanState(PlanState::IS_EOF);
@@ -569,19 +543,19 @@ PlanState ScanStage::getNext() {
                                                          _snapshotIdAccessor,
                                                          _indexIdentAccessor,
                                                          _indexKeyAccessor,
-                                                         _coll,
+                                                         _coll.getPtr(),
                                                          *nextRecord)) {
         _priority.reset();
         return trackPlanState(PlanState::IS_EOF);
     }
 
-    if (_recordAccessor) {
-        _recordAccessor->reset(false,
-                               value::TypeTags::bsonObject,
-                               value::bitcastFrom<const char*>(nextRecord->data.data()));
+    if (_recordSlot) {
+        _recordAccessor.reset(false,
+                              value::TypeTags::bsonObject,
+                              value::bitcastFrom<const char*>(nextRecord->data.data()));
     }
 
-    if (_recordIdAccessor) {
+    if (_recordIdSlot) {
         _recordId = std::move(nextRecord->id);
         if (_hasScanEndRecordId) {
             if (_excludeScanEndRecordId) {
@@ -595,7 +569,7 @@ PlanState ScanStage::getNext() {
         if (_havePassedScanEndRecordId) {
             return trackPlanState(PlanState::IS_EOF);
         }
-        _recordIdAccessor->reset(
+        _recordIdAccessor.reset(
             false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_recordId));
     }
 
@@ -629,21 +603,9 @@ PlanState ScanStage::getNext() {
 
             auto fieldsToMatch = _scanFieldAccessors.size();
             for (auto bsonElement = start; bsonElement != last;) {
-                // Oftentimes _scanFieldAccessors hashtable only has a few entries, but the object
-                // we're scanning could have dozens of fields. In this common scenario, most
-                // hashtable lookups will "miss" (i.e. they won't find a matching entry in the
-                // hashtable). To optimize for this, we put a very simple bloom filter (requiring
-                // only a few basic machine instructions) in front of the hashtable. When we "miss"
-                // in the bloom filter, we can quickly skip over a field without having to generate
-                // the hash for the field.
                 auto field = bson::fieldNameAndLength(bsonElement);
-                const size_t offset = computeFieldMaskOffset(field.rawData(), field.size());
-                if (!(_fieldsBloomFilter.maybeContainsHash(computeFieldMask(offset)))) {
-                    bsonElement = bson::advance(bsonElement, field.size());
-                    continue;
-                }
+                auto accessor = getFieldAccessor(field);
 
-                auto accessor = getFieldAccessor(field, offset);
                 if (accessor != nullptr) {
                     auto [tag, val] = bson::convertFrom<true>(bsonElement, end, field.size());
                     accessor->reset(false, tag, val);
@@ -729,7 +691,7 @@ std::unique_ptr<PlanStageStats> ScanStage::getStats(bool includeDebugInfo) const
             bob.appendNumber("indexKeyPatternSlot", static_cast<long long>(*_indexKeyPatternSlot));
         }
 
-        bob.append("scanFieldNames", _scanFieldNames);
+        bob.append("scanFieldNames", _scanFieldNames.getUnderlyingVector());
         bob.append("scanFieldSlots", _scanFieldSlots.begin(), _scanFieldSlots.end());
         ret->debugInfo = bob.obj();
     }
@@ -828,7 +790,8 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
 
 size_t ScanStage::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);
-    size += size_estimator::estimate(_scanFieldNames);
+    size += size_estimator::estimate(_scanFieldNames.getUnderlyingVector());
+    size += size_estimator::estimate(_scanFieldNames.getUnderlyingMap());
     size += size_estimator::estimate(_scanFieldSlots);
     size += size_estimator::estimate(_specificStats);
     return size;
@@ -901,7 +864,7 @@ std::unique_ptr<PlanStage> ParallelScanStage::clone() const {
                                                _indexIdentSlot,
                                                _indexKeySlot,
                                                _indexKeyPatternSlot,
-                                               _scanFieldNames,
+                                               _scanFieldNames.getUnderlyingVector(),
                                                _scanFieldSlots,
                                                _yieldPolicy,
                                                _commonStats.nodeId,
@@ -910,20 +873,13 @@ std::unique_ptr<PlanStage> ParallelScanStage::clone() const {
 }
 
 void ParallelScanStage::prepare(CompileCtx& ctx) {
-    if (_recordSlot) {
-        _recordAccessor = std::make_unique<value::OwnedValueAccessor>();
-    }
-
-    if (_recordIdSlot) {
-        _recordIdAccessor = std::make_unique<value::OwnedValueAccessor>();
-    }
+    _scanFieldAccessors.resize(_scanFieldNames.size());
 
     for (size_t idx = 0; idx < _scanFieldNames.size(); ++idx) {
-        auto [it, inserted] = _scanFieldAccessors.emplace(
-            _scanFieldNames[idx], std::make_unique<value::OwnedValueAccessor>());
-        uassert(4822816, str::stream() << "duplicate field: " << _scanFieldNames[idx], inserted);
+        auto accessorPtr = &_scanFieldAccessors[idx];
+
         auto [itRename, insertedRename] =
-            _scanFieldAccessorsMap.emplace(_scanFieldSlots[idx], it->second.get());
+            _scanFieldAccessorsMap.emplace(_scanFieldSlots[idx], accessorPtr);
         uassert(
             4822817, str::stream() << "duplicate field: " << _scanFieldSlots[idx], insertedRename);
     }
@@ -945,16 +901,16 @@ void ParallelScanStage::prepare(CompileCtx& ctx) {
     }
 
     tassert(5709601, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
-    std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid);
+    _coll.acquireCollection(_opCtx, _collUuid);
 }
 
 value::SlotAccessor* ParallelScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
     if (_recordSlot && *_recordSlot == slot) {
-        return _recordAccessor.get();
+        return &_recordAccessor;
     }
 
     if (_recordIdSlot && *_recordIdSlot == slot) {
-        return _recordIdAccessor.get();
+        return &_recordIdAccessor;
     }
 
     if (auto it = _scanFieldAccessorsMap.find(slot); it != _scanFieldAccessorsMap.end()) {
@@ -967,9 +923,8 @@ value::SlotAccessor* ParallelScanStage::getAccessor(CompileCtx& ctx, value::Slot
 void ParallelScanStage::doSaveState(bool relinquishCursor) {
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     if (slotsAccessible()) {
-        if (_recordAccessor &&
-            _recordAccessor->getViewOfValue().first != value::TypeTags::Nothing) {
-            auto [tag, val] = _recordAccessor->getViewOfValue();
+        if (_recordSlot && _recordAccessor.getViewOfValue().first != value::TypeTags::Nothing) {
+            auto [tag, val] = _recordAccessor.getViewOfValue();
             tassert(5975904, "expected scan to produce bson", tag == value::TypeTags::bsonObject);
 
             auto* raw = value::bitcastTo<const char*>(val);
@@ -980,22 +935,22 @@ void ParallelScanStage::doSaveState(bool relinquishCursor) {
     }
 #endif
 
-    if (_recordAccessor) {
-        prepareForYielding(*_recordAccessor, slotsAccessible());
+    if (_recordSlot) {
+        prepareForYielding(_recordAccessor, slotsAccessible());
     }
-    if (_recordIdAccessor) {
+    if (_recordIdSlot) {
         // TODO: SERVER-72054
         // RecordId are currently (incorrectly) accessed after EOF, therefore
         // we must treat them as always accessible ratther invalidate them when slots are
         // disabled. We should use slotsAccessible() instead of true, once the bug is fixed.
-        prepareForYielding(*_recordIdAccessor, true);
+        prepareForYielding(_recordIdAccessor, true);
     }
-    for (auto& [fieldName, accessor] : _scanFieldAccessors) {
-        prepareForYielding(*accessor, slotsAccessible());
+    for (auto& accessor : _scanFieldAccessors) {
+        prepareForYielding(accessor, slotsAccessible());
     }
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-    if (!_recordAccessor || !slotsAccessible()) {
+    if (!_recordSlot || !slotsAccessible()) {
         _lastReturned.clear();
     }
 #endif
@@ -1013,12 +968,11 @@ void ParallelScanStage::doRestoreState(bool relinquishCursor) {
     invariant(!_coll);
 
     // If this stage has not been prepared, then yield recovery is a no-op.
-    if (!_collName) {
+    if (!_coll.getCollName()) {
         return;
     }
 
-    tassert(5777409, "Catalog epoch should be initialized", _catalogEpoch);
-    _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+    _coll.restoreCollection(_opCtx, _collUuid);
 
     if (_cursor && relinquishCursor) {
         const bool couldRestore = _cursor->restore();
@@ -1029,8 +983,8 @@ void ParallelScanStage::doRestoreState(bool relinquishCursor) {
     }
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-    if (_recordAccessor && !_lastReturned.empty()) {
-        auto [tag, val] = _recordAccessor->getViewOfValue();
+    if (_recordSlot && !_lastReturned.empty()) {
+        auto [tag, val] = _recordAccessor.getViewOfValue();
         tassert(5975905, "expected scan to produce bson", tag == value::TypeTags::bsonObject);
 
         auto* raw = value::bitcastTo<const char*>(val);
@@ -1068,22 +1022,20 @@ void ParallelScanStage::open(bool reOpen) {
         // we're being opened after 'close()'. we need to re-acquire '_coll' in this case and
         // make some validity checks (the collection has not been dropped, renamed, etc.).
         tassert(5071013, "ParallelScanStage is not open but have _cursor", !_cursor);
-        tassert(5777403, "Collection name should be initialized", _collName);
-        tassert(5777404, "Catalog epoch should be initialized", _catalogEpoch);
-        _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+        _coll.restoreCollection(_opCtx, _collUuid);
     }
 
     {
         stdx::unique_lock lock(_state->mutex);
         if (_state->ranges.empty()) {
-            auto ranges = _coll->getRecordStore()->numRecords(_opCtx) / 10240;
+            auto ranges = _coll.getPtr()->getRecordStore()->numRecords(_opCtx) / 10240;
             if (ranges < 2) {
                 _state->ranges.emplace_back(Range{RecordId{}, RecordId{}});
             } else {
                 if (ranges > 1024) {
                     ranges = 1024;
                 }
-                auto randomCursor = _coll->getRecordStore()->getRandomCursor(_opCtx);
+                auto randomCursor = _coll.getPtr()->getRecordStore()->getRandomCursor(_opCtx);
                 invariant(randomCursor);
                 std::set<RecordId> rids;
                 while (ranges--) {
@@ -1102,7 +1054,7 @@ void ParallelScanStage::open(bool reOpen) {
         }
     }
 
-    _cursor = _coll->getCursor(_opCtx);
+    _cursor = _coll.getPtr()->getCursor(_opCtx);
 
     _open = true;
 }
@@ -1117,6 +1069,13 @@ boost::optional<Record> ParallelScanStage::nextRange() {
     } else {
         return boost::none;
     }
+}
+
+value::OwnedValueAccessor* ParallelScanStage::getFieldAccessor(StringData name) {
+    if (size_t pos = _scanFieldNames.findPos(name); pos != IndexedStringVector::npos) {
+        return &_scanFieldAccessors[pos];
+    }
+    return nullptr;
 }
 
 PlanState ParallelScanStage::getNext() {
@@ -1144,13 +1103,13 @@ PlanState ParallelScanStage::getNext() {
                         "Index key corruption check can only performed when inspecting the first "
                         "recordId in a range",
                         needRange);
-                tassert(5777405, "Collection name should be initialized", _collName);
+                tassert(5777405, "Collection name should be initialized", _coll.getCollName());
                 _scanCallbacks.indexKeyCorruptionCheckCallback(_opCtx,
                                                                _snapshotIdAccessor,
                                                                _indexKeyAccessor,
                                                                _indexKeyPatternAccessor,
                                                                _range.begin,
-                                                               *_collName);
+                                                               *_coll.getCollName());
             }
             return trackPlanState(PlanState::IS_EOF);
         }
@@ -1168,21 +1127,21 @@ PlanState ParallelScanStage::getNext() {
                                                              _snapshotIdAccessor,
                                                              _indexIdentAccessor,
                                                              _indexKeyAccessor,
-                                                             _coll,
+                                                             _coll.getPtr(),
                                                              *nextRecord)) {
             return trackPlanState(PlanState::IS_EOF);
         }
     } while (!nextRecord);
 
-    if (_recordAccessor) {
-        _recordAccessor->reset(false,
-                               value::TypeTags::bsonObject,
-                               value::bitcastFrom<const char*>(nextRecord->data.data()));
+    if (_recordSlot) {
+        _recordAccessor.reset(false,
+                              value::TypeTags::bsonObject,
+                              value::bitcastFrom<const char*>(nextRecord->data.data()));
     }
 
-    if (_recordIdAccessor) {
+    if (_recordIdSlot) {
         _recordId = nextRecord->id;
-        _recordIdAccessor->reset(
+        _recordIdAccessor.reset(
             false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_recordId));
     }
 
@@ -1192,17 +1151,16 @@ PlanState ParallelScanStage::getNext() {
         auto rawBson = nextRecord->data.data();
         auto be = rawBson + 4;
         auto end = rawBson + ConstDataView(rawBson).read<LittleEndian<uint32_t>>();
-        for (auto& [name, accessor] : _scanFieldAccessors) {
-            accessor->reset();
+        for (auto& accessor : _scanFieldAccessors) {
+            accessor.reset();
         }
         while (be != end - 1) {
             auto sv = bson::fieldNameAndLength(be);
-            if (auto it = _scanFieldAccessors.find(sv); it != _scanFieldAccessors.end()) {
-                // Found the field so convert it to Value.
+            auto accessor = getFieldAccessor(sv);
+
+            if (accessor != nullptr) {
                 auto [tag, val] = bson::convertFrom<true>(be, end, sv.size());
-
-                it->second->reset(false, tag, val);
-
+                accessor->reset(false, tag, val);
                 if ((--fieldsToMatch) == 0) {
                     // No need to scan any further so bail out early.
                     break;
@@ -1295,7 +1253,8 @@ std::vector<DebugPrinter::Block> ParallelScanStage::debugPrint() const {
 
 size_t ParallelScanStage::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);
-    size += size_estimator::estimate(_scanFieldNames);
+    size += size_estimator::estimate(_scanFieldNames.getUnderlyingVector());
+    size += size_estimator::estimate(_scanFieldNames.getUnderlyingMap());
     size += size_estimator::estimate(_scanFieldSlots);
     return size;
 }

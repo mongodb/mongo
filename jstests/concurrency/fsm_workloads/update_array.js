@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * update_array.js
  *
@@ -13,7 +11,7 @@
 // For isMongod.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
-var $config = (function() {
+export const $config = (function() {
     var states = (function() {
         // db: explicitly passed to avoid accidentally using the global `db`
         // res: WriteResult

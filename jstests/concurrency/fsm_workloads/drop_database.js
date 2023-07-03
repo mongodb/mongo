@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * drop_database.js
  *
@@ -8,7 +6,7 @@
  * @tags: [
  * ]
  */
-var $config = (function() {
+export const $config = (function() {
     var states = {
         init: function init(db, collName) {
             this.uniqueDBName = db.getName() + 'drop_database' + this.tid;

@@ -27,15 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/collation/collator_interface_icu.h"
-
+#include <cstdint>
 #include <memory>
-
+#include <string>
 #include <unicode/coll.h>
 #include <unicode/sortkey.h>
+#include <utility>
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <unicode/stringpiece.h>
+#include <unicode/ucol.h>
+#include <unicode/unistr.h>
+#include <unicode/utypes.h>
+
+#include "mongo/db/query/collation/collator_interface_icu.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

@@ -30,8 +30,11 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 
 namespace mongo::input_params {
@@ -51,7 +54,7 @@ void bind(const CanonicalQuery&, stage_builder::PlanStageData&, bool bindingCach
  *
  * - 'cq' is the query
  * - 'indexBoundsInfo' contains the IETs and the slots
- * - runtimeEnvironment SBE runtime environment
+ * - 'runtimeEnvironment' is the SBE runtime environment
  * - 'indexBoundsEvaluationCache' is the evaluation cache used by the explode nodes to keep the
  * common IET evaluation results.
  */
@@ -60,4 +63,19 @@ void bindIndexBounds(
     const stage_builder::IndexBoundsEvaluationInfo& indexBoundsInfo,
     sbe::RuntimeEnvironment* runtimeEnvironment,
     interval_evaluation_tree::IndexBoundsEvaluationCache* indexBoundsEvaluationCache = nullptr);
+
+/**
+ * If the execution tree ('root'), which was cloned from the SBE plan cache, contains an SBE
+ * clustered collection scan stage, this method is called to bind the current query ('cq')'s scan
+ * bounds into its minRecord and maxRecord slots.
+ *
+ * - 'cq' is the query
+ * - 'root' is the root node of the SBE execution plan from the plan cache
+ * - 'data' contains cached info to be substituted into the plan
+ * - 'runtimeEnvironment' is the SBE runtime environment
+ */
+void bindClusteredCollectionBounds(const CanonicalQuery& cq,
+                                   const sbe::PlanStage* root,
+                                   const stage_builder::PlanStageData* data,
+                                   sbe::RuntimeEnvironment* runtimeEnvironment);
 }  // namespace mongo::input_params

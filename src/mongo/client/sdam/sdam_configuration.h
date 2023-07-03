@@ -28,9 +28,20 @@
  */
 #pragma once
 
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/sdam/sdam_configuration_parameters_gen.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+
 namespace mongo::sdam {
 class SdamConfiguration {
 public:
@@ -90,7 +101,7 @@ public:
     const boost::optional<std::string>& getSetName() const;
 
     /**
-     * The frequency at which we measure RTT and IsMaster responses.
+     * The frequency at which we measure RTT and "hello" responses.
      */
     Milliseconds getHeartBeatFrequency() const;
 

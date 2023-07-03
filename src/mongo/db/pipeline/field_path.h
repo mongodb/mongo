@@ -29,10 +29,16 @@
 
 #pragma once
 
+#include <compare>
+#include <cstddef>
 #include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/exec/document_value/document_internal.h"
@@ -69,11 +75,17 @@ public:
      *
      * Field names are validated using uassertValidFieldName().
      */
-    /* implicit */ FieldPath(std::string inputPath, bool precomputeHashes = false);
-    /* implicit */ FieldPath(StringData inputPath, bool precomputeHashes = false)
-        : FieldPath(inputPath.toString(), precomputeHashes) {}
-    /* implicit */ FieldPath(const char* inputPath, bool precomputeHashes = false)
-        : FieldPath(std::string(inputPath), precomputeHashes) {}
+    /* implicit */ FieldPath(std::string inputPath,
+                             bool precomputeHashes = false,
+                             bool validateFieldNames = true);
+    /* implicit */ FieldPath(StringData inputPath,
+                             bool precomputeHashes = false,
+                             bool validateFieldNames = true)
+        : FieldPath(inputPath.toString(), precomputeHashes, validateFieldNames) {}
+    /* implicit */ FieldPath(const char* inputPath,
+                             bool precomputeHashes = false,
+                             bool validateFieldNames = true)
+        : FieldPath(std::string(inputPath), precomputeHashes, validateFieldNames) {}
 
     /**
      * Returns the number of path elements in the field path.

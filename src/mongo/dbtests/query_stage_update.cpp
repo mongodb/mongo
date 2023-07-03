@@ -31,30 +31,58 @@
  * This file tests the UpdateStage class
  */
 
-#include "mongo/platform/basic.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <map>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/eof.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/upsert_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/update/update_driver.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace QueryStageUpdate {
 
@@ -62,7 +90,8 @@ using std::make_unique;
 using std::unique_ptr;
 using std::vector;
 
-static const NamespaceString nss("unittests.QueryStageUpdate");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageUpdate");
 
 class QueryStageUpdateBase {
 public:
@@ -124,13 +153,13 @@ public:
         params.tailable = false;
 
         unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), &collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
-                verify(member->hasObj());
+                MONGO_verify(member->hasObj());
                 out->push_back(member->doc.value().toBson().getOwned());
             }
         }
@@ -146,13 +175,13 @@ public:
         params.tailable = false;
 
         unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), &collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
-                verify(member->hasRecordId());
+                MONGO_verify(member->hasRecordId());
                 out->push_back(member->recordId);
             }
         }
@@ -310,7 +339,7 @@ public:
 
             auto ws = make_unique<WorkingSet>();
             auto cs = make_unique<CollectionScan>(
-                _expCtx.get(), collection.getCollectionPtr(), collScanParams, ws.get(), cq->root());
+                _expCtx.get(), &collection, collScanParams, ws.get(), cq->root());
 
             auto updateStage = make_unique<UpdateStage>(
                 _expCtx.get(), updateParams, ws.get(), collection, cs.release());

@@ -27,11 +27,14 @@
  *    it in the license file.
  */
 
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/platform/source_location.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/latch_analyzer.h"
 

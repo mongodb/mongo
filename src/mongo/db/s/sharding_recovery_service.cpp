@@ -29,26 +29,69 @@
 
 
 #include <fmt/format.h>
+#include <memory>
 #include <set>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/s/sharding_recovery_service.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/db/db_raii.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_critical_section_document_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/shard_authoritative_catalog_gen.h"
-#include "mongo/db/s/sharding_migration_critical_section.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/s/sharding_recovery_service.h"
+#include "mongo/db/write_concern.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/catalog/type_collection_gen.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -144,8 +187,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& reason,
-    const WriteConcernOptions& writeConcern,
-    bool allowViews) {
+    const WriteConcernOptions& writeConcern) {
     LOGV2_DEBUG(5656600,
                 3,
                 "Acquiring recoverable critical section blocking writes",
@@ -164,23 +206,20 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         Lock::GlobalLock lk(opCtx, MODE_IX);
         boost::optional<AutoGetDb> dbLock;
         boost::optional<AutoGetCollection> collLock;
-        if (nsIsDbOnly(nss.ns())) {
+        if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_S);
         } else {
-            // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
-            // construct collLock.
             collLock.emplace(opCtx,
                              nss,
                              MODE_S,
-                             (allowViews ? AutoGetCollection::Options{}.viewMode(
-                                               auto_get_collection::ViewMode::kViewsPermitted)
-                                         : AutoGetCollection::Options{}));
+                             AutoGetCollection::Options{}.viewMode(
+                                 auto_get_collection::ViewMode::kViewsPermitted));
         }
 
         DBDirectClient dbClient(opCtx);
         FindCommandRequest findRequest{NamespaceString::kCollectionCriticalSectionsNamespace};
-        findRequest.setFilter(
-            BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()));
+        findRequest.setFilter(BSON(CollectionCriticalSectionDocument::kNssFieldName
+                                   << NamespaceStringUtil::serialize(nss)));
         auto cursor = dbClient.find(std::move(findRequest));
 
         // if there is a doc with the same nss -> in order to not fail it must have the same
@@ -233,11 +272,12 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         std::string unusedErrmsg;
         batchedResponse.parseBSON(commandReply, &unusedErrmsg);
         tassert(7032369,
-                fmt::format("Insert did not add any doc to collection '{}' for namespace '{}' "
-                            "and reason '{}'",
-                            nss.toStringForErrorMsg(),
-                            reason.toString(),
-                            NamespaceString::kCollectionCriticalSectionsNamespace.toString()),
+                fmt::format(
+                    "Insert did not add any doc to collection '{}' for namespace '{}' "
+                    "and reason '{}'",
+                    nss.toStringForErrorMsg(),
+                    reason.toString(),
+                    NamespaceString::kCollectionCriticalSectionsNamespace.toStringForErrorMsg()),
                 batchedResponse.getN() > 0);
     }
 
@@ -257,8 +297,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& reason,
-    const WriteConcernOptions& writeConcern,
-    bool allowViews) {
+    const WriteConcernOptions& writeConcern) {
     LOGV2_DEBUG(5656603,
                 3,
                 "Promoting recoverable critical section to also block reads",
@@ -276,23 +315,20 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
     {
         boost::optional<AutoGetDb> dbLock;
         boost::optional<AutoGetCollection> collLock;
-        if (nsIsDbOnly(nss.ns())) {
+        if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_X);
         } else {
-            // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
-            // construct collLock.
             collLock.emplace(opCtx,
                              nss,
                              MODE_X,
-                             (allowViews ? AutoGetCollection::Options{}.viewMode(
-                                               auto_get_collection::ViewMode::kViewsPermitted)
-                                         : AutoGetCollection::Options{}));
+                             AutoGetCollection::Options{}.viewMode(
+                                 auto_get_collection::ViewMode::kViewsPermitted));
         }
 
         DBDirectClient dbClient(opCtx);
         FindCommandRequest findRequest{NamespaceString::kCollectionCriticalSectionsNamespace};
-        findRequest.setFilter(
-            BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()));
+        findRequest.setFilter(BSON(CollectionCriticalSectionDocument::kNssFieldName
+                                   << NamespaceStringUtil::serialize(nss)));
         auto cursor = dbClient.find(std::move(findRequest));
 
         tassert(7032361,
@@ -338,9 +374,10 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
         // - Otherwise this call will fail and the CS won't be advanced (neither persisted nor
         // in-mem)
         auto commandResponse = dbClient.runCommand([&] {
-            const auto query = BSON(
-                CollectionCriticalSectionDocument::kNssFieldName
-                << nss.toString() << CollectionCriticalSectionDocument::kReasonFieldName << reason);
+            const auto query =
+                BSON(CollectionCriticalSectionDocument::kNssFieldName
+                     << NamespaceStringUtil::serialize(nss)
+                     << CollectionCriticalSectionDocument::kReasonFieldName << reason);
             const auto update = BSON(
                 "$set" << BSON(CollectionCriticalSectionDocument::kBlockReadsFieldName << true));
 
@@ -359,13 +396,14 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
         BatchedCommandResponse batchedResponse;
         std::string unusedErrmsg;
         batchedResponse.parseBSON(commandReply, &unusedErrmsg);
-        tassert(7032363,
-                fmt::format("Update did not modify any doc from collection '{}' for namespace '{}' "
-                            "and reason '{}'",
-                            NamespaceString::kCollectionCriticalSectionsNamespace.toString(),
-                            nss.toStringForErrorMsg(),
-                            reason.toString()),
-                batchedResponse.getNModified() > 0);
+        tassert(
+            7032363,
+            fmt::format("Update did not modify any doc from collection '{}' for namespace '{}' "
+                        "and reason '{}'",
+                        NamespaceString::kCollectionCriticalSectionsNamespace.toStringForErrorMsg(),
+                        nss.toStringForErrorMsg(),
+                        reason.toString()),
+            batchedResponse.getNModified() > 0);
     }
 
     WriteConcernResult ignoreResult;
@@ -385,8 +423,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
     const NamespaceString& nss,
     const BSONObj& reason,
     const WriteConcernOptions& writeConcern,
-    bool throwIfReasonDiffers,
-    bool allowViews) {
+    bool throwIfReasonDiffers) {
     LOGV2_DEBUG(5656606,
                 3,
                 "Releasing recoverable critical section",
@@ -404,23 +441,20 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
     {
         boost::optional<AutoGetDb> dbLock;
         boost::optional<AutoGetCollection> collLock;
-        if (nsIsDbOnly(nss.ns())) {
+        if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_X);
         } else {
-            // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
-            // construct collLock.
             collLock.emplace(opCtx,
                              nss,
                              MODE_X,
-                             (allowViews ? AutoGetCollection::Options{}.viewMode(
-                                               auto_get_collection::ViewMode::kViewsPermitted)
-                                         : AutoGetCollection::Options{}));
+                             AutoGetCollection::Options{}.viewMode(
+                                 auto_get_collection::ViewMode::kViewsPermitted));
         }
 
         DBDirectClient dbClient(opCtx);
 
-        const auto queryNss =
-            BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString());
+        const auto queryNss = BSON(CollectionCriticalSectionDocument::kNssFieldName
+                                   << NamespaceStringUtil::serialize(nss));
         FindCommandRequest findRequest{NamespaceString::kCollectionCriticalSectionsNamespace};
         findRequest.setFilter(queryNss);
         auto cursor = dbClient.find(std::move(findRequest));
@@ -489,13 +523,14 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
         BatchedCommandResponse batchedResponse;
         std::string unusedErrmsg;
         batchedResponse.parseBSON(commandReply, &unusedErrmsg);
-        tassert(7032367,
-                fmt::format("Delete did not remove any doc from collection '{}' for namespace '{}' "
-                            "and reason '{}'",
-                            NamespaceString::kCollectionCriticalSectionsNamespace.toString(),
-                            nss.toStringForErrorMsg(),
-                            reason.toString()),
-                batchedResponse.getN() > 0);
+        tassert(
+            7032367,
+            fmt::format("Delete did not remove any doc from collection '{}' for namespace '{}' "
+                        "and reason '{}'",
+                        NamespaceString::kCollectionCriticalSectionsNamespace.toStringForErrorMsg(),
+                        nss.toStringForErrorMsg(),
+                        reason.toString()),
+            batchedResponse.getN() > 0);
     }
 
     WriteConcernResult ignoreResult;
@@ -536,7 +571,7 @@ void ShardingRecoveryService::recoverRecoverableCriticalSections(OperationContex
     store.forEach(opCtx, BSONObj{}, [&opCtx](const CollectionCriticalSectionDocument& doc) {
         const auto& nss = doc.getNss();
         {
-            if (nsIsDbOnly(nss.ns())) {
+            if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
                 AutoGetDb dbLock(opCtx, nss.dbName(), MODE_X);
                 auto scopedDss =
                     DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, nss.dbName());

@@ -28,23 +28,42 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
+#include <memory>
+#include <ostream>
 #include <string>
 #include <vector>
 
-#include "mongo/config.h"
-#include "mongo/db/concurrency/lock_manager_test_help.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/fast_map_noalloc.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/timer.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

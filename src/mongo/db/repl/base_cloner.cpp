@@ -28,11 +28,20 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <mutex>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

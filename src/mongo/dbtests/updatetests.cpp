@@ -31,19 +31,35 @@
  * unit tests relating to update requests
  */
 
-#include "mongo/platform/basic.h"
-
+#include <algorithm>
 #include <iostream>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/json.h"
-#include "mongo/db/ops/update.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/service_context.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace UpdateTests {
 
@@ -159,7 +175,7 @@ protected:
     }
 
     NamespaceString nss() const {
-        return NamespaceString{ns()};
+        return NamespaceString::createNamespaceString_forTest(ns());
     }
 };
 
@@ -425,7 +441,7 @@ class MultiInc : public SetBase {
 public:
     string s() {
         stringstream ss;
-        FindCommandRequest findRequest{NamespaceString{ns()}};
+        FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
         findRequest.setSort(BSON("_id" << 1));
         std::unique_ptr<DBClientCursor> cc = _client.find(std::move(findRequest));
         bool first = true;
@@ -963,7 +979,7 @@ protected:
     }
 
     NamespaceString nss() const {
-        return NamespaceString{ns()};
+        return NamespaceString::createNamespaceString_forTest(ns());
     }
 
     void setParams(const BSONArray& fields,
@@ -1852,7 +1868,7 @@ protected:
     virtual const char* ns() = 0;
 
     NamespaceString nss() {
-        return NamespaceString(ns());
+        return NamespaceString::createNamespaceString_forTest(ns());
     };
 
     virtual void dotest() = 0;
@@ -1866,7 +1882,8 @@ protected:
     }
 
     BSONObj findOne() {
-        return _client.findOne(NamespaceString{ns()}, BSONObj{} /*filter*/);
+        return _client.findOne(NamespaceString::createNamespaceString_forTest(ns()),
+                               BSONObj{} /*filter*/);
     }
 
     void test(const char* initial, const char* mod, const char* after) {

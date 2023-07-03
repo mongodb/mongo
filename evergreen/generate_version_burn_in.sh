@@ -8,6 +8,7 @@ set -o verbose
 
 setup_mongo_task_generator
 activate_venv
+$python buildscripts/burn_in_tests.py generate-test-membership-map-file-for-ci
 PATH=$PATH:$HOME:/ ./mongo-task-generator \
   --expansion-file ../expansions.yml \
   --evg-auth-file ./.evergreen.yml \

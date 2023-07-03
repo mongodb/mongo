@@ -89,7 +89,7 @@ obj_bulk_unique(int force)
 
     /* Generate a unique object name. */
     testutil_check(pthread_rwlock_wrlock(&single));
-    testutil_check(__wt_snprintf(new_uri, sizeof(new_uri), "%s.%u", uri, ++uid));
+    testutil_snprintf(new_uri, sizeof(new_uri), "%s.%u", uri, ++uid);
     testutil_check(pthread_rwlock_unlock(&single));
 
     if (use_txn)
@@ -179,7 +179,7 @@ obj_create_unique(int force)
 
     /* Generate a unique object name. */
     testutil_check(pthread_rwlock_wrlock(&single));
-    testutil_check(__wt_snprintf(new_uri, sizeof(new_uri), "%s.%u", uri, ++uid));
+    testutil_snprintf(new_uri, sizeof(new_uri), "%s.%u", uri, ++uid);
     testutil_check(pthread_rwlock_unlock(&single));
 
     if (use_txn)

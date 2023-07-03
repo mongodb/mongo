@@ -27,15 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 
-#include "mongo/db/feature_compatibility_version_parser.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
+#include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo {
@@ -110,16 +118,16 @@ StatusWith<multiversion::FeatureCompatibilityVersion> FeatureCompatibilityVersio
             version == targetVersion) {
             // Downgrading FCV must have a "previousVersion" field.
             if (!previousVersion) {
-                return Status(ErrorCodes::Error(4926902),
-                              str::stream()
-                                  << "Missing field "
-                                  << FeatureCompatibilityVersionDocument::kPreviousVersionFieldName
-                                  << " in downgrading states for " << multiversion::kParameterName
-                                  << " document in "
-                                  << NamespaceString::kServerConfigurationNamespace.toString()
-                                  << ": " << featureCompatibilityVersionDoc << ". See "
-                                  << feature_compatibility_version_documentation::kCompatibilityLink
-                                  << ".");
+                return Status(
+                    ErrorCodes::Error(4926902),
+                    str::stream()
+                        << "Missing field "
+                        << FeatureCompatibilityVersionDocument::kPreviousVersionFieldName
+                        << " in downgrading states for " << multiversion::kParameterName
+                        << " document in "
+                        << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg()
+                        << ": " << featureCompatibilityVersionDoc << ". See "
+                        << feature_compatibility_version_documentation::kCompatibilityLink << ".");
             }
             if (version == GenericFCV::kLastLTS) {
                 // Downgrading to last-lts.
@@ -131,16 +139,16 @@ StatusWith<multiversion::FeatureCompatibilityVersion> FeatureCompatibilityVersio
 
         // Non-downgrading FCV must not have a "previousVersion" field.
         if (previousVersion) {
-            return Status(ErrorCodes::Error(4926903),
-                          str::stream()
-                              << "Unexpected field "
-                              << FeatureCompatibilityVersionDocument::kPreviousVersionFieldName
-                              << " in non-downgrading states for " << multiversion::kParameterName
-                              << " document in "
-                              << NamespaceString::kServerConfigurationNamespace.toString() << ": "
-                              << featureCompatibilityVersionDoc << ". See "
-                              << feature_compatibility_version_documentation::kCompatibilityLink
-                              << ".");
+            return Status(
+                ErrorCodes::Error(4926903),
+                str::stream()
+                    << "Unexpected field "
+                    << FeatureCompatibilityVersionDocument::kPreviousVersionFieldName
+                    << " in non-downgrading states for " << multiversion::kParameterName
+                    << " document in "
+                    << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg() << ": "
+                    << featureCompatibilityVersionDoc << ". See "
+                    << feature_compatibility_version_documentation::kCompatibilityLink << ".");
         }
 
         // Upgrading FCV.
@@ -148,13 +156,13 @@ StatusWith<multiversion::FeatureCompatibilityVersion> FeatureCompatibilityVersio
             // For upgrading FCV, "targetVersion" must be kLatest or kLastContinuous and "version"
             // must be kLastContinuous or kLastLTS.
             if (targetVersion == GenericFCV::kLastLTS || version == GenericFCV::kLatest) {
-                return Status(ErrorCodes::Error(4926904),
-                              str::stream()
-                                  << "Invalid " << multiversion::kParameterName << " document in "
-                                  << NamespaceString::kServerConfigurationNamespace.toString()
-                                  << ": " << featureCompatibilityVersionDoc << ". See "
-                                  << feature_compatibility_version_documentation::kCompatibilityLink
-                                  << ".");
+                return Status(
+                    ErrorCodes::Error(4926904),
+                    str::stream()
+                        << "Invalid " << multiversion::kParameterName << " document in "
+                        << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg()
+                        << ": " << featureCompatibilityVersionDoc << ". See "
+                        << feature_compatibility_version_documentation::kCompatibilityLink << ".");
             }
 
             if (version == GenericFCV::kLastLTS) {
@@ -165,8 +173,8 @@ StatusWith<multiversion::FeatureCompatibilityVersion> FeatureCompatibilityVersio
                 uassert(5070601,
                         str::stream()
                             << "Invalid " << multiversion::kParameterName << " document in "
-                            << NamespaceString::kServerConfigurationNamespace.toString() << ": "
-                            << featureCompatibilityVersionDoc << ". See "
+                            << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg()
+                            << ": " << featureCompatibilityVersionDoc << ". See "
                             << feature_compatibility_version_documentation::kCompatibilityLink
                             << ".",
                         version == GenericFCV::kLastContinuous);
@@ -180,8 +188,8 @@ StatusWith<multiversion::FeatureCompatibilityVersion> FeatureCompatibilityVersio
         auto status = e.toStatus();
         status.addContext(str::stream()
                           << "Invalid " << multiversion::kParameterName << " document in "
-                          << NamespaceString::kServerConfigurationNamespace.toString() << ": "
-                          << featureCompatibilityVersionDoc << ". See "
+                          << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg()
+                          << ": " << featureCompatibilityVersionDoc << ". See "
                           << feature_compatibility_version_documentation::kCompatibilityLink
                           << ".");
         return status;

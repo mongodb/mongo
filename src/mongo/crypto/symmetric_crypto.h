@@ -31,6 +31,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <set>
 #include <string>
 

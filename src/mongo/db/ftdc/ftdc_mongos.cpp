@@ -27,26 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <functional>
+#include <memory>
+#include <string>
 
-#include "mongo/db/ftdc/ftdc_mongos.h"
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 
-#include <boost/filesystem.hpp>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor_manager.h"
+#include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/controller.h"
+#include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/ftdc/ftdc_server.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/ftdc/util.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/executor/connection_pool_stats.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/transport/transport_layer_ftdc_collector.h"
-#include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 

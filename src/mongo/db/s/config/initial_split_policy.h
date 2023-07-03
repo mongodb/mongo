@@ -29,18 +29,32 @@
 
 #pragma once
 
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <utility>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/uuid.h"
+
 namespace mongo {
 
 struct SplitPolicyParams {
@@ -288,11 +302,13 @@ public:
                                          const ShardKeyPattern& shardKey,
                                          int numInitialChunks,
                                          boost::optional<std::vector<TagsType>> zones,
+                                         boost::optional<std::vector<ShardId>> availableShardIds,
                                          int samplesPerChunk = kDefaultSamplesPerChunk);
 
     SamplingBasedSplitPolicy(int numInitialChunks,
                              boost::optional<std::vector<TagsType>> zones,
-                             std::unique_ptr<SampleDocumentSource> samples);
+                             std::unique_ptr<SampleDocumentSource> samples,
+                             boost::optional<std::vector<ShardId>> availableShardIds);
 
     /**
      * Generates the initial split points and returns them in ascending shard key order. Does not
@@ -342,6 +358,8 @@ private:
     const int _numInitialChunks;
     boost::optional<std::vector<TagsType>> _zones;
     std::unique_ptr<SampleDocumentSource> _samples;
+    // If provided, only pick shard that is in this vector.
+    boost::optional<std::vector<ShardId>> _availableShardIds;
 };
 
 class ShardDistributionSplitPolicy : public InitialSplitPolicy {

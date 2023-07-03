@@ -27,31 +27,53 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <boost/algorithm/string/join.hpp>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/range/adaptor/argument_fwd.hpp>
+#include <boost/range/adaptor/transformed.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
 #include <fmt/format.h>
+#include <numeric>
 #include <queue>
+#include <s2cellid.h>
+#include <tuple>
 #include <vector>
 
-#include "mongo/db/query/query_solution.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include <boost/algorithm/string/join.hpp>
-#include <boost/range/adaptor/transformed.hpp>
-
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/mutable/document.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/interval.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
+#include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/projection_ast_util.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/util/set_util.h"
+#include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 
@@ -174,6 +196,20 @@ bool QuerySolutionNode::hasNode(StageType type) const {
     }
 
     return false;
+}
+
+bool QuerySolutionNode::isEligibleForPlanCache() const {
+    if (!eligibleForPlanCache) {
+        return false;
+    }
+
+    for (auto&& child : children) {
+        if (!child->isEligibleForPlanCache()) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 std::string QuerySolution::summaryString() const {
@@ -666,6 +702,14 @@ void IndexScanNode::appendToString(str::stream* ss, int indent) const {
     addCommon(ss, indent);
 }
 
+bool IndexScanNode::hasStringBounds(const string& field) const {
+    std::set<StringData> collatedFields = getFieldsWithStringBounds(bounds, index.keyPattern);
+    if (collatedFields.find(field) != collatedFields.end()) {
+        return true;
+    }
+    return false;
+}
+
 FieldAvailability IndexScanNode::getFieldAvailability(const string& field) const {
     // A $** index whose bounds overlap the object type bracket cannot provide covering, since the
     // index only contains the leaf nodes along each of the object's subpaths.
@@ -692,11 +736,18 @@ FieldAvailability IndexScanNode::getFieldAvailability(const string& field) const
             return FieldAvailability::kNotProvided;
     }
 
+    // If the index and the query collator are the same and the field is in the index we can use it
+    // for sorting and search.
+    if (index.collator && CollatorInterface::collatorsMatch(index.collator, this->queryCollator)) {
+        if (hasStringBounds(field)) {
+            return FieldAvailability::kCollatedProvided;
+        }
+    }
+
     // If the index has a non-simple collation and we have collation keys inside 'field', then this
     // index scan does not provide that field (and the query cannot be covered).
     if (index.collator) {
-        std::set<StringData> collatedFields = getFieldsWithStringBounds(bounds, index.keyPattern);
-        if (collatedFields.find(field) != collatedFields.end()) {
+        if (hasStringBounds(field)) {
             return FieldAvailability::kNotProvided;
         }
     }
@@ -993,12 +1044,17 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
                 "The bounds did not have as many fields as the key pattern.",
                 static_cast<size_t>(index.keyPattern.nFields()) == bounds.fields.size());
 
-        // No sorts are provided if the bounds for '$_path' consist of multiple intervals. This can
-        // happen for existence queries. For example, {a: {$exists: true}} results in bounds
-        // [["a","a"], ["a.", "a/")] for '$_path' so that keys from documents where "a" is a nested
-        // object are in bounds.
-        if (bounds.fields[index.wildcardFieldPos - 1].intervals.size() != 1u) {
-            return {};
+        // TODO SERVER-68303: Merge this check with the same check below for CWI.
+        //
+        // No sorts are provided if this wildcard index has one single field and the bounds for
+        // '$_path' consist of multiple intervals. This can happen for existence queries. For
+        // example, {a: {$exists: true}} results in bounds
+        // [["a","a"], ["a.", "a/")] for '$_path' so that keys from documents where "a" is a
+        // nested object are in bounds.
+        if (bounds.fields.size() == 2u) {
+            if (bounds.fields[index.wildcardFieldPos - 1].intervals.size() != 1u) {
+                return {};
+            }
         }
 
         BSONObjBuilder sortPatternStripped;
@@ -1007,13 +1063,24 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
         // (Ignore FCV check): This is intentional because we want clusters which have wildcard
         // indexes still be able to use the feature even if the FCV is downgraded.
         if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe()) {
-            bool hasPathField = false;
             for (auto elem : sortPatternProvidedByIndex) {
                 if (elem.fieldNameStringData() == "$_path"_sd) {
-                    if (hasPathField) {
+                    tassert(7767200,
+                            "The bounds cannot be empty.",
+                            bounds.fields[index.wildcardFieldPos - 1].intervals.size() > 0u);
+
+                    auto allValuePath = wcp::makeAllValuesForPath();
+                    // No sorts on the following fields should be provided if it's full scan on the
+                    // '$_path' field or the bounds for '$_path' consist of multiple intervals. This
+                    // can happen for existence queries. For example, {a: {$exists: true}} results
+                    // in bounds [["a","a"], ["a.", "a/")] for '$_path' so that keys from documents
+                    // where "a" is a nested object are in bounds.
+                    if (bounds.fields[index.wildcardFieldPos - 1].intervals.size() != 1u ||
+                        std::equal(bounds.fields[index.wildcardFieldPos - 1].intervals.begin(),
+                                   bounds.fields[index.wildcardFieldPos - 1].intervals.end(),
+                                   allValuePath.begin())) {
                         break;
                     }
-                    hasPathField = true;
                 } else {
                     sortPatternStripped.append(elem);
                 }
@@ -1702,7 +1769,7 @@ void EqLookupNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "EQ_LOOKUP\n";
     addIndent(ss, indent + 1);
-    *ss << "from = " << foreignCollection << "\n";
+    *ss << "from = " << toStringForLogging(foreignCollection) << "\n";
     addIndent(ss, indent + 1);
     *ss << "as = " << joinField.fullPath() << "\n";
     addIndent(ss, indent + 1);

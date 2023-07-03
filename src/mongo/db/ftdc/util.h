@@ -30,12 +30,21 @@
 #pragma once
 
 #include <boost/filesystem/path.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 
+#include "mongo/base/data_range.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/ftdc/decompressor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

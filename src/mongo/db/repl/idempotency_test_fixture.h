@@ -29,21 +29,30 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <initializer_list>
 #include <ostream>
 #include <string>
+#include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

@@ -27,18 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <boost/intrusive_ptr.hpp>
+#include <bitset>
+#include <cmath>
+#include <cstddef>
 #include <deque>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -46,8 +52,12 @@
 #include "mongo/db/pipeline/document_source_bucket_auto.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -868,8 +878,8 @@ TEST_F(BucketAutoTests, RedactionWithoutOutputField) {
         R"({
             "$bucketAuto": {
                 "groupBy": "$HASH<_id>",
-                "buckets": "?",
-                "granularity": "?",
+                "buckets": "?number",
+                "granularity": "?string",
                 "output": {
                     "HASH<count>": {
                         "$sum": "?number"
@@ -896,7 +906,7 @@ TEST_F(BucketAutoTests, RedactionWithOutputField) {
         R"({
             "$bucketAuto": {
                 "groupBy": "$HASH<year>",
-                "buckets": "?",
+                "buckets": "?number",
                 "output": {
                     "HASH<count>": {
                         "$sum": "?number"

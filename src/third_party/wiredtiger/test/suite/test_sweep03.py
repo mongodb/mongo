@@ -32,6 +32,7 @@
 
 import time
 from suite_subprocess import suite_subprocess
+import wiredtiger
 from wiredtiger import stat
 from wtscenario import make_scenarios
 import wttest
@@ -167,6 +168,31 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(close2, close1)
         # Ensure that any space was reclaimed from cache.
         self.assertLess(cache2, cache1)
+
+    # FIXME - WT11133 Uncomment and re-enable this test after fixing this ticket.
+    # def test_force_drop_and_sweep(self):
+    #     # Create a table to drop.
+    #     # The following sequence of operations are expected to generate several errors, but not crash/abort.
+    #     drop_uri = '%s.%s' % (self.uri, "force_drop_and_sweep_test")
+    #
+    #     self.session.create(drop_uri, "")
+    #     self.session.begin_transaction()
+    #
+    #     c = self.session.open_cursor(drop_uri, None)
+    #     for k in range(5):
+    #         c["key{}".format(k)] = "value".format(k)
+    #     c.close()
+    #
+    #     self.session.drop(drop_uri, "force=true")
+    #     time.sleep(1)
+    #
+    #     self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+    #         lambda: self.session.checkpoint('name=ckpt'),
+    #         '/not permitted in a running transaction/')
+    #
+    #     self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+    #         lambda: self.session.commit_transaction(),
+    #         '/transaction requires rollback/')
 
 if __name__ == '__main__':
     wttest.run()

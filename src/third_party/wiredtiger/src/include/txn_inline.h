@@ -895,6 +895,7 @@ __wt_upd_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value, u_int modify_type
   size_t *sizep)
 {
     WT_UPDATE *upd;
+    size_t allocsz; /* Allocation size in bytes. */
 
     *updp = NULL;
 
@@ -909,6 +910,11 @@ __wt_upd_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value, u_int modify_type
         (value != NULL &&
           !(modify_type == WT_UPDATE_RESERVE || modify_type == WT_UPDATE_TOMBSTONE)));
 
+    if (value == NULL || value->size == 0)
+        allocsz = WT_UPDATE_SIZE_NOVALUE;
+    else
+        allocsz = WT_UPDATE_SIZE + value->size;
+
     /*
      * Allocate the WT_UPDATE structure and room for the value, then copy any value into place.
      * Memory is cleared, which is the equivalent of setting:
@@ -918,7 +924,7 @@ __wt_upd_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value, u_int modify_type
      *    WT_UPDATE.prepare_state = WT_PREPARE_INIT;
      *    WT_UPDATE.flags = 0;
      */
-    WT_RET(__wt_calloc(session, 1, WT_UPDATE_SIZE + (value == NULL ? 0 : value->size), &upd));
+    WT_RET(__wt_calloc(session, 1, allocsz, &upd));
     if (value != NULL && value->size != 0) {
         upd->size = WT_STORE_SIZE(value->size);
         memcpy(upd->data, value->data, value->size);
@@ -951,7 +957,10 @@ __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, 
   WT_UPDATE **prepare_updp, WT_UPDATE **restored_updp)
 {
     WT_VISIBLE_TYPE upd_visible;
+    uint64_t prepare_txnid;
     uint8_t prepare_state, type;
+
+    prepare_txnid = WT_TXN_NONE;
 
     if (prepare_updp != NULL)
         *prepare_updp = NULL;
@@ -966,6 +975,35 @@ __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, 
             continue;
 
         WT_ORDERED_READ(prepare_state, upd->prepare_state);
+
+        /*
+         * We previously found a prepared update, check if the update has the same transaction id,
+         * if it does it must not be visible as it is part of the same transaction as the previous
+         * prepared update.
+         */
+        if (prepare_txnid != WT_TXN_NONE && upd->txnid == prepare_txnid) {
+            /*
+             * If we see an update with prepare resolved this indicates that the read, which is
+             * configured to ignore prepared updates raced with the commit of the same prepared
+             * transaction. Increment a stat to track this.
+             *
+             * This case exists as reconciliation chooses which update to write to disk in a newest
+             * to oldest fashion, and if prepared update resolution happens in the same direction
+             * some artifacts of a prepared transaction could be written to disk while some remain
+             * only in-memory. Instead prepared update resolution is recursively done from oldest to
+             * newest. Which mean that our reader would see a prepared update followed by a
+             * committed update.
+             *
+             * There is an alternate solution which would have reconciliation forget the chosen
+             * update if it sees a prepared update after it. That would allow the update chain
+             * resolution to occur from newest to oldest and this reader edge case would no longer
+             * exist. That solution needs further exploration.
+             */
+            if (prepare_state == WT_PREPARE_RESOLVED)
+                WT_STAT_CONN_DATA_INCR(session, txn_read_race_prepare_commit);
+            continue;
+        }
+
         /*
          * If the cursor is configured to ignore tombstones, copy the timestamps from the tombstones
          * to the stop time window of the update value being returned to the caller. Caller can
@@ -1009,8 +1047,10 @@ __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, 
 
         if (upd_visible == WT_VISIBLE_PREPARE) {
             /* Ignore the prepared update, if transaction configuration says so. */
-            if (F_ISSET(session->txn, WT_TXN_IGNORE_PREPARE))
+            if (F_ISSET(session->txn, WT_TXN_IGNORE_PREPARE)) {
+                prepare_txnid = upd->txnid;
                 continue;
+            }
 
             return (WT_PREPARE_CONFLICT);
         }
@@ -1226,6 +1266,9 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
     F_SET(txn, WT_TXN_RUNNING);
     if (F_ISSET(S2C(session), WT_CONN_READONLY))
         F_SET(txn, WT_TXN_READONLY);
+
+    WT_ASSERT_ALWAYS(
+      session, txn->mod_count == 0, "The mod count should be 0 when beginning a transaction");
 
     return (0);
 }

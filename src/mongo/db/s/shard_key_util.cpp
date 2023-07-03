@@ -27,20 +27,56 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <iterator>
+#include <list>
 
-#include "mongo/db/s/shard_key_util.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/encryption_fields_util.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collation_spec.h"
+#include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/shard_key_index_util.h"
+#include "mongo/db/s/shard_key_util.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace shardkeyutil {
@@ -50,13 +86,12 @@ constexpr StringData kCheckShardingIndexCmdName = "checkShardingIndex"_sd;
 constexpr StringData kKeyPatternField = "keyPattern"_sd;
 
 /**
- * Constructs the BSON specification document for the create indexes command using the given
- * namespace, index key and options.
+ * Create an index specification used for create index command.
  */
-BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
-                             const BSONObj& keys,
-                             const BSONObj& collation,
-                             bool unique) {
+BSONObj makeIndexSpec(const NamespaceString& nss,
+                      const BSONObj& keys,
+                      const BSONObj& collation,
+                      bool unique) {
     BSONObjBuilder index;
 
     // Required fields for an index.
@@ -93,10 +128,22 @@ BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
         index.appendBool("unique", unique);
     }
 
+    return index.obj();
+}
+
+/**
+ * Constructs the BSON specification document for the create indexes command using the given
+ * namespace, index key and options.
+ */
+BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
+                             const BSONObj& keys,
+                             const BSONObj& collation,
+                             bool unique) {
+    auto indexSpec = makeIndexSpec(nss, keys, collation, unique);
     // The outer createIndexes command.
     BSONObjBuilder createIndexes;
     createIndexes.append("createIndexes", nss.coll());
-    createIndexes.append("indexes", BSON_ARRAY(index.obj()));
+    createIndexes.append("indexes", BSON_ARRAY(indexSpec));
     createIndexes.append("writeConcern", WriteConcernOptions::Majority);
     return createIndexes.obj();
 }
@@ -166,7 +213,8 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
 
     // 3. If proposed key is required to be unique, additionally check for exact match.
     if (hasUsefulIndexForKey && requiresUnique) {
-        BSONObj eqQuery = BSON("ns" << nss.ns() << "key" << shardKeyPattern.toBSON());
+        BSONObj eqQuery =
+            BSON("ns" << NamespaceStringUtil::serialize(nss) << "key" << shardKeyPattern.toBSON());
         BSONObj eqQueryResult;
 
         for (const auto& idx : indexes) {
@@ -288,10 +336,11 @@ std::vector<BSONObj> ValidationBehaviorsShardCollection::loadIndexes(
 void ValidationBehaviorsShardCollection::verifyUsefulNonMultiKeyIndex(
     const NamespaceString& nss, const BSONObj& proposedKey) const {
     BSONObj res;
-    auto success = _localClient->runCommand(
-        DatabaseName::kAdmin,
-        BSON(kCheckShardingIndexCmdName << nss.ns() << kKeyPatternField << proposedKey),
-        res);
+    auto success = _localClient->runCommand(DatabaseName::kAdmin,
+                                            BSON(kCheckShardingIndexCmdName
+                                                 << NamespaceStringUtil::serialize(nss)
+                                                 << kKeyPatternField << proposedKey),
+                                            res);
     uassert(ErrorCodes::InvalidOptions, res["errmsg"].str(), success);
 }
 
@@ -347,9 +396,9 @@ void ValidationBehaviorsRefineShardKey::verifyUsefulNonMultiKeyIndex(
         _opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         "admin",
-        appendShardVersion(
-            BSON(kCheckShardingIndexCmdName << nss.ns() << kKeyPatternField << proposedKey),
-            _cri.getShardVersion(_indexShard->getId())),
+        appendShardVersion(BSON(kCheckShardingIndexCmdName << NamespaceStringUtil::serialize(nss)
+                                                           << kKeyPatternField << proposedKey),
+                           _cri.getShardVersion(_indexShard->getId())),
         Shard::RetryPolicy::kIdempotent));
     if (checkShardingIndexRes.commandStatus == ErrorCodes::UnknownError) {
         // CheckShardingIndex returns UnknownError if a compatible shard key index cannot be found,
@@ -423,6 +472,65 @@ void ValidationBehaviorsLocalRefineShardKey::createShardKeyIndex(
     MONGO_UNREACHABLE;
 }
 
+ValidationBehaviorsReshardingBulkIndex::ValidationBehaviorsReshardingBulkIndex()
+    : _opCtx(nullptr), _cloneTimestamp(), _shardKeyIndexSpec() {}
+
+std::vector<BSONObj> ValidationBehaviorsReshardingBulkIndex::loadIndexes(
+    const NamespaceString& nss) const {
+    invariant(_opCtx);
+    auto catalogCache = Grid::get(_opCtx)->catalogCache();
+    auto cri = catalogCache->getShardedCollectionRoutingInfo(_opCtx, nss);
+    auto [indexSpecs, _] = MigrationDestinationManager::getCollectionIndexes(
+        _opCtx, nss, cri.cm.getMinKeyShardIdWithSimpleCollation(), cri, _cloneTimestamp);
+    return indexSpecs;
+}
+
+void ValidationBehaviorsReshardingBulkIndex::verifyUsefulNonMultiKeyIndex(
+    const NamespaceString& nss, const BSONObj& proposedKey) const {
+    invariant(_opCtx);
+    auto catalogCache = Grid::get(_opCtx)->catalogCache();
+    auto cri = catalogCache->getShardedCollectionRoutingInfo(_opCtx, nss);
+    auto shard = uassertStatusOK(Grid::get(_opCtx)->shardRegistry()->getShard(
+        _opCtx, cri.cm.getMinKeyShardIdWithSimpleCollation()));
+    auto checkShardingIndexRes = uassertStatusOK(
+        shard->runCommand(_opCtx,
+                          ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                          "admin",
+                          appendShardVersion(BSON(kCheckShardingIndexCmdName
+                                                  << nss.ns() << kKeyPatternField << proposedKey),
+                                             cri.getShardVersion(shard->getId())),
+                          Shard::RetryPolicy::kIdempotent));
+    if (checkShardingIndexRes.commandStatus == ErrorCodes::UnknownError) {
+        // CheckShardingIndex returns UnknownError if a compatible shard key index cannot be found,
+        // but we return InvalidOptions to correspond with the shardCollection behavior.
+        uasserted(ErrorCodes::InvalidOptions, checkShardingIndexRes.response["errmsg"].str());
+    }
+    // Rethrow any other error to allow retries on retryable errors.
+    uassertStatusOK(checkShardingIndexRes.commandStatus);
+}
+
+void ValidationBehaviorsReshardingBulkIndex::verifyCanCreateShardKeyIndex(
+    const NamespaceString& nss, std::string* errMsg) const {}
+
+void ValidationBehaviorsReshardingBulkIndex::createShardKeyIndex(
+    const NamespaceString& nss,
+    const BSONObj& proposedKey,
+    const boost::optional<BSONObj>& defaultCollation,
+    bool unique) const {
+    BSONObj collation =
+        defaultCollation && !defaultCollation->isEmpty() ? CollationSpec::kSimpleSpec : BSONObj();
+    _shardKeyIndexSpec = makeIndexSpec(nss, proposedKey, collation, unique);
+}
+
+void ValidationBehaviorsReshardingBulkIndex::setOpCtxAndCloneTimestamp(OperationContext* opCtx,
+                                                                       Timestamp cloneTimestamp) {
+    _opCtx = opCtx;
+    _cloneTimestamp = cloneTimestamp;
+}
+
+boost::optional<BSONObj> ValidationBehaviorsReshardingBulkIndex::getShardKeyIndexSpec() const {
+    return _shardKeyIndexSpec;
+}
 
 }  // namespace shardkeyutil
 }  // namespace mongo

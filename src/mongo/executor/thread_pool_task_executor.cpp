@@ -28,24 +28,38 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/executor/thread_pool_task_executor.h"
-
-#include <boost/optional.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
 #include <iterator>
+#include <queue>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/transport/baton.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kExecutor
@@ -90,8 +104,9 @@ public:
     }
 
     // All fields except for "canceled" are guarded by the owning task executor's _mutex. The
-    // "canceled" field may be observed without holding _mutex, but may only be set while holding
-    // _mutex.
+    // "canceled" field may be observed without holding _mutex only if we are checking if the value
+    // is true. This is because once "canceled" stores true, we never set it back to false. The
+    // "canceled" field may only be set while holding _mutex.
 
     CallbackFn callback;
     AtomicWord<unsigned> canceled{0U};
@@ -731,34 +746,22 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaust
                 return;
             }
 
-            if (cbState->canceled.load()) {
-                // Release any resources the callback function is holding
-                TaskExecutor::CallbackFn callback = [](const CallbackArgs&) {
-                };
-                std::swap(cbState->callback, callback);
-
-                _networkInProgressQueue.erase(cbState->iter);
-                cbState->exhaustErased.store(1);
-
-                if (cbState->exhaustIter) {
-                    _poolInProgressQueue.erase(cbState->exhaustIter.value());
-                    cbState->exhaustIter = boost::none;
-                }
-
-                return;
-            }
-
             // Swap the callback function with the new one
             CallbackFn newCb = [cb, scheduledRequest, response](const CallbackArgs& cbData) {
                 remoteCommandFinished(cbData, cb, scheduledRequest, response);
             };
             swap(cbState->callback, newCb);
 
-            // If this is the last response, invoke the non-exhaust path. This will mark cbState as
-            // finished and remove the task from _networkInProgressQueue
-            if (!response.moreToCome) {
+            // If this is the last response, or command was cancelled, invoke the non-exhaust path.
+            // This will mark cbState as finished and remove the task from _networkInProgressQueue.
+            if (!response.moreToCome || cbState->canceled.load()) {
                 _networkInProgressQueue.erase(cbState->iter);
                 cbState->exhaustErased.store(1);
+
+                if (cbState->canceled.load() && cbState->exhaustIter) {
+                    _poolInProgressQueue.erase(cbState->exhaustIter.value());
+                    cbState->exhaustIter = boost::none;
+                }
 
                 WorkQueue result;
                 result.emplace_front(cbState);
@@ -828,19 +831,19 @@ void ThreadPoolTaskExecutor::runCallbackExhaust(std::shared_ptr<CallbackState> c
                       std::move(cbHandle),
                       cbState->canceled.load() ? kCallbackCanceledErrorStatus : Status::OK());
 
-    if (!cbState->isFinished.load()) {
+    if (auto lk = stdx::unique_lock(_mutex); !cbState->isFinished.load()) {
         TaskExecutor::CallbackFn callback = [](const CallbackArgs&) {
         };
         {
-            auto lk = stdx::lock_guard(_mutex);
             std::swap(cbState->callback, callback);
+            lk.unlock();
         }
         callback(std::move(args));
 
+        lk.lock();
         // Leave the empty callback function if the request has been marked canceled or finished
         // while running the callback to avoid leaking resources.
         if (!cbState->canceled.load() && !cbState->isFinished.load()) {
-            auto lk = stdx::lock_guard(_mutex);
             std::swap(callback, cbState->callback);
         }
     }

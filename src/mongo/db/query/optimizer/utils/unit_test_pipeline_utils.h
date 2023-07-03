@@ -29,14 +29,25 @@
 
 #pragma once
 
-#include "mongo/db/operation_context_noop.h"
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/optimizer/containers.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/golden_test.h"
+#include "mongo/unittest/golden_test_base.h"
 
 namespace mongo::optimizer {
 

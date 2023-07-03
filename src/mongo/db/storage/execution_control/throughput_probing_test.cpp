@@ -28,8 +28,23 @@
  */
 
 #include "mongo/db/storage/execution_control/throughput_probing.h"
+
+#include <cmath>
+#include <functional>
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/storage/execution_control/throughput_probing_gen.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/periodic_runner.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo::execution_control {
@@ -70,7 +85,7 @@ public:
     void resume() override {}
     void stop() override {}
 
-    Milliseconds getPeriod() override {
+    Milliseconds getPeriod() const override {
         return _job.interval;
     }
 
@@ -115,7 +130,7 @@ TickSourceMock<Microseconds>* initTickSource(ServiceContext* svcCtx) {
 
 class ThroughputProbingTest : public unittest::Test {
 protected:
-    explicit ThroughputProbingTest(int32_t size = 64)
+    explicit ThroughputProbingTest(int32_t size = 64, double readWriteRatio = 0.5)
         : _runner([svcCtx = _svcCtx.get()] {
               auto runner = std::make_unique<MockPeriodicRunner>();
               auto runnerPtr = runner.get();
@@ -125,6 +140,7 @@ protected:
           _tickSource(initTickSource(_svcCtx.get())),
           _throughputProbing([&]() -> ThroughputProbing {
               throughput_probing::gInitialConcurrency = size;
+              throughput_probing::gReadWriteRatio.store(readWriteRatio);
               return {_svcCtx.get(), &_readTicketHolder, &_writeTicketHolder, Milliseconds{1}};
           }()) {
         // We need to advance the ticks to something other than zero, since that is used to
@@ -167,6 +183,16 @@ protected:
     // This input is the total initial concurrency between both ticketholders, so it will be split
     // evenly between each ticketholder. We are attempting to test a limit that is per-ticketholder.
     ThroughputProbingMinConcurrencyTest() : ThroughputProbingTest(gMinConcurrency * 2) {}
+};
+
+class ThroughputProbingReadHeavyTest : public ThroughputProbingTest {
+protected:
+    ThroughputProbingReadHeavyTest() : ThroughputProbingTest(16, 0.9) {}
+};
+
+class ThroughputProbingWriteHeavyTest : public ThroughputProbingTest {
+protected:
+    ThroughputProbingWriteHeavyTest() : ThroughputProbingTest(16, 0.1) {}
 };
 
 TEST_F(ThroughputProbingTest, ProbeUpSucceeds) {
@@ -353,8 +379,8 @@ TEST_F(ThroughputProbingMinConcurrencyTest, StepSizeNonZero) {
 }
 
 TEST_F(ThroughputProbingTest, ReadWriteRatio) {
-    gReadWriteRatio.store(2);  // 33% of tickets for writes, 66% for reads
-    ON_BLOCK_EXIT([]() { gReadWriteRatio.store(1); });
+    gReadWriteRatio.store(0.67);  // 33% of tickets for writes, 67% for reads
+    ON_BLOCK_EXIT([]() { gReadWriteRatio.store(0.5); });
 
     auto initialReads = _readTicketHolder.outof();
     auto reads = initialReads;
@@ -398,6 +424,92 @@ TEST_F(ThroughputProbingTest, ReadWriteRatio) {
 
     // This imbalance should still exist.
     ASSERT_GT(_readTicketHolder.outof(), _writeTicketHolder.outof());
+}
+
+TEST_F(ThroughputProbingReadHeavyTest, StepSizeNonZeroIncreasing) {
+    auto reads = _readTicketHolder.outof();
+    auto writes = _writeTicketHolder.outof();
+    ASSERT_GT(reads, writes);
+
+    // The concurrency level and read/write ratio are such that the step multiple on its own is not
+    // enough to get to the next integer for writes.
+    ASSERT_EQ(std::lround(writes * (1 + gStepMultiple.load())), writes);
+
+    // Write tickets are exhausted.
+    _writeTicketHolder.setUsed(writes);
+    _writeTicketHolder.setUsed(writes - 1);
+    _writeTicketHolder.setNumFinishedProcessing(1);
+    _tick();
+
+    // Stable. Probe up next since tickets are exhausted. The number of write tickets should still
+    // go up by 1.
+    _run();
+    ASSERT_GT(_readTicketHolder.outof(), reads);
+    ASSERT_EQ(_writeTicketHolder.outof(), writes + 1);
+}
+
+TEST_F(ThroughputProbingReadHeavyTest, StepSizeNonZeroDecreasing) {
+    auto reads = _readTicketHolder.outof();
+    auto writes = _writeTicketHolder.outof();
+    ASSERT_GT(reads, writes);
+
+    // The concurrency level and read/write ratio are such that the step multiple on its own is not
+    // enough to get to the next integer for writes.
+    ASSERT_EQ(std::lround(writes * (1 - gStepMultiple.load())), writes);
+
+    // Tickets are not exhausted.
+    _readTicketHolder.setUsed(reads - 1);
+    _readTicketHolder.setNumFinishedProcessing(1);
+    _tick();
+
+    // Stable. Probe down next since tickets are not exhausted. The number of write tickets should
+    // still go down by 1.
+    _run();
+    ASSERT_LT(_readTicketHolder.outof(), reads);
+    ASSERT_EQ(_writeTicketHolder.outof(), writes - 1);
+}
+
+TEST_F(ThroughputProbingWriteHeavyTest, StepSizeNonZeroIncreasing) {
+    auto reads = _readTicketHolder.outof();
+    auto writes = _writeTicketHolder.outof();
+    ASSERT_LT(reads, writes);
+
+    // The concurrency level and read/write ratio are such that the step multiple on its own is not
+    // enough to get to the next integer for reads.
+    ASSERT_EQ(std::lround(reads * (1 + gStepMultiple.load())), reads);
+
+    // Read tickets are exhausted.
+    _readTicketHolder.setUsed(reads);
+    _readTicketHolder.setUsed(reads - 1);
+    _readTicketHolder.setNumFinishedProcessing(1);
+    _tick();
+
+    // Stable. Probe up next since tickets are exhausted. The number of read tickets should still
+    // go up by 1.
+    _run();
+    ASSERT_EQ(_readTicketHolder.outof(), reads + 1);
+    ASSERT_GT(_writeTicketHolder.outof(), writes);
+}
+
+TEST_F(ThroughputProbingWriteHeavyTest, StepSizeNonZeroDecreasing) {
+    auto reads = _readTicketHolder.outof();
+    auto writes = _writeTicketHolder.outof();
+    ASSERT_LT(reads, writes);
+
+    // The concurrency level and read/write ratio are such that the step multiple on its own is not
+    // enough to get to the next integer for reads.
+    ASSERT_EQ(std::lround(reads * (1 + gStepMultiple.load())), reads);
+
+    // Tickets are not exhausted.
+    _writeTicketHolder.setUsed(writes - 1);
+    _writeTicketHolder.setNumFinishedProcessing(1);
+    _tick();
+
+    // Stable. Probe down next since tickets are not exhausted. The number of read tickets should
+    // still go down by 1.
+    _run();
+    ASSERT_EQ(_readTicketHolder.outof(), reads - 1);
+    ASSERT_LT(_writeTicketHolder.outof(), writes);
 }
 
 

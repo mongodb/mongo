@@ -27,23 +27,74 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <iostream>
+#include <iterator>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_util.h"
-#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -382,7 +433,7 @@ protected:
         return pipeline;
     }
 
-    const NamespaceString _crudNss{"test.foo"};
+    const NamespaceString _crudNss = NamespaceString::createNamespaceString_forTest("test.foo");
     // Use a constant value so unittests can store oplog entries as extended json strings in code.
     const UUID _reshardingCollUUID =
         fassert(5074001, UUID::parse("8926ba8e-611a-42c2-bb1a-3b7819f610ed"));
@@ -1430,7 +1481,7 @@ using ReshardingAggWithStorageTest = MockReplCoordServerFixture;
 // with no-op pre/post image oplog.
 TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
     repl::OpTime opTime(Timestamp(43, 56), 1);
-    const NamespaceString kCrudNs("foo", "bar");
+    const NamespaceString kCrudNs = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const UUID kCrudUUID = UUID::gen();
     const ShardId kMyShardId{"shard1"};
     ReshardingDonorOplogId id(opTime.getTimestamp(), opTime.getTimestamp());
@@ -1525,7 +1576,7 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
 
 TEST_F(ReshardingAggWithStorageTest,
        RetryableFindAndModifyInsideInternalTransactionWithImageLookup) {
-    const NamespaceString kCrudNs("foo", "bar");
+    const NamespaceString kCrudNs = NamespaceString::createNamespaceString_forTest("foo", "bar");
     const UUID kCrudUUID = UUID::gen();
     const ShardId kMyShardId{"shard1"};
 

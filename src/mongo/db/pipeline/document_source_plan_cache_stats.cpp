@@ -27,9 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <iterator>
+#include <list>
 
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_plan_cache_stats.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -77,7 +89,8 @@ void DocumentSourcePlanCacheStats::serializeToArray(std::vector<Value>& array,
     if (opts.verbosity) {
         tassert(7513100,
                 "$planCacheStats is not equipped to serialize in explain mode with redaction on",
-                !opts.applyHmacToIdentifiers && !opts.replacementForLiteralArgs);
+                !opts.transformIdentifiers &&
+                    opts.literalPolicy == LiteralSerializationPolicy::kUnchanged);
         array.push_back(Value{Document{
             {kStageName,
              Document{{"match"_sd, _absorbedMatch ? Value{_absorbedMatch->getQuery()} : Value{}},

@@ -27,14 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
 #include <cstddef>
+#include <memory>
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/repl/idempotency_document_structure.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

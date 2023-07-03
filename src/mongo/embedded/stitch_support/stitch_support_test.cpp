@@ -28,14 +28,26 @@
  */
 
 #include <algorithm>
+#include <iostream>
+#include <iterator>
 #include <string>
+#include <tuple>
 #include <utility>
+#include <vector>
 
 #include "stitch_support/stitch_support.h"
 
 #include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
@@ -98,7 +110,7 @@ protected:
         ASSERT(matcher);
         ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
         return std::all_of(
-            documentsJSON.begin(), documentsJSON.end(), [=](const char* documentJSON) {
+            documentsJSON.begin(), documentsJSON.end(), [=, this](const char* documentJSON) {
                 bool isMatch;
                 stitch_support_v1_check_match(
                     matcher, toBSONForAPI(documentJSON).first, &isMatch, nullptr);
@@ -153,7 +165,7 @@ protected:
         std::transform(documentsJSON.begin(),
                        documentsJSON.end(),
                        std::back_inserter(results),
-                       [=](const char* documentJSON) {
+                       [=, this](const char* documentJSON) {
                            auto bson = stitch_support_v1_projection_apply(
                                projection, toBSONForAPI(documentJSON).first, nullptr);
                            auto result = fromBSONForAPI(bson);

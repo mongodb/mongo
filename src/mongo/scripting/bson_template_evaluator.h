@@ -44,10 +44,15 @@
  */
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <string>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/random.h"
 

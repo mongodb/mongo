@@ -29,14 +29,39 @@
 
 // Unit tests for MatchExpression::serialize serialization.
 
-#include "mongo/platform/basic.h"
+#include <array>
+#include <cstdint>
+#include <fmt/format.h>
+#include <functional>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
 
-#include "mongo/db/json.h"
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_eq.h"
@@ -47,8 +72,14 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -1869,8 +1900,8 @@ TEST(SerializeInternalSchema, AllowedPropertiesRedactsCorrectly) {
     ASSERT_OK(objMatch.getStatus());
 
     SerializationOptions opts;
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1914,9 +1945,9 @@ std::unique_ptr<InternalSchemaCondMatchExpression> createCondMatchExpression(BSO
 
 TEST(SerializeInternalSchema, CondMatchRedactsCorrectly) {
     SerializationOptions opts;
-    opts.applyHmacToIdentifiers = true;
+    opts.transformIdentifiers = true;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.transformIdentifiersCallback = applyHmacForTest;
     auto conditionQuery = BSON("age" << BSON("$lt" << 18));
     auto thenQuery = BSON("job"
                           << "student");
@@ -1970,8 +2001,8 @@ TEST(SerializeInternalSchema, MatchArrayIndexRedactsCorrectly) {
     BSONObjBuilder bob;
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
     objMatch.getValue()->serialize(&bob, opts);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1994,8 +2025,8 @@ TEST(SerializeInternalSchema, MaxItemsRedactsCorrectly) {
     InternalSchemaMaxItemsMatchExpression maxItems("a.b"_sd, 2);
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaMaxItems":"?number"})",
         maxItems.getSerializedRightHandSide(opts));
@@ -2005,8 +2036,8 @@ TEST(SerializeInternalSchema, MaxLengthRedactsCorrectly) {
     InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 2);
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaMaxLength":"?number"})",
         maxLength.getSerializedRightHandSide(opts));
@@ -2016,8 +2047,8 @@ TEST(SerializeInternalSchema, MinItemsRedactsCorrectly) {
     InternalSchemaMinItemsMatchExpression minItems("a.b"_sd, 2);
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaMinItems":"?number"})",
@@ -2048,8 +2079,8 @@ TEST(SerializeInternalSchema, MinPropertiesRedactsCorrectly) {
 TEST(SerializeInternalSchema, ObjectMatchRedactsCorrectly) {
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
     auto query = fromjson(
         "    {a: {$_internalSchemaObjectMatch: {"
         "        c: {$eq: 3}"
@@ -2068,8 +2099,8 @@ TEST(SerializeInternalSchema, RootDocEqRedactsCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -2122,9 +2153,8 @@ TEST(SerializesInternalSchema, MaxPropertiesRedactsCorrectly) {
 TEST(SerializesInternalSchema, EqRedactsCorrectly) {
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.identifierHmacPolicy = applyHmacForTest;
-    opts.applyHmacToIdentifiers = true;
-    opts.replacementForLiteralArgs = "?";
+    opts.transformIdentifiersCallback = applyHmacForTest;
+    opts.transformIdentifiers = true;
     auto query = fromjson("{$_internalSchemaEq: {a:1, b: {c: 1, d: [1]}}}");
     BSONObjBuilder bob;
     InternalSchemaEqMatchExpression e("a"_sd, query.firstElement());
@@ -2155,8 +2185,8 @@ TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, RedactsExpressionCorrec
         expr.getValue().get());
 
     SerializationOptions opts;
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT

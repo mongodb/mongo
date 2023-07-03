@@ -29,41 +29,78 @@
 
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/strings/string_view.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <string>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/client/read_preference.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/ops/write_ops_retryability.h"
-#include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_source_manager.h"
-#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/s/request_types/migration_secondary_throttle_options.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -83,6 +120,7 @@ const int kMaxObjectPerChunk{250000};
 const Hours kMaxWaitToCommitCloneForJumboChunk(6);
 
 MONGO_FAIL_POINT_DEFINE(failTooMuchMemoryUsed);
+MONGO_FAIL_POINT_DEFINE(hangAfterProcessingDeferredXferMods);
 
 /**
  * Returns true if the given BSON object in the shard key value pair format is within the given
@@ -107,7 +145,7 @@ BSONObj createRequestWithSessionId(StringData commandName,
                                    const MigrationSessionId& sessionId,
                                    bool waitForSteadyOrDone = false) {
     BSONObjBuilder builder;
-    builder.append(commandName, nss.ns());
+    builder.append(commandName, NamespaceStringUtil::serialize(nss));
     builder.append("waitForSteadyOrDone", waitForSteadyOrDone);
     sessionId.append(&builder);
     return builder.obj();
@@ -448,7 +486,7 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
 
     auto responseStatus = _callRecipient(opCtx, [&] {
         BSONObjBuilder builder;
-        builder.append(kRecvChunkCommit, nss().ns());
+        builder.append(kRecvChunkCommit, NamespaceStringUtil::serialize(nss()));
         // For backward compatibility with v6.0 recipients.
         // TODO (SERVER-67844): Remove it once 7.0 becomes LTS.
         builder.append("acquireCSOnRecipient", true);
@@ -457,7 +495,7 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
     }());
 
     if (responseStatus.isOK()) {
-        _cleanup();
+        _cleanup(true);
 
         if (_sessionCatalogSource && _sessionCatalogSource->hasMoreOplog()) {
             return {ErrorCodes::SessionTransferIncomplete,
@@ -496,7 +534,7 @@ void MigrationChunkClonerSource::cancelClone(OperationContext* opCtx) noexcept {
             [[fallthrough]];
         }
         case kNew:
-            _cleanup();
+            _cleanup(false);
             break;
         default:
             MONGO_UNREACHABLE;
@@ -888,6 +926,12 @@ void MigrationChunkClonerSource::_processDeferredXferMods(OperationContext* opCt
             CollectionMetadata::extractDocumentKey(&_shardKeyPattern, newerVersionDoc);
         static_cast<void>(_processUpdateForXferMod(preImageDocKey, postImageDocKey));
     }
+
+    hangAfterProcessingDeferredXferMods.execute([&](const auto& data) {
+        if (!deferredReloadOrDeletePreImageDocKeys.empty()) {
+            hangAfterProcessingDeferredXferMods.pauseWhileSet();
+        }
+    });
 }
 
 Status MigrationChunkClonerSource::nextModsBatch(OperationContext* opCtx, BSONObjBuilder* builder) {
@@ -912,6 +956,11 @@ Status MigrationChunkClonerSource::nextModsBatch(OperationContext* opCtx, BSONOb
         deleteList.splice(deleteList.cbegin(), _deleted);
         updateList.splice(updateList.cbegin(), _reload);
     }
+
+    // It's important to abandon any open snapshots before processing updates so that we are sure
+    // that our snapshot is at least as new as those updates. It's possible for a stale snapshot to
+    // still be open from reads performed by _processDeferredXferMods(), above.
+    opCtx->recoveryUnit()->abandonSnapshot();
 
     BSONArrayBuilder arrDel(builder->subarrayStart("deleted"));
     auto noopFn = [](BSONObj idDoc, BSONObj* fullDoc) {
@@ -943,11 +992,17 @@ Status MigrationChunkClonerSource::nextModsBatch(OperationContext* opCtx, BSONOb
     return Status::OK();
 }
 
-void MigrationChunkClonerSource::_cleanup() {
+void MigrationChunkClonerSource::_cleanup(bool wasSuccessful) {
     stdx::unique_lock<Latch> lk(_mutex);
     _state = kDone;
 
     _drainAllOutstandingOperationTrackRequests(lk);
+
+    if (wasSuccessful) {
+        invariant(_reload.empty());
+        invariant(_deleted.empty());
+        invariant(_deferredReloadOrDeletePreImageDocKeys.empty());
+    }
 
     _reload.clear();
     _untransferredUpsertsCounter = 0;
@@ -1297,7 +1352,7 @@ Status MigrationChunkClonerSource::_checkRecipientCloningStatus(OperationContext
                                   << migrationSessionIdStatus.getStatus().toString()};
         }
 
-        if (res["ns"].str() != nss().ns() ||
+        if (res["ns"].str() != NamespaceStringUtil::serialize(nss()) ||
             (res.hasField("fromShardId")
                  ? (res["fromShardId"].str() != _args.getFromShard().toString())
                  : (res["from"].str() != _donorConnStr.toString())) ||

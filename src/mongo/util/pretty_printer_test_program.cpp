@@ -31,11 +31,19 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/debugger.h"
 #include "mongo/util/decorable.h"
-
 
 #if defined(__clang__)
 #define clang_optnone __attribute__((optnone))
@@ -70,6 +78,15 @@ int clang_optnone main(int argc, char** argv) {
     intVec(d1) = {123, 213, 312};
     str1(d1) = "hello";
     str2(d1) = "world";
+    mongo::TenantId tenantId{mongo::OID{"6491a2112ef5c818703bf2a7"}};
+    mongo::DatabaseName dbName =
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "foo");
+    mongo::DatabaseName dbNameWithTenantId =
+        mongo::DatabaseName::createDatabaseName_forTest(tenantId, "foo");
+    mongo::NamespaceString nss =
+        mongo::NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar");
+    mongo::NamespaceString nssWithTenantId =
+        mongo::NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
     mongo::breakpoint();
 
     return 0;

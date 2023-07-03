@@ -27,15 +27,41 @@
  *    it in the license file.
  */
 
+#include <cstdint>
+#include <iostream>
+#include <limits>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/data_view.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
 #include "mongo/db/query/ce/test_utils.h"
-#include "mongo/db/query/optimizer/utils/ce_math.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/maxdiff_test_utils.h"
+#include "mongo/db/query/stats/scalar_histogram.h"
 #include "mongo/db/query/stats/value_utils.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::optimizer::ce {
 namespace {

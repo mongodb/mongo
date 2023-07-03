@@ -28,11 +28,20 @@
  */
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <utility>
+
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/future.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"

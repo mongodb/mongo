@@ -27,9 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/db/fts/fts_spec.h"
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_tokenizer.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/fts/fts_util.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace fts {

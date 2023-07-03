@@ -18,8 +18,6 @@ var st = new ShardingTest({shards: 2, mongos: 1});
 var mongos = st.s0;
 var admin = mongos.getDB("admin");
 var coll = mongos.getCollection("migration_server_status.coll");
-const usingSetClusterParameter =
-    FeatureFlagUtil.isPresentAndEnabled(st.config, "ClusterCardinalityParameter");
 
 assert.commandWorked(
     admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
@@ -74,10 +72,8 @@ var assertSessionMigrationStatusSource = function(
     if (expectedEntriesSkippedLowerBound == null) {
         assert(migrationResult.sessionOplogEntriesSkippedSoFarLowerBound);
     } else {
-        // Running DDL operations increases this number by 1
-        let actualEntriesSkippedLowerBound = usingSetClusterParameter
-            ? expectedEntriesSkippedLowerBound + 1
-            : expectedEntriesSkippedLowerBound;
+        // Running DDL operations increases this number by 1, and addShard runs setClusterParameter
+        let actualEntriesSkippedLowerBound = expectedEntriesSkippedLowerBound + 1;
         assert.eq(migrationResult.sessionOplogEntriesSkippedSoFarLowerBound,
                   actualEntriesSkippedLowerBound);
     }

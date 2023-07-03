@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * timeseries_deletes_and_inserts.js
  *
@@ -17,7 +15,7 @@
  * ]
  */
 
-var $config = (function() {
+export const $config = (function() {
     const data = {
         logColl: "deletes_and_inserts_log",
         nReadingsPerSensor: 100,

@@ -28,7 +28,17 @@
  */
 
 #include "mongo/db/op_observer/batched_write_context.h"
+
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 const OperationContext::Decoration<BatchedWriteContext> BatchedWriteContext::get =

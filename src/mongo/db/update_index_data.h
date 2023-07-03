@@ -29,7 +29,8 @@
 
 #pragma once
 
-#include <set>
+#include <absl/container/btree_set.h>
+#include <string>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
@@ -89,8 +90,8 @@ private:
      */
     bool _startsWith(const FieldRef& a, const FieldRef& b) const;
 
-    std::set<FieldRef> _canonicalPaths;
-    std::set<std::string> _pathComponents;
+    absl::btree_set<FieldRef> _canonicalPaths;
+    absl::btree_set<std::string> _pathComponents;
 
     bool _allPathsIndexed;
 };

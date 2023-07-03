@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
-#include "mongo/scripting/dbdirectclient_factory.h"
-
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/scripting/dbdirectclient_factory.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 

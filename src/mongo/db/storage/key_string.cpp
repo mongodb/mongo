@@ -28,22 +28,38 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/key_string.h"
-
+#include <algorithm>
+#include <boost/optional.hpp>
+#include <cfloat>
 #include <cmath>
+#include <cstdlib>
+#include <fmt/format.h>
+#include <limits>
+#include <memory>
+#include <set>
 #include <type_traits>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/bits.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/endian.h"
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/shared_buffer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -57,9 +73,9 @@ namespace mongo {
 
 using std::string;
 
-template class StackBufBuilderBase<KeyString::TypeBits::SmallStackSize>;
+template class StackBufBuilderBase<key_string::TypeBits::SmallStackSize>;
 
-namespace KeyString {
+namespace key_string {
 
 
 namespace {
@@ -2869,7 +2885,8 @@ int compare(const char* leftBuf, const char* rightBuf, size_t leftSize, size_t r
 }
 
 int Value::compareWithTypeBits(const Value& other) const {
-    return KeyString::compare(getBuffer(), other.getBuffer(), _buffer.size(), other._buffer.size());
+    return key_string::compare(
+        getBuffer(), other.getBuffer(), _buffer.size(), other._buffer.size());
 }
 
 bool readSBEValue(BufReader* reader,
@@ -2886,7 +2903,7 @@ bool readSBEValue(BufReader* reader,
     // "discriminator" types are used for querying and are never stored in an index.
     invariant(ctype > kLess && ctype < kGreater);
 
-    const uint32_t depth = 1;  // This function only gets called for a top-level KeyString::Value.
+    const uint32_t depth = 1;  // This function only gets called for a top-level key_string::Value.
     toBsonValue(ctype, reader, typeBits, inverted, version, valueBuilder, depth);
     return true;
 }
@@ -2900,7 +2917,7 @@ void appendSingleFieldToBSONAs(
     uint8_t ctype = readType<uint8_t>(&reader, inverted);
     invariant(ctype != kEnd && ctype > kLess && ctype < kGreater);
 
-    const uint32_t depth = 1;  // This function only gets called for a top-level KeyString::Value.
+    const uint32_t depth = 1;  // This function only gets called for a top-level key_string::Value.
     // Callers discard their TypeBits.
     TypeBits typeBits(version);
     TypeBits::Reader typeBitsReader(typeBits);
@@ -2917,7 +2934,7 @@ void appendToBSONArray(const char* buf, int len, BSONArrayBuilder* builder, Vers
     uint8_t ctype = readType<uint8_t>(&reader, inverted);
     invariant(ctype != kEnd && ctype > kLess && ctype < kGreater);
 
-    // This function only gets called for a top-level KeyString::Value.
+    // This function only gets called for a top-level key_string::Value.
     const uint32_t depth = 1;
     // All users of this currently discard type bits.
     TypeBits typeBits(version);
@@ -3053,9 +3070,9 @@ std::string explain(const char* buffer,
 
         RecordId recordId;
         if (keyFormat == KeyFormat::Long) {
-            recordId = KeyString::decodeRecordIdLongAtEnd(buffer, len);
+            recordId = key_string::decodeRecordIdLongAtEnd(buffer, len);
         } else {
-            recordId = KeyString::decodeRecordIdStrAtEnd(buffer, len);
+            recordId = key_string::decodeRecordIdStrAtEnd(buffer, len);
         }
         str << "Bytes: 0x" << hexblob::encodeLower(startPos, (len - startOff)) << "\n";
         auto kfString = (*keyFormat == KeyFormat::Long) ? "Long" : "String";
@@ -3067,6 +3084,6 @@ std::string explain(const char* buffer,
     return str;
 }
 
-}  // namespace KeyString
+}  // namespace key_string
 
 }  // namespace mongo

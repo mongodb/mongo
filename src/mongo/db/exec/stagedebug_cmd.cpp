@@ -27,40 +27,60 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/catalog/database.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/client.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
 #include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/limit.h"
 #include "mongo/db/exec/merge_sort.h"
 #include "mongo/db/exec/or.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/skip.h"
-#include "mongo/db/exec/sort.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/fts_access_method.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/transaction_resources.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -181,7 +201,7 @@ public:
 
         // Add a fetch at the top for the user so we can get obj back for sure.
         unique_ptr<PlanStage> rootFetch = std::make_unique<FetchStage>(
-            expCtx.get(), ws.get(), std::move(userRoot), nullptr, collection.getCollectionPtr());
+            expCtx.get(), ws.get(), std::move(userRoot), nullptr, &collection);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(expCtx,
@@ -246,7 +266,7 @@ public:
                 std::unique_ptr<MatchExpression> me = std::move(statusWithMatcher.getValue());
                 // exprs is what will wind up deleting this.
                 matcher = me.get();
-                verify(nullptr != matcher);
+                MONGO_verify(nullptr != matcher);
                 exprs->push_back(std::move(me));
             } else if (argsTag == e.fieldName()) {
                 nodeArgs = argObj;
@@ -296,7 +316,7 @@ public:
             params.direction = nodeArgs["direction"].numberInt();
             params.shouldDedup = desc->getEntry()->isMultikey(opCtx, collectionPtr);
 
-            return new IndexScan(expCtx.get(), collectionPtr, params, workingSet, matcher);
+            return new IndexScan(expCtx.get(), &collection, params, workingSet, matcher);
         } else if ("andHash" == nodeName) {
             uassert(
                 16921, "Nodes argument must be provided to AND", nodeArgs["nodes"].isABSONObj());
@@ -374,7 +394,7 @@ public:
                     "Can't parse sub-node of FETCH: " + nodeArgs["node"].Obj().toString(),
                     nullptr != subNode);
             return new FetchStage(
-                expCtx.get(), workingSet, std::move(subNode), matcher, collectionPtr);
+                expCtx.get(), workingSet, std::move(subNode), matcher, &collection);
         } else if ("limit" == nodeName) {
             uassert(16937,
                     "Limit stage doesn't have a filter (put it on the child)",
@@ -415,7 +435,7 @@ public:
                 params.direction = CollectionScanParams::BACKWARD;
             }
 
-            return new CollectionScan(expCtx.get(), collectionPtr, params, workingSet, matcher);
+            return new CollectionScan(expCtx.get(), &collection, params, workingSet, matcher);
         } else if ("mergeSort" == nodeName) {
             uassert(
                 16971, "Nodes argument must be provided to sort", nodeArgs["nodes"].isABSONObj());

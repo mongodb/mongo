@@ -29,7 +29,14 @@
 
 #pragma once
 
+#include <memory>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/variables.h"
 
 namespace mongo {
 namespace change_stream_filter {

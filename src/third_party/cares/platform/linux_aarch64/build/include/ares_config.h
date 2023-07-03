@@ -55,6 +55,9 @@
 /* Define to 1 if you have AF_INET6. */
 #define HAVE_AF_INET6 1
 
+/* Define to 1 if you have the arc4random_buf function. */
+/* #undef HAVE_ARC4RANDOM_BUF */
+
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #define HAVE_ARPA_INET_H 1
 
@@ -276,7 +279,7 @@
 /* #undef HAVE_STRNICMP */
 
 /* Define to 1 if you have the <stropts.h> header file. */
-/* #undef HAVE_STROPTS_H */
+#define HAVE_STROPTS_H 1
 
 /* Define to 1 if you have struct addrinfo. */
 #define HAVE_STRUCT_ADDRINFO 1
@@ -363,13 +366,13 @@
 #define PACKAGE "c-ares"
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT "c-ares mailing list: http://cool.haxx.se/mailman/listinfo/c-ares"
+#define PACKAGE_BUGREPORT "c-ares mailing list: http://lists.haxx.se/listinfo/c-ares"
 
 /* Define to the full name of this package. */
 #define PACKAGE_NAME "c-ares"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "c-ares 1.17.2"
+#define PACKAGE_STRING "c-ares 1.19.1"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "c-ares"
@@ -378,7 +381,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.17.2"
+#define PACKAGE_VERSION "1.19.1"
 
 /* Define to the type qualifier pointed by arg 5 for recvfrom. */
 #define RECVFROM_QUAL_ARG5 
@@ -452,14 +455,15 @@
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
 
-/* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
+/* Define to 1 if you can safely include both <sys/time.h> and <time.h>. This
+   macro is obsolete. */
 #define TIME_WITH_SYS_TIME 1
 
 /* Define to disable non-blocking sockets. */
 /* #undef USE_BLOCKING_SOCKETS */
 
 /* Version number of package */
-#define VERSION "1.17.2"
+#define VERSION "1.19.1"
 
 /* Define to avoid automatic inclusion of winsock.h */
 /* #undef WIN32_LEAN_AND_MEAN */

@@ -27,12 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstring>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbmessage.h"
-
+#include "mongo/db/server_options.h"
 #include "mongo/platform/strnlen.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -61,7 +67,7 @@ DbMessage::DbMessage(const Message& msg) : _msg(msg), _nsStart(nullptr), _mark(n
 }
 
 const char* DbMessage::getns() const {
-    verify(messageShouldHaveNs());
+    MONGO_verify(messageShouldHaveNs());
     return _nsStart;
 }
 
@@ -91,8 +97,8 @@ BSONObj DbMessage::nextJsObj() {
     }
 
     BSONObj js(_nextjsobj);
-    verify(js.objsize() >= 5);
-    verify(js.objsize() <= (_theEnd - _nextjsobj));
+    MONGO_verify(js.objsize() >= 5);
+    MONGO_verify(js.objsize() <= (_theEnd - _nextjsobj));
 
     _nextjsobj += js.objsize();
     if (_nextjsobj >= _theEnd)
@@ -105,7 +111,7 @@ void DbMessage::markReset(const char* toMark = nullptr) {
         toMark = _mark;
     }
 
-    verify(toMark);
+    MONGO_verify(toMark);
     _nextjsobj = toMark;
 }
 

@@ -27,69 +27,91 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog/index_catalog_entry_impl.h"
 
 #include <algorithm>
-#include <memory>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <utility>
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
-
 namespace mongo {
-MONGO_FAIL_POINT_DEFINE(skipUpdateIndexMultikey);
 
-using std::string;
+MONGO_FAIL_POINT_DEFINE(skipUpdateIndexMultikey);
 
 IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
                                              const CollectionPtr& collection,
                                              const std::string& ident,
-                                             std::unique_ptr<IndexDescriptor> descriptor,
+                                             IndexDescriptor&& descriptor,
                                              bool isFrozen)
-    : _ident(ident),
-      _descriptor(std::move(descriptor)),
-      _catalogId(collection->getCatalogId()),
+    : _shared(make_intrusive<SharedState>(ident, collection->getCatalogId())),
+      _descriptor(descriptor),
       _isReady(false),
       _isFrozen(isFrozen),
       _shouldValidateDocument(false),
       _isDropped(false),
       _indexOffset(invariantStatusOK(
-          collection->checkMetaDataForIndex(_descriptor->indexName(), _descriptor->infoObj()))) {
-
-    _descriptor->_entry = this;
-    _isReady = collection->isIndexReady(_descriptor->indexName());
+          collection->checkMetaDataForIndex(_descriptor.indexName(), _descriptor.infoObj()))) {
+    _descriptor._entry = this;
+    _isReady = collection->isIndexReady(_descriptor.indexName());
 
     // For time-series collections, we need to check that the indexed metric fields do not have
     // expanded array values.
     _shouldValidateDocument =
         collection->getTimeseriesOptions() &&
         timeseries::doesBucketsIndexIncludeMeasurement(
-            opCtx, collection->ns(), *collection->getTimeseriesOptions(), _descriptor->infoObj());
+            opCtx, collection->ns(), *collection->getTimeseriesOptions(), _descriptor.infoObj());
 
-    const BSONObj& collation = _descriptor->collation();
+    const BSONObj& collation = _descriptor.collation();
     if (!collation.isEmpty()) {
         auto statusWithCollator =
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation);
@@ -97,35 +119,36 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
         // Index spec should have already been validated.
         invariant(statusWithCollator.getStatus());
 
-        _collator = std::move(statusWithCollator.getValue());
+        _shared->_collator = std::move(statusWithCollator.getValue());
     }
 
-    if (_descriptor->isPartial()) {
-        const BSONObj& filter = _descriptor->partialFilterExpression();
+    if (_descriptor.isPartial()) {
+        const BSONObj& filter = _descriptor.partialFilterExpression();
 
-        _expCtxForFilter = make_intrusive<ExpressionContext>(
-            opCtx, CollatorInterface::cloneCollator(_collator.get()), collection->ns());
+        _shared->_expCtxForFilter = make_intrusive<ExpressionContext>(
+            opCtx, CollatorInterface::cloneCollator(_shared->_collator.get()), collection->ns());
 
         // Parsing the partial filter expression is not expected to fail here since the
         // expression would have been successfully parsed upstream during index creation.
-        _filterExpression =
+        _shared->_filterExpression =
             MatchExpressionParser::parseAndNormalize(filter,
-                                                     _expCtxForFilter,
+                                                     _shared->_expCtxForFilter,
                                                      ExtensionsCallbackNoop(),
                                                      MatchExpressionParser::kBanAllSpecialFeatures);
         LOGV2_DEBUG(20350,
                     2,
                     "have filter expression for {namespace} {indexName} {filter}",
                     logAttrs(collection->ns()),
-                    "indexName"_attr = _descriptor->indexName(),
+                    "indexName"_attr = _descriptor.indexName(),
                     "filter"_attr = redact(filter));
     }
 }
 
 void IndexCatalogEntryImpl::setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) {
-    invariant(!_accessMethod);
-    _accessMethod = std::move(accessMethod);
-    CollectionQueryInfo::computeUpdateIndexData(this, _accessMethod.get(), &_indexedPaths);
+    invariant(!_shared->_accessMethod);
+    _shared->_accessMethod = std::move(accessMethod);
+    CollectionQueryInfo::computeUpdateIndexData(
+        this, _shared->_accessMethod.get(), &_shared->_indexedPaths);
 }
 
 bool IndexCatalogEntryImpl::isFrozen() const {
@@ -229,7 +252,7 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     if (MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo()) {
         MultikeyPathTracker::get(opCtx).addMultikeyPathInfo({collection->ns(),
                                                              collection->uuid(),
-                                                             _descriptor->indexName(),
+                                                             _descriptor.indexName(),
                                                              multikeyMetadataKeys,
                                                              std::move(paths)});
         return;
@@ -240,7 +263,7 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     // RecordId. An attempt to write a duplicate key will therefore be ignored.
     if (!multikeyMetadataKeys.empty()) {
         uassertStatusOK(accessMethod()->asSortedData()->insertKeys(
-            opCtx, collection, multikeyMetadataKeys, {}, {}, nullptr));
+            opCtx, collection, _descriptor.getEntry(), multikeyMetadataKeys, {}, {}, nullptr));
     }
 
     // Mark the catalog as multikey, and record the multikey paths if applicable.
@@ -267,7 +290,7 @@ void IndexCatalogEntryImpl::forceSetMultikey(OperationContext* const opCtx,
     // caller wants to upgrade this index because it knows exactly which paths are multikey. We rely
     // on the following function to make sure this upgrade only takes place on index types that
     // currently support path-level multikey path tracking.
-    coll->forceSetIndexIsMultikey(opCtx, _descriptor.get(), isMultikey, multikeyPaths);
+    coll->forceSetIndexIsMultikey(opCtx, &_descriptor, isMultikey, multikeyPaths);
 
     // Since multikey metadata has changed, invalidate the query cache.
     CollectionQueryInfo::get(coll).clearQueryCacheForSetMultikey(coll);
@@ -290,7 +313,8 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
     // If the index is not visible within the side transaction, the index may have been created,
     // but not committed, in the parent transaction. Therefore, we abandon the side transaction
     // and set the multikey flag in the parent transaction.
-    if (!DurableCatalog::get(opCtx)->isIndexPresent(opCtx, _catalogId, _descriptor->indexName())) {
+    if (!DurableCatalog::get(opCtx)->isIndexPresent(
+            opCtx, _shared->_catalogId, _descriptor.indexName())) {
         return {ErrorCodes::SnapshotUnavailable, "index not visible in side transaction"};
     }
 
@@ -337,8 +361,9 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
 
                 auto msg = BSON("msg"
                                 << "Setting index to multikey"
-                                << "coll" << collection->ns().ns() << "index"
-                                << _descriptor->indexName());
+                                << "coll"
+                                << NamespaceStringUtil::serializeForCatalog(collection->ns())
+                                << "index" << _descriptor.indexName());
                 opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx, msg);
             }
 
@@ -351,30 +376,29 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
 }
 
 std::shared_ptr<Ident> IndexCatalogEntryImpl::getSharedIdent() const {
-    return _accessMethod ? _accessMethod->getSharedIdent() : nullptr;
+    return _shared->_accessMethod ? _shared->_accessMethod->getSharedIdent() : nullptr;
 }
 
 const Ordering& IndexCatalogEntryImpl::ordering() const {
-    return _descriptor->ordering();
+    return _descriptor.ordering();
 }
 
 void IndexCatalogEntryImpl::setIdent(std::shared_ptr<Ident> newIdent) {
-    if (!_accessMethod)
+    if (!_shared->_accessMethod)
         return;
-    _accessMethod->setIdent(std::move(newIdent));
+    _shared->_accessMethod->setIdent(std::move(newIdent));
 }
 
 // ----
 
 NamespaceString IndexCatalogEntryImpl::getNSSFromCatalog(OperationContext* opCtx) const {
-    return DurableCatalog::get(opCtx)->getEntry(_catalogId).nss;
+    return DurableCatalog::get(opCtx)->getEntry(_shared->_catalogId).nss;
 }
 
 bool IndexCatalogEntryImpl::_catalogIsMultikey(OperationContext* opCtx,
                                                const CollectionPtr& collection,
                                                MultikeyPaths* multikeyPaths) const {
-    return collection->isIndexMultikey(
-        opCtx, _descriptor->indexName(), multikeyPaths, _indexOffset);
+    return collection->isIndexMultikey(opCtx, _descriptor.indexName(), multikeyPaths, _indexOffset);
 }
 
 void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
@@ -385,15 +409,15 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
     // CollectionCatalogEntry::setIndexIsMultikey() requires that we discard the path-level
     // multikey information in order to avoid unintentionally setting path-level multikey
     // information on an index created before 3.4.
-    auto indexMetadataHasChanged = collection->setIndexIsMultikey(
-        opCtx, _descriptor->indexName(), multikeyPaths, _indexOffset);
+    auto indexMetadataHasChanged =
+        collection->setIndexIsMultikey(opCtx, _descriptor.indexName(), multikeyPaths, _indexOffset);
 
     if (indexMetadataHasChanged) {
         LOGV2_DEBUG(4718705,
                     1,
                     "Index set to multi key, clearing query plan cache",
                     logAttrs(collection->ns()),
-                    "keyPattern"_attr = _descriptor->keyPattern());
+                    "keyPattern"_attr = _descriptor.keyPattern());
         CollectionQueryInfo::get(collection).clearQueryCacheForSetMultikey(collection);
     }
 }

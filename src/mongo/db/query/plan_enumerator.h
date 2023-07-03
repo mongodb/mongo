@@ -29,15 +29,27 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <deque>
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 

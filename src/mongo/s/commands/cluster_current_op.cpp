@@ -27,17 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/commands/current_op_common.h"
-
-#include <tuple>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
-#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/commands/current_op_common.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/s/query/cluster_aggregate.h"
 
 namespace mongo {
@@ -51,11 +58,12 @@ public:
     ClusterCurrentOpCommand() = default;
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const final {
-        bool isAuthorized = AuthorizationSession::get(opCtx->getClient())
-                                ->isAuthorizedForActionsOnResource(
-                                    ResourcePattern::forClusterResource(), ActionType::inprog);
+        bool isAuthorized =
+            AuthorizationSession::get(opCtx->getClient())
+                ->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::inprog);
 
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
@@ -82,7 +90,7 @@ private:
             ClusterAggregate::Namespaces{nss, nss},
             request,
             {request},
-            {Privilege(ResourcePattern::forClusterResource(), ActionType::inprog)},
+            {Privilege(ResourcePattern::forClusterResource(nss.tenantId()), ActionType::inprog)},
             &responseBuilder);
 
         if (!status.isOK()) {

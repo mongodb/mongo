@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/db/query/query_settings.h"
 
 namespace mongo {

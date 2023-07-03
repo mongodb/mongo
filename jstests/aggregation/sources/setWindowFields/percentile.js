@@ -2,7 +2,6 @@
  * Test that $percentile and $median work as window functions.
  *  @tags: [
  *   requires_fcv_70,
- *   featureFlagApproxPercentiles
  * ]
  */
 (function() {
@@ -30,20 +29,22 @@ testAccumAgainstGroup(
     coll, "$percentile", [null, null], {p: [0.1, 0.6], input: "$price", method: "approximate"});
 testAccumAgainstGroup(coll, "$median", null, {input: "$price", method: "approximate"});
 
-function runSetWindowStage(percentileSpec, medianSpec) {
+function runSetWindowStage(percentileSpec, medianSpec, letSpec) {
     return coll
-        .aggregate([
-            {$addFields: {str: "hiya"}},
-            {
-                $setWindowFields: {
-                    sortBy: {_id: 1},
-                    output: {
-                        runningPercentile: percentileSpec,
-                        runningMedian: medianSpec,
+        .aggregate(
+            [
+                {$addFields: {str: "hiya"}},
+                {
+                    $setWindowFields: {
+                        sortBy: {_id: 1},
+                        output: {
+                            runningPercentile: percentileSpec,
+                            runningMedian: medianSpec,
+                        }
                     }
                 }
-            }
-        ])
+            ],
+            {let : letSpec})
         .toArray();
 }
 
@@ -69,6 +70,27 @@ results =
 assertResultEqToVal(
     {resultArray: results, percentile: [minDoc.price, maxDoc.price], median: medianDoc.price});
 
+// Test that an expression can be used for 'input'.
+results = runSetWindowStage(
+    {$percentile: {p: [0.01, 0.99], input: {$add: [42, "$price"]}, method: "approximate"}},
+    {$median: {input: {$add: [42, "$price"]}, method: "approximate"}});
+// Since our percentiles are 0.01 and 0.99 and our collection is small, we will always return the
+// minimum and maximum value in the collection.
+assertResultEqToVal({
+    resultArray: results,
+    percentile: [42 + minDoc.price, 42 + maxDoc.price],
+    median: 42 + medianDoc.price
+});
+
+// Test that a variable can be used for 'p'.
+results = runSetWindowStage({$percentile: {p: "$$ps", input: "$price", method: "approximate"}},
+                            {$median: {input: "$price", method: "approximate"}},
+                            {ps: [0.01, 0.99]});
+// Since our percentiles are 0.01 and 0.99 and our collection is small, we will always return the
+// minimum and maximum value in the collection.
+assertResultEqToVal(
+    {resultArray: results, percentile: [minDoc.price, maxDoc.price], median: medianDoc.price});
+
 // Test that a removable window calculates $percentile and $median correctly using an approximate
 // method.
 results = runSetWindowStage(
@@ -85,14 +107,15 @@ for (let index = 0; index < results.length; index++) {
     assert.eq(minVal, results[index].runningMedian, results[index]);
 }
 
-function testError(percentileSpec, expectedCode) {
+function testError(percentileSpec, expectedCode, letSpec) {
     assert.throwsWithCode(() => coll.aggregate([{
-        $setWindowFields: {
-            partitionBy: "$ticket",
-            sortBy: {ts: 1},
-            output: {outputField: percentileSpec},
-        }
-    }]),
+                                                   $setWindowFields: {
+                                                       partitionBy: "$ticket",
+                                                       sortBy: {ts: 1},
+                                                       output: {outputField: percentileSpec},
+                                                   }
+                                               }],
+                                               {let : letSpec}),
                           expectedCode);
 }
 
@@ -118,6 +141,18 @@ testError({$median: "not an object"}, 7436100);
 
 testError({$percentile: {p: [0.1, 0.6], input: "$str", method: false}}, ErrorCodes.TypeMismatch);
 testError({$median: {input: "$str", method: false}}, ErrorCodes.TypeMismatch);
+testError({$percentile: {p: [0.1, 0.6], input: "$str", method: "discrete"}}, ErrorCodes.BadValue);
+testError({$median: {input: "$str", method: "discrete"}}, ErrorCodes.BadValue);
+testError({$percentile: {p: [0.1, 0.6], input: "$str", method: "continuous"}}, ErrorCodes.BadValue);
+testError({$median: {input: "$str", method: "continuous"}}, ErrorCodes.BadValue);
+
+// invalid expressions or variables for 'p'
+testError({$percentile: {p: "$$ps", input: "$price", method: "continuous"}},
+          ErrorCodes.BadValue /* non-numeric 'p' value in the variable */,
+          {ps: "foo"} /* letSpec */);
+
+testError({$percentile: {p: ["$price"], input: "$str", method: "continuous"}},
+          ErrorCodes.BadValue /* non-const 'p' expression */);
 
 testError({$percentile: {input: "$str", method: "approximate"}},
           40414 /* IDL required field error */);

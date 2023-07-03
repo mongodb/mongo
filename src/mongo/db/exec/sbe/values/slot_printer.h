@@ -32,6 +32,7 @@
 #include <ostream>
 
 #include "mongo/db/exec/sbe/util/print_options.h"
+#include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"

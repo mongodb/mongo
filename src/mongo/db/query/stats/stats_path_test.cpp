@@ -27,14 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/sbe/values/bson.h"
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
 #include "mongo/db/query/stats/stats_gen.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::stats {
 namespace {

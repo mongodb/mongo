@@ -29,13 +29,23 @@
 
 #include "mongo/db/repl/hello_auth.h"
 
+#include <boost/optional.hpp>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/sasl_commands.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands/authentication_commands.h"
-#include "mongo/db/stats/counters.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

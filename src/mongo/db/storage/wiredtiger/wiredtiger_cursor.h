@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <cstdint>
+#include <string>
 #include <wiredtiger.h>
 
 #include "mongo/db/operation_context.h"

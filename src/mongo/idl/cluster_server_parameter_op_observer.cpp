@@ -29,9 +29,24 @@
 
 #include "mongo/idl/cluster_server_parameter_op_observer.h"
 
-#include "mongo/db/dbdirectclient.h"
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -46,8 +61,8 @@ constexpr auto kOplog = "oplog"_sd;
  * associated. This is used in the aboutToDelte/onDelete handlers since the document is not
  * necessarily available in the latter.
  */
-const auto aboutToDeleteDoc = OperationContext::declareDecoration<std::string>();
-const auto tenantIdToDelete = OperationContext::declareDecoration<boost::optional<TenantId>>();
+const auto aboutToDeleteDoc = OplogDeleteEntryArgs::declareDecoration<std::string>();
+const auto tenantIdToDelete = OplogDeleteEntryArgs::declareDecoration<boost::optional<TenantId>>();
 
 bool isConfigNamespace(const NamespaceString& nss) {
     return nss == NamespaceString::makeClusterParametersNSS(nss.dbName().tenantId());
@@ -61,16 +76,19 @@ void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
                                                  std::vector<InsertStatement>::const_iterator last,
                                                  std::vector<bool> fromMigrate,
                                                  bool defaultFromMigrate,
-                                                 InsertsOpStateAccumulator* opAccumulator) {
+                                                 OpStateAccumulator* opAccumulator) {
     if (!isConfigNamespace(coll->ns())) {
         return;
     }
 
     for (auto it = first; it != last; ++it) {
-        opCtx->recoveryUnit()->onCommit([doc = it->doc, tenantId = coll->ns().dbName().tenantId()](
-                                            OperationContext* opCtx, boost::optional<Timestamp>) {
-            cluster_parameters::updateParameter(opCtx, doc, kOplog, tenantId);
-        });
+        auto& doc = it->doc;
+        auto tenantId = coll->ns().dbName().tenantId();
+        cluster_parameters::validateParameter(opCtx, doc, tenantId);
+        opCtx->recoveryUnit()->onCommit(
+            [doc, tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
+                cluster_parameters::updateParameter(opCtx, doc, kOplog, tenantId);
+            });
     }
 }
 
@@ -82,20 +100,24 @@ void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
         return;
     }
 
-    opCtx->recoveryUnit()->onCommit([updatedDoc, tenantId = args.coll->ns().dbName().tenantId()](
-                                        OperationContext* opCtx, boost::optional<Timestamp>) {
-        cluster_parameters::updateParameter(opCtx, updatedDoc, kOplog, tenantId);
-    });
+    auto tenantId = args.coll->ns().dbName().tenantId();
+    cluster_parameters::validateParameter(opCtx, updatedDoc, tenantId);
+    opCtx->recoveryUnit()->onCommit(
+        [updatedDoc, tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
+            cluster_parameters::updateParameter(opCtx, updatedDoc, kOplog, tenantId);
+        });
 }
 
 void ClusterServerParameterOpObserver::aboutToDelete(OperationContext* opCtx,
                                                      const CollectionPtr& coll,
-                                                     const BSONObj& doc) {
+                                                     const BSONObj& doc,
+                                                     OplogDeleteEntryArgs* args,
+                                                     OpStateAccumulator* opAccumulator) {
     std::string docBeingDeleted;
 
     if (isConfigNamespace(coll->ns())) {
         // Store the tenantId associated with the doc to be deleted.
-        tenantIdToDelete(opCtx) = coll->ns().dbName().tenantId();
+        tenantIdToDelete(args) = coll->ns().dbName().tenantId();
         auto elem = doc[kIdField];
         if (elem.type() == String) {
             docBeingDeleted = elem.str();
@@ -113,7 +135,7 @@ void ClusterServerParameterOpObserver::aboutToDelete(OperationContext* opCtx,
     // Stash the name of the config doc being deleted (if any)
     // in an opCtx decoration for use in the onDelete() hook below
     // since OpLogDeleteEntryArgs isn't guaranteed to have the deleted doc.
-    aboutToDeleteDoc(opCtx) = std::move(docBeingDeleted);
+    aboutToDeleteDoc(args) = std::move(docBeingDeleted);
 }
 
 void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
@@ -121,9 +143,9 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
                                                 StmtId stmtId,
                                                 const OplogDeleteEntryArgs& args,
                                                 OpStateAccumulator* opAccumulator) {
-    const auto& docName = aboutToDeleteDoc(opCtx);
+    const auto& docName = aboutToDeleteDoc(args);
     if (!docName.empty()) {
-        opCtx->recoveryUnit()->onCommit([docName, tenantId = tenantIdToDelete(opCtx)](
+        opCtx->recoveryUnit()->onCommit([docName, tenantId = tenantIdToDelete(args)](
                                             OperationContext* opCtx, boost::optional<Timestamp>) {
             cluster_parameters::clearParameter(opCtx, docName, tenantId);
         });
@@ -132,7 +154,7 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
 
 void ClusterServerParameterOpObserver::onDropDatabase(OperationContext* opCtx,
                                                       const DatabaseName& dbName) {
-    if (dbName.db() == DatabaseName::kConfig.db()) {
+    if (dbName.isConfigDB()) {
         // Entire config DB deleted, reset to default state.
         opCtx->recoveryUnit()->onCommit(
             [tenantId = dbName.tenantId()](OperationContext* opCtx, boost::optional<Timestamp>) {

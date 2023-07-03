@@ -29,9 +29,39 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/keys_collection_document_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/grid.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

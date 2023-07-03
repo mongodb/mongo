@@ -59,7 +59,7 @@ public:
      * RecordStore.
      */
     SortedDataInterface(StringData ident,
-                        KeyString::Version keyStringVersion,
+                        key_string::Version keyStringVersion,
                         Ordering ordering,
                         KeyFormat rsKeyFormat)
         : _ident(std::make_shared<Ident>(ident.toString())),
@@ -96,7 +96,7 @@ public:
      */
     virtual Status insert(
         OperationContext* opCtx,
-        const KeyString::Value& keyString,
+        const key_string::Value& keyString,
         bool dupsAllowed,
         IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff) = 0;
 
@@ -109,7 +109,7 @@ public:
      *        match, false otherwise
      */
     virtual void unindex(OperationContext* opCtx,
-                         const KeyString::Value& keyString,
+                         const key_string::Value& keyString,
                          bool dupsAllowed) = 0;
 
     /**
@@ -118,7 +118,7 @@ public:
      * This will not accept a KeyString with a Discriminator other than kInclusive.
      */
     virtual boost::optional<RecordId> findLoc(OperationContext* opCtx,
-                                              const KeyString::Value& keyString) const = 0;
+                                              const key_string::Value& keyString) const = 0;
 
     /**
      * Return ErrorCodes::DuplicateKey if there is more than one occurence of 'KeyString' in this
@@ -127,7 +127,7 @@ public:
      *
      * @param opCtx the transaction under which this operation takes place
      */
-    virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString) = 0;
+    virtual Status dupKeyCheck(OperationContext* opCtx, const key_string::Value& keyString) = 0;
 
     /**
      * Attempt to reduce the storage space used by this index via compaction. Only called if the
@@ -176,7 +176,7 @@ public:
      * Prints any storage engine provided metadata for the index entry with key 'keyString'.
      */
     virtual void printIndexEntryMetadata(OperationContext* opCtx,
-                                         const KeyString::Value& keyString) const = 0;
+                                         const key_string::Value& keyString) const = 0;
 
     /**
      * Return the number of entries in 'this' index.
@@ -186,7 +186,7 @@ public:
     /*
      * Return the KeyString version for 'this' index.
      */
-    KeyString::Version getKeyStringVersion() const {
+    key_string::Version getKeyStringVersion() const {
         return _keyStringVersion;
     }
 
@@ -247,23 +247,12 @@ public:
     class Cursor {
     public:
         /**
-         * Tells methods that return an IndexKeyEntry what part of the data the caller is
-         * interested in.
-         *
-         * Methods returning an engaged optional<T> will only return null RecordIds or empty
-         * BSONObjs if they have been explicitly left out of the request.
-         *
-         * Implementations are allowed to return more data than requested, but not less.
+         * Tells methods that return an IndexKeyEntry whether the caller is interested
+         * in including the key field.
          */
-        enum RequestedInfo {
-            // Only usable part of the return is whether it is engaged or not.
-            kJustExistance = 0,
-            // Key must be filled in.
-            kWantKey = 1,
-            // Loc must be fulled in.
-            kWantLoc = 2,
-            // Both must be returned.
-            kKeyAndLoc = kWantKey | kWantLoc,
+        enum class KeyInclusion {
+            kExclude,
+            kInclude,
         };
 
         virtual ~Cursor() = default;
@@ -284,7 +273,8 @@ public:
          * Moves forward and returns the new data or boost::none if there is no more data.
          * If not positioned, returns boost::none.
          */
-        virtual boost::optional<IndexKeyEntry> next(RequestedInfo parts = kKeyAndLoc) = 0;
+        virtual boost::optional<IndexKeyEntry> next(
+            KeyInclusion keyInclusion = KeyInclusion::kInclude) = 0;
         virtual boost::optional<KeyStringEntry> nextKeyString() = 0;
 
         //
@@ -296,14 +286,15 @@ public:
          * The provided keyString has discriminator information encoded.
          */
         virtual boost::optional<KeyStringEntry> seekForKeyString(
-            const KeyString::Value& keyString) = 0;
+            const key_string::Value& keyString) = 0;
 
         /**
          * Seeks to the provided keyString and returns the IndexKeyEntry.
          * The provided keyString has discriminator information encoded.
          */
-        virtual boost::optional<IndexKeyEntry> seek(const KeyString::Value& keyString,
-                                                    RequestedInfo parts = kKeyAndLoc) = 0;
+        virtual boost::optional<IndexKeyEntry> seek(
+            const key_string::Value& keyString,
+            KeyInclusion keyInclusion = KeyInclusion::kInclude) = 0;
 
         //
         // Saving and restoring state
@@ -405,13 +396,13 @@ public:
      * For testing only.
      */
     virtual void insertWithRecordIdInValue_forTest(OperationContext* opCtx,
-                                                   const KeyString::Value& keyString,
+                                                   const key_string::Value& keyString,
                                                    RecordId rid) = 0;
 
 protected:
     std::shared_ptr<Ident> _ident;
 
-    const KeyString::Version _keyStringVersion;
+    const key_string::Version _keyStringVersion;
     const Ordering _ordering;
     const KeyFormat _rsKeyFormat;
 };
@@ -433,7 +424,7 @@ public:
      * transactionally. Other storage engines do not perform inserts transactionally and will ignore
      * any parent WriteUnitOfWork.
      */
-    virtual Status addKey(const KeyString::Value& keyString) = 0;
+    virtual Status addKey(const key_string::Value& keyString) = 0;
 };
 
 }  // namespace mongo

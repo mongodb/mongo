@@ -29,6 +29,17 @@
 
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 
+#include <absl/meta/type_traits.h>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <iosfwd>
+#include <string_view>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/util/builder.h"
+
 namespace mongo::sbe {
 RuntimeEnvironment::RuntimeEnvironment(const RuntimeEnvironment& other)
     : _state{other._state}, _isSmp{other._isSmp} {
@@ -142,7 +153,7 @@ std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeCopyForParallelUse()
     return makeCopy();
 }
 
-void RuntimeEnvironment::debugString(StringBuilder* builder) {
+void RuntimeEnvironment::debugString(StringBuilder* builder) const {
     using namespace std::literals;
 
     value::SlotMap<StringData> slotName;

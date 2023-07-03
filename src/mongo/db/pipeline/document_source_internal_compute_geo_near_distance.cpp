@@ -28,11 +28,22 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <utility>
+#include <vector>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <s2cellid.h>
+
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/pipeline/document_source_internal_compute_geo_near_distance.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -144,13 +155,13 @@ DocumentSource::GetNextResult DocumentSourceInternalGeoNearDistance::doGetNext()
 Value DocumentSourceInternalGeoNearDistance::serialize(SerializationOptions opts) const {
     MutableDocument out;
     out.setField(DocumentSourceInternalGeoNearDistance::kNearFieldName,
-                 opts.serializeLiteralValue(_coords));
+                 opts.serializeLiteral(_coords));
     out.setField(DocumentSourceInternalGeoNearDistance::kKeyFieldName,
                  Value(opts.serializeFieldPathFromString(_key)));
     out.setField(DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName,
                  Value(opts.serializeFieldPath(_distanceField)));
     out.setField(DocumentSourceInternalGeoNearDistance::kDistanceMultiplierFieldName,
-                 opts.serializeLiteralValue(_distanceMultiplier));
+                 opts.serializeLiteral(_distanceMultiplier));
 
     return Value(DOC(getSourceName() << out.freeze()));
 }

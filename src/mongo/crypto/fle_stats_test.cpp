@@ -27,24 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/fle_stats.h"
-
-#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/concurrency/locker_impl_client_observer.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/testing_options_gen.h"
 #include "mongo/util/tick_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
+namespace {
 
-class FLEStatsTest : public unittest::Test {
+class FLEStatsTest : public ServiceContextTest {
 public:
+    FLEStatsTest() {
+        auto service = getServiceContext();
+        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
+        opCtxPtr = makeOperationContext();
+        opCtx = opCtxPtr.get();
+    }
+
     void setUp() final {
+        ServiceContextTest::setUp();
         oldDiagnosticsFlag = gTestingDiagnosticsEnabledAtStartup;
         tickSource = std::make_unique<TickSourceMock<Milliseconds>>();
         instance = std::make_unique<FLEStatusSection>(tickSource.get());
@@ -52,9 +68,12 @@ public:
 
     void tearDown() final {
         gTestingDiagnosticsEnabledAtStartup = oldDiagnosticsFlag;
+        ServiceContextTest::tearDown();
     }
 
-protected:
+    ServiceContext::UniqueOperationContext opCtxPtr;
+    OperationContext* opCtx;
+
     CompactStats zeroStats = CompactStats::parse(
         IDLParserContext("compactStats"),
         BSON("ecoc" << BSON("deleted" << 0 << "read" << 0) << "esc"
@@ -72,14 +91,14 @@ protected:
 
     std::unique_ptr<TickSourceMock<Milliseconds>> tickSource;
     std::unique_ptr<FLEStatusSection> instance;
-    OperationContextNoop opCtx;
+
     bool oldDiagnosticsFlag;
 };
 
 TEST_F(FLEStatsTest, NoopStats) {
     ASSERT_FALSE(instance->includeByDefault());
 
-    auto obj = instance->generateSection(&opCtx, BSONElement());
+    auto obj = instance->generateSection(opCtx, BSONElement());
     ASSERT_TRUE(obj.hasField("compactStats"));
     ASSERT_BSONOBJ_EQ(zeroStats.toBSON(), obj["compactStats"].Obj());
     ASSERT_TRUE(obj.hasField("cleanupStats"));
@@ -92,7 +111,7 @@ TEST_F(FLEStatsTest, CompactStats) {
 
     ASSERT_TRUE(instance->includeByDefault());
 
-    auto obj = instance->generateSection(&opCtx, BSONElement());
+    auto obj = instance->generateSection(opCtx, BSONElement());
     ASSERT_TRUE(obj.hasField("compactStats"));
     ASSERT_BSONOBJ_NE(zeroStats.toBSON(), obj["compactStats"].Obj());
     ASSERT_BSONOBJ_EQ(compactStats.toBSON(), obj["compactStats"].Obj());
@@ -106,7 +125,7 @@ TEST_F(FLEStatsTest, CleanupStats) {
 
     ASSERT_TRUE(instance->includeByDefault());
 
-    auto obj = instance->generateSection(&opCtx, BSONElement());
+    auto obj = instance->generateSection(opCtx, BSONElement());
     ASSERT_TRUE(obj.hasField("compactStats"));
     ASSERT_BSONOBJ_EQ(zeroStats.toBSON(), obj["compactStats"].Obj());
     ASSERT_TRUE(obj.hasField("cleanupStats"));
@@ -122,7 +141,7 @@ TEST_F(FLEStatsTest, BinaryEmuStatsAreEmptyWithoutTesting) {
 
     ASSERT_FALSE(instance->includeByDefault());
 
-    auto obj = instance->generateSection(&opCtx, BSONElement());
+    auto obj = instance->generateSection(opCtx, BSONElement());
     ASSERT_TRUE(obj.hasField("compactStats"));
     ASSERT_BSONOBJ_EQ(zeroStats.toBSON(), obj["compactStats"].Obj());
     ASSERT_TRUE(obj.hasField("cleanupStats"));
@@ -143,7 +162,7 @@ TEST_F(FLEStatsTest, BinaryEmuStatsArePopulatedWithTesting) {
 
     ASSERT_TRUE(instance->includeByDefault());
 
-    auto obj = instance->generateSection(&opCtx, BSONElement());
+    auto obj = instance->generateSection(opCtx, BSONElement());
     ASSERT_TRUE(obj.hasField("compactStats"));
     ASSERT_BSONOBJ_EQ(zeroStats.toBSON(), obj["compactStats"].Obj());
     ASSERT_TRUE(obj.hasField("cleanupStats"));
@@ -154,5 +173,5 @@ TEST_F(FLEStatsTest, BinaryEmuStatsArePopulatedWithTesting) {
     ASSERT_EQ(100, obj["emuBinaryStats"]["totalMillis"].Long());
 }
 
-
+}  // namespace
 }  // namespace mongo

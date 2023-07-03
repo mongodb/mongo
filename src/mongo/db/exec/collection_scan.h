@@ -29,12 +29,25 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
 #include <memory>
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/s/resharding/resume_token_gen.h"
 
 namespace mongo {
@@ -53,7 +66,7 @@ class OperationContext;
 class CollectionScan final : public RequiresCollectionStage {
 public:
     CollectionScan(ExpressionContext* expCtx,
-                   const CollectionPtr& collection,
+                   VariantCollectionPtrOrAcquisition collection,
                    const CollectionScanParams& params,
                    WorkingSet* workingSet,
                    const MatchExpression* filter);

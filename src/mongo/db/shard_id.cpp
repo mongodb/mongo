@@ -29,7 +29,7 @@
 
 #include "mongo/db/shard_id.h"
 
-#include <functional>
+#include "mongo/base/error_codes.h"
 
 namespace mongo {
 

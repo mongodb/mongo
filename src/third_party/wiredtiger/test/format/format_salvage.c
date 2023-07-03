@@ -45,12 +45,12 @@ uri_path(TABLE *table, char **object_namep, char *buf, size_t len)
     testutil_assert(p != NULL);
     ++p;
 
-    testutil_check(__wt_snprintf(buf, len, "%s/%s", g.home, p));
+    testutil_snprintf(buf, len, "%s/%s", g.home, p);
     if (object_namep != NULL)
         *object_namep = strrchr(buf, '/') + 1;
     if (!access(buf, F_OK))
         return;
-    testutil_check(__wt_snprintf(buf, len, "%s/%s.wt", g.home, p));
+    testutil_snprintf(buf, len, "%s/%s.wt", g.home, p);
     if (object_namep != NULL)
         *object_namep = strrchr(buf, '/') + 1;
     if (!access(buf, F_OK))
@@ -90,7 +90,7 @@ corrupt(TABLE *table)
     len = WT_MIN(len, WT_MEGABYTE);
 
     /* Log the corruption offset and length. */
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/SALVAGE.corrupt", g.home));
+    testutil_snprintf(buf, sizeof(buf), "%s/SALVAGE.corrupt", g.home);
     testutil_assert((fp = fopen(buf, "w")) != NULL);
     (void)fprintf(fp, "salvage-corrupt: offset %" PRIuMAX ", length %" WT_SIZET_FMT "\n",
       (uintmax_t)offset, len);
@@ -106,14 +106,9 @@ corrupt(TABLE *table)
     testutil_check(close(fd));
 
     /* Save a copy of the corrupted file so we can replay the salvage step as necessary.  */
-    testutil_check(__wt_snprintf(
-      buf, sizeof(buf), "cp %s %s/SALVAGE.copy/%s.corrupted", path, g.home, object_name));
-    testutil_check(system(buf));
+    testutil_snprintf(buf, sizeof(buf), "%s/SALVAGE.copy/%s.corrupted", g.home, object_name);
+    testutil_copy(path, buf);
 }
-
-/* Salvage command, save the interesting files so we can replay the salvage command as necessary. */
-#define SALVAGE_COPY_CMD \
-    "rm -rf %s/SALVAGE.copy && mkdir %s/SALVAGE.copy && cp %s/WiredTiger* %s %s/SALVAGE.copy/"
 
 /*
  * wts_salvage --
@@ -125,7 +120,7 @@ wts_salvage(TABLE *table, void *arg)
     SAP sap;
     WT_CONNECTION *conn;
     WT_SESSION *session;
-    char buf[MAX_FORMAT_PATH * 5], path[MAX_FORMAT_PATH];
+    char buf[MAX_FORMAT_PATH], path[MAX_FORMAT_PATH], salvage_copy[MAX_FORMAT_PATH];
 
     (void)arg; /* unused argument */
     testutil_assert(table != NULL);
@@ -134,10 +129,14 @@ wts_salvage(TABLE *table, void *arg)
         return;
 
     /* Save a copy of the interesting files so we can replay the salvage step as necessary. */
+    testutil_snprintf(salvage_copy, sizeof(salvage_copy), "%s/SALVAGE.copy", g.home);
+    testutil_recreate_dir(salvage_copy);
+
     uri_path(table, NULL, path, sizeof(path));
-    testutil_check(
-      __wt_snprintf(buf, sizeof(buf), SALVAGE_COPY_CMD, g.home, g.home, g.home, path, g.home));
-    testutil_check(system(buf));
+    testutil_copy(path, salvage_copy);
+
+    testutil_snprintf(buf, sizeof(buf), "%s/WiredTiger*", g.home);
+    testutil_copy(buf, salvage_copy);
 
     /* Salvage, then verify. */
     wts_open(g.home, &conn, true);

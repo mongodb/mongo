@@ -31,8 +31,10 @@
 
 #include <memory>
 
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

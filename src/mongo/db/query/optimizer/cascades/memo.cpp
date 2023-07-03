@@ -29,12 +29,36 @@
 
 #include "mongo/db/query/optimizer/cascades/memo.h"
 
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <iostream>
+#include <map>
 #include <set>
+#include <string>
+#include <unordered_map>
+#include <utility>
 
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/bool_expression.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/util/assert_util.h"
 
 
 namespace mongo::optimizer::cascades {
@@ -444,20 +468,24 @@ static bool isSimpleIdLookup(ABT::reference_type n) {
     }
 
     bool isIdLookup = false;
-    PSRExpr::visitAnyShape(node->getReqMap().getRoot(), [&](const PartialSchemaEntry& entry) {
-        if (const auto interval = IntervalReqExpr::getSingularDNF(entry.second.getIntervals());
-            !interval || !interval->isEquality()) {
-            return;
-        }
-        if (const PathGet* getPtr = entry.first._path.cast<PathGet>();
-            getPtr && getPtr->name() == "_id") {
-            if (getPtr->getPath().is<PathIdentity>()) {
-                isIdLookup = true;
-            } else if (const PathTraverse* traversePtr = getPtr->getPath().cast<PathTraverse>()) {
-                isIdLookup = traversePtr->getPath().is<PathIdentity>();
+    PSRExpr::visitAnyShape(
+        node->getReqMap().getRoot(),
+        [&](const PartialSchemaEntry& entry, const PSRExpr::VisitorContext& ctx) {
+            if (const auto interval = IntervalReqExpr::getSingularDNF(entry.second.getIntervals());
+                !interval || !interval->isEquality()) {
+                return;
             }
-        }
-    });
+            if (const PathGet* getPtr = entry.first._path.cast<PathGet>();
+                getPtr && getPtr->name() == "_id") {
+                if (getPtr->getPath().is<PathIdentity>()) {
+                    isIdLookup = true;
+                    ctx.returnEarly();
+                } else if (const PathTraverse* traversePtr =
+                               getPtr->getPath().cast<PathTraverse>()) {
+                    isIdLookup = traversePtr->getPath().is<PathIdentity>();
+                }
+            }
+        });
     return isIdLookup;
 }
 
@@ -484,19 +512,20 @@ void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
         invariant(partialSchemaKeyCE.empty());
 
         // Cache estimation for each individual requirement.
-        PSRExpr::visitDNF(sargablePtr->getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
-            ABT singularReq =
-                make<SargableNode>(PartialSchemaRequirements{PSRExpr::makeSingularDNF(e)},
-                                   CandidateIndexes{},
-                                   ScanParams{},
-                                   sargablePtr->getTarget(),
-                                   sargablePtr->getChild());
-            const CEType singularEst = simpleIdLookup
-                ? CEType{1.0}
-                : ctx._cardinalityEstimator->deriveCE(
-                      *ctx._metadata, *this, props, singularReq.ref());
-            partialSchemaKeyCE.emplace_back(e.first, singularEst);
-        });
+        PSRExpr::visitDNF(sargablePtr->getReqMap().getRoot(),
+                          [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
+                              ABT singularReq = make<SargableNode>(
+                                  PartialSchemaRequirements{PSRExpr::makeSingularDNF(e)},
+                                  CandidateIndexes{},
+                                  ScanParams{},
+                                  sargablePtr->getTarget(),
+                                  sargablePtr->getChild());
+                              const CEType singularEst = simpleIdLookup
+                                  ? CEType{1.0}
+                                  : ctx._cardinalityEstimator->deriveCE(
+                                        *ctx._metadata, *this, props, singularReq.ref());
+                              partialSchemaKeyCE.emplace_back(e.first, singularEst);
+                          });
     }
 
     properties::setPropertyOverwrite(props, std::move(ceProp));
@@ -546,7 +575,7 @@ MemoLogicalNodeId Memo::addNode(const Context& ctx,
     if (inserted || noTargetGroup) {
         insertedNodeIds.insert(newId);
         _inputGroupsToNodeIdMap[groupVector].insert(newId);
-        _nodeIdToInputGroupsMap[newId] = groupVector;
+        _nodeIdToInputGroupsMap[newId] = std::move(groupVector);
 
         if (noTargetGroup) {
             estimateCE(ctx, groupId);

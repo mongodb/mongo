@@ -29,28 +29,49 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
 #include <functional>
+#include <list>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/journal_listener.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_interface.h"
 #include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/periodic_runner.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
-class DurableCatalogImpl;
+class DurableCatalog;
 class KVEngine;
 
 struct StorageEngineOptions {
@@ -160,7 +181,7 @@ public:
 
     bool supportsPendingDrops() const final;
 
-    void clearDropPendingState() final;
+    void clearDropPendingState(OperationContext* opCtx) final;
 
     SnapshotManager* getSnapshotManager() const final;
 
@@ -335,7 +356,7 @@ public:
     const DurableCatalog* getCatalog() const override;
 
     /**
-     * When loading after an unclean shutdown, this performs cleanup on the DurableCatalogImpl.
+     * When loading after an unclean shutdown, this performs cleanup on the DurableCatalog.
      */
     void loadCatalog(OperationContext* opCtx,
                      boost::optional<Timestamp> stableTs,
@@ -393,7 +414,7 @@ private:
 
     /**
      * When called in a repair context (_options.forRepair=true), attempts to recover a collection
-     * whose entry is present in the DurableCatalogImpl, but missing from the KVEngine. Returns an
+     * whose entry is present in the DurableCatalog, but missing from the KVEngine. Returns an
      * error Status if called outside of a repair context or the implementation of
      * KVEngine::recoverOrphanedIdent returns an error other than DataModifiedByRepair.
      *
@@ -452,7 +473,7 @@ private:
     const bool _supportsCappedCollections;
 
     std::unique_ptr<RecordStore> _catalogRecordStore;
-    std::unique_ptr<DurableCatalogImpl> _catalog;
+    std::unique_ptr<DurableCatalog> _catalog;
 
     // Flag variable that states if the storage engine is in backup mode.
     bool _inBackupMode = false;

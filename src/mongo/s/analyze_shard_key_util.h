@@ -29,11 +29,16 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/platform/basic.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -110,6 +115,11 @@ double round(double val, int n);
  * Returns the percentage between 'part' and 'whole' (between 0 and 100).
  */
 double calculatePercentage(double part, double whole);
+
+/*
+ * Returns true if the client is internal.
+ */
+bool isInternalClient(OperationContext* opCtx);
 
 }  // namespace analyze_shard_key
 }  // namespace mongo

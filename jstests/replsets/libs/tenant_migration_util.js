@@ -6,6 +6,13 @@ export const kProtocolShardMerge = "shard merge";
 export const kProtocolMultitenantMigrations = "multitenant migrations";
 
 /**
+ * Crafts a tenant database name.
+ */
+export function tenantDB(tenantId, dbName) {
+    return `${tenantId}_${dbName}`;
+}
+
+/**
  * Returns true if feature flag 'featureFlagShardMerge' is enabled, false otherwise.
  */
 export function isShardMergeEnabled(db) {

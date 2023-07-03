@@ -30,10 +30,22 @@
 #pragma once
 
 #include <absl/container/flat_hash_set.h>
+#include <cstddef>
+#include <memory>
+#include <utility>
 #include <vector>
 
+#include <absl/hash/hash.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -248,7 +260,12 @@ class TargetedWriteBatch {
     TargetedWriteBatch& operator=(const TargetedWriteBatch&) = delete;
 
 public:
-    TargetedWriteBatch(const ShardId& shardId) : _shardId(shardId) {}
+    /**
+     * baseCommandSizeBytes specifies an estimate of the size of the corresponding batch request
+     * command prior to adding any write ops to it.
+     */
+    TargetedWriteBatch(const ShardId& shardId, const int baseCommandSizeBytes)
+        : _shardId(shardId), _estimatedSizeBytes(baseCommandSizeBytes) {}
 
     const ShardId& getShardId() const {
         return _shardId;
@@ -279,9 +296,9 @@ private:
     // TargetedWrite*s are owned by the TargetedWriteBatch
     std::vector<std::unique_ptr<TargetedWrite>> _writes;
 
-    // Conservatively estimated size of the batch, for ensuring it doesn't grow past the maximum
-    // BSON size
-    int _estimatedSizeBytes{0};
+    // Conservatively estimated size of the batch command, for ensuring it doesn't grow past the
+    // maximum BSON size.
+    int _estimatedSizeBytes;
 };
 
 }  // namespace mongo

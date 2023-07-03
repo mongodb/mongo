@@ -29,27 +29,53 @@
 
 #include "mongo/db/catalog/database_holder_impl.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_impl.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
 
 Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, const DatabaseName& dbName) const {
-    uassert(
-        13280,
-        "invalid db name: " + dbName.toStringForErrorMsg(),
-        NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
+    uassert(13280,
+            "invalid db name: " + dbName.toStringForErrorMsg(),
+            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
 
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS) ||
               (dbName.db().compare("local") == 0 && opCtx->lockState()->isLocked()));
@@ -64,31 +90,29 @@ Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, const DatabaseName&
 }
 
 bool DatabaseHolderImpl::dbExists(OperationContext* opCtx, const DatabaseName& dbName) const {
-    uassert(
-        6198702,
-        "invalid db name: " + dbName.toStringForErrorMsg(),
-        NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
+    uassert(6198702,
+            "invalid db name: " + dbName.toStringForErrorMsg(),
+            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
     stdx::lock_guard<SimpleMutex> lk(_m);
     auto it = _dbs.find(dbName);
     return it != _dbs.end() && it->second != nullptr;
 }
 
-std::set<DatabaseName> DatabaseHolderImpl::_getNamesWithConflictingCasing_inlock(
+boost::optional<DatabaseName> DatabaseHolderImpl::_getNameWithConflictingCasing_inlock(
     const DatabaseName& dbName) {
-    std::set<DatabaseName> duplicates;
-
     for (const auto& nameAndPointer : _dbs) {
-        // A name that's equal with case-insensitive match must be identical, or it's a duplicate.
+        // A case insensitive match indicates that 'dbName' is a duplicate of an existing database.
         if (dbName.equalCaseInsensitive(nameAndPointer.first) && dbName != nameAndPointer.first)
-            duplicates.insert(nameAndPointer.first);
+            return nameAndPointer.first;
     }
-    return duplicates;
+
+    return boost::none;
 }
 
-std::set<DatabaseName> DatabaseHolderImpl::getNamesWithConflictingCasing(
+boost::optional<DatabaseName> DatabaseHolderImpl::getNameWithConflictingCasing(
     const DatabaseName& dbName) {
     stdx::lock_guard<SimpleMutex> lk(_m);
-    return _getNamesWithConflictingCasing_inlock(dbName);
+    return _getNameWithConflictingCasing_inlock(dbName);
 }
 
 std::vector<DatabaseName> DatabaseHolderImpl::getNames() {
@@ -103,10 +127,9 @@ std::vector<DatabaseName> DatabaseHolderImpl::getNames() {
 Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
                                      const DatabaseName& dbName,
                                      bool* justCreated) {
-    uassert(
-        6198701,
-        "invalid db name: " + dbName.toStringForErrorMsg(),
-        NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
+    uassert(6198701,
+            "invalid db name: " + dbName.toStringForErrorMsg(),
+            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
 
     if (justCreated)
@@ -115,7 +138,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
     stdx::unique_lock<SimpleMutex> lk(_m);
 
     // The following will insert a nullptr for dbname, which will treated the same as a non-
-    // existant database by the get method, yet still counts in getNamesWithConflictingCasing.
+    // existant database by the get method, yet still counts in getNameWithConflictingCasing.
     if (auto db = _dbs[dbName])
         return db;
 
@@ -131,19 +154,19 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
     });
 
     // Check casing in lock to avoid transient duplicates.
-    auto duplicates = _getNamesWithConflictingCasing_inlock(dbName);
+    auto duplicate = _getNameWithConflictingCasing_inlock(dbName);
     uassert(ErrorCodes::DatabaseDifferCase,
             str::stream() << "db already exists with different case already have: ["
-                          << (*duplicates.cbegin()).toStringForErrorMsg() << "] trying to create ["
+                          << duplicate->toStringForErrorMsg() << "] trying to create ["
                           << dbName.toStringForErrorMsg() << "]",
-            duplicates.empty());
+            !duplicate);
 
     // Do the catalog lookup and database creation outside of the scoped lock, because these may
     // block.
     lk.unlock();
 
     if (CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(dbName).empty()) {
-        audit::logCreateDatabase(opCtx->getClient(), DatabaseNameUtil::serialize(dbName));
+        audit::logCreateDatabase(opCtx->getClient(), dbName);
         if (justCreated)
             *justCreated = true;
     }
@@ -191,7 +214,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
                                 << coll->ns().toStringForErrorMsg() << "'.");
     }
 
-    audit::logDropDatabase(opCtx->getClient(), DatabaseNameUtil::serialize(name));
+    audit::logDropDatabase(opCtx->getClient(), name);
 
     auto const serviceContext = opCtx->getServiceContext();
 
@@ -236,10 +259,9 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 }
 
 void DatabaseHolderImpl::close(OperationContext* opCtx, const DatabaseName& dbName) {
-    uassert(
-        6198700,
-        "invalid db name: " + dbName.toStringForErrorMsg(),
-        NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
+    uassert(6198700,
+            "invalid db name: " + dbName.toStringForErrorMsg(),
+            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 
     stdx::lock_guard<SimpleMutex> lk(_m);

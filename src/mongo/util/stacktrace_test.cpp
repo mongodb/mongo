@@ -28,46 +28,56 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+// IWYU pragma: no_include "bits/types/__sigset_t.h"
+// IWYU pragma: no_include "bits/types/siginfo_t.h"
+// IWYU pragma: no_include "bits/types/stack_t.h"
+#include <fmt/format.h>
+#include <fmt/printf.h>  // IWYU pragma: keep
+// IWYU pragma: no_include "syscall.h"
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
 #include <array>
+#include <chrono>
 #include <csignal>
-#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <fmt/format.h>
-#include <fmt/printf.h>
+#include <deque>
 #include <functional>
+#include <iostream>
+#include <iterator>
 #include <map>
-#include <random>
-#include <sstream>
-#include <utility>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <thread>
 #include <vector>
-
-#include "mongo/base/parse_number.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/json.h"
-#include "mongo/config.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/pcre.h"
-#include "mongo/util/stacktrace.h"
 
 /** `sigaltstack` was introduced in glibc-2.12 in 2010. */
 #if !defined(_WIN32)
 #define HAVE_SIGALTSTACK
 #endif
+#include "mongo/base/parse_number.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/json.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_truncation.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/pcre.h"
+#include "mongo/util/stacktrace.h"
 
-#ifdef __linux__
-#include <ctime>
-#include <sys/syscall.h>
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
-#endif  //  __linux__
+#endif
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -28,7 +28,13 @@
  */
 
 #include "mongo/db/fts/unicode/codepoints.h"
-#include "mongo/unittest/unittest.h"
+
+#include <cstdint>
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace unicode {

@@ -29,15 +29,14 @@
 
 #include "mongo/db/index/2d_access_method.h"
 
-#include <string>
-#include <vector>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/index/index_descriptor.h"
 
 namespace mongo {
 
@@ -58,6 +57,7 @@ void TwoDAccessMethod::validateDocument(const CollectionPtr& collection,
 /** Finds the key objects to put in an index */
 void TwoDAccessMethod::doGetKeys(OperationContext* opCtx,
                                  const CollectionPtr& collection,
+                                 const IndexCatalogEntry* entry,
                                  SharedBufferFragmentBuilder& pooledBufferBuilder,
                                  const BSONObj& obj,
                                  GetKeysContext context,

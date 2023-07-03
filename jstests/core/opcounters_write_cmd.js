@@ -7,6 +7,7 @@
 //   # The config fuzzer may run logical session cache refreshes in the background, which modifies
 //   # some serverStatus metrics read in this test.
 //   does_not_support_config_fuzzer,
+//   inspects_command_opcounters,
 //   does_not_support_repeated_reads,
 // ]
 

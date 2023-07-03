@@ -27,9 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <array>
+#include <cstring>
+#include <string>
+#include <tuple>
 
-#include "mongo/bson/bsonmisc.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
@@ -38,8 +51,18 @@
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
+#include "mongo/db/exec/shard_filterer.h"
+#include "mongo/db/fts/fts_matcher.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/pcre.h"
+#include "mongo/util/shared_buffer.h"
+#include "mongo/util/time_support.h"
+
 namespace mongo::sbe::value {
 
 static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {
@@ -171,8 +194,8 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {
             break;
         }
         case TypeTags::ksValue: {
-            auto version = static_cast<KeyString::Version>(buf.read<uint8_t>());
-            auto ks = KeyString::Value::deserialize(buf, version);
+            auto version = static_cast<key_string::Version>(buf.read<uint8_t>());
+            auto ks = key_string::Value::deserialize(buf, version);
             auto [ksTag, ksVal] = makeCopyKeyString(ks);
             tag = ksTag;
             val = ksVal;
@@ -358,7 +381,7 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
     }
 }
 
-static void serializeValueIntoKeyString(KeyString::Builder& buf, TypeTags tag, Value val) {
+static void serializeValueIntoKeyString(key_string::Builder& buf, TypeTags tag, Value val) {
     switch (tag) {
         case TypeTags::Nothing: {
             buf.appendBool(false);
@@ -561,7 +584,7 @@ void RowBase<RowType>::serializeForSorter(BufBuilder& buf) const {
 
 
 template <typename RowType>
-void RowBase<RowType>::serializeIntoKeyString(KeyString::Builder& buf) const {
+void RowBase<RowType>::serializeIntoKeyString(key_string::Builder& buf) const {
     const RowType& self = *static_cast<const RowType*>(this);
     for (size_t idx = 0; idx < self.size(); ++idx) {
         auto [tag, val] = self.getViewOfValue(idx);
@@ -570,17 +593,17 @@ void RowBase<RowType>::serializeIntoKeyString(KeyString::Builder& buf) const {
 }
 
 template <typename RowType>
-RowType RowBase<RowType>::deserializeFromKeyString(const KeyString::Value& keyString,
+RowType RowBase<RowType>::deserializeFromKeyString(const key_string::Value& keyString,
                                                    BufBuilder* valueBufferBuilder,
                                                    boost::optional<size_t> numPrefixValsToRead) {
     BufReader reader(keyString.getBuffer(), keyString.getSize());
-    KeyString::TypeBits typeBits(keyString.getTypeBits());
-    KeyString::TypeBits::Reader typeBitsReader(typeBits);
+    key_string::TypeBits typeBits(keyString.getTypeBits());
+    key_string::TypeBits::Reader typeBitsReader(typeBits);
 
     RowValueBuilder<RowType> valBuilder(valueBufferBuilder);
     auto keepReading = true;
     do {
-        keepReading = KeyString::readSBEValue(
+        keepReading = key_string::readSBEValue(
             &reader, &typeBitsReader, false /* inverted */, typeBits.version, &valBuilder);
     } while (keepReading);
 

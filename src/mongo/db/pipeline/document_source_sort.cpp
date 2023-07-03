@@ -27,28 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/serialization_options.h"
-#include "mongo/platform/basic.h"
+#include <boost/cstdint.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <iterator>
+#include <list>
+#include <tuple>
+#include <type_traits>
 
-#include "mongo/db/pipeline/document_source_sort.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include <algorithm>
-
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
-#include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/serialization_options.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/overflow_arithmetic.h"
-#include "mongo/s/query/document_source_merge_cursors.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -71,7 +86,7 @@ struct BoundMakerMin {
     Document serialize(SerializationOptions opts) const {
         // Convert from millis to seconds.
         return Document{{{"base"_sd, DocumentSourceSort::kMin},
-                         {DocumentSourceSort::kOffset, opts.serializeLiteralValue(offset / 1000)}}};
+                         {DocumentSourceSort::kOffset, opts.serializeLiteral(offset / 1000)}}};
     }
 };
 
@@ -87,7 +102,7 @@ struct BoundMakerMax {
     Document serialize(SerializationOptions opts) const {
         // Convert from millis to seconds.
         return Document{{{"base"_sd, DocumentSourceSort::kMax},
-                         {DocumentSourceSort::kOffset, opts.serializeLiteralValue(offset / 1000)}}};
+                         {DocumentSourceSort::kOffset, opts.serializeLiteral(offset / 1000)}}};
     }
 };
 struct CompAsc {
@@ -260,7 +275,7 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
     }
 
     if (!_populated) {
-        const auto populationResult = populate();
+        auto populationResult = populate();
         if (populationResult.isPaused()) {
             return populationResult;
         }
@@ -297,21 +312,19 @@ void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
 
         MutableDocument mutDoc{Document{{
             {"$_internalBoundedSort"_sd,
-             Document{
-                 {{"sortKey"_sd, std::move(sortKey)},
-                  {"bound"_sd, _timeSorter->serializeBound(opts)},
-                  {"limit"_sd,
-                   opts.serializeLiteralValue(static_cast<long long>(_timeSorter->limit()))}}}},
+             Document{{{"sortKey"_sd, std::move(sortKey)},
+                       {"bound"_sd, _timeSorter->serializeBound(opts)},
+                       {"limit"_sd,
+                        opts.serializeLiteral(static_cast<long long>(_timeSorter->limit()))}}}},
         }}};
 
         if (explain >= ExplainOptions::Verbosity::kExecStats) {
-            mutDoc["totalDataSizeSortedBytesEstimate"] = opts.serializeLiteralValue(
-                static_cast<long long>(_timeSorter->stats().bytesSorted()));
-            mutDoc["usedDisk"] =
-                opts.serializeLiteralValue(_timeSorter->stats().spilledRanges() > 0);
-            mutDoc["spills"] = opts.serializeLiteralValue(
-                static_cast<long long>(_timeSorter->stats().spilledRanges()));
-            mutDoc["spilledDataStorageSize"] = opts.serializeLiteralValue(
+            mutDoc["totalDataSizeSortedBytesEstimate"] =
+                opts.serializeLiteral(static_cast<long long>(_timeSorter->stats().bytesSorted()));
+            mutDoc["usedDisk"] = opts.serializeLiteral(_timeSorter->stats().spilledRanges() > 0);
+            mutDoc["spills"] =
+                opts.serializeLiteral(static_cast<long long>(_timeSorter->stats().spilledRanges()));
+            mutDoc["spilledDataStorageSize"] = opts.serializeLiteral(
                 static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
         }
 
@@ -333,24 +346,23 @@ void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
         return;
     }
 
-    MutableDocument mutDoc(
-        DOC(kStageName << DOC("sortKey"
-                              << _sortExecutor->sortPattern().serialize(
-                                     SortPattern::SortKeySerialization::kForExplain, opts)
-                              << "limit"
-                              << (_sortExecutor->hasLimit()
-                                      ? opts.serializeLiteralValue(static_cast<long long>(limit))
-                                      : Value()))));
+    MutableDocument mutDoc(DOC(
+        kStageName << DOC("sortKey" << _sortExecutor->sortPattern().serialize(
+                                           SortPattern::SortKeySerialization::kForExplain, opts)
+                                    << "limit"
+                                    << (_sortExecutor->hasLimit()
+                                            ? opts.serializeLiteral(static_cast<long long>(limit))
+                                            : Value()))));
 
     if (explain >= ExplainOptions::Verbosity::kExecStats) {
         auto& stats = _sortExecutor->stats();
 
         mutDoc["totalDataSizeSortedBytesEstimate"] =
-            opts.serializeLiteralValue(static_cast<long long>(stats.totalDataSizeBytes));
-        mutDoc["usedDisk"] = opts.serializeLiteralValue(stats.spills > 0);
-        mutDoc["spills"] = opts.serializeLiteralValue(static_cast<long long>(stats.spills));
-        mutDoc["spilledDataStorageSize"] = opts.serializeLiteralValue(
-            static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
+            opts.serializeLiteral(static_cast<long long>(stats.totalDataSizeBytes));
+        mutDoc["usedDisk"] = opts.serializeLiteral(stats.spills > 0);
+        mutDoc["spills"] = opts.serializeLiteral(static_cast<long long>(stats.spills));
+        mutDoc["spilledDataStorageSize"] =
+            opts.serializeLiteral(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
     }
 
     array.push_back(Value(mutDoc.freeze()));

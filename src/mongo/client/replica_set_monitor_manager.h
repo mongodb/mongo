@@ -29,18 +29,37 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <deque>
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "mongo/base/counter.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/client/replica_set_monitor_stats.h"
 #include "mongo/executor/egress_tag_closer.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -56,8 +75,8 @@ public:
     virtual ~ReplicaSetMonitorManagerNetworkConnectionHook() = default;
 
     Status validateHost(const HostAndPort& remoteHost,
-                        const BSONObj& isMasterRequest,
-                        const executor::RemoteCommandResponse& isMasterReply) override;
+                        const BSONObj& helloRequest,
+                        const executor::RemoteCommandResponse& helloReply) override;
 
     StatusWith<boost::optional<executor::RemoteCommandRequest>> makeRequest(
         const HostAndPort& remoteHost) override;

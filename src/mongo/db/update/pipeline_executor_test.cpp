@@ -27,18 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
 
-#include "mongo/db/update/pipeline_executor.h"
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/update/pipeline_executor.h"
 #include "mongo/db/update/update_node_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -371,6 +378,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithDeletes) {
         // Verify post-image and diff format.
         ASSERT_EQUALS(doc, fromjson("{paddingField: 'largeValueString'}"));
         ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry, fromjson("{$v: 2, diff: {d: {f1: false}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // When a path in the diff is same as index path.
@@ -386,6 +394,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithDeletes) {
                 "{f1: {a: {paddingField: 'largeValueString'}}, paddingField: 'largeValueString'}"));
         ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
                                  fromjson("{$v: 2, diff: {sf1: {sa: {d: {b: false, c: false}}}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // When the index path is a prefix of a path in the diff.
@@ -401,6 +410,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithDeletes) {
             doc,
             fromjson("{f1: {a: {b: {paddingField: 'largeValueString'}, c: 1, paddingField: "
                      "'largeValueString'}}, paddingField: 'largeValueString'}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // With common parent, but path diverges.
@@ -416,6 +426,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithDeletes) {
             doc,
             fromjson("{f1: {a: {b: {c: 1, paddingField: 'largeValueString'}, paddingField: "
                      "'largeValueString'}}, paddingField: 'largeValueString'}"));
+        ASSERT_FALSE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
 }
 
@@ -438,6 +449,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithUpdatesAndInserts) {
         ASSERT_EQUALS(doc, fromjson("{f1: true, paddingField: 'largeValueString', f2: true}"));
         ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
                                  fromjson("{$v: 2, diff: {u: {f1: true}, i: {f2: true}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // When a path in the diff is same as index path.
@@ -449,6 +461,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithUpdatesAndInserts) {
         // Verify diff format.
         ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
                                  fromjson("{$v: 2, diff: {sf1: {sa: {i: {newField: true}}}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // When the index path is a prefix of a path in the diff.
@@ -465,6 +478,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithUpdatesAndInserts) {
             fromjson(
                 "{f1: {a: {b: {c: true, paddingField: 'largeValueString'}, c: 1, paddingField: "
                 "'largeValueString'}}, paddingField: 'largeValueString'}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // With common parent, but path diverges.
@@ -480,6 +494,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithUpdatesAndInserts) {
             doc,
             fromjson("{f1: {a: {b: {c: 1, paddingField: 'largeValueString'}, c: 1, paddingField: "
                      "'largeValueString', p: true}}, paddingField: 'largeValueString'}"));
+        ASSERT_FALSE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
 }
 
@@ -509,6 +524,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAlongIndexPath) {
         ASSERT_BSONOBJ_BINARY_EQ(
             result.oplogEntry,
             fromjson("{$v: 2, diff: {sf1: {a: true, s1: {sa: {sb: {a: true, l: 1}}}}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // When the index path is a prefix of a path in the diff and also involves numeric
@@ -530,6 +546,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAlongIndexPath) {
             result.oplogEntry,
             fromjson(
                 "{$v: 2, diff: {sf1: {a: true, s1: {sa: {sb: {a: true, s1: {i: {d: 1} }}}}}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // When inserting a sub-object into array, and the sub-object diverges from the index path.
@@ -548,6 +565,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAlongIndexPath) {
                 "'largeValueString'}"));
         ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
                                  fromjson("{$v: 2, diff: {sf1: {a: true, u2: {newField: 1} }}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // When a common array path element is updated, but the paths diverge at the last element.
@@ -567,6 +585,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAlongIndexPath) {
             fromjson(
                 "{f1: [0, {a: {b: ['someStringValue', {c: 1, paddingField: 'largeValueString'}], "
                 "c: 2, paddingField: 'largeValueString'}}], paddingField: 'largeValueString'}"));
+        ASSERT_FALSE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
 }
 
@@ -593,6 +612,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath) {
                      "'largeValueString'}}, paddingField: 'largeValueString'}"));
         ASSERT_BSONOBJ_BINARY_EQ(
             result.oplogEntry, fromjson("{$v: 2, diff: {sf1: {sa: {sb: {sc: {a: true, l: 1}}}}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // Add an array element.
@@ -610,6 +630,7 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath) {
         ASSERT_BSONOBJ_BINARY_EQ(
             result.oplogEntry,
             fromjson("{$v: 2, diff: {sf1: {sa: {sb: {sc: {a: true, u2: {newField: 1} }}}}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
     {
         // Updating a sub-array element.
@@ -627,7 +648,48 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath) {
         ASSERT_BSONOBJ_BINARY_EQ(
             result.oplogEntry,
             fromjson("{$v: 2, diff: {sf1: {sa: {sb: {sc: {a: true, u1: 'updatedVal'}}}}}}"));
+        ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
+}
+
+/**
+ * Verifies the fix for SERVER-76934 in the case where the original document has a duplicate field.
+ */
+TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath1) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj preImage(
+        fromjson("{f1: {paddingField: 'largeValueString'}, k: {c: 1, c: 2, paddingField: "
+                 "'largeValueString'}}"));
+
+    auto doc = mutablebson::Document(preImage);
+    const std::vector<BSONObj> pipeline{
+        fromjson("{$replaceWith: {$literal: {f1: {paddingField: 'largeValueString'}, k: {c: 4, "
+                 "paddingField: 'largeValueString'}} }}")};
+    PipelineExecutor exec(expCtx, pipeline);
+    ASSERT_THROWS_CODE_AND_WHAT(exec.applyUpdate(getApplyParams(doc.root())),
+                                AssertionException,
+                                7693400,
+                                "Document already has a field named 'c'");
+}
+
+/**
+ * Verifies the fix for SERVER-76934 in the case where the pipeline tries to add a duplicate field.
+ */
+TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath2) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj preImage(
+        fromjson("{f1: {paddingField: 'largeValueString'}, k: {c: 1, paddingField: "
+                 "'largeValueString'}}"));
+
+    auto doc = mutablebson::Document(preImage);
+    const std::vector<BSONObj> pipeline{
+        fromjson("{$replaceWith: {$literal: {f1: {paddingField: 'largeValueString'}, k: {c: 4, c: "
+                 "5, paddingField: 'largeValueString'}} }}")};
+    PipelineExecutor exec(expCtx, pipeline);
+    ASSERT_THROWS_CODE_AND_WHAT(exec.applyUpdate(getApplyParams(doc.root())),
+                                AssertionException,
+                                7693400,
+                                "Document already has a field named 'c'");
 }
 
 }  // namespace

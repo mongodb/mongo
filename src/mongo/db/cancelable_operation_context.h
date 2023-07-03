@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <memory>
+#include <utility>
 
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"

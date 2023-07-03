@@ -28,11 +28,19 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <cstddef>
+#include <map>
+#include <string>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_internal.h"
+#include "mongo/util/assert_util_core.h"
 
 
 namespace mongo {
@@ -89,5 +97,19 @@ void BM_documentToBson(benchmark::State& state) {
 }
 
 BENCHMARK(BM_documentToBson)->DenseRange(2'000, 10'000, 2'000)->Unit(benchmark::kMicrosecond);
+
+void BM_FieldNameHasher(benchmark::State& state) {
+    std::string field;
+    for (auto i = 0; i < state.range(0); i++) {
+        field.append("a");
+    }
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(FieldNameHasher{}(field));
+    }
+}
+
+BENCHMARK(BM_FieldNameHasher)->RangeMultiplier(2)->Range(1, 1 << 8);
+
 
 }  // namespace mongo

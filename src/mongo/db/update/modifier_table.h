@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/update/update_leaf_node.h"
 
 namespace mongo {

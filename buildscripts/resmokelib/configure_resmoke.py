@@ -14,6 +14,7 @@ import textwrap
 import shlex
 
 import pymongo.uri_parser
+import yaml
 
 from buildscripts.idl import gen_all_feature_flag_list
 from buildscripts.idl.lib import ALL_FEATURE_FLAG_FILE
@@ -238,6 +239,11 @@ be invoked as either:
     _config.EXCLUDE_WITH_ANY_TAGS.extend(
         utils.default_if_none(_tags_from_list(config.pop("exclude_with_any_tags")), []))
 
+    force_disabled_flags = yaml.safe_load(
+        open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml"))
+
+    _config.EXCLUDE_WITH_ANY_TAGS.extend(force_disabled_flags)
+
     if _config.RUN_NO_FEATURE_FLAG_TESTS:
         # Don't run any feature flag tests.
         _config.EXCLUDE_WITH_ANY_TAGS.extend(all_feature_flags)
@@ -337,6 +343,7 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.NUM_SHARDS = config.pop("num_shards")
     _config.CONFIG_SHARD = utils.pick_catalog_shard_node(
         config.pop("config_shard"), _config.NUM_SHARDS)
+    _config.ORIGIN_SUITE = config.pop("origin_suite")
     _config.PERF_REPORT_FILE = config.pop("perf_report_file")
     _config.CEDAR_REPORT_FILE = config.pop("cedar_report_file")
     _config.RANDOM_SEED = config.pop("seed")

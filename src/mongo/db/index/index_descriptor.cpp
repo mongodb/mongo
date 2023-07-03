@@ -27,28 +27,68 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/index/index_descriptor.h"
-
+#include <absl/container/node_hash_map.h>
 #include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <map>
+#include <memory>
+#include <set>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/index_path_projection.h"
+#include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/index/column_key_generator.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index/wildcard_key_generator.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 
 namespace mongo {
+
+namespace {
+
+/**
+ * Returns wildcardProjection or columnstoreProjection projection
+ */
+BSONObj createPathProjection(const BSONObj& infoObj) {
+    if (const auto wildcardProjection = infoObj[IndexDescriptor::kWildcardProjectionFieldName]) {
+        return wildcardProjection.Obj().getOwned();
+    } else if (const auto columnStoreProjection =
+                   infoObj[IndexDescriptor::kColumnStoreProjectionFieldName]) {
+        return columnStoreProjection.Obj().getOwned();
+    } else {
+        return BSONObj();
+    }
+}
+
+}  // namespace
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
@@ -124,6 +164,9 @@ constexpr StringData IndexDescriptor::kColumnStoreCompressorFieldName;
  *   infoObj          - options information
  */
 IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj infoObj)
+    : _shared(make_intrusive<SharedState>(accessMethodName, infoObj)) {}
+
+IndexDescriptor::SharedState::SharedState(const std::string& accessMethodName, BSONObj infoObj)
     : _accessMethodName(accessMethodName),
       _indexType(IndexNames::nameToType(accessMethodName)),
       _infoObj(infoObj.getOwned()),
@@ -222,8 +265,8 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     // the original and normalized projections will be empty BSON objects, so we can still do the
     // comparison based on the normalized projection.
     static const UnorderedFieldsBSONObjComparator kUnorderedBSONCmp;
-    if (kUnorderedBSONCmp.evaluate(_normalizedProjection !=
-                                   existingIndexDesc->_normalizedProjection)) {
+    if (kUnorderedBSONCmp.evaluate(_shared->_normalizedProjection !=
+                                   existingIndexDesc->_shared->_normalizedProjection)) {
         return Comparison::kDifferent;
     }
 
@@ -309,14 +352,14 @@ std::vector<const char*> IndexDescriptor::getFieldNames() const {
     };
 
     // Iterate over the key pattern and add the field names to the 'fieldNames' vector.
-    BSONObjIterator keyPatternIter(_keyPattern);
+    BSONObjIterator keyPatternIter(_shared->_keyPattern);
     while (keyPatternIter.more()) {
         BSONElement KeyPatternElem = keyPatternIter.next();
         auto fieldName = KeyPatternElem.fieldNameStringData();
 
         // If the index type is text and the field name is either '_fts' or '_ftsx', then append the
         // index fields to the field names, otherwise add the field name from the key pattern.
-        if ((_indexType == IndexType::INDEX_TEXT) &&
+        if ((_shared->_indexType == IndexType::INDEX_TEXT) &&
             (fieldName == kFTSFieldName || fieldName == kFTSXFieldName)) {
             maybeAppendFtsIndexField();
         } else {
@@ -326,7 +369,7 @@ std::vector<const char*> IndexDescriptor::getFieldNames() const {
 
     // If the index type is text and the 'hasSeenFtsOrFtsxFields' is set to false, then append the
     // index fields.
-    if (_indexType == IndexType::INDEX_TEXT) {
+    if (_shared->_indexType == IndexType::INDEX_TEXT) {
         maybeAppendFtsIndexField();
     }
 

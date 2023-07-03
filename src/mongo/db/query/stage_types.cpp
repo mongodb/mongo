@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
 
 #include "mongo/db/query/stage_types.h"
 #include "mongo/stdx/unordered_map.h"

@@ -28,23 +28,61 @@
  */
 
 #include <absl/container/flat_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <map>
+#include <memory>
+#include <numeric>
+#include <stack>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/query/sbe_stage_builder_expression.h"
-#include "mongo/db/query/util/make_data_structure.h"
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/vm/datetime.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/accumulator_percentile.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/bson_typemask.h"
+#include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/expression_walker.h"
-#include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
+#include "mongo/db/query/sbe_stage_builder_abt_holder_def.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
+#include "mongo/db/query/sbe_stage_builder_expression.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 
@@ -1138,7 +1176,7 @@ public:
     void visit(const ExpressionDateDiff* expr) final {
         using namespace std::literals;
 
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         invariant(children.size() == 5);
 
         auto startDateName = makeLocalVariableName(_context->state.frameId(), 0);
@@ -1169,7 +1207,7 @@ public:
         auto endDateExpression = _context->popABTExpr();
         auto startDateExpression = _context->popABTExpr();
 
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
         auto timeZoneDBVar = makeVariable(timeZoneDBName);
 
@@ -1284,7 +1322,7 @@ public:
         pushABT(std::move(dateDiffExpression));
     }
     void visit(const ExpressionDateFromString* expr) final {
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         invariant(children.size() == 5);
         _context->ensureArity(
             1 + (expr->isFormatSpecified() ? 1 : 0) + (expr->isTimezoneSpecified() ? 1 : 0) +
@@ -1308,7 +1346,7 @@ public:
         auto dateStringExpression = _context->popABTExpr();
         auto dateStringName = makeLocalVariableName(_context->state.frameId(), 0);
 
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
 
         // Set parameters for an invocation of built-in "dateFromString" function.
@@ -1412,7 +1450,7 @@ public:
                         "$dateFromString parameter 'timezone' must be a string",
                         sbe::value::isString(timezoneTag));
                 auto [timezoneDBTag, timezoneDBVal] =
-                    _context->state.data->env->getAccessor(timeZoneDBSlot)->getViewOfValue();
+                    _context->state.env->getAccessor(timeZoneDBSlot)->getViewOfValue();
                 uassert(4997801,
                         "$dateFromString first argument must be a timezoneDB object",
                         timezoneDBTag == sbe::value::TypeTags::timeZoneDB);
@@ -1456,7 +1494,7 @@ public:
     void visit(const ExpressionDateFromParts* expr) final {
         // This expression can carry null children depending on the set of fields provided,
         // to compute a date from parts so we only need to pop if a child exists.
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         invariant(children.size() == 11);
 
         boost::optional<optimizer::ABT> eTimezone;
@@ -1702,7 +1740,7 @@ public:
         // for datetime computation. This global object is registered as an unowned value in the
         // runtime environment so we pass the corresponding slot to the datePartsWeekYear and
         // dateParts functions as a variable.
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
         auto computeDate = makeABTFunction(eIsoWeekYear ? "datePartsWeekYear" : "dateParts",
                                            makeVariable(timeZoneDBName),
@@ -1760,7 +1798,7 @@ public:
     }
 
     void visit(const ExpressionDateToParts* expr) final {
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         auto dateName = makeLocalVariableName(_context->state.frameId(), 0);
         auto timezoneName = makeLocalVariableName(_context->state.frameId(), 0);
         auto isoflagName = makeLocalVariableName(_context->state.frameId(), 0);
@@ -1784,7 +1822,7 @@ public:
         }
         auto date = _context->popABTExpr();
 
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
         auto timeZoneDBVar = makeVariable(timeZoneDBName);
 
@@ -1830,29 +1868,30 @@ public:
     }
 
     void visit(const ExpressionDateToString* expr) final {
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         invariant(children.size() == 4);
         _context->ensureArity(1 + (expr->isFormatSpecified() ? 1 : 0) +
                               (expr->isTimezoneSpecified() ? 1 : 0) +
                               (expr->isOnNullSpecified() ? 1 : 0));
 
         // Get child expressions.
-        auto onNullExpression =
+        optimizer::ABT onNullExpression =
             expr->isOnNullSpecified() ? _context->popABTExpr() : optimizer::Constant::null();
 
-        auto timezoneExpression = expr->isTimezoneSpecified() ? _context->popABTExpr()
-                                                              : optimizer::Constant::str("UTC"_sd);
-        auto dateExpression = _context->popABTExpr();
-
-        auto formatExpression = expr->isFormatSpecified()
+        optimizer::ABT timezoneExpression = expr->isTimezoneSpecified()
             ? _context->popABTExpr()
-            : optimizer::Constant::str("%Y-%m-%dT%H:%M:%S.%LZ"_sd);
+            : optimizer::Constant::str("UTC"_sd);
+        optimizer::ABT dateExpression = _context->popABTExpr();
 
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        optimizer::ABT formatExpression = expr->isFormatSpecified()
+            ? _context->popABTExpr()
+            : optimizer::Constant::str(kIsoFormatStringZ);  // assumes UTC until disproven
+
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
         auto timeZoneDBVar = makeVariable(timeZoneDBName);
         auto [timezoneDBTag, timezoneDBVal] =
-            _context->state.data->env->getAccessor(timeZoneDBSlot)->getViewOfValue();
+            _context->state.env->getAccessor(timeZoneDBSlot)->getViewOfValue();
         uassert(4997900,
                 "$dateToString first argument must be a timezoneDB object",
                 timezoneDBTag == sbe::value::TypeTags::timeZoneDB);
@@ -1861,19 +1900,6 @@ public:
         // Local bind to hold the date expression result
         auto dateName = makeLocalVariableName(_context->state.frameId(), 0);
         auto dateVar = makeVariable(dateName);
-
-        // Set parameters for an invocation of built-in "dateToString" function.
-        optimizer::ABTVector arguments;
-        arguments.push_back(timeZoneDBVar);
-        arguments.push_back(dateExpression);
-        arguments.push_back(formatExpression);
-        arguments.push_back(timezoneExpression);
-
-        // Create an expression to invoke built-in "dateToString" function.
-        auto dateToStringFunctionCall =
-            optimizer::make<optimizer::FunctionCall>("dateToString", std::move(arguments));
-        auto dateToStringName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto dateToStringVar = makeVariable(dateToStringName);
 
         // Create expressions to check that each argument to "dateToString" function exists, is not
         // null, and is of the correct type.
@@ -1888,6 +1914,37 @@ public:
         // "date" parameter validation.
         inputValidationCases.emplace_back(generateABTFailIfNotCoercibleToDate(
             dateVar, ErrorCodes::Error{4997901}, "$dateToString"_sd, "date"_sd));
+
+        // "timezone" parameter validation.
+        if (auto* timezoneExpressionConst = timezoneExpression.cast<optimizer::Constant>();
+            timezoneExpressionConst) {
+            auto [timezoneTag, timezoneVal] = timezoneExpressionConst->get();
+            if (!sbe::value::isNullish(timezoneTag)) {
+                // If the query did not specify a format string and a non-UTC timezone was
+                // specified, the default format should not use a 'Z' suffix.
+                if (!expr->isFormatSpecified() &&
+                    !(sbe::vm::getTimezone(timezoneTag, timezoneVal, timezoneDB).isUtcZone())) {
+                    formatExpression = optimizer::Constant::str(kIsoFormatStringNonZ);
+                }
+
+                // We don't want to error on null.
+                uassert(4997905,
+                        "$dateToString parameter 'timezone' must be a string",
+                        sbe::value::isString(timezoneTag));
+                uassert(4997906,
+                        "$dateToString parameter 'timezone' must be a valid timezone",
+                        sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
+            }
+        } else {
+            inputValidationCases.emplace_back(
+                generateABTNonStringCheck(timezoneExpression),
+                makeABTFail(ErrorCodes::Error{4997907},
+                            "$dateToString parameter 'timezone' must be a string"));
+            inputValidationCases.emplace_back(
+                makeNot(makeABTFunction("isTimezone", timeZoneDBVar, timezoneExpression)),
+                makeABTFail(ErrorCodes::Error{4997908},
+                            "$dateToString parameter 'timezone' must be a valid timezone"));
+        }
 
         // "format" parameter validation.
         if (auto* formatExpressionConst = formatExpression.cast<optimizer::Constant>();
@@ -1911,29 +1968,18 @@ public:
                             "$dateToString parameter 'format' must be a valid format"));
         }
 
-        // "timezone" parameter validation.
-        if (auto* timezoneExpressionConst = timezoneExpression.cast<optimizer::Constant>();
-            timezoneExpressionConst) {
-            auto [timezoneTag, timezoneVal] = timezoneExpressionConst->get();
-            if (!sbe::value::isNullish(timezoneTag)) {
-                // We don't want to error on null.
-                uassert(4997905,
-                        "$dateToString parameter 'timezone' must be a string",
-                        sbe::value::isString(timezoneTag));
-                uassert(4997906,
-                        "$dateToString parameter 'timezone' must be a valid timezone",
-                        sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
-            }
-        } else {
-            inputValidationCases.emplace_back(
-                generateABTNonStringCheck(timezoneExpression),
-                makeABTFail(ErrorCodes::Error{4997907},
-                            "$dateToString parameter 'timezone' must be a string"));
-            inputValidationCases.emplace_back(
-                makeNot(makeABTFunction("isTimezone", timeZoneDBVar, timezoneExpression)),
-                makeABTFail(ErrorCodes::Error{4997908},
-                            "$dateToString parameter 'timezone' must be a valid timezone"));
-        }
+        // Set parameters for an invocation of built-in "dateToString" function.
+        optimizer::ABTVector arguments;
+        arguments.push_back(timeZoneDBVar);
+        arguments.push_back(dateExpression);
+        arguments.push_back(formatExpression);
+        arguments.push_back(timezoneExpression);
+
+        // Create an expression to invoke built-in "dateToString" function.
+        auto dateToStringFunctionCall =
+            optimizer::make<optimizer::FunctionCall>("dateToString", std::move(arguments));
+        auto dateToStringName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto dateToStringVar = makeVariable(dateToStringName);
 
         pushABT(optimizer::make<optimizer::Let>(
             std::move(dateName),
@@ -1948,7 +1994,7 @@ public:
                         std::move(inputValidationCases), optimizer::Constant::nothing())))));
     }
     void visit(const ExpressionDateTrunc* expr) final {
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         invariant(children.size() == 5);
         _context->ensureArity(2 + (expr->isBinSizeSpecified() ? 1 : 0) +
                               (expr->isTimezoneSpecified() ? 1 : 0) +
@@ -1965,11 +2011,11 @@ public:
         auto unitExpression = _context->popABTExpr();
         auto dateExpression = _context->popABTExpr();
 
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
         auto timeZoneDBVar = makeVariable(timeZoneDBName);
         auto [timezoneDBTag, timezoneDBVal] =
-            _context->state.data->env->getAccessor(timeZoneDBSlot)->getViewOfValue();
+            _context->state.env->getAccessor(timeZoneDBSlot)->getViewOfValue();
         tassert(7157927,
                 "$dateTrunc first argument must be a timezoneDB object",
                 timezoneDBTag == sbe::value::TypeTags::timeZoneDB);
@@ -2233,7 +2279,7 @@ public:
                         "Encountered unexpected system variable ID",
                         it != Variables::kIdToBuiltinVarName.end());
 
-                auto slot = _context->state.data->env->getSlotIfExists(it->second);
+                auto slot = _context->state.env->getSlotIfExists(it->second);
                 uassert(5611301,
                         str::stream()
                             << "Builtin variable '$$" << it->second << "' is not available",
@@ -2849,7 +2895,7 @@ public:
         auto [specTag, specVal] = makeValue(expr->getSortPattern());
         auto specConstant = makeABTConstant(specTag, specVal);
 
-        auto collatorSlot = _context->state.data->env->getSlotIfExists("collator"_sd);
+        auto collatorSlot = _context->state.env->getSlotIfExists("collator"_sd);
         auto collatorVar = collatorSlot.map(
             [&](auto slotId) { return _context->registerVariable(*collatorSlot); });
 
@@ -2961,7 +3007,21 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionStrLenBytes* expr) final {
-        unsupportedExpression(expr->getOpName());
+        invariant(expr->getChildren().size() == 1);
+        _context->ensureArity(1);
+
+        auto strName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto strExpression = _context->popABTExpr();
+        auto strVar = makeVariable(strName);
+
+        auto strLenBytesExpr = optimizer::make<optimizer::If>(
+            makeFillEmptyFalse(makeABTFunction("isString", strVar)),
+            makeABTFunction("strLenBytes", strVar),
+            makeABTFail(ErrorCodes::Error{5155800}, "$strLenBytes requires a string argument"));
+
+        pushABT(optimizer::make<optimizer::Let>(
+            std::move(strName), std::move(strExpression), std::move(strLenBytesExpr)));
+        return;
     }
     void visit(const ExpressionBinarySize* expr) final {
         unsupportedExpression(expr->getOpName());
@@ -3379,7 +3439,7 @@ private:
     }
 
     void generateDateExpressionAcceptingTimeZone(StringData exprName, const Expression* expr) {
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         invariant(children.size() == 2);
 
         auto timezoneExpression =
@@ -3390,7 +3450,7 @@ private:
         auto dateName = makeLocalVariableName(_context->state.frameId(), 0);
         auto dateVar = makeVariable(dateName);
 
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
 
         // Set parameters for an invocation of the built-in function.
         optimizer::ABTVector arguments;
@@ -3408,7 +3468,7 @@ private:
         if (timezoneExpression.is<optimizer::Constant>()) {
             auto [timezoneTag, timezoneVal] = timezoneExpression.cast<optimizer::Constant>()->get();
             auto [timezoneDBTag, timezoneDBVal] =
-                _context->state.data->env->getAccessor(timeZoneDBSlot)->getViewOfValue();
+                _context->state.env->getAccessor(timeZoneDBSlot)->getViewOfValue();
             auto timezoneDB = sbe::value::getTimeZoneDBView(timezoneDBVal);
             uassert(5157900,
                     str::stream() << "$" << exprName.toString()
@@ -3644,7 +3704,7 @@ private:
     void visitIndexOfFunction(const Expression* expr,
                               ExpressionVisitorContext* _context,
                               const std::string& indexOfFunction) {
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         auto operandSize = children.size() <= 3 ? 3 : 4;
         optimizer::ABTVector operands;
         operands.reserve(operandSize);
@@ -3778,7 +3838,7 @@ private:
         optimizer::ABTVector checkNulls;
         optimizer::ABTVector checkNotArrays;
 
-        auto collatorSlot = _context->state.data->env->getSlotIfExists("collator"_sd);
+        auto collatorSlot = _context->state.env->getSlotIfExists("collator"_sd);
 
         args.reserve(arity);
         argNames.reserve(arity);
@@ -4054,7 +4114,7 @@ private:
      */
     void generateDateArithmeticsExpression(const ExpressionDateArithmetics* expr,
                                            const std::string& dateExprName) {
-        auto children = expr->getChildren();
+        const auto& children = expr->getChildren();
         auto arity = children.size();
         invariant(arity == 4);
         auto timezoneExpr =
@@ -4087,7 +4147,7 @@ private:
             }
         }();
 
-        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBVar = makeVariable(_context->registerVariable(timeZoneDBSlot));
 
         optimizer::ABTVector checkNullArg;

@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include <cstddef>
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/util/options_parser/environment.h"
 
 namespace mongo {

@@ -89,3 +89,8 @@ structs:
                 description: "The coordinator's decision for the transaction including the decision
                               ('commit' or 'abort') and a commit timestamp (if the decision is
                               'commit'). Only set if the coordinator has made a decision."
+            affectedNamespaces:
+                optional: true
+                type: array<namespacestring>
+                description: "The list of namespaces, affected by the transaction. Each participant
+                              returns a list in response to prepareTransaction command."

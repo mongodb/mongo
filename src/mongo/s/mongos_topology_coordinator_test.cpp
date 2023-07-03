@@ -27,23 +27,35 @@
  *    it in the license file.
  */
 
+#include <ratio>
+#include <string>
 
-#include "mongo/logv2/log.h"
+#include <boost/none.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker_impl_client_observer.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/platform/basic.h"
-#include "mongo/s/concurrency/locker_mongos_client_observer.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/mongos_topology_coordinator.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/transport/hello_metrics.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
-
-using std::unique_ptr;
 
 namespace mongo {
 namespace {
@@ -52,7 +64,7 @@ class MongosTopoCoordTest : public ServiceContextTest {
 public:
     MongosTopoCoordTest() {
         auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
     }
 
     virtual void setUp() {

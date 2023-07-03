@@ -27,28 +27,42 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/auth_op_observer.h"
+
+#include <memory>
+#include <set>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/locker_noop.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/keys_collection_client_sharded.h"
-#include "mongo/db/keys_collection_manager.h"
-#include "mongo/db/logical_time_validator.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_interface_local.h"
-#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/session/session_catalog_mongod.h"
-#include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/util/clock_source_mock.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -146,29 +160,30 @@ TEST_F(AuthOpObserverTest, MultipleAboutToDeleteAndOnDelete) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     WriteUnitOfWork wunit(opCtx.get());
     AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, BSON("_id" << 1));
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, BSON("_id" << 1));
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
+    OplogDeleteEntryArgs args;
+    opObserver.aboutToDelete(opCtx.get(), *autoColl, BSON("_id" << 1), &args);
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
+    opObserver.aboutToDelete(opCtx.get(), *autoColl, BSON("_id" << 1), &args);
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
 }
 
 DEATH_TEST_F(AuthOpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") {
     AuthOpObserver opObserver;
     auto opCtx = cc().makeOperationContext();
-    cc().swapLockState(std::make_unique<LockerNoop>());
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
+    OplogDeleteEntryArgs args;
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
 }
 
 DEATH_TEST_F(AuthOpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
     AuthOpObserver opObserver;
     auto opCtx = cc().makeOperationContext();
-    cc().swapLockState(std::make_unique<LockerNoop>());
     AutoGetCollection autoColl(opCtx.get(), _nss, MODE_IX);
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, {});
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, {});
+    OplogDeleteEntryArgs args;
+    opObserver.aboutToDelete(opCtx.get(), *autoColl, {}, &args);
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, args);
 }
 
 }  // namespace

@@ -29,14 +29,41 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::sbe {
 
@@ -140,16 +167,11 @@ protected:
 
     vm::ByteCode _bytecode;
 
-    // These members are default constructed to boost::none and are initialized when 'prepare()'
-    // is called. Once they are set, they are never modified again.
-    boost::optional<NamespaceString> _collName;
-    boost::optional<uint64_t> _catalogEpoch;
+    CollectionRef _coll;
 
-    CollectionPtr _coll;
-
-    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
-    std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
-    std::unique_ptr<value::OwnedValueAccessor> _snapshotIdAccessor;
+    value::OwnedValueAccessor _recordAccessor;
+    value::OwnedValueAccessor _recordIdAccessor;
+    value::OwnedValueAccessor _snapshotIdAccessor;
 
     value::OwnedValueAccessor _indexIdentAccessor;
     value::ViewOfValueAccessor _indexIdentViewAccessor;
@@ -234,8 +256,8 @@ protected:
     bool validateKey(const boost::optional<KeyStringEntry>& key) override;
 
 private:
-    const KeyString::Value& getSeekKeyLow() const;
-    const KeyString::Value* getSeekKeyHigh() const;
+    const key_string::Value& getSeekKeyLow() const;
+    const key_string::Value* getSeekKeyHigh() const;
 
     std::unique_ptr<EExpression> _seekKeyLow;
     std::unique_ptr<EExpression> _seekKeyHigh;
@@ -244,8 +266,8 @@ private:
     std::unique_ptr<vm::CodeFragment> _seekKeyLowCode;
     std::unique_ptr<vm::CodeFragment> _seekKeyHighCode;
 
-    std::unique_ptr<value::OwnedValueAccessor> _seekKeyLowHolder;
-    std::unique_ptr<value::OwnedValueAccessor> _seekKeyHighHolder;
+    value::OwnedValueAccessor _seekKeyLowHolder;
+    value::OwnedValueAccessor _seekKeyHighHolder;
 };
 
 /**
@@ -267,7 +289,7 @@ struct GenericIndexScanStageParams {
     std::unique_ptr<EExpression> indexBounds;
     const BSONObj keyPattern;
     const int direction;
-    const KeyString::Version version;
+    const key_string::Version version;
     const Ordering ord;
 };
 class GenericIndexScanStage final : public IndexScanStageBase {

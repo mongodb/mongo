@@ -46,7 +46,7 @@ NearStage::NearStage(ExpressionContext* expCtx,
                      const char* typeName,
                      StageType type,
                      WorkingSet* workingSet,
-                     const CollectionPtr& collection,
+                     VariantCollectionPtrOrAcquisition collection,
                      const IndexDescriptor* indexDescriptor)
     : RequiresIndexStage(typeName, expCtx, collection, indexDescriptor, workingSet),
       _workingSet(workingSet),
@@ -136,7 +136,7 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn) {
     //
 
     if (!_nextInterval) {
-        auto interval = nextInterval(opCtx(), _workingSet, collection());
+        auto interval = nextInterval(opCtx(), _workingSet);
         if (!interval) {
             _searchState = SearchState_Finished;
             return PlanStage::IS_EOF;

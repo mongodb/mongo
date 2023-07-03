@@ -33,7 +33,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 
 namespace mongo::logv2 {
 
@@ -73,7 +73,6 @@ namespace mongo::logv2 {
     X(kShardingMigration,      , "migration"             , "MIGRATE" , kSharding) \
     X(kResharding,             , "reshard"               , "RESHARD" , kSharding) \
     X(kShardMigrationPerf,     , "migrationPerf"         , "MIG_PERF", kSharding) \
-    X(kMovePrimary,            , "movePrimary"           , "MVPRIMRY", kSharding) \
     X(kStorage,                , "storage"               , "STORAGE" , kDefault) \
     X(kStorageRecovery,        , "recovery"              , "RECOVERY", kStorage) \
     X(kJournal,                , "journal"               , "JOURNAL" , kStorage) \

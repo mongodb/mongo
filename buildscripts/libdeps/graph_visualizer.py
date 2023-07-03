@@ -43,6 +43,8 @@ import copy
 import textwrap
 
 import flask
+from werkzeug.serving import is_running_from_reloader
+
 from graph_visualizer_web_stack.flask.flask_backend import BackendServer
 
 
@@ -98,10 +100,10 @@ def check_node(node_check, cwd):
     """Check node version and install npm packages."""
 
     status, output = subprocess.getstatusoutput(node_check)
-    if status != 0 or not output.split('\n')[-1].startswith('v12'):
+    if status != 0 or not output.split('\n')[-1].startswith('v14'):
         print(
             textwrap.dedent(f"""\
-            Failed to get node version 12 from 'node -v':
+            Failed to get node version 14 from 'node -v':
             output: '{output}'
             Perhaps run 'source {cwd}/setup_node_env.sh install'"""))
         exit(1)
@@ -179,24 +181,26 @@ def main():
     npm_start = ['npm', 'start']
     npm_build = ['npm', 'run', 'build']
 
-    check_node(node_check, cwd)
+    if not is_running_from_reloader():
+        check_node(node_check, cwd)
 
-    frontend_thread = None
-    if args.launch in ['frontend', 'both']:
-        if args.debug:
-            npm_command = npm_start
-        else:
-            npm_command = npm_build
+        frontend_thread = None
+        if args.launch in ['frontend', 'both']:
+            if args.debug:
+                npm_command = npm_start
+            else:
+                npm_command = npm_build
 
-        frontend_thread = threading.Thread(target=start_frontend_thread,
-                                           args=(web_service_info, npm_command, args.debug))
-        frontend_thread.start()
+            frontend_thread = threading.Thread(target=start_frontend_thread,
+                                               args=(web_service_info, npm_command, args.debug))
+            frontend_thread.start()
 
     if args.launch in ['backend', 'both']:
         start_backend(web_service_info, args.debug)
 
-    if frontend_thread:
-        frontend_thread.join()
+    if not is_running_from_reloader():
+        if frontend_thread:
+            frontend_thread.join()
 
 
 if __name__ == "__main__":

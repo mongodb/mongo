@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-present, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -13,7 +13,7 @@
 #define ZSTD_STATIC_LINKING_ONLY
 #include <zstd.h>      // presumes zstd library is installed
 
-#include "zstd_seekable.h"
+#include "../zstd_seekable.h"
 
 static void* malloc_orDie(size_t size)
 {
@@ -112,20 +112,23 @@ static char* createOutFilename_orDie(const char* filename)
     return (char*)outSpace;
 }
 
-int main(int argc, const char** argv) {
+#define CLEVEL_DEFAULT 5
+int main(int argc, const char** argv)
+{
     const char* const exeName = argv[0];
-    if (argc!=3) {
-        printf("wrong arguments\n");
-        printf("usage:\n");
-        printf("%s FILE FRAME_SIZE\n", exeName);
+    if (argc<3 || argc>4) {
+        printf("wrong arguments \n");
+        printf("usage: \n");
+        printf("%s FILE FRAME_SIZE [LEVEL] \n", exeName);
         return 1;
     }
 
     {   const char* const inFileName = argv[1];
         unsigned const frameSize = (unsigned)atoi(argv[2]);
+        int const cLevel = (argc==4) ? atoi(argv[3]) : CLEVEL_DEFAULT;
 
         char* const outFileName = createOutFilename_orDie(inFileName);
-        compressFile_orDie(inFileName, outFileName, 5, frameSize);
+        compressFile_orDie(inFileName, outFileName, cLevel, frameSize);
         free(outFileName);
     }
 

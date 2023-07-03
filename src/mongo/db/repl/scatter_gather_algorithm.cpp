@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 
 namespace mongo {

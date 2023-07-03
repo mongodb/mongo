@@ -27,14 +27,34 @@
  *    it in the license file.
  */
 
+#include <absl/container/node_hash_map.h>
+#include <array>
+#include <cstdint>
+#include <fmt/format.h>
+#include <functional>
+#include <list>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/async_remote_command_targeter_adapter.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/hedging_mode_gen.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/client/remote_command_targeter_rs.h"
-#include "mongo/db/database_name.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/query/find_command.h"
@@ -44,19 +64,23 @@
 #include "mongo/executor/async_rpc_test_fixture.h"
 #include "mongo/executor/hedged_async_rpc.h"
 #include "mongo/executor/hedging_metrics.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
-#include "mongo/executor/network_interface_integration_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
-#include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/rpc/topology_version_gen.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/assert_that.h"
-#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/matcher.h"
+#include "mongo/unittest/matcher_core.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -113,8 +137,7 @@ public:
         std::vector<HostAndPort> hosts,
         std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
         GenericArgs genericArgs = GenericArgs(),
-        BatonHandle bh = nullptr,
-        boost::optional<UUID> opKey = boost::none) {
+        BatonHandle bh = nullptr) {
         // Use a readPreference that's elgible for hedging.
         ReadPreferenceSetting readPref(ReadPreference::Nearest);
         readPref.hedgingMode = HedgingMode();
@@ -136,8 +159,7 @@ public:
                                  retryPolicy,
                                  readPref,
                                  genericArgs,
-                                 bh,
-                                 opKey);
+                                 bh);
     }
 
     void ignoreKillOperations() {
@@ -286,7 +308,10 @@ TEST_F(HedgedAsyncRPCTest, HelloHedgeRemoteErrorWithGenericReplyFields) {
     network->enterNetwork();
 
     GenericReplyFieldsWithTypesV1 stableFields;
-    stableFields.setDollarClusterTime(LogicalTime(Timestamp(2, 3)));
+    auto clusterTime = ClusterTime();
+    clusterTime.setClusterTime(LogicalTime(Timestamp(2, 3)));
+    clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
+    stableFields.setDollarClusterTime(clusterTime);
     GenericReplyFieldsWithTypesUnstableV1 unstableFields;
     unstableFields.setDollarConfigTime(Timestamp(1, 1));
     unstableFields.setOk(false);
@@ -481,11 +506,7 @@ TEST_F(HedgedAsyncRPCTest, OpCtxRemainingDeadline) {
     network->runUntil(now + Milliseconds(150));
     network->exitNetwork();
 
-    auto counters = getNetworkInterfaceCounters();
-    ASSERT_EQ(counters.succeeded, 1);
-    ASSERT_EQ(counters.canceled, 1);
-
-    std::move(resultFuture).get();
+    resultFuture.wait();
 }
 
 /**
@@ -1185,13 +1206,16 @@ TEST_F(HedgedAsyncRPCTest, OperationKeyIsSetByDefault) {
 
 TEST_F(HedgedAsyncRPCTest, UseOperationKeyWhenProvided) {
     const auto opKey = UUID::gen();
+
+    // Set OperationKey via GenericArgs
+    GenericArgs args;
+    args.stable.setClientOperationKey(opKey);
     auto future =
         sendHedgedCommandWithHosts(write_ops::InsertCommandRequest(testNS, {BSON("id" << 1)}),
                                    kTwoHosts,
                                    std::make_shared<NeverRetryPolicy>(),
-                                   GenericArgs(),
-                                   nullptr,
-                                   opKey);
+                                   args,
+                                   nullptr);
     onCommand([&](const auto& request) {
         ASSERT_EQ(getOpKeyFromCommand(request.cmdObj), opKey);
         return write_ops::InsertCommandReply().toBSON();
@@ -1201,12 +1225,10 @@ TEST_F(HedgedAsyncRPCTest, UseOperationKeyWhenProvided) {
 
 TEST_F(HedgedAsyncRPCTest, RewriteOperationKeyWhenHedging) {
     const auto opKey = UUID::gen();
-    auto future = sendHedgedCommandWithHosts(testFindCmd,
-                                             kTwoHosts,
-                                             std::make_shared<NeverRetryPolicy>(),
-                                             GenericArgs(),
-                                             nullptr,
-                                             opKey);
+    GenericArgs args;
+    args.stable.setClientOperationKey(opKey);
+    auto future = sendHedgedCommandWithHosts(
+        testFindCmd, kTwoHosts, std::make_shared<NeverRetryPolicy>(), args, nullptr);
     onCommand([&](const auto& request) {
         ASSERT_NE(getOpKeyFromCommand(request.cmdObj), opKey);
         return CursorResponse(testNS, 0LL, {testFirstBatch})

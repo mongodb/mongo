@@ -29,18 +29,24 @@
 
 #pragma once
 
+#include <memory>
+#include <ostream>
+#include <string>
+#include <tuple>
+#include <vector>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/restriction.h"
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/auth/restriction_set.h"
 #include "mongo/util/net/cidr.h"
-
-#include <memory>
-#include <string>
-#include <vector>
 
 namespace mongo {
 

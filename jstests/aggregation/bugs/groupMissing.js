@@ -6,8 +6,6 @@
 // covered, which will not happen if the $sort is within a $facet stage.
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
-//   # TODO SERVER-67550: Equality to null does not match undefined in CQF.
-//   cqf_incompatible,
 // ]
 load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
 
@@ -83,20 +81,28 @@ coll.insert({a: 1});
 
 let collScanResult = coll.aggregate({$match: {a: 1}}, {$project: {_id: 0, a: 1, b: 1}}).toArray();
 assertArrayEq({actual: collScanResult, expected: [{"a": 1, "b": null}, {"a": 1}]});
-// After creating the index, the plan will use PROJECTION_COVERED, and the index will incorrectly
-// provide a null for the missing "b" value.
-coll.createIndex({a: 1, b: 1});
-// Assert that the bug SERVER-23229 is still present.
-assertArrayEq({
-    actual: coll.aggregate({$match: {a: 1}}, {$project: {_id: 0, a: 1, b: 1}}).toArray(),
-    expected: [{"a": 1, "b": null}, {"a": 1, "b": null}]
-});
 
-// Correct behavior after SERVER-23229 is fixed.
-if (0) {
-    assertArrayEq({
-        actual: coll.aggregate({$match: {a: 1}}, {$project: {_id: 0, a: 1, b: 1}}).toArray(),
-        expected: collScanResult
-    });
+// After creating the index, the classic plan will use PROJECTION_COVERED, and the index will
+// incorrectly provide a null for the missing "b" value. Bonsai does not exhibit SERVER-23229. So,
+// either the new engine is used and the correct results (collScanResult) are seen, or we see the
+// incorrect result, where all values of "b" are null.
+assert.commandWorked(coll.createIndex({a: 1, b: 1}));
+const possibleResults = [collScanResult, [{"a": 1, "b": null}, {"a": 1, "b": null}]];
+
+function checkActualMatchesAnExpected(actual) {
+    let foundMatch = false;
+    for (let i = 0; i < possibleResults.length; i++) {
+        foundMatch |= arrayEq(actual, possibleResults[i]);
+    }
+    assert(foundMatch,
+           `Expected actual results to match one of the possible results. actual=${
+               tojson(actual)}, possibleResults=${tojson(possibleResults)}`);
 }
+
+// Check behavior with and without a hint.
+checkActualMatchesAnExpected(
+    coll.aggregate([{$match: {a: 1}}, {$project: {_id: 0, a: 1, b: 1}}]).toArray());
+checkActualMatchesAnExpected(
+    coll.aggregate([{$match: {a: 1}}, {$project: {_id: 0, a: 1, b: 1}}], {hint: {a: 1, b: 1}})
+        .toArray());
 }());

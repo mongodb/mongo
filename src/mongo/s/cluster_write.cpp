@@ -28,16 +28,20 @@
  */
 
 
-#include "mongo/logv2/log.h"
+#include <boost/move/utility_core.hpp>
+#include <memory>
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/s/cluster_write.h"
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/not_primary_error_tracker.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/s/cluster_write.h"
 #include "mongo/s/collection_routing_info_targeter.h"
-#include "mongo/s/grid.h"
+#include "mongo/s/ns_targeter.h"
+#include "mongo/s/write_ops/bulk_write_exec.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -47,6 +51,7 @@ namespace cluster {
 
 void write(OperationContext* opCtx,
            const BatchedCommandRequest& request,
+           NamespaceString* nss,
            BatchWriteExecStats* stats,
            BatchedCommandResponse* response,
            boost::optional<OID> targetEpoch) {
@@ -63,6 +68,9 @@ void write(OperationContext* opCtx,
         &NotPrimaryErrorTracker::get(opCtx->getClient()));
 
     CollectionRoutingInfoTargeter targeter(opCtx, request.getNS(), targetEpoch);
+    if (nss) {
+        *nss = targeter.getNS();
+    }
 
     LOGV2_DEBUG_OPTIONS(
         4817400, 2, {logv2::LogComponent::kShardMigrationPerf}, "Starting batch write");

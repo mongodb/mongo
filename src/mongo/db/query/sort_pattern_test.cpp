@@ -26,14 +26,24 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include <functional>
+#include <string>
+
+#include "serialization_options.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/unittest/assert.h"
-#include "mongo/unittest/unittest.h"
-#include "serialization_options.h"
+#include "mongo/unittest/framework.h"
+
 namespace mongo {
 namespace {
 
@@ -50,8 +60,8 @@ TEST(SerializeSortPatternTest, SerializeAndRedactFieldName) {
     auto expCtx = getExpCtx();
     auto sortPattern = SortPattern(fromjson("{val: 1}"), expCtx);
     SerializationOptions opts = {};
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
 
     // Most basic sort pattern, confirm that field name gets redacted.
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
@@ -87,7 +97,7 @@ TEST(SerializeSortPatternTest, SerializeNoRedaction) {
     auto expCtx = getExpCtx();
     auto sortPattern = SortPattern(fromjson("{val: 1}"), expCtx);
     SerializationOptions opts = {};
-    opts.applyHmacToIdentifiers = false;
+    opts.transformIdentifiers = false;
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
         R"({"val":1})",
         sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts));

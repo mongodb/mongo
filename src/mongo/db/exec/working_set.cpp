@@ -29,9 +29,13 @@
 
 #include "mongo/db/exec/working_set.h"
 
+#include <cstdint>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/data_type_endian.h"
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -76,8 +80,8 @@ WorkingSetID WorkingSet::allocate() {
 
 void WorkingSet::free(WorkingSetID i) {
     MemberHolder& holder = _data[i];
-    verify(i < _data.size());            // ID has been allocated.
-    verify(holder.nextFreeOrSelf == i);  // ID currently in use.
+    MONGO_verify(i < _data.size());            // ID has been allocated.
+    MONGO_verify(holder.nextFreeOrSelf == i);  // ID currently in use.
 
     // Free resources and push this WSM to the head of the freelist.
     holder.member.clear();

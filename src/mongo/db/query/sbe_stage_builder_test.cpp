@@ -27,13 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/shard_filterer_mock.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_test_fixture.h"
+#include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/shard_filterer_factory_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 
@@ -63,7 +77,7 @@ TEST_F(SbeStageBuilderTest, TestVirtualScan) {
     auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
     auto [resultSlots, stage, data, _] =
         buildPlanStage(std::move(querySolution), true, std::move(shardFiltererInterface));
-    auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
+    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
 
     int64_t index = 0;
     for (auto st = stage->getNext(); st == sbe::PlanState::ADVANCED; st = stage->getNext()) {
@@ -103,7 +117,7 @@ TEST_F(SbeStageBuilderTest, TestLimitOneVirtualScan) {
         buildPlanStage(std::move(querySolution), true, std::move(shardFiltererInterface));
 
     // Prepare the sbe::PlanStage for execution.
-    auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
+    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
 
     int64_t index = 0;
     for (auto st = stage->getNext(); st == sbe::PlanState::ADVANCED; st = stage->getNext()) {
@@ -139,7 +153,7 @@ TEST_F(SbeStageBuilderTest, VirtualCollScanWithoutRecordId) {
         buildPlanStage(std::move(querySolution), false, std::move(shardFiltererInterface));
 
     // Prepare the sbe::PlanStage for execution.
-    auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
+    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
     ASSERT_EQ(resultAccessors.size(), 1u);
 
     int64_t index = 0;
@@ -169,7 +183,7 @@ TEST_F(SbeStageBuilderTest, VirtualIndexScan) {
     auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
     auto [resultSlots, stage, data, _] =
         buildPlanStage(std::move(querySolution), true, std::move(shardFiltererInterface));
-    auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
+    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
     ASSERT_EQ(resultAccessors.size(), 2u);
 
     int64_t index = 0;
@@ -203,7 +217,7 @@ TEST_F(SbeStageBuilderTest, VirtualIndexScanWithoutRecordId) {
     auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
     auto [resultSlots, stage, data, _] =
         buildPlanStage(std::move(querySolution), false, std::move(shardFiltererInterface));
-    auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
+    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
     ASSERT_EQ(resultAccessors.size(), 1u);
 
     int64_t index = 0;

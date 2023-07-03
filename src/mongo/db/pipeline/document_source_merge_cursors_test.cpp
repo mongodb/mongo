@@ -27,37 +27,69 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/s/query/document_source_merge_cursors.h"
-
+// IWYU pragma: no_include "cxxabi.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <fmt/format.h>
 #include <memory>
+#include <string>
+#include <system_error>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/cursor_id.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/getmore_command_gen.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/executor/thread_pool_mock.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/query/async_results_merger_params_gen.h"
+#include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/sharding_router_test_fixture.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -155,8 +187,9 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectEmptyArray) {
 
 TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectLegacySerializationFormats) {
     // Formats like this were used in old versions of the server but are no longer supported.
-    auto spec = BSON("$mergeCursors" << BSON_ARRAY(BSON("ns" << getTenantIdNss().ns() << "id" << 0LL
-                                                             << "host" << kTestHost.toString())));
+    auto spec =
+        BSON("$mergeCursors" << BSON_ARRAY(BSON("ns" << getTenantIdNss().ns_forTest() << "id" << 0LL
+                                                     << "host" << kTestHost.toString())));
     ASSERT_THROWS_CODE(DocumentSourceMergeCursors::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
                        17026);
@@ -549,17 +582,17 @@ TEST_F(DocumentSourceMergeCursorsShapeTest, QueryShape) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$mergeCursors": {
-                "compareWholeSortKey": "?",
+                "compareWholeSortKey": "?bool",
                 "remotes": [
                     {
                         "shardId": "HASH<FakeShard1>",
                         "hostAndPort": "HASH<FakeShard1Host:12345>",
-                        "cursorResponse": "?"
+                        "cursorResponse": "?object"
                     },
                     {
                         "shardId": "HASH<FakeShard2>",
                         "hostAndPort": "HASH<FakeShard2Host:12345>",
-                        "cursorResponse": "?"
+                        "cursorResponse": "?object"
                     }
                 ],
                 "nss": "HASH<test.mergeCursors>",

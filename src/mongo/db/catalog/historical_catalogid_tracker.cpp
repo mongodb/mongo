@@ -28,7 +28,24 @@
  */
 
 #include "mongo/db/catalog/historical_catalogid_tracker.h"
-#include "mongo/db/storage/storage_options.h"
+
+#include <algorithm>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <immer/detail/iterator_facade.hpp>
+#include <immer/detail/util.hpp>
+#include <immer/map.hpp>
+#include <immer/map_transient.hpp>
+#include <immer/set.hpp>
+#include <memory>
+#include <type_traits>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 namespace {
@@ -550,21 +567,6 @@ void HistoricalCatalogIdTracker::_createNoTimestamp(const NamespaceString& nss,
             // Nothing to cleanup after untimestamped write
             changesContainer = changesContainer.erase(key);
             return;
-        }
-
-        if (ids->size() > 1 && !storageGlobalParams.repair) {
-            // This namespace or UUID was added due to an untimestamped write. But this
-            // namespace or UUID already had some timestamped writes performed. In this
-            // case, we re-write the history. The only known area that does this today is
-            // when profiling is enabled (untimestamped collection creation), followed by
-            // dropping the database (timestamped collection drop).
-            // TODO SERVER-75740: Remove this branch.
-            invariant(!ids->back().ts.isNull());
-
-            idsContainer = idsContainer.set(key, {{catalogId, Timestamp::min()}});
-
-            // Nothing to cleanup after untimestamped write
-            changesContainer = changesContainer.erase(key);
         }
     };
 

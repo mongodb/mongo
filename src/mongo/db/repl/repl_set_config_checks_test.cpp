@@ -27,23 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <fmt/format.h>
+#include <memory>
+#include <string>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
-#include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace repl {

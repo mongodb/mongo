@@ -29,10 +29,16 @@
 
 #include "mongo/db/concurrency/exception_util.h"
 
+#include <cstddef>
+
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/log_and_backoff.h"
@@ -46,7 +52,7 @@ MONGO_FAIL_POINT_DEFINE(skipWriteConflictRetries);
 void logWriteConflictAndBackoff(int attempt,
                                 StringData operation,
                                 StringData reason,
-                                StringData ns) {
+                                const NamespaceStringOrUUID& nssOrUUID) {
     logAndBackoff(4640401,
                   logv2::LogComponent::kWrite,
                   logv2::LogSeverity::Debug(1),
@@ -54,7 +60,7 @@ void logWriteConflictAndBackoff(int attempt,
                   "Caught WriteConflictException",
                   "operation"_attr = operation,
                   "reason"_attr = reason,
-                  logAttrs(NamespaceString(ns)));
+                  "namespace"_attr = toStringForLogging(nssOrUUID));
 }
 
 namespace {
@@ -74,7 +80,7 @@ CounterMetric transactionTooLargeForCacheErrorsConvertedToWriteConflict{
 void handleTemporarilyUnavailableException(OperationContext* opCtx,
                                            int attempts,
                                            StringData opStr,
-                                           StringData ns,
+                                           const NamespaceStringOrUUID& nssOrUUID,
                                            const TemporarilyUnavailableException& e) {
     CurOp::get(opCtx)->debug().additiveMetrics.incrementTemporarilyUnavailableErrors(1);
 
@@ -88,7 +94,7 @@ void handleTemporarilyUnavailableException(OperationContext* opCtx,
                     "reason"_attr = e.reason(),
                     "attempts"_attr = attempts,
                     "operation"_attr = opStr,
-                    logAttrs(NamespaceString(ns)));
+                    "namespace"_attr = toStringForLogging(nssOrUUID));
         temporarilyUnavailableErrorsEscaped.increment(1);
         throw e;
     }
@@ -103,13 +109,12 @@ void handleTemporarilyUnavailableException(OperationContext* opCtx,
                 "attempts"_attr = attempts,
                 "operation"_attr = opStr,
                 "sleepFor"_attr = sleepFor,
-                logAttrs(NamespaceString(ns)));
+                "namespace"_attr = toStringForLogging(nssOrUUID));
     opCtx->sleepFor(sleepFor);
 }
 
 void handleTemporarilyUnavailableExceptionInTransaction(OperationContext* opCtx,
                                                         StringData opStr,
-                                                        StringData ns,
                                                         const TemporarilyUnavailableException& e) {
     // Since WriteConflicts are tagged as TransientTransactionErrors and TemporarilyUnavailable
     // errors are not, we convert the error to a WriteConflict to allow users of multi-document
@@ -122,7 +127,7 @@ void handleTemporarilyUnavailableExceptionInTransaction(OperationContext* opCtx,
 void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
                                                 int* writeConflictAttempts,
                                                 StringData opStr,
-                                                StringData ns,
+                                                const NamespaceStringOrUUID& nssOrUUID,
                                                 const TransactionTooLargeForCacheException& e) {
     transactionTooLargeForCacheErrors.increment(1);
     if (opCtx->writesAreReplicated()) {
@@ -137,7 +142,8 @@ void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
 
     // Handle as write conflict.
     CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-    logWriteConflictAndBackoff(*writeConflictAttempts, opStr, e.reason(), ns);
+    logWriteConflictAndBackoff(
+        *writeConflictAttempts, opStr, e.reason(), NamespaceStringOrUUID(nssOrUUID));
     ++(*writeConflictAttempts);
     opCtx->recoveryUnit()->abandonSnapshot();
 }

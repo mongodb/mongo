@@ -28,9 +28,17 @@
  */
 #pragma once
 
+#include <memory>
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

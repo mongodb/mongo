@@ -33,7 +33,6 @@ var ReshardingTest = class {
         writePeriodicNoops: writePeriodicNoops = undefined,
         enableElections: enableElections = false,
         logComponentVerbosity: logComponentVerbosity = undefined,
-        storeFindAndModifyImagesInSideCollection: storeFindAndModifyImagesInSideCollection = true,
         oplogSize: oplogSize = undefined,
         maxNumberOfTransactionOperationsInSingleOplogEntry:
             maxNumberOfTransactionOperationsInSingleOplogEntry = undefined,
@@ -66,8 +65,6 @@ var ReshardingTest = class {
         this._enableElections = enableElections;
         /** @private */
         this._logComponentVerbosity = logComponentVerbosity;
-        /** @private */
-        this._storeFindAndModifyImagesInSideCollection = storeFindAndModifyImagesInSideCollection;
         this._oplogSize = oplogSize;
         this._maxNumberOfTransactionOperationsInSingleOplogEntry =
             maxNumberOfTransactionOperationsInSingleOplogEntry;
@@ -111,12 +108,7 @@ var ReshardingTest = class {
     setup() {
         const mongosOptions = {setParameter: {}};
         let configOptions = {setParameter: {}};
-        let rsOptions = {
-            setParameter: {
-                storeFindAndModifyImagesInSideCollection:
-                    this._storeFindAndModifyImagesInSideCollection
-            }
-        };
+        let rsOptions = {setParameter: {}};
         if (this._oplogSize) {
             rsOptions.oplogSize = this._oplogSize;
         }

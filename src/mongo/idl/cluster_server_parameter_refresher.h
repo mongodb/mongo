@@ -28,8 +28,19 @@
  */
 #pragma once
 
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/periodic_runner.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 
@@ -63,17 +74,24 @@ public:
      */
     Status refreshParameters(OperationContext* opCtx);
 
+    // What the actual refresh job runs to do a refresh.
+    Status _refreshParameters(OperationContext* opCtx);
+
     /**
      * Set the period of the background job. This should only be used internally (by the
      * setParameter).
      */
     void setPeriod(Milliseconds period);
 
+    // Public for testing.
+    std::unique_ptr<SharedPromise<void>> _refreshPromise;
+
 private:
     void run();
 
     std::unique_ptr<PeriodicJobAnchor> _job;
     multiversion::FeatureCompatibilityVersion _lastFcv;
+    Mutex _mutex = MONGO_MAKE_LATCH("ClusterServerParameterRefresher::_mutex");
 };
 
 Status clusterServerParameterRefreshIntervalSecsNotify(const int& newValue);

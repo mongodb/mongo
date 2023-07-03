@@ -27,12 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/free_mon/free_mon_controller.h"
 #include "mongo/db/free_mon/free_mon_options.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 namespace {
@@ -47,8 +57,9 @@ public:
 
     Status checkAuthForOperation(OperationContext* opCtx) const override {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                  ActionType::checkFreeMonitoringStatus)) {
+        if (!as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(as->getUserTenantId()),
+                ActionType::checkFreeMonitoringStatus)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 

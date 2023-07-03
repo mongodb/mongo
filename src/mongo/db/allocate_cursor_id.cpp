@@ -29,6 +29,9 @@
 
 #include "mongo/db/allocate_cursor_id.h"
 
+#include <cstdlib>
+#include <limits>
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo::generic_cursor {

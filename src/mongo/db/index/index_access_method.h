@@ -30,19 +30,40 @@
 #pragma once
 
 #include <atomic>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <memory>
 #include <set>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_metadata_access_stats.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/db/sorter/sorter_stats.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/yieldable.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 namespace mongo {
 
@@ -75,7 +96,7 @@ public:
                                                    Status status,
                                                    const BSONObj& obj,
                                                    const boost::optional<RecordId>& loc)>;
-    using KeyHandlerFn = std::function<Status(const KeyString::Value&)>;
+    using KeyHandlerFn = std::function<Status(const key_string::Value&)>;
     using RecordIdHandlerFn = std::function<Status(const RecordId&)>;
 
     IndexAccessMethod() = default;
@@ -107,6 +128,7 @@ public:
     virtual Status insert(OperationContext* opCtx,
                           SharedBufferFragmentBuilder& pooledBufferBuilder,
                           const CollectionPtr& coll,
+                          const IndexCatalogEntry* entry,
                           const std::vector<BsonRecord>& bsonRecords,
                           const InsertDeleteOptions& options,
                           int64_t* numInserted) = 0;
@@ -114,6 +136,7 @@ public:
     virtual void remove(OperationContext* opCtx,
                         SharedBufferFragmentBuilder& pooledBufferBuilder,
                         const CollectionPtr& coll,
+                        const IndexCatalogEntry* entry,
                         const BSONObj& obj,
                         const RecordId& loc,
                         bool logIfError,
@@ -127,6 +150,7 @@ public:
                           const BSONObj& newDoc,
                           const RecordId& loc,
                           const CollectionPtr& coll,
+                          const IndexCatalogEntry* entry,
                           const InsertDeleteOptions& options,
                           int64_t* numInserted,
                           int64_t* numDeleted) = 0;
@@ -193,6 +217,7 @@ public:
 
     virtual Status applyIndexBuildSideWrite(OperationContext* opCtx,
                                             const CollectionPtr& coll,
+                                            const IndexCatalogEntry* entry,
                                             const BSONObj& operation,
                                             const InsertDeleteOptions& options,
                                             KeyHandlerFn&& onDuplicateKey,
@@ -212,6 +237,7 @@ public:
          */
         virtual Status insert(OperationContext* opCtx,
                               const CollectionPtr& collection,
+                              const IndexCatalogEntry* entry,
                               const BSONObj& obj,
                               const RecordId& loc,
                               const InsertDeleteOptions& options,
@@ -231,6 +257,7 @@ public:
          */
         virtual Status commit(OperationContext* opCtx,
                               const CollectionPtr& collection,
+                              const IndexCatalogEntry* entry,
                               bool dupsAllowed,
                               int32_t yieldIterations,
                               const KeyHandlerFn& onDuplicateKeyInserted,
@@ -255,9 +282,10 @@ public:
          * Abandon the current snapshot and release then reacquire locks. Tests that target the
          * behavior of bulk index builds that yield can use failpoints to stall this yield.
          */
-        static void yield(OperationContext* opCtx,
-                          const Yieldable* yieldable,
-                          const NamespaceString& ns);
+        [[nodiscard]] static const IndexCatalogEntry* yield(OperationContext* opCtx,
+                                                            const CollectionPtr& collection,
+                                                            const NamespaceString& ns,
+                                                            const IndexCatalogEntry* entry);
     };
 
     /**
@@ -274,9 +302,10 @@ public:
      * new index build.
      */
     virtual std::unique_ptr<BulkBuilder> initiateBulk(
+        const IndexCatalogEntry* entry,
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
-        StringData dbName) = 0;
+        const DatabaseName& dbName) = 0;
 };
 
 /**
@@ -390,6 +419,7 @@ public:
      */
     void getKeys(OperationContext* opCtx,
                  const CollectionPtr& collection,
+                 const IndexCatalogEntry* entry,
                  SharedBufferFragmentBuilder& pooledBufferBuilder,
                  const BSONObj& obj,
                  InsertDeleteOptions::ConstraintEnforcementMode mode,
@@ -410,6 +440,7 @@ public:
     Status insertKeys(
         OperationContext* opCtx,
         const CollectionPtr& coll,
+        const IndexCatalogEntry* entry,
         const KeyStringSet& keys,
         const InsertDeleteOptions& options,
         KeyHandlerFn&& onDuplicateKey,
@@ -424,6 +455,7 @@ public:
     Status insertKeysAndUpdateMultikeyPaths(
         OperationContext* opCtx,
         const CollectionPtr& coll,
+        const IndexCatalogEntry* entry,
         const KeyStringSet& keys,
         const KeyStringSet& multikeyMetadataKeys,
         const MultikeyPaths& multikeyPaths,
@@ -437,9 +469,10 @@ public:
      * 'numDeleted' will be set to the number of keys removed from the index for the provided keys.
      */
     Status removeKeys(OperationContext* opCtx,
+                      const IndexCatalogEntry* entry,
                       const KeyStringSet& keys,
                       const InsertDeleteOptions& options,
-                      int64_t* numDeleted);
+                      int64_t* numDeleted) const;
 
     /**
      * Gets the keys of the documents 'from' and 'to' and prepares them for the update.
@@ -447,6 +480,7 @@ public:
      */
     void prepareUpdate(OperationContext* opCtx,
                        const CollectionPtr& collection,
+                       const IndexCatalogEntry* entry,
                        const BSONObj& from,
                        const BSONObj& to,
                        const RecordId& loc,
@@ -466,12 +500,14 @@ public:
      */
     Status doUpdate(OperationContext* opCtx,
                     const CollectionPtr& coll,
+                    const IndexCatalogEntry* entry,
                     const UpdateTicket& ticket,
                     int64_t* numInserted,
                     int64_t* numDeleted);
 
     RecordId findSingle(OperationContext* opCtx,
                         const CollectionPtr& collection,
+                        const IndexCatalogEntry* entry,
                         const BSONObj& key) const;
 
     /**
@@ -512,6 +548,7 @@ public:
     Status insert(OperationContext* opCtx,
                   SharedBufferFragmentBuilder& pooledBufferBuilder,
                   const CollectionPtr& coll,
+                  const IndexCatalogEntry* entry,
                   const std::vector<BsonRecord>& bsonRecords,
                   const InsertDeleteOptions& options,
                   int64_t* numInserted) final;
@@ -519,6 +556,7 @@ public:
     void remove(OperationContext* opCtx,
                 SharedBufferFragmentBuilder& pooledBufferBuilder,
                 const CollectionPtr& coll,
+                const IndexCatalogEntry* entry,
                 const BSONObj& obj,
                 const RecordId& loc,
                 bool logIfError,
@@ -532,6 +570,7 @@ public:
                   const BSONObj& newDoc,
                   const RecordId& loc,
                   const CollectionPtr& coll,
+                  const IndexCatalogEntry* entry,
                   const InsertDeleteOptions& options,
                   int64_t* numInserted,
                   int64_t* numDeleted) final;
@@ -558,15 +597,17 @@ public:
 
     Status applyIndexBuildSideWrite(OperationContext* opCtx,
                                     const CollectionPtr& coll,
+                                    const IndexCatalogEntry* entry,
                                     const BSONObj& operation,
                                     const InsertDeleteOptions& options,
                                     KeyHandlerFn&& onDuplicateKey,
                                     int64_t* keysInserted,
                                     int64_t* keysDeleted) final;
 
-    std::unique_ptr<BulkBuilder> initiateBulk(size_t maxMemoryUsageBytes,
+    std::unique_ptr<BulkBuilder> initiateBulk(const IndexCatalogEntry* entry,
+                                              size_t maxMemoryUsageBytes,
                                               const boost::optional<IndexStateInfo>& stateInfo,
-                                              StringData dbName) final;
+                                              const DatabaseName& dbName) final;
 
 protected:
     /**
@@ -593,6 +634,7 @@ protected:
      */
     virtual void doGetKeys(OperationContext* opCtx,
                            const CollectionPtr& collection,
+                           const IndexCatalogEntry* entry,
                            SharedBufferFragmentBuilder& pooledBufferBuilder,
                            const BSONObj& obj,
                            GetKeysContext context,
@@ -600,9 +642,6 @@ protected:
                            KeyStringSet* multikeyMetadataKeys,
                            MultikeyPaths* multikeyPaths,
                            const boost::optional<RecordId>& id) const = 0;
-
-    const IndexCatalogEntry* const _indexCatalogEntry;  // owned by IndexCatalog
-    const IndexDescriptor* const _descriptor;
 
 private:
     class BulkBuilderImpl;
@@ -612,7 +651,10 @@ private:
      *
      * Used by remove() only.
      */
-    void removeOneKey(OperationContext* opCtx, const KeyString::Value& keyString, bool dupsAllowed);
+    void removeOneKey(OperationContext* opCtx,
+                      const IndexCatalogEntry* entry,
+                      const key_string::Value& keyString,
+                      bool dupsAllowed) const;
 
     /**
      * While inserting keys into index (from external sorter), if a duplicate key is detected
@@ -620,11 +662,13 @@ private:
      * DuplicateKey error will be returned.
      */
     Status _handleDuplicateKey(OperationContext* opCtx,
-                               const KeyString::Value& dataKey,
+                               const IndexCatalogEntry* entry,
+                               const key_string::Value& dataKey,
                                const RecordIdHandlerFn& onDuplicateRecord);
 
     Status _indexKeysOrWriteToSideTable(OperationContext* opCtx,
                                         const CollectionPtr& coll,
+                                        const IndexCatalogEntry* entry,
                                         const KeyStringSet& keys,
                                         const KeyStringSet& multikeyMetadataKeys,
                                         const MultikeyPaths& multikeyPaths,
@@ -634,6 +678,7 @@ private:
 
     void _unindexKeysOrWriteToSideTable(OperationContext* opCtx,
                                         const NamespaceString& ns,
+                                        const IndexCatalogEntry* entry,
                                         const KeyStringSet& keys,
                                         const BSONObj& obj,
                                         bool logIfError,

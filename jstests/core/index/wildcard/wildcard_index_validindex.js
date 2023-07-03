@@ -4,6 +4,7 @@
  *   # Uses index building in background
  *   requires_background_index,
  *   does_not_support_stepdowns,
+ *   does_not_support_transactions,
  * ]
  */
 (function() {
@@ -31,12 +32,6 @@ IndexCatalogHelpers.createIndexAndVerifyWithDrop(coll, {"a.$**": 1}, {name: kInd
 // Can create a wildcard index with partialFilterExpression.
 IndexCatalogHelpers.createIndexAndVerifyWithDrop(
     coll, {"$**": 1}, {name: kIndexName, partialFilterExpression: {a: {"$gt": 0}}});
-
-// Can create a wildcard index with foreground & background construction.
-IndexCatalogHelpers.createIndexAndVerifyWithDrop(
-    coll, {"$**": 1}, {background: false, name: kIndexName});
-IndexCatalogHelpers.createIndexAndVerifyWithDrop(
-    coll, {"$**": 1}, {background: true, name: kIndexName});
 
 // Can create a wildcard index with index level collation.
 IndexCatalogHelpers.createIndexAndVerifyWithDrop(

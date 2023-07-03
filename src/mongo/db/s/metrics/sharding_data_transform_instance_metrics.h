@@ -29,12 +29,24 @@
 
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/metrics/field_names/sharding_data_transform_instance_metrics_field_name_provider.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_observer_interface.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -72,10 +84,10 @@ public:
     Date_t getStartTimestamp() const;
     const UUID& getInstanceId() const;
 
-    void onStarted();
-    void onSuccess();
-    void onFailure();
-    void onCanceled();
+    void onStarted(bool isSameKeyResharding);
+    void onSuccess(bool isSameKeyResharding);
+    void onFailure(bool isSameKeyResharding);
+    void onCanceled(bool isSameKeyResharding);
 
     void onDocumentsProcessed(int64_t documentCount,
                               int64_t totalDocumentsSizeBytes,
@@ -97,6 +109,10 @@ public:
     Seconds getOperationRunningTimeSecs() const;
 
     void setLastOpEndingChunkImbalance(int64_t imbalanceCount);
+
+    void setIsSameKeyResharding(bool isSameKeyResharding);
+    void setIndexesToBuild(int64_t numIndexes);
+    void setIndexesBuilt(int64_t numIndexes);
 
 protected:
     static constexpr auto kNoDate = Date_t::min();
@@ -151,6 +167,10 @@ private:
 
     AtomicWord<int64_t> _readsDuringCriticalSection;
     AtomicWord<int64_t> _writesDuringCriticalSection;
+
+    AtomicWord<bool> _isSameKeyResharding;
+    AtomicWord<int64_t> _indexesToBuild;
+    AtomicWord<int64_t> _indexesBuilt;
 };
 
 }  // namespace mongo

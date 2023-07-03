@@ -28,7 +28,24 @@
  */
 
 #include "mongo/db/query/optimizer/rewrites/path.h"
+
+#include <set>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/util/assert_util.h"
 
 
 namespace mongo::optimizer {

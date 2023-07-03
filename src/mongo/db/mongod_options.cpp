@@ -30,18 +30,35 @@
 
 #include "mongo/db/mongod_options.h"
 
-#include <boost/filesystem.hpp>
+#include <algorithm>
+#include <boost/filesystem.hpp>  // IWYU pragma: keep
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
+#include <initializer_list>
 #include <iostream>
+#include <iterator>
+#include <map>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/config.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/cluster_auth_mode_option_gen.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/keyfile_option_gen.h"
 #include "mongo/db/mongod_options_general_gen.h"
@@ -49,19 +66,28 @@
 #include "mongo/db/mongod_options_replication_gen.h"
 #include "mongo/db/mongod_options_sharding_gen.h"
 #include "mongo/db/mongod_options_storage_gen.h"
+#include "mongo/db/repl/repl_set_config_params_gen.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_nongeneral_gen.h"
 #include "mongo/db/server_options_server_helpers.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_domain_global.h"
-#include "mongo/logv2/log_manager.h"
-#include "mongo/util/net/ssl_options.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_proxy.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -118,6 +144,47 @@ void appendSysInfo(BSONObjBuilder* obj) {
 #if defined(_SC_AVPHYS_PAGES)
     o.append("_SC_AVPHYS_PAGES", (long long)sysconf(_SC_AVPHYS_PAGES));
 #endif
+}
+
+StatusWith<repl::ReplSettings> populateReplSettings(const moe::Environment& params) {
+    repl::ReplSettings replSettings;
+
+    if (params.count("replication.serverless")) {
+        if (params.count("replication.replSet") || params.count("replication.replSetName")) {
+            return Status(ErrorCodes::BadValue,
+                          "serverless cannot be used with replSet or replSetName options");
+        }
+        // Starting a node in "serverless" mode implies it uses a replSet.
+        replSettings.setServerlessMode();
+    } else if (params.count("replication.replSet")) {
+        /* seed list of hosts for the repl set */
+        replSettings.setReplSetString(params["replication.replSet"].as<std::string>().c_str());
+    } else if (params.count("replication.replSetName")) {
+        // "replSetName" is previously removed if "replSet" and "replSetName" are both found to be
+        // set by the user. Therefore, we only need to check for it if "replSet" in not found.
+        replSettings.setReplSetString(params["replication.replSetName"].as<std::string>().c_str());
+    }
+
+    if (params.count("replication.oplogSizeMB")) {
+        long long x = params["replication.oplogSizeMB"].as<int>();
+        if (x <= 0) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "bad --oplogSize, arg must be greater than 0,"
+                                           "found: "
+                                        << x);
+        }
+        // note a small size such as x==1 is ok for an arbiter.
+        if (x > 1000 && sizeof(void*) == 4) {
+            StringBuilder sb;
+            sb << "--oplogSize of " << x
+               << "MB is too big for 32 bit version. Use 64 bit build instead.";
+            return Status(ErrorCodes::BadValue, sb.str());
+        }
+        replSettings.setOplogSizeBytes(x * 1024 * 1024);
+        invariant(replSettings.getOplogSizeBytes() > 0);
+    }
+
+    return replSettings;
 }
 
 }  // namespace
@@ -216,31 +283,6 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
             return ret;
         }
         ret = params->remove("auth");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
-
-    // "sharding.archiveMovedChunks" comes from the config file, so override it if
-    // "noMoveParanoia" or "moveParanoia" are set since those come from the command line.
-    if (params->count("noMoveParanoia")) {
-        Status ret = params->set("sharding.archiveMovedChunks",
-                                 moe::Value(!(*params)["noMoveParanoia"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("noMoveParanoia");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
-    if (params->count("moveParanoia")) {
-        Status ret = params->set("sharding.archiveMovedChunks",
-                                 moe::Value((*params)["moveParanoia"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("moveParanoia");
         if (!ret.isOK()) {
             return ret;
         }
@@ -492,25 +534,22 @@ Status storeMongodOptions(const moe::Environment& params) {
         storageGlobalParams.magicRestore = 1;
     }
 
-    repl::ReplSettings replSettings;
-    if (params.count("replication.serverless")) {
-        if (params.count("replication.replSet") || params.count("replication.replSetName")) {
+    const auto replSettingsWithStatus = populateReplSettings(params);
+    if (!replSettingsWithStatus.isOK())
+        return replSettingsWithStatus.getStatus();
+    const repl::ReplSettings& replSettings(replSettingsWithStatus.getValue());
+
+    if (replSettings.usingReplSets()) {
+        if ((params.count("security.authorization") &&
+             params["security.authorization"].as<std::string>() == "enabled") &&
+            !serverGlobalParams.startupClusterAuthMode.x509Only() &&
+            serverGlobalParams.keyFile.empty()) {
             return Status(ErrorCodes::BadValue,
-                          "serverless cannot be used with replSet or replSetName options");
+                          str::stream() << "security.keyFile is required when authorization is "
+                                           "enabled with replica sets");
         }
-        // Starting a node in "serverless" mode implies it uses a replSet.
-        replSettings.setServerlessMode();
-    }
-    if (params.count("replication.replSet")) {
-        /* seed list of hosts for the repl set */
-        replSettings.setReplSetString(params["replication.replSet"].as<std::string>().c_str());
-    } else if (params.count("replication.replSetName")) {
-        // "replSetName" is previously removed if "replSet" and "replSetName" are both found to be
-        // set by the user. Therefore, we only need to check for it if "replSet" in not found.
-        replSettings.setReplSetString(params["replication.replSetName"].as<std::string>().c_str());
     } else {
-        // If neither "replication.replSet" nor "replication.replSetName" is set, then we are in
-        // standalone mode.
+        // If we are not using a replica set, then we are in standalone mode.
         //
         // A standalone node does not use the oplog collection, so special truncation handling for
         // the capped collection is unnecessary.
@@ -524,17 +563,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         // WT. Non-WT storage engines will continue to perform regular capped collection handling
         // for the oplog collection, regardless of this parameter setting.
         storageGlobalParams.allowOplogTruncation = false;
-    }
-
-    if (replSettings.usingReplSets() &&
-        (params.count("security.authorization") &&
-         params["security.authorization"].as<std::string>() == "enabled") &&
-        !serverGlobalParams.startupClusterAuthMode.x509Only() &&
-        serverGlobalParams.keyFile.empty()) {
-        return Status(
-            ErrorCodes::BadValue,
-            str::stream()
-                << "security.keyFile is required when authorization is enabled with replica sets");
     }
 
     serverGlobalParams.enableMajorityReadConcern = true;
@@ -555,25 +583,6 @@ Status storeMongodOptions(const moe::Environment& params) {
                           "enableMajorityReadConcern=false: disabling lock-free reads.");
             storageGlobalParams.disableLockFreeReads = true;
         }
-    }
-
-    if (params.count("replication.oplogSizeMB")) {
-        long long x = params["replication.oplogSizeMB"].as<int>();
-        if (x <= 0) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "bad --oplogSize, arg must be greater than 0,"
-                                           "found: "
-                                        << x);
-        }
-        // note a small size such as x==1 is ok for an arbiter.
-        if (x > 1000 && sizeof(void*) == 4) {
-            StringBuilder sb;
-            sb << "--oplogSize of " << x
-               << "MB is too big for 32 bit version. Use 64 bit build instead.";
-            return Status(ErrorCodes::BadValue, sb.str());
-        }
-        replSettings.setOplogSizeBytes(x * 1024 * 1024);
-        invariant(replSettings.getOplogSizeBytes() > 0);
     }
 
     if (params.count("storage.oplogMinRetentionHours")) {
@@ -607,19 +616,13 @@ Status storeMongodOptions(const moe::Environment& params) {
                 return Status(ErrorCodes::BadValue, sb.str());
             }
         }
-    } else {
-        if (serverGlobalParams.port < 0 || serverGlobalParams.port > 65535) {
-            return Status(ErrorCodes::BadValue, "bad --port number");
-        }
     }
     if (params.count("sharding.clusterRole")) {
         auto clusterRoleParam = params["sharding.clusterRole"].as<std::string>();
-        const bool replicationEnabled = params.count("replication.replSet") ||
-            params.count("replication.replSetName") || params.count("replication.serverless");
         // Force to set up the node as a replica set, unless we're a shard and we're using queryable
         // backup mode.
         if ((clusterRoleParam == "configsvr" || !params.count("storage.queryableBackupMode")) &&
-            !replicationEnabled) {
+            !replSettings.usingReplSets()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Cannot start a " << clusterRoleParam
                                         << " as a standalone server. Please use the option "
@@ -639,10 +642,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         } else if (clusterRoleParam == "shardsvr") {
             serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         }
-    }
-
-    if (params.count("sharding.archiveMovedChunks")) {
-        serverGlobalParams.moveParanoia = params["sharding.archiveMovedChunks"].as<bool>();
     }
 
     if (params.count("sharding._overrideShardIdentity")) {

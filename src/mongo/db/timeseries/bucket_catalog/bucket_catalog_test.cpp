@@ -27,22 +27,48 @@
  *    it in the license file.
  */
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/preprocessor/control/iif.hpp>
+#include <initializer_list>
+#include <ostream>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/stdx/future.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {
@@ -914,7 +940,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     ASSERT_EQ(batch1->bucketHandle.bucketId, batch2->bucketHandle.bucketId);
 
     // Now clear the bucket. Since there's a prepared batch it should conflict.
-    clear(*_bucketCatalog, _ns1);
+    clearBucketState(_bucketCatalog->bucketStateRegistry, batch1->bucketHandle.bucketId);
 
     // Now try to prepare the second batch. Ensure it aborts the batch.
     ASSERT(claimWriteBatchCommitRights(*batch2));
@@ -1119,6 +1145,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
     // Wait for the batch 2 task to finish preparing commit. Since batch 1 finished, batch 2 should
     // be unblocked. Note that after aborting batch 3, batch 2 was not in a prepared state, so we
     // expect the prepareCommit() call to fail.
+    ASSERT_NOT_OK(prepareCommit(*_bucketCatalog, batch2));
     ASSERT(isWriteBatchFinished(*batch2));
 
     // Make sure a new batch ends up in a new bucket.

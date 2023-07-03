@@ -151,7 +151,7 @@ thread_run(void *arg)
     /* Insert and then delete the keys until we're killed. */
     printf("Worker thread started.\n");
     for (oldest_ts = 0, ts = 1;; ++ts) {
-        testutil_check(__wt_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, ts));
+        testutil_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, ts);
 
         /* Insert the same value for key and value. */
         testutil_check(session->begin_transaction(session, NULL));
@@ -163,25 +163,24 @@ thread_run(void *arg)
         data.size = sizeof(kname);
         cursor->set_value(cursor, &data);
         testutil_check(cursor->insert(cursor));
-        testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, ts));
+        testutil_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, ts);
         testutil_check(session->commit_transaction(session, tscfg));
 
         /* Update stable timestamp to the current timestamp. */
-        testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%" PRIx64, ts));
+        testutil_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%" PRIx64, ts);
         testutil_check(conn->set_timestamp(conn, tscfg));
 
         /* Remove the key using a higher timestamp. */
         testutil_check(session->begin_transaction(session, NULL));
         cursor->set_key(cursor, kname);
         testutil_check_error_ok(cursor->remove(cursor), WT_NOTFOUND);
-        testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, ts + 1));
+        testutil_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, ts + 1);
         testutil_check(session->commit_transaction(session, tscfg));
 
         /* Set the oldest timestamp to make half of the data obsolete. */
         if (ts - oldest_ts > MAX_DATA) {
             oldest_ts = ts - MAX_DATA / 2;
-            testutil_check(
-              __wt_snprintf(tscfg, sizeof(tscfg), "oldest_timestamp=%" PRIx64, oldest_ts));
+            testutil_snprintf(tscfg, sizeof(tscfg), "oldest_timestamp=%" PRIx64, oldest_ts);
             testutil_check(conn->set_timestamp(conn, tscfg));
         }
     }
@@ -208,15 +207,15 @@ run_workload(void)
 
     if (chdir(home) != 0)
         testutil_die(errno, "Child chdir: %s", home);
-    testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG));
+    testutil_snprintf(envconf, sizeof(envconf), ENV_CONFIG);
 
     printf("wiredtiger_open configuration: %s\n", envconf);
     testutil_check(wiredtiger_open(NULL, NULL, envconf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /* Create the table. */
-    testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
-      "key_format=%s,value_format=u,log=(enabled=false)", use_columns ? "r" : "S"));
+    testutil_snprintf(tableconf, sizeof(tableconf),
+      "key_format=%s,value_format=u,log=(enabled=false)", use_columns ? "r" : "S");
     testutil_check(session->create(session, uri, tableconf));
     testutil_check(session->close(session, NULL));
 
@@ -308,7 +307,7 @@ main(int argc, char *argv[])
         usage();
 
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
 
     __wt_random_init_seed(NULL, &rnd);
     if (rand_time) {
@@ -339,7 +338,7 @@ main(int argc, char *argv[])
      * time we notice that the file has been created. That allows the test to run correctly on
      * really slow machines.
      */
-    testutil_check(__wt_snprintf(statname, sizeof(statname), "%s/%s", home, ckpt_file));
+    testutil_snprintf(statname, sizeof(statname), "%s/%s", home, ckpt_file);
     while (stat(statname, &sb) != 0)
         testutil_sleep_wait(1, pid);
     sleep(timeout);
@@ -384,9 +383,9 @@ main(int argc, char *argv[])
 
     fatal = false;
     for (ts = oldest_ts; ts <= stable_ts; ++ts) {
-        testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "read_timestamp=%" PRIx64, ts));
+        testutil_snprintf(tscfg, sizeof(tscfg), "read_timestamp=%" PRIx64, ts);
         testutil_check(session->begin_transaction(session, tscfg));
-        testutil_check(__wt_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, ts));
+        testutil_snprintf(kname, sizeof(kname), ROW_KEY_FORMAT, ts);
         if (use_columns)
             cursor->set_key(cursor, ts);
         else
@@ -408,7 +407,7 @@ main(int argc, char *argv[])
         /* At this point $PATH is inside `home`, which we intend to delete. cd to the parent dir. */
         if (chdir("../") != 0)
             testutil_die(errno, "root chdir: %s", home);
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
     }
     return (EXIT_SUCCESS);
 }

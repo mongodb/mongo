@@ -29,10 +29,22 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <functional>
 #include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
 
+#include "mongo/base/status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/transaction_coordinator.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/with_lock.h"
 

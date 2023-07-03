@@ -345,9 +345,9 @@ const failureModes = {
     },
 };
 
-clearRawMongoProgramOutput();
 for (const failureModeName in failureModes) {
     for (const type in transactionTypes) {
+        clearRawMongoProgramOutput();
         const lsid = getLSID();
         txnNumber++;
         assert.lt(txnNumber,

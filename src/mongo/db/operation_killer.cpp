@@ -28,15 +28,18 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/operation_killer.h"
-
-#include "mongo/db/audit.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_key_manager.h"
+#include "mongo/db/operation_killer.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -50,12 +53,8 @@ OperationKiller::OperationKiller(Client* myClient) : _myClient(myClient) {
 
 bool OperationKiller::isGenerallyAuthorizedToKill() const {
     AuthorizationSession* authzSession = AuthorizationSession::get(_myClient);
-    if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::killop)) {
-        return true;
-    }
-
-    return false;
+    return authzSession->isAuthorizedForActionsOnResource(
+        ResourcePattern::forClusterResource(authzSession->getUserTenantId()), ActionType::killop);
 }
 
 bool OperationKiller::isAuthorizedToKill(const LockedClient& target) const {

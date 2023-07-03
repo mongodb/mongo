@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/record_store.h"
 
 namespace mongo {

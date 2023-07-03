@@ -28,13 +28,34 @@
  */
 
 
+#include <boost/cstdint.hpp>
+#include <cstdint>
+#include <initializer_list>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/hostandport.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

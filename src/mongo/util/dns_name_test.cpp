@@ -30,8 +30,11 @@
 
 #include "mongo/util/dns_name.h"
 
+#include <type_traits>
+
 #include "mongo/stdx/utility.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 using namespace std::literals::string_literals;
 
@@ -215,7 +218,7 @@ TEST(DNSNameTest, Resolution) {
             const ::mongo::dns::HostName subdomain(test.subdomain);
             const ::mongo::dns::HostName resolved = [&] {
                 try {
-                    const ::mongo::dns::HostName rv = subdomain.resolvedIn(domain);
+                    ::mongo::dns::HostName rv = subdomain.resolvedIn(domain);
                     return rv;
                 } catch (const ExceptionFor<ErrorCodes::DNSRecordTypeMismatch>&) {
                     ASSERT(test.fails);

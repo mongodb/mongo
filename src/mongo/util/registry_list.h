@@ -29,8 +29,11 @@
 
 #pragma once
 
+#include <cstddef>
 #include <deque>
 #include <memory>
+#include <mutex>
+#include <utility>
 
 #include "mongo/stdx/mutex.h"
 

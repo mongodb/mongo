@@ -27,9 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/capped_collection_maintenance.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/record_id_helpers.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -72,7 +97,7 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
         {
             WriteUnitOfWork wuow(opCtx.get());
             BSONObj obj = BSON("not_ts" << Timestamp(2, 1));
-            ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp(2, 1))
+            ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), Timestamp())
                           .getStatus(),
                       ErrorCodes::BadValue);
         }
@@ -99,6 +124,7 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
     // Forward cursor seeks
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get());
         auto rec = cur->seekNear(RecordId(0, 1));
@@ -108,6 +134,7 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get());
         auto rec = cur->seekNear(RecordId(2, 1));
@@ -117,6 +144,7 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get());
         auto rec = cur->seekNear(RecordId(2, 2));
@@ -126,6 +154,7 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get());
         auto rec = cur->seekNear(RecordId(2, 3));
@@ -136,6 +165,7 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
     // Reverse cursor seeks
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get(), false /* forward */);
         auto rec = cur->seekNear(RecordId(0, 1));
@@ -145,6 +175,7 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get(), false /* forward */);
         auto rec = cur->seekNear(RecordId(2, 1));
@@ -154,6 +185,7 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get(), false /* forward */);
         auto rec = cur->seekNear(RecordId(2, 2));
@@ -163,6 +195,7 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         WriteUnitOfWork wuow(opCtx.get());
         auto cur = rs->getCursor(opCtx.get(), false /* forward */);
         auto rec = cur->seekNear(RecordId(2, 3));
@@ -180,6 +213,7 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         auto cur = rs->getCursor(opCtx.get());
         auto rec = cur->seekNear(RecordId(2, 3));
         ASSERT(rec);
@@ -196,6 +230,7 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         auto cur = rs->getCursor(opCtx.get());
         auto rec = cur->seekNear(RecordId(2, 3));
         ASSERT(rec);
@@ -212,6 +247,7 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         auto cur = rs->getCursor(opCtx.get());
         auto rec = cur->seekNear(RecordId(2, 3));
         ASSERT(rec);
@@ -227,6 +263,7 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         auto cur = rs->getCursor(opCtx.get());
         auto rec = cur->seekNear(RecordId(2, 3));
         ASSERT_FALSE(rec);
@@ -261,6 +298,7 @@ TEST(RecordStoreTestHarness, SeekNearOnNonOplog) {
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore("local.NOT_oplog.foo"));
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     BSONObj obj = BSON("ts" << Timestamp(2, -1));
     {
@@ -335,6 +373,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         auto cursor = rs->getCursor(opCtx.get());
         auto record = cursor->seekNear(RecordId(id1.getLong() + 1));
         ASSERT(record);
@@ -346,7 +385,6 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         // now we insert 2 docs, but commit the 2nd one first.
         // we make sure we can't find the 2nd until the first is committed.
         ServiceContext::UniqueOperationContext earlyReader(harnessHelper->newOperationContext());
-
         auto earlyCursor = rs->getCursor(earlyReader.get());
         ASSERT_EQ(earlyCursor->seekExact(id1)->id, id1);
         earlyCursor->save();
@@ -386,6 +424,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         {
             auto client2 = harnessHelper->serviceContext()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
+            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekNear(id2);
             ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
@@ -397,6 +436,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         {
             auto client2 = harnessHelper->serviceContext()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
+            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekNear(id3);
             ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
@@ -479,6 +519,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         {
             auto client2 = harnessHelper->serviceContext()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
+            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekNear(id2);
             ASSERT(record);
@@ -490,6 +531,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         {
             auto client2 = harnessHelper->serviceContext()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
+            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekNear(id3);
             ASSERT(record);
@@ -558,6 +600,7 @@ TEST(RecordStoreTestHarness, OplogVisibilityStandalone) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         auto cursor = rs->getCursor(opCtx.get());
         auto record = cursor->seekNear(RecordId(id1.getLong() + 1));
         ASSERT(record);

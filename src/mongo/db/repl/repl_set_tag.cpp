@@ -27,15 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/repl/repl_set_tag.h"
-
 #include <algorithm>
-#include <functional>
+#include <memory>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/repl/repl_set_tag.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
 

@@ -27,15 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <mutex>
 
-#include "mongo/s/query/cluster_cursor_cleanup_job.h"
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cursor_server_params.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_cursor_cleanup_job.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/time_support.h"
 

@@ -28,16 +28,25 @@
  */
 
 
-#include <algorithm>
+#include <benchmark/benchmark.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <memory>
 
-#include <benchmark/benchmark.h>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
-#include "mongo/logv2/log_debug.h"
-#include "mongo/unittest/unittest.h"
-
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/assert.h"
 
 namespace mongo {
 namespace {
@@ -46,11 +55,8 @@ using Cursor = SortedDataInterface::Cursor;
 enum Direction { kBackward, kForward };
 enum Uniqueness { kUnique, kNonUnique };
 enum EndPosition { kWithEnd, kWithoutEnd };
-const auto kWantLoc = Cursor::kWantLoc;
-const auto kWantKey = Cursor::kWantKey;
-const auto kKeyAndLoc = Cursor::kKeyAndLoc;
-const auto kJustExistance = Cursor::kJustExistance;
-
+const auto kRecordId = Cursor::KeyInclusion::kExclude;
+const auto kRecordIdAndKey = Cursor::KeyInclusion::kInclude;
 
 struct Fixture {
     Fixture(Uniqueness uniqueness, Direction direction, int nToInsert)
@@ -60,6 +66,7 @@ struct Fixture {
           harness(newSortedDataInterfaceHarnessHelper()),
           sorted(harness->newSortedDataInterface(uniqueness == kUnique, /*partial*/ false)),
           opCtx(harness->newOperationContext()),
+          globalLock(opCtx.get(), MODE_X),
           cursor(sorted->newCursor(opCtx.get(), direction == kForward)),
           firstKey(makeKeyStringForSeek(sorted.get(),
                                         BSON("" << (direction == kForward ? 1 : nToInsert)),
@@ -83,14 +90,15 @@ struct Fixture {
     std::unique_ptr<SortedDataInterfaceHarnessHelper> harness;
     std::unique_ptr<SortedDataInterface> sorted;
     ServiceContext::UniqueOperationContext opCtx;
+    Lock::GlobalLock globalLock;
     std::unique_ptr<SortedDataInterface::Cursor> cursor;
-    KeyString::Value firstKey;
+    key_string::Value firstKey;
     size_t itemsProcessed = 0;
 };
 
 void BM_Advance(benchmark::State& state,
                 Direction direction,
-                Cursor::RequestedInfo requestedInfo,
+                Cursor::KeyInclusion keyInclusion,
                 Uniqueness uniqueness) {
 
     Fixture fix(uniqueness, direction, 100'000);
@@ -98,7 +106,7 @@ void BM_Advance(benchmark::State& state,
     for (auto _ : state) {
         fix.cursor->seek(fix.firstKey);
         for (int i = 1; i < fix.nToInsert; i++)
-            fix.cursor->next(requestedInfo);
+            fix.cursor->next(keyInclusion);
         fix.itemsProcessed += fix.nToInsert;
     }
     ASSERT(!fix.cursor->next());
@@ -114,7 +122,7 @@ void BM_AdvanceWithEnd(benchmark::State& state, Direction direction, Uniqueness 
         BSONObj lastKey = BSON("" << (direction == kForward ? fix.nToInsert : 1));
         fix.cursor->setEndPosition(lastKey, /*inclusive*/ true);
         for (int i = 1; i < fix.nToInsert; i++)
-            fix.cursor->next(kWantLoc);
+            fix.cursor->next(kRecordId);
         fix.itemsProcessed += fix.nToInsert;
     }
     ASSERT(!fix.cursor->next());
@@ -122,19 +130,15 @@ void BM_AdvanceWithEnd(benchmark::State& state, Direction direction, Uniqueness 
 };
 
 
-BENCHMARK_CAPTURE(BM_Advance, AdvanceForwardLoc, kForward, kWantLoc, kNonUnique);
-BENCHMARK_CAPTURE(BM_Advance, AdvanceForwardKeyAndLoc, kForward, kKeyAndLoc, kNonUnique);
-BENCHMARK_CAPTURE(BM_Advance, AdvanceForwardLocUnique, kForward, kWantLoc, kUnique);
-BENCHMARK_CAPTURE(BM_Advance, AdvanceForwardKeyAndLocUnique, kForward, kKeyAndLoc, kUnique);
+BENCHMARK_CAPTURE(BM_Advance, AdvanceForwardLoc, kForward, kRecordId, kNonUnique);
+BENCHMARK_CAPTURE(BM_Advance, AdvanceForwardKeyAndLoc, kForward, kRecordIdAndKey, kNonUnique);
+BENCHMARK_CAPTURE(BM_Advance, AdvanceForwardLocUnique, kForward, kRecordId, kUnique);
+BENCHMARK_CAPTURE(BM_Advance, AdvanceForwardKeyAndLocUnique, kForward, kRecordIdAndKey, kUnique);
 
-BENCHMARK_CAPTURE(BM_Advance, AdvanceBackwardLoc, kBackward, kWantLoc, kNonUnique);
-BENCHMARK_CAPTURE(BM_Advance, AdvanceBackwardKeyAndLoc, kBackward, kKeyAndLoc, kNonUnique);
-BENCHMARK_CAPTURE(BM_Advance, AdvanceBackwardLocUnique, kBackward, kWantLoc, kUnique);
-BENCHMARK_CAPTURE(BM_Advance, AdvanceBackwardKeyAndLocUnique, kBackward, kKeyAndLoc, kUnique);
-
-// TODO(SERVER-72575): Remove these two cases
-BENCHMARK_CAPTURE(BM_Advance, AdvanceForwardJustExistance, kForward, kJustExistance, kNonUnique);
-BENCHMARK_CAPTURE(BM_Advance, AdvanceForwardWantKey, kForward, kWantKey, kNonUnique);
+BENCHMARK_CAPTURE(BM_Advance, AdvanceBackwardLoc, kBackward, kRecordId, kNonUnique);
+BENCHMARK_CAPTURE(BM_Advance, AdvanceBackwardKeyAndLoc, kBackward, kRecordIdAndKey, kNonUnique);
+BENCHMARK_CAPTURE(BM_Advance, AdvanceBackwardLocUnique, kBackward, kRecordId, kUnique);
+BENCHMARK_CAPTURE(BM_Advance, AdvanceBackwardKeyAndLocUnique, kBackward, kRecordIdAndKey, kUnique);
 
 BENCHMARK_CAPTURE(BM_AdvanceWithEnd, AdvanceForward, kForward, kNonUnique);
 BENCHMARK_CAPTURE(BM_AdvanceWithEnd, AdvanceForwardUnique, kForward, kUnique);

@@ -27,24 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <boost/optional.hpp>
 #include <memory>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/mock_stage.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/mock_yield_policies.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
 namespace {
 
-const NamespaceString kTestNss = NamespaceString("db.dummy");
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("db.dummy");
 
 class TrialStageTest : public unittest::Test {
 public:

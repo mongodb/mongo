@@ -1,12 +1,11 @@
-'use strict';
-
 /**
  * Runs findAndModify, update, delete, find, and getMore within a transaction.
  *
  * @tags: [uses_transactions, state_functions_share_transaction]
  */
 load('jstests/concurrency/fsm_workload_helpers/cleanup_txns.js');
-var $config = (function() {
+
+export const $config = (function() {
     function quietly(func) {
         const printOriginal = print;
         try {

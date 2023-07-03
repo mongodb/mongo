@@ -27,18 +27,27 @@
  *    it in the license file.
  */
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <list>
 #include <string>
+#include <type_traits>
+#include <utility>
 
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/stats_cache.h"
 #include "mongo/db/query/stats/stats_cache_loader_mock.h"
-#include "mongo/unittest/barrier.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/future.h"
 #include "mongo/util/read_through_cache.h"
-#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -51,7 +60,7 @@ using unittest::assertGet;
  * Fixture for tests, which do not need to exercise the multi-threading capabilities of the cache
  * and as such do not require control over the creation/destruction of their operation contexts.
  */
-class StatsCacheTest : public LockerNoopServiceContextTest {
+class StatsCacheTest : public ServiceContextTest {
 protected:
     // Extends StatsCache and automatically provides it with a thread  pool, which will be
     // shutdown and joined before the StatsCache is destroyed (which is part of the  contract of

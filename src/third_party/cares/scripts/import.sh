@@ -7,8 +7,8 @@ IFS=$'\n\t'
 set -vx
 
 NAME=cares
-REVISION="cares-1_17_2"
-VERSION="1.17.2"
+REVISION="cares-1_19_1"
+VERSION="1.19.1"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/cares
 if [[ -d $DEST_DIR/dist ]]; then
@@ -16,7 +16,7 @@ if [[ -d $DEST_DIR/dist ]]; then
     exit 1
 fi
 
-git clone --branch cares-1_17_2 git@github.com:mongodb-forks/c-ares.git $DEST_DIR/dist
+git clone --branch cares-1_19_1 git@github.com:mongodb-forks/c-ares.git $DEST_DIR/dist
 
 HOST_OS="$(uname -s|tr A-Z a-z)"
 HOST_ARCH="$(uname -m)"
@@ -47,14 +47,33 @@ popd
 
 pushd $DEST_DIR/dist
 # tranfer useful gen files
-# mkdir -p $HOST_DIR/build/include
-# mkdir -p $HOST_DIR/install/include
-# cp $HOST_DIR/build_tmp/src/lib/ares_config.h $HOST_DIR/build/include/ares_config.h
-# cp $HOST_DIR/install_tmp/include/ares_build.h $HOST_DIR/install/include/ares_build.h
-# cp $HOST_DIR/install_tmp/include/ares_dns.h $HOST_DIR/install/include/ares_dns.h
-# cp $HOST_DIR/install_tmp/include/ares_rules.h $HOST_DIR/install/include/ares_rules.h
-# cp $HOST_DIR/install_tmp/include/ares_version.h $HOST_DIR/install/include/ares_version.h
-# cp $HOST_DIR/install_tmp/include/ares.h $HOST_DIR/install/include/ares.h
+mkdir -p $HOST_DIR/build/include
+mkdir -p $HOST_DIR/install/include
+
+# Config artifacts needed to rebuild the library.
+config_headers=(
+    ares_config.h
+)
+
+# Headers needed to use the library.
+public_headers=(
+    ares_build.h
+    ares_dns.h
+    ares_nameser.h
+    ares_rules.h
+    ares_version.h
+    ares.h
+)
+
+mkdir -p "$HOST_DIR/build/include"
+for h in "${config_headers[@]}" ; do
+    cp "$HOST_DIR/build_tmp/src/lib/$h" "$HOST_DIR/build/include/$h"
+done
+
+mkdir -p "$HOST_DIR/install/include"
+for h in "${public_headers[@]}" ; do
+    cp "$HOST_DIR/install_tmp/include/$h" "$HOST_DIR/install/include/$h"
+done
 
 # clean up
 find . -mindepth 1 -maxdepth 1 -name ".*" -exec rm -rf {} \;

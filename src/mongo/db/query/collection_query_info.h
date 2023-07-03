@@ -29,12 +29,22 @@
 
 #pragma once
 
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <memory>
+#include <utility>
+
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache_indexability.h"
 #include "mongo/db/query/plan_cache_invalidator.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/update_index_data.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 

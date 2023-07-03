@@ -1,5 +1,3 @@
-'use strict';
-
 // UMC commands are not supported in transactions.
 TestData.runInsideTransaction = false;
 
@@ -10,7 +8,7 @@ TestData.runInsideTransaction = false;
  * drops the user from the database.
  * @tags: [incompatible_with_concurrency_simultaneous]
  */
-var $config = (function() {
+export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the username,
         // since the workload name is assumed to be unique.

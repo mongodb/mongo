@@ -29,6 +29,14 @@
 
 #include "mongo/db/query/interval.h"
 
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
+
 namespace mongo {
 
 using std::string;
@@ -45,7 +53,7 @@ Interval::Interval(BSONObj base, bool si, bool ei) {
 }
 
 void Interval::init(BSONObj base, bool si, bool ei) {
-    verify(base.nFields() >= 2);
+    MONGO_verify(base.nFields() >= 2);
 
     _intervalData = base.getOwned();
     BSONObjIterator it(_intervalData);
@@ -248,7 +256,7 @@ void Interval::intersect(const Interval& other, IntervalComparison cmp) {
             break;
 
         default:
-            verify(false);
+            MONGO_verify(false);
     }
 }
 
@@ -284,7 +292,7 @@ void Interval::combine(const Interval& other, IntervalComparison cmp) {
             break;
 
         default:
-            verify(false);
+            MONGO_verify(false);
     }
 }
 

@@ -29,30 +29,65 @@
 
 #include "mongo/shell/program_runner.h"
 
+#include <algorithm>
 #include <boost/filesystem/operations.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
-#include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/stream_buffer.hpp>
-#include <boost/iostreams/tee.hpp>
+#include <cerrno>
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
 #include <fcntl.h>
+#include <iostream>
+#include <iterator>
+#include <memory>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include <boost/core/typeinfo.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iostreams/categories.hpp>
+// IWYU pragma: no_include "boost/iostreams/detail/error.hpp"
+// IWYU pragma: no_include "boost/iostreams/detail/streambuf/indirect_streambuf.hpp"
+#include <boost/iostreams/imbue.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
 
 #ifdef _WIN32
 #include <io.h>
+
 #define SIGKILL 9
 #else
-#include <csignal>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/wait.h>
-#include <unistd.h>
 #endif
 
 #include "mongo/base/environment_buffer.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_truncation.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/errno_util.h"
-#include "mongo/util/text.h"
+#include "mongo/util/exit_code.h"
+#include "mongo/util/str.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

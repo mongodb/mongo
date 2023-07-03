@@ -29,17 +29,33 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 #include <map>
+#include <memory>
+#include <utility>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/invalidating_lru_cache.h"
 #include "mongo/util/read_through_cache.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

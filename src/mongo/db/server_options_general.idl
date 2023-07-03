@@ -75,6 +75,7 @@ configs:
             is_constexpr: false
         short_name: port
         arg_vartype: Int
+        validator: { gte: 0, lte: 65535 }
     'net.ipv6':
         description: 'Enable IPv6 support (disabled by default)'
         short_name: ipv6

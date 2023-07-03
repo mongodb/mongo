@@ -67,16 +67,8 @@ const numDocsRange = {
     max: 10000
 };
 
-const setParameterOpts = {
-    // Skip calculating the read and write distribution metrics since there are no sampled queries
-    // anyway.
-    "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-        tojson({mode: "alwaysOn"})
-};
-
 {
-    const st =
-        new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
+    const st = new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, oplogSize: 500}});
 
     testAnalyzeShardKeysUnshardedCollection(st.s, testCases, numDocsRange);
     testAnalyzeShardKeysShardedCollection(st, testCases, numDocsRange);
@@ -85,8 +77,7 @@ const setParameterOpts = {
 }
 
 {
-    const rst =
-        new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
+    const rst = new ReplSetTest({nodes: numNodesPerRS, oplogSize: 250});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

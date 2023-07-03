@@ -27,20 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <algorithm>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <cstdint>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/document_value/document.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo {
 namespace {
@@ -225,25 +237,26 @@ TEST(ResolvedViewTest, FromBSONFailsOnInvalidViewNsType) {
 }
 
 TEST(ResolvedViewTest, FromBSONFailsIfMissingPipeline) {
-    BSONObj badCmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns()));
+    BSONObj badCmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns_forTest()));
     ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40251);
 }
 
 TEST(ResolvedViewTest, FromBSONFailsOnInvalidPipelineType) {
     BSONObj badCmdResponse =
-        BSON("resolvedView" << BSON("ns" << backingNss.ns() << "pipeline" << 7));
+        BSON("resolvedView" << BSON("ns" << backingNss.ns_forTest() << "pipeline" << 7));
     ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40251);
 }
 
 TEST(ResolvedViewTest, FromBSONFailsOnInvalidCollationType) {
-    BSONObj badCmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns() << "pipeline"
-                                                              << BSONArray() << "collation" << 1));
+    BSONObj badCmdResponse =
+        BSON("resolvedView" << BSON("ns" << backingNss.ns_forTest() << "pipeline" << BSONArray()
+                                         << "collation" << 1));
     ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40639);
 }
 
 TEST(ResolvedViewTest, FromBSONSuccessfullyParsesEmptyBSONArrayIntoEmptyVector) {
     BSONObj cmdResponse =
-        BSON("resolvedView" << BSON("ns" << backingNss.ns() << "pipeline" << BSONArray()));
+        BSON("resolvedView" << BSON("ns" << backingNss.ns_forTest() << "pipeline" << BSONArray()));
     const ResolvedView result = ResolvedView::fromBSON(cmdResponse);
     ASSERT_EQ(result.getNamespace(), backingNss);
     ASSERT(std::equal(emptyPipeline.begin(),
@@ -253,7 +266,7 @@ TEST(ResolvedViewTest, FromBSONSuccessfullyParsesEmptyBSONArrayIntoEmptyVector) 
 }
 
 TEST(ResolvedViewTest, FromBSONSuccessfullyParsesCollation) {
-    BSONObj cmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns() << "pipeline"
+    BSONObj cmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns_forTest() << "pipeline"
                                                            << BSONArray() << "collation"
                                                            << BSON("locale"
                                                                    << "fil")));
@@ -292,7 +305,8 @@ TEST(ResolvedViewTest, IsResolvedViewErrorResponseDetectsKickbackErrorCodeSucces
     BSONObj errorResponse =
         BSON("ok" << 0 << "code" << ErrorCodes::CommandOnShardedViewNotSupportedOnMongod << "errmsg"
                   << "This view is sharded and cannot be run on mongod"
-                  << "resolvedView" << BSON("ns" << backingNss.ns() << "pipeline" << BSONArray()));
+                  << "resolvedView"
+                  << BSON("ns" << backingNss.ns_forTest() << "pipeline" << BSONArray()));
     auto status = getStatusFromCommandResult(errorResponse);
     ASSERT_EQ(status, ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
     ASSERT(status.extraInfo<ResolvedView>());

@@ -27,19 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/sorted_data_interface_test_harness.h"
-
+#include <boost/none.hpp>
 #include <memory>
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/storage/sorted_data_interface_test_harness.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
+
 // Tests findLoc when it hits something.
 void testFindLoc_Hit(bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
@@ -47,6 +51,9 @@ void testFindLoc_Hit(bool unique) {
                                                             {key2, loc1},
                                                             {key3, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
 
     auto loc = sorted->findLoc(opCtx.get(), makeKeyString(sorted.get(), key2));
     ASSERT_EQ(loc, loc1);
@@ -61,7 +68,6 @@ TEST(SortedDataInterface, SeekExact_Hit_Standard) {
 // Tests findLoc when it doesn't hit the query.
 void testFindLoc_Miss(bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
@@ -69,6 +75,9 @@ void testFindLoc_Miss(bool unique) {
                                                             // No key2.
                                                             {key3, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
 
     ASSERT_EQ(sorted->findLoc(opCtx.get(), makeKeyString(sorted.get(), key2)), boost::none);
 }
@@ -78,5 +87,6 @@ TEST(SortedDataInterface, SeekExact_Miss_Unique) {
 TEST(SortedDataInterface, SeekExact_Miss_Standard) {
     testFindLoc_Miss(false);
 }
+
 }  // namespace
 }  // namespace mongo

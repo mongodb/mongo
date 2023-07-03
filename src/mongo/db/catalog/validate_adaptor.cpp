@@ -28,43 +28,71 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/catalog/validate_adaptor.h"
-
+#include <absl/container/flat_hash_map.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <climits>
 #include <fmt/format.h>
+#include <memory>
+#include <mutex>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/column_index_consistency.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/throttle_cursor.h"
+#include "mongo/db/catalog/validate_adaptor.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/index/columns_access_method.h"
-#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id_helpers.h"
-#include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/shared_buffer_fragment.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/testing_proctor.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -72,6 +100,8 @@
 namespace mongo {
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(failRecordStoreTraversal);
 
 // Set limit for size of corrupted records that will be reported.
 const long long kMaxErrorSizeBytes = 1 * 1024 * 1024;
@@ -106,8 +136,8 @@ void _validateClusteredCollectionRecordId(OperationContext* opCtx,
     }
 
     const auto ksFromBSON =
-        KeyString::Builder(KeyString::Version::kLatestVersion, ridFromDoc.getValue());
-    const auto ksFromRid = KeyString::Builder(KeyString::Version::kLatestVersion, rid);
+        key_string::Builder(key_string::Version::kLatestVersion, ridFromDoc.getValue());
+    const auto ksFromRid = key_string::Builder(key_string::Version::kLatestVersion, rid);
 
     const auto clusterKeyField = clustered_util::getClusterKeyFieldName(indexSpec);
     if (ksFromRid != ksFromBSON) {
@@ -539,11 +569,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                        long long* nNonCompliantDocuments,
                                        size_t* dataSize,
                                        ValidateResults* results) {
-    auto validateBSONMode = BSONValidateMode::kDefault;
-    if (feature_flags::gExtendValidateCommand.isEnabled(serverGlobalParams.featureCompatibility)) {
-        validateBSONMode = _validateState->getBSONValidateMode();
-    }
-    const Status status = validateBSON(record.data(), record.size(), validateBSONMode);
+    Status status =
+        validateBSON(record.data(), record.size(), _validateState->getBSONValidateMode());
     if (!status.isOK()) {
         if (status.code() != ErrorCodes::NonConformantBSON) {
             return status;
@@ -573,15 +600,17 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                              results);
     }
 
-    SharedBufferFragmentBuilder pool(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+    SharedBufferFragmentBuilder pool(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
-    for (const auto& index : _validateState->getIndexes()) {
-        const IndexDescriptor* descriptor = index->descriptor();
-        if (descriptor->isPartial() && !index->getFilterExpression()->matchesBSON(recordBson))
+    for (const auto& indexIdent : _validateState->getIndexIdents()) {
+        const IndexDescriptor* descriptor =
+            coll->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
+        if (descriptor->isPartial() &&
+            !descriptor->getEntry()->getFilterExpression()->matchesBSON(recordBson))
             continue;
 
 
-        this->traverseRecord(opCtx, coll, index.get(), recordId, recordBson, results);
+        this->traverseRecord(opCtx, coll, descriptor->getEntry(), recordId, recordBson, results);
     }
     return Status::OK();
 }
@@ -650,6 +679,24 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         Status status = validateRecord(
             opCtx, record->id, record->data, &nNonCompliantDocuments, &validatedSize, results);
 
+        // Log the out-of-order entries as errors.
+        //
+        // Validate uses a DataCorruptionDetectionMode::kLogAndContinue mode such that data
+        // corruption errors are logged without throwing, so certain checks must be duplicated here
+        // as well.
+        if ((prevRecordId.isValid() && prevRecordId > record->id) ||
+            MONGO_unlikely(failRecordStoreTraversal.shouldFail())) {
+            // TODO SERVER-78040: Clean this up once we can insert errors blindly into the list and
+            // not care about deduplication.
+            static constexpr auto kErrorMessage = "Detected out-of-order documents. See logs.";
+            if (results->valid ||
+                std::find(results->errors.begin(), results->errors.end(), kErrorMessage) ==
+                    results->errors.end()) {
+                results->errors.push_back(kErrorMessage);
+                results->valid = false;
+            }
+        }
+
         // validatedSize = dataSize is not a general requirement as some storage engines may use
         // padding, but we still require that they return the unpadded record data.
         if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
@@ -677,8 +724,14 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 results->numRemovedCorruptRecords++;
                 _numRecords--;
             } else {
-                if (results->valid) {
-                    results->errors.push_back("Detected one or more invalid documents. See logs.");
+                // TODO SERVER-78040: Clean this up once we can insert errors blindly into the list
+                // and not care about deduplication.
+                static constexpr auto kErrorMessage =
+                    "Detected one or more invalid documents. See logs.";
+                if (results->valid ||
+                    std::find(results->errors.begin(), results->errors.end(), kErrorMessage) ==
+                        results->errors.end()) {
+                    results->errors.push_back(kErrorMessage);
                     results->valid = false;
                 }
 
@@ -708,9 +761,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 
                 nNonCompliantDocuments++;
                 schemaValidationFailed(_validateState, result.first, results);
-            } else if (feature_flags::gExtendValidateCommand.isEnabled(
-                           serverGlobalParams.featureCompatibility) &&
-                       coll->getTimeseriesOptions()) {
+            } else if (coll->getTimeseriesOptions()) {
                 // Checks for time-series collection consistency.
                 Status bucketStatus =
                     _validateTimeSeriesBucketRecord(coll, record->data.toBson(), results);

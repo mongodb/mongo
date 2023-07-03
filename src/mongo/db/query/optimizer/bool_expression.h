@@ -30,8 +30,15 @@
 
 #pragma once
 
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <functional>
 #include <numeric>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "mongo/db/query/optimizer/algebra/operator.h"
@@ -42,7 +49,7 @@ namespace mongo::optimizer {
 
 template <class T>
 struct TassertNegator {
-    T operator()(const T v) const {
+    T operator()(T v) const {
         tassert(7453909, "No negator specified", false);
         return v;
     }
@@ -61,7 +68,6 @@ struct BoolExpr {
 
     using Node = algebra::PolyValue<Atom, Conjunction, Disjunction>;
     using NodeVector = std::vector<Node>;
-
 
     class Atom final : public algebra::OpFixedArity<Node, 0> {
         using Base = algebra::OpFixedArity<Node, 0>;
@@ -150,125 +156,154 @@ struct BoolExpr {
         return getSingularDNF(n).has_value();
     }
 
-    using ChildVisitor = std::function<void(Node& child, const size_t childIndex)>;
-    using ChildVisitorConst = std::function<void(const Node& child, const size_t childIndex)>;
-    using AtomVisitor = std::function<void(T& expr)>;
-    using AtomVisitorConst = std::function<void(const T& expr)>;
+    /**
+     * Context present during traversal.
+     */
+    struct VisitorContext {
+        /**
+         * Get the index of the child element in the conjunction or disjunction being traversed.
+         */
+        size_t getChildIndex() const {
+            return _childIndex;
+        }
+
+        /**
+         * Allow the visitor to signal that traversal should end early.
+         */
+        void returnEarly() const {
+            _returnEarly = true;
+        }
+
+    private:
+        size_t _childIndex = 0;
+        mutable bool _returnEarly = false;
+
+        friend struct BoolExpr<T>;
+    };
+
     using AtomPredConst = std::function<bool(const T& expr)>;
 
-    static size_t visitConjuncts(const Node& node, const ChildVisitorConst& visitor) {
-        size_t index = 0;
-        for (const auto& conj : node.template cast<Conjunction>()->nodes()) {
-            visitor(conj, index++);
-        }
-        return index;
-    }
-
-    static size_t visitConjuncts(Node& node, const ChildVisitor& visitor) {
-        size_t index = 0;
-        for (auto& conj : node.template cast<Conjunction>()->nodes()) {
-            visitor(conj, index++);
-        }
-        return index;
-    }
-
-    static size_t visitDisjuncts(const Node& node, const ChildVisitorConst& visitor) {
-        size_t index = 0;
-        for (const auto& conj : node.template cast<Disjunction>()->nodes()) {
-            visitor(conj, index++);
-        }
-        return index;
-    }
-
-    static size_t visitDisjuncts(Node& node, const ChildVisitor& visitor) {
-        size_t index = 0;
-        for (auto& conj : node.template cast<Disjunction>()->nodes()) {
-            visitor(conj, index++);
-        }
-        return index;
-    }
-
-    static void visitAtom(const Node& node, const AtomVisitorConst& visitor) {
-        visitor(node.template cast<Atom>()->getExpr());
-    }
-
-    static void visitAtom(Node& node, const AtomVisitor& visitor) {
-        visitor(node.template cast<Atom>()->getExpr());
-    }
-
-    static void visitCNF(const Node& node, const AtomVisitorConst& visitor) {
-        visitConjuncts(node, [&](const Node& child, const size_t) {
-            visitDisjuncts(child, [&](const Node& grandChild, const size_t) {
-                visitAtom(grandChild, visitor);
-            });
-        });
-    }
-
-    static void visitDNF(const Node& node, const AtomVisitorConst& visitor) {
-        visitDisjuncts(node, [&](const Node& child, const size_t) {
-            visitConjuncts(child, [&](const Node& grandChild, const size_t) {
-                visitAtom(grandChild, visitor);
-            });
-        });
-    }
-
-    static void visitAnyShape(const Node& node, const AtomVisitorConst& atomVisitor) {
-        struct AtomTransport {
-            void transport(const Conjunction&, const NodeVector&) {}
-            void transport(const Disjunction&, const NodeVector&) {}
-            void transport(const Atom& node) {
-                atomVisitor(node.getExpr());
+    template <typename ListType, typename NodeType, typename Visitor>
+    static size_t visitNodes(NodeType&& node, const Visitor& visitor) {
+        VisitorContext ctx;
+        for (auto&& n : node.template cast<ListType>()->nodes()) {
+            visitor(n, ctx);
+            ctx._childIndex++;
+            if (ctx._returnEarly) {
+                break;
             }
-            const AtomVisitorConst& atomVisitor;
+        }
+        return ctx._childIndex;
+    }
+
+    template <typename NodeType, typename Visitor>
+    static size_t visitConjuncts(NodeType&& node, const Visitor& visitor) {
+        return visitNodes<Conjunction>(node, visitor);
+    }
+
+    template <typename NodeType, typename Visitor>
+    static size_t visitDisjuncts(NodeType&& node, const Visitor& visitor) {
+        return visitNodes<Disjunction>(node, visitor);
+    }
+
+    template <typename NodeType, typename Visitor>
+    static void visitAtom(NodeType&& node, const Visitor& visitor) {
+        const VisitorContext ctx;
+        visitor(node.template cast<Atom>()->getExpr(), ctx);
+    }
+
+    template <typename NodeType, typename Visitor>
+    static void visitCNF(NodeType&& node, const Visitor& visitor) {
+        visitConjuncts(node, [&](const Node& child, const VisitorContext& conjCtx) {
+            visitDisjuncts(child, [&](const Node& grandChild, const VisitorContext& disjCtx) {
+                visitor(grandChild.template cast<Atom>()->getExpr(), disjCtx);
+                if (disjCtx._returnEarly) {
+                    conjCtx.returnEarly();
+                }
+            });
+        });
+    }
+
+    template <typename NodeType, typename Visitor>
+    static void visitDNF(NodeType&& node, const Visitor& visitor) {
+        visitDisjuncts(node, [&](NodeType&& child, const VisitorContext& disjCtx) {
+            visitConjuncts(child, [&](NodeType&& grandChild, const VisitorContext& conjCtx) {
+                visitor(grandChild.template cast<Atom>()->getExpr(), conjCtx);
+                if (conjCtx._returnEarly) {
+                    disjCtx.returnEarly();
+                }
+            });
+        });
+    }
+
+    template <typename NodeType, typename Visitor>
+    static void visitSingletonDNF(NodeType&& node, const Visitor& visitor) {
+        tassert(7382800, "Expected a singleton disjunction", isSingletonDisjunction(node));
+        visitDNF(node, visitor);
+    }
+
+    template <typename NodeType, typename Visitor>
+    static void visitAnyShape(NodeType&& node, const Visitor& atomVisitor) {
+        constexpr bool isConst = std::is_const_v<std::remove_reference_t<NodeType>>;
+        using VectorT = std::conditional_t<isConst, const NodeVector&, NodeVector&>;
+        struct AtomTransport {
+            void transport(std::conditional_t<isConst, const Conjunction&, Conjunction&>, VectorT) {
+                // noop
+            }
+            void transport(std::conditional_t<isConst, const Disjunction&, Disjunction&>, VectorT) {
+                // noop
+            }
+            void transport(std::conditional_t<isConst, const Atom&, Atom&> node) {
+                const VisitorContext ctx;
+                atomVisitor(node.getExpr(), ctx);
+            }
+            const Visitor& atomVisitor;
         };
         AtomTransport impl{atomVisitor};
         algebra::transport<false>(node, impl);
     }
 
+    template <typename NodeType>
+    static T& firstDNFLeaf(NodeType&& node) {
+        T* leaf = nullptr;
+        visitDNF(node, [&](T& e, const VisitorContext& ctx) {
+            leaf = &e;
+            ctx.returnEarly();
+        });
+        tassert(7382801, "Expected a non-empty expression", leaf);
+        return *leaf;
+    }
+
     static bool any(const Node& node, const AtomPredConst& atomPred) {
         bool result = false;
-        visitAnyShape(node, [&](const T& atom) { result = result || atomPred(atom); });
+        visitAnyShape(node, [&](const T& atom, const VisitorContext& ctx) {
+            if (atomPred(atom)) {
+                result = true;
+                ctx.returnEarly();
+            }
+        });
         return result;
     }
 
     static bool all(const Node& node, const AtomPredConst& atomPred) {
         bool result = true;
-        visitAnyShape(node, [&](const T& atom) { result = result && atomPred(atom); });
-        return result;
-    }
-
-    static void visitCNF(Node& node, const AtomVisitor& visitor) {
-        visitConjuncts(node, [&](Node& child, const size_t) {
-            visitDisjuncts(child,
-                           [&](Node& grandChild, const size_t) { visitAtom(grandChild, visitor); });
-        });
-    }
-
-    static void visitDNF(Node& node, const AtomVisitor& visitor) {
-        visitDisjuncts(node, [&](Node& child, const size_t) {
-            visitConjuncts(child,
-                           [&](Node& grandChild, const size_t) { visitAtom(grandChild, visitor); });
-        });
-    }
-
-    static void visitAnyShape(Node& node, const AtomVisitor& atomVisitor) {
-        struct AtomTransport {
-            void transport(Conjunction&, NodeVector&) {}
-            void transport(Disjunction&, NodeVector&) {}
-            void transport(Atom& node) {
-                atomVisitor(node.getExpr());
+        visitAnyShape(node, [&](const T& atom, const VisitorContext& ctx) {
+            if (!atomPred(atom)) {
+                result = false;
+                ctx.returnEarly();
             }
-            const AtomVisitor& atomVisitor;
-        };
-        AtomTransport impl{atomVisitor};
-        algebra::transport<false>(node, impl);
+        });
+        return result;
     }
 
     static bool isCNF(const Node& n) {
         if (n.template is<Conjunction>()) {
             bool disjunctions = true;
-            visitConjuncts(n, [&](const Node& child, const size_t) {
-                disjunctions &= child.template is<Disjunction>();
+            visitConjuncts(n, [&](const Node& child, const VisitorContext& ctx) {
+                if (!child.template is<Disjunction>()) {
+                    disjunctions = false;
+                    ctx.returnEarly();
+                }
             });
             return disjunctions;
         }
@@ -278,8 +313,11 @@ struct BoolExpr {
     static bool isDNF(const Node& n) {
         if (n.template is<Disjunction>()) {
             bool conjunctions = true;
-            visitDisjuncts(n, [&](const Node& child, const size_t) {
-                conjunctions &= child.template is<Conjunction>();
+            visitDisjuncts(n, [&](const Node& child, const VisitorContext& ctx) {
+                if (!child.template is<Conjunction>()) {
+                    conjunctions = false;
+                    ctx.returnEarly();
+                }
             });
             return conjunctions;
         }

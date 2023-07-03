@@ -27,13 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/s/catalog/type_tags.h"
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/s/catalog/type_tags.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 namespace {
 
@@ -51,7 +54,7 @@ TEST(TagsType, Valid) {
 
     TagsType tag = status.getValue();
 
-    ASSERT_EQUALS(tag.getNS().ns(), "test.mycol");
+    ASSERT_EQUALS(tag.getNS().ns_forTest(), "test.mycol");
     ASSERT_EQUALS(tag.getTag(), "tag");
     ASSERT_BSONOBJ_EQ(tag.getMinKey(), BSON("a" << 10));
     ASSERT_BSONOBJ_EQ(tag.getMaxKey(), BSON("a" << 20));

@@ -29,7 +29,11 @@
 
 #include "mongo/logv2/log_severity_suppressor.h"
 
-#include "mongo/unittest/unittest.h"
+#include <ratio>
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
 

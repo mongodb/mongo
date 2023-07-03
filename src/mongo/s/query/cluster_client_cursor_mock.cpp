@@ -28,10 +28,14 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/s/query/cluster_client_cursor_mock.h"
-
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -170,7 +174,7 @@ bool ClusterClientCursorMock::shouldOmitDiagnosticInformation() const {
     return false;
 }
 
-std::unique_ptr<query_stats::RequestShapifier> ClusterClientCursorMock::getRequestShapifier() {
+std::unique_ptr<query_stats::KeyGenerator> ClusterClientCursorMock::getKeyGenerator() {
     return nullptr;
 }
 

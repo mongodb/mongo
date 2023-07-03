@@ -27,11 +27,18 @@
  *    it in the license file.
  */
 
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_builds_manager.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/shard_role.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

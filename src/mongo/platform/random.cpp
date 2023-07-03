@@ -28,11 +28,10 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/platform/random.h"
-
+#include <array>
 #include <cstring>
+#include <fstream>  // IWYU pragma: keep
+#include <memory>
 
 #ifdef _WIN32
 #include <bcrypt.h>
@@ -42,16 +41,17 @@
 #endif
 
 #define _CRT_RAND_S
-#include <array>
-#include <cstdlib>
-#include <fstream>
-#include <iostream>
-#include <limits>
-#include <memory>
-#include <random>
 
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

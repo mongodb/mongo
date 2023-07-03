@@ -28,14 +28,36 @@
  */
 
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
-#include "mongo/db/concurrency/d_concurrency.h"
+
+#include <absl/container/inlined_vector.h>
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <type_traits>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
-#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -287,7 +309,7 @@ void HashAggStage::makeTemporaryRecordStore() {
 
 void HashAggStage::spillRowToDisk(const value::MaterializedRow& key,
                                   const value::MaterializedRow& val) {
-    KeyString::Builder kb{KeyString::Version::kLatestVersion};
+    key_string::Builder kb{key_string::Version::kLatestVersion};
     key.serializeIntoKeyString(kb);
     // Add a unique integer to the end of the key, since record ids must be unique. We want equal
     // keys to be adjacent in the 'RecordStore' so that we can merge the partial aggregates with a
@@ -530,7 +552,8 @@ HashAggStage::SpilledRow HashAggStage::deserializeSpilledRecord(const Record& re
     // Read the values and type bits out of the value part of the record.
     BufReader valReader(record.data.data(), record.data.size());
     auto val = value::MaterializedRow::deserializeForSorter(valReader, {});
-    auto typeBits = KeyString::TypeBits::fromBuffer(KeyString::Version::kLatestVersion, &valReader);
+    auto typeBits =
+        key_string::TypeBits::fromBuffer(key_string::Version::kLatestVersion, &valReader);
 
     keyBuffer.reset();
     auto key = value::MaterializedRow::deserializeFromKeyString(

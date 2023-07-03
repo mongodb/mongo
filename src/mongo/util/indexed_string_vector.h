@@ -29,11 +29,18 @@
 
 #pragma once
 
+#include <array>
 #include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <limits>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -46,16 +53,20 @@ private:
         return val & ((1u << n) - 1u);
     }
 
-    // This function assumes that 'length' is not 0.
     inline static size_t computeFastHash1(const char* str, size_t len) {
+        if (MONGO_unlikely(len == 0)) {
+            return 126;
+        }
         // The lowest 5 bits of 'str[len - 1]' and the lowest 2 bits of 'len' are decent sources
         // of entropy. Combine them to generate a pseudo-random number 'h' where 0 <= h <= 127.
         size_t h = getLowestNBits(size_t(str[len - 1]) + (len << 5u), 7);
         return h;
     }
 
-    // This function assumes that 'length' is not 0.
     inline static size_t computeFastHash2(const char* str, size_t len, size_t fastHash1) {
+        if (MONGO_unlikely(len == 0)) {
+            return 38;
+        }
         // The lowest 5 bits of 'str[0]' are a decent source of entropy. Using 'str[0]' and
         // 'fastHash1', generate a pseudo-random number 'h' where 0 <= h <= 127 and where
         // h != fastHash1.

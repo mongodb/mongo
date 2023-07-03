@@ -27,16 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonmisc.h"
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_densify.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
-#include <utility>
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
@@ -1299,6 +1307,7 @@ TEST_F(DensifyRedactionTest, RedactionDateBounds) {
             }
         }
     })");
+
     auto docSource =
         DocumentSourceInternalDensify::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1307,9 +1316,12 @@ TEST_F(DensifyRedactionTest, RedactionDateBounds) {
                 "field": "HASH<a>",
                 "partitionByFields": [],
                 "range": {
-                    "step": "?",
-                    "bounds": ["?", "?"],
-                    "unit": "?"
+                    "step": "?number",
+                    "bounds": [
+                        "?date",
+                        "?date"
+                    ],
+                    "unit": "?string"
                 }
             }
         })",
@@ -1339,7 +1351,7 @@ TEST_F(DensifyRedactionTest, RedactionFullBoundsWithPartitionFields) {
                     "HASH<c>.HASH<d>"
                 ],
                 "range": {
-                    "step": "?",
+                    "step": "?number",
                     "bounds": "full"
                 }
             }
@@ -1369,9 +1381,9 @@ TEST_F(DensifyRedactionTest, RedactionPartitionBounds) {
                     "HASH<foo>"
                 ],
                 "range": {
-                    "step": "?",
+                    "step": "?number",
                     "bounds": "partition",
-                    "unit": "?"
+                    "unit": "?string"
                 }
             }
         })",

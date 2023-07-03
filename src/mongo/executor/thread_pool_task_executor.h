@@ -31,14 +31,24 @@
 
 #include <list>
 #include <memory>
+#include <mutex>
 
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/baton.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

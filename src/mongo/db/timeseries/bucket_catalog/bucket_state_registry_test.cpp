@@ -27,12 +27,41 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include <boost/optional.hpp>
+#include <memory>
+#include <string>
+#include <variant>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_state.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
+#include "mongo/db/timeseries/bucket_catalog/closed_bucket.h"
+#include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
+#include "mongo/db/timeseries/bucket_catalog/rollover.h"
+#include "mongo/db/timeseries/bucket_catalog/write_batch.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/bson_test_util.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {
@@ -48,7 +77,19 @@ public:
 
     bool hasBeenCleared(Bucket& bucket) {
         auto state = getBucketState(bucketStateRegistry, &bucket);
-        return (state && state.value().isSet(BucketStateFlag::kCleared));
+        if (!state.has_value()) {
+            return false;
+        }
+
+        return stdx::visit(OverloadedVisitor{[](BucketState bucketState) {
+                                                 return bucketState == BucketState::kCleared ||
+                                                     bucketState ==
+                                                     BucketState::kPreparedAndCleared;
+                                             },
+                                             [](DirectWriteCounter dwcount) {
+                                                 return false;
+                                             }},
+                           *state);
     }
 
     Bucket& createBucket(const internal::CreationInfo& info) {
@@ -92,6 +133,27 @@ public:
                                internal::RemovalMode::kAbort);
     }
 
+    bool doesBucketStateMatch(const BucketId& bucketId,
+                              boost::optional<BucketState> expectedBucketState) {
+        auto state = getBucketState(bucketStateRegistry, bucketId);
+        if (!state.has_value()) {
+            // We don't expect the bucket to be tracked within the BucketStateRegistry.
+            return !expectedBucketState.has_value();
+        } else if (stdx::holds_alternative<DirectWriteCounter>(*state)) {
+            // If the state is tracked by a direct write counter, then the states are not equal.
+            return false;
+        }
+
+        // Interpret the variant value as BucketState and check it against the expected value.
+        auto bucketState = stdx::get<BucketState>(*state);
+        return bucketState == expectedBucketState.value();
+    }
+
+    bool doesBucketHaveDirectWrite(const BucketId& bucketId) {
+        auto state = getBucketState(bucketStateRegistry, bucketId);
+        return state.has_value() && stdx::holds_alternative<DirectWriteCounter>(*state);
+    }
+
     WithLock withLock = WithLock::withoutLock();
     NamespaceString ns1 = NamespaceString::createNamespaceString_forTest("db.test1");
     NamespaceString ns2 = NamespaceString::createNamespaceString_forTest("db.test2");
@@ -125,205 +187,235 @@ public:
                                  &closedBuckets};
 };
 
-TEST_F(BucketStateRegistryTest, BucketStateSetUnsetFlag) {
-    BucketState state;
-    auto testFlags = [&state](std::initializer_list<BucketStateFlag> set,
-                              std::initializer_list<BucketStateFlag> unset) {
-        for (auto flag : set) {
-            ASSERT_TRUE(state.isSet(flag));
-        }
-        for (auto flag : unset) {
-            ASSERT_FALSE(state.isSet(flag));
-        }
-    };
 
-    testFlags({},
-              {
-                  BucketStateFlag::kPrepared,
-                  BucketStateFlag::kCleared,
-                  BucketStateFlag::kPendingCompression,
-                  BucketStateFlag::kPendingDirectWrite,
-              });
+TEST_F(BucketStateRegistryTest, TransitionsFromUntrackedState) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+    // Start with an untracked bucket in the registry.
+    auto& bucket = createBucket(info1);
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
 
-    state.setFlag(BucketStateFlag::kPrepared);
-    testFlags(
-        {
-            BucketStateFlag::kPrepared,
-        },
-        {
-            BucketStateFlag::kCleared,
-            BucketStateFlag::kPendingCompression,
-            BucketStateFlag::kPendingDirectWrite,
-        });
+    // We expect a no-op when attempting to stop tracking an already untracked bucket.
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
 
-    state.setFlag(BucketStateFlag::kCleared);
-    testFlags(
-        {
-            BucketStateFlag::kPrepared,
-            BucketStateFlag::kCleared,
-        },
-        {
-            BucketStateFlag::kPendingCompression,
-            BucketStateFlag::kPendingDirectWrite,
-        });
+    // We expect a no-op when clearing an untracked bucket.
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
 
-    state.setFlag(BucketStateFlag::kPendingCompression);
-    testFlags(
-        {
-            BucketStateFlag::kPrepared,
-            BucketStateFlag::kCleared,
-            BucketStateFlag::kPendingCompression,
-        },
-        {
+    // We expect transition to 'kNormal' to succeed.
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
+    // Reset the state.
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
 
-            BucketStateFlag::kPendingDirectWrite,
-        });
-
-    state.setFlag(BucketStateFlag::kPendingDirectWrite);
-    testFlags(
-        {
-            BucketStateFlag::kPrepared,
-            BucketStateFlag::kCleared,
-            BucketStateFlag::kPendingCompression,
-            BucketStateFlag::kPendingDirectWrite,
-        },
-        {});
-
-    state.unsetFlag(BucketStateFlag::kPrepared);
-    testFlags(
-        {
-            BucketStateFlag::kCleared,
-            BucketStateFlag::kPendingCompression,
-            BucketStateFlag::kPendingDirectWrite,
-
-        },
-        {
-            BucketStateFlag::kPrepared,
-        });
-
-    state.unsetFlag(BucketStateFlag::kCleared);
-    testFlags(
-        {
-            BucketStateFlag::kPendingCompression,
-            BucketStateFlag::kPendingDirectWrite,
-
-        },
-        {
-            BucketStateFlag::kPrepared,
-            BucketStateFlag::kCleared,
-        });
-
-    state.unsetFlag(BucketStateFlag::kPendingCompression);
-    testFlags(
-        {
-            BucketStateFlag::kPendingDirectWrite,
-        },
-        {
-            BucketStateFlag::kPrepared,
-            BucketStateFlag::kCleared,
-            BucketStateFlag::kPendingCompression,
-        });
-
-    state.unsetFlag(BucketStateFlag::kPendingDirectWrite);
-    testFlags({},
-              {
-                  BucketStateFlag::kPrepared,
-                  BucketStateFlag::kCleared,
-                  BucketStateFlag::kPendingCompression,
-                  BucketStateFlag::kPendingDirectWrite,
-              });
+    // We expect direct writes to succeed on untracked buckets.
+    addDirectWrite(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
 }
 
-TEST_F(BucketStateRegistryTest, BucketStateReset) {
-    BucketState state;
+DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnUntrackedBucket, "invariant") {
+    // Start with an untracked bucket in the registry.
+    auto& bucket = createBucket(info1);
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
 
-    state.setFlag(BucketStateFlag::kPrepared);
-    state.setFlag(BucketStateFlag::kCleared);
-    state.setFlag(BucketStateFlag::kPendingCompression);
-    state.setFlag(BucketStateFlag::kPendingDirectWrite);
-
-    ASSERT_TRUE(state.isSet(BucketStateFlag::kPrepared));
-    ASSERT_TRUE(state.isSet(BucketStateFlag::kCleared));
-    ASSERT_TRUE(state.isSet(BucketStateFlag::kPendingCompression));
-    ASSERT_TRUE(state.isSet(BucketStateFlag::kPendingDirectWrite));
-
-    state.reset();
-
-    ASSERT_FALSE(state.isSet(BucketStateFlag::kPrepared));
-    ASSERT_FALSE(state.isSet(BucketStateFlag::kCleared));
-    ASSERT_FALSE(state.isSet(BucketStateFlag::kPendingCompression));
-    ASSERT_FALSE(state.isSet(BucketStateFlag::kPendingDirectWrite));
+    // We expect to invariant when attempting to prepare an untracked bucket.
+    ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
+                StateChangeSucessful::kNo);
 }
 
-TEST_F(BucketStateRegistryTest, BucketStateIsPrepared) {
-    BucketState state;
+TEST_F(BucketStateRegistryTest, TransitionsFromNormalState) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+    // Start with a 'kNormal' bucket in the registry.
+    auto& bucket = createBucket(info1);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
-    ASSERT_FALSE(state.isPrepared());
+    // We expect transition to 'kNormal' to succeed.
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
-    state.setFlag(BucketStateFlag::kPrepared);
-    ASSERT_TRUE(state.isPrepared());
+    // We can stop tracking a 'kNormal' bucket.
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    // Reset the state.
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
 
-    state.setFlag(BucketStateFlag::kCleared);
-    state.setFlag(BucketStateFlag::kPendingCompression);
-    state.setFlag(BucketStateFlag::kPendingDirectWrite);
-    ASSERT_TRUE(state.isPrepared());
+    // We expect transition to 'kPrepared' to succeed.
+    (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
+    // Reset the state.
+    (void)unprepareBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
-    state.unsetFlag(BucketStateFlag::kPrepared);
-    ASSERT_FALSE(state.isPrepared());
+    // We expect transition to 'kClear' to succeed.
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
+    // Reset the state.
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+
+    // We expect direct writes to succeed on 'kNormal' buckets.
+    addDirectWrite(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
 }
 
-TEST_F(BucketStateRegistryTest, BucketStateConflictsWithInsert) {
-    BucketState state;
-    ASSERT_FALSE(state.conflictsWithInsertion());
+TEST_F(BucketStateRegistryTest, TransitionsFromClearedState) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+    // Start with a 'kCleared' bucket in the registry.
+    auto& bucket = createBucket(info1);
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
 
-    // Just prepared is false
-    state.setFlag(BucketStateFlag::kPrepared);
-    ASSERT_FALSE(state.conflictsWithInsertion());
+    // We expect transition to 'kCleared' to succeed.
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
 
-    // Prepared and cleared is true
-    state.setFlag(BucketStateFlag::kCleared);
-    ASSERT_TRUE(state.conflictsWithInsertion());
+    // We can stop tracking a 'kCleared' bucket.
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    // Reset the state.
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
 
-    // Just cleared is true
-    state.reset();
-    state.setFlag(BucketStateFlag::kCleared);
-    ASSERT_TRUE(state.conflictsWithInsertion());
+    // We expect transition to 'kNormal' to succeed.
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId).code());
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
+    // Reset the state.
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
 
-    // Pending operations are true
-    state.reset();
-    state.setFlag(BucketStateFlag::kPendingCompression);
-    ASSERT_TRUE(state.conflictsWithInsertion());
+    // We expect transition to 'kPrepared' to fail.
+    ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
+                StateChangeSucessful::kNo);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
 
-    state.reset();
-    state.setFlag(BucketStateFlag::kPendingDirectWrite);
-    ASSERT_TRUE(state.conflictsWithInsertion());
+    // We expect direct writes to succeed on 'kCleared' buckets.
+    addDirectWrite(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
 }
 
-TEST_F(BucketStateRegistryTest, BucketStateConflictsWithReopening) {
-    BucketState state;
-    ASSERT_FALSE(state.conflictsWithReopening());
+TEST_F(BucketStateRegistryTest, TransitionsFromPreparedState) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+    // Start with a 'kPrepared' bucket in the registry.
+    auto& bucket = createBucket(info1);
+    (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
 
-    // Just prepared is false
-    state.setFlag(BucketStateFlag::kPrepared);
-    ASSERT_FALSE(state.conflictsWithReopening());
+    // We expect direct writes to fail and leave the state as 'kPrepared'.
+    (void)addDirectWrite(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
 
-    // Prepared and cleared is false
-    state.setFlag(BucketStateFlag::kCleared);
-    ASSERT_FALSE(state.conflictsWithReopening());
+    // We expect unpreparing bucket will transition the bucket state to 'kNormal'.
+    unprepareBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
+    // Reset the state.
+    (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
 
-    // Just cleared is false
-    state.reset();
-    state.setFlag(BucketStateFlag::kCleared);
-    ASSERT_FALSE(state.conflictsWithReopening());
+    // We expect transition to 'kCleared' to succeed and update the state as 'kPreparedAndCleared'.
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
 
-    // Pending operations are true
-    state.reset();
-    state.setFlag(BucketStateFlag::kPendingCompression);
-    ASSERT_TRUE(state.conflictsWithReopening());
+    // We can untrack a 'kPrepared' bucket
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+}
 
-    state.reset();
-    state.setFlag(BucketStateFlag::kPendingDirectWrite);
-    ASSERT_TRUE(state.conflictsWithReopening());
+DEATH_TEST_F(BucketStateRegistryTest, CannotInitializeAPreparedBucket, "invariant") {
+    // Start with a 'kPrepared' bucket in the registry.
+    auto& bucket = createBucket(info1);
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
+    (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
+
+    // We expect to invariant when attempting to prepare an 'kPrepared' bucket.
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
+}
+
+DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnAlreadyPreparedBucket, "invariant") {
+    // Start with a 'kPrepared' bucket in the registry.
+    auto& bucket = createBucket(info1);
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
+    (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
+    // We expect to invariant when attempting to prepare an untracked bucket.
+    (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
+}
+
+TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndClearedState) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+    // Start with a 'kPreparedAndCleared' bucket in the registry.
+    auto& bucket = createBucket(info1);
+    (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
+
+    // We expect transition to 'kPrepared' to fail.
+    ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
+                StateChangeSucessful::kNo);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
+
+    // We expect direct writes to fail and leave the state as 'kPreparedAndCleared'.
+    (void)addDirectWrite(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
+
+    // We expect clearing the bucket state will not affect the state.
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
+
+    // We expect untracking 'kPreparedAndCleared' buckets to remove the state.
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    // Reset the state.
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
+    ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
+                StateChangeSucessful::kYes);
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
+
+    // We expect unpreparing 'kPreparedAndCleared' buckets to transition to 'kCleared'.
+    unprepareBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
+}
+
+TEST_F(BucketStateRegistryTest, TransitionsFromDirectWriteState) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+    // Start with a bucket with a direct write in the registry.
+    auto& bucket = createBucket(info1);
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
+    auto bucketState = addDirectWrite(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+    auto originalDirectWriteCount = stdx::get<DirectWriteCounter>(bucketState);
+
+    // We expect future direct writes to add-on.
+    bucketState = addDirectWrite(bucketStateRegistry, bucket.bucketId);
+    auto newDirectWriteCount = stdx::get<DirectWriteCounter>(bucketState);
+    ASSERT_GT(newDirectWriteCount, originalDirectWriteCount);
+
+    // We expect untracking to leave the state unaffected.
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+
+    // We expect transition to 'kNormal' to return a WriteConflict.
+    ASSERT_EQ(initializeBucketState(bucketStateRegistry, bucket.bucketId),
+              ErrorCodes::WriteConflict);
+    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+
+    // We expect transition to 'kCleared' to leave the state unaffected.
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+
+    // We expect transition to 'kPrepared' to leave the state unaffected.
+    (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
 }
 
 TEST_F(BucketStateRegistryTest, EraAdvancesAsExpected) {
@@ -559,8 +651,7 @@ TEST_F(BucketStateRegistryTest, ArchivingBucketPreservesState) {
     internal::archiveBucket(
         *this, stripes[info1.stripe], WithLock::withoutLock(), bucket, closedBuckets);
     auto state = getBucketState(bucketStateRegistry, bucketId);
-    ASSERT_TRUE(state.has_value());
-    ASSERT_TRUE(state == BucketState{});
+    ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kNormal));
 }
 
 TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
@@ -584,14 +675,13 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
     auto& bucket = createBucket(info1);
     auto bucketId = bucket.bucketId;
 
-    ASSERT(getBucketState(bucketStateRegistry, bucketId).value() == BucketState{});
+    ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kNormal));
 
     auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.ns);
     auto batch = std::make_shared<WriteBatch>(BucketHandle{bucketId, info1.stripe}, 0, stats);
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*this, batch));
-    ASSERT(getBucketState(bucketStateRegistry, bucketId).value() ==
-           BucketState{}.setFlag(BucketStateFlag::kPrepared));
+    ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kPrepared));
 
     {
         // Fool the system by marking the bucket for closure, then finish the batch so it detects
@@ -602,15 +692,13 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
         ASSERT(closedBucket.has_value());
         ASSERT_EQ(closedBucket.value().bucketId.oid, bucketId.oid);
 
-        // Bucket should now be in pending compression state.
-        ASSERT(getBucketState(bucketStateRegistry, bucketId).has_value());
-        ASSERT(getBucketState(bucketStateRegistry, bucketId).value() ==
-               BucketState{}.setFlag(BucketStateFlag::kPendingCompression));
+        // Bucket should now be in pending compression state represented by direct write.
+        ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
     }
 
     // Destructing the 'ClosedBucket' struct should report it compressed should remove it from the
     // catalog.
-    ASSERT(getBucketState(bucketStateRegistry, bucketId) == boost::none);
+    ASSERT_TRUE(doesBucketStateMatch(bucketId, boost::none));
 }
 
 TEST_F(BucketStateRegistryTest, DirectWriteStartInitializesBucketState) {
@@ -619,9 +707,7 @@ TEST_F(BucketStateRegistryTest, DirectWriteStartInitializesBucketState) {
 
     auto bucketId = BucketId{ns1, OID()};
     directWriteStart(bucketStateRegistry, ns1, bucketId.oid);
-    auto state = getBucketState(bucketStateRegistry, bucketId);
-    ASSERT_TRUE(state.has_value());
-    ASSERT_TRUE(state.value().isSet(BucketStateFlag::kPendingDirectWrite));
+    ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
 }
 
 TEST_F(BucketStateRegistryTest, DirectWriteFinishRemovesBucketState) {
@@ -630,13 +716,10 @@ TEST_F(BucketStateRegistryTest, DirectWriteFinishRemovesBucketState) {
 
     auto bucketId = BucketId{ns1, OID()};
     directWriteStart(bucketStateRegistry, ns1, bucketId.oid);
-    auto state = getBucketState(bucketStateRegistry, bucketId);
-    ASSERT_TRUE(state.has_value());
-    ASSERT_TRUE(state.value().isSet(BucketStateFlag::kPendingDirectWrite));
+    ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
 
     directWriteFinish(bucketStateRegistry, ns1, bucketId.oid);
-    state = getBucketState(bucketStateRegistry, bucketId);
-    ASSERT_FALSE(state.has_value());
+    ASSERT_TRUE(doesBucketStateMatch(bucketId, boost::none));
 }
 
 TEST_F(BucketStateRegistryTest, TestDirectWriteStartCounter) {
@@ -646,34 +729,30 @@ TEST_F(BucketStateRegistryTest, TestDirectWriteStartCounter) {
     auto bucketId = bucket.bucketId;
 
     // Under the hood, the BucketState will contain a counter on the number of ongoing DirectWrites.
-    int32_t dwCounter = 0;
+    DirectWriteCounter dwCounter = 0;
 
     // If no direct write has been initiated, the direct write counter should be 0.
     auto state = getBucketState(bucketStateRegistry, bucketId);
     ASSERT_TRUE(state.has_value());
-    ASSERT_EQ(dwCounter, state.value().getNumberOfDirectWrites());
+    ASSERT_TRUE(stdx::holds_alternative<BucketState>(*state));
 
     // Start a direct write and ensure the counter is incremented correctly.
     while (dwCounter < 4) {
         directWriteStart(bucketStateRegistry, ns1, bucketId.oid);
         dwCounter++;
-        state = getBucketState(bucketStateRegistry, bucketId);
-        ASSERT_TRUE(state.value().isSet(BucketStateFlag::kPendingDirectWrite));
-        ASSERT_EQ(dwCounter, state.value().getNumberOfDirectWrites());
+        ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
     }
 
     while (dwCounter > 1) {
         directWriteFinish(bucketStateRegistry, ns1, bucketId.oid);
         dwCounter--;
-        state = getBucketState(bucketStateRegistry, bucketId);
-        ASSERT_TRUE(state.value().isSet(BucketStateFlag::kPendingDirectWrite));
-        ASSERT_EQ(dwCounter, state.value().getNumberOfDirectWrites());
+        ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
     }
 
     // When the number of direct writes reaches 0, we should clear the bucket.
     directWriteFinish(bucketStateRegistry, ns1, bucketId.oid);
-    state = getBucketState(bucketStateRegistry, bucketId);
-    ASSERT_TRUE(hasBeenCleared(bucket));
+    ASSERT_FALSE(doesBucketHaveDirectWrite(bucketId));
+    ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kCleared));
 }
 
 TEST_F(BucketStateRegistryTest, ConflictingDirectWrites) {
@@ -685,24 +764,17 @@ TEST_F(BucketStateRegistryTest, ConflictingDirectWrites) {
 
     // First direct write initializes state as untracked.
     directWriteStart(bucketStateRegistry, bucketId.ns, bucketId.oid);
-    state = getBucketState(bucketStateRegistry, bucketId);
-    ASSERT(state.has_value());
-    ASSERT(state.value().isSet(BucketStateFlag::kPendingDirectWrite));
-    ASSERT(state.value().isSet(BucketStateFlag::kUntracked));
+    ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
 
     directWriteStart(bucketStateRegistry, bucketId.ns, bucketId.oid);
 
     // First finish does not remove the state from the registry.
     directWriteFinish(bucketStateRegistry, bucketId.ns, bucketId.oid);
-    state = getBucketState(bucketStateRegistry, bucketId);
-    ASSERT(state.has_value());
-    ASSERT(state.value().isSet(BucketStateFlag::kPendingDirectWrite));
-    ASSERT(state.value().isSet(BucketStateFlag::kUntracked));
+    ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
 
     // Second one removes it.
     directWriteFinish(bucketStateRegistry, bucketId.ns, bucketId.oid);
-    state = getBucketState(bucketStateRegistry, bucketId);
-    ASSERT_FALSE(state.has_value());
+    ASSERT_TRUE(doesBucketStateMatch(bucketId, boost::none));
 }
 
 }  // namespace

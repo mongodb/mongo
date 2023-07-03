@@ -27,14 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
 
-#include "mongo/db/curop.h"
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 using boost::intrusive_ptr;
 
@@ -216,19 +233,14 @@ Value DocumentSourceChangeStreamCheckResumability::serialize(SerializationOption
     if (opts.verbosity) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
         sub.append("stage"_sd, kStageName);
-        opts.serializeLiteralValue(ResumeToken(_tokenFromClient).toDocument().toBson())
+        opts.serializeLiteral(ResumeToken(_tokenFromClient).toDocument().toBson())
             .addToBsonObj(&sub, "resumeToken"_sd);
         sub.done();
     } else {
-        BSONObjBuilder sub(builder.subobjStart(kStageName));
-        if (opts.replacementForLiteralArgs) {
-            sub.append(DocumentSourceChangeStreamCheckResumabilitySpec::kResumeTokenFieldName,
-                       *opts.replacementForLiteralArgs);
-        } else {
+        builder.append(
+            kStageName,
             DocumentSourceChangeStreamCheckResumabilitySpec(ResumeToken(_tokenFromClient))
-                .serialize(&sub);
-        }
-        sub.done();
+                .toBSON(opts));
     }
     return Value(builder.obj());
 }

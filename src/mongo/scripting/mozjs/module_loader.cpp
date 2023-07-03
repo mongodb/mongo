@@ -27,17 +27,46 @@
  *    it in the license file.
  */
 
-#include <boost/filesystem.hpp>
-
-#include "mongo/logv2/log.h"
-#include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/module_loader.h"
-#include "mongo/util/file.h"
-
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
 #include <js/JSON.h>
 #include <js/Modules.h>
 #include <js/SourceText.h>
 #include <js/StableStringChars.h>
+// IWYU pragma: no_include "boost/system/detail/errc.hpp"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include <algorithm>
+#include <cstring>
+#include <js/CharacterEncoding.h>
+#include <js/CompileOptions.h>
+#include <js/Context.h>
+#include <js/ErrorReport.h>
+#include <js/MapAndSet.h>
+#include <js/Object.h>
+#include <js/PropertyDescriptor.h>
+#include <js/String.h>
+#include <js/Utility.h>
+#include <js/Value.h>
+#include <jsapi.h>
+#include <jscustomallocator.h>
+#include <mozilla/Range.h>
+#include <mozilla/RangedPtr.h>
+#include <mozilla/UniquePtr.h>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/module_loader.h"
+#include "mongo/util/file.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

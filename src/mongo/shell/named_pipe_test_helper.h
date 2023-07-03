@@ -30,6 +30,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "mongo/bson/bsonobj.h"
 

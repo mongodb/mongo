@@ -28,63 +28,77 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstdint>
+#include <fmt/format.h>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/s/query/cluster_aggregate.h"
+#include <boost/optional/optional.hpp>
 
-#include <boost/intrusive_ptr.hpp>
-
-#include "mongo/db/api_parameters.h"
-#include "mongo/db/auth/authorization_session.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/catalog_shard_feature_flag_gen.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
-#include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/explain_common.h"
-#include "mongo/db/query/find_common.h"
-#include "mongo/db/query/fle/server_rewrite.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats_aggregate_key_generator.h"
+#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/resolved_view.h"
-#include "mongo/db/views/view.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/multi_statement_transaction_requests_sender.h"
+#include "mongo/s/query/cluster_aggregate.h"
 #include "mongo/s/query/cluster_aggregation_planner.h"
-#include "mongo/s/query/cluster_client_cursor_impl.h"
-#include "mongo/s/query/cluster_client_cursor_params.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/s/query/cluster_query_knobs_gen.h"
-#include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/s/query/establish_cursors.h"
-#include "mongo/s/query/owned_remote_cursor.h"
-#include "mongo/s/query/router_stage_pipeline.h"
-#include "mongo/s/query/store_possible_cursor.h"
-#include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -100,7 +114,7 @@ namespace {
 // definition. It's okay that this is incorrect, we will repopulate the real namespace map on the
 // mongod. Note that this function must be called before forwarding an aggregation command on an
 // unsharded collection, in order to verify that the involved namespaces are allowed to be sharded.
-auto resolveInvolvedNamespaces(stdx::unordered_set<NamespaceString> involvedNamespaces) {
+auto resolveInvolvedNamespaces(const stdx::unordered_set<NamespaceString>& involvedNamespaces) {
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     for (auto&& nss : involvedNamespaces) {
         resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
@@ -268,6 +282,58 @@ std::vector<BSONObj> rebuildPipelineWithTimeSeriesGranularity(
     return newPipeline;
 }
 
+/**
+ * Builds an expCtx with which to parse the request's pipeline, then parses the pipeline and
+ * registers the pre-optimized pipeline with query stats collection.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
+    OperationContext* opCtx,
+    const stdx::unordered_set<NamespaceString>& involvedNamespaces,
+    const NamespaceString& executionNss,
+    AggregateCommandRequest& request,
+    boost::optional<CollectionRoutingInfo> cri,
+    bool hasChangeStream,
+    bool shouldDoFLERewrite) {
+    // Populate the collection UUID and the appropriate collation to use.
+    auto [collationObj, uuid] = [&]() -> std::pair<BSONObj, boost::optional<UUID>> {
+        // If this is a change stream, take the user-defined collation if one exists, or an
+        // empty BSONObj otherwise. Change streams never inherit the collection's default
+        // collation, and since collectionless aggregations generally run on the 'admin'
+        // database, the standard logic would attempt to resolve its non-existent UUID and
+        // collation by sending a specious 'listCollections' command to the config servers.
+        if (hasChangeStream) {
+            return {request.getCollation().value_or(BSONObj()), boost::none};
+        }
+
+        return cluster_aggregation_planner::getCollationAndUUID(
+            opCtx,
+            cri ? boost::make_optional(cri->cm) : boost::none,
+            executionNss,
+            request.getCollation().value_or(BSONObj()));
+    }();
+
+    // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
+    // includes all involved namespaces, and creates a shared MongoProcessInterface for use by
+    // the pipeline's stages.
+    boost::intrusive_ptr<ExpressionContext> expCtx =
+        makeExpressionContext(opCtx,
+                              request,
+                              collationObj,
+                              uuid,
+                              resolveInvolvedNamespaces(involvedNamespaces),
+                              hasChangeStream);
+
+    auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+    // Skip query stats recording for queryable encryption queries.
+    if (!shouldDoFLERewrite) {
+        query_stats::registerRequest(opCtx, executionNss, [&]() {
+            return std::make_unique<query_stats::AggregateKeyGenerator>(
+                request, *pipeline, expCtx, involvedNamespaces, executionNss);
+        });
+    }
+    return pipeline;
+}
+
 }  // namespace
 
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
@@ -309,6 +375,9 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                           << AggregateCommandRequest::kFromMongosFieldName
                           << "] cannot be set to 'true' when sent to mongos",
             !request.getNeedsMerge() && !request.getFromMongos());
+    uassert(ErrorCodes::BadValue,
+            "Aggregate queries on mongoS may not request or provide a resume token",
+            !request.getRequestResumeToken() && !request.getResumeAfter());
 
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {
         const auto [resolvedNsCM, _] =
@@ -322,10 +391,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
     auto shouldDoFLERewrite = ::mongo::shouldDoFLERewrite(request);
     auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();
-
-    if (!shouldDoFLERewrite) {
-        query_stats::registerAggRequest(request, opCtx);
-    }
 
     // If the routing table is not already taken by the higher level, fill it now.
     if (!cri) {
@@ -366,36 +431,14 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
     const auto pipelineBuilder = [&]() {
-        // Populate the collection UUID and the appropriate collation to use.
-        auto [collationObj, uuid] = [&]() -> std::pair<BSONObj, boost::optional<UUID>> {
-            // If this is a change stream, take the user-defined collation if one exists, or an
-            // empty BSONObj otherwise. Change streams never inherit the collection's default
-            // collation, and since collectionless aggregations generally run on the 'admin'
-            // database, the standard logic would attempt to resolve its non-existent UUID and
-            // collation by sending a specious 'listCollections' command to the config servers.
-            if (hasChangeStream) {
-                return {request.getCollation().value_or(BSONObj()), boost::none};
-            }
-
-            return cluster_aggregation_planner::getCollationAndUUID(
-                opCtx,
-                cri ? boost::make_optional(cri->cm) : boost::none,
-                namespaces.executionNss,
-                request.getCollation().value_or(BSONObj()));
-        }();
-
-        // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
-        // resolves all involved namespaces, and creates a shared MongoProcessInterface for use by
-        // the pipeline's stages.
-        expCtx = makeExpressionContext(opCtx,
-                                       request,
-                                       collationObj,
-                                       uuid,
-                                       resolveInvolvedNamespaces(involvedNamespaces),
-                                       hasChangeStream);
-
-        // Parse and optimize the full pipeline.
-        auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+        auto pipeline = parsePipelineAndRegisterQueryStats(opCtx,
+                                                           involvedNamespaces,
+                                                           namespaces.executionNss,
+                                                           request,
+                                                           cri,
+                                                           hasChangeStream,
+                                                           shouldDoFLERewrite);
+        expCtx = pipeline->getContext();
 
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
         // support querying against encrypted fields.
@@ -444,15 +487,30 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kMongosRequired);
 
     if (!expCtx) {
-        // When the AggregationTargeter chooses a "passthrough" policy, it does not call the
-        // 'pipelineBuilder' function, so we never get an expression context. Because this is a
-        // passthrough, we only need a bare minimum expression context anyway.
+        // When the AggregationTargeter chooses a "passthrough" or "specific shard only"
+        // policy, it does not call the 'pipelineBuilder' function, so we've yet to construct an
+        // expression context or register query stats. Because this is a passthrough, we only need a
+        // bare minimum expression context on mongos.
         invariant(targeter.policy ==
                       cluster_aggregation_planner::AggregationTargeter::kPassthrough ||
                   targeter.policy ==
                       cluster_aggregation_planner::AggregationTargeter::kSpecificShardOnly);
+
         expCtx = make_intrusive<ExpressionContext>(
             opCtx, nullptr, namespaces.executionNss, boost::none, request.getLet());
+        expCtx->addResolvedNamespaces(involvedNamespaces);
+
+        // Skip query stats recording for queryable encryption queries.
+        if (!shouldDoFLERewrite) {
+            // We want to hold off parsing the pipeline until it's clear we must. Because of that,
+            // we wait to parse the pipeline until this callback is invoked within
+            // query_stats::registerRequest.
+            query_stats::registerRequest(opCtx, namespaces.executionNss, [&]() {
+                auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+                return std::make_unique<query_stats::AggregateKeyGenerator>(
+                    request, *pipeline, expCtx, involvedNamespaces, namespaces.executionNss);
+            });
+        }
     }
 
     if (request.getExplain()) {

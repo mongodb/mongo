@@ -27,29 +27,38 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
+#include <string>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/persistent_task_store.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/s/metadata_manager.h"
-#include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/s/range_arithmetic.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/vector_clock.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

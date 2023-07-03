@@ -32,49 +32,115 @@
 
 #include "mongo/db/transaction/transaction_participant.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <exception>
 #include <fmt/format.h>
+#include <fstream>  // IWYU pragma: keep
+#include <future>
+#include <type_traits>
 
-#include "mongo/base/shim.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/ops/update.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/ops/write_ops_retryability.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
-#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/sharding_write_router.h"
-#include "mongo/db/server_recovery.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/internal_session_pool.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/stats/fill_locker_info.h"
-#include "mongo/db/storage/flow_control.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
+#include "mongo/db/stats/top.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/storage_stats.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/server_transactions_metrics.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/txn_retry_counter_too_old_info.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/grid.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
-#include "mongo/util/debugger.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/log_with_sampling.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/tick_source.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -170,6 +236,10 @@ void validateTransactionHistoryApplyOpsOplogEntry(const repl::OplogEntry& oplogE
 template <typename Callable>
 auto performReadWithNoTimestampDBDirectClient(OperationContext* opCtx, Callable&& callable) {
     ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
+    // ReadConcern must also be fixed for the new scope. It will get restored when exiting this.
+    auto originalReadConcern =
+        std::exchange(repl::ReadConcernArgs::get(opCtx), repl::ReadConcernArgs());
+    ON_BLOCK_EXIT([&] { repl::ReadConcernArgs::get(opCtx) = std::move(originalReadConcern); });
 
     DBDirectClient client(opCtx);
     return callable(&client);
@@ -208,6 +278,9 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
 
     result.lastTxnRecord = [&]() -> boost::optional<SessionTxnRecord> {
         ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
+        auto originalReadConcern =
+            std::exchange(repl::ReadConcernArgs::get(opCtx), repl::ReadConcernArgs());
+        ON_BLOCK_EXIT([&] { repl::ReadConcernArgs::get(opCtx) = std::move(originalReadConcern); });
 
         AutoGetCollectionForRead autoRead(opCtx,
                                           NamespaceString::kSessionTransactionsTableNamespace);
@@ -273,6 +346,9 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
     // Restore the current timestamp read source after fetching transaction history, which may
     // change our ReadSource.
     ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
+    auto originalReadConcern =
+        std::exchange(repl::ReadConcernArgs::get(opCtx), repl::ReadConcernArgs());
+    ON_BLOCK_EXIT([&] { repl::ReadConcernArgs::get(opCtx) = std::move(originalReadConcern); });
 
     auto it = TransactionHistoryIterator(result.lastTxnRecord->getLastWriteOpTime());
     while (it.hasNext()) {
@@ -313,14 +389,6 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                                   TransactionParticipant::kDeadEndSentinel) == 0);
                     result.hasIncompleteHistory = true;
                     continue;
-                }
-
-                // TODO (SERVER-64172): Remove leftover upgrade/downgrade code from 4.2 in
-                // fetchActiveTransactionHistory.
-                if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
-                    !entry.shouldPrepare() && !entry.isPartialTransaction()) {
-                    result.lastTxnRecord->setState(DurableTxnStateEnum::kCommitted);
-                    return result;
                 }
 
                 insertStmtIdsForOplogEntry(entry);
@@ -392,8 +460,13 @@ void updateSessionEntry(OperationContext* opCtx,
 
     // TODO SERVER-58243: evaluate whether this is safe or whether acquiring the lock can block.
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-    AutoGetCollection collection(
-        opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IX);
+    const auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     uassert(
         40527,
@@ -401,11 +474,11 @@ void updateSessionEntry(OperationContext* opCtx,
                          "collection is missing. This indicates that the "
                       << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg()
                       << " collection has been manually deleted.",
-        collection.getCollection());
+        collection.exists());
 
     WriteUnitOfWork wuow(opCtx);
 
-    auto idIndex = collection->getIndexCatalog()->findIdIndex(opCtx);
+    auto idIndex = collection.getCollectionPtr()->getIndexCatalog()->findIdIndex(opCtx);
 
     uassert(
         40672,
@@ -413,20 +486,22 @@ void updateSessionEntry(OperationContext* opCtx,
                       << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg(),
         idIndex);
 
-    auto indexAccess =
-        collection->getIndexCatalog()->getEntry(idIndex)->accessMethod()->asSortedData();
+    const IndexCatalogEntry* entry =
+        collection.getCollectionPtr()->getIndexCatalog()->getEntry(idIndex);
+    auto indexAccess = entry->accessMethod()->asSortedData();
     // Since we are looking up a key inside the _id index, create a key object consisting of only
     // the _id field.
     auto idToFetch = updateRequest.getQuery().firstElement();
     auto toUpdateIdDoc = idToFetch.wrap();
     dassert(idToFetch.fieldNameStringData() == "_id"_sd);
-    auto recordId = indexAccess->findSingle(opCtx, *collection, toUpdateIdDoc);
+    auto recordId =
+        indexAccess->findSingle(opCtx, collection.getCollectionPtr(), entry, toUpdateIdDoc);
     auto startingSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
 
     if (recordId.isNull()) {
         // Upsert case.
         auto status = collection_internal::insertDocument(
-            opCtx, *collection, InsertStatement(updateMod), nullptr, false);
+            opCtx, collection.getCollectionPtr(), InsertStatement(updateMod), nullptr, false);
 
         if (status == ErrorCodes::DuplicateKey) {
             throwWriteConflictException(
@@ -439,7 +514,8 @@ void updateSessionEntry(OperationContext* opCtx,
         return;
     }
 
-    auto originalRecordData = collection->getRecordStore()->dataFor(opCtx, recordId);
+    auto originalRecordData =
+        collection.getCollectionPtr()->getRecordStore()->dataFor(opCtx, recordId);
     auto originalDoc = originalRecordData.toBson();
 
     const auto parentLsidFieldName = SessionTxnRecord::kParentSessionIdFieldName;
@@ -451,7 +527,7 @@ void updateSessionEntry(OperationContext* opCtx,
         updateMod.getObjectField(parentLsidFieldName)
                 .woCompare(originalDoc.getObjectField(parentLsidFieldName)) == 0);
 
-    invariant(collection->getDefaultCollator() == nullptr);
+    invariant(collection.getCollectionPtr()->getDefaultCollator() == nullptr);
     boost::intrusive_ptr<ExpressionContext> expCtx(
         new ExpressionContext(opCtx, nullptr, updateRequest.getNamespaceString()));
 
@@ -471,7 +547,7 @@ void updateSessionEntry(OperationContext* opCtx,
     // Specify kUpdateNoIndexes because the sessions collection has two indexes: {_id: 1} and
     // {parentLsid: 1, _id.txnNumber: 1, _id: 1}, and none of the fields are mutable.
     collection_internal::updateDocument(opCtx,
-                                        *collection,
+                                        collection.getCollectionPtr(),
                                         recordId,
                                         Snapshotted<BSONObj>(startingSnapshotId, originalDoc),
                                         updateMod,
@@ -1599,7 +1675,8 @@ void TransactionParticipant::Participant::refreshLocksForPreparedTransaction(
     o(lk).txnResourceStash = TxnResources(lk, opCtx, stashStyle);
 }
 
-Timestamp TransactionParticipant::Participant::prepareTransaction(
+std::pair<Timestamp, std::vector<NamespaceString>>
+TransactionParticipant::Participant::prepareTransaction(
     OperationContext* opCtx, boost::optional<repl::OpTime> prepareOptime) {
 
     ScopeGuard abortGuard([&] {
@@ -1637,8 +1714,13 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     // collection multiple times: it is a costly check.
     auto transactionOperationUuids = completedTransactionOperations->getCollectionUUIDs();
     auto catalog = CollectionCatalog::get(opCtx);
+
+    std::vector<NamespaceString> affectedNamespaces;
+    affectedNamespaces.reserve(transactionOperationUuids.size());
+
     for (const auto& uuid : transactionOperationUuids) {
         auto collection = catalog->lookupCollectionByUUID(opCtx, uuid);
+        affectedNamespaces.emplace_back(collection->ns());
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream() << "prepareTransaction failed because one of the transaction "
                                  "operations was done against a temporary collection '"
@@ -1654,7 +1736,9 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
         // prepared) transaction is killed, but it still ends up in the prepared state
         opCtx->checkForInterrupt();
         o(lk).txnState.transitionTo(TransactionState::kPrepared);
+        o(lk).affectedNamespaces = affectedNamespaces;
     }
+
     std::vector<OplogSlot> reservedSlots;
     if (prepareOptime) {
         // On secondary, we just prepare the transaction and discard the buffered ops.
@@ -1738,7 +1822,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     const bool unlocked = opCtx->lockState()->unlockRSTLforPrepare();
     invariant(unlocked);
 
-    return prepareOplogSlot.getTimestamp();
+    return {prepareOplogSlot.getTimestamp(), std::move(affectedNamespaces)};
 }
 
 void TransactionParticipant::Participant::setPrepareOpTimeForRecovery(OperationContext* opCtx,
@@ -2334,7 +2418,7 @@ void TransactionParticipant::Participant::_abortTransactionOnSession(OperationCo
     if (o().txnResourceStash && opCtx->recoveryUnit()->getNoEvictionAfterRollback()) {
         o(lk).txnResourceStash->setNoEvictionAfterRollback();
     }
-    _resetTransactionStateAndUnlock(&lk, nextState);
+    _resetTransactionStateAndUnlock(&lk, opCtx, nextState);
 
     _resetRetryableWriteState();
 }
@@ -2868,7 +2952,7 @@ void TransactionParticipant::Participant::_setNewTxnNumberAndRetryCounter(
     o(lk).transactionMetricsObserver.resetSingleTransactionStats(txnNumberAndRetryCounter);
 
     // Reset the transactional state
-    _resetTransactionStateAndUnlock(&lk, TransactionState::kNone);
+    _resetTransactionStateAndUnlock(&lk, opCtx, TransactionState::kNone);
 
     invariant(!lk);
     if (isParentSessionId(_sessionId())) {
@@ -3259,7 +3343,7 @@ void TransactionParticipant::Participant::_resetRetryableWriteState() {
 }
 
 void TransactionParticipant::Participant::_resetTransactionStateAndUnlock(
-    stdx::unique_lock<Client>* lk, TransactionState::StateFlag state) {
+    stdx::unique_lock<Client>* lk, OperationContext* opCtx, TransactionState::StateFlag state) {
     invariant(lk && lk->owns_lock());
 
     // If we are transitioning to kNone, we are either starting a new transaction or aborting a
@@ -3287,6 +3371,12 @@ void TransactionParticipant::Participant::_resetTransactionStateAndUnlock(
     boost::optional<TxnResources> temporary;
     swap(o(*lk).txnResourceStash, temporary);
     lk->unlock();
+
+    // Make sure we have a valid OperationContext set in the RecoveryUnit when it is destroyed as it
+    // is passed to registered rollback handlers.
+    if (temporary && temporary->recoveryUnit()) {
+        temporary->recoveryUnit()->setOperationContext(opCtx);
+    }
     temporary = boost::none;
 }
 
@@ -3314,7 +3404,7 @@ void TransactionParticipant::Participant::invalidate(OperationContext* opCtx) {
         retryableWriteTxnParticipantCatalog.invalidate();
     }
 
-    _resetTransactionStateAndUnlock(&lk, TransactionState::kNone);
+    _resetTransactionStateAndUnlock(&lk, opCtx, TransactionState::kNone);
 }
 
 boost::optional<repl::OplogEntry> TransactionParticipant::Participant::checkStatementExecuted(
@@ -3464,8 +3554,7 @@ void TransactionParticipant::Participant::handleWouldChangeOwningShardError(
         invariant(wouldChangeOwningShardInfo->getUuid());
         operation.setNss(*wouldChangeOwningShardInfo->getNs());
         operation.setUuid(*wouldChangeOwningShardInfo->getUuid());
-        ShardingWriteRouter shardingWriteRouter(
-            opCtx, *wouldChangeOwningShardInfo->getNs(), Grid::get(opCtx)->catalogCache());
+        ShardingWriteRouter shardingWriteRouter(opCtx, *wouldChangeOwningShardInfo->getNs());
         operation.setDestinedRecipient(shardingWriteRouter.getReshardingDestinedRecipient(
             wouldChangeOwningShardInfo->getPreImage()));
 

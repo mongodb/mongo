@@ -28,17 +28,27 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/startup_warnings_mongod.h"
-
 #include <boost/filesystem/operations.hpp>
-#include <fstream>
+#include <cstddef>
+#include <fstream>  // IWYU pragma: keep
+
+#include <boost/filesystem/exception.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/startup_warnings_mongod.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/util/errno_util.h"
 #ifndef _WIN32
 #include <sys/resource.h>
 #endif
 
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/storage/storage_options.h"
@@ -46,7 +56,6 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
-#include "mongo/util/version.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

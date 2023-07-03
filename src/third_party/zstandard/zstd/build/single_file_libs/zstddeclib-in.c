@@ -4,11 +4,11 @@
  *
  * Generate using:
  * \code
- *	combine.sh -r ../../lib -o zstddeclib.c zstddeclib-in.c
+ *	python combine.py -r ../../lib -x legacy/zstd_legacy.h -o zstddeclib.c zstddeclib-in.c
  * \endcode
  */
 /*
- * Copyright (c) 2016-2021, Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -25,8 +25,12 @@
  * Note: MEM_MODULE stops xxhash redefining BYTE, U16, etc., which are also
  * defined in mem.h (breaking C99 compatibility).
  *
- * Note: the undefs for xxHash allow Zstd's implementation to coincide with with
+ * Note: the undefs for xxHash allow Zstd's implementation to coincide with
  * standalone xxHash usage (with global defines).
+ *
+ * Note: if you enable ZSTD_LEGACY_SUPPORT the combine.py script will need
+ * re-running without the "-x legacy/zstd_legacy.h" option (it excludes the
+ * legacy support at the source level).
  */
 #define DEBUGLEVEL 0
 #define MEM_MODULE

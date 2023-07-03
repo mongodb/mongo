@@ -29,10 +29,19 @@
 
 #pragma once
 
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -51,12 +60,14 @@ public:
                                         const BSONObj& postImage,
                                         const bool shouldUpsert,
                                         boost::optional<NamespaceString> ns,
-                                        boost::optional<UUID> uuid)
+                                        boost::optional<UUID> uuid,
+                                        boost::optional<BSONObj> userPostImage = boost::none)
         : _preImage(preImage.getOwned()),
           _postImage(postImage.getOwned()),
           _shouldUpsert(shouldUpsert),
           _ns(ns),
-          _uuid(uuid) {}
+          _uuid(uuid),
+          _userPostImage(userPostImage) {}
 
     const auto& getPreImage() const {
         return _preImage;
@@ -76,6 +87,10 @@ public:
 
     const auto& getUuid() const {
         return _uuid;
+    }
+
+    const boost::optional<BSONObj>& getUserPostImage() const {
+        return _userPostImage;
     }
 
     BSONObj toBSON() const {
@@ -105,6 +120,9 @@ private:
     // The uuid of collection containing the document. Does not get serialized into the BSONObj for
     // this error.
     boost::optional<UUID> _uuid;
+
+    // The user-level post image for shard key update on a sharded timeseries collection.
+    boost::optional<BSONObj> _userPostImage;
 };
 using WouldChangeOwningShardException = ExceptionFor<ErrorCodes::WouldChangeOwningShard>;
 

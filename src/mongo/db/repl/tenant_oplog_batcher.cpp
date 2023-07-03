@@ -28,13 +28,36 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <type_traits>
+#include <utility>
 
-#include "mongo/db/repl/tenant_oplog_batcher.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/repl/apply_ops.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/client.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_batcher.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/tenant_oplog_batcher.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 

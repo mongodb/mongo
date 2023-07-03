@@ -29,16 +29,30 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
 
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/action_set.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 namespace {
@@ -97,8 +111,8 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss{parseNs(dbName, cmdObj)};
 
-        BSONObjBuilder cmdBuilder(
-            BSON("_configsvrRepairShardedCollectionChunksHistory" << nss.ns()));
+        BSONObjBuilder cmdBuilder(BSON("_configsvrRepairShardedCollectionChunksHistory"
+                                       << NamespaceStringUtil::serialize(nss)));
         if (cmdObj["force"].booleanSafe())
             cmdBuilder.appendBool("force", true);
 

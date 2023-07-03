@@ -28,11 +28,21 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/roll_back_local_operations.h"
-
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

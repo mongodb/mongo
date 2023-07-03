@@ -66,7 +66,6 @@ const allCommands = {
     _configsvrRemoveShardFromZone: {skip: isAnInternalCommand},
     _configsvrRemoveTags: {skip: isAnInternalCommand},
     _configsvrRepairShardedCollectionChunksHistory: {skip: isAnInternalCommand},
-    _configsvrRenameCollectionMetadata: {skip: isAnInternalCommand},
     _configsvrResetPlacementHistory: {skip: isAnInternalCommand},
     _configsvrReshardCollection: {skip: isAnInternalCommand},
     _configsvrRunRestore: {skip: isAnInternalCommand},
@@ -76,6 +75,7 @@ const allCommands = {
     _configsvrTransitionFromDedicatedConfigServer: {skip: isAnInternalCommand},
     _configsvrTransitionToDedicatedConfigServer: {skip: isAnInternalCommand},
     _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
+    _dropConnectionsToMongot: {skip: isAnInternalCommand},
     _flushDatabaseCacheUpdates: {skip: isAnInternalCommand},
     _flushDatabaseCacheUpdatesWithWriteConcern: {skip: isAnInternalCommand},
     _flushReshardingStateChange: {skip: isAnInternalCommand},
@@ -89,6 +89,7 @@ const allCommands = {
     _killOperations: {skip: isAnInternalCommand},
     _mergeAuthzCollections: {skip: isAnInternalCommand},
     _migrateClone: {skip: isAnInternalCommand},
+    _mongotConnPoolStats: {skip: isAnInternalCommand},
     _movePrimaryRecipientAbortMigration: {skip: isAnInternalCommand},
     _movePrimaryRecipientForgetMigration: {skip: isAnInternalCommand},
     _movePrimaryRecipientSyncData: {skip: isAnInternalCommand},
@@ -154,6 +155,7 @@ const allCommands = {
     streams_getMoreStreamSample: {skip: isAnInternalCommand},
     streams_getStats: {skip: isAnInternalCommand},
     streams_testOnlyInsert: {skip: isAnInternalCommand},
+    streams_getMetrics: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
     abortReshardCollection: {
@@ -228,11 +230,7 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
         },
         command: {analyze: collName},
-        expectFailure: true,
-        expectedErrorCode: [
-            6660400,
-            6765500
-        ],  // Analyze command requires common query framework feature flag to be enabled.
+        checkFeatureFlag: "CommonQueryFramework",
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
@@ -511,7 +509,7 @@ const allCommands = {
                 assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
             }
         },
-        command: {configureQueryAnalyzer: fullNs, mode: "full", sampleRate: 1},
+        command: {configureQueryAnalyzer: fullNs, mode: "full", samplesPerSecond: 1},
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },

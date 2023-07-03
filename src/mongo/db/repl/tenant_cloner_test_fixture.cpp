@@ -27,13 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <utility>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/client/dbclient_connection.h"
+#include "mongo/db/client.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_sync_shared_data.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/tenant_cloner_test_fixture.h"
+#include "mongo/unittest/assert.h"
 
 namespace mongo {
 namespace repl {

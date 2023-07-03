@@ -2,6 +2,7 @@
 //   # Running getCollection on views in sharded suites tries to shard views, which fails.
 //   assumes_unsharded_collection,
 //   requires_non_retryable_commands,
+//   references_foreign_collection,
 // ]
 
 (function() {

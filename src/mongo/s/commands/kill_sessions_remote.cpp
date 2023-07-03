@@ -28,20 +28,33 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <memory>
+#include <tuple>
+#include <utility>
+#include <vector>
 
-#include "mongo/s/commands/kill_sessions_remote.h"
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
 
-#include "mongo/db/client.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/kill_sessions_common.h"
+#include "mongo/db/session/kill_sessions_gen.h"
 #include "mongo/executor/async_multicaster.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_gen.h"
+#include "mongo/s/commands/kill_sessions_remote.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

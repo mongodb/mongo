@@ -31,12 +31,21 @@
  * This file contains a test framework for testing sbe::PlanStages.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <ostream>
 
+#include <absl/container/inlined_vector.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
-
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/unittest/assert.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

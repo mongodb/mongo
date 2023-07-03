@@ -28,12 +28,18 @@
  */
 #pragma once
 
+#include <array>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
 #include <queue>
+#include <type_traits>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/ticket_pool.h"

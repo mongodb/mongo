@@ -31,6 +31,7 @@
 
 #include <string>
 
+#include "mongo/base/status.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

@@ -29,32 +29,53 @@
 
 #pragma once
 
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <iterator>
+#include <memory>
+#include <tuple>
+#include <utility>
+#include <vector>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/baton.h"
 #include "mongo/db/commands/kill_operations_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
+#include "mongo/executor/async_rpc_retry_policy.h"
 #include "mongo/executor/async_rpc_targeter.h"
+#include "mongo/executor/async_rpc_util.h"
 #include "mongo/executor/hedge_options_util.h"
 #include "mongo/executor/hedging_metrics.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/idl/generic_args_with_types_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/net/hostandport.h"
-#include <cstddef>
-#include <memory>
-#include <vector>
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kExecutor
 
@@ -62,50 +83,28 @@ namespace mongo {
 namespace async_rpc {
 
 namespace hedging_rpc_details {
-/**
- * Given a vector of input Futures, whenAnyThat returns a Future which holds the value
- * of the first of those futures to resolve with a status, value, and index that
- * satisfies the conditions in the ConditionCallable Callable.
- */
-template <typename SingleResponse, typename ConditionCallable>
-Future<SingleResponse> whenAnyThat(std::vector<ExecutorFuture<SingleResponse>>&& futures,
-                                   ConditionCallable&& shouldAccept) {
-    invariant(futures.size() > 0);
-
-    struct SharedBlock {
-        SharedBlock(Promise<SingleResponse> result) : resultPromise(std::move(result)) {}
-        // Tracks whether or not the resultPromise has been set.
-        AtomicWord<bool> done{false};
-        // The promise corresponding to the resulting SemiFuture returned by this function.
-        Promise<SingleResponse> resultPromise;
-    };
-
-    Promise<SingleResponse> promise{NonNullPromiseTag{}};
-    auto future = promise.getFuture();
-    auto sharedBlock = std::make_shared<SharedBlock>(std::move(promise));
-
-    for (size_t i = 0; i < futures.size(); ++i) {
-        std::move(futures[i])
-            .getAsync(
-                [sharedBlock, myIndex = i, shouldAccept](StatusOrStatusWith<SingleResponse> value) {
-                    if (shouldAccept(value, myIndex)) {
-                        // If this is the first input future to complete and satisfy the
-                        // shouldAccept condition, change done to true and set the value on the
-                        // promise.
-                        if (!sharedBlock->done.swap(true)) {
-                            sharedBlock->resultPromise.setFrom(std::move(value));
-                        }
-                    }
-                });
-    }
-
-    return future;
-}
-
 HedgingMetrics* getHedgingMetrics(ServiceContext* svcCtx) {
     auto hm = HedgingMetrics::get(svcCtx);
     invariant(hm);
     return hm;
+}
+
+UUID getOrCreateOperationKey(bool isHedge, GenericArgs& genericArgs) {
+    // Check if the caller has provided an operation key, and hedging is not enabled. If so,
+    // we will attach the caller-provided key to all remote commands sent to resolved
+    // targets. Note that doing so may have side-effects if the operation is retried:
+    // cancelling the Nth attempt may impact the (N + 1)th attempt as they share `opKey`.
+    if (auto& opKey = genericArgs.stable.getClientOperationKey(); opKey && !isHedge) {
+        return *opKey;
+    }
+
+    // The caller has not provided an operation key or hedging is enabled, so we generate a
+    // new `clientOperationKey` for each attempt. The operationKey allows cancelling remote
+    // operations. A new one is generated here to ensure retry attempts are isolated:
+    // cancelling the Nth attempt does not impact the (N + 1)th attempt.
+    auto opKey = UUID::gen();
+    genericArgs.stable.setClientOperationKey(opKey);
+    return opKey;
 }
 
 /**
@@ -134,6 +133,7 @@ void killOperations(ServiceContext* svcCtx,
             .getAsync([](Status) {});
     }
 }
+
 }  // namespace hedging_rpc_details
 
 /**
@@ -158,16 +158,11 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
     ReadPreferenceSetting readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly),
     GenericArgs genericArgs = GenericArgs(),
-    BatonHandle baton = nullptr,
-    boost::optional<UUID> clientOperationKey = boost::none) {
+    BatonHandle baton = nullptr) {
     using SingleResponse = AsyncRPCResponse<typename CommandType::Reply>;
 
     invariant(opCtx);
     auto svcCtx = opCtx->getServiceContext();
-
-    if (MONGO_unlikely(clientOperationKey && !genericArgs.stable.getClientOperationKey())) {
-        genericArgs.stable.setClientOperationKey(*clientOperationKey);
-    }
 
     // Set up cancellation token to cancel remaining hedged operations.
     CancellationSource hedgeCancellationToken{token};
@@ -175,24 +170,8 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
     auto proxyExec = std::make_shared<detail::ProxyingExecutor>(baton, exec);
     auto tryBody = [=, targeter = std::move(targeter)]() mutable {
         HedgeOptions opts = getHedgeOptions(CommandType::kCommandName, readPref);
-        auto operationKey = [&] {
-            // Check if the caller has provided an operation key, and hedging is not enabled. If so,
-            // we will attach the caller-provided key to all remote commands sent to resolved
-            // targets. Note that doing so may have side-effects if the operation is retried:
-            // cancelling the Nth attempt may impact the (N + 1)th attempt as they share `opKey`.
-            if (auto& opKey = genericArgs.stable.getClientOperationKey();
-                opKey && !opts.isHedgeEnabled) {
-                return *opKey;
-            }
-
-            // The caller has not provided an operation key or hedging is enabled, so we generate a
-            // new `clientOperationKey` for each attempt. The operationKey allows cancelling remote
-            // operations. A new one is generated here to ensure retry attempts are isolated:
-            // cancelling the Nth attempt does not impact the (N + 1)th attempt.
-            auto opKey = UUID::gen();
-            genericArgs.stable.setClientOperationKey(opKey);
-            return opKey;
-        }();
+        auto operationKey =
+            hedging_rpc_details::getOrCreateOperationKey(opts.isHedgeEnabled, genericArgs);
 
         return targeter->resolve(token)
             .thenRunOn(proxyExec)
@@ -269,7 +248,7 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                  * "authoritative" request. This is the codepath followed when we are not
                  * hedging or there is only 1 target provided.
                  */
-                return hedging_rpc_details::whenAnyThat(
+                return whenAnyThat(
                            std::move(requests),
                            [&](StatusWith<SingleResponse> response, size_t index) {
                                Status commandStatus = response.getStatus();

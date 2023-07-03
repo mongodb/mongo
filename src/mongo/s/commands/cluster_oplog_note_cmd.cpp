@@ -28,20 +28,28 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <iosfwd>
+#include <string>
 
-#include "mongo/db/commands.h"
-
-#include "mongo/bson/util/bson_extract.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -73,11 +81,12 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const override {
         if (!AuthorizationSession::get(opCtx->getClient())
-                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                    ActionType::appendOplogNote)) {
+                 ->isAuthorizedForActionsOnResource(
+                     ResourcePattern::forClusterResource(dbName.tenantId()),
+                     ActionType::appendOplogNote)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();

@@ -29,14 +29,38 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_connection.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/base_cloner.h"
+#include "mongo/db/repl/collection_bulk_loader.h"
 #include "mongo/db/repl/initial_sync_base_cloner.h"
 #include "mongo/db/repl/initial_sync_shared_data.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/task_runner.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/progress_meter.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {
@@ -100,7 +124,7 @@ public:
         return _sourceNss;
     }
     UUID getSourceUuid() const {
-        return *_sourceDbAndUuid.uuid();
+        return _sourceDbAndUuid.uuid();
     }
 
     /**
@@ -163,7 +187,7 @@ private:
 
     std::string describeForFuzzer(BaseClonerStage* stage) const final {
         return _sourceNss.db() + " db: { " + stage->getName() + ": UUID(\"" +
-            _sourceDbAndUuid.uuid()->toString() + "\") coll: " + _sourceNss.coll() + " }";
+            _sourceDbAndUuid.uuid().toString() + "\") coll: " + _sourceNss.coll() + " }";
     }
 
     /**

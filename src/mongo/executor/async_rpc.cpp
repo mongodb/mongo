@@ -28,12 +28,23 @@
  */
 
 #include "mongo/executor/async_rpc.h"
+
+#include <boost/smart_ptr.hpp>
+#include <string>
+#include <tuple>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
-#include <vector>
 
 namespace mongo::async_rpc {
 namespace detail {
@@ -48,13 +59,15 @@ public:
      *
      * Do not call directly - this is not part of the public API.
      */
-    ExecutorFuture<AsyncRPCInternalResponse> _sendCommand(StringData dbName,
-                                                          BSONObj cmdBSON,
-                                                          Targeter* targeter,
-                                                          OperationContext* opCtx,
-                                                          std::shared_ptr<TaskExecutor> exec,
-                                                          CancellationToken token,
-                                                          BatonHandle baton) final {
+    ExecutorFuture<AsyncRPCInternalResponse> _sendCommand(
+        StringData dbName,
+        BSONObj cmdBSON,
+        Targeter* targeter,
+        OperationContext* opCtx,
+        std::shared_ptr<TaskExecutor> exec,
+        CancellationToken token,
+        BatonHandle baton,
+        boost::optional<UUID> clientOperationKey) final {
         auto proxyExec = std::make_shared<ProxyingExecutor>(baton, exec);
         auto targetsUsed = std::make_shared<std::vector<HostAndPort>>();
         return targeter->resolve(token)
@@ -65,24 +78,51 @@ public:
                    exec = std::move(exec),
                    token,
                    baton = std::move(baton),
-                   targetsUsed](std::vector<HostAndPort> targets) {
+                   targetsUsed,
+                   clientOperationKey](std::vector<HostAndPort> targets) {
                 invariant(targets.size(),
                           "Successful targeting implies there are hosts to target.");
                 *targetsUsed = targets;
                 executor::RemoteCommandRequestOnAny executorRequest(
-                    targets, dbName, cmdBSON, rpc::makeEmptyMetadata(), opCtx);
+                    targets,
+                    dbName,
+                    cmdBSON,
+                    rpc::makeEmptyMetadata(),
+                    opCtx,
+                    executor::RemoteCommandRequest::kNoTimeout,
+                    {},
+                    clientOperationKey);
                 return exec->scheduleRemoteCommandOnAny(executorRequest, token, std::move(baton));
             })
-            .onError([targetsUsed](Status s) -> StatusWith<TaskExecutor::ResponseOnAnyStatus> {
-                // If there was a scheduling error or other local error before the
-                // command was accepted by the executor.
-                return Status{AsyncRPCErrorInfo(s, *targetsUsed),
-                              "Remote command execution failed"};
-            })
-            .then([targetsUsed](TaskExecutor::ResponseOnAnyStatus r) {
+            .onError(
+                [targetsUsed, targeter](Status s) -> StatusWith<TaskExecutor::ResponseOnAnyStatus> {
+                    if (targetsUsed->size()) {
+                        // TODO SERVER-78148 Mirrors AsyncRequestsSender in that the first target is
+                        // used. The assumption that the first target triggers the error is wrong
+                        // and will be changed as part of the TODO.
+                        targeter->onRemoteCommandError((*targetsUsed)[0], s).get();
+                    }
+                    // If there was a scheduling error or other local error before the
+                    // command was accepted by the executor.
+                    return Status{AsyncRPCErrorInfo(s, *targetsUsed),
+                                  "Remote command execution failed"};
+                })
+            .then([targetsUsed, targeter](TaskExecutor::ResponseOnAnyStatus r) {
                 auto s = makeErrorIfNeeded(r, *targetsUsed);
+                // Update targeter for errors.
+                if (!s.isOK() && s.code() == ErrorCodes::RemoteCommandExecutionError) {
+                    auto extraInfo = s.extraInfo<AsyncRPCErrorInfo>();
+                    if (extraInfo->isLocal()) {
+                        targeter->onRemoteCommandError(*(r.target), extraInfo->asLocal()).get();
+                    } else {
+                        targeter
+                            ->onRemoteCommandError(*(r.target),
+                                                   extraInfo->asRemote().getRemoteCommandResult())
+                            .get();
+                    }
+                }
                 uassertStatusOK(s);
-                return AsyncRPCInternalResponse{r.data, r.target.get()};
+                return AsyncRPCInternalResponse{r.data, r.target.get(), *r.elapsed};
             });
     }
 };

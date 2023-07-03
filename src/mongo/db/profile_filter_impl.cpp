@@ -28,12 +28,31 @@
  */
 
 
-#include "mongo/logv2/log.h"
-#include "mongo/platform/basic.h"
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
 
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/profile_filter_impl.h"
+#include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

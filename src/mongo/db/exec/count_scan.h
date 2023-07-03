@@ -29,13 +29,29 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_index_stage.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 
@@ -90,7 +106,7 @@ struct CountScanParams {
 class CountScan final : public RequiresIndexStage {
 public:
     CountScan(ExpressionContext* expCtx,
-              const CollectionPtr& collection,
+              VariantCollectionPtrOrAcquisition collection,
               CountScanParams params,
               WorkingSet* workingSet);
 

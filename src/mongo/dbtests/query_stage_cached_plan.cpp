@@ -27,27 +27,66 @@
  *    it in the license file.
  */
 
+#include <cmath>
+#include <cstddef>
+#include <fmt/format.h>
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/cached_plan.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/mock_stage.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/platform/atomic_proxy.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -55,7 +94,8 @@ using unittest::assertGet;
 
 namespace QueryStageCachedPlan {
 
-static const NamespaceString nss("unittests.QueryStageCachedPlan");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageCachedPlan");
 
 namespace {
 std::unique_ptr<CanonicalQuery> canonicalQueryFromFilterObj(OperationContext* opCtx,
@@ -158,7 +198,7 @@ public:
         }
 
         CachedPlanStage cachedPlanStage(_expCtx.get(),
-                                        collection,
+                                        &collection,
                                         &_ws,
                                         cq,
                                         plannerParams,
@@ -213,7 +253,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailureMemoryLimitExceeded) {
     // High enough so that we shouldn't trigger a replan based on works.
     const size_t decisionWorks = 50;
     CachedPlanStage cachedPlanStage(_expCtx.get(),
-                                    collection.getCollection(),
+                                    &collection.getCollection(),
                                     &_ws,
                                     cq.get(),
                                     plannerParams,
@@ -267,7 +307,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
     }
 
     CachedPlanStage cachedPlanStage(_expCtx.get(),
-                                    collection.getCollection(),
+                                    &collection.getCollection(),
                                     &_ws,
                                     cq.get(),
                                     plannerParams,
@@ -487,7 +527,7 @@ TEST_F(QueryStageCachedPlan, ThrowsOnYieldRecoveryWhenIndexIsDroppedBeforePlanSe
 
     const size_t decisionWorks = 10;
     CachedPlanStage cachedPlanStage(_expCtx.get(),
-                                    collection,
+                                    &collection,
                                     &_ws,
                                     cq.get(),
                                     plannerParams,
@@ -531,7 +571,7 @@ TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAferPl
 
     const size_t decisionWorks = 10;
     CachedPlanStage cachedPlanStage(_expCtx.get(),
-                                    collection,
+                                    &collection,
                                     &_ws,
                                     cq.get(),
                                     plannerParams,

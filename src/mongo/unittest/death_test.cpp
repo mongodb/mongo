@@ -27,25 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/unittest/death_test.h"
-
-#include <cstdio>
-#include <fmt/format.h>
-
-#include "mongo/bson/json.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/util/exit_code.h"
-
-#ifndef _WIN32
-#include <climits>
+#include <algorithm>
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
+#include <fmt/format.h>
+#include <iterator>
+#include <sstream>
+#include <stdexcept>
+#include <utility>
+#include <vector>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/test_info.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/scopeguard.h"
+
+#ifndef _WIN32
 #include <sys/resource.h>
 #include <sys/wait.h>
-#include <unistd.h>
 #endif
 
 #if defined(__APPLE__)
@@ -56,13 +62,20 @@
 #include <sanitizer/common_interface_defs.h>
 #endif
 
-#include <sstream>
-
+#include "mongo/bson/json.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debugger.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/pcre_util.h"
 #include "mongo/util/quick_exit.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

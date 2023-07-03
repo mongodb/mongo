@@ -29,22 +29,36 @@
 
 #include "mongo/db/update/update_driver.h"
 
-
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 #include <map>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement_comparator.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/json.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/db/update_index_data.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/service_context.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

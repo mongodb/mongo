@@ -27,23 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/matcher/expression_leaf.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
 #include <cmath>
+#include <iterator>
+#include <limits>
 #include <memory>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/config.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/platform/overflow_arithmetic.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
@@ -52,10 +60,11 @@
 
 namespace mongo {
 
+template <typename T>
 ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     MatchType type,
     boost::optional<StringData> path,
-    Value rhs,
+    T&& rhs,
     ElementPath::LeafArrayBehavior leafArrBehavior,
     ElementPath::NonLeafArrayBehavior nonLeafArrBehavior,
     clonable_ptr<ErrorAnnotation> annotation,
@@ -66,6 +75,24 @@ ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     setData(_backingBSON.firstElement());
     invariant(_rhs.type() != BSONType::EOO);
 }
+
+// Instantiate above constructor for 'Value&&' and 'const BSONElement&' types.
+template ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
+    MatchType,
+    boost::optional<StringData>,
+    Value&&,
+    ElementPath::LeafArrayBehavior,
+    ElementPath::NonLeafArrayBehavior,
+    clonable_ptr<ErrorAnnotation>,
+    const CollatorInterface*);
+template ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
+    MatchType,
+    boost::optional<StringData>,
+    const BSONElement&,
+    ElementPath::LeafArrayBehavior,
+    ElementPath::NonLeafArrayBehavior,
+    clonable_ptr<ErrorAnnotation>,
+    const CollatorInterface*);
 
 bool ComparisonMatchExpressionBase::equivalent(const MatchExpression* other) const {
     if (other->matchType() != matchType())
@@ -92,14 +119,15 @@ BSONObj ComparisonMatchExpressionBase::getSerializedRightHandSide(SerializationO
     return BSON(name() << opts.serializeLiteral(_rhs));
 }
 
+template <typename T>
 ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
                                                      boost::optional<StringData> path,
-                                                     Value rhs,
+                                                     T&& rhs,
                                                      clonable_ptr<ErrorAnnotation> annotation,
                                                      const CollatorInterface* collator)
     : ComparisonMatchExpressionBase(type,
                                     path,
-                                    std::move(rhs),
+                                    std::forward<T>(rhs),
                                     ElementPath::LeafArrayBehavior::kTraverse,
                                     ElementPath::NonLeafArrayBehavior::kTraverse,
                                     std::move(annotation),
@@ -118,6 +146,18 @@ ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
             uasserted(ErrorCodes::BadValue, "bad match type for ComparisonMatchExpression");
     }
 }
+
+// Instantiate above constructor for 'Value&&' and 'const BSONElement&' types.
+template ComparisonMatchExpression::ComparisonMatchExpression(MatchType,
+                                                              boost::optional<StringData>,
+                                                              Value&&,
+                                                              clonable_ptr<ErrorAnnotation>,
+                                                              const CollatorInterface*);
+template ComparisonMatchExpression::ComparisonMatchExpression(MatchType,
+                                                              boost::optional<StringData>,
+                                                              const BSONElement&,
+                                                              clonable_ptr<ErrorAnnotation>,
+                                                              const CollatorInterface*);
 
 bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
                                                      MatchDetails* details) const {
@@ -275,7 +315,16 @@ void RegexMatchExpression::debugString(StringBuilder& debug, int indentationLeve
 
 BSONObj RegexMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
     BSONObjBuilder regexBuilder;
-    opts.appendLiteral(&regexBuilder, "$regex", _regex);
+
+    // Sadly we cannot use the fast/short syntax to append this, we need to be careful to generate a
+    // valid regex, and the default string "?" is not valid.
+    if (opts.literalPolicy == LiteralSerializationPolicy::kToRepresentativeParseableValue) {
+        regexBuilder.append("$regex", "\\?");
+    } else {
+        // May generate {$regex: "?string"} - invalid regex but we don't care since it's not
+        // parseable it's just saying "there was a string here."
+        opts.appendLiteral(&regexBuilder, "$regex", _regex);
+    }
 
     if (!_flags.empty()) {
         opts.appendLiteral(&regexBuilder, "$options", _flags);
@@ -487,7 +536,7 @@ BSONObj InMatchExpression::serializeToShape(SerializationOptions opts) const {
     if (hasRegex()) {
         firstOfEachType.emplace_back(BSONRegEx());
     }
-    return BSON("$in" << opts.serializeLiteral(firstOfEachType));
+    return BSON("$in" << opts.serializeLiteral(std::move(firstOfEachType)));
 }
 
 BSONObj InMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {

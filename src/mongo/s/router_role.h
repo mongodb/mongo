@@ -29,10 +29,19 @@
 
 #pragma once
 
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/database_version.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace sharding {

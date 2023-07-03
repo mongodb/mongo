@@ -30,11 +30,21 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
 #include <functional>
+#include <iostream>
 #include <list>
 #include <memory>
+#include <mutex>
+#include <set>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/db/baton.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/storage_change_lock.h"
@@ -42,6 +52,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/clock_source.h"
@@ -53,13 +64,12 @@
 #include "mongo/util/tick_source.h"
 #include "mongo/util/uuid.h"
 
-#include <iostream>
-
 namespace mongo {
 
 class AbstractMessagingPort;
 class Client;
 class OperationContext;
+
 class OpObserver;
 class ServiceEntryPoint;
 
@@ -744,6 +754,7 @@ private:
     /**
      * Managing classes for our issued operation IDs.
      */
+    Mutex _clientByOpIdMutex = MONGO_MAKE_LATCH("ServiceContext::_clientByOpIdMutex");
     std::shared_ptr<UniqueOperationIdRegistry> _opIdRegistry;
     stdx::unordered_map<OperationId, Client*> _clientByOperationId;
 

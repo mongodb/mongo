@@ -29,13 +29,23 @@
 
 #include "mongo/db/query/ce/bound_utils.h"
 
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/pipeline/abt/utils.h"
+#include "mongo/db/query/optimizer/bool_expression.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/interval_utils.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo::optimizer::ce {
 
@@ -81,8 +91,8 @@ IntervalRequirement getMinMaxIntervalForType(sbe::value::TypeTags type) {
     auto&& [max, maxInclusive] = getMinMaxBoundForType(false /*isMin*/, type);
     tassert(7051104, str::stream() << "Type " << type << " has no maximum", max);
 
-    return IntervalRequirement{BoundRequirement(minInclusive, *min),
-                               BoundRequirement(maxInclusive, *max)};
+    return IntervalRequirement{BoundRequirement(minInclusive, std::move(*min)),
+                               BoundRequirement(maxInclusive, std::move(*max))};
 }
 
 bool isIntervalSubsetOfType(const IntervalRequirement& interval, sbe::value::TypeTags type) {

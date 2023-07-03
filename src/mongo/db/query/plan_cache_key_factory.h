@@ -29,9 +29,14 @@
 
 #pragma once
 
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_cache_indexability.h"
 #include "mongo/db/query/sbe_plan_cache.h"
 
 namespace mongo {

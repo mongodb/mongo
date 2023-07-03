@@ -27,22 +27,38 @@
  *    it in the license file.
  */
 
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <string>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/sharded_index_catalog_commands_gen.h"
 #include "mongo/db/s/sharding_index_catalog_util.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/internal_session_pool.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/network_interface_thread_pool.h"
-#include "mongo/executor/task_executor.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/logv2/log.h"
-#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/util/future_util.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -124,8 +140,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
 };
@@ -204,8 +221,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
 };

@@ -29,6 +29,9 @@
 
 #include "mongo/s/chunk_version.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/idl/idl_parser.h"
 #include "mongo/s/chunk_version_gen.h"
 #include "mongo/util/str.h"
 
@@ -76,4 +79,12 @@ std::string ChunkVersion::toString() const {
                          << _timestamp.toString();
 }
 
+BSONObj ChunkVersion::toBSON() const {
+    BSONObjBuilder builder;
+    builder.append("majorVersion", static_cast<int64_t>(majorVersion()));
+    builder.append("minorVersion", static_cast<int64_t>(minorVersion()));
+    builder.append("epoch", _epoch);
+    builder.append("timestamp", _timestamp);
+    return builder.obj();
+}
 }  // namespace mongo

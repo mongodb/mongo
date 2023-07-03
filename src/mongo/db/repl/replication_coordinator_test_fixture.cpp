@@ -27,37 +27,55 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 
-#include <functional>
-#include <memory>
+#include <cstdint>
+#include <list>
+#include <mutex>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/hello_response.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/log_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/rpc/topology_version_gen.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace repl {
@@ -361,7 +379,8 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
           "Election timeout scheduled at {electionTimeoutWhen} (simulator time)",
           "electionTimeoutWhen"_attr = electionTimeoutWhen);
 
-    simulateSuccessfulV1ElectionAt(electionTimeoutWhen);
+    auto opCtx{makeOperationContext()};
+    simulateSuccessfulV1ElectionAt(opCtx.get(), electionTimeoutWhen);
 }
 
 void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t electionTime,
@@ -430,15 +449,14 @@ void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t e
     ASSERT_TRUE(helloResponse->isSecondary()) << helloResponse->toBSON().toString();
 }
 
-void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
-    auto opCtx = makeOperationContext();
-    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTime, opCtx.get());
+void ReplCoordTest::simulateSuccessfulV1ElectionAt(OperationContext* opCtx, Date_t electionTime) {
+    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTime, opCtx);
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
 
-    signalDrainComplete(opCtx.get());
+    signalDrainComplete(opCtx);
 
     ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped);
-    auto helloResponse = replCoord->awaitHelloResponse(opCtx.get(), {}, boost::none, boost::none);
+    auto helloResponse = replCoord->awaitHelloResponse(opCtx, {}, boost::none, boost::none);
     ASSERT_TRUE(helloResponse->isWritablePrimary()) << helloResponse->toBSON().toString();
     ASSERT_FALSE(helloResponse->isSecondary()) << helloResponse->toBSON().toString();
 

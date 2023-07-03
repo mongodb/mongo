@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * update_where.js
  *
@@ -7,10 +5,10 @@
  * thread and updates them. Also queries by the thread that created the documents to verify counts.
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');            // for extendWorkload
-load('jstests/concurrency/fsm_workloads/indexed_insert_where.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_where.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.randomBound = 10;
     $config.data.generateDocumentToInsert = function generateDocumentToInsert() {
         return {tid: this.tid, x: Random.randInt(this.randomBound)};

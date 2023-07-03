@@ -28,14 +28,15 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <vector>
 
-#include "mongo/util/version.h"
-
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
-
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/version.h"
 #include "mongo/util/version_constants.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl

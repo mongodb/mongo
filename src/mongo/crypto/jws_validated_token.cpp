@@ -29,13 +29,23 @@
 
 #include "mongo/crypto/jws_validated_token.h"
 
+#include <boost/optional.hpp>
+#include <cstddef>
+#include <memory>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/crypto/jws_validator.h"
-#include "mongo/db/basic_types_gen.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::crypto {
 namespace {

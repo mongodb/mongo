@@ -33,6 +33,7 @@
 #include <memory>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
 namespace mongo {
 namespace clonable_ptr_detail {

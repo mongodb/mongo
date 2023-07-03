@@ -27,23 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/client/remote_command_targeter_mock.h"
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/op_observer/op_observer_impl.h"
-#include "mongo/db/op_observer/op_observer_registry.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/config_server_op_observer.h"
-#include "mongo/db/s/shard_server_catalog_cache_loader.h"
-#include "mongo/db/s/shard_server_op_observer.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

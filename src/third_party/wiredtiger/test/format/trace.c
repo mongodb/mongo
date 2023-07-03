@@ -75,7 +75,6 @@ trace_config(const char *config)
 }
 
 #define TRACE_DIR "OPS.TRACE"
-#define TRACE_INIT_CMD "rm -rf %s/" TRACE_DIR " && mkdir %s/" TRACE_DIR
 
 /*
  * trace_init --
@@ -85,7 +84,7 @@ void
 trace_init(void)
 {
     int retain;
-    char config[256], tracedir[MAX_FORMAT_PATH * 2];
+    char config[256], tracedir[MAX_FORMAT_PATH];
 
     if (!FLD_ISSET(g.trace_flags, TRACE))
         return;
@@ -94,15 +93,14 @@ trace_init(void)
     retain = WT_MAX(g.trace_retain, 10);
 
     /* Create the trace directory. */
-    testutil_check(__wt_snprintf(tracedir, sizeof(tracedir), TRACE_INIT_CMD, g.home, g.home));
-    testutil_checkfmt(system(tracedir), "%s", "logging directory creation failed");
+    testutil_snprintf(tracedir, sizeof(tracedir), "%s/" TRACE_DIR, g.home);
+    testutil_recreate_dir(tracedir);
 
     /* Configure logging with automatic removal, and keep the last N log files. */
-    testutil_check(__wt_snprintf(config, sizeof(config),
+    testutil_snprintf(config, sizeof(config),
       "create,log=(enabled=true,remove=true),debug_mode=(log_retention=%d),statistics=(fast),"
       "statistics_log=(json,on_close,wait=5)",
-      retain));
-    testutil_check(__wt_snprintf(tracedir, sizeof(tracedir), "%s/%s", g.home, TRACE_DIR));
+      retain);
     testutil_checkfmt(
       wiredtiger_open(tracedir, NULL, config, &g.trace_conn), "%s: %s", tracedir, config);
 

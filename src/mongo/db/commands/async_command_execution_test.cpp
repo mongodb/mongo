@@ -29,18 +29,40 @@
 
 
 #include <fmt/format.h>
+#include <memory>
+#include <mutex>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/request_execution_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/factory.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/protocol.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

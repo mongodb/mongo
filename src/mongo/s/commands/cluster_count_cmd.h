@@ -96,7 +96,7 @@ public:
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 
-        return Impl::checkAuthForOperation(opCtx);
+        return Impl::checkAuthForOperation(opCtx, dbName, cmdObj);
     }
 
     bool errmsgRun(OperationContext* opCtx,

@@ -28,49 +28,116 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <array>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/tuple/tuple.hpp>
 #include <csignal>
-#include <fstream>
+#include <cstdint>
+#include <cstdlib>
+#include <deque>
+#include <exception>
+#include <forward_list>
+#include <fstream>  // IWYU pragma: keep
+#include <initializer_list>
+#include <iostream>
+#include <iterator>
+#include <limits>
+#include <list>
+#include <map>
+#include <memory>
 #include <sstream>
 #include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/core/swap.hpp>
+#include <boost/exception/exception.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/log/attributes/attribute_value_set.hpp>
+#include <boost/log/core/core.hpp>
+#include <boost/log/core/record_view.hpp>
+// IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
+// IWYU pragma: no_include "boost/log/detail/locking_ptr.hpp"
+#include <boost/log/keywords/file_name.hpp>
+#include <boost/log/sinks/basic_sink_backend.hpp>
+#include <boost/log/sinks/frontend_requirements.hpp>
+#include <boost/log/sinks/sink.hpp>
+#include <boost/log/sinks/sync_frontend.hpp>
+#include <boost/log/sinks/text_file_backend.hpp>
+#include <boost/log/sinks/unlocked_frontend.hpp>
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "boost/multi_index/detail/bidir_node_iterator.hpp"
+#include <boost/none.hpp>
+#include <boost/operators.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/parameter/keyword.hpp>
+// IWYU pragma: no_include "boost/property_tree/detail/exception_implementation.hpp"
+// IWYU pragma: no_include "boost/property_tree/detail/ptree_implementation.hpp"
+#include <boost/property_tree/ptree_fwd.hpp>
+#include <boost/smart_ptr/make_shared_object.hpp>
+#include <boost/smart_ptr/shared_ptr.hpp>
+#include <boost/thread/exceptions.hpp>
+#include <fmt/format.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/bson_formatter.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/composite_backend.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/json_formatter.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_capture_backend.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_debug.h"
+#include "mongo/logv2/log_detail.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_domain_internal.h"
 #include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_source.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_truncation.h"
 #include "mongo/logv2/plain_formatter.h"
+#include "mongo/logv2/ramlog.h"
 #include "mongo/logv2/ramlog_sink.h"
 #include "mongo/logv2/text_formatter.h"
 #include "mongo/logv2/uassert_sink.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/str_escape.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
-
-#include <boost/log/attributes/constant.hpp>
-#include <boost/optional.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/ptree.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -825,6 +892,46 @@ TEST_F(LogV2TypesTest, Duration) {
                       .Long(),
                   ms.count());
 }
+
+void exceptionThrower() {
+    uasserted(7733401, "exception in logger");
+}
+
+template <typename T>
+void testExceptionHandling(T arg, LogV2Test::LineCapture& text, LogV2Test::LineCapture& json) {
+    LOGV2(7733402, "test1 {a1}", "a1"_attr = arg);
+
+    ASSERT_EQ(
+        mongo::fromjson(json.back()).getField(kAttributesFieldName).Obj().getField("a1").String(),
+        "Failed to serialize due to exception: Location7733401: exception in logger");
+
+    ASSERT_EQ(text.back(),
+              "test1 Failed to serialize due to exception: Location7733401: exception in logger");
+}
+
+// Throw an exception in a BSON serialization method
+TEST_F(LogV2TypesTest, AttrExceptionBSONSerialize) {
+    struct TypeWithBSONSerialize {
+        void serialize(BSONObjBuilder*) const {
+            exceptionThrower();
+        }
+    };
+
+    testExceptionHandling(TypeWithBSONSerialize(), text, json);
+}
+
+// Throw an exception in a BSON Array serialization method
+TEST_F(LogV2TypesTest, AttrExceptionBSONToARray) {
+    struct TypeToArray {
+        BSONArray toBSONArray() const {
+            exceptionThrower();
+            return {};
+        }
+    };
+
+    testExceptionHandling(TypeToArray(), text, json);
+}
+
 
 TEST_F(LogV2Test, TextFormat) {
     auto lines = makeLineCapture(TextFormatter());

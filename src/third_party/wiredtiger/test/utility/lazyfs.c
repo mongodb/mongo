@@ -92,9 +92,9 @@ lazyfs_init(void)
 
     /* Find LazyFS relative to the path to the current executable. */
     testutil_assert_errno(readlink("/proc/self/exe", buf, sizeof(buf)) >= 0);
-    testutil_check(__wt_snprintf(program_dir, sizeof(program_dir), "%s", dirname(buf)));
+    testutil_snprintf(program_dir, sizeof(program_dir), "%s", dirname(buf));
 
-    testutil_check(__wt_snprintf(lazyfs_home, sizeof(lazyfs_home), "%s/" LAZYFS_PATH, program_dir));
+    testutil_snprintf(lazyfs_home, sizeof(lazyfs_home), "%s/" LAZYFS_PATH, program_dir);
     if (stat(lazyfs_home, &sb) != 0)
         testutil_die(errno, "Cannot find LazyFS.");
 #endif
@@ -152,7 +152,7 @@ lazyfs_mount(const char *mount_dir, const char *base_dir, const char *lazyfs_con
      * exits. In this way, we never forget to unmount.
      */
 
-    testutil_check(__wt_snprintf(subdir_arg, sizeof(subdir_arg), "subdir=%s", base_dir));
+    testutil_snprintf(subdir_arg, sizeof(subdir_arg), "subdir=%s", base_dir);
 
     parent_pid = getpid();
     testutil_assert_errno((pid = fork()) >= 0);
@@ -235,8 +235,8 @@ lazyfs_unmount(const char *mount_dir, pid_t lazyfs_pid)
         return;
 
     /* Unmount. */
-    testutil_check(__wt_snprintf(
-      buf, sizeof(buf), "cd '%s' && ./scripts/umount-lazyfs.sh -m \"%s\"", lazyfs_home, mount_dir));
+    testutil_snprintf(
+      buf, sizeof(buf), "cd '%s' && ./scripts/umount-lazyfs.sh -m \"%s\"", lazyfs_home, mount_dir);
     testutil_check(system(buf));
     if (lazyfs_pid > 0)
         testutil_assert_errno(waitpid(lazyfs_pid, &status, 0) >= 0);
@@ -302,26 +302,25 @@ testutil_lazyfs_setup(WT_LAZY_FS *lazyfs, const char *home)
 
     /* Get the canonical path to the home directory. */
     testutil_assert_errno((str = canonicalize_file_name(home)) != NULL);
-    testutil_check(__wt_snprintf(home_canonical, sizeof(home_canonical), "%s", str));
+    testutil_snprintf(home_canonical, sizeof(home_canonical), "%s", str);
     free(str);
 
     /* Create the base directory on the underlying file system. */
-    testutil_check(
-      __wt_snprintf(lazyfs->base, sizeof(lazyfs->base), "%s/%s", home_canonical, LAZYFS_BASE_DIR));
-    testutil_make_work_dir(lazyfs->base);
+    testutil_snprintf(lazyfs->base, sizeof(lazyfs->base), "%s/%s", home_canonical, LAZYFS_BASE_DIR);
+    testutil_recreate_dir(lazyfs->base);
 
     /* Set up the relevant LazyFS files. */
-    testutil_check(__wt_snprintf(
-      lazyfs->control, sizeof(lazyfs->control), "%s/%s", home_canonical, LAZYFS_CONTROL_FILE));
-    testutil_check(__wt_snprintf(
-      lazyfs->config, sizeof(lazyfs->config), "%s/%s", home_canonical, LAZYFS_CONFIG_FILE));
-    testutil_check(__wt_snprintf(
-      lazyfs->logfile, sizeof(lazyfs->logfile), "%s/%s", home_canonical, LAZYFS_LOG_FILE));
+    testutil_snprintf(
+      lazyfs->control, sizeof(lazyfs->control), "%s/%s", home_canonical, LAZYFS_CONTROL_FILE);
+    testutil_snprintf(
+      lazyfs->config, sizeof(lazyfs->config), "%s/%s", home_canonical, LAZYFS_CONFIG_FILE);
+    testutil_snprintf(
+      lazyfs->logfile, sizeof(lazyfs->logfile), "%s/%s", home_canonical, LAZYFS_LOG_FILE);
     lazyfs_create_config(lazyfs->config, lazyfs->control, lazyfs->logfile);
 
     /* Mount LazyFS. */
-    testutil_check(__wt_snprintf(
-      lazyfs->mountpoint, sizeof(lazyfs->mountpoint), "%s/%s", home_canonical, WT_HOME_DIR));
+    testutil_snprintf(
+      lazyfs->mountpoint, sizeof(lazyfs->mountpoint), "%s/%s", home_canonical, WT_HOME_DIR);
     lazyfs->pid = lazyfs_mount(lazyfs->mountpoint, lazyfs->base, lazyfs->config);
 #endif
 }
@@ -351,6 +350,6 @@ testutil_lazyfs_cleanup(WT_LAZY_FS *lazyfs)
     lazyfs_unmount(lazyfs->mountpoint, lazyfs->pid);
     lazyfs->pid = 0;
 
-    testutil_clean_work_dir(lazyfs->mountpoint);
+    testutil_remove(lazyfs->mountpoint);
 #endif
 }

@@ -27,17 +27,42 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/matcher/expression_parser.h"
-
+#include <algorithm>
+#include <array>
+#include <boost/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <memory>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/init.h"
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <s2cellid.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/matcher/doc_validation_util.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -47,9 +72,11 @@
 #include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
@@ -67,10 +94,12 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/dbref.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 

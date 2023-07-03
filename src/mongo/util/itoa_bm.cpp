@@ -28,19 +28,9 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include <array>
-#include <cstdint>
-#include <limits>
-#include <random>
-#include <string>
-#include <vector>
-
 #include <benchmark/benchmark.h>
+#include <cstdint>
 
-#include "mongo/base/string_data.h"
-#include "mongo/util/decimal_counter.h"
 #include "mongo/util/itoa.h"
 
 namespace mongo {

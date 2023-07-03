@@ -27,23 +27,47 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <cstdint>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/client/index_spec.h"
+#include <absl/container/node_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/sessions_collection_standalone.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/idl/idl_parser.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
 
-const NamespaceString kTestNS("config.system.sessions");
+const NamespaceString kTestNS =
+    NamespaceString::createNamespaceString_forTest("config.system.sessions");
 
 LogicalSessionRecord makeRecord(Date_t time = Date_t::now()) {
     auto record = makeLogicalSessionRecordForTest();

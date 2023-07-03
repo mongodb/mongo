@@ -28,15 +28,19 @@
  */
 
 
-#include "mongo/config.h"
-#include "mongo/platform/basic.h"
-
+#include <ostream>
 #include <type_traits>
 
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/base/static_assert.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/matcher.h"
+#include "mongo/unittest/matcher_core.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
@@ -138,7 +142,7 @@ TEST(AssertUtils, UassertNamedCodeWithTwoCategories) {
 }
 
 MONGO_STATIC_ASSERT(!error_details::isNamedCode<19999>);
-// ExceptionFor<ErrorCodes::Error(19999)> invalidType;  // Must not compile.
+// ExceptionFor<ErrorCodes::Error19999)> invalidType;  // Must not compile.
 
 TEST(AssertUtils, UassertNumericCode) {
     ASSERT_CATCHES(19999, DBException);

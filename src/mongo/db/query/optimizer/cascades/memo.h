@@ -29,7 +29,10 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <map>
+#include <memory>
 #include <set>
 #include <unordered_map>
 #include <vector>
@@ -39,6 +42,12 @@
 #include "mongo/db/query/optimizer/cascades/memo_explain_interface.h"
 #include "mongo/db/query/optimizer/cascades/memo_group_binder_interface.h"
 #include "mongo/db/query/optimizer/cascades/rewrite_queues.h"
+#include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
+#include "mongo/db/query/optimizer/containers.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 
 
 namespace mongo::optimizer::cascades {

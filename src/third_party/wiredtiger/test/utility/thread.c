@@ -56,7 +56,7 @@ thread_append(void *arg)
         if (opts->table_type == TABLE_FIX)
             cursor->set_value(cursor, buf[0]);
         else {
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "%" PRIu64 " VALUE ------", recno));
+            testutil_snprintf(buf, sizeof(buf), "%" PRIu64 " VALUE ------", recno);
             cursor->set_value(cursor, buf);
         }
         testutil_check(cursor->insert(cursor));
@@ -177,8 +177,8 @@ op_bulk_unique(void *arg)
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
     /* Generate a unique object name. */
-    testutil_check(__wt_snprintf(
-      new_uri, sizeof(new_uri), "%s.%" PRIu64, opts->uri, __wt_atomic_add64(&opts->unique_id, 1)));
+    testutil_snprintf(
+      new_uri, sizeof(new_uri), "%s.%" PRIu64, opts->uri, __wt_atomic_add64(&opts->unique_id, 1));
     testutil_check(session->create(session, new_uri, DEFAULT_TABLE_SCHEMA));
 
     __wt_yield();
@@ -292,8 +292,8 @@ op_create_unique(void *arg)
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
     /* Generate a unique object name. */
-    testutil_check(__wt_snprintf(
-      new_uri, sizeof(new_uri), "%s.%" PRIu64, opts->uri, __wt_atomic_add64(&opts->unique_id, 1)));
+    testutil_snprintf(
+      new_uri, sizeof(new_uri), "%s.%" PRIu64, opts->uri, __wt_atomic_add64(&opts->unique_id, 1));
     testutil_check(session->create(session, new_uri, DEFAULT_TABLE_SCHEMA));
 
     __wt_yield();

@@ -27,14 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <mutex>
 
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
-
+#include "mongo/bson/bsonelement.h"
 #include "mongo/client/dbclient_mockcursor.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/util/net/socket_exception.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
 using mongo::BSONObj;

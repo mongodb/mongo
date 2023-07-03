@@ -30,13 +30,18 @@
 #include "mongo/db/exec/distinct_scan.h"
 
 #include <memory>
+#include <vector>
 
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/exec/filter.h"
-#include "mongo/db/exec/scoped_timer.h"
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -48,7 +53,7 @@ using std::vector;
 const char* DistinctScan::kStageType = "DISTINCT_SCAN";
 
 DistinctScan::DistinctScan(ExpressionContext* expCtx,
-                           const CollectionPtr& collection,
+                           VariantCollectionPtrOrAcquisition collection,
                            DistinctParams params,
                            WorkingSet* workingSet)
     : RequiresIndexStage(kStageType, expCtx, collection, params.indexDescriptor, workingSet),
@@ -84,7 +89,6 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
     const auto ret = handlePlanStageYield(
         expCtx(),
         "DistinctScan",
-        collection()->ns().ns(),
         [&] {
             if (!_cursor)
                 _cursor = indexAccessMethod()->newCursor(opCtx(), _scanDirection == 1);

@@ -29,8 +29,14 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"
 
@@ -64,6 +70,12 @@ MaybeImpersonatedUserMetadata getImpersonatedUserMetadata(OperationContext* opCt
  * Parses any impersonation data out of a metdata bson obj and into the opCtx
  */
 void readImpersonatedUserMetadata(const BSONElement& elem, OperationContext* opCtx);
+
+/*
+ * Get impersonation metadata off the opCtx
+ */
+boost::optional<ImpersonatedUserMetadata> getAuthDataToImpersonatedUserMetadata(
+    OperationContext* opCtx);
 
 /*
  * Writes the current impersonation metadata off the opCtx and into a BSONObjBuilder

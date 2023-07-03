@@ -5,6 +5,8 @@
  *   requires_fcv_53,
  *   requires_replication,
  *   does_not_support_stepdowns,
+ *   # Tests running with experimental CQF behavior require test commands to be enabled.
+ *   cqf_experimental_incompatible,
  * ]
  */
 (function() {

@@ -29,34 +29,53 @@
 
 #include "mongo/db/s/resharding/resharding_util.h"
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/s/resharding/common_types_gen.h"
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/optional.hpp>
+#include <cmath>
 #include <fmt/format.h>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
-#include "mongo/bson/util/bson_extract.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/document_source_resharding_add_resume_id.h"
 #include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/async_requests_sender.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
-#include "mongo/s/shard_invalidated_for_targeting_exception.h"
+#include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
@@ -242,6 +261,20 @@ std::vector<BSONObj> buildTagsDocsFromZones(const NamespaceString& tempNss,
     return tags;
 }
 
+std::vector<ReshardingZoneType> getZonesFromExistingCollection(OperationContext* opCtx,
+                                                               const NamespaceString& sourceNss) {
+    std::vector<ReshardingZoneType> zones;
+    const auto collectionZones = uassertStatusOK(
+        ShardingCatalogManager::get(opCtx)->localCatalogClient()->getTagsForCollection(opCtx,
+                                                                                       sourceNss));
+
+    for (const auto& zone : collectionZones) {
+        ReshardingZoneType newZone(zone.getTag(), zone.getMinKey(), zone.getMaxKey());
+        zones.push_back(newZone);
+    }
+    return zones;
+}
+
 std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForResharding(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ReshardingDonorOplogId& startAfter,
@@ -410,6 +443,7 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
                                const ShardKeyPattern& keyPattern) {
     boost::optional<bool> hasMinMax = boost::none;
     std::vector<ShardKeyRange> validShards;
+    stdx::unordered_set<ShardId> shardIds;
     for (const auto& shard : shardDistribution) {
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shard.getShard()));
         uassert(ErrorCodes::InvalidOptions,
@@ -421,6 +455,11 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
         uassert(ErrorCodes::InvalidOptions,
                 "ShardKeyRange max should follow shard key's keyPattern",
                 (!shard.getMax().has_value()) || keyPattern.isShardKey(*shard.getMax()));
+        if (hasMinMax && !(*hasMinMax)) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Non-explicit shardDistribution should have unique shardIds",
+                    shardIds.find(shard.getShard()) == shardIds.end());
+        }
 
         // Check all shardKeyRanges have min/max or none of them has min/max.
         if (hasMinMax.has_value()) {
@@ -432,6 +471,7 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
         }
 
         validShards.push_back(shard);
+        shardIds.insert(shard.getShard());
     }
 
     // If the shardDistribution contains min/max, validate whether they are continuous and complete.

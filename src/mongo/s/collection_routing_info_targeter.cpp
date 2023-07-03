@@ -29,31 +29,59 @@
 
 #include "mongo/s/collection_routing_info_targeter.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/curop.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
+#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/collation/collation_spec.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/s/chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_ddl.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/index_version.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_index_catalog_cache.h"
+#include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -423,23 +451,28 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         uassert(ErrorCodes::InvalidOptions,
                 str::stream()
                     << "A {multi:false} update on a sharded timeseries collection is disallowed.",
-                isMulti);
+                feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+                    serverGlobalParams.featureCompatibility) ||
+                    isMulti);
         uassert(ErrorCodes::InvalidOptions,
                 str::stream()
                     << "An {upsert:true} update on a sharded timeseries collection is disallowed.",
-                !isUpsert);
+                feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+                    serverGlobalParams.featureCompatibility) ||
+                    !isUpsert);
 
-        // Since this is a timeseries query, we may need to rename the metaField.
-        if (auto metaField = _cri.cm.getTimeseriesFields().value().getMetaField()) {
-            query = timeseries::translateQuery(query, *metaField);
-        } else {
-            // We want to avoid targeting the query incorrectly if no metaField is defined on the
-            // timeseries collection, since we only allow queries on the metaField for timeseries
-            // updates. Note: any non-empty query should fail to update once it reaches the shards
-            // because there is no metaField for it to query for, but we don't want to validate this
-            // during routing.
-            query = BSONObj();
-        }
+        // Translate the update query on a timeseries collection into the bucket-level predicate
+        // so that we can target the request to the correct shard or broadcast the request if
+        // the bucket-level predicate is empty.
+        //
+        // Note: The query returned would match a super set of the documents matched by the
+        // original query.
+        query = timeseries::getBucketLevelPredicateForRouting(
+            query,
+            expCtx,
+            _cri.cm.getTimeseriesFields()->getTimeseriesOptions(),
+            feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+                serverGlobalParams.featureCompatibility));
     }
 
     validateUpdateDoc(updateOp);
@@ -486,12 +519,15 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         return endPoints;
     }
 
+    auto isShardedTimeseriesCollection = isShardedTimeSeriesBucketsNamespace();
+
     // Targeting by replacement document is no longer necessary when an updateOne without shard key
     // is allowed, since we're able to decisively select a document to modify with the two phase
     // write without shard key protocol.
     if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
             serverGlobalParams.featureCompatibility) ||
-        isExactIdQuery(opCtx, _nss, query, collation, _cri.cm)) {
+        (isExactIdQuery(opCtx, _nss, query, collation, _cri.cm) &&
+         !isShardedTimeseriesCollection)) {
         // Replacement-style updates must always target a single shard. If we were unable to do so
         // using the query, we attempt to extract the shard key from the replacement and target
         // based on it.
@@ -505,7 +541,8 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     }
 
     // If we are here then this is an op-style update and we were not able to target a single shard.
-    // Non-multi updates must target a single shard or an exact _id.
+    // Non-multi updates must target a single shard or an exact _id. Time-series single updates must
+    // target a single shard.
     uassert(ErrorCodes::InvalidOptions,
             str::stream()
                 << "A {multi:false} update on a sharded collection must contain an "
@@ -513,14 +550,18 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                    "single shard (and have the simple collation), but this update targeted "
                 << endPoints.size() << " shards. Update request: " << updateOp.toBSON()
                 << ", shard key pattern: " << shardKeyPattern.toString(),
-            isMulti || isExactIdQuery(opCtx, _nss, query, collation, _cri.cm) ||
+            isMulti ||
+                (isExactIdQuery(opCtx, _nss, query, collation, _cri.cm) &&
+                 !isShardedTimeseriesCollection) ||
                 feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
                     serverGlobalParams.featureCompatibility));
 
     // If the request is {multi:false} and it's not a write without shard key, then this is a single
     // op-style update which we are broadcasting to multiple shards by exact _id. Record this event
     // in our serverStatus metrics.
-    if (!isMulti && isExactIdQuery(opCtx, _nss, query, collation, _cri.cm)) {
+    if (!isMulti &&
+        (isExactIdQuery(opCtx, _nss, query, collation, _cri.cm) &&
+         !isShardedTimeseriesCollection)) {
         updateOneTargetedShardedCount.increment(1);
         updateOneOpStyleBroadcastWithExactIDCount.increment(1);
     }
@@ -564,7 +605,11 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
             // Note: The query returned would match a super set of the documents matched by the
             // original query.
             deleteQuery = timeseries::getBucketLevelPredicateForRouting(
-                deleteQuery, expCtx, tsFields->getTimeseriesOptions());
+                deleteQuery,
+                expCtx,
+                tsFields->getTimeseriesOptions(),
+                feature_flags::gTimeseriesDeletesSupport.isEnabled(
+                    serverGlobalParams.featureCompatibility));
         }
 
         // Sharded collections have the following further requirements for targeting:

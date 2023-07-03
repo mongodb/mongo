@@ -27,15 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/devnull/devnull_kv_engine.h"
-
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
 #include <memory>
+#include <set>
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/mutable/damage_vector.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/catalog/validate_results.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/devnull/ephemeral_catalog_record_store.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -203,7 +218,7 @@ class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
 public:
     DevNullSortedDataBuilderInterface() {}
 
-    virtual Status addKey(const KeyString::Value& keyString) {
+    virtual Status addKey(const key_string::Value& keyString) {
         return Status::OK();
     }
 };
@@ -212,7 +227,7 @@ class DevNullSortedDataInterface : public SortedDataInterface {
 public:
     DevNullSortedDataInterface(StringData identName)
         : SortedDataInterface(identName,
-                              KeyString::Version::kLatestVersion,
+                              key_string::Version::kLatestVersion,
                               Ordering::make(BSONObj()),
                               KeyFormat::Long) {}
 
@@ -224,22 +239,22 @@ public:
     }
 
     virtual Status insert(OperationContext* opCtx,
-                          const KeyString::Value& keyString,
+                          const key_string::Value& keyString,
                           bool dupsAllowed,
                           IncludeDuplicateRecordId includeDuplicateRecordId) {
         return Status::OK();
     }
 
     virtual void unindex(OperationContext* opCtx,
-                         const KeyString::Value& keyString,
+                         const key_string::Value& keyString,
                          bool dupsAllowed) {}
 
-    virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString) {
+    virtual Status dupKeyCheck(OperationContext* opCtx, const key_string::Value& keyString) {
         return Status::OK();
     }
 
     virtual boost::optional<RecordId> findLoc(OperationContext* opCtx,
-                                              const KeyString::Value& keyString) const override {
+                                              const key_string::Value& keyString) const override {
         return boost::none;
     }
 
@@ -270,7 +285,7 @@ public:
     }
 
     virtual void printIndexEntryMetadata(OperationContext* opCtx,
-                                         const KeyString::Value& keyString) const {}
+                                         const key_string::Value& keyString) const {}
 
     virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                                    bool isForward) const {
@@ -282,7 +297,7 @@ public:
     }
 
     void insertWithRecordIdInValue_forTest(OperationContext* opCtx,
-                                           const KeyString::Value& keyString,
+                                           const key_string::Value& keyString,
                                            RecordId rid) override {
         MONGO_UNREACHABLE;
     }
@@ -302,10 +317,10 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* o
                                                              const CollectionOptions& options) {
     if (ident == "_mdb_catalog") {
         return std::make_unique<EphemeralForTestRecordStore>(
-            nss.ns(), options.uuid, ident, &_catalogInfo);
+            nss.ns_forTest(), options.uuid, ident, &_catalogInfo);
     }
     return std::make_unique<DevNullRecordStore>(
-        nss.ns(), options.uuid, ident, options, KeyFormat::Long);
+        nss.ns_forTest(), options.uuid, ident, options, KeyFormat::Long);
 }
 
 std::unique_ptr<RecordStore> DevNullKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,

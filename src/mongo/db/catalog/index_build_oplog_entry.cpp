@@ -27,13 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
 
-#include "mongo/db/catalog/index_build_oplog_entry.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/catalog/index_build_oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEntry& entry) {
@@ -133,8 +143,8 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
                                 commandType,
                                 commandName.toString(),
                                 swBuildUUID.getValue(),
-                                indexNames,
-                                indexSpecs,
+                                std::move(indexNames),
+                                std::move(indexSpecs),
                                 cause};
 }
 }  // namespace mongo

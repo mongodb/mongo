@@ -34,6 +34,7 @@
 #include <set>
 #include <string>
 
+#include "mongo/base/string_data.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/client/replica_set_monitor_interface.h"

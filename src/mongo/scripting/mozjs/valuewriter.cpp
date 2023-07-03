@@ -27,26 +27,50 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/scripting/mozjs/valuewriter.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
 #include <js/Array.h>
+#include <js/ComparisonOperators.h>
 #include <js/Conversions.h>
 #include <js/Date.h>
 #include <js/Object.h>
 #include <js/RegExp.h>
+#include <jsapi.h>
 #include <jsfriendapi.h>
+#include <jspubtd.h>
+#include <new>
+
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/scripting/mozjs/bindata.h"
+#include "mongo/scripting/mozjs/code.h"
+#include "mongo/scripting/mozjs/dbpointer.h"
 #include "mongo/scripting/mozjs/exception.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
+#include "mongo/scripting/mozjs/maxkey.h"
+#include "mongo/scripting/mozjs/minkey.h"
+#include "mongo/scripting/mozjs/nativefunction.h"
+#include "mongo/scripting/mozjs/numberdecimal.h"
+#include "mongo/scripting/mozjs/numberint.h"
+#include "mongo/scripting/mozjs/numberlong.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/valuereader.h"
+#include "mongo/scripting/mozjs/oid.h"
+#include "mongo/scripting/mozjs/timestamp.h"
+#include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/represent_as.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace mozjs {

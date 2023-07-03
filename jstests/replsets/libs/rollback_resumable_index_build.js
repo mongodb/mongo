@@ -79,8 +79,10 @@ const RollbackResumableIndexBuildTest = class {
 
         rollbackTest.awaitLastOpCommitted();
 
-        assert.commandWorked(originalPrimary.adminCommand(
-            {setParameter: 1, logComponentVerbosity: {index: 1, replication: {heartbeats: 0}}}));
+        assert.commandWorked(originalPrimary.adminCommand({
+            setParameter: 1,
+            logComponentVerbosity: {index: 1, replication: {election: 0, heartbeats: 0}},
+        }));
 
         // Set internalQueryExecYieldIterations to 0, internalIndexBuildBulkLoadYieldIterations to
         // 1, and maxIndexBuildDrainBatchSize to 1 so that the index builds are guaranteed to yield

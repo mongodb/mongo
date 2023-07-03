@@ -29,14 +29,18 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <memory>
 #include <string>
-
 #include <wiredtiger.h>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

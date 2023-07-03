@@ -27,9 +27,22 @@
  *    it in the license file.
  */
 
+#include <cstddef>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/inline_auto_update.h"
+#include "mongo/util/str.h"
 
 
 namespace mongo::optimizer {

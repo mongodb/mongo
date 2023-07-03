@@ -27,29 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <stack>
+#include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"  // IWYU pragma: keep
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/oplog_application_checks.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/apply_ops.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/uuid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

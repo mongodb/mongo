@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * update_upsert_multi_noindex.js
  *
@@ -8,8 +6,8 @@
  *
  * @tags: [requires_non_retryable_writes]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');                 // for extendWorkload
-load('jstests/concurrency/fsm_workloads/update_upsert_multi.js');        // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/update_upsert_multi.js";
 load('jstests/concurrency/fsm_workload_modifiers/drop_all_indexes.js');  // for dropAllIndexes
 
-var $config = extendWorkload($config, dropAllIndexes);
+export const $config = extendWorkload($baseConfig, dropAllIndexes);

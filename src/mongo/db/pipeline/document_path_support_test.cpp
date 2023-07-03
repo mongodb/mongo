@@ -27,20 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <boost/optional.hpp>
+#include <cstddef>
+#include <string>
 #include <vector>
 
+#include <absl/container/node_hash_set.h>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace document_path_support {

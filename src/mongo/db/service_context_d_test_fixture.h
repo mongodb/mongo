@@ -29,10 +29,16 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+#include <utility>
+
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {

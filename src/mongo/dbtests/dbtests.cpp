@@ -31,37 +31,58 @@
  * Runs db unit tests.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/dbtests/dbtests.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/init.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_mongod.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/dbtests/framework.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_layer_manager.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/testing_proctor.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 namespace dbtests {
@@ -100,7 +121,7 @@ Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, 
 }
 
 Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec) {
-    NamespaceString nss(ns);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
     AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
     {
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
@@ -110,7 +131,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         if (!coll) {
             auto db = autoDb.ensureDbExists(opCtx);
             invariant(db);
-            coll = db->createCollection(opCtx, NamespaceString(ns));
+            coll = db->createCollection(opCtx, NamespaceString::createNamespaceString_forTest(ns));
         }
         invariant(coll);
         wunit.commit();
@@ -179,7 +200,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
 }
 
 WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData ns)
-    : _opCtx(opCtx), _nss(ns) {
+    : _opCtx(opCtx), _nss(NamespaceString::createNamespaceString_forTest(ns)) {
     // Lock the database and collection
     _autoDb.emplace(opCtx, _nss.dbName(), MODE_IX);
     _collLock.emplace(opCtx, _nss, MODE_IX);

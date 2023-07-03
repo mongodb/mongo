@@ -29,7 +29,18 @@
 
 #pragma once
 
+#include <map>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -76,7 +87,7 @@ public:
             output.push_back(*it);
         }
 
-        return Value(output);
+        return Value(std::move(output));
     }
 
 private:

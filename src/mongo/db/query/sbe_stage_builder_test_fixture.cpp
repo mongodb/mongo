@@ -27,15 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/inlined_vector.h>
+#include <boost/optional/optional.hpp>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/shard_filterer.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/mock_yield_policies.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_test_fixture.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 std::unique_ptr<QuerySolution> SbeStageBuilderTestFixture::makeQuerySolution(
@@ -77,8 +89,7 @@ SbeStageBuilderTestFixture::buildPlanStage(
     stage_builder::SlotBasedStageBuilder builder{
         operationContext(), colls, *statusWithCQ.getValue(), *querySolution, getYieldPolicy()};
 
-    auto stage = builder.build(querySolution->root());
-    auto data = builder.getPlanStageData();
+    auto [stage, data] = builder.build(querySolution->root());
 
     // Reset "shardFilterer".
     if (auto shardFiltererSlot = data.env->getSlotIfExists("shardFilterer"_sd);
@@ -92,9 +103,9 @@ SbeStageBuilderTestFixture::buildPlanStage(
 
     auto slots = sbe::makeSV();
     if (hasRecordId) {
-        slots.push_back(data.outputs.get(stage_builder::PlanStageSlots::kRecordId));
+        slots.push_back(data.staticData->outputs.get(stage_builder::PlanStageSlots::kRecordId));
     }
-    slots.push_back(data.outputs.get(stage_builder::PlanStageSlots::kResult));
+    slots.push_back(data.staticData->outputs.get(stage_builder::PlanStageSlots::kResult));
 
     // 'expCtx' owns the collator and a collator slot is registered into the runtime environment
     // while creating 'builder'. So, the caller should retain the 'expCtx' until the execution is

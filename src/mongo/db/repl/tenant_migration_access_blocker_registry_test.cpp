@@ -28,8 +28,25 @@
  */
 
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
+
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 

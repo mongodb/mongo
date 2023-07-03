@@ -28,20 +28,42 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <algorithm>
+#include <list>
 #include <memory>
+#include <ratio>
+#include <utility>
+#include <vector>
 
-#include "mongo/client/sdam/sdam.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/sdam/sdam_configuration.h"
+#include "mongo/client/sdam/topology_description.h"
 #include "mongo/client/sdam/topology_listener_mock.h"
 #include "mongo/client/server_ping_monitor.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/duration.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -164,7 +186,7 @@ protected:
         ASSERT_LT(elapsed(), deadline);
         auto pingResponse = _topologyListener->getPingResponse(hostAndPort);
 
-        // There should only be one isMaster response queued up.
+        // There should only be one "hello" response queued up.
         ASSERT_EQ(pingResponse.size(), 1);
         ASSERT(pingResponse[0].isOK());
 

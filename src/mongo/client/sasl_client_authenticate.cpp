@@ -31,9 +31,13 @@
 
 #include <string>
 
-#include "mongo/base/string_data.h"
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/sasl_command_constants.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/str.h"
 

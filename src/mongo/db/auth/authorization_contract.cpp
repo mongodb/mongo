@@ -30,11 +30,19 @@
 
 #include "mongo/db/auth/authorization_contract.h"
 
-#include "mongo/bson/bsontypes.h"
+#include <cstddef>
+#include <mutex>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/access_checks_gen.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/action_type_gen.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/debug_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
@@ -52,6 +60,10 @@ void AuthorizationContract::clear() {
 }
 
 void AuthorizationContract::addAccessCheck(AccessCheckEnum check) {
+    if (!_isTestModeEnabled) {
+        return;
+    }
+
     stdx::lock_guard<Mutex> lck(_mutex);
 
     _checks.set(static_cast<size_t>(check), true);
@@ -64,6 +76,10 @@ bool AuthorizationContract::hasAccessCheck(AccessCheckEnum check) const {
 }
 
 void AuthorizationContract::addPrivilege(const Privilege& p) {
+    if (!_isTestModeEnabled) {
+        return;
+    }
+
     stdx::lock_guard<Mutex> lck(_mutex);
 
     auto matchType = p.getResourcePattern().matchType();

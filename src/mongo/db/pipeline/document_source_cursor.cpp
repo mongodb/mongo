@@ -28,23 +28,39 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/optional.hpp>
+#include <map>
+#include <type_traits>
 
-#include "mongo/db/pipeline/document_source_cursor.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/db/catalog/collection.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/resharding/resume_token_gen.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/serialization_context.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -217,7 +233,8 @@ Value DocumentSourceCursor::serialize(SerializationOptions opts) const {
     auto verbosity = opts.verbosity;
     // We never parse a DocumentSourceCursor, so we only serialize for explain. Since it's never
     // part of user input, there's no need to compute its query shape.
-    if (!verbosity || opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs)
+    if (!verbosity || opts.transformIdentifiers ||
+        opts.literalPolicy != LiteralSerializationPolicy::kUnchanged)
         return Value();
 
     invariant(_exec);
@@ -249,6 +266,7 @@ Value DocumentSourceCursor::serialize(SerializationOptions opts) const {
                                _execStatus,
                                _winningPlanTrialStats,
                                BSONObj(),
+                               SerializationContext::stateCommandReply(pExpCtx->serializationCtxt),
                                BSONObj(),
                                &explainStatsBuilder);
     }
@@ -347,7 +365,7 @@ DocumentSourceCursor::DocumentSourceCursor(
     for (auto& [nss, coll] : collections.getSecondaryCollections()) {
         if (coll) {
             PlanSummaryStats stats;
-            explainer.getSecondarySummaryStats(nss.toString(), &stats);
+            explainer.getSecondarySummaryStats(nss, &stats);
             CollectionQueryInfo::get(coll).notifyOfQuery(pExpCtx->opCtx, coll, stats);
         }
     }

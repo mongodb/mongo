@@ -29,14 +29,22 @@
 
 #pragma once
 
-#include <MurmurHash3.h>
-
 #include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <deque>
-#include <fstream>
+#include <exception>
+#include <fstream>  // IWYU pragma: keep
+#include <functional>
+#include <iterator>
 #include <memory>
 #include <queue>
 #include <string>
+#include <system_error>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -45,9 +53,11 @@
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/sorter/sorter_stats.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 /**
  * This is the public API for the Sorter (both in-memory and external)

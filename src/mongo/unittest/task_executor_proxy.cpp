@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
 #include "mongo/unittest/task_executor_proxy.h"
 

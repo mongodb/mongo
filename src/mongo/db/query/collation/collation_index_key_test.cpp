@@ -27,15 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
 
-#include "mongo/db/query/collation/collation_index_key.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/storage/key_string.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace {
 
@@ -44,18 +53,18 @@ using namespace mongo;
 void assertKeyStringCollatorOutput(const CollatorInterfaceMock& collator,
                                    const BSONObj& dataObj,
                                    const BSONObj& expected) {
-    KeyString::Builder ks(KeyString::Version::kLatestVersion, KeyString::ALL_ASCENDING);
+    key_string::Builder ks(key_string::Version::kLatestVersion, key_string::ALL_ASCENDING);
     ks.appendBSONElement(dataObj.firstElement(), [&](StringData stringData) {
         return collator.getComparisonString(stringData);
     });
 
-    ASSERT_EQ(
-        ks.getValueCopy(),
-        KeyString::Builder(KeyString::Version::kLatestVersion, expected, KeyString::ALL_ASCENDING));
+    ASSERT_EQ(ks.getValueCopy(),
+              key_string::Builder(
+                  key_string::Version::kLatestVersion, expected, key_string::ALL_ASCENDING));
 }
 
 void assertKeyStringCollatorThrows(const CollatorInterfaceMock& collator, const BSONObj& dataObj) {
-    KeyString::Builder ks(KeyString::Version::kLatestVersion, KeyString::ALL_ASCENDING);
+    key_string::Builder ks(key_string::Version::kLatestVersion, key_string::ALL_ASCENDING);
     ASSERT_THROWS_CODE(ks.appendBSONElement(dataObj.firstElement(),
                                             [&](StringData stringData) {
                                                 return collator.getComparisonString(stringData);

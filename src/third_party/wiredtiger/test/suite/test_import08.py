@@ -131,7 +131,7 @@ class test_import08(test_import_base):
         # Copy over the datafiles for the object we want to import.
         self.copy_file(self.original_db_file, '.', newdir)
 
-        # Contruct the config string.
+        # Construct the config string.
         if self.repair:
             import_config = 'import=(enabled,repair=true)'
         else:

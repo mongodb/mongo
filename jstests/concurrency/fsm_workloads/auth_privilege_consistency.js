@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * auth_privilege_consistency.js
  *
@@ -12,7 +10,7 @@ load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropRole
 // UMC commands are not supported in transactions.
 TestData.runInsideTransaction = false;
 
-var $config = (function() {
+export const $config = (function() {
     const kTestUserPassword = 'secret';
     const kMaxCmdTimeMs = 60000;
     const kMaxTxnLockReqTimeMs = 100;

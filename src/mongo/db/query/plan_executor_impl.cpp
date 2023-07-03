@@ -28,47 +28,55 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/plan_executor_impl.h"
-
-#include "mongo/util/duration.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <fmt/format.h>
 #include <memory>
+#include <string>
+#include <utility>
+#include <variant>
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/count_scan.h"
-#include "mongo/db/exec/distinct_scan.h"
-#include "mongo/db/exec/idhack.h"
-#include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/near.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/timeseries_modify.h"
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/mock_yield_policies.h"
+#include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/stacktrace.h"
+#include "mongo/util/future.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -152,8 +160,9 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
             _nss = (*collectionPtr)->ns();
         } else {
             invariant(_cq);
-            _nss =
-                _cq->getFindCommandRequest().getNamespaceOrUUID().nss().value_or(NamespaceString());
+            if (_cq->getFindCommandRequest().getNamespaceOrUUID().isNamespaceString()) {
+                _nss = _cq->getFindCommandRequest().getNamespaceOrUUID().nss();
+            }
         }
     }
 
@@ -479,7 +488,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                     _opCtx,
                     tempUnavailErrorsInARow,
                     "plan executor",
-                    _nss.ns(),
+                    NamespaceStringOrUUID(_nss),
                     TemporarilyUnavailableException(
                         Status(ErrorCodes::TemporarilyUnavailable, "temporarily unavailable")));
             } else {
@@ -493,7 +502,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                 CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
                 writeConflictsInARow++;
                 logWriteConflictAndBackoff(
-                    writeConflictsInARow, "plan execution", ""_sd, _nss.ns());
+                    writeConflictsInARow, "plan execution", ""_sd, NamespaceStringOrUUID(_nss));
             }
 
             // Yield next time through the loop.
@@ -505,11 +514,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
             invariant(PlanStage::IS_EOF == code);
             if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
                     [this](const BSONObj& data) {
-                        if (data.hasField("namespace") &&
-                            _nss != NamespaceString(data.getStringField("namespace"))) {
-                            return false;
-                        }
-                        return true;
+                        auto fpNss = NamespaceStringUtil::parseFailPointData(data, "namespace"_sd);
+                        return fpNss.isEmpty() || fpNss == _nss;
                     }))) {
                 LOGV2(20946,
                       "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point "
@@ -595,41 +601,54 @@ UpdateResult PlanExecutorImpl::getUpdateResult() const {
     }
 
     // If the collection exists, then we expect the root of the plan tree to either be an update
-    // stage, or (for findAndModify) a projection stage wrapping an update stage.
-    switch (_root->stageType()) {
-        case StageType::STAGE_PROJECTION_DEFAULT:
-        case StageType::STAGE_PROJECTION_COVERED:
-        case StageType::STAGE_PROJECTION_SIMPLE: {
-            invariant(_root->getChildren().size() == 1U);
-            invariant(StageType::STAGE_UPDATE == _root->child()->stageType());
-            const SpecificStats* stats = _root->child()->getSpecificStats();
-            return updateStatsToResult(
-                static_cast<const UpdateStats&>(*stats),
-                static_cast<UpdateStage*>(_root->child().get())->containsDotsAndDollarsField());
+    // stage, or (for findAndModify) a projection stage wrapping an update / TS_MODIFY stage.
+    const auto updateStage = [&] {
+        switch (_root->stageType()) {
+            case StageType::STAGE_PROJECTION_DEFAULT:
+            case StageType::STAGE_PROJECTION_COVERED:
+            case StageType::STAGE_PROJECTION_SIMPLE: {
+                tassert(7314604,
+                        "Unexpected number of children: {}"_format(_root->getChildren().size()),
+                        _root->getChildren().size() == 1U);
+                auto childStage = _root->child().get();
+                tassert(7314605,
+                        "Unexpected child stage type: {}"_format(childStage->stageType()),
+                        StageType::STAGE_UPDATE == childStage->stageType() ||
+                            StageType::STAGE_TIMESERIES_MODIFY == childStage->stageType());
+                return childStage;
+            }
+            default:
+                return _root.get();
         }
+    }();
+    switch (updateStage->stageType()) {
         case StageType::STAGE_TIMESERIES_MODIFY: {
             const auto& stats =
-                static_cast<const TimeseriesModifyStats&>(*_root->getSpecificStats());
+                static_cast<const TimeseriesModifyStats&>(*updateStage->getSpecificStats());
             return UpdateResult(
                 stats.nMeasurementsModified > 0 /* Did we update at least one obj? */,
                 stats.isModUpdate /* Is this a $mod update? */,
                 stats.nMeasurementsModified /* number of modified docs, no no-ops */,
                 stats.nMeasurementsMatched /* # of docs matched/updated, even no-ops */,
                 stats.objInserted /* objInserted */,
-                static_cast<TimeseriesModifyStage*>(_root.get())->containsDotsAndDollarsField());
+                static_cast<TimeseriesModifyStage*>(updateStage)->containsDotsAndDollarsField());
+        }
+        case StageType::STAGE_UPDATE: {
+            const auto& stats = static_cast<const UpdateStats&>(*updateStage->getSpecificStats());
+            return updateStatsToResult(
+                stats, static_cast<UpdateStage*>(updateStage)->containsDotsAndDollarsField());
         }
         default:
-            invariant(StageType::STAGE_UPDATE == _root->stageType());
-            const auto stats = _root->getSpecificStats();
-            return updateStatsToResult(
-                static_cast<const UpdateStats&>(*stats),
-                static_cast<UpdateStage*>(_root.get())->containsDotsAndDollarsField());
+            MONGO_UNREACHABLE_TASSERT(7314606);
     }
 }
 
 long long PlanExecutorImpl::executeDelete() {
     _executePlan();
+    return getDeleteResult();
+}
 
+long long PlanExecutorImpl::getDeleteResult() const {
     // If we're deleting from a non-existent collection, then the delete plan may have an EOF as
     // the root stage.
     if (_root->stageType() == STAGE_EOF) {
@@ -659,15 +678,15 @@ long long PlanExecutorImpl::executeDelete() {
     }();
     switch (deleteStage->stageType()) {
         case StageType::STAGE_TIMESERIES_MODIFY: {
-            const auto* tsModifyStats =
-                static_cast<const TimeseriesModifyStats*>(deleteStage->getSpecificStats());
-            return tsModifyStats->nMeasurementsModified;
+            const auto& tsModifyStats =
+                static_cast<const TimeseriesModifyStats&>(*deleteStage->getSpecificStats());
+            return tsModifyStats.nMeasurementsModified;
         }
         case StageType::STAGE_DELETE:
         case StageType::STAGE_BATCHED_DELETE: {
-            const auto* deleteStats =
-                static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
-            return deleteStats->docsDeleted;
+            const auto& deleteStats =
+                static_cast<const DeleteStats&>(*deleteStage->getSpecificStats());
+            return deleteStats.docsDeleted;
         }
         default:
             MONGO_UNREACHABLE_TASSERT(7308306);

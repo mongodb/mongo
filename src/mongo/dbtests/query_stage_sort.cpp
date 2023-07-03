@@ -27,28 +27,66 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <cstdint>
 #include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/client/dbclient_cursor.h"
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/sort.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/sort_key_generator.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 /**
  * This file tests db/exec/sort.cpp
@@ -180,7 +218,7 @@ public:
                                                             std::move(keyGenStage));
 
         auto fetchStage = std::make_unique<FetchStage>(
-            _expCtx.get(), ws.get(), std::move(sortStage), nullptr, coll);
+            _expCtx.get(), ws.get(), std::move(sortStage), nullptr, &coll);
 
         // Must fetch so we can look at the doc as a BSONObj.
         auto statusWithPlanExecutor =
@@ -245,7 +283,7 @@ public:
         return "unittests.QueryStageSort";
     }
     static NamespaceString nss() {
-        return NamespaceString(ns());
+        return NamespaceString::createNamespaceString_forTest(ns());
     }
 
 protected:
@@ -633,7 +671,7 @@ public:
                                                             std::move(keyGenStage));
 
         auto fetchStage = std::make_unique<FetchStage>(
-            _expCtx.get(), ws.get(), std::move(sortStage), nullptr, coll);
+            _expCtx.get(), ws.get(), std::move(sortStage), nullptr, &coll);
 
         // We don't get results back since we're sorting some parallel arrays.
         auto statusWithPlanExecutor =

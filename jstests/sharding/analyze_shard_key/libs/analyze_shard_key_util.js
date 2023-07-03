@@ -110,6 +110,16 @@ var AnalyzeShardKeyUtil = (function() {
     }
 
     /**
+     * Returns true if the collection is a clustered collection. Assumes that the collection
+     * exists.
+     */
+    function isClusterCollection(conn, dbName, collName) {
+        const listCollectionRes = assert.commandWorked(
+            conn.getDB(dbName).runCommand({listCollections: 1, filter: {name: collName}}));
+        return listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
+    }
+
+    /**
      * Enables profiling of the given database on all the given mongods.
      */
     function enableProfiler(mongodConns, dbName) {
@@ -164,7 +174,22 @@ var AnalyzeShardKeyUtil = (function() {
     }
 
     function validateKeyCharacteristicsMetrics(metrics) {
-        assert.gte(metrics.numDocs, metrics.numDistinctValues, metrics);
+        assert.gt(metrics.numDocsTotal, 0, metrics);
+        assert.gt(metrics.numDocsSampled, 0, metrics);
+        assert.gt(metrics.numDistinctValues, 0, metrics);
+        assert.gt(metrics.mostCommonValues.length, 0, metrics);
+        assert.gt(metrics.avgDocSizeBytes, 0, metrics);
+
+        assert.gte(metrics.numDocsTotal, metrics.numDocsSampled, metrics);
+        if (metrics.hasOwnProperty("numOrphanDocs")) {
+            assert.gte(metrics.numOrphanDocs, 0, metrics);
+            assert.gte(metrics.numDocsTotal, metrics.numOrphanDocs);
+        }
+        if (metrics.isUnique) {
+            assert.eq(metrics.numDocsSampled, metrics.numDistinctValues, metrics);
+        } else {
+            assert.gte(metrics.numDocsSampled, metrics.numDistinctValues, metrics);
+        }
         assert.gte(metrics.numDistinctValues, metrics.mostCommonValues.length, metrics);
 
         let totalFrequency = 0;
@@ -177,7 +202,7 @@ var AnalyzeShardKeyUtil = (function() {
             totalFrequency += frequency;
             prevFrequency = frequency;
         }
-        assert.gte(metrics.numDocs, totalFrequency, metrics);
+        assert.gte(metrics.numDocsTotal, totalFrequency, metrics);
 
         if (metrics.monotonicity.type == "unknown") {
             assert(!metrics.monotonicity.hasOwnProperty("recordIdCorrelationCoefficient"), metrics);
@@ -187,21 +212,16 @@ var AnalyzeShardKeyUtil = (function() {
             assert.gte(Math.abs(coefficient), 0, metrics);
             assert.lte(Math.abs(coefficient), 1, metrics);
         }
-
-        assert.gt(metrics.avgDocSizeBytes, 0);
     }
 
-    function assertNotContainKeyCharacteristicsMetrics(metrics) {
-        assert(!metrics.hasOwnProperty("numDocs"), metrics);
-        assert(!metrics.hasOwnProperty("isUnique"), metrics);
-        assert(!metrics.hasOwnProperty("numDistinctValues"), metrics);
-        assert(!metrics.hasOwnProperty("mostCommonValues"), metrics);
-        assert(!metrics.hasOwnProperty("monotonicity"), metrics);
-        assert(!metrics.hasOwnProperty("avgDocSizeBytes"), metrics);
+    function assertNotContainKeyCharacteristicsMetrics(res) {
+        assert(!res.hasOwnProperty("keyCharacteristics"), res);
     }
 
-    function assertContainKeyCharacteristicsMetrics(metrics) {
-        assert(metrics.hasOwnProperty("numDocs"), metrics);
+    function assertContainKeyCharacteristicsMetrics(res) {
+        assert(res.hasOwnProperty("keyCharacteristics"), res);
+        const metrics = res.keyCharacteristics;
+        assert(metrics.hasOwnProperty("numDocsTotal"), metrics);
         assert(metrics.hasOwnProperty("isUnique"), metrics);
         assert(metrics.hasOwnProperty("numDistinctValues"), metrics);
         assert(metrics.hasOwnProperty("mostCommonValues"), metrics);
@@ -211,9 +231,8 @@ var AnalyzeShardKeyUtil = (function() {
     }
 
     function assertKeyCharacteristicsMetrics(actual, expected) {
-        assertContainKeyCharacteristicsMetrics(actual);
-
-        assert.eq(actual.numDocs, expected.numDocs, {actual, expected});
+        assert.eq(actual.numDocsTotal, expected.numDocs, {actual, expected});
+        assert.eq(actual.numDocsSampled, expected.numDocs, {actual, expected});
         assert.eq(actual.isUnique, expected.isUnique, {actual, expected});
         assert.eq(actual.numDistinctValues, expected.numDistinctValues, {actual, expected});
 
@@ -313,16 +332,16 @@ var AnalyzeShardKeyUtil = (function() {
         }
     }
 
-    function assertNotContainReadWriteDistributionMetrics(metrics) {
-        assert(!metrics.hasOwnProperty("readDistribution"));
-        assert(!metrics.hasOwnProperty("writeDistribution"));
+    function assertNotContainReadWriteDistributionMetrics(res) {
+        assert(!res.hasOwnProperty("readDistribution"));
+        assert(!res.hasOwnProperty("writeDistribution"));
     }
 
-    function assertContainReadWriteDistributionMetrics(metrics) {
-        assert(metrics.hasOwnProperty("readDistribution"));
-        assert(metrics.hasOwnProperty("writeDistribution"));
-        validateReadDistributionMetrics(metrics.readDistribution);
-        validateWriteDistributionMetrics(metrics.writeDistribution);
+    function assertContainReadWriteDistributionMetrics(res) {
+        assert(res.hasOwnProperty("readDistribution"));
+        assert(res.hasOwnProperty("writeDistribution"));
+        validateReadDistributionMetrics(res.readDistribution);
+        validateWriteDistributionMetrics(res.writeDistribution);
     }
 
     function validateSampledQueryDocument(doc) {
@@ -348,6 +367,7 @@ var AnalyzeShardKeyUtil = (function() {
         getRandInteger,
         getRandomElement,
         getRandomFieldName,
+        isClusterCollection,
         enableProfiler,
         disableProfiler,
         calculatePercentage,
@@ -356,6 +376,7 @@ var AnalyzeShardKeyUtil = (function() {
         assertNotContainKeyCharacteristicsMetrics,
         assertContainKeyCharacteristicsMetrics,
         assertKeyCharacteristicsMetrics,
+        validateKeyCharacteristicsMetrics,
         assertNotContainReadWriteDistributionMetrics,
         assertContainReadWriteDistributionMetrics,
         validateSampledQueryDocument

@@ -30,58 +30,69 @@
 #include "mongo/shell/shell_utils_launcher.h"
 
 #include <algorithm>
-#include <array>
-#include <boost/iostreams/device/file_descriptor.hpp>
-#include <boost/iostreams/stream.hpp>
-#include <boost/iostreams/stream_buffer.hpp>
-#include <boost/iostreams/tee.hpp>
+#include <cerrno>
 #include <csignal>
-#include <fcntl.h>
+#include <cstdint>
+#include <cstring>
 #include <fmt/format.h>
-#include <fstream>
+#include <fstream>  // IWYU pragma: keep
 #include <iostream>
 #include <iterator>
 #include <map>
 #include <memory>
+#include <sstream>
+#include <string>
+#include <system_error>
+#include <utility>
 #include <vector>
+
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #ifdef _WIN32
 #include <io.h>
+
 #define SIGKILL 9
 #else
-#include <csignal>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <unistd.h>
 #endif
 
-#include "mongo/base/environment_buffer.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/client/dbclient_connection.h"
+#include "mongo/client/dbclient_connection.h"  // IWYU pragma: keep
+#include "mongo/config.h"                      // IWYU pragma: keep
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/named_pipe.h"
 #include "mongo/db/traffic_reader.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/basic.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/named_pipe_test_helper.h"
 #include "mongo/shell/program_runner.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/ctype.h"
 #include "mongo/util/destructor_guard.h"
-#include "mongo/util/exit.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/exit_code.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/signal_win32.h"
-#include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/shared_buffer.h"
+#include "mongo/util/signal_win32.h"  // IWYU pragma: keep
+#include "mongo/util/text.h"          // IWYU pragma: keep
+#include "mongo/util/time_support.h"
 #include "mongo/util/version/releases.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

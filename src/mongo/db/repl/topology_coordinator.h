@@ -29,23 +29,46 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
 #include <functional>
 #include <iosfwd>
+#include <map>
+#include <memory>
 #include <queue>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/repl/hello_response.h"
 #include "mongo/db/repl/last_vote.h"
+#include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/member_data.h"
+#include "mongo/db/repl/member_id.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
+#include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_metrics_gen.h"
 #include "mongo/db/repl/split_horizon.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/topology_version_gen.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -905,6 +928,9 @@ private:
 
     // Returns a HostAndPort if one is forced via the 'replSetSyncFrom' command.
     boost::optional<HostAndPort> _chooseSyncSourceReplSetSyncFrom(Date_t now);
+
+    // Returns a HostAndPort if one is forced via the 'unsupportedSyncSource' startup parameter.
+    boost::optional<HostAndPort> _chooseSyncSourceUnsupportedSyncSourceParameter(Date_t now);
 
     // Does preliminary checks involved in choosing sync source
     // * Do we have a valid configuration?

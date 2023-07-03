@@ -27,16 +27,27 @@
  *    it in the license file.
  */
 
-#include <type_traits>
+#include <algorithm>
+#include <array>
+#include <limits>
+#include <utility>
 
-#include "mongo/db/write_concern_options.h"
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/db/write_concern_options_gen.h"
-#include "mongo/util/str.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {

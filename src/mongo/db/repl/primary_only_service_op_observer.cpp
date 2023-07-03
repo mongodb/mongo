@@ -27,18 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
 
-#include "mongo/db/repl/primary_only_service_op_observer.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/primary_only_service_op_observer.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace repl {
 
 namespace {
 
-const auto documentIdDecoration = OperationContext::declareDecoration<BSONObj>();
+const auto documentIdDecoration = OplogDeleteEntryArgs::declareDecoration<BSONObj>();
 
 }  // namespace
 
@@ -51,10 +61,12 @@ PrimaryOnlyServiceOpObserver::~PrimaryOnlyServiceOpObserver() = default;
 
 void PrimaryOnlyServiceOpObserver::aboutToDelete(OperationContext* opCtx,
                                                  const CollectionPtr& coll,
-                                                 BSONObj const& doc) {
+                                                 BSONObj const& doc,
+                                                 OplogDeleteEntryArgs* args,
+                                                 OpStateAccumulator* opAccumulator) {
     // Extract the _id field from the document. If it does not have an _id, use the
     // document itself as the _id.
-    documentIdDecoration(opCtx) = doc["_id"] ? doc["_id"].wrap() : doc;
+    documentIdDecoration(args) = doc["_id"] ? doc["_id"].wrap() : doc;
 }
 
 void PrimaryOnlyServiceOpObserver::onDelete(OperationContext* opCtx,
@@ -63,7 +75,7 @@ void PrimaryOnlyServiceOpObserver::onDelete(OperationContext* opCtx,
                                             const OplogDeleteEntryArgs& args,
                                             OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
-    auto& documentId = documentIdDecoration(opCtx);
+    auto& documentId = documentIdDecoration(args);
     invariant(!documentId.isEmpty());
 
     auto service = _registry->lookupServiceByNamespace(nss);

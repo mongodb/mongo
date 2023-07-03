@@ -27,12 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <memory>
+#include <stack>
+#include <string>
+#include <vector>
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/matcher/copyable_match_expression.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/projection_ast_path_tracking_visitor.h"
 #include "mongo/db/query/projection_ast_util.h"
+#include "mongo/db/query/projection_ast_visitor.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/db/query/tree_walker.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::projection_ast {
 namespace {
@@ -61,18 +77,11 @@ public:
     void visit(const ProjectionSliceASTNode* node) override {
         BSONObjBuilder sub(_builders.top().subobjStart(getFieldName()));
         if (node->skip()) {
-            if (_options.replacementForLiteralArgs) {
-                const auto rep = _options.replacementForLiteralArgs.value();
-                sub.appendArray("$slice", BSON_ARRAY(rep << rep));
-            } else {
-                sub.appendArray("$slice", BSON_ARRAY(*node->skip() << node->limit()));
-            }
+            sub.appendArray("$slice",
+                            BSON_ARRAY(_options.serializeLiteral(*node->skip())
+                                       << _options.serializeLiteral(node->limit())));
         } else {
-            if (_options.replacementForLiteralArgs) {
-                sub.append("$slice", _options.replacementForLiteralArgs.value());
-            } else {
-                sub.appendNumber("$slice", node->limit());
-            }
+            _options.appendLiteral(&sub, "$slice", node->limit());
         }
     }
 

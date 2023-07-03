@@ -29,14 +29,35 @@
 
 #include "equality_predicate.h"
 
+#include <array>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <iterator>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_tags.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 namespace mongo::fle {
 
@@ -192,7 +213,7 @@ std::unique_ptr<MatchExpression> EqualityPredicate::rewriteToRuntimeComparison(
  */
 boost::optional<std::pair<ExpressionFieldPath*, ExpressionConstant*>>
 EqualityPredicate::extractDetailsFromComparison(ExpressionCompare* expr) const {
-    auto equalitiesList = expr->getChildren();
+    auto& equalitiesList = expr->getChildren();
 
     auto leftConstant = dynamic_cast<ExpressionConstant*>(equalitiesList[0].get());
     auto rightConstant = dynamic_cast<ExpressionConstant*>(equalitiesList[1].get());

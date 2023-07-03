@@ -29,23 +29,57 @@
 
 #include "mongo/db/db_raii.h"
 
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
+#include <mutex>
+#include <string>
+#include <tuple>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/repl/collection_utils.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/snapshot_helper.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/rpc/message.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/stale_exception.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -58,19 +92,13 @@ MONGO_FAIL_POINT_DEFINE(reachedAutoGetLockFreeShardConsistencyRetry);
 
 const boost::optional<int> kDoNotChangeProfilingLevel = boost::none;
 
-// TODO (SERVER-69813): Get rid of this when ShardServerCatalogCacheLoader will be removed.
-// If set to false, secondary reads should wait behind the PBW lock.
-const auto allowSecondaryReadsDuringBatchApplication_DONT_USE =
-    OperationContext::declareDecoration<boost::optional<bool>>();
-
 /**
  * Performs some checks to determine whether the operation is compatible with a lock-free read.
  * Multi-doc transactions are not supported, nor are operations holding an exclusive lock.
  */
 bool supportsLockFreeRead(OperationContext* opCtx) {
     // Lock-free reads are not supported in multi-document transactions.
-    // Lock-free reads are not supported under an exclusive lock (nested reads under exclusive lock
-    // holding operations).
+    // Lock-free reads are not supported when performing a write.
     // Lock-free reads are not supported if a storage txn is already open w/o the lock-free reads
     // operation flag set.
     return !storageGlobalParams.disableLockFreeReads && !opCtx->inMultiDocumentTransaction() &&
@@ -328,8 +356,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     : _callerWasConflicting(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()),
       _shouldNotConflictWithSecondaryBatchApplicationBlock(
           [&]() -> boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> {
-              if (allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx).value_or(true) &&
-                  opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
+              if (opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
                   return boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>(
                       opCtx->lockState());
               }
@@ -337,9 +364,9 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
               return boost::none;
           }()),
       _autoDb(AutoGetDb::createForAutoGetCollection(
-          opCtx, nsOrUUID, getLockModeForQuery(opCtx, nsOrUUID.nss()), options)) {
+          opCtx, nsOrUUID, getLockModeForQuery(opCtx, nsOrUUID), options)) {
 
-    const auto modeColl = getLockModeForQuery(opCtx, nsOrUUID.nss());
+    const auto modeColl = getLockModeForQuery(opCtx, nsOrUUID);
     const auto viewMode = options._viewMode;
     const auto deadline = options._deadline;
     const auto& secondaryNssOrUUIDs = options._secondaryNssOrUUIDs;
@@ -348,7 +375,11 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     // there are many, however, the locks must be taken in _ascending_ ResourceId order to avoid
     // deadlocks across threads.
     if (secondaryNssOrUUIDs.empty()) {
-        uassertStatusOK(nsOrUUID.isNssValid());
+        uassert(ErrorCodes::InvalidNamespace,
+                fmt::format("Namespace {} is not a valid collection name",
+                            nsOrUUID.toStringForErrorMsg()),
+                nsOrUUID.isUUID() || (nsOrUUID.isNamespaceString() && nsOrUUID.nss().isValid()));
+
         _collLocks.emplace_back(opCtx, nsOrUUID, modeColl, deadline);
     } else {
         catalog_helper::acquireCollectionLocksInResourceIdOrder(
@@ -592,7 +623,7 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
         try {
             nss = catalogBeforeSnapshot->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            invariant(nsOrUUID.uuid());
+            invariant(nsOrUUID.isUUID());
 
             const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
             if (readSource == RecoveryUnit::ReadSource::kNoTimestamp ||
@@ -790,7 +821,6 @@ boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
 makeShouldNotConflictWithSecondaryBatchApplicationBlock(OperationContext* opCtx,
                                                         bool isLockFreeReadSubOperation) {
     if (!isLockFreeReadSubOperation &&
-        allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx).value_or(true) &&
         opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
         return boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>(
             opCtx->lockState());
@@ -1100,6 +1130,20 @@ const NamespaceString& AutoGetCollectionForReadCommandMaybeLockFree::getNss() co
     }
 }
 
+StringData AutoGetCollectionForReadCommandMaybeLockFree::getCollectionType() const {
+    if (auto&& view = getView()) {
+        if (view->timeseries())
+            return "timeseries"_sd;
+        return "view"_sd;
+    }
+    auto&& collection = getCollection();
+    if (!collection) {
+        return "nonExistent"_sd;
+    }
+    return "collection"_sd;
+}
+
+
 bool AutoGetCollectionForReadCommandMaybeLockFree::isAnySecondaryNamespaceAViewOrSharded() const {
     return _autoGet ? _autoGet->isAnySecondaryNamespaceAViewOrSharded()
                     : _autoGetLockFree->isAnySecondaryNamespaceAViewOrSharded();
@@ -1150,7 +1194,7 @@ OldClientContext::~OldClientContext() {
     auto currentOp = CurOp::get(_opCtx);
     Top::get(_opCtx->getClient()->getServiceContext())
         .record(_opCtx,
-                currentOp->getNS(),
+                currentOp->getNSS(),
                 currentOp->getLogicalOp(),
                 _opCtx->lockState()->isWriteLocked() ? Top::LockType::WriteLocked
                                                      : Top::LockType::ReadLocked,
@@ -1159,31 +1203,17 @@ OldClientContext::~OldClientContext() {
                 currentOp->getReadWriteType());
 }
 
-LockMode getLockModeForQuery(OperationContext* opCtx, const boost::optional<NamespaceString>& nss) {
+LockMode getLockModeForQuery(OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) {
     invariant(opCtx);
 
     // Use IX locks for multi-statement transactions; otherwise, use IS locks.
     if (opCtx->inMultiDocumentTransaction()) {
         uassert(51071,
                 "Cannot query system.views within a transaction",
-                !nss || !nss->isSystemDotViews());
+                !nssOrUUID.isNamespaceString() || !nssOrUUID.nss().isSystemDotViews());
         return MODE_IX;
     }
     return MODE_IS;
-}
-
-BlockSecondaryReadsDuringBatchApplication_DONT_USE::
-    BlockSecondaryReadsDuringBatchApplication_DONT_USE(OperationContext* opCtx)
-    : _opCtx(opCtx) {
-    auto allowSecondaryReads = &allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx);
-    allowSecondaryReads->swap(_originalSettings);
-    *allowSecondaryReads = false;
-}
-
-BlockSecondaryReadsDuringBatchApplication_DONT_USE::
-    ~BlockSecondaryReadsDuringBatchApplication_DONT_USE() {
-    auto allowSecondaryReads = &allowSecondaryReadsDuringBatchApplication_DONT_USE(_opCtx);
-    allowSecondaryReads->swap(_originalSettings);
 }
 
 template class AutoGetCollectionForReadCommandBase<AutoGetCollectionForRead>;

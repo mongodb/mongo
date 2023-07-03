@@ -29,11 +29,23 @@
 
 #include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 
+#include <map>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -42,6 +54,19 @@ namespace mongo::cluster_parameters {
 constexpr auto kIdField = "_id"_sd;
 constexpr auto kCPTField = "clusterParameterTime"_sd;
 constexpr auto kOplog = "oplog"_sd;
+
+void validateParameter(OperationContext* opCtx,
+                       BSONObj doc,
+                       const boost::optional<TenantId>& tenantId) {
+    auto nameElem = doc[kIdField];
+    uassert(ErrorCodes::OperationFailed,
+            "Validate with invalid parameter name",
+            nameElem.type() == String);
+    auto name = nameElem.valueStringData();
+    auto* sp = ServerParameterSet::getClusterParameterSet()->getIfExists(name);
+    uassert(ErrorCodes::OperationFailed, "Validate on unknown cluster parameter", sp);
+    uassertStatusOK(sp->validate(doc, tenantId));
+}
 
 void updateParameter(OperationContext* opCtx,
                      BSONObj doc,
@@ -81,6 +106,8 @@ void updateParameter(OperationContext* opCtx,
                     "clusterParameterTime"_attr = cptElem);
         return;
     }
+
+    uassertStatusOK(sp->validate(doc, tenantId));
 
     BSONObjBuilder oldValueBob;
     sp->append(opCtx, &oldValueBob, name.toString(), tenantId);

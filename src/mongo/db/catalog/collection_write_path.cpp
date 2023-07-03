@@ -29,19 +29,61 @@
 
 #include "mongo/db/catalog/collection_write_path.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/crypto/fle_crypto.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/crypto/fle_crypto_types.h"
 #include "mongo/db/catalog/capped_collection_maintenance.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_options_gen.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/local_oplog_info.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/write_stage_common.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/record_id_helpers.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -185,8 +227,7 @@ Status insertDocumentsImpl(OperationContext* opCtx,
         // SERVER-21646. On the other hand, capped clustered collections with a monotonically
         // increasing cluster key natively guarantee preservation of the insertion order, and don't
         // need serialisation. We allow concurrent inserts for clustered capped collections.
-        Lock::ResourceLock heldUntilEndOfWUOW{
-            opCtx, ResourceId(RESOURCE_METADATA, nss.ns()), MODE_X};
+        Lock::ResourceLock heldUntilEndOfWUOW{opCtx, ResourceId(RESOURCE_METADATA, nss), MODE_X};
     }
 
     std::vector<Record> records;
@@ -450,10 +491,10 @@ Status insertDocuments(OperationContext* opCtx,
             hangAfterCollectionInserts.pauseWhileSet(opCtx);
         },
         [&](const BSONObj& data) {
-            const auto& collElem = data["collectionNS"];
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "collectionNS");
             const auto& firstIdElem = data["first_id"];
             // If the failpoint specifies no collection or matches the existing one, hang.
-            return (!collElem || nss.ns() == collElem.str()) &&
+            return (fpNss.isEmpty() || nss == fpNss) &&
                 (!firstIdElem ||
                  (begin != end && firstIdElem.type() == mongo::String &&
                   begin->doc["_id"].str() == firstIdElem.str()));
@@ -487,8 +528,8 @@ Status checkFailCollectionInsertsFailPoint(const NamespaceString& ns, const BSON
         },
         [&](const BSONObj& data) {
             // If the failpoint specifies no collection or matches the existing one, fail.
-            const auto collElem = data["collectionNS"];
-            return !collElem || ns.ns() == collElem.str();
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "collectionNS");
+            return fpNss.isEmpty() || ns == fpNss;
         });
     return s;
 }
@@ -735,27 +776,27 @@ void deleteDocument(OperationContext* opCtx,
         Lock::ResourceLock heldUntilEndOfWUOW{opCtx, ResourceId(RESOURCE_METADATA, nss), MODE_X};
     }
 
-    std::vector<OplogSlot> oplogSlots;
-    auto retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kNone;
-    if (storeDeletedDoc == StoreDeletedDoc::On && retryableWrite == RetryableWrite::kYes) {
-        retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kSideCollection;
-        oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx);
-    }
-    OplogDeleteEntryArgs deleteArgs{nullptr /* deletedDoc */,
-                                    fromMigrate,
-                                    collection->isChangeStreamPreAndPostImagesEnabled(),
-                                    retryableFindAndModifyLocation,
-                                    oplogSlots};
+    OplogDeleteEntryArgs deleteArgs;
+    opCtx->getServiceContext()->getOpObserver()->aboutToDelete(
+        opCtx, collection, doc.value(), &deleteArgs);
 
-    opCtx->getServiceContext()->getOpObserver()->aboutToDelete(opCtx, collection, doc.value());
+    deleteArgs.deletedDoc = nullptr;
+    deleteArgs.fromMigrate = fromMigrate;
+    deleteArgs.changeStreamPreAndPostImagesEnabledForCollection =
+        collection->isChangeStreamPreAndPostImagesEnabled();
+
+    const bool shouldRecordPreImageForRetryableWrite =
+        storeDeletedDoc == StoreDeletedDoc::On && retryableWrite == RetryableWrite::kYes;
+    if (shouldRecordPreImageForRetryableWrite) {
+        deleteArgs.retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kSideCollection;
+        deleteArgs.oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx);
+    }
 
     boost::optional<BSONObj> deletedDoc;
-    const bool isRecordingPreImageForRetryableWrite =
-        retryableFindAndModifyLocation != RetryableFindAndModifyLocation::kNone;
     const bool isTimeseriesCollection =
         collection->getTimeseriesOptions() || nss.isTimeseriesBucketsCollection();
 
-    if (isRecordingPreImageForRetryableWrite ||
+    if (shouldRecordPreImageForRetryableWrite ||
         collection->isChangeStreamPreAndPostImagesEnabled() ||
         (isTimeseriesCollection &&
          feature_flags::gTimeseriesScalabilityImprovements.isEnabled(

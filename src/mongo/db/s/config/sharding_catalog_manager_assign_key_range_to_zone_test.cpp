@@ -27,19 +27,46 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -83,7 +110,7 @@ public:
      */
     void assertNoZoneDocWithNamespace(NamespaceString ns) {
         auto findStatus = findOneOnConfigCollection(
-            operationContext(), TagsType::ConfigNS, BSON("ns" << ns.toString()));
+            operationContext(), TagsType::ConfigNS, BSON("ns" << ns.toString_forTest()));
         ASSERT_EQ(ErrorCodes::NoMatchingDocument, findStatus);
     }
 
@@ -225,13 +252,13 @@ TEST_F(AssignKeyRangeToZoneTestFixture, RemoveZoneWithDollarPrefixedShardKeysSho
 
     // Manually insert a zone with illegal keys in order to bypass the checks performed by
     // assignKeyRangeToZone
-    BSONObj updateQuery(BSON("_id" << BSON(TagsType::ns(shardedNS().toString())
+    BSONObj updateQuery(BSON("_id" << BSON(TagsType::ns(shardedNS().toString_forTest())
                                            << TagsType::min(zoneWithDollarKeys.getMin()))));
 
     BSONObjBuilder updateBuilder;
-    updateBuilder.append(
-        "_id",
-        BSON(TagsType::ns(shardedNS().toString()) << TagsType::min(zoneWithDollarKeys.getMin())));
+    updateBuilder.append("_id",
+                         BSON(TagsType::ns(shardedNS().toString_forTest())
+                              << TagsType::min(zoneWithDollarKeys.getMin())));
     updateBuilder.append(TagsType::ns(), shardedNS().ns_forTest());
     updateBuilder.append(TagsType::min(), zoneWithDollarKeys.getMin());
     updateBuilder.append(TagsType::max(), zoneWithDollarKeys.getMax());

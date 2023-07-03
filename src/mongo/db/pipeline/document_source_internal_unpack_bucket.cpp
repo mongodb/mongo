@@ -29,25 +29,43 @@
 
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <s2cellid.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <iterator>
+#include <list>
+#include <ostream>
 #include <string>
-#include <type_traits>
+#include <tuple>
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/matcher/expression_expr.h"
-#include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
-#include "mongo/db/matcher/expression_internal_expr_comparison.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
+#include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
+#include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sample.h"
@@ -55,15 +73,21 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_streaming_group.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/monotonic_expression.h"
+#include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/time_support.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -223,7 +247,7 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
     }
 
     return DocumentSourceSort::create(
-        sort.getContext(), SortPattern{updatedPattern}, 0, maxMemoryUsageBytes);
+        sort.getContext(), SortPattern{std::move(updatedPattern)}, 0, maxMemoryUsageBytes);
 }
 
 /**
@@ -243,7 +267,7 @@ boost::intrusive_ptr<DocumentSourceGroup> createBucketGroupForReorder(
             expCtx.get(), field.firstElement(), expCtx->variablesParseState));
     };
 
-    return DocumentSourceGroup::create(expCtx, groupByExpr, accumulators);
+    return DocumentSourceGroup::create(expCtx, groupByExpr, std::move(accumulators));
 }
 
 // Optimize the section of the pipeline before the $_internalUnpackBucket stage.
@@ -524,17 +548,17 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
         out.addField(timeseries::kMetaFieldName,
                      Value{opts.serializeFieldPathFromString(*spec.metaField())});
     }
-    out.addField(kBucketMaxSpanSeconds, opts.serializeLiteralValue(Value{_bucketMaxSpanSeconds}));
+    out.addField(kBucketMaxSpanSeconds, opts.serializeLiteral(Value{_bucketMaxSpanSeconds}));
     if (_assumeNoMixedSchemaData)
         out.addField(kAssumeNoMixedSchemaData,
-                     opts.serializeLiteralValue(Value(_assumeNoMixedSchemaData)));
+                     opts.serializeLiteral(Value(_assumeNoMixedSchemaData)));
 
     if (spec.usesExtendedRange()) {
         // Include this flag so that 'explain' is more helpful.
         // But this is not so useful for communicating from one process to another,
         // because mongos and/or the primary shard don't know whether any other shard
         // has extended-range data.
-        out.addField(kUsesExtendedRange, opts.serializeLiteralValue(Value{true}));
+        out.addField(kUsesExtendedRange, opts.serializeLiteral(Value{true}));
     }
 
     if (!spec.computedMetaProjFields().empty())
@@ -552,11 +576,11 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
 
     if (_bucketUnpacker.includeMinTimeAsMetadata()) {
         out.addField(kIncludeMinTimeAsMetadata,
-                     opts.serializeLiteralValue(Value{_bucketUnpacker.includeMinTimeAsMetadata()}));
+                     opts.serializeLiteral(Value{_bucketUnpacker.includeMinTimeAsMetadata()}));
     }
     if (_bucketUnpacker.includeMaxTimeAsMetadata()) {
         out.addField(kIncludeMaxTimeAsMetadata,
-                     opts.serializeLiteralValue(Value{_bucketUnpacker.includeMaxTimeAsMetadata()}));
+                     opts.serializeLiteral(Value{_bucketUnpacker.includeMaxTimeAsMetadata()}));
     }
 
     if (_wholeBucketFilter) {
@@ -575,8 +599,8 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
     } else {
         if (_sampleSize) {
             out.addField("sample",
-                         opts.serializeLiteralValue(Value{static_cast<long long>(*_sampleSize)}));
-            out.addField("bucketMaxCount", opts.serializeLiteralValue(Value{_bucketMaxCount}));
+                         opts.serializeLiteral(Value{static_cast<long long>(*_sampleSize)}));
+            out.addField("bucketMaxCount", opts.serializeLiteral(Value{_bucketMaxCount}));
         }
         array.push_back(Value(DOC(getSourceName() << out.freeze())));
     }
@@ -763,6 +787,15 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPu
 std::pair<bool, Pipeline::SourceContainer::iterator>
 DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContainer::iterator itr,
                                                          Pipeline::SourceContainer* container) {
+    // The computed min/max for each bucket uses the default collation. If the collation of the
+    // query doesn't match the default we cannot rely on the computed values as they might differ
+    // (e.g. numeric and lexicographic collations compare "5" and "10" in opposite order).
+    // NB: Unfortuntealy, this means we have to forgo the optimization even if the source field is
+    // numeric and not affected by the collation as we cannot know the data type until runtime.
+    if (pExpCtx->collationMatchesDefault == ExpressionContext::CollationMatchesDefault::kNo) {
+        return {};
+    }
+
     const auto* groupPtr = dynamic_cast<DocumentSourceGroup*>(std::next(itr)->get());
     if (groupPtr == nullptr) {
         return {};
@@ -1280,6 +1313,14 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         } else {
             // Don't push down query on measurements.
         }
+    }
+
+    // If there is a $limit stage right after $_internalUnpackBucket, add a $limit stage above the
+    // _internalUnpackBucket stage so that we don't fetch buckets that are not necessary
+    if (auto limitPtr = dynamic_cast<DocumentSourceLimit*>(std::next(itr)->get());
+        limitPtr && !_eventFilter) {
+        container->insert(itr, DocumentSourceLimit::create(getContext(), limitPtr->getLimit()));
+        return std::next(itr);
     }
 
     // Optimize the pipeline after this stage to merge $match stages and push them forward, and to

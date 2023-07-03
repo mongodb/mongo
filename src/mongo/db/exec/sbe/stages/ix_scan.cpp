@@ -27,17 +27,35 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/inlined_vector.h>
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
 
-#include "mongo/db/exec/sbe/stages/ix_scan.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/client.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/str.h"
 
 namespace mongo::sbe {
 IndexScanStageBase::IndexScanStageBase(StringData stageType,
@@ -69,18 +87,6 @@ IndexScanStageBase::IndexScanStageBase(StringData stageType,
 }
 
 void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
-    if (_indexKeySlot) {
-        _recordAccessor = std::make_unique<value::OwnedValueAccessor>();
-    }
-
-    if (_recordIdSlot) {
-        _recordIdAccessor = std::make_unique<value::OwnedValueAccessor>();
-    }
-
-    if (_snapshotIdSlot) {
-        _snapshotIdAccessor = std::make_unique<value::OwnedValueAccessor>();
-    }
-
     _accessors.resize(_vars.size());
     for (size_t idx = 0; idx < _accessors.size(); ++idx) {
         auto [it, inserted] = _accessorMap.emplace(_vars[idx], &_accessors[idx]);
@@ -88,13 +94,15 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
     }
 
     tassert(5709602, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
-    std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid);
+    _coll.acquireCollection(_opCtx, _collUuid);
 
-    auto indexCatalog = _coll->getIndexCatalog();
+    auto indexCatalog = _coll.getPtr()->getIndexCatalog();
     auto indexDesc = indexCatalog->findIndexByName(_opCtx, _indexName);
-    tassert(4938500,
+    // uassert here, not tassert, because it is not a programming bug if the index got dropped just
+    // before we looked for it.
+    uassert(4938500,
             str::stream() << "could not find index named '" << _indexName << "' in collection '"
-                          << _collName->toStringForErrorMsg() << "'",
+                          << _coll.getCollName()->toStringForErrorMsg() << "'",
             indexDesc);
 
     _entry = indexCatalog->getEntry(indexDesc);
@@ -113,22 +121,22 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
         _indexIdentViewAccessor.reset();
     }
 
-    if (_snapshotIdAccessor) {
+    if (_snapshotIdSlot) {
         _latestSnapshotId = _opCtx->recoveryUnit()->getSnapshotId().toNumber();
     }
 }
 
 value::SlotAccessor* IndexScanStageBase::getAccessor(CompileCtx& ctx, value::SlotId slot) {
     if (_indexKeySlot && *_indexKeySlot == slot) {
-        return _recordAccessor.get();
+        return &_recordAccessor;
     }
 
     if (_recordIdSlot && *_recordIdSlot == slot) {
-        return _recordIdAccessor.get();
+        return &_recordIdAccessor;
     }
 
     if (_snapshotIdSlot && *_snapshotIdSlot == slot) {
-        return _snapshotIdAccessor.get();
+        return &_snapshotIdAccessor;
     }
 
     if (_indexIdentSlot && *_indexIdentSlot == slot) {
@@ -144,11 +152,11 @@ value::SlotAccessor* IndexScanStageBase::getAccessor(CompileCtx& ctx, value::Slo
 
 void IndexScanStageBase::doSaveState(bool relinquishCursor) {
     if (relinquishCursor) {
-        if (_recordAccessor) {
-            prepareForYielding(*_recordAccessor, slotsAccessible());
+        if (_indexKeySlot) {
+            prepareForYielding(_recordAccessor, slotsAccessible());
         }
-        if (_recordIdAccessor) {
-            prepareForYielding(*_recordIdAccessor, slotsAccessible());
+        if (_recordIdSlot) {
+            prepareForYielding(_recordIdAccessor, slotsAccessible());
         }
         for (auto& accessor : _accessors) {
             prepareForYielding(accessor, slotsAccessible());
@@ -170,15 +178,13 @@ void IndexScanStageBase::doSaveState(bool relinquishCursor) {
 }
 
 void IndexScanStageBase::restoreCollectionAndIndex() {
-    tassert(5777406, "Collection name should be initialized", _collName);
-    tassert(5777407, "Catalog epoch should be initialized", _catalogEpoch);
-    _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
+    _coll.restoreCollection(_opCtx, _collUuid);
 
     auto [identTag, identVal] = _indexIdentAccessor.getViewOfValue();
     tassert(7566700, "Expected ident to be a string", value::isString(identTag));
 
     auto indexIdent = value::getStringView(identTag, identVal);
-    auto desc = _coll->getIndexCatalog()->findIndexByIdent(_opCtx, indexIdent);
+    auto desc = _coll.getPtr()->getIndexCatalog()->findIndexByIdent(_opCtx, indexIdent);
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
             desc && !desc->getEntry()->isDropped());
@@ -196,7 +202,7 @@ void IndexScanStageBase::doRestoreState(bool relinquishCursor) {
     invariant(!_coll);
 
     // If this stage has not been prepared, then yield recovery is a no-op.
-    if (!_collName) {
+    if (!_coll.getCollName()) {
         return;
     }
     restoreCollectionAndIndex();
@@ -207,7 +213,7 @@ void IndexScanStageBase::doRestoreState(bool relinquishCursor) {
 
     // Yield is the only time during plan execution that the snapshotId can change. As such, we
     // update it accordingly as part of yield recovery.
-    if (_snapshotIdAccessor) {
+    if (_snapshotIdSlot) {
         _latestSnapshotId = _opCtx->recoveryUnit()->getSnapshotId().toNumber();
     }
 }
@@ -220,8 +226,8 @@ void IndexScanStageBase::doDetachFromOperationContext() {
 }
 
 void IndexScanStageBase::doAttachToOperationContext(OperationContext* opCtx) {
-    if (_lowPriority && _open && _opCtx->getClient()->isFromUserConnection() &&
-        _opCtx->lockState()->shouldWaitForTicket()) {
+    if (_lowPriority && _open && gDeprioritizeUnboundedUserIndexScans.load() &&
+        _opCtx->getClient()->isFromUserConnection() && _opCtx->lockState()->shouldWaitForTicket()) {
         _priority.emplace(opCtx->lockState(), AdmissionContext::Priority::kLow);
     }
     if (_cursor) {
@@ -284,8 +290,8 @@ void IndexScanStageBase::trackRead() {
 PlanState IndexScanStageBase::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
-    if (_lowPriority && !_priority && _opCtx->getClient()->isFromUserConnection() &&
-        _opCtx->lockState()->shouldWaitForTicket()) {
+    if (_lowPriority && !_priority && gDeprioritizeUnboundedUserIndexScans.load() &&
+        _opCtx->getClient()->isFromUserConnection() && _opCtx->lockState()->shouldWaitForTicket()) {
         _priority.emplace(_opCtx->lockState(), AdmissionContext::Priority::kLow);
     }
 
@@ -313,21 +319,21 @@ PlanState IndexScanStageBase::getNext() {
         }
     } while (!validateKey(_nextRecord));
 
-    if (_recordAccessor) {
-        _recordAccessor->reset(false,
-                               value::TypeTags::ksValue,
-                               value::bitcastFrom<KeyString::Value*>(&_nextRecord->keyString));
+    if (_indexKeySlot) {
+        _recordAccessor.reset(false,
+                              value::TypeTags::ksValue,
+                              value::bitcastFrom<key_string::Value*>(&_nextRecord->keyString));
     }
 
-    if (_recordIdAccessor) {
-        _recordIdAccessor->reset(
+    if (_recordIdSlot) {
+        _recordIdAccessor.reset(
             false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_nextRecord->loc));
     }
 
-    if (_snapshotIdAccessor) {
+    if (_snapshotIdSlot) {
         // Copy the latest snapshot ID into the 'snapshotId' slot.
-        _snapshotIdAccessor->reset(value::TypeTags::NumberInt64,
-                                   value::bitcastFrom<uint64_t>(_latestSnapshotId));
+        _snapshotIdAccessor.reset(value::TypeTags::NumberInt64,
+                                  value::bitcastFrom<uint64_t>(_latestSnapshotId));
     }
 
     if (_accessors.size()) {
@@ -516,20 +522,21 @@ void SimpleIndexScanStage::prepare(CompileCtx& ctx) {
     if (_seekKeyHigh) {
         ctx.root = this;
         _seekKeyHighCode = _seekKeyHigh->compile(ctx);
-        _seekKeyHighHolder = std::make_unique<value::OwnedValueAccessor>();
     }
-    _seekKeyLowHolder = std::make_unique<value::OwnedValueAccessor>();
+
+    _seekKeyLowHolder.reset();
+    _seekKeyHighHolder.reset();
 }
 
 void SimpleIndexScanStage::doSaveState(bool relinquishCursor) {
     // Seek points are external to the index scan and must be accessible no matter what as long
     // as the index scan is opened.
     if (_open && relinquishCursor) {
-        if (_seekKeyLowHolder) {
-            prepareForYielding(*_seekKeyLowHolder, true);
+        if (_seekKeyLow) {
+            prepareForYielding(_seekKeyLowHolder, true);
         }
-        if (_seekKeyHighHolder) {
-            prepareForYielding(*_seekKeyHighHolder, true);
+        if (_seekKeyHigh) {
+            prepareForYielding(_seekKeyHighHolder, true);
         }
     }
 
@@ -547,7 +554,7 @@ void SimpleIndexScanStage::open(bool reOpen) {
         uassert(4822851,
                 str::stream() << "seek key is wrong type: " << msgTagLow,
                 tagLow == value::TypeTags::ksValue);
-        _seekKeyLowHolder->reset(ownedLow, tagLow, valLow);
+        _seekKeyLowHolder.reset(ownedLow, tagLow, valLow);
 
         auto [ownedHi, tagHi, valHi] = _bytecode.run(_seekKeyHighCode.get());
         const auto msgTagHi = tagHi;
@@ -555,36 +562,36 @@ void SimpleIndexScanStage::open(bool reOpen) {
                 str::stream() << "seek key is wrong type: " << msgTagHi,
                 tagHi == value::TypeTags::ksValue);
 
-        _seekKeyHighHolder->reset(ownedHi, tagHi, valHi);
+        _seekKeyHighHolder.reset(ownedHi, tagHi, valHi);
     } else if (_seekKeyLow) {
         auto [ownedLow, tagLow, valLow] = _bytecode.run(_seekKeyLowCode.get());
         const auto msgTagLow = tagLow;
         uassert(4822853,
                 str::stream() << "seek key is wrong type: " << msgTagLow,
                 tagLow == value::TypeTags::ksValue);
-        _seekKeyLowHolder->reset(ownedLow, tagLow, valLow);
+        _seekKeyLowHolder.reset(ownedLow, tagLow, valLow);
     } else {
         auto sdi = _entry->accessMethod()->asSortedData()->getSortedDataInterface();
-        KeyString::Builder kb(sdi->getKeyStringVersion(),
-                              sdi->getOrdering(),
-                              KeyString::Discriminator::kExclusiveBefore);
-        kb.appendDiscriminator(KeyString::Discriminator::kExclusiveBefore);
+        key_string::Builder kb(sdi->getKeyStringVersion(),
+                               sdi->getOrdering(),
+                               key_string::Discriminator::kExclusiveBefore);
+        kb.appendDiscriminator(key_string::Discriminator::kExclusiveBefore);
 
         auto [copyTag, copyVal] = value::makeCopyKeyString(kb.getValueCopy());
-        _seekKeyLowHolder->reset(true, copyTag, copyVal);
+        _seekKeyLowHolder.reset(true, copyTag, copyVal);
     }
 }
 
-const KeyString::Value& SimpleIndexScanStage::getSeekKeyLow() const {
-    auto [tag, value] = _seekKeyLowHolder->getViewOfValue();
+const key_string::Value& SimpleIndexScanStage::getSeekKeyLow() const {
+    auto [tag, value] = _seekKeyLowHolder.getViewOfValue();
     return *value::getKeyStringView(value);
 }
 
-const KeyString::Value* SimpleIndexScanStage::getSeekKeyHigh() const {
-    if (!_seekKeyHighHolder) {
+const key_string::Value* SimpleIndexScanStage::getSeekKeyHigh() const {
+    if (!_seekKeyHigh) {
         return nullptr;
     }
-    auto [tag, value] = _seekKeyHighHolder->getViewOfValue();
+    auto [tag, value] = _seekKeyHighHolder.getViewOfValue();
     return value::getKeyStringView(value);
 }
 
@@ -768,11 +775,11 @@ bool GenericIndexScanStage::validateKey(const boost::optional<KeyStringEntry>& k
 
         _keyBuffer.reset();
         BSONObjBuilder keyBuilder(_keyBuffer);
-        KeyString::toBsonSafe(key->keyString.getBuffer(),
-                              key->keyString.getSize(),
-                              _params.ord,
-                              key->keyString.getTypeBits(),
-                              keyBuilder);
+        key_string::toBsonSafe(key->keyString.getBuffer(),
+                               key->keyString.getSize(),
+                               _params.ord,
+                               key->keyString.getTypeBits(),
+                               keyBuilder);
         auto bsonKey = keyBuilder.done();
 
         switch (_checker->checkKey(bsonKey, &_seekPoint)) {

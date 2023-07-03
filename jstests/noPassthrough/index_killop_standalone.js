@@ -1,5 +1,5 @@
 /**
- * Confirms that both foreground and background index builds can be aborted using killop.
+ * Confirms that index builds can be aborted using killop.
  */
 (function() {
 "use strict";
@@ -14,11 +14,11 @@ assert.commandWorked(testDB.dropDatabase());
 assert.commandWorked(testDB.test.insert({a: 1}));
 const coll = testDB.test;
 
-// Test that building an index with 'options' can be aborted using killop.
-function testAbortIndexBuild(options) {
+// Test that building an index can be aborted using killop.
+function testAbortIndexBuild() {
     IndexBuildTest.pauseIndexBuilds(conn);
 
-    const createIdx = IndexBuildTest.startIndexBuild(conn, coll.getFullName(), {a: 1}, options);
+    const createIdx = IndexBuildTest.startIndexBuild(conn, coll.getFullName(), {a: 1});
 
     // When the index build starts, find its op id.
     const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
@@ -42,7 +42,6 @@ function testAbortIndexBuild(options) {
     IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
 }
 
-testAbortIndexBuild({background: true});
-testAbortIndexBuild({background: false});
+testAbortIndexBuild();
 MongoRunner.stopMongod(conn);
 })();

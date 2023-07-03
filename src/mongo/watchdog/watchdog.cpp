@@ -28,31 +28,50 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/watchdog/watchdog.h"
 
 #include <boost/align.hpp>  // IWYU pragma: keep
-#include <boost/filesystem.hpp>
+#include <cerrno>
+#include <cstring>
+#include <mutex>
+#include <ratio>
+#include <system_error>
+#include <utility>
+
+#include <boost/align/align_up.hpp>
+// IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #ifndef _WIN32
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 #endif
 
-#include "mongo/base/static_assert.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
-#include "mongo/util/hex.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

@@ -27,28 +27,68 @@
  *    it in the license file.
  */
 
+#include <absl/container/node_hash_map.h>
 #include <absl/hash/hash.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
 
-#include "mongo/db/catalog_raii.h"
-#include "mongo/platform/basic.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonelement_comparator.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/global_index.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
+#include "mongo/db/repl/oplog_constraint_violation_logger.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/split_prepare_session_manager.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/util/fail_point.h"
-
+#include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -77,12 +117,12 @@ CachedCollectionProperties::getCollectionProperties(OperationContext* opCtx,
 
 namespace {
 /**
- * Updates a CRUD op's hash and isForCappedCollection field if necessary.
+ * Populates a CRUD op's idHash and updates the isForCappedCollection field if necessary.
  */
 void processCrudOp(OperationContext* opCtx,
                    OplogEntry* op,
-                   uint32_t* hash,
-                   const CachedCollectionProperties::CollectionProperties& collProperties) {
+                   const CachedCollectionProperties::CollectionProperties& collProperties,
+                   boost::optional<size_t>& idHash) {
     // Include the _id of the document in the hash so we get parallelism even if all writes are to a
     // single collection.
     //
@@ -100,8 +140,7 @@ void processCrudOp(OperationContext* opCtx,
         }();
         BSONElementComparator elementHasher(BSONElementComparator::FieldNamesMode::kIgnore,
                                             collProperties.collator);
-        const size_t idHash = elementHasher.hash(id);
-        MurmurHash3_x86_32(&idHash, sizeof(idHash), *hash, hash);
+        idHash.emplace(elementHasher.hash(id));
     }
 
     if (op->getOpType() == OpTypeEnum::kInsert && collProperties.isCapped) {
@@ -120,20 +159,17 @@ uint32_t getWriterId(OperationContext* opCtx,
                      CachedCollectionProperties* collPropertiesCache,
                      uint32_t numWriters,
                      boost::optional<uint32_t> forceWriterId = boost::none) {
+    boost::optional<size_t> idHash;
     NamespaceString nss = op->isGlobalIndexCrudOpType()
         ? NamespaceString::makeGlobalIndexNSS(op->getUuid().value())
         : op->getNss();
 
-    // Reduce the hash from 64bit down to 32bit, just to allow combinations with murmur3 later
-    // on. Bit depth not important, we end up just doing integer modulo with this in the end.
-    // The hash function should provide entropy in the lower bits as it's used in hash tables.
-    auto hashedNs = absl::Hash<NamespaceString>{}(nss);
-    auto hash = static_cast<uint32_t>(hashedNs);
-
     if (op->isCrudOpType()) {
         auto collProperties = collPropertiesCache->getCollectionProperties(opCtx, nss);
-        processCrudOp(opCtx, op, &hash, collProperties);
+        processCrudOp(opCtx, op, collProperties, idHash);
     }
+
+    auto hash = idHash ? absl::HashOf(nss, *idHash) : absl::HashOf(nss);
 
     return (forceWriterId ? *forceWriterId : hash) % numWriters;
 }
@@ -561,7 +597,7 @@ Status OplogApplierUtils::applyOplogBatchCommon(
 
         // If we didn't create a group, try to apply the op individually.
         try {
-            const Status status =
+            Status status =
                 applyOplogEntryOrGroupedInserts(opCtx, op, oplogApplicationMode, isDataConsistent);
 
             if (!status.isOK()) {

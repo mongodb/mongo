@@ -27,16 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/executor/task_executor_cursor.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/kill_cursors_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/pinned_connection_task_executor_factory.h"
+#include "mongo/executor/task_executor_cursor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -49,7 +61,7 @@ MONGO_FAIL_POINT_DEFINE(blockBeforePinnedExecutorIsDestroyedOnUnderlying);
 
 TaskExecutorCursor::TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> executor,
                                        const RemoteCommandRequest& rcr,
-                                       Options&& options)
+                                       Options options)
     : _rcr(rcr), _options(std::move(options)), _batchIter(_batch.end()) {
 
     if (rcr.opCtx) {
@@ -268,7 +280,17 @@ void TaskExecutorCursor::_scheduleGetMore(OperationContext* opCtx) {
     invariant(!_cmdState);
     GetMoreCommandRequest getMoreRequest(_cursorId, _ns.coll().toString());
     getMoreRequest.setBatchSize(_options.batchSize);
-    _runRemoteCommand(_createRequest(opCtx, getMoreRequest.toBSON({})));
+
+    if (_options.getMoreAugmentationWriter) {
+        // Prefetching must be disabled to use the augmenting functionality.
+        invariant(!_options.preFetchNextBatch);
+        BSONObjBuilder getMoreBob;
+        getMoreRequest.serialize({}, &getMoreBob);
+        _options.getMoreAugmentationWriter(getMoreBob);
+        _runRemoteCommand(_createRequest(opCtx, getMoreBob.obj()));
+    } else {
+        _runRemoteCommand(_createRequest(opCtx, getMoreRequest.toBSON({})));
+    }
 }
 
 void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {

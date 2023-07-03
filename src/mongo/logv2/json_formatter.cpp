@@ -30,17 +30,33 @@
 #include "mongo/logv2/json_formatter.h"
 
 #include <boost/log/attributes/value_extraction.hpp>
-#include <boost/log/expressions/message.hpp>
 #include <boost/log/utility/formatting_ostream.hpp>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/logv2/attributes.h"
-#include "mongo/logv2/constants.h"
-#include "mongo/util/str_escape.h"
-
+#include <cstddef>
 #include <fmt/compile.h>
 #include <fmt/format.h>
+#include <functional>
+#include <iterator>
+#include <variant>
+
+#include <boost/cstdint.hpp>
+#include <boost/exception/exception.hpp>
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
+#include <boost/log/utility/value_ref.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/logv2/attributes.h"
+#include "mongo/logv2/constants.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
+#include "mongo/util/str_escape.h"
 
 namespace mongo::logv2 {
 namespace {
@@ -50,52 +66,58 @@ struct JSONValueExtractor {
         : _buffer(buffer), _attributeMaxSize(attributeMaxSize) {}
 
     void operator()(const char* name, CustomAttributeValue const& val) {
-        // Try to format as BSON first if available. Prefer BSONAppend if available as we might only
-        // want the value and not the whole element.
-        if (val.BSONAppend) {
-            BSONObjBuilder builder;
-            val.BSONAppend(builder, name);
-            // This is a JSON subobject, no quotes needed
-            storeUnquoted(name);
-            BSONElement element = builder.done().getField(name);
-            BSONObj truncated = element.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0,
-                                                         false,
-                                                         false,
+        try {
+            // Try to format as BSON first if available. Prefer BSONAppend if available as we might
+            // only want the value and not the whole element.
+            if (val.BSONAppend) {
+                BSONObjBuilder builder;
+                val.BSONAppend(builder, name);
+                // This is a JSON subobject, no quotes needed
+                storeUnquoted(name);
+                BSONElement element = builder.done().getField(name);
+                BSONObj truncated =
+                    element.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0,
+                                             false,
+                                             false,
+                                             0,
+                                             _buffer,
+                                             bufferSizeToTriggerTruncation());
+                addTruncationReport(name, truncated, element.size());
+            } else if (val.BSONSerialize) {
+                // This is a JSON subobject, no quotes needed
+                BSONObjBuilder builder;
+                val.BSONSerialize(builder);
+                BSONObj obj = builder.done();
+                storeUnquoted(name);
+                BSONObj truncated = obj.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0,
                                                          0,
+                                                         false,
                                                          _buffer,
                                                          bufferSizeToTriggerTruncation());
-            addTruncationReport(name, truncated, element.size());
-        } else if (val.BSONSerialize) {
-            // This is a JSON subobject, no quotes needed
-            storeUnquoted(name);
-            BSONObjBuilder builder;
-            val.BSONSerialize(builder);
-            BSONObj obj = builder.done();
-            BSONObj truncated = obj.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0,
-                                                     0,
-                                                     false,
-                                                     _buffer,
-                                                     bufferSizeToTriggerTruncation());
-            addTruncationReport(name, truncated, builder.done().objsize());
+                addTruncationReport(name, truncated, builder.done().objsize());
 
-        } else if (val.toBSONArray) {
-            // This is a JSON subarray, no quotes needed
-            storeUnquoted(name);
-            BSONArray arr = val.toBSONArray();
-            BSONObj truncated = arr.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0,
-                                                     0,
-                                                     true,
-                                                     _buffer,
-                                                     bufferSizeToTriggerTruncation());
-            addTruncationReport(name, truncated, arr.objsize());
+            } else if (val.toBSONArray) {
+                // This is a JSON subarray, no quotes needed
+                BSONArray arr = val.toBSONArray();
+                storeUnquoted(name);
+                BSONObj truncated = arr.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0,
+                                                         0,
+                                                         true,
+                                                         _buffer,
+                                                         bufferSizeToTriggerTruncation());
+                addTruncationReport(name, truncated, arr.objsize());
 
-        } else if (val.stringSerialize) {
-            fmt::memory_buffer intermediate;
-            val.stringSerialize(intermediate);
-            storeQuoted(name, StringData(intermediate.data(), intermediate.size()));
-        } else {
-            // This is a string, surround value with quotes
-            storeQuoted(name, val.toString());
+            } else if (val.stringSerialize) {
+                fmt::memory_buffer intermediate;
+                val.stringSerialize(intermediate);
+                storeQuoted(name, StringData(intermediate.data(), intermediate.size()));
+            } else {
+                // This is a string, surround value with quotes
+                storeQuoted(name, val.toString());
+            }
+        } catch (...) {
+            Status s = exceptionToStatus();
+            storeQuoted(name, std::string("Failed to serialize due to exception: ") + s.toString());
         }
     }
 

@@ -12,7 +12,7 @@
  *  command_not_supported_in_serverless,
  *   # TODO SERVER-70847: Snapshot reads do not succeed on non-conflicting documents while txn is
  *   # in prepare.
- *  cqf_incompatible,
+ *  cqf_experimental_incompatible,
  * ]
  */
 (function() {

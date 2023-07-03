@@ -28,24 +28,52 @@
  */
 
 #include <algorithm>
+#include <boost/optional.hpp>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/bson/bsonelement.h"
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/external_data_source_scope_guard.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/explain_verbosity_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/idl/idl_parser.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo {
 namespace {
@@ -130,6 +158,14 @@ public:
               _liteParsedPipeline(_aggregationRequest),
               _privileges(std::move(privileges)) {
             auto externalDataSources = _aggregationRequest.getExternalDataSources();
+            // Support collection-less aggregate commands without $_externalDataSources.
+            if (_aggregationRequest.getNamespace().isCollectionlessAggregateNS()) {
+                uassert(7604400,
+                        "$_externalDataSources can't be used with the collectionless aggregate",
+                        !externalDataSources.has_value());
+                return;
+            }
+
             uassert(7039000,
                     "Either $_externalDataSources must always be present when enableComputeMode="
                     "true or must not when enableComputeMode=false",

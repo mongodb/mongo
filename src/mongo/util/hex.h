@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <fmt/format.h>
 #include <string>
 #include <type_traits>

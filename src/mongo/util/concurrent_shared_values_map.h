@@ -29,10 +29,9 @@
 
 #pragma once
 
+#include <absl/container/flat_hash_map.h>
 #include <memory>
 #include <utility>
-
-#include <absl/container/flat_hash_map.h>
 
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/mutex.h"

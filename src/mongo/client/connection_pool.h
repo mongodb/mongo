@@ -31,10 +31,12 @@
 
 #include <list>
 #include <map>
+#include <memory>
 
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 

@@ -28,11 +28,7 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog/index_catalog_entry.h"
-
-#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
@@ -40,7 +36,7 @@
 
 namespace mongo {
 
-std::shared_ptr<IndexCatalogEntry> IndexCatalogEntryContainer::release(
+std::shared_ptr<const IndexCatalogEntry> IndexCatalogEntryContainer::release(
     const IndexDescriptor* desc) {
     for (auto i = _entries.begin(); i != _entries.end(); ++i) {
         if ((*i)->descriptor() != desc)

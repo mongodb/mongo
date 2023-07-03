@@ -28,48 +28,76 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/shell/shell_utils.h"
-
 #include <algorithm>
-#include <boost/filesystem.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cerrno>
+#include <climits>
+#include <cstdint>
+#include <cstdio>
 #include <cstdlib>
+#include <fmt/format.h>
+#include <functional>
+#include <iostream>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #ifndef _WIN32
 #include <pwd.h>
-#include <sys/types.h>
 #endif
 
+#include "mongo/base/data_range.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/shim.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/client/client_api_version_parameters_gen.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_base.h"
+#include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/crypto/hash_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/security_token_gen.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/hasher.h"
-#include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/bench.h"
 #include "mongo/shell/shell_options.h"
+#include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
+#include "mongo/unittest/golden_test_base.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/processinfo.h"
-#include "mongo/util/quick_exit.h"
 #include "mongo/util/represent_as.h"
-#include "mongo/util/text.h"
+#include "mongo/util/str.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 #include "mongo/util/version.h"
 
-#include "mongo/unittest/golden_test_base.h"
-#include "mongo/unittest/test_info.h"
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

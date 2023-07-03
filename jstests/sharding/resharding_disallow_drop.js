@@ -27,15 +27,15 @@ const db = st.s.getDB(dbName);
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
-const reshardingPauseBeforeInsertCoordinatorDocFailpoint =
-    configureFailPoint(st.configRS.getPrimary(), "pauseBeforeInsertCoordinatorDoc");
+const reshardingPauseCoordinatorBeforeInitializingFailpoint =
+    configureFailPoint(st.configRS.getPrimary(), "reshardingPauseCoordinatorBeforeInitializing");
 
 assert.commandFailedWithCode(
     db.adminCommand({reshardCollection: ns, key: {newKey: 1}, maxTimeMS: 1000}),
     ErrorCodes.MaxTimeMSExpired);
 
 // Wait for resharding to start running on the configsvr
-reshardingPauseBeforeInsertCoordinatorDocFailpoint.wait();
+reshardingPauseCoordinatorBeforeInitializingFailpoint.wait();
 
 // Drop cannot progress while resharding is in progress
 assert.commandFailedWithCode(db.runCommand({drop: collName, maxTimeMS: 5000}),
@@ -52,7 +52,7 @@ assert.commandFailedWithCode(db.runCommand({drop: collName, maxTimeMS: 5000}),
                              ErrorCodes.MaxTimeMSExpired);
 
 // Finish resharding
-reshardingPauseBeforeInsertCoordinatorDocFailpoint.off();
+reshardingPauseCoordinatorBeforeInitializingFailpoint.off();
 assert.commandWorked(db.adminCommand({reshardCollection: ns, key: {newKey: 1}}));
 
 // Now the drop can complete

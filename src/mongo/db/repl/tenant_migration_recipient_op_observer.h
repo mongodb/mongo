@@ -29,7 +29,19 @@
 
 #pragma once
 
+#include <cstdint>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {
@@ -46,13 +58,17 @@ public:
     TenantMigrationRecipientOpObserver() = default;
     ~TenantMigrationRecipientOpObserver() = default;
 
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kConfig, NamespaceFilter::kConfig};
+    }
+
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator first,
                    std::vector<InsertStatement>::const_iterator last,
                    std::vector<bool> fromMigrate,
                    bool defaultFromMigrate,
-                   InsertsOpStateAccumulator* opAccumulator = nullptr) final;
+                   OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onUpdate(OperationContext* opCtx,
                   const OplogUpdateEntryArgs& args,
@@ -60,7 +76,9 @@ public:
 
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
-                       const BSONObj& doc) final;
+                       const BSONObj& doc,
+                       OplogDeleteEntryArgs* args,
+                       OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,

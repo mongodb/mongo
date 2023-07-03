@@ -28,46 +28,77 @@
  */
 
 
-#include "mongo/db/pipeline/dependencies.h"
-
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstring>
+#include <s2cellid.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <deque>
+#include <limits>
+#include <set>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/catalog/clustered_collection_util.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor_utils.h"
-#include "mongo/db/exec/timeseries/bucket_unpacker.h"
-#include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/plan_enumerator.h"
+#include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
-#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/util/set_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -471,6 +502,28 @@ bool collscanIsBounded(const CollectionScanNode* collscan) {
     return collscan->minRecord || collscan->maxRecord;
 }
 
+bool canUseClusteredCollScan(QuerySolutionNode* node,
+                             std::vector<std::unique_ptr<QuerySolutionNode>> children) {
+    if (node->getType() == StageType::STAGE_COLLSCAN) {
+        return static_cast<CollectionScanNode*>(node)->doClusteredCollectionScanClassic();
+    }
+
+    // We assume we are subplanning the children of an OR expression and therefore should expect one
+    // child per node. However, we have to recur down to the child leaf node to check if we can
+    // perform a clustered collection scan.
+    if (1 == children.size()) {
+        QuerySolutionNode* child = children[0].get();
+        // Find the leaf node of the solution node.
+        while (1 == child->children.size()) {
+            child = child->children[0].get();
+        }
+        if (child->getType() == StageType::STAGE_COLLSCAN) {
+            return static_cast<CollectionScanNode*>(child)->doClusteredCollectionScanClassic();
+        }
+    }
+    return false;
+}
+
 }  // namespace
 
 using std::numeric_limits;
@@ -684,44 +737,18 @@ static BSONObj finishMaxObj(const IndexEntry& indexEntry,
     }
 }
 
-bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
-    return query.getFindCommandRequest().getSort().isPrefixOf(
-        kp, SimpleBSONElementComparator::kInstance);
-}
-
-/**
- * Determine whether this query has a sort that can be provided by the clustered index, if so, which
- * direction the scan should be. If the collection is not clustered, or the sort cannot be provided,
- * returns 'boost::none'.
- */
-boost::optional<int> determineClusteredScanDirection(const CanonicalQuery& query,
-                                                     const QueryPlannerParams& params) {
-    if (params.clusteredInfo && query.getSortPattern() &&
-        CollatorInterface::collatorsMatch(params.clusteredCollectionCollator,
-                                          query.getCollator())) {
-        auto kp = clustered_util::getSortPattern(params.clusteredInfo->getIndexSpec());
-        if (providesSort(query, kp)) {
-            return 1;
-        } else if (providesSort(query, QueryPlannerCommon::reverseSortObj(kp))) {
-            return -1;
-        }
-    }
-
-    return boost::none;
-}
-
 /**
  * Determine the direction of the scan needed for the query. Defaults to 1 unless this is a
  * clustered collection and we have a sort that can be provided by the clustered index.
  */
 int determineCollscanDirection(const CanonicalQuery& query, const QueryPlannerParams& params) {
-    return determineClusteredScanDirection(query, params).value_or(1);
+    return QueryPlannerCommon::determineClusteredScanDirection(query, params).value_or(1);
 }
 
 std::pair<std::unique_ptr<QuerySolution>, const CollectionScanNode*> buildCollscanSolnWithNode(
     const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params, int direction) {
     std::unique_ptr<QuerySolutionNode> solnRoot(
-        QueryPlannerAccess::makeCollectionScan(query, tailable, params, direction));
+        QueryPlannerAccess::makeCollectionScan(query, tailable, params, direction, query.root()));
     const auto* collscanNode = checked_cast<const CollectionScanNode*>(solnRoot.get());
     return std::make_pair(
         QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot)), collscanNode);
@@ -836,7 +863,7 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
 
     // We're tagging the tree here, so it shouldn't have
     // any tags hanging off yet.
-    verify(nullptr == filter->getTag());
+    MONGO_verify(nullptr == filter->getTag());
 
     if (filter->numChildren() != indexTree->children.size()) {
         str::stream ss;
@@ -1498,7 +1525,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                 }
 
                 const BSONObj kp = QueryPlannerAnalysis::getSortPattern(index.keyPattern);
-                if (providesSort(query, kp)) {
+                if (QueryPlannerCommon::providesSort(query, kp)) {
                     LOGV2_DEBUG(
                         20981, 5, "Planner: outputting soln that uses index to provide sort");
                     auto soln = buildWholeIXSoln(fullIndexList[i], query, params);
@@ -1514,7 +1541,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                         out.push_back(std::move(soln));
                     }
                 }
-                if (providesSort(query, QueryPlannerCommon::reverseSortObj(kp))) {
+                if (QueryPlannerCommon::providesSort(query,
+                                                     QueryPlannerCommon::reverseSortObj(kp))) {
                     LOGV2_DEBUG(
                         20982,
                         5,
@@ -1603,8 +1631,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     }
 
     if (possibleToCollscan && (collscanRequested || collScanRequired || clusteredCollection)) {
-        auto clusteredScanDirection = determineClusteredScanDirection(query, params);
-        auto direction = clusteredScanDirection.value_or(1);
+        boost::optional<int> clusteredScanDirection =
+            QueryPlannerCommon::determineClusteredScanDirection(query, params);
+        int direction = clusteredScanDirection.value_or(1);
         auto [collscanSoln, collscanNode] =
             buildCollscanSolnWithNode(query, isTailable, params, direction);
         if (!collscanSoln && collScanRequired) {
@@ -1635,7 +1664,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     invariant(out.size() > 0);
     return {std::move(out)};
-}
+}  // QueryPlanner::plan
 
 /**
  * The 'query' might contain parts of aggregation pipeline. For now, we plan those separately and
@@ -1723,8 +1752,17 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
             QuerySolution* soln = branchResult->solutions.front().get();
             Status tagStatus = tagOrChildAccordingToCache(
                 cacheData.get(), soln->cacheData.get(), orChild, planningResult.indexMap);
+
+            // Check if 'soln' is a CLUSTERED_IXSCAN. This branch won't be tagged, and 'tagStatus'
+            // will return 'NoQueryExecutionPlans'. However, this plan can be executed by the OR
+            // stage.
+            QuerySolutionNode* root = soln->root();
             if (!tagStatus.isOK()) {
-                return tagStatus;
+                const bool allowPlanWithoutTag = tagStatus == ErrorCodes::NoQueryExecutionPlans &&
+                    canUseClusteredCollScan(root, std::move(root->children));
+                if (!allowPlanWithoutTag) {
+                    return tagStatus;
+                }
             }
         } else {
             // N solutions, rank them.
@@ -1748,22 +1786,33 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
                 return Status(ErrorCodes::NoQueryExecutionPlans, ss);
             }
 
-            if (SolutionCacheData::USE_INDEX_TAGS_SOLN != bestSoln->cacheData->solnType) {
-                str::stream ss;
-                ss << "No indexed cache data for subchild " << orChild->debugString();
-                return Status(ErrorCodes::NoQueryExecutionPlans, ss);
+            // The cached plan might be an indexed solution or a clustered collection scan.
+            SolutionCacheData::SolutionType solnType = bestSoln->cacheData->solnType;
+            bool useClusteredCollScan = false;
+            if (SolutionCacheData::USE_INDEX_TAGS_SOLN != solnType) {
+                if (!(SolutionCacheData::COLLSCAN_SOLN == solnType &&
+                      canUseClusteredCollScan(bestSoln->root(),
+                                              std::move(bestSoln->root()->children)))) {
+                    str::stream ss;
+                    ss << "No indexed cache data for subchild " << orChild->debugString();
+                    return Status(ErrorCodes::NoQueryExecutionPlans, ss);
+                } else {
+                    useClusteredCollScan = true;
+                }
             }
 
-            // Add the index assignments to our original query.
-            Status tagStatus = QueryPlanner::tagAccordingToCache(
-                orChild, bestSoln->cacheData->tree.get(), planningResult.indexMap);
-            if (!tagStatus.isOK()) {
-                str::stream ss;
-                ss << "Failed to extract indices from subchild " << orChild->debugString();
-                return tagStatus.withContext(ss);
+            // If the cached plan is not a clustered collection scan, add the index assignments to
+            // the original query.
+            if (!useClusteredCollScan) {
+                Status tagStatus = QueryPlanner::tagAccordingToCache(
+                    orChild, bestSoln->cacheData->tree.get(), planningResult.indexMap);
+                if (!tagStatus.isOK()) {
+                    str::stream ss;
+                    ss << "Failed to extract indices from subchild " << orChild->debugString();
+                    return tagStatus.withContext(ss);
+                }
+                cacheData->children.push_back(bestSoln->cacheData->tree->clone());
             }
-
-            cacheData->children.push_back(bestSoln->cacheData->tree->clone());
         }
     }
 

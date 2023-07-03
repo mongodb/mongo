@@ -27,26 +27,42 @@
  *    it in the license file.
  */
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
-#include "mongo/platform/basic.h"
+#include <boost/filesystem/path.hpp>
 
-#include <boost/filesystem.hpp>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {

@@ -33,9 +33,15 @@
 
 #include "mongo/db/hasher.h"
 
+#include <cstddef>
+#include <memory>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/util/md5.hpp"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/platform/endian.h"
+#include "mongo/util/md5.h"
 
 namespace mongo {
 

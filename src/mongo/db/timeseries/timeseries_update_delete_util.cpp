@@ -29,12 +29,34 @@
 
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <fmt/format.h>
+#include <string>
+#include <type_traits>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/element.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/timeseries/bucket_spec.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/ops/parsed_writes_common.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo::timeseries {
@@ -257,14 +279,14 @@ std::unique_ptr<MatchExpression> andCombineMatchExpressions(Ts&&... matchExprs) 
 
 BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
                                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                          const TimeseriesOptions& tsOptions) {
+                                          const TimeseriesOptions& tsOptions,
+                                          bool allowArbitraryWrites) {
     if (originalQuery.isEmpty()) {
         return BSONObj();
     }
 
     auto&& metaField = tsOptions.getMetaField();
-    if (!feature_flags::gTimeseriesDeletesSupport.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (!allowArbitraryWrites) {
         if (!metaField) {
             // In case the time-series collection does not have meta field defined, we broadcast
             // the request to all shards or use two phase protocol using empty predicate.

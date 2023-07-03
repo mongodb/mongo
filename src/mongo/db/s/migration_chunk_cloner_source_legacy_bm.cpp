@@ -28,7 +28,16 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <chrono>
+#include <cstdint>
+#include <list>
+#include <string>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 
 namespace mongo {

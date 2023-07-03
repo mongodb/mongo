@@ -29,10 +29,22 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_util.h"
 
 namespace mongo {
@@ -138,6 +150,37 @@ private:
     OperationContext* _opCtx;
 
     const CollectionPtr& _coll;
+};
+
+/**
+ * Implementation of steps for validating a shard key for resharding building indexes after cloning.
+ */
+class ValidationBehaviorsReshardingBulkIndex final : public ShardKeyValidationBehaviors {
+public:
+    class RecipientStateMachineExternalState;
+    ValidationBehaviorsReshardingBulkIndex();
+
+    std::vector<BSONObj> loadIndexes(const NamespaceString& nss) const override;
+
+    void verifyUsefulNonMultiKeyIndex(const NamespaceString& nss,
+                                      const BSONObj& proposedKey) const override;
+
+    void verifyCanCreateShardKeyIndex(const NamespaceString& nss,
+                                      std::string* errMsg) const override;
+
+    void createShardKeyIndex(const NamespaceString& nss,
+                             const BSONObj& proposedKey,
+                             const boost::optional<BSONObj>& defaultCollation,
+                             bool unique) const override;
+
+    void setOpCtxAndCloneTimestamp(OperationContext* opCtx, Timestamp cloneTimestamp);
+
+    boost::optional<BSONObj> getShardKeyIndexSpec() const;
+
+private:
+    OperationContext* _opCtx;
+    Timestamp _cloneTimestamp;
+    mutable boost::optional<BSONObj> _shardKeyIndexSpec;
 };
 
 /**

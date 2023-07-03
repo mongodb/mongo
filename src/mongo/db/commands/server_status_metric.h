@@ -29,12 +29,19 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
 #include <string>
+#include <utility>
 
+#include "mongo/base/counter.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/synchronized_value.h"
 
 namespace mongo {

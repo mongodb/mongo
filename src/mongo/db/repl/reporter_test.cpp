@@ -27,16 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <boost/move/utility_core.hpp>
+#include <map>
 #include <memory>
+#include <ratio>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/baton.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/reporter.h"
 #include "mongo/db/repl/update_position_args.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/task_executor_proxy.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace {
 

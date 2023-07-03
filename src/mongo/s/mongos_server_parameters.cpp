@@ -29,7 +29,16 @@
 
 #include "mongo/s/mongos_server_parameters.h"
 
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/util/str.h"
 

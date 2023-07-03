@@ -30,26 +30,56 @@
 
 #include "mongo/db/s/collmod_coordinator.h"
 
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/smart_ptr.hpp>
+#include <set>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/catalog/coll_mod.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_uuid_mismatch.h"
-#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/coll_mod_gen.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/ops/insert.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/sharded_collmod_gen.h"
+#include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_collmod.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/async_rpc.h"
+#include "mongo/executor/async_rpc_util.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/logv2/log.h"
 #include "mongo/s/async_requests_sender.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/read_through_cache.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -78,18 +108,16 @@ bool hasTimeSeriesBucketingUpdate(const CollModRequest& request) {
     return ts->getGranularity() || ts->getBucketMaxSpanSeconds() || ts->getBucketRoundingSeconds();
 }
 
+template <typename CommandType>
 std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandWithOsiToShards(
     OperationContext* opCtx,
-    StringData dbName,
-    const BSONObj& command,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
     const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
     const OperationSessionInfo& osi,
     WriteConcernOptions wc = WriteConcernOptions()) {
-    command.addFields(osi.toBSON());
-    const auto commandWithWc = CommandHelpers::appendMajorityWriteConcern(command, wc);
-    return sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, dbName, commandWithWc, shardIds, executor);
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(opts->genericArgs, wc);
+    async_rpc::AsyncRPCCommandHelpers::appendOSI(opts->genericArgs, osi);
+    return sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 }  // namespace
@@ -223,7 +251,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
         })
         .then(_buildPhaseHandler(
             Phase::kBlockShards,
-            [this, executor = executor, anchor = shared_from_this()] {
+            [this, token, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -256,12 +284,14 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     ShardsvrParticipantBlock blockCRUDOperationsRequest(_collInfo->nsForTargeting);
                     blockCRUDOperationsRequest.setBlockType(
                         CriticalSectionBlockTypeEnum::kReadsAndWrites);
-                    sendAuthenticatedCommandWithOsiToShards(opCtx,
-                                                            nss().db().toString(),
-                                                            blockCRUDOperationsRequest.toBSON({}),
-                                                            _shardingInfo->shardsOwningChunks,
-                                                            **executor,
-                                                            getNewSession(opCtx));
+                    auto opts =
+                        std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
+                            blockCRUDOperationsRequest,
+                            **executor,
+                            token,
+                            async_rpc::GenericArgs());
+                    sendAuthenticatedCommandWithOsiToShards(
+                        opCtx, opts, _shardingInfo->shardsOwningChunks, getNewSession(opCtx));
                 }
             }))
         .then(_buildPhaseHandler(
@@ -280,8 +310,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     hasTimeSeriesBucketingUpdate(_request)) {
                     ConfigsvrCollMod request(_collInfo->nsForTargeting, _request);
                     const auto cmdObj =
-                        CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))
-                            .addFields(getNewSession(opCtx).toBSON());
+                        CommandHelpers::appendMajorityWriteConcern(request.toBSON({}));
 
                     const auto& configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
                     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(
@@ -293,7 +322,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 }
             }))
         .then(_buildPhaseHandler(
-            Phase::kUpdateShards, [this, executor = executor, anchor = shared_from_this()] {
+            Phase::kUpdateShards, [this, token, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -344,39 +373,37 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             // strip out other incompatible options.
                             auto dryRunRequest = ShardsvrCollModParticipant{
                                 originalNss(), makeCollModDryRunRequest(_request)};
+                            async_rpc::GenericArgs args;
+                            async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+                            auto optsDryRun = std::make_shared<
+                                async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
+                                dryRunRequest, **executor, token, args);
                             sharding_ddl_util::sendAuthenticatedCommandToShards(
-                                opCtx,
-                                nss().db().toString(),
-                                CommandHelpers::appendMajorityWriteConcern(
-                                    dryRunRequest.toBSON({})),
-                                shardsOwningChunks,
-                                **executor);
+                                opCtx, optsDryRun, shardsOwningChunks);
                         }
 
                         // A view definition will only be present on the primary shard. So we pass
                         // an addition 'performViewChange' flag only to the primary shard.
                         if (primaryShardOwningChunk != shardsOwningChunks.end()) {
                             request.setPerformViewChange(true);
+                            auto opts = std::make_shared<
+                                async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
+                                request, **executor, token, async_rpc::GenericArgs());
                             const auto& primaryResponse = sendAuthenticatedCommandWithOsiToShards(
-                                opCtx,
-                                nss().db().toString(),
-                                request.toBSON({}),
-                                {_shardingInfo->primaryShard},
-                                **executor,
-                                getNewSession(opCtx));
+                                opCtx, opts, {_shardingInfo->primaryShard}, getNewSession(opCtx));
+
                             responses.insert(
                                 responses.end(), primaryResponse.begin(), primaryResponse.end());
                             shardsOwningChunks.erase(primaryShardOwningChunk);
                         }
 
                         request.setPerformViewChange(false);
-                        const auto& secondaryResponses =
-                            sendAuthenticatedCommandWithOsiToShards(opCtx,
-                                                                    nss().db().toString(),
-                                                                    request.toBSON({}),
-                                                                    shardsOwningChunks,
-                                                                    **executor,
-                                                                    getNewSession(opCtx));
+                        auto opts = std::make_shared<
+                            async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
+                            request, **executor, token, async_rpc::GenericArgs());
+                        const auto& secondaryResponses = sendAuthenticatedCommandWithOsiToShards(
+                            opCtx, opts, shardsOwningChunks, getNewSession(opCtx));
+
                         responses.insert(
                             responses.end(), secondaryResponses.begin(), secondaryResponses.end());
 

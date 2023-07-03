@@ -27,17 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/document_source_match.h"
-
+#include <absl/container/flat_hash_map.h>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <iterator>
+#include <list>
 #include <memory>
+#include <type_traits>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
@@ -45,11 +53,12 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/document_path_support.h"
-#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -69,7 +78,8 @@ const char* DocumentSourceMatch::getSourceName() const {
 }
 
 Value DocumentSourceMatch::serialize(SerializationOptions opts) const {
-    if (opts.verbosity || opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
+    if (opts.verbosity || opts.transformIdentifiers ||
+        opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
         return Value(DOC(getSourceName() << Document(_expression->serialize(opts))));
     }
     return Value(DOC(getSourceName() << Document(getQuery())));
@@ -503,7 +513,7 @@ DocumentSourceMatch::splitMatchByModifiedFields(
             // This stage modifies all paths, so cannot be swapped with a $match at all.
             return {nullptr, match};
         case DocumentSource::GetModPathsReturn::Type::kFiniteSet:
-            modifiedPaths = std::move(modifiedPathsRet.paths);
+            modifiedPaths = modifiedPathsRet.paths;
             break;
         case DocumentSource::GetModPathsReturn::Type::kAllExcept: {
             DepsTracker depsTracker;

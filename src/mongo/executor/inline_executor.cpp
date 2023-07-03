@@ -28,12 +28,20 @@
  */
 
 #include <functional>
+#include <list>
+#include <utility>
 
-#include "mongo/executor/inline_executor.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/executor/inline_executor.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo::executor {

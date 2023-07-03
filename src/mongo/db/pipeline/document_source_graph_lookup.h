@@ -29,12 +29,49 @@
 
 #pragma once
 
+#include <cstddef>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_comparator.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lookup_set_cache.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -52,9 +89,15 @@ public:
                                                  const BSONElement& spec);
 
 
-        bool allowShardedForeignCollection(NamespaceString nss,
-                                           bool inMultiDocumentTransaction) const override {
-            return !inMultiDocumentTransaction || _foreignNss != nss;
+        Status checkShardedForeignCollAllowed(NamespaceString nss,
+                                              bool inMultiDocumentTransaction) const override {
+            if (!inMultiDocumentTransaction || _foreignNss != nss) {
+                return Status::OK();
+            }
+
+            return Status(
+                ErrorCodes::NamespaceCannotBeSharded,
+                "Sharded $graphLookup is not allowed within a multi-document transaction");
         }
 
         PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const {

@@ -27,28 +27,54 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/document_source_graph_lookup.h"
-
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <iterator>
+#include <limits>
+#include <list>
 #include <memory>
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/document_path_support.h"
+#include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/stale_exception.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -587,8 +613,9 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
     // Do not include tenantId in serialized 'from' namespace.
     auto fromValue = (pExpCtx->ns.db() == _from.db())
         ? Value(opts.serializeIdentifier(_from.coll()))
-        : Value(Document{{"db", opts.serializeIdentifier(_from.dbName().db())},
-                         {"coll", opts.serializeIdentifier(_from.coll())}});
+        : Value(Document{
+              {"db", opts.serializeIdentifier(_from.dbName().serializeWithoutTenantPrefix())},
+              {"coll", opts.serializeIdentifier(_from.coll())}});
 
     // Serialize default options.
     MutableDocument spec(DOC("from" << fromValue << "as" << opts.serializeFieldPath(_as)
@@ -603,11 +630,12 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
     }
 
     if (_maxDepth) {
-        spec["maxDepth"] = Value(opts.serializeLiteralValue(*_maxDepth));
+        spec["maxDepth"] = Value(opts.serializeLiteral(*_maxDepth));
     }
 
     if (_additionalFilter) {
-        if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
+        if (opts.transformIdentifiers ||
+            opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
             auto matchExpr =
                 uassertStatusOK(MatchExpressionParser::parse(*_additionalFilter, pExpCtx));
             spec["restrictSearchWithMatch"] = Value(matchExpr->serialize(opts));
@@ -621,7 +649,7 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
         const boost::optional<FieldPath> indexPath = (*_unwind)->indexPath();
         spec["unwinding"] =
             Value(DOC("preserveNullAndEmptyArrays"
-                      << opts.serializeLiteralValue((*_unwind)->preserveNullAndEmptyArrays())
+                      << opts.serializeLiteral((*_unwind)->preserveNullAndEmptyArrays())
                       << "includeArrayIndex"
                       << (indexPath ? Value(opts.serializeFieldPath(*indexPath)) : Value())));
     }

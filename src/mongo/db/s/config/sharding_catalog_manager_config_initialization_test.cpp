@@ -27,44 +27,74 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <algorithm>
+#include <cstdint>
+#include <fmt/format.h>
+#include <memory>
+#include <random>
 #include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/curop.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version.h"
-#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/client/shard.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -364,18 +394,21 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         setupDatabase(dbName, ShardId(primaryShard), DatabaseVersion(UUID::gen(), timestamp));
     }
 
-    NamespaceString coll1Name("dbWithCollections_1_2", "coll1");
+    NamespaceString coll1Name =
+        NamespaceString::createNamespaceString_forTest("dbWithCollections_1_2", "coll1");
     std::vector<ShardId> expectedColl1Placement{ShardId("shard1"), ShardId("shard4")};
     const auto [coll1, coll1Chunks] =
         createCollectionAndChunksMetadata(operationContext(), coll1Name, 2, expectedColl1Placement);
 
-    NamespaceString coll2Name("dbWithCollections_1_2", "coll2");
+    NamespaceString coll2Name =
+        NamespaceString::createNamespaceString_forTest("dbWithCollections_1_2", "coll2");
     std::vector<ShardId> expectedColl2Placement{
         ShardId("shard1"), ShardId("shard2"), ShardId("shard3"), ShardId("shard4")};
     const auto [coll2, coll2Chunks] =
         createCollectionAndChunksMetadata(operationContext(), coll2Name, 8, expectedColl2Placement);
 
-    NamespaceString corruptedCollName("dbWithCorruptedCollection", "corruptedColl");
+    NamespaceString corruptedCollName = NamespaceString::createNamespaceString_forTest(
+        "dbWithCorruptedCollection", "corruptedColl");
     std::vector<ShardId> expectedCorruptedCollPlacement{
         ShardId("shard1"), ShardId("shard2"), ShardId("shard3")};
     const auto [corruptedColl, corruptedCollChunks] =
@@ -414,7 +447,9 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         // Each database is correctly described
         for (const auto& [dbName, primaryShard, timeOfCreation] : databaseInfos) {
             const NamespacePlacementType expectedEntry(
-                NamespaceString(dbName), timeOfCreation, {primaryShard});
+                NamespaceString::createNamespaceString_forTest(dbName),
+                timeOfCreation,
+                {primaryShard});
             const auto generatedEntry = findOneOnConfigCollection<NamespacePlacementType>(
                 operationContext(),
                 NamespaceString::kConfigsvrPlacementHistoryNamespace,
@@ -442,7 +477,7 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         const auto generatedEntryForColl1 = findOneOnConfigCollection<NamespacePlacementType>(
             operationContext(),
             NamespaceString::kConfigsvrPlacementHistoryNamespace,
-            BSON("nss" << coll1.getNss().ns()));
+            BSON("nss" << coll1.getNss().ns_forTest()));
 
         assertSamePlacementInfo(expectedEntryForColl1, generatedEntryForColl1);
 
@@ -453,7 +488,7 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         const auto generatedEntryForColl2 = findOneOnConfigCollection<NamespacePlacementType>(
             operationContext(),
             NamespaceString::kConfigsvrPlacementHistoryNamespace,
-            BSON("nss" << coll2.getNss().ns()));
+            BSON("nss" << coll2.getNss().ns_forTest()));
 
         assertSamePlacementInfo(expectedEntryForColl2, generatedEntryForColl2);
 
@@ -465,7 +500,7 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
             findOneOnConfigCollection<NamespacePlacementType>(
                 operationContext(),
                 NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                BSON("nss" << corruptedColl.getNss().ns()));
+                BSON("nss" << corruptedColl.getNss().ns_forTest()));
 
         assertSamePlacementInfo(expectedEntryForCorruptedColl, generatedEntryForCorruptedColl);
 
@@ -478,8 +513,9 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         const auto generatedMarkerForDawnOfTime = findOneOnConfigCollection<NamespacePlacementType>(
             operationContext(),
             NamespaceString::kConfigsvrPlacementHistoryNamespace,
-            BSON("nss" << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns()
-                       << "timestamp" << Timestamp(0, 1)));
+            BSON("nss"
+                 << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns_forTest()
+                 << "timestamp" << Timestamp(0, 1)));
 
         assertSamePlacementInfo(expectedMarkerForDawnOfTime, generatedMarkerForDawnOfTime);
 
@@ -493,9 +529,9 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
             findOneOnConfigCollection<NamespacePlacementType>(
                 operationContext(),
                 NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                BSON(
-                    "nss" << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns()
-                          << "timestamp" << timeAtInitialization));
+                BSON("nss" << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker
+                                  .ns_forTest()
+                           << "timestamp" << timeAtInitialization));
 
         assertSamePlacementInfo(expectedMarkerForInitializationTime,
                                 generatedMarkerForInitializationTime);

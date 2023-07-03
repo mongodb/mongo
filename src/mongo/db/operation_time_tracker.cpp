@@ -27,10 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <mutex>
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace {

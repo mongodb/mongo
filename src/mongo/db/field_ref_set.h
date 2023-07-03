@@ -29,10 +29,18 @@
 
 #pragma once
 
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <memory>
 #include <set>
+#include <string>
+#include <utility>
 #include <vector>
 
-#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
 
 namespace mongo {
@@ -70,6 +78,10 @@ public:
     /** Returns 'true' if the set is empty */
     bool empty() const {
         return _fieldSet.empty();
+    }
+
+    size_t size() const {
+        return _fieldSet.size();
     }
 
     inline const_iterator begin() const {
@@ -130,7 +142,7 @@ public:
      *
      * Return true if conflicts were found.
      */
-    bool findConflicts(const FieldRef* toCheck, FieldRefSet* conflicts) const;
+    StatusWith<bool> checkForConflictsAndPrefix(const FieldRef* toCheck) const;
 
     void clear() {
         _fieldSet.clear();

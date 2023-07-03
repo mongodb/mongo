@@ -27,17 +27,41 @@
  *    it in the license file.
  */
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
+#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 
 class LockManagerTest : public ServiceContextTest {};
 
-TEST(ResourceId, Semantics) {
+class ResourceIdTest : public unittest::Test {
+protected:
+    constexpr int getResourceTypeBits() {
+        return ResourceId::resourceTypeBits;
+    }
+};
+
+TEST(ResourceIdTest, Semantics) {
     ResourceId resIdDb(RESOURCE_DATABASE, 324334234);
     ASSERT(resIdDb.getType() == RESOURCE_DATABASE);
     ASSERT(resIdDb.getHashId() == 324334234);
@@ -60,8 +84,9 @@ TEST(ResourceId, Semantics) {
     ASSERT_EQUALS(resId, resIdColl);
 }
 
-TEST(ResourceId, Masking) {
-    const uint64_t maxHash = (1ULL << 61) - 1;  //  Only 61 bits usable for hash
+TEST_F(ResourceIdTest, Masking) {
+    const uint64_t maxHash =
+        (1ULL << (64 - getResourceTypeBits())) - 1;  //  Only 60 bits usable for hash
     ResourceType resources[3] = {RESOURCE_GLOBAL, RESOURCE_COLLECTION, RESOURCE_METADATA};
     uint64_t hashes[3] = {maxHash, maxHash / 3, maxHash / 3 * 2};
 
@@ -74,8 +99,6 @@ TEST(ResourceId, Masking) {
         }
     }
 }
-
-class ResourceIdTest : public unittest::Test {};
 
 DEATH_TEST_F(ResourceIdTest, StringConstructorMustNotBeCollection, "invariant") {
     ResourceId(RESOURCE_COLLECTION, "TestDB.collection");
@@ -92,6 +115,10 @@ DEATH_TEST_F(ResourceIdTest, CantCreateResourceMutexDirectly, "invariant") {
 //
 // LockManager
 //
+
+TEST_F(LockManagerTest, IsModeCovered) {
+    ASSERT(isModeCovered(MODE_IS, MODE_IX));
+}
 
 TEST_F(LockManagerTest, Grant) {
     LockManager lockMgr;

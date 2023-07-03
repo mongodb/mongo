@@ -30,8 +30,13 @@
 #pragma once
 
 #include <functional>
+#include <memory>
+#include <string>
 
 #include "mongo/db/repl/oplog_interface.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
@@ -50,10 +55,7 @@ public:
      */
     using GetConnectionFn = std::function<DBClientBase*()>;
 
-    OplogInterfaceRemote(HostAndPort hostAndPort,
-                         GetConnectionFn getConnection,
-                         StringData collectionName,
-                         int batchSize);
+    OplogInterfaceRemote(HostAndPort hostAndPort, GetConnectionFn getConnection, int batchSize);
     std::string toString() const override;
     std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;
     std::unique_ptr<TransactionHistoryIteratorBase> makeTransactionHistoryIterator(
@@ -63,7 +65,6 @@ public:
 private:
     HostAndPort _hostAndPort;
     GetConnectionFn _getConnection;
-    std::string _collectionName;
     int _batchSize;
 };
 

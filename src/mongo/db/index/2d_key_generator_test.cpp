@@ -28,19 +28,32 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/index/expression_keys_private.h"
-
 #include <algorithm>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <memory>
+#include <ostream>
+#include <string>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/geo/hash.h"
 #include "mongo/db/index/2d_common.h"
+#include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
-#include "mongo/db/json.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -53,7 +66,7 @@ std::string dumpKeyset(const KeyStringSet& keyStrings) {
     std::stringstream ss;
     ss << "[ ";
     for (auto& keyString : keyStrings) {
-        auto key = KeyString::toBson(keyString, Ordering::make(BSONObj()));
+        auto key = key_string::toBson(keyString, Ordering::make(BSONObj()));
         ss << key.toString() << " ";
     }
     ss << "]";
@@ -81,21 +94,21 @@ bool assertKeysetsEqual(const KeyStringSet& expectedKeys, const KeyStringSet& ac
     return true;
 }
 
-KeyString::Value make2DKey(const TwoDIndexingParams& params,
-                           int x,
-                           int y,
-                           BSONElement trailingFields) {
+key_string::Value make2DKey(const TwoDIndexingParams& params,
+                            int x,
+                            int y,
+                            BSONElement trailingFields) {
     BSONObjBuilder bob;
     BSONObj locObj = BSON_ARRAY(x << y);
     params.geoHashConverter->hash(locObj, nullptr).appendHashMin(&bob, "");
     bob.append(trailingFields);
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, bob.obj(), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, bob.obj(), Ordering::make(BSONObj()));
     return keyString.release();
 }
 
 struct TwoDKeyGeneratorTest : public unittest::Test {
-    SharedBufferFragmentBuilder allocator{KeyString::HeapBuilder::kHeapAllocatorDefaultBytes};
+    SharedBufferFragmentBuilder allocator{key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
 };
 
 TEST_F(TwoDKeyGeneratorTest, TrailingField) {
@@ -108,7 +121,7 @@ TEST_F(TwoDKeyGeneratorTest, TrailingField) {
                                      obj,
                                      params,
                                      &actualKeys,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      Ordering::make(BSONObj()));
 
     KeyStringSet expectedKeys;
@@ -128,7 +141,7 @@ TEST_F(TwoDKeyGeneratorTest, ArrayTrailingField) {
                                      obj,
                                      params,
                                      &actualKeys,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      Ordering::make(BSONObj()));
 
     KeyStringSet expectedKeys;
@@ -148,7 +161,7 @@ TEST_F(TwoDKeyGeneratorTest, ArrayOfObjectsTrailingField) {
                                      obj,
                                      params,
                                      &actualKeys,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      Ordering::make(BSONObj()));
 
     KeyStringSet expectedKeys;

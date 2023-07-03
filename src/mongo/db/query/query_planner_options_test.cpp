@@ -27,13 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/query/collation/collator_interface_mock.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/classic_plan_cache.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/query_solution.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
@@ -847,7 +874,7 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
 }
 
 TEST_F(QueryPlannerTest, DollarResumeAfterFieldPropagatedFromQueryRequestToStageBuilder) {
-    BSONObj cmdObj = BSON("find" << nss.ns() << "hint" << BSON("$natural" << 1) << "sort"
+    BSONObj cmdObj = BSON("find" << nss.ns_forTest() << "hint" << BSON("$natural" << 1) << "sort"
                                  << BSON("$natural" << 1) << "$_requestResumeToken" << true
                                  << "$_resumeAfter" << BSON("$recordId" << 42LL));
 

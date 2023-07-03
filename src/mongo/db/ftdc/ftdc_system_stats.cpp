@@ -27,16 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/ftdc/ftdc_system_stats.h"
-
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/ftdc/collector.h"
+#include "mongo/db/ftdc/ftdc_system_stats.h"
 
 namespace mongo {
 

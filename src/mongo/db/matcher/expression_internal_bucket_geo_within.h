@@ -29,9 +29,28 @@
 
 #pragma once
 
+#include <cstddef>
+#include <memory>
+#include <s2cellid.h>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/matcher/match_details.h"
+#include "mongo/db/matcher/matchable.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -70,6 +89,7 @@ public:
         : MatchExpression(MatchExpression::INTERNAL_BUCKET_GEO_WITHIN, std::move(annotation)),
           _geoContainer(container),
           _indexField("data." + field),
+          _fieldRef(_indexField),
           _field(std::move(field)) {}
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
@@ -127,8 +147,7 @@ public:
     }
 
     const FieldRef* fieldRef() const final {
-        MONGO_UNREACHABLE_TASSERT(5837104);
-        return nullptr;
+        return &_fieldRef;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -153,6 +172,7 @@ private:
 
     std::shared_ptr<GeometryContainer> _geoContainer;
     std::string _indexField;
+    FieldRef _fieldRef;
     std::string _field;
 };
 

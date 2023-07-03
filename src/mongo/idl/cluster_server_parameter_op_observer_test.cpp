@@ -27,11 +27,44 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <boost/optional.hpp>
+#include <ctime>
+#include <initializer_list>
+#include <iterator>
+#include <memory>
+#include <set>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands/create_gen.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/server_parameter_with_storage.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/idl/cluster_server_parameter_op_observer.h"
+#include "mongo/idl/cluster_server_parameter_test_gen.h"
 #include "mongo/idl/cluster_server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -107,8 +140,8 @@ public:
         auto opCtx = cc().makeOperationContext();
         WriteUnitOfWork wuow(opCtx.get());
         AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
-        observer.aboutToDelete(opCtx.get(), *autoColl, deletedDoc);
         OplogDeleteEntryArgs args;
+        observer.aboutToDelete(opCtx.get(), *autoColl, deletedDoc, &args);
         args.deletedDoc = includeDeletedDoc ? &deletedDoc : nullptr;
         observer.onDelete(opCtx.get(), *autoColl, 1 /* StmtId */, args);
         if (commit)
@@ -144,6 +177,31 @@ public:
         const auto initialCPTime = sp->getClusterParameterTime(tenantId);
         ClusterServerParameterTest initialCspTest = sp->getValue(tenantId);
         fn(nss);
+        ClusterServerParameterTest finalCspTest = sp->getValue(tenantId);
+
+        ASSERT_EQ(sp->getClusterParameterTime(tenantId), initialCPTime);
+        ASSERT_EQ(finalCspTest.getIntValue(), initialCspTest.getIntValue());
+        ASSERT_EQ(finalCspTest.getStrValue(), initialCspTest.getStrValue());
+    }
+
+    // Asserts that this action causes a failure, and state does not change.
+    template <typename F>
+    void assertFailure(const NamespaceString& nss,
+                       F fn,
+                       const boost::optional<TenantId>& tenantId) {
+        auto* sp =
+            ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
+        ASSERT(sp != nullptr);
+
+        const auto initialCPTime = sp->getClusterParameterTime(tenantId);
+        ClusterServerParameterTest initialCspTest = sp->getValue(tenantId);
+        bool failed = false;
+        try {
+            fn(nss);
+        } catch (const DBException&) {
+            failed = true;
+        }
+        ASSERT(failed);
         ClusterServerParameterTest finalCspTest = sp->getValue(tenantId);
 
         ASSERT_EQ(sp->getClusterParameterTime(tenantId), initialCPTime);
@@ -194,6 +252,13 @@ public:
         assertIgnoredOtherNamespaces(fn, tenantId);
         assertIgnored(NamespaceString::makeClusterParametersNSS(boost::none), fn, tenantId);
         assertIgnored(NamespaceString::makeClusterParametersNSS(kTenantId), fn, tenantId);
+    }
+
+    template <typename F>
+    void assertFailsOnlyCPNamespace(F fn, const boost::optional<TenantId>& tenantId) {
+        assertIgnoredOtherNamespaces(fn, tenantId);
+        assertFailure(NamespaceString::makeClusterParametersNSS(boost::none), fn, tenantId);
+        assertFailure(NamespaceString::makeClusterParametersNSS(kTenantId), fn, tenantId);
     }
 
     void assertParameterState(int line,
@@ -247,12 +312,12 @@ TEST_F(ClusterServerParameterOpObserverTest, OnInsertRecord) {
     const auto multiStrValue = "OnInsertRecord.multi";
 
     ASSERT_LT(singleLogicalTime, multiLogicalTime);
-    doInserts(NamespaceString::kClusterParametersNamespace,
-              {
-                  BSON(ClusterServerParameter::k_idFieldName << "ignored"),
-                  makeClusterParametersDoc(multiLogicalTime, multiIntValue, multiStrValue),
-                  BSON(ClusterServerParameter::k_idFieldName << "alsoIgnored"),
-              });
+    doInserts(
+        NamespaceString::kClusterParametersNamespace,
+        {
+            makeClusterParametersDoc(multiLogicalTime, multiIntValue, multiStrValue, "cspTest2"),
+            makeClusterParametersDoc(multiLogicalTime, multiIntValue, multiStrValue),
+        });
 
     ASSERT_PARAMETER_STATE(boost::none, multiIntValue, multiStrValue, multiLogicalTime);
     ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
@@ -273,22 +338,22 @@ TEST_F(ClusterServerParameterOpObserverTest, OnInsertRecord) {
         },
         boost::none);
 
-    // Unknown CSP record ignored on all namespaces.
-    assertIgnoredAlways(
+    // Unknown CSP record fails
+    assertFailsOnlyCPNamespace(
         [this](const auto& nss) {
             doInserts(nss,
                       {BSON("_id"
                             << "ignored")});
         },
         boost::none);
-    // Unknown CSP, multi-insert.
-    assertIgnoredAlways(
+
+    // Unknown CSP and not unknown CSP fails, multi-insert.
+    assertFailsOnlyCPNamespace(
         [this](const auto& nss) {
             doInserts(nss,
-                      {BSON("_id"
-                            << "ignored"),
+                      {makeClusterParametersDoc(LogicalTime(), 456, "yellow"),
                        BSON("_id"
-                            << "also-ingored")});
+                            << "ignored")});
         },
         boost::none);
 
@@ -329,8 +394,8 @@ TEST_F(ClusterServerParameterOpObserverTest, OnUpdateRecord) {
         },
         boost::none);
 
-    // Non cluster parameter doc.
-    assertIgnoredAlways(
+    // Non cluster parameter doc fails.
+    assertFailsOnlyCPNamespace(
         [this](const auto& nss) {
             doUpdate(nss, BSON(ClusterServerParameter::k_idFieldName << "ignored"));
         },

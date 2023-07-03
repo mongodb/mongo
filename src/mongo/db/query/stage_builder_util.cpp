@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/stage_builder_util.h"
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/query/classic_stage_builder.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/sbe_stage_builder.h"
-#include "mongo/db/query/shard_filterer_factory_impl.h"
+#include "mongo/db/query/stage_builder_util.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo::stage_builder {
 std::unique_ptr<PlanStage> buildClassicExecutableTree(OperationContext* opCtx,
-                                                      const CollectionPtr& collection,
+                                                      VariantCollectionPtrOrAcquisition collection,
                                                       const CanonicalQuery& cq,
                                                       const QuerySolution& solution,
                                                       WorkingSet* ws) {
@@ -48,7 +48,8 @@ std::unique_ptr<PlanStage> buildClassicExecutableTree(OperationContext* opCtx,
     // execute the query.
     invariant(solution.root());
     invariant(ws);
-    auto builder = std::make_unique<ClassicStageBuilder>(opCtx, collection, cq, solution, ws);
+    auto builder =
+        std::make_unique<ClassicStageBuilder>(opCtx, std::move(collection), cq, solution, ws);
     return builder->build(solution.root());
 }
 
@@ -69,8 +70,7 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
 
     auto builder =
         std::make_unique<SlotBasedStageBuilder>(opCtx, collections, cq, solution, sbeYieldPolicy);
-    auto root = builder->build(solution.root());
-    auto data = builder->getPlanStageData();
+    auto [root, data] = builder->build(solution.root());
 
     return {std::move(root), std::move(data)};
 }

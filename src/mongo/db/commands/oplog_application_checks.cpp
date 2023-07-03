@@ -26,15 +26,40 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_check.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/builtin_roles.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/oplog_application_checks.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 UUID OplogApplicationChecks::getUUIDFromOplogEntry(const BSONObj& oplogEntry) {
@@ -43,7 +68,7 @@ UUID OplogApplicationChecks::getUUIDFromOplogEntry(const BSONObj& oplogEntry) {
 };
 
 Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opCtx,
-                                                           const DatabaseName&,
+                                                           const DatabaseName& dbName,
                                                            const BSONObj& oplogEntry,
                                                            AuthorizationSession* authSession,
                                                            bool alwaysUpsert) {
@@ -53,8 +78,9 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
 
     if (opType == "n"_sd) {
         // oplog notes require cluster permissions, and may not have a ns
-        if (!authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::appendOplogNote)) {
+        if (!authSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()),
+                ActionType::appendOplogNote)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
@@ -145,8 +171,8 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
         // It seems that 'db' isn't used anymore. Require all actions to prevent casual use.
         ActionSet allActions;
         allActions.addAllActions();
-        if (!authSession->isAuthorizedForActionsOnResource(ResourcePattern::forAnyResource(),
-                                                           allActions)) {
+        if (!authSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forAnyResource(nss.tenantId()), allActions)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
@@ -222,14 +248,14 @@ Status OplogApplicationChecks::checkAuthForOperation(OperationContext* opCtx,
                                                      const BSONObj& cmdObj,
                                                      OplogApplicationValidity validity) {
     AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-    if (!authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::applyOps)) {
+    if (!authSession->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::applyOps)) {
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
     if (validity == OplogApplicationValidity::kNeedsSuperuser) {
         std::vector<Privilege> universalPrivileges;
-        auth::generateUniversalPrivileges(&universalPrivileges);
+        auth::generateUniversalPrivileges(&universalPrivileges, dbName.tenantId());
         if (!authSession->isAuthorizedForPrivileges(universalPrivileges)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
@@ -237,15 +263,15 @@ Status OplogApplicationChecks::checkAuthForOperation(OperationContext* opCtx,
     }
     if (validity == OplogApplicationValidity::kNeedsForceAndUseUUID) {
         if (!authSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(),
+                ResourcePattern::forClusterResource(dbName.tenantId()),
                 {ActionType::forceUUID, ActionType::useUUID})) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         validity = OplogApplicationValidity::kOk;
     }
     if (validity == OplogApplicationValidity::kNeedsUseUUID) {
-        if (!authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::useUUID)) {
+        if (!authSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::useUUID)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         validity = OplogApplicationValidity::kOk;

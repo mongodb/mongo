@@ -11,7 +11,7 @@
 (function() {
 'use strict';
 
-const testDB = db.getSiblingDB(jsTestName());
+const testDB = db.getSiblingDB("coll_uuid_rename_coll");
 assert.commandWorked(testDB.dropDatabase());
 
 const coll = testDB.coll;

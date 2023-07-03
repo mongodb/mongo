@@ -27,19 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/scripting/mozjs/status.h"
-
+#include <boost/preprocessor/control/iif.hpp>
+#include <js/CallArgs.h>
+#include <js/ComparisonOperators.h>
 #include <js/Object.h>
+#include <js/PropertyDescriptor.h>
+#include <js/RootingAPI.h>
 #include <js/ValueArray.h>
+#include <jsapi.h>
+#include <memory>
+#include <string>
+#include <utility>
 
+#include <js/TypeDecls.h>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/scripting/jsexception.h"
+#include "mongo/scripting/mozjs/error.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
+#include "mongo/scripting/mozjs/status.h"
 #include "mongo/scripting/mozjs/valuereader.h"
-#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace mozjs {

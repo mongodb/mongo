@@ -49,9 +49,13 @@ let collectionMetadata = st.s.getCollection('config.collections').findOne({_id: 
 assert.eq(true, collectionMetadata.hasOwnProperty('allowMigrations'));
 assert.eq(false, collectionMetadata.allowMigrations);
 
+// We should get a TransactionTooOld error if we try to re-execute the TXN with an older txnNumber
 assert.commandFailedWithCode(
     runConfigsvrSetAllowMigrationsWithRetries(st, ns, lsid, NumberLong(0), true),
     ErrorCodes.TransactionTooOld);
+
+// The command should be idempotent
+assert.commandWorked(runConfigsvrSetAllowMigrationsWithRetries(st, ns, lsid, NumberLong(2), false));
 
 collectionMetadata = st.s.getCollection('config.collections').findOne({_id: ns});
 assert.eq(true, collectionMetadata.hasOwnProperty('allowMigrations'));

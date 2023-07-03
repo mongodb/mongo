@@ -29,11 +29,26 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/field_name_bloom_filter.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/storage/key_string.h"
@@ -63,7 +78,7 @@ public:
     /**
      * Computes a KeyString that can be used as the sort key for this object.
      */
-    KeyString::Value computeSortKeyString(const BSONObj& bson);
+    key_string::Value computeSortKeyString(const BSONObj& bson);
 
     /**
      * Determines all of the portions of the sort key for the given document and populates the

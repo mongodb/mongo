@@ -29,11 +29,32 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/db/views/view.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -52,9 +73,19 @@ struct CollectionOrViewAcquisitionRequest {
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
-        : nss(nssOrUUID.nss()),
+        : nss([nssOrUUID]() -> boost::optional<NamespaceString> {
+              if (nssOrUUID.isNamespaceString()) {
+                  return nssOrUUID.nss();
+              }
+              return boost::none;
+          }()),
           dbname(nssOrUUID.dbName()),
-          uuid(nssOrUUID.uuid()),
+          uuid([nssOrUUID]() -> boost::optional<UUID> {
+              if (nssOrUUID.isUUID()) {
+                  return nssOrUUID.uuid();
+              }
+              return boost::none;
+          }()),
           placementConcern(placementConcern),
           readConcern(readConcern),
           operationType(operationType),
@@ -71,26 +102,25 @@ struct CollectionOrViewAcquisitionRequest {
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
-        : nss(nss),
-          uuid(uuid),
+        : nss(std::move(nss)),
+          uuid(std::move(uuid)),
           placementConcern(placementConcern),
           readConcern(readConcern),
           operationType(operationType),
           viewMode(viewMode) {}
 
     /**
-     * Infers the placement and read concerns from the OperationShardingState and ReadConcern values
-     * on the OperationContext.
+     * Overload, which acquires a collection or view by NSS or DB/UUID and infers the placement and
+     * read concerns from the OperationShardingState and ReadConcern values on the OperationContext.
      */
     static CollectionOrViewAcquisitionRequest fromOpCtx(
         OperationContext* opCtx,
-        NamespaceString nss,
+        NamespaceStringOrUUID nssOrUUID,
         AcquisitionPrerequisites::OperationType operationType,
-        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView,
-        boost::optional<UUID> expectedUUID = boost::none);
+        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView);
 
+    // TODO(SERVER-78226): Replace the following with a type which can express "nss and uuid".
     boost::optional<NamespaceString> nss;
-
     boost::optional<DatabaseName> dbname;
     boost::optional<UUID> uuid;
 
@@ -147,20 +177,23 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
         AcquisitionPrerequisites::OperationType operationType);
 };
 
+class ScopedCollectionOrViewAcquisition;
+
 class ScopedCollectionAcquisition {
 public:
-    ScopedCollectionAcquisition(const mongo::ScopedCollectionAcquisition&) = delete;
+    ScopedCollectionAcquisition(OperationContext* opCtx,
+                                shard_role_details::AcquiredCollection& acquiredCollection);
 
-    ScopedCollectionAcquisition(mongo::ScopedCollectionAcquisition&& other)
-        : _opCtx(other._opCtx), _acquiredCollection(other._acquiredCollection) {
-        other._opCtx = nullptr;
+    ScopedCollectionAcquisition(ScopedCollectionAcquisition&& other)
+        : _txnResources(other._txnResources), _acquiredCollection(other._acquiredCollection) {
+        other._txnResources = nullptr;
     }
 
-    ~ScopedCollectionAcquisition();
+    explicit ScopedCollectionAcquisition(ScopedCollectionOrViewAcquisition&& other);
 
-    ScopedCollectionAcquisition(OperationContext* opCtx,
-                                shard_role_details::AcquiredCollection& acquiredCollection)
-        : _opCtx(opCtx), _acquiredCollection(acquiredCollection) {}
+    ScopedCollectionAcquisition(const ScopedCollectionAcquisition&) = delete;
+
+    ~ScopedCollectionAcquisition();
 
     const NamespaceString& nss() const {
         return _acquiredCollection.prerequisites.nss;
@@ -183,7 +216,6 @@ public:
     // stack
 
     // Sharding catalog services
-
     const ScopedCollectionDescription& getShardingDescription() const;
     const boost::optional<ScopedCollectionFilter>& getShardingFilter() const;
 
@@ -193,28 +225,25 @@ public:
 private:
     friend class ScopedLocalCatalogWriteFence;
 
-    OperationContext* _opCtx;
-
     // Points to the acquired resources that live on the TransactionResources opCtx decoration. The
-    // lifetime of these resources is tied to the lifetime of this
-    // ScopedCollectionOrViewAcquisition.
+    // lifetime of these resources is tied to the lifetime of this ScopedCollectionAcquisition.
+    shard_role_details::TransactionResources* _txnResources;
     shard_role_details::AcquiredCollection& _acquiredCollection;
 };
 
 class ScopedViewAcquisition {
 public:
-    ScopedViewAcquisition(const mongo::ScopedViewAcquisition&) = delete;
+    ScopedViewAcquisition(OperationContext* opCtx,
+                          const shard_role_details::AcquiredView& acquiredView);
 
-    ScopedViewAcquisition(mongo::ScopedViewAcquisition&& other)
-        : _opCtx(other._opCtx), _acquiredView(other._acquiredView) {
-        other._opCtx = nullptr;
+    ScopedViewAcquisition(ScopedViewAcquisition&& other)
+        : _txnResources(other._txnResources), _acquiredView(other._acquiredView) {
+        other._txnResources = nullptr;
     }
 
-    ~ScopedViewAcquisition();
+    ScopedViewAcquisition(const ScopedViewAcquisition&) = delete;
 
-    ScopedViewAcquisition(OperationContext* opCtx,
-                          const shard_role_details::AcquiredView& acquiredView)
-        : _opCtx(opCtx), _acquiredView(acquiredView) {}
+    ~ScopedViewAcquisition();
 
     const NamespaceString& nss() const {
         return _acquiredView.prerequisites.nss;
@@ -227,16 +256,66 @@ public:
     }
 
 private:
-    OperationContext* _opCtx;
-
     // Points to the acquired resources that live on the TransactionResources opCtx decoration. The
-    // lifetime of these resources is tied to the lifetime of this
-    // ScopedCollectionOrViewAcquisition.
+    // lifetime of these resources is tied to the lifetime of this ScopedViewAcquisition.
+    shard_role_details::TransactionResources* _txnResources;
     const shard_role_details::AcquiredView& _acquiredView;
 };
 
-using ScopedCollectionOrViewAcquisition =
-    std::variant<ScopedCollectionAcquisition, ScopedViewAcquisition>;
+class ScopedCollectionOrViewAcquisition {
+public:
+    ScopedCollectionOrViewAcquisition(ScopedCollectionAcquisition&& collection)
+        : _collectionOrViewAcquisition(std::move(collection)) {}
+
+    ScopedCollectionOrViewAcquisition(ScopedViewAcquisition&& view)
+        : _collectionOrViewAcquisition(std::move(view)) {}
+
+    const NamespaceString& nss() const {
+        if (isCollection()) {
+            return getCollection().nss();
+        } else {
+            return getView().nss();
+        }
+    }
+
+    bool isCollection() const {
+        return std::holds_alternative<ScopedCollectionAcquisition>(_collectionOrViewAcquisition);
+    }
+
+    bool isView() const {
+        return std::holds_alternative<ScopedViewAcquisition>(_collectionOrViewAcquisition);
+    }
+
+    const ScopedCollectionAcquisition& getCollection() const {
+        invariant(isCollection());
+        return std::get<ScopedCollectionAcquisition>(_collectionOrViewAcquisition);
+    }
+
+    const CollectionPtr& getCollectionPtr() const {
+        if (isCollection()) {
+            return getCollection().getCollectionPtr();
+        } else {
+            return CollectionPtr::null;
+        }
+    }
+
+    const ScopedViewAcquisition& getView() const {
+        invariant(isView());
+        return std::get<ScopedViewAcquisition>(_collectionOrViewAcquisition);
+    }
+
+private:
+    friend class ScopedCollectionAcquisition;
+
+    std::variant<ScopedCollectionAcquisition, ScopedViewAcquisition, std::monostate>
+        _collectionOrViewAcquisition;
+};
+
+using ScopedCollectionAcquisitions =
+    stdx::unordered_map<NamespaceString, ScopedCollectionAcquisition>;
+
+using ScopedCollectionOrViewAcquisitions =
+    stdx::unordered_map<NamespaceString, ScopedCollectionOrViewAcquisition>;
 
 /**
  * Takes into account the specified namespace acquisition requests and if they can be satisfied,
@@ -249,7 +328,7 @@ ScopedCollectionAcquisition acquireCollection(OperationContext* opCtx,
                                               CollectionAcquisitionRequest acquisitionRequest,
                                               LockMode mode);
 
-std::vector<ScopedCollectionAcquisition> acquireCollections(
+ScopedCollectionAcquisitions acquireCollections(
     OperationContext* opCtx,
     std::vector<CollectionAcquisitionRequest> acquisitionRequests,
     LockMode mode);
@@ -257,7 +336,11 @@ std::vector<ScopedCollectionAcquisition> acquireCollections(
 ScopedCollectionOrViewAcquisition acquireCollectionOrView(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest, LockMode mode);
 
-std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
+// TODO SERVER-77405 Rename and make it delegate to locked version when lock-free is not possible.
+ScopedCollectionOrViewAcquisition acquireCollectionOrViewWithoutTakingLocks(
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest);
+
+ScopedCollectionOrViewAcquisitions acquireCollectionsOrViews(
     OperationContext* opCtx,
     std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests,
     LockMode mode);
@@ -266,7 +349,7 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
  * Same semantics as `acquireCollectionsOrViews` above, but will not acquire or hold any of the
  * 2-phase hierarchical locks.
  */
-std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViewsWithoutTakingLocks(
+ScopedCollectionOrViewAcquisitions acquireCollectionsOrViewsWithoutTakingLocks(
     OperationContext* opCtx, std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests);
 
 /**
@@ -295,10 +378,11 @@ ScopedCollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDat
 class ScopedLocalCatalogWriteFence {
 public:
     ScopedLocalCatalogWriteFence(OperationContext* opCtx, ScopedCollectionAcquisition* acquisition);
-    ~ScopedLocalCatalogWriteFence();
 
     ScopedLocalCatalogWriteFence(ScopedLocalCatalogWriteFence&) = delete;
     ScopedLocalCatalogWriteFence(ScopedLocalCatalogWriteFence&&) = delete;
+
+    ~ScopedLocalCatalogWriteFence();
 
 private:
     static void _updateAcquiredLocalCollection(
@@ -313,16 +397,13 @@ private:
  * `yieldTransactionResources`. Must never be destroyed without having been restored and the
  * transaction resources properly committed/aborted, or disposed of.
  */
-class YieldedTransactionResources {
-public:
-    ~YieldedTransactionResources();
-
-    YieldedTransactionResources() = default;
+struct YieldedTransactionResources {
+    YieldedTransactionResources(
+        std::unique_ptr<shard_role_details::TransactionResources> yieldedResources);
 
     YieldedTransactionResources(YieldedTransactionResources&&) = default;
 
-    YieldedTransactionResources(
-        std::unique_ptr<shard_role_details::TransactionResources>&& yieldedResources);
+    ~YieldedTransactionResources();
 
     /**
      * Releases the yielded TransactionResources.
@@ -333,15 +414,28 @@ public:
 };
 
 /**
- * Yields the TransactionResources from the opCtx.
- * Returns boost::none if the lock manager global lock has been recursively locked, meaning that
- * yielding is not allowed. In this case, the opCtx's TransactionResources are left intact.
+ * This method puts the TransactionResources associated with the current OpCtx into the yielded
+ * state and then detaches them from the OpCtx, moving their ownership to the returned object.
+ *
+ * The returned object must either be properly restored by a later call to
+ * `restoreTransactionResourcesToOperationContext` or it must be `.dispose()`d of before
+ * destruction.
+ *
+ * It is not always allowed to yield the transaction resources and it is the caller's responsibility
+ * to verify a yield can be performed by calling Locker::canSaveLockState().
  */
-boost::optional<YieldedTransactionResources> yieldTransactionResourcesFromOperationContext(
-    OperationContext* opCtx);
+YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx);
 
-void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
-                                                   YieldedTransactionResources&& yieldedResources);
+void restoreTransactionResourcesToOperationContext(
+    OperationContext* opCtx, YieldedTransactionResources yieldedResourcesHolder);
+
+/**
+ * TODO SERVER-77405 remove, make internal only.
+ *
+ * Performs some checks to determine whether the operation is compatible with a lock-free read.
+ * Multi-doc transactions are not supported, nor are operations performing a write.
+ */
+bool supportsLockFreeRead(OperationContext* opCtx);
 
 namespace shard_role_details {
 class SnapshotAttempt {
@@ -354,6 +448,8 @@ public:
 
     void snapshotInitialState();
 
+    void changeReadSourceForSecondaryReads();
+
     void openStorageSnapshot();
 
     [[nodiscard]] std::shared_ptr<const CollectionCatalog> getConsistentCatalog();
@@ -365,6 +461,7 @@ private:
     bool _successful = false;
     boost::optional<long long> _replTermBeforeSnapshot;
     boost::optional<std::shared_ptr<const CollectionCatalog>> _catalogBeforeSnapshot;
+    boost::optional<bool> _shouldReadAtLastApplied;
 };
 }  // namespace shard_role_details
 }  // namespace mongo

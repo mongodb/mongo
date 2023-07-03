@@ -28,21 +28,43 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <utility>
 
-#include "mongo/s/shard_util.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/s/auto_split_vector.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/auto_split_vector_gen.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/shard_util.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -102,7 +124,8 @@ StatusWith<long long> retrieveCollectionShardSize(OperationContext* opCtx,
     }
 
     const Minutes maxTimeMSOverride{10};
-    const auto cmdObj = BSON("dataSize" << ns.ns() << "estimate" << estimate);
+    const auto cmdObj =
+        BSON("dataSize" << NamespaceStringUtil::serialize(ns) << "estimate" << estimate);
     auto statStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
@@ -204,7 +227,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     }
 
     BSONObjBuilder cmd;
-    cmd.append("splitChunk", nss.ns());
+    cmd.append("splitChunk", NamespaceStringUtil::serialize(nss));
     cmd.append("from", shardId.toString());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
     cmd.append("epoch", epoch);

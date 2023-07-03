@@ -27,24 +27,72 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <algorithm>
+#include <array>
+#include <boost/optional.hpp>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <fmt/format.h>
+#include <initializer_list>
+#include <iostream>
 #include <limits>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/auth/access_checks_gen.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_contract.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options_gen.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/idl/idl_test.h"
+#include "mongo/idl/idl_test_types.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/idl/unittest_gen.h"
+#include "mongo/idl/unittest_import_gen.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/serialization_context.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 using namespace mongo::idl::test;
 using namespace mongo::idl::import;
@@ -2470,6 +2518,12 @@ TEST(IDLEnum, ExtraDataEnum) {
     ASSERT_BSONOBJ_EQ(s2Data, s2Expected);
 }
 
+TEST(IDLEnum, NonContiguousIntEnum) {
+    ASSERT_EQ(static_cast<int>(NonContiguousIntEnum::one), 1);
+    ASSERT_EQ(static_cast<int>(NonContiguousIntEnum::five), 5);
+    ASSERT_EQ(static_cast<int>(NonContiguousIntEnum::ten), 10);
+}
+
 OpMsgRequest makeOMR(BSONObj obj) {
     OpMsgRequest request;
     request.body = obj;
@@ -2656,7 +2710,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
     auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().value(),
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss(),
                   NamespaceString::createNamespaceString_forTest("db.coll1"));
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
@@ -2717,7 +2771,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
     auto testStruct =
         BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().value(),
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss(),
                   NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
@@ -2741,7 +2795,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
     auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid().value(), uuid);
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid(), uuid);
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
 
@@ -4074,7 +4128,7 @@ TEST(IDLCommand, BasicNamespaceConstGetterCommand_TestNonConstGetterGeneration) 
 
     auto testStruct = BasicNamespaceConstGetterCommand::parse(ctxt, makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid().value(), uuid);
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid(), uuid);
 
     // Verify that both const and non-const getters are generated.
     assert_same_types<
@@ -4907,20 +4961,27 @@ TEST(IDLAccessCheck, TestSimpleAccessCheck) {
 
 TEST(IDLAccessCheck, TestSimplePrivilegeAccessCheck) {
     AuthorizationContract ac;
-    ac.addPrivilege(Privilege(ResourcePattern::forClusterResource(), ActionType::addShard));
-    ac.addPrivilege(Privilege(ResourcePattern::forClusterResource(), ActionType::serverStatus));
+    ac.addPrivilege(
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::addShard));
+    ac.addPrivilege(
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::serverStatus));
 
     verifyContract(ac, AccessCheckSimplePrivilege::kAuthorizationContract);
 }
 
 TEST(IDLAccessCheck, TestComplexAccessCheck) {
+    const auto kTestDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
     AuthorizationContract ac;
-    ac.addPrivilege(Privilege(ResourcePattern::forClusterResource(), ActionType::addShard));
-    ac.addPrivilege(Privilege(ResourcePattern::forClusterResource(), ActionType::serverStatus));
+    ac.addPrivilege(
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::addShard));
+    ac.addPrivilege(
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::serverStatus));
 
-    ac.addPrivilege(Privilege(ResourcePattern::forDatabaseName("test"), ActionType::trafficRecord));
+    ac.addPrivilege(
+        Privilege(ResourcePattern::forDatabaseName(kTestDB), ActionType::trafficRecord));
 
-    ac.addPrivilege(Privilege(ResourcePattern::forAnyResource(), ActionType::splitVector));
+    ac.addPrivilege(
+        Privilege(ResourcePattern::forAnyResource(boost::none), ActionType::splitVector));
 
     ac.addAccessCheck(AccessCheckEnum::kIsAuthenticated);
     ac.addAccessCheck(AccessCheckEnum::kIsAuthorizedToParseNamespaceElement);

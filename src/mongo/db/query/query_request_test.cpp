@@ -27,21 +27,53 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
-#include <boost/optional.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/json.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/max_time_ms_parser.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/serialization_context.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -49,7 +81,8 @@ namespace {
 using std::unique_ptr;
 using unittest::assertGet;
 
-static const NamespaceString testns("testdb.testcoll");
+static const NamespaceString testns =
+    NamespaceString::createNamespaceString_forTest("testdb.testcoll");
 
 TEST(QueryRequestTest, NegativeSkip) {
     FindCommandRequest findCommand(testns);
@@ -246,10 +279,13 @@ TEST(QueryRequestTest, InvalidResumeAfterWrongRecordIdType) {
     findCommand.setRequestResumeToken(true);
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
+                                                            false /* isClusteredCollection */));
     resumeAfter = BSON("$recordId" << 1LL);
     findCommand.setResumeAfter(resumeAfter);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
+    ASSERT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
+                                                        false /* isClusteredCollection */));
 }
 
 TEST(QueryRequestTest, InvalidResumeAfterExtraField) {
@@ -259,7 +295,8 @@ TEST(QueryRequestTest, InvalidResumeAfterExtraField) {
     findCommand.setRequestResumeToken(true);
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
+                                                            false /* isClusteredCollection */));
 }
 
 TEST(QueryRequestTest, ResumeAfterWithHint) {
@@ -282,6 +319,8 @@ TEST(QueryRequestTest, ResumeAfterWithSort) {
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
+    ASSERT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
+                                                        false /* isClusteredCollection */));
     findCommand.setSort(fromjson("{a: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setSort(fromjson("{$natural: 1}"));
@@ -297,6 +336,8 @@ TEST(QueryRequestTest, ResumeNoSpecifiedRequestResumeToken) {
     ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
+    ASSERT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
+                                                        false /* isClusteredCollection */));
 }
 
 TEST(QueryRequestTest, ExplicitEmptyResumeAfter) {
@@ -308,6 +349,8 @@ TEST(QueryRequestTest, ExplicitEmptyResumeAfter) {
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
+    ASSERT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
+                                                        false /* isClusteredCollection */));
 }
 
 //
@@ -1347,10 +1390,18 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowPartialResultsFails) {
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
-TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenFails) {
+TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenSucceeds) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               true);
     FindCommandRequest findCommand(testns);
     findCommand.setRequestResumeToken(true);
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
+    findCommand.setHint(BSON("$natural" << 1));
+    const auto agg = query_request_helper::asAggregationCommand(findCommand);
+    ASSERT_OK(agg);
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
+    ASSERT_OK(ar.getStatus());
+    ASSERT(ar.getValue().getRequestResumeToken());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithResumeAfterFails) {
@@ -1567,7 +1618,7 @@ TEST_F(QueryRequestTest, ParseFromUUID) {
     FindCommandRequest findCommand(nssOrUUID);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.testns");
     findCommand.setNss(nss);
-    ASSERT_EQ(nss, *findCommand.getNamespaceOrUUID().nss());
+    ASSERT_EQ(nss, findCommand.getNamespaceOrUUID().nss());
 }
 
 }  // namespace

@@ -28,33 +28,69 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
-
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
+#include <absl/container/inlined_vector.h>
+#include <absl/meta/type_traits.h>
+#include <boost/container/flat_set.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
 #include <iterator>
 #include <numeric>
+#include <string_view>
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/health_log_interface.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
+#include "mongo/db/exec/sbe/stages/makeobj.h"
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
-#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/matcher/matcher_type_set.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
+#include "mongo/db/query/bson_typemask.h"
+#include "mongo/db/query/projection.h"
+#include "mongo/db/query/projection_ast.h"
+#include "mongo/db/query/projection_ast_visitor.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/tree_walker.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -87,13 +123,20 @@ std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
 std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
                                                std::unique_ptr<sbe::EExpression> lhs,
                                                std::unique_ptr<sbe::EExpression> rhs,
-                                               sbe::RuntimeEnvironment* env) {
-    invariant(env);
+                                               sbe::RuntimeEnvironment* runtimeEnv) {
+    invariant(runtimeEnv);
 
-    auto collatorSlot = env->getSlotIfExists("collator"_sd);
+    auto collatorSlot = runtimeEnv->getSlotIfExists("collator"_sd);
     auto collatorVar = collatorSlot ? sbe::makeE<sbe::EVariable>(*collatorSlot) : nullptr;
 
     return makeBinaryOp(binaryOp, std::move(lhs), std::move(rhs), std::move(collatorVar));
+}
+
+std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
+                                               std::unique_ptr<sbe::EExpression> lhs,
+                                               std::unique_ptr<sbe::EExpression> rhs,
+                                               PlanStageEnvironment& env) {
+    return makeBinaryOp(binaryOp, std::move(lhs), std::move(rhs), env.runtimeEnv);
 }
 
 std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
@@ -108,13 +151,19 @@ std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression>
 
 std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
                                                std::unique_ptr<sbe::EExpression> arr,
-                                               sbe::RuntimeEnvironment* env) {
-    invariant(env);
+                                               sbe::RuntimeEnvironment* runtimeEnv) {
+    invariant(runtimeEnv);
 
-    auto collatorSlot = env->getSlotIfExists("collator"_sd);
+    auto collatorSlot = runtimeEnv->getSlotIfExists("collator"_sd);
     auto collatorVar = collatorSlot ? sbe::makeE<sbe::EVariable>(*collatorSlot) : nullptr;
 
     return makeIsMember(std::move(input), std::move(arr), std::move(collatorVar));
+}
+
+std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
+                                               std::unique_ptr<sbe::EExpression> arr,
+                                               PlanStageEnvironment& env) {
+    return makeIsMember(std::move(input), std::move(arr), env.runtimeEnv);
 }
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissingExpr(const sbe::EExpression& expr) {
@@ -144,7 +193,7 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EEx
 }
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(EvalExpr arg, StageBuilderState& state) {
-    auto expr = arg.extractExpr(state.slotVarMap, *state.data->env);
+    auto expr = arg.extractExpr(state.slotVarMap, *state.env);
     return generateNullOrMissingExpr(*expr);
 }
 
@@ -153,7 +202,7 @@ std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& 
 }
 
 std::unique_ptr<sbe::EExpression> generateNonNumericCheck(EvalExpr expr, StageBuilderState& state) {
-    return makeNot(makeFunction("isNumber", expr.extractExpr(state.slotVarMap, *state.data->env)));
+    return makeNot(makeFunction("isNumber", expr.extractExpr(state.slotVarMap, *state.env)));
 }
 
 std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable& var) {
@@ -176,7 +225,7 @@ std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var) {
 }
 
 std::unique_ptr<sbe::EExpression> generateNaNCheck(EvalExpr expr, StageBuilderState& state) {
-    return makeFunction("isNaN", expr.extractExpr(state.slotVarMap, *state.data->env));
+    return makeFunction("isNaN", expr.extractExpr(state.slotVarMap, *state.env));
 }
 
 std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& var) {
@@ -184,7 +233,7 @@ std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& va
 }
 
 std::unique_ptr<sbe::EExpression> generateInfinityCheck(EvalExpr expr, StageBuilderState& state) {
-    return makeFunction("isInfinity"_sd, expr.extractExpr(state.slotVarMap, *state.data->env));
+    return makeFunction("isInfinity"_sd, expr.extractExpr(state.slotVarMap, *state.env));
 }
 
 std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable& var) {
@@ -342,7 +391,7 @@ std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
     // into a slot.
     auto slot = slotIdGenerator->generate();
     stage = makeProject(
-        std::move(stage), planNodeId, slot, expr.extractExpr(state.slotVarMap, *state.data->env));
+        std::move(stage), planNodeId, slot, expr.extractExpr(state.slotVarMap, *state.env));
     return {slot, std::move(stage)};
 }
 
@@ -641,8 +690,8 @@ sbe::value::SlotId StageBuilderState::getGlobalVariableSlot(Variables::Id variab
         return it->second;
     }
 
-    auto slotId = data->env->registerSlot(
-        sbe::value::TypeTags::Nothing, 0, false /* owned */, slotIdGenerator);
+    auto slotId =
+        env->registerSlot(sbe::value::TypeTags::Nothing, 0, false /* owned */, slotIdGenerator);
     data->variableIdToSlotMap.emplace(variableId, slotId);
     return slotId;
 }
@@ -693,7 +742,7 @@ void indexKeyCorruptionCheckCallback(OperationContext* opCtx,
             tassert(5113708, "KeyString does not exist", keyString);
 
             BSONObj bsonKeyPattern(sbe::value::bitcastTo<const char*>(kpVal));
-            auto bsonKeyString = KeyString::toBson(*keyString, Ordering::make(bsonKeyPattern));
+            auto bsonKeyString = key_string::toBson(*keyString, Ordering::make(bsonKeyPattern));
             auto hydratedKey = IndexKeyEntry::rehydrateKey(bsonKeyPattern, bsonKeyString);
 
             HealthLogEntry entry;
@@ -797,7 +846,7 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
             auto& executionCtx = StorageExecutionContext::get(opCtx);
             auto keys = executionCtx.keys();
             SharedBufferFragmentBuilder pooledBuilder(
-                KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+                key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
             // There's no need to compute the prefixes of the indexed fields that cause the
             // index to be multikey when ensuring the keyData is still valid.
@@ -806,6 +855,7 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
 
             iam->getKeys(opCtx,
                          collection,
+                         entry,
                          pooledBuilder,
                          nextRecord.data.toBson(),
                          InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints,
@@ -883,8 +933,8 @@ sbe::value::SlotId StageBuilderState::registerInputParamSlot(
         return it->second;
     }
 
-    auto slotId = data->env->registerSlot(
-        sbe::value::TypeTags::Nothing, 0, false /* owned */, slotIdGenerator);
+    auto slotId =
+        env->registerSlot(sbe::value::TypeTags::Nothing, 0, false /* owned */, slotIdGenerator);
     data->inputParamToSlotMap.emplace(paramId, slotId);
     return slotId;
 }
@@ -1207,12 +1257,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
                 tassert(7182002, "Expected DfsState to have at least 2 entries", dfs.size() >= 2);
 
                 auto parent = dfs[dfs.size() - 2].first;
-                auto getFieldExpr = makeFunction(
-                    "getField"_sd,
-                    parent->value.hasSlot()
-                        ? makeVariable(*parent->value.getSlot())
-                        : parent->value.extractExpr(state.slotVarMap, *state.data->env),
-                    makeConstant(node->name));
+                auto getFieldExpr =
+                    makeFunction("getField"_sd,
+                                 parent->value.hasSlot()
+                                     ? makeVariable(*parent->value.getSlot())
+                                     : parent->value.extractExpr(state.slotVarMap, *state.env),
+                                 makeConstant(node->name));
 
                 auto hasOneChildToVisit = [&] {
                     size_t count = 0;

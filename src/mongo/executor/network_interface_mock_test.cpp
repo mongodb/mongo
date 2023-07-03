@@ -27,17 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <iostream>
+#include <list>
 #include <memory>
 #include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/executor/network_connection_hook.h"
-#include "mongo/executor/network_interface.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_interface_mock_test_fixture.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/executor/test_network_connection_hook.h"
+#include "mongo/rpc/metadata.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace executor {
@@ -70,23 +90,23 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
                                            Milliseconds(30)};
 
     // need to copy as it will be moved
-    auto isMasterReplyData = BSON("iamyour"
-                                  << "father");
+    auto helloReplyData = BSON("iamyour"
+                               << "father");
 
-    RemoteCommandResponse isMasterReply{isMasterReplyData.copy(), Milliseconds(20)};
+    RemoteCommandResponse helloReply{helloReplyData.copy(), Milliseconds(20)};
 
-    net().setHandshakeReplyForHost(testHost(), std::move(isMasterReply));
+    net().setHandshakeReplyForHost(testHost(), std::move(helloReply));
 
     // Since the contract of these methods is that they do not throw, we run the ASSERTs in
     // the test scope.
     net().setConnectionHook(makeTestHook(
         [&](const HostAndPort& remoteHost,
             const BSONObj&,
-            const RemoteCommandResponse& isMasterReply) {
+            const RemoteCommandResponse& helloReply) {
             validateCalled = true;
             hostCorrectForValidate = (remoteHost == testHost());
-            replyCorrectForValidate = SimpleBSONObjComparator::kInstance.evaluate(
-                isMasterReply.data == isMasterReplyData);
+            replyCorrectForValidate =
+                SimpleBSONObjComparator::kInstance.evaluate(helloReply.data == helloReplyData);
             return Status::OK();
         },
         [&](const HostAndPort& remoteHost) {
@@ -169,9 +189,8 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
 
 TEST_F(NetworkInterfaceMockTest, ConnectionHookFailedValidation) {
     net().setConnectionHook(makeTestHook(
-        [&](const HostAndPort& remoteHost,
-            const BSONObj&,
-            const RemoteCommandResponse& isMasterReply) -> Status {
+        [&](const HostAndPort& remoteHost, const BSONObj&, const RemoteCommandResponse& helloReply)
+            -> Status {
             // We just need some obscure non-OK code.
             return {ErrorCodes::ConflictingOperationInProgress, "blah"};
         },
@@ -199,7 +218,7 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookFailedValidation) {
     {
         net().enterNetwork();
         // We should have short-circuited the network and immediately called the callback.
-        // If we change isMaster replies to go through the normal network mechanism,
+        // If we change "hello" replies to go through the normal network mechanism,
         // this test will need to change.
         ASSERT(!net().hasReadyRequests());
         net().exitNetwork();
@@ -212,9 +231,8 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookFailedValidation) {
 TEST_F(NetworkInterfaceMockTest, ConnectionHookNoRequest) {
     bool makeRequestCalled = false;
     net().setConnectionHook(makeTestHook(
-        [&](const HostAndPort& remoteHost,
-            const BSONObj&,
-            const RemoteCommandResponse& isMasterReply) -> Status { return Status::OK(); },
+        [&](const HostAndPort& remoteHost, const BSONObj&, const RemoteCommandResponse& helloReply)
+            -> Status { return Status::OK(); },
         [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
             makeRequestCalled = true;
             return {boost::none};
@@ -248,9 +266,8 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookNoRequest) {
 TEST_F(NetworkInterfaceMockTest, ConnectionHookMakeRequestFails) {
     bool makeRequestCalled = false;
     net().setConnectionHook(makeTestHook(
-        [&](const HostAndPort& remoteHost,
-            const BSONObj&,
-            const RemoteCommandResponse& isMasterReply) -> Status { return Status::OK(); },
+        [&](const HostAndPort& remoteHost, const BSONObj&, const RemoteCommandResponse& helloReply)
+            -> Status { return Status::OK(); },
         [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
             makeRequestCalled = true;
             return {ErrorCodes::InvalidSyncSource, "blah"};
@@ -285,9 +302,8 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookMakeRequestFails) {
 TEST_F(NetworkInterfaceMockTest, ConnectionHookHandleReplyFails) {
     bool handleReplyCalled = false;
     net().setConnectionHook(makeTestHook(
-        [&](const HostAndPort& remoteHost,
-            const BSONObj&,
-            const RemoteCommandResponse& isMasterReply) -> Status { return Status::OK(); },
+        [&](const HostAndPort& remoteHost, const BSONObj&, const RemoteCommandResponse& helloReply)
+            -> Status { return Status::OK(); },
         [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
             return boost::make_optional<RemoteCommandRequest>({});
         },

@@ -27,12 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
+#include <iostream>
+#include <string>
+#include <string_view>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/server_parameter_specialized_test.h"
 #include "mongo/idl/server_parameter_specialized_test_gen.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/assert_that.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/matcher.h"
+#include "mongo/unittest/matcher_core.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace test {

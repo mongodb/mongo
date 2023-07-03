@@ -30,12 +30,18 @@
 
 #include "mongo/db/storage/disk_space_util.h"
 
-#include "mongo/db/storage/storage_options.h"
+#include <limits>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/fail_point.h"
-
-
-#include <boost/filesystem.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -60,11 +66,11 @@ int64_t getAvailableDiskSpaceBytes(const std::string& path) {
     return static_cast<int64_t>(spaceInfo.available);
 }
 
-int64_t getAvailableDiskSpaceBytesInDbPath() {
+int64_t getAvailableDiskSpaceBytesInDbPath(const std::string& dbpath) {
     if (auto fp = simulateAvailableDiskSpace.scoped(); fp.isActive()) {
         return static_cast<int64_t>(fp.getData()["bytes"].numberLong());
     }
-    return getAvailableDiskSpaceBytes(storageGlobalParams.dbpath);
+    return getAvailableDiskSpaceBytes(dbpath);
 }
 
 }  // namespace mongo

@@ -29,26 +29,56 @@
 
 #include "mongo/db/query/get_executor.h"
 
+#include <absl/container/flat_hash_set.h>
+#include <absl/container/node_hash_map.h>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cstdint>
+#include <iterator>
 #include <limits>
+#include <mutex>
+#include <set>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <variant>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/batched_delete_stage.h"
 #include "mongo/db/exec/cached_plan.h"
-#include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/count.h"
+#include "mongo/db/exec/delete_stage.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/idhack.h"
+#include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_cache_util.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/exec/record_store_fast_count.h"
 #include "mongo/db/exec/return_key.h"
-#include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/exec/sbe/stages/limit_skip.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/spool.h"
@@ -56,35 +86,54 @@
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/exec/timeseries_modify.h"
 #include "mongo/db/exec/timeseries_upsert.h"
+#include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/upsert_stage.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_metadata_access_stats.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/delete_request_gen.h"
+#include "mongo/db/ops/update_request.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_lookup.h"
-#include "mongo/db/query/bind_input_params.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/classic_plan_cache.h"
-#include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/cqf_get_executor.h"
-#include "mongo/db/query/explain.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/interval.h"
+#include "mongo/db/query/interval_evaluation_tree.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/explain_interface.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor_factory.h"
-#include "mongo/db/query/planner_access.h"
+#include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_explainer_factory.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
@@ -95,29 +144,45 @@
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/sbe_cached_solution_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
+#include "mongo/db/query/sbe_plan_cache.h"
+#include "mongo/db/query/sbe_runtime_planner.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_sub_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
+#include "mongo/db/update/update_driver.h"
+#include "mongo/db/yieldable.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
-#include "mongo/scripting/engine.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/tick_source.h"
-#include "mongo/util/timer.h"
+#include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -227,8 +292,8 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
     const WildcardProjection* wildcardProjection = nullptr;
     std::set<FieldRef> multikeyPathSet;
     if (desc->getIndexType() == IndexType::INDEX_WILDCARD) {
-        auto wam = static_cast<const WildcardAccessMethod*>(accessMethod);
-        wildcardProjection = wam->getWildcardProjection();
+        wildcardProjection =
+            static_cast<const WildcardAccessMethod*>(accessMethod)->getWildcardProjection();
         if (isMultikey) {
             MultikeyMetadataAccessStats mkAccessStats;
 
@@ -244,9 +309,9 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                 }
 
                 multikeyPathSet =
-                    getWildcardMultikeyPathSet(wam, opCtx, projectedFields, &mkAccessStats);
+                    getWildcardMultikeyPathSet(opCtx, &ice, projectedFields, &mkAccessStats);
             } else {
-                multikeyPathSet = getWildcardMultikeyPathSet(wam, opCtx, &mkAccessStats);
+                multikeyPathSet = getWildcardMultikeyPathSet(opCtx, &ice, &mkAccessStats);
             }
 
             LOGV2_DEBUG(20920,
@@ -948,7 +1013,7 @@ class ClassicPrepareExecutionHelper final
                                     false /* DeferExecutionTreeGeneration */> {
 public:
     ClassicPrepareExecutionHelper(OperationContext* opCtx,
-                                  const CollectionPtr& collection,
+                                  VariantCollectionPtrOrAcquisition collection,
                                   WorkingSet* ws,
                                   CanonicalQuery* cq,
                                   PlanYieldPolicy* yieldPolicy,
@@ -958,7 +1023,7 @@ public:
           _ws{ws} {}
 
     const CollectionPtr& getMainCollection() const override {
-        return _collection;
+        return _collection.getCollectionPtr();
     }
 
 protected:
@@ -967,10 +1032,11 @@ protected:
     }
 
     std::unique_ptr<ClassicPrepareExecutionResult> buildIdHackPlan() {
-        if (!isIdHackEligibleQuery(_collection, *_cq))
+        if (!isIdHackEligibleQuery(getMainCollection(), *_cq))
             return nullptr;
 
-        const IndexDescriptor* descriptor = _collection->getIndexCatalog()->findIdIndex(_opCtx);
+        const IndexDescriptor* descriptor =
+            getMainCollection()->getIndexCatalog()->findIdIndex(_opCtx);
         if (!descriptor)
             return nullptr;
 
@@ -985,14 +1051,13 @@ protected:
 
         // Might have to filter out orphaned docs.
         if (_plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+            auto shardFilterer = _collection.getShardingFilter(_opCtx);
+            invariant(shardFilterer,
+                      "Attempting to use shard filter when there's no shard filter available for "
+                      "the collection");
+
             stage = std::make_unique<ShardFilterStage>(
-                _cq->getExpCtxRaw(),
-                CollectionShardingState::assertCollectionLockedAndAcquire(_opCtx, _cq->nss())
-                    ->getOwnershipFilter(
-                        _opCtx,
-                        CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup),
-                _ws,
-                std::move(stage));
+                _cq->getExpCtxRaw(), std::move(*shardFilterer), _ws, std::move(stage));
         }
 
         const auto* cqProjection = _cq->getProj();
@@ -1042,7 +1107,7 @@ protected:
     }
 
     PlanCacheKey buildPlanCacheKey() const {
-        return plan_cache_key_factory::make<PlanCacheKey>(*_cq, _collection);
+        return plan_cache_key_factory::make<PlanCacheKey>(*_cq, getMainCollection());
     }
 
     std::unique_ptr<ClassicPrepareExecutionResult> buildCachedPlan(
@@ -1060,7 +1125,7 @@ protected:
 
         if (shouldCacheQuery(*_cq)) {
             // Try to look up a cached solution for the query.
-            if (auto cs = CollectionQueryInfo::get(_collection)
+            if (auto cs = CollectionQueryInfo::get(getMainCollection())
                               .getPlanCache()
                               ->getCacheEntryIfActive(planCacheKey)) {
                 planCacheCounters.incrementClassicHitsCounter();
@@ -1131,7 +1196,7 @@ protected:
     }
 
 private:
-    const CollectionPtr& _collection;
+    VariantCollectionPtrOrAcquisition _collection;
     WorkingSet* _ws;
 };
 
@@ -1228,7 +1293,7 @@ private:
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecutor(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
+    VariantCollectionPtrOrAcquisition collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const QueryPlannerParams& plannerParams) {
@@ -1250,7 +1315,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecu
     return plan_executor_factory::make(std::move(canonicalQuery),
                                        std::move(ws),
                                        std::move(root),
-                                       &collection,
+                                       collection,
                                        yieldPolicy,
                                        plannerParams.options,
                                        {},
@@ -1307,7 +1372,7 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     // we will need to do the runtime planning to check if the cached plan still
     // performs efficiently, or requires re-planning.
     tassert(6693503, "PlanStageData must be present", planStageData);
-    const bool hasHashLookup = !planStageData->foreignHashJoinCollections.empty();
+    const bool hasHashLookup = !planStageData->staticData->foreignHashJoinCollections.empty();
     if (decisionWorks || hasHashLookup) {
         QueryPlannerParams plannerParams;
         plannerParams.options = plannerOptions;
@@ -1319,10 +1384,11 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     return nullptr;
 }
 
-std::unique_ptr<PlanYieldPolicySBE> makeSbeYieldPolicy(OperationContext* opCtx,
-                                                       PlanYieldPolicy::YieldPolicy policy,
-                                                       const Yieldable* yieldable,
-                                                       NamespaceString nss) {
+std::unique_ptr<PlanYieldPolicySBE> makeSbeYieldPolicy(
+    OperationContext* opCtx,
+    PlanYieldPolicy::YieldPolicy policy,
+    stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable,
+    NamespaceString nss) {
     return std::make_unique<PlanYieldPolicySBE>(opCtx,
                                                 policy,
                                                 opCtx->getServiceContext()->getFastClockSource(),
@@ -1418,34 +1484,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        std::move(yieldPolicy),
                                        planningResult->isRecoveredFromPlanCache(),
                                        false /* generatedByBonsai */);
-}
-
-/**
- * Checks if the result of query planning is SBE compatible. If any of the query solutions in
- * 'planningResult' cannot currently be compiled to an SBE plan via the SBE stage builders, then we
- * will fall back to the classic engine.
- */
-bool shouldPlanningResultUseSbe(const SlotBasedPrepareExecutionResult& planningResult) {
-    // If we have an entry in the SBE plan cache, then we can use SBE.
-    if (planningResult.isRecoveredFromPlanCache()) {
-        return true;
-    }
-
-    const auto& solutions = planningResult.solutions();
-    if (solutions.empty()) {
-        // Query needs subplanning (plans are generated later, we don't have access yet). We can
-        // proceed with using SBE in this case.
-        invariant(planningResult.needsSubplanning());
-        return true;
-    }
-
-    // Check that all query solutions are SBE compatible.
-    return std::all_of(solutions.begin(), solutions.end(), [](const auto& solution) {
-        // We must have a solution, otherwise we would have early exited.
-        invariant(solution->root());
-        return isQueryPlanSbeCompatible(solution.get());
-    });
-}
+}  // getSlotBasedExecutor
 
 /**
  * Function which returns true if 'cq' uses features that are currently supported in SBE without
@@ -1513,11 +1552,14 @@ attemptToGetSlotBasedExecutor(
     // SBE-compatible query using SBE, even if the query uses features that are not on in SBE by
     // default. Either way, try to construct an SBE plan executor.
     if (canUseRegularSbe || sbeFull) {
-        // Create the SBE prepare execution helper and initialize the params for the planner. If
-        // planning results in any 'QuerySolution' which cannot be handled by the SBE stage builder,
-        // then we will fall back to the classic engine.
-        auto sbeYieldPolicy = makeSbeYieldPolicy(
-            opCtx, yieldPolicy, &collections.getMainCollection(), canonicalQuery->nss());
+        stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable;
+        if (collections.isAcquisition()) {
+            yieldable = PlanYieldPolicy::YieldThroughAcquisitions{};
+        } else {
+            yieldable = &collections.getMainCollection();
+        }
+        auto sbeYieldPolicy =
+            makeSbeYieldPolicy(opCtx, yieldPolicy, yieldable, canonicalQuery->nss());
         SlotBasedPrepareExecutionHelper helper{
             opCtx, collections, canonicalQuery.get(), sbeYieldPolicy.get(), plannerParams.options};
         auto planningResultWithStatus = helper.prepare();
@@ -1525,24 +1567,22 @@ attemptToGetSlotBasedExecutor(
             return planningResultWithStatus.getStatus();
         }
 
-        if (shouldPlanningResultUseSbe(*planningResultWithStatus.getValue())) {
-            if (extractAndAttachPipelineStages) {
-                // We know now that we will use SBE, so we need to remove the pushed-down stages
-                // from the original pipeline object.
-                extractAndAttachPipelineStages(canonicalQuery.get(), false /* attachOnly */);
-            }
-            auto statusWithExecutor =
-                getSlotBasedExecutor(opCtx,
-                                     collections,
-                                     std::move(canonicalQuery),
-                                     std::move(sbeYieldPolicy),
-                                     plannerParams,
-                                     std::move(planningResultWithStatus.getValue()));
-            if (statusWithExecutor.isOK()) {
-                return std::move(statusWithExecutor.getValue());
-            } else {
-                return statusWithExecutor.getStatus();
-            }
+        if (extractAndAttachPipelineStages) {
+            // Given that we are using SBE, we need to remove the pushed-down stages
+            // from the original pipeline object.
+            extractAndAttachPipelineStages(canonicalQuery.get(), false /* attachOnly */);
+        }
+        auto statusWithExecutor =
+            getSlotBasedExecutor(opCtx,
+                                 collections,
+                                 std::move(canonicalQuery),
+                                 std::move(sbeYieldPolicy),
+                                 plannerParams,
+                                 std::move(planningResultWithStatus.getValue()));
+        if (statusWithExecutor.isOK()) {
+            return std::move(statusWithExecutor.getValue());
+        } else {
+            return statusWithExecutor.getStatus();
         }
     }
 
@@ -1583,8 +1623,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
                     ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
                         "internalQueryFrameworkControl");
                 tassert(7319400,
-                        "Optimization failed either without tryBonsai set, or without a hint.",
-                        queryControl->_data.get() == QueryFrameworkControlEnum::kTryBonsai &&
+                        "Optimization failed either with forceBonsai set, or without a hint.",
+                        queryControl->_data.get() != QueryFrameworkControlEnum::kForceBonsai &&
                             !canonicalQuery->getFindCommandRequest().getHint().isEmpty() &&
                             !fastIndexNullHandling);
             }
@@ -1621,8 +1661,16 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
         }
         // Ensure that 'sbeCompatible' is set accordingly.
         canonicalQuery->setSbeCompatible(false);
-        return getClassicExecutor(
-            opCtx, mainColl, std::move(canonicalQuery), yieldPolicy, plannerParams);
+        if (collections.isAcquisition()) {
+            return getClassicExecutor(opCtx,
+                                      collections.getMainAcquisition(),
+                                      std::move(canonicalQuery),
+                                      yieldPolicy,
+                                      plannerParams);
+        } else {
+            return getClassicExecutor(
+                opCtx, &mainColl, std::move(canonicalQuery), yieldPolicy, plannerParams);
+        }
     }();
     if (exec.isOK()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -1633,19 +1681,21 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     OperationContext* opCtx,
-    const CollectionPtr* collection,
+    VariantCollectionPtrOrAcquisition coll,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
-    MultipleCollectionAccessor multi{collection};
 
-    return getExecutor(opCtx,
-                       multi,
-                       std::move(canonicalQuery),
-                       std::move(extractAndAttachPipelineStages),
-                       yieldPolicy,
-                       QueryPlannerParams{plannerOptions});
+    return getExecutor(
+        opCtx,
+        stdx::holds_alternative<const ScopedCollectionAcquisition*>(coll.get())
+            ? MultipleCollectionAccessor{stdx::get<const ScopedCollectionAcquisition*>(coll.get())}
+            : MultipleCollectionAccessor{coll.getCollectionPtr()},
+        std::move(canonicalQuery),
+        std::move(extractAndAttachPipelineStages),
+        yieldPolicy,
+        QueryPlannerParams{plannerOptions});
 }
 
 //
@@ -1850,7 +1900,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                 LOGV2_DEBUG(20928, 2, "Using idhack", "query"_attr = redact(unparsedQuery));
 
                 auto idHackStage = std::make_unique<IDHackStage>(
-                    expCtx.get(), unparsedQuery["_id"].wrap(), ws.get(), collectionPtr, descriptor);
+                    expCtx.get(), unparsedQuery["_id"].wrap(), ws.get(), &coll, descriptor);
                 std::unique_ptr<DeleteStage> root =
                     std::make_unique<DeleteStage>(expCtx.get(),
                                                   std::move(deleteStageParams),
@@ -1902,7 +1952,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     const size_t defaultPlannerOptions = QueryPlannerParams::DEFAULT;
     ClassicPrepareExecutionHelper helper{
-        opCtx, collectionPtr, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
+        opCtx, &coll, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
     auto executionResult = helper.prepare();
 
     if (!executionResult.isOK()) {
@@ -1915,9 +1965,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     // TODO (SERVER-64506): support change streams' pre- and post-images.
     // TODO (SERVER-66079): allow batched deletions in the config.* namespace.
-    const bool batchDelete =
-        feature_flags::gBatchMultiDeletes.isEnabled(serverGlobalParams.featureCompatibility) &&
-        gBatchUserMultiDeletes.load() &&
+    const bool batchDelete = gBatchUserMultiDeletes.load() &&
         (opCtx->recoveryUnit()->getState() == RecoveryUnit::State::kInactive ||
          opCtx->recoveryUnit()->getState() == RecoveryUnit::State::kActiveNotInUnitOfWork) &&
         !opCtx->inMultiDocumentTransaction() && !opCtx->isRetryableWrite() &&
@@ -2108,7 +2156,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     const size_t defaultPlannerOptions = QueryPlannerParams::DEFAULT;
     ClassicPrepareExecutionHelper helper{
-        opCtx, collectionPtr, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
+        opCtx, &coll, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
     auto executionResult = helper.prepare();
 
     if (!executionResult.isOK()) {
@@ -2134,6 +2182,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                 coll,
                 BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
                 parsedUpdate->releaseResidualExpr(),
+                parsedUpdate->releaseOriginalExpr(),
                 *request);
         } else {
             root = std::make_unique<TimeseriesModifyStage>(
@@ -2143,7 +2192,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                 std::move(root),
                 coll,
                 BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
-                parsedUpdate->releaseResidualExpr());
+                parsedUpdate->releaseResidualExpr(),
+                parsedUpdate->releaseOriginalExpr());
         }
     } else if (isUpsert) {
         root = std::make_unique<UpsertStage>(
@@ -2246,7 +2296,8 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
     auto makeCountScan = [&isn](BSONObj& csnStartKey,
                                 bool startKeyInclusive,
                                 BSONObj& csnEndKey,
-                                bool endKeyInclusive) {
+                                bool endKeyInclusive,
+                                std::vector<interval_evaluation_tree::IET> iets) {
         // Since count scans return no data, they are always forward scans. Index scans, on the
         // other hand, may need to scan the index in reverse order in order to obtain a sort. If the
         // index scan direction is backwards, then we need to swap the start and end of the count
@@ -2261,6 +2312,7 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
         csn->startKeyInclusive = startKeyInclusive;
         csn->endKey = csnEndKey;
         csn->endKeyInclusive = endKeyInclusive;
+        csn->iets = std::move(iets);
         return csn;
     };
 
@@ -2273,13 +2325,14 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
         // quickly explode to a point where it would just be more efficient to use a single index
         // scan. Consequently, we draw the line at one such interval.
         if (auto nullFieldNo = boundsHasExactlyOneNullOrNullAndEmptyInterval(isn)) {
-            OrderedIntervalList undefinedPointOil, nullPointOil;
-            undefinedPointOil.intervals.push_back(IndexBoundsBuilder::kUndefinedPointInterval);
-            nullPointOil.intervals.push_back(IndexBoundsBuilder::kNullPointInterval);
-
             tassert(5506501,
                     "The index of the null interval is invalid",
                     *nullFieldNo < isn->bounds.fields.size());
+            auto nullFieldName = isn->bounds.fields[*nullFieldNo].name;
+            OrderedIntervalList undefinedPointOil(nullFieldName), nullPointOil(nullFieldName);
+            undefinedPointOil.intervals.push_back(IndexBoundsBuilder::kUndefinedPointInterval);
+            nullPointOil.intervals.push_back(IndexBoundsBuilder::kNullPointInterval);
+
             auto makeNullBoundsCountScan =
                 [&](OrderedIntervalList& oil) -> std::unique_ptr<QuerySolutionNode> {
                 std::swap(isn->bounds.fields[*nullFieldNo], oil);
@@ -2289,7 +2342,17 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
                 bool startKeyInclusive, endKeyInclusive;
                 if (IndexBoundsBuilder::isSingleInterval(
                         isn->bounds, &startKey, &startKeyInclusive, &endKey, &endKeyInclusive)) {
-                    return makeCountScan(startKey, startKeyInclusive, endKey, endKeyInclusive);
+                    // Build a new IET list based on the rewritten index bounds.
+                    std::vector<interval_evaluation_tree::IET> iets = isn->iets;
+                    if (!isn->iets.empty()) {
+                        tassert(8423396,
+                                "IETs and index bounds field must have same size.",
+                                iets.size() == isn->bounds.fields.size());
+                        iets[*nullFieldNo] = interval_evaluation_tree::IET::make<
+                            interval_evaluation_tree::ConstNode>(isn->bounds.fields[*nullFieldNo]);
+                    }
+                    return makeCountScan(
+                        startKey, startKeyInclusive, endKey, endKeyInclusive, std::move(iets));
                 }
 
                 return nullptr;
@@ -2309,7 +2372,7 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
 
                 if (isn->index.multikey) {
                     // For a multikey index, add the third COUNT_SCAN stage for empty array values.
-                    OrderedIntervalList emptyArrayPointOil;
+                    OrderedIntervalList emptyArrayPointOil(nullFieldName);
                     emptyArrayPointOil.intervals.push_back(
                         IndexBoundsBuilder::kEmptyArrayPointInterval);
                     auto emptyArrayCsn = makeNullBoundsCountScan(emptyArrayPointOil);
@@ -2330,7 +2393,7 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
     }
 
     // Make the count node that we replace the fetch + ixscan with.
-    auto csn = makeCountScan(startKey, startKeyInclusive, endKey, endKeyInclusive);
+    auto csn = makeCountScan(startKey, startKeyInclusive, endKey, endKeyInclusive, isn->iets);
     // Takes ownership of 'cn' and deletes the old root.
     soln->setRoot(std::move(csn));
     return true;
@@ -2472,7 +2535,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 
     if (useRecordStoreCount) {
         std::unique_ptr<PlanStage> root =
-            std::make_unique<RecordStoreFastCountStage>(expCtx.get(), collection, skip, limit);
+            std::make_unique<RecordStoreFastCountStage>(expCtx.get(), &collection, skip, limit);
         return plan_executor_factory::make(expCtx,
                                            std::move(ws),
                                            std::move(root),
@@ -2488,8 +2551,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 
-    ClassicPrepareExecutionHelper helper{
-        opCtx, collection, ws.get(), cq.get(), nullptr, plannerOptions};
+    ClassicPrepareExecutionHelper helper{opCtx, coll, ws.get(), cq.get(), nullptr, plannerOptions};
     auto executionResult = helper.prepare();
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
@@ -2777,11 +2839,10 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForSimpleDistinct(
     OperationContext* opCtx,
-    const CollectionPtr* coll,
+    VariantCollectionPtrOrAcquisition coll,
     const QueryPlannerParams& plannerParams,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     ParsedDistinct* parsedDistinct) {
-    const auto& collection = *coll;
 
     invariant(parsedDistinct->getQuery());
     auto collator = parsedDistinct->getQuery()->getCollator();
@@ -2822,7 +2883,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
 
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     auto&& root = stage_builder::buildClassicExecutableTree(
-        opCtx, collection, *parsedDistinct->getQuery(), *soln, ws.get());
+        opCtx, coll, *parsedDistinct->getQuery(), *soln, ws.get());
 
     auto exec = plan_executor_factory::make(parsedDistinct->releaseQuery(),
                                             std::move(ws),
@@ -2857,13 +2918,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
 // 'strictDistinctOnly' parameter.
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
-                                      const CollectionPtr* coll,
+                                      VariantCollectionPtrOrAcquisition coll,
                                       std::vector<std::unique_ptr<QuerySolution>> solutions,
                                       PlanYieldPolicy::YieldPolicy yieldPolicy,
                                       ParsedDistinct* parsedDistinct,
                                       bool flipDistinctScanDirection,
                                       size_t plannerOptions) {
-    const auto& collection = *coll;
     const bool strictDistinctOnly = (plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY);
 
     // We look for a solution that has an ixscan we can turn into a distinctixscan
@@ -2876,7 +2936,7 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
             std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
             std::unique_ptr<QuerySolution> currentSolution = std::move(solutions[i]);
             auto&& root = stage_builder::buildClassicExecutableTree(
-                opCtx, collection, *parsedDistinct->getQuery(), *currentSolution, ws.get());
+                opCtx, coll, *parsedDistinct->getQuery(), *currentSolution, ws.get());
 
             auto exec = plan_executor_factory::make(parsedDistinct->releaseQuery(),
                                                     std::move(ws),
@@ -2908,17 +2968,17 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorWithoutProjection(
     OperationContext* opCtx,
-    const CollectionPtr* coll,
+    VariantCollectionPtrOrAcquisition coll,
     const CanonicalQuery* cq,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
-    const auto& collection = *coll;
+    const auto& collectionPtr = coll.getCollectionPtr();
 
     auto findCommand = std::make_unique<FindCommandRequest>(cq->getFindCommandRequest());
     findCommand->setProjection(BSONObj());
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
-    const ExtensionsCallbackReal extensionsCallback(opCtx, &collection->ns());
+    const ExtensionsCallbackReal extensionsCallback(opCtx, &collectionPtr->ns());
 
     auto cqWithoutProjection = uassertStatusOKWithContext(
         CanonicalQuery::canonicalize(opCtx,
@@ -2939,11 +2999,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorWith
 }  // namespace
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
-    const CollectionPtr* coll,
+    VariantCollectionPtrOrAcquisition coll,
     size_t plannerOptions,
     ParsedDistinct* parsedDistinct,
     bool flipDistinctScanDirection) {
-    const auto& collection = *coll;
+    const auto& collectionPtr = coll.getCollectionPtr();
 
     auto expCtx = parsedDistinct->getQuery()->getExpCtx();
     OperationContext* opCtx = expCtx->opCtx;
@@ -2952,9 +3012,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
     // Assert that not eligible for bonsai
     uassert(ErrorCodes::InternalErrorNotSupported,
             "distinct command is not eligible for bonsai",
-            !isEligibleForBonsai(*parsedDistinct->getQuery(), opCtx, collection));
+            !isEligibleForBonsai(*parsedDistinct->getQuery(), opCtx, collectionPtr));
 
-    if (!collection) {
+    if (!collectionPtr) {
         // Treat collections that do not exist as empty collections.
         return plan_executor_factory::make(parsedDistinct->releaseQuery(),
                                            std::make_unique<WorkingSet>(),
@@ -2976,7 +3036,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
     // a soln with the above properties.
 
     auto plannerParams = fillOutPlannerParamsForDistinct(
-        opCtx, collection, plannerOptions, *parsedDistinct, flipDistinctScanDirection);
+        opCtx, collectionPtr, plannerOptions, *parsedDistinct, flipDistinctScanDirection);
 
     // If there are no suitable indices for the distinct hack bail out now into regular planning
     // with no projection.

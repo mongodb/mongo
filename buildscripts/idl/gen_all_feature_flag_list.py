@@ -56,16 +56,22 @@ def is_third_party_idl(idl_path: str) -> bool:
     return False
 
 
-def gen_all_feature_flags(idl_dir: str = os.getcwd()):
+def gen_all_feature_flags(idl_dirs: List[str] = None):
     """Generate a list of all feature flags."""
+    default_idl_dirs = ["src", "buildscripts"]
+
+    if not idl_dirs:
+        idl_dirs = default_idl_dirs
+
     all_flags = []
-    for idl_path in sorted(lib.list_idls(idl_dir)):
-        if is_third_party_idl(idl_path):
-            continue
-        doc = parser.parse_file(open(idl_path), idl_path)
-        for feature_flag in doc.spec.feature_flags:
-            if feature_flag.default.literal != "true":
-                all_flags.append(feature_flag.name)
+    for idl_dir in idl_dirs:
+        for idl_path in sorted(lib.list_idls(idl_dir)):
+            if is_third_party_idl(idl_path):
+                continue
+            doc = parser.parse_file(open(idl_path), idl_path)
+            for feature_flag in doc.spec.feature_flags:
+                if feature_flag.default.literal != "true":
+                    all_flags.append(feature_flag.name)
 
     force_disabled_flags = yaml.safe_load(
         open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml"))

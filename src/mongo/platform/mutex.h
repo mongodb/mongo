@@ -29,14 +29,24 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <mutex>
+#include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/config.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/stdx/mutex.h"

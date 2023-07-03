@@ -29,6 +29,11 @@
 
 #include "mongo/s/shard_version.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/idl/idl_parser.h"
+#include "mongo/s/index_version_gen.h"
 #include "mongo/s/shard_version_gen.h"
 
 namespace mongo {
@@ -56,4 +61,12 @@ std::string ShardVersion::toString() const {
     return (_indexVersion ? _indexVersion->toString() : "") + "||" + placementVersion().toString();
 }
 
+BSONObj ShardVersion::toBSON() const {
+    BSONObjBuilder builder;
+    if (_indexVersion) {
+        builder.append("indexVersion", *_indexVersion);
+    }
+    builder.append("placementVersion", placementVersion().toBSON());
+    return builder.obj();
+}
 }  // namespace mongo

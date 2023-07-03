@@ -27,27 +27,52 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
+#include <utility>
 
-#include "mongo/client/dbclient_cursor.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_yield_restore.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/service_context.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -83,7 +108,7 @@ public:
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
         unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), collection(), params, ws.get(), nullptr));
+            new CollectionScan(_expCtx.get(), &collection(), params, ws.get(), nullptr));
 
         // Create a plan executor to hold it
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
@@ -131,7 +156,7 @@ public:
     }
 
     bool dropCollection(StringData ns) {
-        bool res = _client.dropCollection(NamespaceString(ns));
+        bool res = _client.dropCollection(NamespaceString::createNamespaceString_forTest(ns));
         _refreshCollection();
         return res;
     }

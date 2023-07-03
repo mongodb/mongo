@@ -1,10 +1,5 @@
 /**
  * Test change stream 'updateDescription' with 'showExpandedEvents'.
- *
- * @tags: [
- *      requires_fcv_61,
- *      featureFlagChangeStreamsFurtherEnrichedEvents,
- * ]
  */
 
 (function() {

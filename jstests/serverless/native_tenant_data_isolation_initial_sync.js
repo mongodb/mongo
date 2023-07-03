@@ -66,7 +66,7 @@ assert.commandWorked(primaryDB.runCommand({insert: kCollName, documents: tenant1
 const tenant1Idxs = [{key: {a: 1}, name: "indexA"}, {key: {b: 1}, name: "indexB"}];
 let res =
     assert.commandWorked(primaryDB.runCommand({createIndexes: kCollName, indexes: tenant1Idxs}));
-assert.eq(3, res.numIndexesAfter);
+assert.eq(3, res.numIndexesAfter, tojson(res));
 
 // Create a collections, insert some data, and create indexes on the collection for tenant2.
 primaryConn._setSecurityToken(securityToken2);
@@ -76,7 +76,7 @@ assert.commandWorked(primaryDB.runCommand({insert: kCollName, documents: tenant2
 
 const tenant2Idxs = [{key: {a: -1}, name: "indexA"}, {key: {b: -1}, name: "indexB"}];
 res = assert.commandWorked(primaryDB.runCommand({createIndexes: kCollName, indexes: tenant2Idxs}));
-assert.eq(3, res.numIndexesAfter);
+assert.eq(3, res.numIndexesAfter, tojson(res));
 
 // Add a new secondary to the replica set and wait for initial sync to finish.
 const secondary = rst.add({
@@ -101,13 +101,14 @@ const findTenant1Res = assert.commandWorked(secondaryDB.runCommand({find: kCollN
 assert(arrayEq(tenant1Docs, findTenant1Res.cursor.firstBatch), tojson(findTenant1Res));
 
 res = assert.commandWorked(secondaryDB.runCommand({listIndexes: kCollName}));
-assert.eq(3, res.cursor.firstBatch.length);
+assert.eq(3, res.cursor.firstBatch.length, tojson(res.cursor.firstBatch));
 assert(arrayEq(tenant1Idxs.concat([
-    {key: {"_id": 1}, name: "_id_"},
-]),
+           {key: {"_id": 1}, name: "_id_"},
+       ]),
                res.cursor.firstBatch.map(function(index) {
                    return {key: index.key, name: index.name};
-               })));
+               })),
+       tojson(res.cursor.firstBatch));
 
 // Look for tenant2's data and indexes.
 secondaryConn._setSecurityToken(securityToken2);
@@ -115,13 +116,14 @@ const findTenant2Res = assert.commandWorked(secondaryDB.runCommand({find: kCollN
 assert(arrayEq(tenant2Docs, findTenant2Res.cursor.firstBatch), tojson(findTenant2Res));
 
 res = assert.commandWorked(secondaryDB.runCommand({listIndexes: kCollName}));
-assert.eq(3, res.cursor.firstBatch.length);
+assert.eq(3, res.cursor.firstBatch.length, tojson(res.cursor.firstBatch));
 assert(arrayEq(tenant2Idxs.concat([
-    {key: {"_id": 1}, name: "_id_"},
-]),
+           {key: {"_id": 1}, name: "_id_"},
+       ]),
                res.cursor.firstBatch.map(function(index) {
                    return {key: index.key, name: index.name};
-               })));
+               })),
+       tojson(res.cursor.firstBatch));
 
 rst.stopSet();
 })();

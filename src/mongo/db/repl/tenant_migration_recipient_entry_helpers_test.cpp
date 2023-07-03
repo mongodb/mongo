@@ -27,19 +27,41 @@
  *    it in the license file.
  */
 
-#include <fstream>
+#include <fstream>  // IWYU pragma: keep
+#include <iterator>
+#include <memory>
+#include <string>
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
 
-#include "mongo/config.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/tenant_migration_pem_payload_gen.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
+#include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/ssl_util.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {

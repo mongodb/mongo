@@ -27,6 +27,15 @@
  *    it in the license file.
  */
 
+#include <set>
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/s/commands/cluster_commit_transaction_cmd.h"
 
 namespace mongo {
@@ -42,7 +51,9 @@ struct ClusterCommitTransactionCmdS {
         return kApiVersions1;
     }
 
-    static Status checkAuthForOperation(OperationContext* opCtx) {
+    static Status checkAuthForOperation(OperationContext* opCtx,
+                                        const DatabaseName&,
+                                        const BSONObj&) {
         return Status::OK();
     }
 

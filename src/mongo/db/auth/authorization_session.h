@@ -29,24 +29,43 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/explain_verbosity_gen.h"
+#include "mongo/db/read_write_concern_provenance_base_gen.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
 class Client;
 class AuthorizationContract;
+
+class ListCollections;
 
 /**
  * Contains all the authorization logic for a single client connection.  It contains a set of
@@ -157,6 +176,9 @@ public:
     // Get the authenticated user's object handle, if any.
     virtual boost::optional<UserHandle> getAuthenticatedUser() = 0;
 
+    // Get the authenticated user's tenant ID, if any.
+    virtual boost::optional<TenantId> getUserTenantId() const = 0;
+
     // Is auth disabled? Returns true if auth is disabled.
     virtual bool shouldIgnoreAuthChecks() = 0;
 
@@ -199,8 +221,8 @@ public:
     // Checks if the current session is authorized to list the collections in the given
     // database. If it is, return a privilegeVector containing the privileges used to authorize
     // this command.
-    virtual StatusWith<PrivilegeVector> checkAuthorizedToListCollections(StringData dbname,
-                                                                         const BSONObj& cmdObj) = 0;
+    virtual StatusWith<PrivilegeVector> checkAuthorizedToListCollections(
+        const ListCollections&) = 0;
 
     // Checks if this connection is using the localhost bypass
     virtual bool isUsingLocalhostBypass() = 0;
@@ -254,7 +276,7 @@ public:
 
     // Returns true if the current session possesses a privilege which could apply to the
     // database resource, or a specific or arbitrary resource within the database.
-    virtual bool isAuthorizedForAnyActionOnAnyResourceInDB(StringData dbname) = 0;
+    virtual bool isAuthorizedForAnyActionOnAnyResourceInDB(const DatabaseName&) = 0;
 
     // Returns true if the current session possesses a privilege which applies to the resource.
     virtual bool isAuthorizedForAnyActionOnResource(const ResourcePattern& resource) = 0;

@@ -28,6 +28,11 @@
  */
 
 #include "mongo/db/index/fts_access_method.h"
+
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -41,6 +46,7 @@ FTSAccessMethod::FTSAccessMethod(IndexCatalogEntry* btreeState,
 
 void FTSAccessMethod::doGetKeys(OperationContext* opCtx,
                                 const CollectionPtr& collection,
+                                const IndexCatalogEntry* entry,
                                 SharedBufferFragmentBuilder& pooledBufferBuilder,
                                 const BSONObj& obj,
                                 GetKeysContext context,

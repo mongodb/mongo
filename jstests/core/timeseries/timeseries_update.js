@@ -84,13 +84,15 @@ TimeseriesTest.run((insert) => {
     const arrayDoc3 = {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: [3, 6, 10]};
 
     /************************************ multi:false updates ************************************/
-    testUpdate({
-        initialDocList: [doc1],
-        updateList: [{q: {[metaFieldName]: {b: "B"}}, u: {$set: {[metaFieldName]: {b: "C"}}}}],
-        resultDocList: [doc1],
-        n: 0,
-        failCode: ErrorCodes.InvalidOptions,
-    });
+    if (!arbitraryUpdatesEnabled) {
+        testUpdate({
+            initialDocList: [doc1],
+            updateList: [{q: {[metaFieldName]: {b: "B"}}, u: {$set: {[metaFieldName]: {b: "C"}}}}],
+            resultDocList: [doc1],
+            n: 0,
+            failCode: ErrorCodes.InvalidOptions,
+        });
+    }
 
     /************************************ multi:true updates *************************************/
     /************************** Tests updating with an update document ***************************/

@@ -28,8 +28,15 @@
  */
 
 #include "mongo/db/matcher/expression_array.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/jsobj.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/util/make_data_structure.h"
 
 namespace mongo {

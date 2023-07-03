@@ -28,11 +28,18 @@
  */
 #pragma once
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/record_id.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace change_stream_pre_image_util {
@@ -40,14 +47,12 @@ namespace change_stream_pre_image_util {
  * Returns pre-images expiry time in milliseconds since the epoch time if configured, boost::none
  * otherwise.
  *
- * Only suitable for a single-tenant enviornment. Otherwise, callers should defer to serverless
+ * Only suitable for a single-tenant environment. Otherwise, callers should defer to serverless
  * methods which compute expireAfterSeconds according to the tenantId.
  */
 boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_t currentTime);
 
 /**
- * TODO SERVER-74981: Investigate whether there is a safer way to extract the Timestamp.
- *
  * Parses the 'ts' field from the 'ChangeStreamPreImageId' associated with the 'rid'. The 'rid' MUST
 be
  * generated from a pre-image.
@@ -64,6 +69,8 @@ RecordId toRecordId(ChangeStreamPreImageId id);
 RecordIdBound getAbsoluteMinPreImageRecordIdBoundForNs(const UUID& nsUUID);
 RecordIdBound getAbsoluteMaxPreImageRecordIdBoundForNs(const UUID& nsUUID);
 
+UUID getPreImageNsUUID(const BSONObj& preImageObj);
+
 /**
  * Finds the next collection UUID in 'preImagesCollPtr' greater than 'currentNsUUID'. Returns
  * boost::none if the next collection is not found. Stores the wall time of the first record in the
@@ -76,7 +83,7 @@ boost::optional<UUID> findNextCollectionUUID(OperationContext* opCtx,
 
 /**
  * Preferred method for getting the current time in pre-image removal code - in testing
- * enviornments, the 'changeStreamPreImageRemoverCurrentTime' failpoint can alter the return value.
+ * environments, the 'changeStreamPreImageRemoverCurrentTime' failpoint can alter the return value.
  *
  * Returns the current time.
  */

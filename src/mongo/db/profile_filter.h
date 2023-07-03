@@ -30,6 +30,9 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 
 namespace mongo {

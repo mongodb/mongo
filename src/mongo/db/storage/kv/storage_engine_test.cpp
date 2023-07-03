@@ -27,36 +27,71 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <absl/container/node_hash_map.h>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <cstring>
 #include <memory>
+#include <mutex>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_names.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/index_builds.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/startup_recovery.h"
-#include "mongo/db/storage/control/storage_control.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
+#include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_impl.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
+#include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/barrier.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 
 namespace mongo {
 namespace {
@@ -321,7 +356,7 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedBackgroundSecondaryIndex) {
     // require it to be rebuilt.
     ASSERT_EQUALS(1UL, reconcileResult.indexesToRebuild.size());
     StorageEngine::IndexIdentifier& toRebuild = reconcileResult.indexesToRebuild[0];
-    ASSERT_EQUALS(ns.ns(), toRebuild.nss.ns());
+    ASSERT_EQUALS(ns.ns_forTest(), toRebuild.nss.ns_forTest());
     ASSERT_EQUALS(indexName, toRebuild.indexName);
 
     // There are no two-phase builds to restart or resume.
@@ -462,7 +497,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     // the actual drop in storage engine.
     {
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(removeEntry(opCtx.get(), collNs.ns(), _storageEngine->getCatalog()));
+        ASSERT_OK(removeEntry(opCtx.get(), collNs.ns_forTest(), _storageEngine->getCatalog()));
         wuow.commit();
     }
 
@@ -496,7 +531,7 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     {
         AutoGetDb db(opCtx.get(), collNs.dbName(), LockMode::MODE_X);
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(removeEntry(opCtx.get(), collNs.ns(), _storageEngine->getCatalog()));
+        ASSERT_OK(removeEntry(opCtx.get(), collNs.ns_forTest(), _storageEngine->getCatalog()));
         wuow.commit();
     }
     ASSERT(!collectionExists(opCtx.get(), collNs));
@@ -734,5 +769,6 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     ASSERT_TRUE(collectionExists(opCtx.get(), coll1Ns));
     ASSERT_FALSE(collectionExists(opCtx.get(), coll2Ns));
 }
+
 }  // namespace
 }  // namespace mongo

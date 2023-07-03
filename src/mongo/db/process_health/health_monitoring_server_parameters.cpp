@@ -27,11 +27,26 @@
  *    it in the license file.
  */
 #include <algorithm>
+#include <iosfwd>
+#include <iterator>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
-#include "mongo/db/process_health/health_observer.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/synchronized_value.h"
 
 
 namespace mongo {

@@ -27,15 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/rs_local_client.h"
+#include <fmt/format.h>
+#include <memory>
+#include <vector>
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

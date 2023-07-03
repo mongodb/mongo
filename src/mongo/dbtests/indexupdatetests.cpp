@@ -27,17 +27,53 @@
  *    it in the license file.
  */
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <fmt/format.h>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/client/index_spec.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace IndexUpdateTests {
@@ -46,7 +82,7 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 }  // namespace
 
 static const char* const _ns = "unittests.indexupdate";
-static const NamespaceString _nss = NamespaceString(_ns);
+static const NamespaceString _nss = NamespaceString::createNamespaceString_forTest(_ns);
 
 /**
  * Test fixture for a write locked test using collection _ns.  Includes functionality to
@@ -154,8 +190,7 @@ public:
         const BSONObj spec = BSON("name"
                                   << "a"
                                   << "key" << BSON("a" << 1) << "v"
-                                  << static_cast<int>(kIndexVersion) << "unique" << true
-                                  << "background" << background);
+                                  << static_cast<int>(kIndexVersion) << "unique" << true);
 
         ScopeGuard abortOnExit([&] {
             indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
@@ -212,8 +247,7 @@ public:
             const BSONObj spec = BSON("name"
                                       << "a"
                                       << "key" << BSON("a" << 1) << "v"
-                                      << static_cast<int>(kIndexVersion) << "unique" << true
-                                      << "background" << background);
+                                      << static_cast<int>(kIndexVersion) << "unique" << true);
             ScopeGuard abortOnExit([&] {
                 indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
             });
@@ -480,8 +514,8 @@ public:
     void run() {
         ASSERT_OK(createIndex(BSON("name"
                                    << "super3"
-                                   << "unique" << 1 << "sparse" << false << "background" << true
-                                   << "expireAfterSeconds" << 3600 << "key"
+                                   << "unique" << 1 << "sparse" << false << "expireAfterSeconds"
+                                   << 3600 << "key"
                                    << BSON("superIdx"
                                            << "2d")
                                    << "v" << static_cast<int>(kIndexVersion))));

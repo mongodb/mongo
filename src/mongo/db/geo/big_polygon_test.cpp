@@ -29,9 +29,21 @@
 
 #include "mongo/db/geo/big_polygon.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/unittest/unittest.h"
+#include <cmath>
+#include <fmt/format.h>
+#include <string>
+#include <vector>
+
+#include <s2.h>
+#include <s2latlng.h>
+#include <s2loop.h>
+#include <s2polygon.h>
+#include <s2polyline.h>
+#include <util/math/vector3-inl.h>
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace {
 

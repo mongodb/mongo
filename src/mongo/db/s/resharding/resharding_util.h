@@ -29,20 +29,46 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace resharding {
@@ -259,6 +285,13 @@ void checkForOverlappingZones(std::vector<ReshardingZoneType>& zones);
 std::vector<BSONObj> buildTagsDocsFromZones(const NamespaceString& tempNss,
                                             std::vector<ReshardingZoneType>& zones,
                                             const ShardKeyPattern& shardKey);
+
+/**
+ * Create an array of resharding zones from the existing collection. This is used for forced
+ * same-key resharding.
+ */
+std::vector<ReshardingZoneType> getZonesFromExistingCollection(OperationContext* opCtx,
+                                                               const NamespaceString& sourceNss);
 
 /**
  * Creates a pipeline that can be serialized into a query for fetching oplog entries. `startAfter`

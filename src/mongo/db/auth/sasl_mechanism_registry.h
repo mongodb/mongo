@@ -29,17 +29,42 @@
 
 #pragma once
 
+#include <algorithm>
+#include <bitset>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <initializer_list>
 #include <memory>
+#include <set>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <typeinfo>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authentication_metrics.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -105,12 +130,12 @@ public:
     virtual SecurityPropertySet properties() const = 0;
 
     /**
-     * This returns a number that represents the "amount" of security provided by this mechanism
-     * to determine the order in which it is offered to clients in the isMaster
-     * saslSupportedMechs response.
+     * This returns a number that represents the "amount" of security provided by this mechanism to
+     * determine the order in which it is offered to clients in the "hello" saslSupportedMechs
+     * response.
      *
-     * The value of securityLevel is arbitrary so long as the more secure mechanisms return a
-     * higher value than the less secure mechanisms.
+     * The value of securityLevel is arbitrary so long as the more secure mechanisms return a higher
+     * value than the less secure mechanisms.
      *
      * For example, SCRAM-SHA-256 > SCRAM-SHA-1 > PLAIN
      */

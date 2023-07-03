@@ -29,15 +29,15 @@
 
 /** Unit tests for MatchExpression operator implementations in match_operators.{h,cpp}. */
 
-#include "mongo/unittest/unittest.h"
-
 #include <memory>
 
-#include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 
 namespace mongo {
@@ -158,7 +158,7 @@ TEST(ExpressionGeoTest, GeoNearEquivalent) {
 
 TEST(ExpressionGeoTest, SerializeGeoExpressions) {
     SerializationOptions opts = {};
-    opts.applyHmacToIdentifiers = true;
+    opts.transformIdentifiers = true;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     {
         BSONObj query = fromjson("{$within: {$box: [{x: 4, y: 4}, [6, 6]]}}");
@@ -320,5 +320,90 @@ TEST(ExpressionGeoTest, GeoNearNotEquivalent) {
     std::unique_ptr<GeoNearMatchExpression> gne1(makeGeoNearMatchExpression(query1)),
         gne2(makeGeoNearMatchExpression(query2));
     ASSERT(!gne1->equivalent(gne2.get()));
+}
+
+TEST(ExpressionGeoTest, SerializeWithCRSIFSpecifiedWithChangedOptions) {
+    BSONObj query1 = fromjson(
+        "{$within: {$geometry: {type: 'Polygon',"
+        "coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]],"
+        "crs: {"
+        "type: 'name',"
+        "properties: { name: 'urn:x-mongodb:crs:strictwinding:EPSG:4326' }"
+        "}}}}");
+    std::unique_ptr<GeoMatchExpression> ge1(makeGeoMatchExpression(query1));
+    SerializationOptions opts;
+    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+    auto serialized = ge1->getSerializedRightHandSide(opts);
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "$within": {
+                "$geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [
+                                0,
+                                0
+                            ],
+                            [
+                                0,
+                                1
+                            ],
+                            [
+                                1,
+                                1
+                            ],
+                            [
+                                0,
+                                0
+                            ]
+                        ]
+                    ],
+                    "crs": {
+                        "type": "name",
+                        "properties": {
+                            "name": "urn:x-mongodb:crs:strictwinding:EPSG:4326"
+                        }
+                    }
+                }
+            }
+        })",
+        serialized);
+    serialized = ge1->getSerializedRightHandSide(opts);
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "$within": {
+                "$geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [
+                                0,
+                                0
+                            ],
+                            [
+                                0,
+                                1
+                            ],
+                            [
+                                1,
+                                1
+                            ],
+                            [
+                                0,
+                                0
+                            ]
+                        ]
+                    ],
+                    "crs": {
+                        "type": "name",
+                        "properties": {
+                            "name": "urn:x-mongodb:crs:strictwinding:EPSG:4326"
+                        }
+                    }
+                }
+            }
+        })",
+        serialized);
 }
 }  // namespace mongo

@@ -29,23 +29,55 @@
 
 #pragma once
 
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <iosfwd>
+#include <iterator>
 #include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/classic_plan_cache.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/plan_enumerator_explain_info.h"
+#include "mongo/db/query/projection.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/stage_types.h"
+#include "mongo/db/record_id.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/id_generator.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -62,6 +94,10 @@ enum class FieldAvailability {
     // The field is provided as a hash of raw data instead of the raw data itself. For example, this
     // can happen when the field is a hashed field in an index.
     kHashedValueProvided,
+
+    // The field is available as ICU encoded string and can be used to do sorting but it does not
+    // provide the actual value.
+    kCollatedProvided,
 
     // The field is completely provided.
     kFullyProvided,
@@ -255,6 +291,11 @@ struct QuerySolutionNode {
     bool hasNode(StageType type) const;
 
     /**
+     * True, if this node, and all of it's children are eligible to be cached.
+     */
+    bool isEligibleForPlanCache() const;
+
+    /**
      * Returns the id associated with this node. Each node in a 'QuerySolution' tree is assigned a
      * unique identifier, which are assigned as sequential positive integers starting from 1.  An id
      * of 0 means that no id was explicitly assigned during construction of the QuerySolution.
@@ -296,6 +337,8 @@ protected:
             other->filter = this->filter->clone();
         }
     }
+
+    bool eligibleForPlanCache = true;
 
 private:
     // Allows the QuerySolution constructor to set '_nodeId'.
@@ -343,6 +386,13 @@ public:
      */
     bool hasNode(StageType type) const {
         return _root && _root->hasNode(type);
+    }
+
+    /**
+     * Return true if all nodes in the solution tree can be cached.
+     */
+    bool isEligibleForPlanCache() const {
+        return !_root || _root->isEligibleForPlanCache();
     }
 
     /**
@@ -456,6 +506,15 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     // Tells whether this scan will be performed as a clustered collection scan in SBE.
     bool doSbeClusteredCollectionScan() const {
         return (isClustered && !isOplog && (minRecord || maxRecord || resumeAfterRecordId));
+    }
+
+    // Tells whether this scan will be performed as a clustered collection scan in classic.
+    bool doClusteredCollectionScanClassic() const {
+        return (isClustered && !isOplog && (minRecord || maxRecord));
+    }
+
+    void markNotEligibleForPlanCache() {
+        eligibleForPlanCache = false;
     }
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
@@ -789,6 +848,11 @@ struct IndexScanNode : public QuerySolutionNodeWithSortSet {
     bool fetched() const {
         return false;
     }
+    /**
+     * This function checks if the given field has string bounds. This is needed to check if we need
+     * to do some special handling in the case of collations.
+     */
+    bool hasStringBounds(const std::string& field) const;
     FieldAvailability getFieldAvailability(const std::string& field) const;
     bool sortedByDiskLoc() const;
 
@@ -1316,6 +1380,11 @@ struct CountScanNode : public QuerySolutionNodeWithSortSet {
 
     BSONObj endKey;
     bool endKeyInclusive;
+
+    /**
+     * A vector of Interval Evaluation Trees (IETs) with the same ordering as the index key pattern.
+     */
+    std::vector<interval_evaluation_tree::IET> iets;
 };
 
 struct EofNode : public QuerySolutionNodeWithSortSet {
@@ -1414,7 +1483,7 @@ struct GroupNode : public QuerySolutionNode {
             expression::addDependencies(acc.expr.argument.get(), &deps);
         }
 
-        requiredFields = deps.fields;
+        requiredFields = std::move(deps.fields);
         needWholeDocument = deps.needWholeDocument;
         needsAnyMetadata = deps.getNeedsAnyMetadata();
     }

@@ -28,18 +28,28 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <type_traits>
 #include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

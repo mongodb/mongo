@@ -27,17 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/s/mongos_options.h"
-
 #include <iostream>
+#include <string>
+#include <vector>
 
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
 #include "mongo/db/cluster_auth_mode_option_gen.h"
 #include "mongo/db/keyfile_option_gen.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_nongeneral_gen.h"
+#include "mongo/s/mongos_options.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/quick_exit.h"

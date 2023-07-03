@@ -29,10 +29,19 @@
 
 #pragma once
 
+#include <memory>
 #include <queue>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
 
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
+#include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 
 namespace mongo::optimizer::cascades {
 

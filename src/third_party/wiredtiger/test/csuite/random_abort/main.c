@@ -147,20 +147,20 @@ thread_run(void *arg)
 
     td = (WT_THREAD_DATA *)arg;
 
-    testutil_check(__wt_snprintf(fname[DELETE_RECORD_FILE_ID], sizeof(fname[DELETE_RECORD_FILE_ID]),
-      DELETE_RECORDS_FILE, td->id));
-    testutil_check(__wt_snprintf(fname[INSERT_RECORD_FILE_ID], sizeof(fname[INSERT_RECORD_FILE_ID]),
-      INSERT_RECORDS_FILE, td->id));
-    testutil_check(__wt_snprintf(fname[MODIFY_RECORD_FILE_ID], sizeof(fname[MODIFY_RECORD_FILE_ID]),
-      MODIFY_RECORDS_FILE, td->id));
+    testutil_snprintf(fname[DELETE_RECORD_FILE_ID], sizeof(fname[DELETE_RECORD_FILE_ID]),
+      DELETE_RECORDS_FILE, td->id);
+    testutil_snprintf(fname[INSERT_RECORD_FILE_ID], sizeof(fname[INSERT_RECORD_FILE_ID]),
+      INSERT_RECORDS_FILE, td->id);
+    testutil_snprintf(fname[MODIFY_RECORD_FILE_ID], sizeof(fname[MODIFY_RECORD_FILE_ID]),
+      MODIFY_RECORDS_FILE, td->id);
 
     /*
      * Set up a large value putting our id in it. Write it in there a bunch of times, but the rest
      * of the buffer can just be zero.
      */
-    testutil_check(__wt_snprintf(lgbuf, sizeof(lgbuf), "th-%" PRIu32, td->id));
+    testutil_snprintf(lgbuf, sizeof(lgbuf), "th-%" PRIu32, td->id);
     for (i = 0; i < 128; i += strlen(lgbuf))
-        testutil_check(__wt_snprintf(&large[i], lsize - i, "%s", lgbuf));
+        testutil_snprintf(&large[i], lsize - i, "%s", lgbuf);
     /*
      * Keep a separate file with the records we wrote for checking.
      */
@@ -198,12 +198,12 @@ thread_run(void *arg)
         /*
          * The value is the insert- with key appended.
          */
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "insert-%" PRIu64, i));
+        testutil_snprintf(buf, sizeof(buf), "insert-%" PRIu64, i);
 
         if (columnar_table)
             cursor->set_key(cursor, i);
         else {
-            testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, i));
+            testutil_snprintf(kname, sizeof(kname), KEY_FORMAT, i);
             cursor->set_key(cursor, kname);
         }
         /*
@@ -256,7 +256,7 @@ thread_run(void *arg)
             if (fprintf(fp[DELETE_RECORD_FILE_ID], "%" PRIu64 "\n", i) == -1)
                 testutil_die(errno, "fprintf");
         } else if (i % MAX_NUM_OPS == OP_TYPE_MODIFY) {
-            testutil_check(__wt_snprintf(new_buf, sizeof(new_buf), "modify-%" PRIu64, i));
+            testutil_snprintf(new_buf, sizeof(new_buf), "modify-%" PRIu64, i);
             new_buf_size = (data.size < MAX_VAL - 1 ? data.size : MAX_VAL - 1);
 
             newv.data = new_buf;
@@ -423,16 +423,16 @@ recover_and_verify(uint32_t nthreads)
         }
 
         middle = 0;
-        testutil_check(__wt_snprintf(fname[DELETE_RECORD_FILE_ID],
-          sizeof(fname[DELETE_RECORD_FILE_ID]), DELETE_RECORDS_FILE, i));
+        testutil_snprintf(fname[DELETE_RECORD_FILE_ID], sizeof(fname[DELETE_RECORD_FILE_ID]),
+          DELETE_RECORDS_FILE, i);
         if ((fp[DELETE_RECORD_FILE_ID] = fopen(fname[DELETE_RECORD_FILE_ID], "r")) == NULL)
             testutil_die(errno, "fopen: %s", fname[DELETE_RECORD_FILE_ID]);
-        testutil_check(__wt_snprintf(fname[INSERT_RECORD_FILE_ID],
-          sizeof(fname[INSERT_RECORD_FILE_ID]), INSERT_RECORDS_FILE, i));
+        testutil_snprintf(fname[INSERT_RECORD_FILE_ID], sizeof(fname[INSERT_RECORD_FILE_ID]),
+          INSERT_RECORDS_FILE, i);
         if ((fp[INSERT_RECORD_FILE_ID] = fopen(fname[INSERT_RECORD_FILE_ID], "r")) == NULL)
             testutil_die(errno, "fopen: %s", fname[INSERT_RECORD_FILE_ID]);
-        testutil_check(__wt_snprintf(fname[MODIFY_RECORD_FILE_ID],
-          sizeof(fname[MODIFY_RECORD_FILE_ID]), MODIFY_RECORDS_FILE, i));
+        testutil_snprintf(fname[MODIFY_RECORD_FILE_ID], sizeof(fname[MODIFY_RECORD_FILE_ID]),
+          MODIFY_RECORDS_FILE, i);
         if ((fp[MODIFY_RECORD_FILE_ID] = fopen(fname[MODIFY_RECORD_FILE_ID], "r")) == NULL)
             testutil_die(errno, "fopen: %s", fname[MODIFY_RECORD_FILE_ID]);
 
@@ -488,7 +488,7 @@ recover_and_verify(uint32_t nthreads)
                 if (columnar_table)
                     cursor->set_key(cursor, key);
                 else {
-                    testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, key));
+                    testutil_snprintf(kname, sizeof(kname), KEY_FORMAT, key);
                     cursor->set_key(cursor, kname);
                 }
 
@@ -518,7 +518,7 @@ recover_and_verify(uint32_t nthreads)
                 if (columnar_table)
                     cursor->set_key(cursor, key);
                 else {
-                    testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, key));
+                    testutil_snprintf(kname, sizeof(kname), KEY_FORMAT, key);
                     cursor->set_key(cursor, kname);
                 }
 
@@ -570,7 +570,7 @@ recover_and_verify(uint32_t nthreads)
                 if (columnar_table)
                     cursor->set_key(cursor, key);
                 else {
-                    testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, key));
+                    testutil_snprintf(kname, sizeof(kname), KEY_FORMAT, key);
                     cursor->set_key(cursor, kname);
                 }
 
@@ -712,13 +712,13 @@ main(int argc, char *argv[])
     /* Create the database, run the test, and fail. */
     if (!verify_only) {
         /* Create the test's home directory. */
-        testutil_make_work_dir(home);
+        testutil_recreate_dir(home);
 
         /* Set up the test subdirectories. */
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, RECORDS_DIR));
-        testutil_make_work_dir(buf);
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, WT_HOME_DIR));
-        testutil_make_work_dir(buf);
+        testutil_snprintf(buf, sizeof(buf), "%s/%s", home, RECORDS_DIR);
+        testutil_mkdir(buf);
+        testutil_snprintf(buf, sizeof(buf), "%s/%s", home, WT_HOME_DIR);
+        testutil_mkdir(buf);
 
         /* Set up LazyFS. */
         if (use_lazyfs)
@@ -770,15 +770,12 @@ main(int argc, char *argv[])
                  * Wait for each record file to exist.
                  */
                 if (j == DELETE_RECORD_FILE_ID)
-                    testutil_check(
-                      __wt_snprintf(fname[j], sizeof(fname[j]), DELETE_RECORDS_FILE, i));
+                    testutil_snprintf(fname[j], sizeof(fname[j]), DELETE_RECORDS_FILE, i);
                 else if (j == INSERT_RECORD_FILE_ID)
-                    testutil_check(
-                      __wt_snprintf(fname[j], sizeof(fname[j]), INSERT_RECORDS_FILE, i));
+                    testutil_snprintf(fname[j], sizeof(fname[j]), INSERT_RECORDS_FILE, i);
                 else
-                    testutil_check(
-                      __wt_snprintf(fname[j], sizeof(fname[j]), MODIFY_RECORDS_FILE, i));
-                testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, fname[j]));
+                    testutil_snprintf(fname[j], sizeof(fname[j]), MODIFY_RECORDS_FILE, i);
+                testutil_snprintf(buf, sizeof(buf), "%s/%s", home, fname[j]);
                 while (stat(buf, &sb) != 0)
                     testutil_sleep_wait(1, pid);
             }
@@ -839,7 +836,7 @@ main(int argc, char *argv[])
 
     /* Delete the work directory. */
     if (ret == EXIT_SUCCESS && !preserve)
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
 
     return (ret);
 }

@@ -27,18 +27,43 @@
  *    it in the license file.
  */
 
+#include <ostream>
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/index_builds_manager.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/validate_state.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_mock.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot_manager.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -147,10 +172,12 @@ void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const std::s
 
     WriteUnitOfWork wuow(opCtx);
 
-    auto indexDescriptor = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
-    ASSERT(indexDescriptor);
-    ASSERT_OK(collection.getWritableCollection(opCtx)->getIndexCatalog()->dropIndex(
-        opCtx, collection.getWritableCollection(opCtx), indexDescriptor));
+    auto writableCollection = collection.getWritableCollection(opCtx);
+    auto writableEntry =
+        writableCollection->getIndexCatalog()->getWritableEntryByName(opCtx, indexName);
+    ASSERT(writableEntry);
+    ASSERT_OK(writableCollection->getIndexCatalog()->dropIndexEntry(
+        opCtx, collection.getWritableCollection(opCtx), writableEntry));
 
     ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(
         repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime().getTimestamp() + 1));
@@ -230,7 +257,7 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
 
         // Make sure all of the indexes were found and cursors opened against them. Including the
         // _id index.
-        ASSERT_EQ(validateState.getIndexes().size(), 5);
+        ASSERT_EQ(validateState.getIndexIdents().size(), 5);
     }
 
     // Checkpoint of all of the data: it should not make any difference for foreground validation
@@ -246,7 +273,7 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
         CollectionValidation::RepairMode::kNone,
         /*logDiagnostics=*/false);
     validateState.initializeCursors(opCtx);
-    ASSERT_EQ(validateState.getIndexes().size(), 5);
+    ASSERT_EQ(validateState.getIndexIdents().size(), 5);
 }
 
 // Open cursors against checkpoint'ed indexes with {background:true}.
@@ -277,7 +304,7 @@ TEST_F(ValidateStateDiskTest, OpenCursorsOnCheckpointedIndexes) {
 
     // Make sure the uncheckpoint'ed indexes are not found.
     // (Note the _id index was create with collection creation, so we have 3 indexes.)
-    ASSERT_EQ(validateState.getIndexes().size(), 3);
+    ASSERT_EQ(validateState.getIndexIdents().size(), 3);
 }
 
 // Indexes in the checkpoint that were dropped in the present should not have cursors opened against
@@ -312,7 +339,7 @@ TEST_F(ValidateStateDiskTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatW
             CollectionValidation::RepairMode::kNone,
             /*logDiagnostics=*/false);
         validateState.initializeCursors(opCtx);
-        ASSERT_EQ(validateState.getIndexes().size(), 3);
+        ASSERT_EQ(validateState.getIndexIdents().size(), 3);
     }
 
     // Checkpoint the index drops and recheck that the indexes are not found.
@@ -326,7 +353,7 @@ TEST_F(ValidateStateDiskTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatW
         CollectionValidation::RepairMode::kNone,
         /*logDiagnostics=*/false);
     validateState.initializeCursors(opCtx);
-    ASSERT_EQ(validateState.getIndexes().size(), 3);
+    ASSERT_EQ(validateState.getIndexIdents().size(), 3);
 }
 
 }  // namespace

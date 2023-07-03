@@ -30,13 +30,17 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <boost/optional.hpp>
+#include <cstddef>
 #include <fmt/format.h>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <type_traits>
 #include <typeinfo>
 #include <utility>
 
@@ -51,19 +55,12 @@
  */
 namespace mongo::unittest::stringify {
 
+template <typename T>
+std::string invoke(const T& x);
+
 std::string formatTypedObj(const std::type_info& ti, StringData obj);
 
 std::string lastResortFormat(const std::type_info& ti, const void* p, size_t sz);
-
-/**
- * `stringifyForAssert` can be overloaded to extend stringification
- * capabilities of the matchers via ADL.
- *
- * The overload in this namespace is used for types for
- * which the unittest library has built-in support.
- */
-template <typename T>
-std::string stringifyForAssert(const T& x);
 
 template <typename T>
 std::string doFormat(const T& x) {
@@ -100,7 +97,8 @@ class Joiner {
 public:
     template <typename T>
     Joiner& operator()(const T& v) {
-        _out += format(FMT_STRING("{}{}"), _sep, stringifyForAssert(v));
+        // `stringify::` qualification necessary to disable ADL on `v`.
+        _out += format(FMT_STRING("{}{}"), _sep, stringify::invoke(v));
         _sep = ", ";
         return *this;
     }
@@ -135,7 +133,14 @@ std::string doTuple(const T& tup) {
 }
 
 /**
- * The default stringifyForAssert implementation.
+ * The only definitions in this namespace are some "built-in" overloads of
+ * `stringifyForAssert`. It defines no types, so ADL will not find it. A
+ * `stringify::invoke` call will consider these in the overload set along with
+ * any overloads found by ADL on the argument.
+ */
+namespace adl_barrier {
+/**
+ * The default `stringifyForAssert` implementation.
  * Encodes the steps by which we determine how to print an object.
  * There's a wildcard branch so everything is printable in some way.
  */
@@ -168,6 +173,26 @@ inline std::string stringifyForAssert(std::nullptr_t) {
 /** Built-in support to stringify `ErrorCode::Error`. */
 inline std::string stringifyForAssert(ErrorCodes::Error ec) {
     return ErrorCodes::errorString(ec);
+}
+}  // namespace adl_barrier
+
+/**
+ * The entry point for the `unittest::stringify` system, this is
+ * called to produce a string representation of an arbitrary value
+ * `x` through the `stringifyForAssert` extension hook.
+ *
+ * An overload for `stringifyForAssert` is selected from a few
+ * "built-in" overloads, and then from any that are found in
+ * namespaces associated with `x` via argument-dependent lookup.
+ *
+ * The `stringifyForAssert` name is an ADL extension point for
+ * user-defined types, and should not be invoked directly.  Call
+ * `stringify::invoke` instead.
+ */
+template <typename T>
+std::string invoke(const T& x) {
+    using adl_barrier::stringifyForAssert;
+    return stringifyForAssert(x);
 }
 
 }  // namespace mongo::unittest::stringify

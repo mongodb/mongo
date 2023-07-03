@@ -1552,6 +1552,14 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
     if (__wt_off_page(page, addr)) {
         WT_TIME_AGGREGATE_COPY(&copy->ta, &addr->ta);
         copy->type = addr->type;
+        /*
+         * FIXME-WT-11062 - We've checked that ref->addr is non-null a few lines above and we only
+         * enter this function when the page is on-disk or clean. However, it is possible that once
+         * we've entered this function the page gets dirtied *and* reconciled. If this happens for a
+         * page with rec_result == 0 we will free the addr being copied - possibly after the null
+         * check above - and this function will attempt to copy from freed memory.
+         */
+        WT_ASSERT(session, (volatile void *)ref->addr != NULL);
         memcpy(copy->addr, addr->addr, copy->size = addr->size);
         return (true);
     }

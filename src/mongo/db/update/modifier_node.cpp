@@ -27,13 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <memory>
 
-#include "mongo/db/update/modifier_node.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/field_ref_set.h"
+#include "mongo/db/update/modifier_node.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/storage_validation.h"
+#include "mongo/db/update/update_executor.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -361,6 +376,7 @@ void ModifierNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                      recursionLevel,
                                      false, /* allowTopLevelDollarPrefixedFields */
                                      validateForStorage,
+                                     false, /* isEmbeddedInIdField */
                                      containsDotsAndDollarsField);
 }
 

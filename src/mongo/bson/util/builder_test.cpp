@@ -27,9 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/unittest.h"
+#include <limits>
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 TEST(Builder, String1) {

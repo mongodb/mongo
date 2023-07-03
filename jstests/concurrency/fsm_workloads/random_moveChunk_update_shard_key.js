@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Performs updates that will change a document's shard key while migrating chunks. Uses both
  * retryable writes and multi-statement transactions.
@@ -10,11 +8,11 @@
  *  uses_transactions,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
 load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
 

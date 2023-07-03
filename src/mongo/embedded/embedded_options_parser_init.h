@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include "mongo/embedded/embedded_options.h"
+#include <new>
+#include <string>
+#include <utility>
 
+#include "mongo/embedded/embedded_options.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/static_immortal.h"
-
-#include <string>
-#include <utility>
 
 namespace mongo::embedded {
 

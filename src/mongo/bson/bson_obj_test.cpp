@@ -27,16 +27,40 @@
  *    it in the license file.
  */
 
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
 #include "mongo/platform/decimal128.h"
-
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/string_map.h"
 
 namespace {
 using namespace mongo;

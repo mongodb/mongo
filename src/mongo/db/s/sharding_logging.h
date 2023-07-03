@@ -29,7 +29,16 @@
 
 #pragma once
 
+#include <memory>
+#include <utility>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard.h"
 

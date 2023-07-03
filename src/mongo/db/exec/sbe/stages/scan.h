@@ -29,30 +29,57 @@
 
 #pragma once
 
-#include "mongo/config.h"
+#include <absl/container/inlined_vector.h>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/exec/field_name_bloom_filter.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/indexed_string_vector.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace sbe {
-using ScanOpenCallback = std::function<void(OperationContext*, const CollectionPtr&)>;
+using ScanOpenCallback = void (*)(OperationContext*, const CollectionPtr&);
 
 struct ScanCallbacks {
-    ScanCallbacks(IndexKeyCorruptionCheckCallback indexKeyCorruptionCheck = {},
-                  IndexKeyConsistencyCheckCallback indexKeyConsistencyCheck = {},
-                  ScanOpenCallback scanOpen = {})
+    ScanCallbacks(IndexKeyCorruptionCheckCallback indexKeyCorruptionCheck = nullptr,
+                  IndexKeyConsistencyCheckCallback indexKeyConsistencyCheck = nullptr,
+                  ScanOpenCallback scanOpen = nullptr)
         : indexKeyCorruptionCheckCallback(std::move(indexKeyCorruptionCheck)),
           indexKeyConsistencyCheckCallback(std::move(indexKeyConsistencyCheck)),
           scanOpenCallback(std::move(scanOpen)) {}
 
-    IndexKeyCorruptionCheckCallback indexKeyCorruptionCheckCallback;
-    IndexKeyConsistencyCheckCallback indexKeyConsistencyCheckCallback;
-    ScanOpenCallback scanOpenCallback;
+    IndexKeyCorruptionCheckCallback indexKeyCorruptionCheckCallback = nullptr;
+    IndexKeyConsistencyCheckCallback indexKeyConsistencyCheckCallback = nullptr;
+    ScanOpenCallback scanOpenCallback = nullptr;
 };
 
 /**
@@ -146,18 +173,6 @@ private:
     // Returns the primary cursor or the random cursor depending on whether _useRandomCursor is set.
     RecordCursor* getActiveCursor() const;
 
-    static size_t computeFieldMaskOffset(const char* name, size_t length) {
-        return static_cast<unsigned char>(name[length / 2]) & 63u;
-    }
-
-    static uint64_t computeFieldMask(size_t offset) {
-        return uint64_t{1} << offset;
-    }
-
-    static uint64_t computeFieldMask(const char* name, size_t length) {
-        return uint64_t{1} << computeFieldMaskOffset(name, length);
-    }
-
     /**
      * Resets the state data members for starting the scan in the 'reOpen' case, i.e. skipping state
      * that would be correct after a prior open() call that was NOT followed by a close() call. This
@@ -175,7 +190,7 @@ private:
     // Only for a clustered collection scan, this sets '_maxRecordId' to the upper scan bound.
     void setMaxRecordId();
 
-    value::OwnedValueAccessor* getFieldAccessor(StringData name, size_t offset) const;
+    value::OwnedValueAccessor* getFieldAccessor(StringData name);
 
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
@@ -187,7 +202,7 @@ private:
 
     // '_scanFieldNames' - names of the fields being scanned from the doc
     // '_scanFieldSlots' - slot IDs corresponding, by index, to _scanFieldAccessors
-    const std::vector<std::string> _scanFieldNames;
+    const IndexedStringVector _scanFieldNames;
     const value::SlotVector _scanFieldSlots;
 
     const boost::optional<value::SlotId> _seekRecordIdSlot;
@@ -197,18 +212,18 @@ private:
     // Tells if this is a forward (as opposed to reverse) scan.
     const bool _forward;
 
+    // Used to return a random sample of the collection.
+    const bool _useRandomCursor;
+
     const UUID _collUuid;
 
     const ScanCallbacks _scanCallbacks;
 
-    // Used to return a random sample of the collection.
-    const bool _useRandomCursor;
-
     // Holds the current record.
-    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
+    value::OwnedValueAccessor _recordAccessor;
 
     // Holds the RecordId of the current record as a TypeTags::RecordId.
-    std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
+    value::OwnedValueAccessor _recordIdAccessor;
     RecordId _recordId;
 
     value::SlotAccessor* _snapshotIdAccessor{nullptr};
@@ -229,7 +244,7 @@ private:
     //     '_scanFieldAccessors' - slot accessors corresponding, by index, to _scanFieldNames
     //     '_scanFieldAccessorsMap' - a map from vector index to pointer to the corresponding
     //         accessor in '_scanFieldAccessors'
-    std::vector<value::OwnedValueAccessor> _scanFieldAccessors;
+    absl::InlinedVector<value::OwnedValueAccessor, 4> _scanFieldAccessors;
     value::SlotAccessorMap _scanFieldAccessorsMap;
 
     // Only for a resumed scan ("seek"). Slot holding the TypeTags::RecordId of the record to resume
@@ -254,29 +269,11 @@ private:
     // Only for clustered collection scans: have we crossed the scan end bound if there is one?
     bool _havePassedScanEndRecordId = false;
 
-    // These members are default constructed to boost::none and are initialized when 'prepare()'
-    // is called. Once they are set, they are never modified again.
-    boost::optional<NamespaceString> _collName;
-    boost::optional<uint64_t> _catalogEpoch;
-
-    CollectionPtr _coll;
+    CollectionRef _coll;
 
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.
     TrialRunTracker* _tracker{nullptr};
-
-    // Variant stores pointers to field accessors for all fields with a given bloom filter mask
-    // offset. If there is only one field with a given offset, it is stored as a StringData and
-    // pointer pair, which allows us to just compare strings instead of hash map lookup.
-    using FieldAccessorVariant = stdx::variant<stdx::monostate,
-                                               std::pair<StringData, value::OwnedValueAccessor*>,
-                                               StringMap<value::OwnedValueAccessor*>>;
-
-    // Array contains FieldAccessorVariants, indexed by bloom filter mask offset, determined by
-    // computeFieldMaskOffset function.
-    std::array<FieldAccessorVariant, 64> _maskOffsetToFieldAccessors;
-
-    FieldNameBloomFilter<computeFieldMask> _fieldsBloomFilter;
 
     bool _open{false};
     std::unique_ptr<SeekableRecordCursor> _cursor;
@@ -375,6 +372,8 @@ private:
         _currentRange = std::numeric_limits<std::size_t>::max();
     }
 
+    value::OwnedValueAccessor* getFieldAccessor(StringData name);
+
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
     const boost::optional<value::SlotId> _snapshotIdSlot;
@@ -384,17 +383,18 @@ private:
 
     // '_scanFieldNames' - names of the fields being scanned from the doc
     // '_scanFieldSlots' - slot IDs corresponding, by index, to _scanFieldAccessors
-    const std::vector<std::string> _scanFieldNames;
+    const IndexedStringVector _scanFieldNames;
     const value::SlotVector _scanFieldSlots;
 
     const UUID _collUuid;
+
     const ScanCallbacks _scanCallbacks;
 
     // Holds the current record.
-    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
+    value::OwnedValueAccessor _recordAccessor;
 
     // Holds the RecordId of the current record as a TypeTags::RecordId.
-    std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
+    value::OwnedValueAccessor _recordIdAccessor;
     RecordId _recordId;
 
     value::SlotAccessor* _snapshotIdAccessor{nullptr};
@@ -406,15 +406,10 @@ private:
     //     '_scanFieldAccessors' - slot accessors corresponding, by index, to _scanFieldNames
     //     '_scanFieldAccessorsMap' - a map from vector index to pointer to the corresponding
     //         accessor in '_scanFieldAccessors'
-    value::FieldAccessorMap _scanFieldAccessors;
+    absl::InlinedVector<value::OwnedValueAccessor, 4> _scanFieldAccessors;
     value::SlotAccessorMap _scanFieldAccessorsMap;
 
-    // These members are default constructed to boost::none and are initialized when 'prepare()'
-    // is called. Once they are set, they are never modified again.
-    boost::optional<NamespaceString> _collName;
-    boost::optional<uint64_t> _catalogEpoch;
-
-    CollectionPtr _coll;
+    CollectionRef _coll;
 
     std::shared_ptr<ParallelState> _state;
 

@@ -29,10 +29,18 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/idl/command_generic_argument.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 

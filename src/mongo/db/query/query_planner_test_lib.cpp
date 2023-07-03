@@ -34,23 +34,55 @@
 
 #include "mongo/db/query/query_planner_test_lib.h"
 
-#include <ostream>
+#include <cstddef>
+#include <memory>
+#include <set>
+#include <utility>
+#include <vector>
 
+#include <absl/container/flat_hash_map.h>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/fts/fts_query.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/interval.h"
+#include "mongo/db/query/projection.h"
+#include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/projection_parser.h"
-#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -1008,8 +1040,8 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
 
         // Create an empty/dummy expression context without access to the operation context and
         // collator. This should be sufficient to parse a projection.
-        auto expCtx =
-            make_intrusive<ExpressionContext>(nullptr, nullptr, NamespaceString("test.dummy"));
+        auto expCtx = make_intrusive<ExpressionContext>(
+            nullptr, nullptr, NamespaceString::createNamespaceString_forTest("test.dummy"));
         auto projection = projection_ast::parseAndAnalyze(
             expCtx, spec.Obj(), ProjectionPolicies::findProjectionPolicies());
         auto specProjObj = projection_ast::astToDebugBSON(projection.root());
@@ -1415,7 +1447,8 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                                   << testSoln.toString()};
         }
 
-        if (expectedForeignCollection.str() != actualEqLookupNode->foreignCollection.toString()) {
+        if (expectedForeignCollection.str() !=
+            actualEqLookupNode->foreignCollection.toString_forTest()) {
             return {
                 ErrorCodes::Error{6267502},
                 str::stream() << "Test solution 'foreignCollection' does not match actual; test "

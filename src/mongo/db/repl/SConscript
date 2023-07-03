@@ -515,6 +515,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
+        '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/op_observer/op_observer',
         '$BUILD_DIR/mongo/db/query_exec',
@@ -562,6 +563,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/serverless/serverless_lock',
         '$BUILD_DIR/mongo/db/session/kill_sessions_local',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
+        '$BUILD_DIR/mongo/db/storage/remove_saver',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'drop_pending_collection_reaper',
     ],
@@ -691,8 +693,8 @@ env.Library(
         'split_horizon.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
@@ -1103,6 +1105,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/shard_role_api',
+        '$BUILD_DIR/mongo/db/storage/durable_catalog',
         '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger_import',
         '$BUILD_DIR/mongo/idl/cluster_parameter_synchronization_helpers',
         '$BUILD_DIR/mongo/rpc/metadata',
@@ -1240,6 +1243,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'read_concern_args',
     ],
 )
@@ -1399,6 +1403,7 @@ env.Library(
         'tenant_migration_recipient_entry_helpers.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/keys_collection_util',
         '$BUILD_DIR/mongo/util/future_util',
         'repl_coordinator_interface',
         'repl_server_parameters',
@@ -1655,7 +1660,6 @@ env.Library(
 )
 
 if wiredtiger:
-
     env.Library(
         target='oplog_applier_impl_test_fixture',
         source=[
@@ -1675,6 +1679,9 @@ if wiredtiger:
             'oplog_application',
             'replmocks',
             'storage_interface_impl',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/db/op_observer/op_observer',
         ],
     )
 
@@ -1770,15 +1777,16 @@ if wiredtiger:
             'sync_source_resolver_test.cpp',
             'task_runner_test.cpp',
             'task_runner_test_fixture.cpp',
-            'tenant_oplog_applier_test.cpp',
-            'tenant_oplog_batcher_test.cpp',
-            'vote_requester_test.cpp',
-            'wait_for_majority_service_test.cpp',
+            'tenant_file_importer_service_test.cpp',
             'tenant_migration_access_blocker_registry_test.cpp',
             'tenant_migration_access_blocker_util_test.cpp',
             'tenant_migration_recipient_access_blocker_test.cpp',
             'tenant_migration_recipient_entry_helpers_test.cpp',
             'tenant_migration_recipient_service_test.cpp',
+            'tenant_oplog_applier_test.cpp',
+            'tenant_oplog_batcher_test.cpp',
+            'vote_requester_test.cpp',
+            'wait_for_majority_service_test.cpp',
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
@@ -1946,10 +1954,10 @@ env.CppUnitTest(
         'tenant_file_cloner_test.cpp',
     ],
     LIBDEPS=[
-        # Required for service context test fixture
+        '$BUILD_DIR/mongo/db/op_observer/op_observer',
         'cloner_test_fixtures',
         'initial_sync_cloners',
-        'tenant_migration_cloners'
+        'tenant_migration_cloners',
     ],
 )
 
@@ -2031,8 +2039,13 @@ env.Library(
         'hello_command',
     ],
 )
-
-env.Library(
+wait_for_majority_service_env = env.Clone()
+# TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
+wait_for_majority_service_env.Append(
+    CXXFLAGS=[] if wait_for_majority_service_env.TargetOSIs('windows') else [
+        '-Wno-deprecated',
+    ], )
+wait_for_majority_service_env.Library(
     target='wait_for_majority_service',
     source=[
         'wait_for_majority_service.cpp',
@@ -2140,12 +2153,10 @@ env.Benchmark(
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/catalog_impl',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
-        '$BUILD_DIR/mongo/db/op_observer/op_observer',
         '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
         '$BUILD_DIR/mongo/db/op_observer/oplog_writer_impl',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context_d',
-        '$BUILD_DIR/mongo/db/session/session_catalog',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/storage/storage_control',

@@ -120,6 +120,9 @@ if has_option("gdbserver"):
 elif has_option("lldb-server"):
     debugger_env.Append(CPPDEFINES=["USE_LLDB_SERVER"])
 
+if has_option("wait-for-debugger"):
+    debugger_env.Append(CPPDEFINES=["WAIT_FOR_DEBUGGER"])
+
 debugger_obj = debugger_env.LibraryObject(
     target='debugger',
     source=[

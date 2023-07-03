@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/password_digest.h"
+#include "mongo/util/md5.h"
+#include "mongo/util/md5.hpp"
 
 namespace mongo {
 

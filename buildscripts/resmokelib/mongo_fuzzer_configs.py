@@ -127,18 +127,21 @@ def generate_mongod_parameters(rng, mode):
         [1, 10, 100])
     ret["minSnapshotHistoryWindowInSeconds"] = rng.choice([300, rng.randint(30, 600)])
     ret["mirrorReads"] = {"samplingRate": rng.random()}
-    ret["queryAnalysisSampleExpirationSecs"] = rng.choice([1, 10, 100, 1000])
-    ret["queryAnalysisSamplerConfigurationRefreshSecs"] = rng.choice([1, 10, 100])
-    ret["queryAnalysisWriterIntervalSecs"] = rng.choice([1, 10, 100])
     ret["queryAnalysisWriterMaxMemoryUsageBytes"] = rng.randint(1, 100) * 1024 * 1024
     ret["syncdelay"] = rng.choice([60, rng.randint(15, 180)])
     ret["wiredTigerCursorCacheSize"] = rng.randint(-100, 100)
     ret["wiredTigerSessionCloseIdleTimeSecs"] = rng.randint(0, 300)
-    ret["storageEngineConcurrencyAdjustmentAlgorithm"] = "fixedConcurrentTransactions"
-    if rng.choice(3 * [True] + [False]):
-        # The old retryable writes format is used by other variants. Weight towards turning on the
-        # new retryable writes format on in this one.
-        ret["storeFindAndModifyImagesInSideCollection"] = True
+    ret["storageEngineConcurrencyAdjustmentAlgorithm"] = rng.choices(
+        ["throughputProbing", "fixedConcurrentTransactions"], weights=[10, 1])[0]
+    ret["throughputProbingStepMultiple"] = rng.uniform(0.1, 0.5)
+    ret["throughputProbingInitialConcurrency"] = rng.randint(4, 128)
+    ret["throughputProbingMinConcurrency"] = rng.randint(4,
+                                                         ret["throughputProbingInitialConcurrency"])
+    ret["throughputProbingMaxConcurrency"] = rng.randint(ret["throughputProbingInitialConcurrency"],
+                                                         128)
+    ret["throughputProbingReadWriteRatio"] = rng.uniform(0, 1)
+    ret["throughputProbingConcurrencyMovingAverageWeight"] = 1 - rng.random()
+
     ret["wiredTigerConcurrentWriteTransactions"] = rng.randint(5, 32)
     ret["wiredTigerConcurrentReadTransactions"] = rng.randint(5, 32)
     ret["wiredTigerStressConfig"] = False if mode != 'stress' else rng.choice([True, False])
@@ -153,7 +156,6 @@ def generate_mongos_parameters(rng, mode):
     ret = {}
     ret["initialServiceExecutorUseDedicatedThread"] = rng.choice([True, False])
     ret["opportunisticSecondaryTargeting"] = rng.choice([True, False])
-    ret["queryAnalysisSamplerConfigurationRefreshSecs"] = rng.choice([1, 10, 100])
     return ret
 
 

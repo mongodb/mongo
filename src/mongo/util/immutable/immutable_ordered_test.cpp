@@ -28,12 +28,28 @@
  */
 
 
-#include "mongo/unittest/unittest.h"
+#include <compare>
+#include <cstddef>
+#include <fmt/format.h>
+#include <initializer_list>
+#include <memory>
+#include <ostream>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <variant>
 
+#include <immer/detail/iterator_facade.hpp>
+#include <immer/detail/rbts/rrbtree_iterator.hpp>
+#include <immer/detail/util.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/immutable/map.h"
 #include "mongo/util/immutable/set.h"
-#include "mongo/util/string_map.h"
-#include <stdexcept>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

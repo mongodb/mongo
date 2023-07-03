@@ -28,31 +28,68 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <absl/container/flat_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <compare>
+#include <functional>
+#include <initializer_list>
 #include <map>
+#include <memory>
+#include <ratio>
 #include <set>
+#include <system_error>
+#include <tuple>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/txn_retry_counter_too_old_info.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/router_transactions_metrics.h"
 #include "mongo/s/session_catalog_router.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/tick_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

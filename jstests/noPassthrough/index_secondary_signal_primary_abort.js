@@ -74,13 +74,9 @@ createIdx();
 
 failSecondaryBuild.off();
 
-// Wait for the builds to be unregistered before asserting indexes.
-IndexBuildTest.waitForIndexBuildToStop(primaryDB, primaryColl.getName(), kIndexName);
-IndexBuildTest.waitForIndexBuildToStop(secondaryDB, secondaryColl.getName(), kIndexName);
-
 // Assert index does not exist.
-IndexBuildTest.assertIndexes(primaryColl, 1, ['_id_'], []);
-IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_'], []);
+IndexBuildTest.assertIndexesSoon(primaryColl, 1, ['_id_'], []);
+IndexBuildTest.assertIndexesSoon(secondaryColl, 1, ['_id_'], []);
 
 rst.stopSet();
 })();

@@ -27,10 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/disk_space_monitor.h"
+#include <utility>
 
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/storage/disk_space_monitor.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

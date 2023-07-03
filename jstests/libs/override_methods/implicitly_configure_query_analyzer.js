@@ -12,7 +12,7 @@ load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelp
 load("jstests/libs/override_methods/shard_collection_util.js");
 
 const kShardProbability = 0.5;
-const kSampleRate = 1000;  // per second.
+const kSamplesPerSecond = 1000;  // per second.
 
 // Save a reference to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
@@ -37,8 +37,8 @@ function configureQueryAnalyzer({db, collName}) {
 
     let result;
     try {
-        result =
-            db.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: kSampleRate});
+        result = db.adminCommand(
+            {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: kSamplesPerSecond});
     } catch (e) {
         print(`Failed to configure query analyzer: ${tojsononeline({ns, e})}`);
         if (!isNetworkError(e)) {

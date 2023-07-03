@@ -27,22 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/kv/kv_engine_test_harness.h"
-
 #include <memory>
 #include <string>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/operation_context_noop.h"
-#include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/kv/kv_engine_test_harness.h"
+#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot_manager.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {

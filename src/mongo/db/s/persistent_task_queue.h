@@ -29,10 +29,34 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 
@@ -105,7 +129,8 @@ private:
 
 template <typename T>
 PersistentTaskQueue<T>::PersistentTaskQueue(OperationContext* opCtx, NamespaceString storageNss)
-    : _storageNss(std::move(storageNss)), _mutex("persistentQueueLock:" + _storageNss.toString()) {
+    : _storageNss(std::move(storageNss)),
+      _mutex("persistentQueueLock:" + NamespaceStringUtil::serialize(_storageNss)) {
 
     DBDirectClient client(opCtx);
 
@@ -224,7 +249,8 @@ PersistentTaskQueue<T>::_loadNextRecord(DBDirectClient& client) {
     if (!bson.isEmpty()) {
         result = typename PersistentTaskQueue<T>::Record{
             bson.getField("_id").Long(),
-            T::parse(IDLParserContext("PersistentTaskQueue:" + _storageNss.toString()),
+            T::parse(IDLParserContext("PersistentTaskQueue:" +
+                                      NamespaceStringUtil::serialize(_storageNss)),
                      bson.getObjectField("task"))};
     }
 

@@ -27,13 +27,46 @@
  *    it in the license file.
  */
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
-#include "mongo/s/catalog/sharding_catalog_client_mock.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/index_version.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/shard_version_factory.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {

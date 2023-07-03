@@ -12,8 +12,14 @@ load("jstests/sharding/analyze_shard_key/libs/validation_common.js");
 
 const analyzeShardKeyNumRanges = 10;
 
-function testValidationBeforeMetricsCalculation(conn, validationTest) {
+function testValidationBeforeMetricsCalculation(conn, mongodConn, validationTest) {
     jsTest.log(`Testing validation before calculating any metrics`);
+
+    // Set the fail point that would make the analyzeShardKey command fail with an InternalError
+    // before metrics calculation. That way if there is no expected validation before the metrics
+    // calculation, the command would fail with an InternalError error instead of the expected
+    // error.
+    let fp = configureFailPoint(mongodConn, "analyzeShardKeyFailBeforeMetricsCalculation");
 
     for (let {dbName, collName, isView} of validationTest.invalidNamespaceTestCases) {
         jsTest.log(`Testing that the analyzeShardKey command fails if the namespace is invalid ${
@@ -30,9 +36,11 @@ function testValidationBeforeMetricsCalculation(conn, validationTest) {
         assert.commandFailedWithCode(conn.adminCommand({analyzeShardKey: ns, key: shardKey}),
                                      ErrorCodes.BadValue);
     }
+
+    fp.off();
 }
 
-function testValidationDuringKeyCharactericsMetricsCalculation(conn, validationTest) {
+function testValidationDuringKeyCharacteristicsMetricsCalculation(conn, validationTest) {
     const dbName = validationTest.dbName;
     const collName = validationTest.collName;
     const ns = dbName + "." + collName;
@@ -58,8 +66,13 @@ function testValidationDuringKeyCharactericsMetricsCalculation(conn, validationT
     for (let {indexOptions, shardKey} of validationTest.noCompatibleIndexTestCases) {
         jsTest.log(`Testing incompatible index ${tojson({indexOptions, shardKey})}`);
         assert.commandWorked(testDB.runCommand({createIndexes: collName, indexes: [indexOptions]}));
-        const res = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: shardKey}));
-        AnalyzeShardKeyUtil.assertNotContainKeyCharacteristicsMetrics(res);
+        assert.commandFailedWithCode(conn.adminCommand({
+            analyzeShardKey: ns,
+            key: shardKey,
+            keyCharacteristics: true,
+            readWriteDistribution: false
+        }),
+                                     ErrorCodes.IllegalOperation);
         assert.commandWorked(testDB.runCommand({dropIndexes: collName, index: indexOptions.name}));
     }
 
@@ -85,7 +98,12 @@ function testValidationDuringReadWriteDistributionMetricsCalculation(
         aggConn, "analyzeShardKeyPauseBeforeCalculatingReadWriteDistributionMetrics");
     let analyzeShardKeyFunc = (cmdHost, ns, arrayFieldName) => {
         const cmdConn = new Mongo(cmdHost);
-        return cmdConn.adminCommand({analyzeShardKey: ns, key: {[arrayFieldName]: 1}});
+        return cmdConn.adminCommand({
+            analyzeShardKey: ns,
+            key: {[arrayFieldName]: 1},
+            keyCharacteristics: false,
+            readWriteDistribution: true
+        });
     };
     let analyzeShardKeyThread = new Thread(analyzeShardKeyFunc, cmdConn.host, ns, arrayFieldName);
 
@@ -114,20 +132,8 @@ const setParameterOpts = {analyzeShardKeyNumRanges};
     const validationTest = ValidationTest(st.s);
 
     // Disable the calculation of all metrics to test validation at the start of the command.
-    let fp0 =
-        configureFailPoint(shard0Primary, "analyzeShardKeySkipCalcalutingKeyCharactericsMetrics");
-    let fp1 = configureFailPoint(shard0Primary,
-                                 "analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics");
-    testValidationBeforeMetricsCalculation(st.s, validationTest);
-
-    // Enable the calculation of the metrics about the characteristics of the shard key to test
-    // validation during that step.
-    fp0.off();
-    testValidationDuringKeyCharactericsMetricsCalculation(st.s, validationTest);
-
-    // Enable the calculation of the metrics about the read and write distribution to test
-    // validation during that step.
-    fp1.off();
+    testValidationBeforeMetricsCalculation(st.s, shard0Primary, validationTest);
+    testValidationDuringKeyCharacteristicsMetricsCalculation(st.s, validationTest);
     testValidationDuringReadWriteDistributionMetricsCalculation(
         st.s, validationTest, shard0Primary);
 
@@ -142,20 +148,8 @@ const setParameterOpts = {analyzeShardKeyNumRanges};
 
     const validationTest = ValidationTest(primary);
 
-    // Disable the calculation of all metrics to test validation at the start of the command.
-    let fp0 = configureFailPoint(primary, "analyzeShardKeySkipCalcalutingKeyCharactericsMetrics");
-    let fp1 =
-        configureFailPoint(primary, "analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics");
-    testValidationBeforeMetricsCalculation(primary, validationTest);
-
-    // Enable the calculation of the metrics about the characteristics of the shard key to test
-    // validation during that step.
-    fp0.off();
-    testValidationDuringKeyCharactericsMetricsCalculation(primary, validationTest);
-
-    // Enable the calculation of the metrics about the read and write distribution to test
-    // validation during that step.
-    fp1.off();
+    testValidationBeforeMetricsCalculation(primary, primary, validationTest);
+    testValidationDuringKeyCharacteristicsMetricsCalculation(primary, validationTest);
     testValidationDuringReadWriteDistributionMetricsCalculation(primary, validationTest, primary);
 
     rst.stopSet();

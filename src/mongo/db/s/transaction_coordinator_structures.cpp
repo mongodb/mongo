@@ -28,11 +28,10 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/transaction_coordinator_structures.h"
-
+#include "mongo/base/error_codes.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 

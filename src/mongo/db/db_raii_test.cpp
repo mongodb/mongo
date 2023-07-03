@@ -27,19 +27,53 @@
  *    it in the license file.
  */
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <functional>
 #include <string>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot_manager.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

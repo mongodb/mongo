@@ -31,17 +31,31 @@
  * Unit tests of the UserName and RoleName types.
  */
 
-#include "mongo/platform/basic.h"
-
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+#include <iosfwd>
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

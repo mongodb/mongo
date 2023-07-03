@@ -29,20 +29,35 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <functional>
+#include <iosfwd>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog_constraint_violation_logger.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 class Collection;
@@ -51,6 +66,7 @@ class Database;
 class NamespaceString;
 class OperationContext;
 class OperationSessionInfo;
+
 class ScopedCollectionAcquisition;
 class Session;
 

@@ -28,6 +28,20 @@
  */
 #pragma once
 
+#include <boost/optional.hpp>
+#include <iosfwd>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/index_version.h"
 
@@ -85,6 +99,8 @@ public:
     void serialize(StringData field, BSONObjBuilder* builder) const;
 
     std::string toString() const;
+
+    BSONObj toBSON() const;
 
 private:
     ShardVersion(const ChunkVersion& chunkVersion,

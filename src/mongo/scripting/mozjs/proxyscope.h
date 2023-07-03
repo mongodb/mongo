@@ -29,10 +29,22 @@
 
 #pragma once
 
+#include <functional>
+#include <string>
 #include <vm/PosixNSPR.h>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/engine.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"

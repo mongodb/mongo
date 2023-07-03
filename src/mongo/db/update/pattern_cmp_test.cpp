@@ -29,16 +29,22 @@
 
 #include "mongo/db/update/pattern_cmp.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

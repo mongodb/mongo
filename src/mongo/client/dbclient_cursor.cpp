@@ -29,23 +29,43 @@
 
 #include "mongo/client/dbclient_cursor.h"
 
+#include <boost/cstdint.hpp>
+#include <cstdint>
+#include <cstring>
 #include <memory>
+#include <ostream>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/connpool.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_command_gen.h"
-#include "mongo/db/query/query_request_helper.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/factory.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/util/debug_util.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/scopeguard.h"
@@ -124,7 +144,7 @@ Message DBClientCursor::assembleGetMore() {
 bool DBClientCursor::init() {
     invariant(!_connectionHasPendingReplies);
     Message toSend = assembleInit();
-    verify(_client);
+    MONGO_verify(_client);
     Message reply;
     try {
         _client->call(toSend, reply, &_originalHost);
@@ -152,7 +172,7 @@ void DBClientCursor::requestMore() {
     }
 
     invariant(!_connectionHasPendingReplies);
-    verify(_cursorId && _batch.pos == _batch.objs.size());
+    MONGO_verify(_cursorId && _batch.pos == _batch.objs.size());
 
     auto doRequestMore = [&] {
         Message toSend = assembleGetMore();
@@ -176,10 +196,10 @@ void DBClientCursor::requestMore() {
  * cursor id of 0.
  */
 void DBClientCursor::exhaustReceiveMore() {
-    verify(_cursorId);
-    verify(_batch.pos == _batch.objs.size());
+    MONGO_verify(_cursorId);
+    MONGO_verify(_batch.pos == _batch.objs.size());
     Message response;
-    verify(_client);
+    MONGO_verify(_client);
     uassertStatusOK(
         _client->recv(response, _lastRequestId).withContext("recv failed while exhausting cursor"));
     dataReceived(response);
@@ -300,11 +320,11 @@ bool DBClientCursor::peekError(BSONObj* error) {
     vector<BSONObj> v;
     peek(v, 1);
 
-    verify(v.size() == 1);
+    MONGO_verify(v.size() == 1);
     // We check both the legacy error format, and the new error format. hasErrField checks for
     // $err, and getStatusFromCommandResult checks for modern errors of the form '{ok: 0.0, code:
     // <...>, errmsg: ...}'.
-    verify(hasErrField(v[0]) || !getStatusFromCommandResult(v[0]).isOK());
+    MONGO_verify(hasErrField(v[0]) || !getStatusFromCommandResult(v[0]).isOK());
 
     if (error)
         *error = v[0].getOwned();
@@ -312,9 +332,9 @@ bool DBClientCursor::peekError(BSONObj* error) {
 }
 
 void DBClientCursor::attach(AScopedConnection* conn) {
-    verify(_scopedHost.size() == 0);
-    verify(conn);
-    verify(conn->get());
+    MONGO_verify(_scopedHost.size() == 0);
+    MONGO_verify(conn);
+    MONGO_verify(conn->get());
 
     if (conn->get()->type() == ConnectionString::ConnectionType::kReplicaSet) {
         if (_client)
@@ -341,7 +361,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _originalHost(_client->getServerAddress()),
       _nsOrUuid(nsOrUuid),
       _isInitialized(true),
-      _ns(nsOrUuid.nss() ? *nsOrUuid.nss() : NamespaceString(nsOrUuid.dbName())),
+      _ns(nsOrUuid.isNamespaceString() ? nsOrUuid.nss() : NamespaceString{nsOrUuid.dbName()}),
       _cursorId(cursorId),
       _isExhaust(isExhaust),
       _operationTime(operationTime),
@@ -354,7 +374,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
     : _client(client),
       _originalHost(_client->getServerAddress()),
       _nsOrUuid(findRequest.getNamespaceOrUUID()),
-      _ns(_nsOrUuid.nss() ? *_nsOrUuid.nss() : NamespaceString(_nsOrUuid.dbName())),
+      _ns(_nsOrUuid.isNamespaceString() ? _nsOrUuid.nss() : NamespaceString{_nsOrUuid.dbName()}),
       _batchSize(findRequest.getBatchSize().value_or(0)),
       _findRequest(std::move(findRequest)),
       _readPref(readPref),

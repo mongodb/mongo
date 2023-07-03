@@ -27,14 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <boost/smart_ptr.hpp>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cmath>
+#include <cstddef>
+#include <deque>
+#include <string>
 
-#include "mongo/db/pipeline/document_source_bucket_auto.h"
-
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/document_source_bucket_auto.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -92,7 +110,7 @@ const char* DocumentSourceBucketAuto::getSourceName() const {
 
 DocumentSource::GetNextResult DocumentSourceBucketAuto::doGetNext() {
     if (!_populated) {
-        const auto populationResult = populateSorter();
+        auto populationResult = populateSorter();
         if (populationResult.isPaused()) {
             return populationResult;
         }
@@ -384,10 +402,10 @@ Value DocumentSourceBucketAuto::serialize(SerializationOptions opts) const {
     MutableDocument insides;
 
     insides["groupBy"] = _groupByExpression->serialize(opts);
-    insides["buckets"] = opts.serializeLiteralValue(_nBuckets);
+    insides["buckets"] = opts.serializeLiteral(_nBuckets);
 
     if (_granularityRounder) {
-        insides["granularity"] = opts.serializeLiteralValue(_granularityRounder->getName());
+        insides["granularity"] = opts.serializeLiteral(_granularityRounder->getName());
     }
 
     MutableDocument outputSpec(_accumulatedFields.size());
@@ -426,7 +444,7 @@ intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(
     return new DocumentSourceBucketAuto(pExpCtx,
                                         groupByExpression,
                                         numBuckets,
-                                        accumulationStatements,
+                                        std::move(accumulationStatements),
                                         granularityRounder,
                                         maxMemoryUsageBytes);
 }
@@ -539,8 +557,11 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
             "$bucketAuto requires 'groupBy' and 'buckets' to be specified",
             groupByExpression && numBuckets);
 
-    return DocumentSourceBucketAuto::create(
-        pExpCtx, groupByExpression, numBuckets.value(), accumulationStatements, granularityRounder);
+    return DocumentSourceBucketAuto::create(pExpCtx,
+                                            groupByExpression,
+                                            numBuckets.value(),
+                                            std::move(accumulationStatements),
+                                            granularityRounder);
 }
 
 }  // namespace mongo

@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <string>
 
-#include <exception>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
-#include "mongo/bson/bson_validate.h"
-#include "mongo/bson/json.h"
-#include "mongo/client/connection_string.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/executor/network_interface_integration_fixture.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace executor {

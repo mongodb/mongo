@@ -27,16 +27,20 @@
  *    it in the license file.
  */
 
+#include <fmt/format.h>
+
+#include <boost/move/utility_core.hpp>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/pipeline/document_source_merge_gen.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/client.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

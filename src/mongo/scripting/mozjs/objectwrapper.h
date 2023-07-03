@@ -29,13 +29,29 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <js/AllocPolicy.h>
+#include <js/CallArgs.h>
+#include <js/GCVector.h>
+#include <js/Id.h>
 #include <js/Object.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 #include <js/ValueArray.h>
-
 #include <jsapi.h>
 #include <string>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/exception.h"

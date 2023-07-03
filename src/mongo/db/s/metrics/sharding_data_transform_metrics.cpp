@@ -28,8 +28,14 @@
  */
 
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
+
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

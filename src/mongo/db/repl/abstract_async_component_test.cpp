@@ -27,17 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <fmt/format.h>
 #include <memory>
+#include <utility>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/repl/abstract_async_component.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/task_executor_mock.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/platform/mutex.h"
-
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 
 namespace {
 

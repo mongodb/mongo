@@ -27,20 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/index_bounds_builder_test.h"
-
+#include <s2cellid.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <limits>
 #include <memory>
 
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/expression_index.h"
+#include "mongo/db/query/index_bounds_builder_test.h"
+#include "mongo/db/query/interval.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/time_support.h"
 
 namespace {
 

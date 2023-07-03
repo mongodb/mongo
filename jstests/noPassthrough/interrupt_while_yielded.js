@@ -1,7 +1,7 @@
 /**
  * @tags: [
- *   # TODO SERVER-64007: Support yielding in CQF plans.
- *   cqf_incompatible,
+ *   # TODO SERVER-70446: Enable yielding for index plans in CQF.
+ *   cqf_experimental_incompatible,
  * ]
  */
 (function() {

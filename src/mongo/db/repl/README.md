@@ -378,6 +378,8 @@ If the server does not support `hello`, the `helloOk` flag is ignored. A new dri
 not see "helloOk: true" in the response and continue to send `isMaster` on this connection. Old drivers
 will not specify this flag at all, so the behavior remains the same.
 
+Communication between nodes in the cluster is always done using `hello`, never with `isMaster`.
+
 ## Communication
 
 Each node has a copy of the **`ReplicaSetConfig`** in the `ReplicationCoordinator` that lists all
@@ -525,7 +527,7 @@ assigns itself a priority takeover timeout proportional to its rank. After that 
 node will check if it's eligible to run for election and if so will begin an election. The timeout
 is simply: `(election timeout) * (priority rank + 1)`.
 
-Heartbeat threads belong to the 
+Heartbeat threads belong to the
 [`ReplCoordThreadPool`](https://github.com/mongodb/mongo/blob/674d57fc70d80dedbfd634ce00ca4b967ea89646/src/mongo/db/mongod_main.cpp#L944)
 connection pool started by the
 [`ReplicationCoordinator`](https://github.com/mongodb/mongo/blob/674d57fc70d80dedbfd634ce00ca4b967ea89646/src/mongo/db/mongod_main.cpp#L986).
@@ -644,14 +646,11 @@ been replicated to a majority of nodes in the replica set. Any data seen in majo
 roll back in the future. Thus majority reads prevent **dirty reads**, though they often are
 **stale reads**.
 
-Read concern majority reads usually return as fast as local reads, but sometimes will block. Read
-concern majority reads do not wait for anything to be committed; they just use different snapshots
-from local reads. They do block though when the node metadata (in the catalog cache) differs from
-the committed snapshot. For example, index builds or drops, collection creates or drops, database
-drops, or collmod’s could cause majority reads to block. If the primary receives a `createIndex`
-command, subsequent majority reads will block until that index build is finished on a majority of
-nodes. Majority reads also block right after startup or rollback when we do not yet have a committed
-snapshot.
+Read concern majority reads do not wait for anything to be committed; they just use different 
+snapshots from local reads. Read concern majority reads usually return as fast as local reads, but 
+sometimes will block. For example, right after startup or rollback when we do not have a committed 
+snapshot, majority reads will be blocked. Also, when some of the secondaries are unavailable or 
+lagging, majority reads could slow down or block.
 
 For information on how majority read concern works within a multi-document transaction, see the
 [Read Concern Behavior Within Transactions](#read-concern-behavior-within-transactions) section.
@@ -845,7 +844,7 @@ node hasn't committed the transaction (and therefore, the WUOW) yet.
 A user can [add additional operations](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/op_observer_impl.cpp#L554) to an existing multi-document transaction by running more
 commands on the same session. These operations are then stored in memory. Once a write completes on
 the primary, [we update the corresponding `sessionTxnRecord`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/op_observer_impl.cpp#L1664-L1673)
-in the transactions table (`config.transactions`) with information about the transaction. 
+in the transactions table (`config.transactions`) with information about the transaction.
 This includes things like the `lsid`, the `txnNumber` currently associated with the session, and the `txnState`.
 
 This table was introduced for retryable writes and is used to keep track of retryable write and
@@ -1192,7 +1191,7 @@ process prepare oplog entries one at a time and operations in a prepare oplog en
 serial, while secondary nodes batch process prepare oplog entries and use multiple threads to
 parallelize the application of operations in each prepare oplog entry.
 
-In order to parallelize the application, a `prepareTransaction` oplog entry can be 
+In order to parallelize the application, a `prepareTransaction` oplog entry can be
 [applied in the same batch](https://github.com/mongodb/mongo/blob/07e1e93c566243983b45385f5c85bc7df0026f39/src/mongo/db/repl/oplog_batcher.cpp#L243-L248)
 as other CRUD or `prepareTransaction` oplog entries, and operations in each `prepareTransaction`
 oplog entry are [split among the writer threads](https://github.com/mongodb/mongo/blob/07e1e93c566243983b45385f5c85bc7df0026f39/src/mongo/db/repl/oplog_applier_utils.cpp#L256)
@@ -1332,7 +1331,7 @@ There are a number of ways that a node will run for election:
   longer than `catchUpTakeoverDelayMillis` (default 30 seconds), it will run for election. This
   behvarior is known as a **catchup takeover**. If primary catchup is taking too long, catchup
   takeover can help allow the replica set to accept writes sooner, since a more up-to-date node will
-  not spend as much time (or any time) in catchup. See the "Transitioning to `PRIMARY`" section for
+  not spend as much time (or any time) in catchup. See the [Transitioning to `PRIMARY` section](https://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/README.md#transitioning-to-primary) section for
   further details on primary catchup.
 * The `replSetStepUp` command can be run on an eligible node to cause it to run for election
   immediately. We don't expect users to call this command, but it is run internally for election
@@ -1345,14 +1344,26 @@ There are a number of ways that a node will run for election:
   `enableElectionHandoff` is false, then nodes in the replica set will wait until the election
   timeout triggers to run for election.
 
+### Code references
+* [election timeout](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L345) ([defaults](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_config.idl#L101))
+* [priority takeover](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L449)
+* [priority takeover: priority check](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L1568-L1578)
+* [priority takeover: wait time calculation](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_config.cpp#L705-L709)
+* [newly elected primary catchup](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4714)
+* [primary catchup completion](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4799-L4813)
+* [primary start accepting writes](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L1361)
+* [catchup takeover](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L466)
+* [catchup takeover: takeover check](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L466)
+* [election handoff](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2924)
+* [election handoff: skip wait](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2917-L2921)
 
 ### Candidate Perspective
 
 A candidate node first runs a dry-run election. In a **dry-run election**, a node starts a
-[`VoteRequester`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/vote_requester.h),
+[`VoteRequester`](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/vote_requester.h),
 which uses a
-[`ScatterGatherRunner`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/scatter_gather_runner.h)
-to send a `replSetRequestVotes` command to every node asking if that node would vote for it. The
+[`ScatterGatherRunner`](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/scatter_gather_runner.h)
+to send a [`replSetRequestVotes` command](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_request_votes.cpp#L47) to every node asking if that node would vote for it. The
 candidate node does not increase its term during a dry-run because if a primary ever sees a higher
 term than its own, it steps down. By first conducting a dry-run election, we make it unlikely that
 nodes will increase their own term when they would not win and prevent needless primary stepdowns.
@@ -1370,6 +1381,13 @@ members in order to get elected.
 
 If the candidate received votes from a majority of nodes, including itself, the candidate wins the
 election.
+
+#### Code references
+* [dry-run election](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L203)
+* [skipping dry-run](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L185)
+* [real election](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L277)
+* [candidate process vote response](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/vote_requester.cpp#L114)
+* [candidate checks election result](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_elect_v1.cpp#L416)
 
 ### Voter Perspective
 
@@ -1391,6 +1409,10 @@ Whenever a node votes for itself, or another node, it records that "LastVote" in
 the `local.replset.election` collection. This information is read into memory at startup and used in
 future elections. This ensures that even if a node restarts, it does not vote for two nodes in the
 same term.
+
+#### Code references
+* [node processing vote request](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L3429)
+* [recording LastVote durably](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L5739)
 
 ### Transitioning to `PRIMARY`
 
@@ -1431,6 +1453,16 @@ Finally, the node drops all temporary collections, restores all locks for
 and logs “transition to primary complete”. At this point, new writes will be accepted by the
 primary.
 
+#### Code references
+* [clearing the sync source, notify nodes of election, prepare catch up](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4697-L4707)
+* [catchup to latest optime known via heartbeats](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4800)
+* [catchup-timeout](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4746)
+* [always allow chaining for catchup](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L5231)
+* [enter drain mode after catchup attempt](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4783)
+* [exit drain mode](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L1205)
+* [term bump](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L1300)
+* [drop temporary collections](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L532)
+
 ## Step Down
 
 ### Conditional
@@ -1459,9 +1491,16 @@ conditions and steps down immediately after it reaches the `secondaryCatchUpPeri
 Upon a successful stepdown, it yields locks held by
 [prepared transactions](#stepdown-with-a-prepared-transaction) because we are now a secondary.
 Finally, we log stepdown metrics and update our member state to `SECONDARY`.
-* User-facing documentation is
-available [here](https://www.mongodb.com/docs/manual/reference/command/replSetStepDown/#command-fields).
-* [Code spelunking point](https://github.com/mongodb/mongo/blob/843762120897ed2dbfe8bbc69dbbf99b641c009c/src/mongo/db/repl/replication_coordinator_impl.cpp#L2737).
+
+#### Code references
+* [User-facing documentation](https://www.mongodb.com/docs/manual/reference/command/replSetStepDown/#command-fields).
+* [Replication coordinator stepDown method](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2729)
+* [ReplSetStepDown command class](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_commands.cpp#L527)
+* [The node loops trying to step down](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2836)
+* [A majority of nodes need to have reached the last applied optime](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L2733)
+* [At least one caught up node needs to be electable](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L2738)
+* [Set the LeaderMode to kSteppingDown](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L1721)
+* [Upon a successful stepdown, it yields locks held by prepared transactions](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L2899)
 
 ### Unconditional
 
@@ -1480,6 +1519,14 @@ schedule a replica set config change.
 During unconditional stepdown, we do not check preconditions before attempting to step down. Similar
 to conditional stepdowns, we must kill any conflicting user/system operations before acquiring the
 RSTL and yield locks of prepared transactions following a successful stepdown.
+
+#### Code references
+* [Stepping down on learning of a higher term](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L6066)
+* [Liveness timeout checks](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/topology_coordinator.cpp#L1236-L1249)
+* [Stepping down on liveness timeout](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L424)
+* [ReplSetReconfig command class](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/repl_set_commands.cpp#L431)
+* [Stepping on reconfig](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L4010)
+* [Stepping down on heartbeat](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl_heartbeat.cpp#L980)
 
 ### Concurrent Stepdown Attempts
 
@@ -1725,15 +1772,15 @@ The `initialSyncTransientErrorRetryPeriodSeconds` is also used to control retrie
 fetcher and all network operations in initial sync which take place after the data cloning has
 started.
 
-As of v4.4, initial syncing a node with [two-phase index builds](https://github.com/mongodb/mongo/blob/0a7641e69031fcfdf25a1780a3b62bca5f59d68f/src/mongo/db/catalog/README.md#replica-set-index-builds) 
-will immediately build all ready indexes from the sync source and setup the index builder threads 
-for any unfinished index builds. 
-[See here](https://github.com/mongodb/mongo/blob/85d75907fd12c2360cf16b97f941386f343ca6fc/src/mongo/db/repl/collection_cloner.cpp#L247-L301). 
+As of v4.4, initial syncing a node with [two-phase index builds](https://github.com/mongodb/mongo/blob/0a7641e69031fcfdf25a1780a3b62bca5f59d68f/src/mongo/db/catalog/README.md#replica-set-index-builds)
+will immediately build all ready indexes from the sync source and setup the index builder threads
+for any unfinished index builds.
+[See here](https://github.com/mongodb/mongo/blob/85d75907fd12c2360cf16b97f941386f343ca6fc/src/mongo/db/repl/collection_cloner.cpp#L247-L301).
 
-This is necessary to avoid a scenario where the primary node cannot satisfy the index builds commit 
-quorum if it depends on the initial syncing nodes vote. Prior to this, initial syncing nodes would 
-start the index build when they came across the `commitIndexBuild` oplog entry, which is only 
-observable once the index builds commit quorum has been satisfied. 
+This is necessary to avoid a scenario where the primary node cannot satisfy the index builds commit
+quorum if it depends on the initial syncing nodes vote. Prior to this, initial syncing nodes would
+start the index build when they came across the `commitIndexBuild` oplog entry, which is only
+observable once the index builds commit quorum has been satisfied.
 [See this test for an example](https://github.com/mongodb/mongo/blob/f495bdead326a06a76f8a980e44092deb096a21d/jstests/noPassthrough/commit_quorum_does_not_hang_with_initial_sync.js).
 
 ## Oplog application phase
@@ -2099,11 +2146,11 @@ transaction. For a prepared transaction, we have the following guarantee: `prepa
 
 **`currentCommittedSnapshot`**: An optime maintained in `ReplicationCoordinator` that is used to
 serve majority reads and is always guaranteed to be <= `lastCommittedOpTime`. When `eMRC=true`, this
-is currently [set to the stable optime](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4945). 
+is currently [set to the stable optime](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4945).
 Since it is reset every time we recalculate the stable optime, it will also be up to date.
 
-When `eMRC=false`, this [is set](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4952-L4961) 
-to the minimum of the stable optime and the `lastCommittedOpTime`, even though it is not used to 
+When `eMRC=false`, this [is set](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4952-L4961)
+to the minimum of the stable optime and the `lastCommittedOpTime`, even though it is not used to
 serve majority reads in that case.
 
 **`initialDataTimestamp`**: A timestamp used to indicate the timestamp at which history “begins”.
@@ -2158,7 +2205,7 @@ populated internally from the `currentCommittedSnapshot` timestamp inside `Repli
 **`stable_timestamp`**: The newest timestamp at which the storage engine is allowed to take a
 checkpoint, which can be thought of as a consistent snapshot of the data. Replication informs the
 storage engine of where it is safe to take its next checkpoint. This timestamp is guaranteed to be
-majority committed so that RTT rollback can use it. In the case when 
+majority committed so that RTT rollback can use it. In the case when
 [`eMRC=false`](#enableMajorityReadConcern-flag), the stable timestamp may not be majority committed,
 which is why we must use the Rollback via Refetch rollback algorithm.
 

@@ -29,12 +29,27 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/storage/key_string.h"
 
 namespace mongo::stage_builder {
 
@@ -45,7 +60,7 @@ class PlanStageSlots;
  * A list of low and high key values representing ranges over a particular index.
  */
 using IndexIntervals =
-    std::vector<std::pair<std::unique_ptr<KeyString::Value>, std::unique_ptr<KeyString::Value>>>;
+    std::vector<std::pair<std::unique_ptr<key_string::Value>, std::unique_ptr<key_string::Value>>>;
 
 /**
  * This method returns a pair containing: (1) an SBE plan stage tree implementing an index scan;
@@ -64,13 +79,39 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     bool needsCorruptionCheck);
 
 /**
+ * Constructs the most simple version of an index scan from the single interval index bounds.
+ *
+ * In case when the 'lowKey' and 'highKey' are not specified, slots will be registered for them in
+ * the runtime environment and their slot ids returned as a pair in the third element of the tuple.
+ *
+ * If 'indexKeySlot' is provided, than the corresponding slot will be filled out with each KeyString
+ * in the index.
+ */
+std::tuple<std::unique_ptr<sbe::PlanStage>,
+           PlanStageSlots,
+           boost::optional<std::pair<sbe::value::SlotId, sbe::value::SlotId>>>
+generateSingleIntervalIndexScan(StageBuilderState& state,
+                                const CollectionPtr& collection,
+                                const std::string& indexName,
+                                const BSONObj& keyPattern,
+                                bool forward,
+                                std::unique_ptr<key_string::Value> lowKey,
+                                std::unique_ptr<key_string::Value> highKey,
+                                sbe::IndexKeysInclusionSet indexKeysToInclude,
+                                sbe::value::SlotVector indexKeySlots,
+                                const PlanStageReqs& reqs,
+                                PlanYieldPolicy* yieldPolicy,
+                                PlanNodeId planNodeId,
+                                bool lowPriority);
+
+/**
  * Constructs low/high key values from the given index 'bounds' if they can be represented either as
  * a single interval between the low and high keys, or multiple single intervals. If index bounds
  * for some interval cannot be expressed as valid low/high keys, then an empty vector is returned.
  */
 IndexIntervals makeIntervalsFromIndexBounds(const IndexBounds& bounds,
                                             bool forward,
-                                            KeyString::Version version,
+                                            key_string::Version version,
                                             Ordering ordering);
 
 /**

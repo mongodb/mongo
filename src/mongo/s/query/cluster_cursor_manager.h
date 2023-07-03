@@ -29,14 +29,32 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <memory>
+#include <mutex>
 #include <utility>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/generic_cursor.h"
+#include "mongo/db/generic_cursor_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_killer.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
@@ -44,8 +62,12 @@
 #include "mongo/s/query/cluster_client_cursor_guard.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -611,7 +633,7 @@ private:
  * getMore requests), so these should only be called from those request paths.
  */
 void collectQueryStatsMongos(OperationContext* opCtx,
-                             std::unique_ptr<query_stats::RequestShapifier> requestShapifier);
+                             std::unique_ptr<query_stats::KeyGenerator> keyGenerator);
 void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor);
 void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor);
 

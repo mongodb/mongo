@@ -30,7 +30,14 @@
 #pragma once
 
 #include <boost/container/small_vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <utility>
 
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/repl/optime.h"
@@ -39,6 +46,8 @@
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo::timeseries::bucket_catalog {
 

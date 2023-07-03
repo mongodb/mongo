@@ -29,6 +29,10 @@
 
 #include "mongo/embedded/read_write_concern_defaults_cache_lookup_embedded.h"
 
+#include <boost/none.hpp>
+
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
 
 boost::optional<RWConcernDefault> readWriteConcernDefaultsCacheLookupEmbedded(

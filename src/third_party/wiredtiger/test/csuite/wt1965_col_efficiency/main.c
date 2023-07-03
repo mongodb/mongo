@@ -116,7 +116,7 @@ main(int argc, char *argv[])
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
     testutil_check(testutil_parse_opts(argc, argv, opts));
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, NULL,
       "create,cache_size=1G,checkpoint=(wait=30),eviction_trigger=80,eviction_target=64,eviction_"
@@ -125,7 +125,7 @@ main(int argc, char *argv[])
       &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 
-    testutil_check(__wt_snprintf(table_format, sizeof(table_format), "key_format=r,value_format="));
+    testutil_snprintf(table_format, sizeof(table_format), "key_format=r,value_format=");
     for (i = 0; i < NR_FIELDS; i++)
         strcat(table_format, "Q");
 

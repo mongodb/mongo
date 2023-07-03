@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 
 namespace mongo {

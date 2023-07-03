@@ -29,13 +29,27 @@
 
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
-#include <numeric>
+#include <cstddef>
+#include <memory>
+#include <mutex>
+#include <string>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/server_options.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -48,6 +62,9 @@ const size_t kMaxKeyPatternPathLength = 2048;
 
 const std::string kTimeseriesBucketsMayHaveMixedSchemaDataFieldName =
     "timeseriesBucketsMayHaveMixedSchemaData";
+
+const std::string kTimeseriesBucketingParametersHaveChanged =
+    "timeseriesBucketingParametersHaveChanged";
 
 /**
  * Encodes 'multikeyPaths' as binary data and appends it to 'bob'.
@@ -262,11 +279,16 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) co
                  *timeseriesBucketsMayHaveMixedSchemaData);
     }
 
+    if (timeseriesBucketingParametersHaveChanged) {
+        b.append(kTimeseriesBucketingParametersHaveChanged,
+                 *timeseriesBucketingParametersHaveChanged);
+    }
+
     return b.obj();
 }
 
 void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
-    nss = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
+    nss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
         obj.getStringField("ns").toString());
 
     if (obj["options"].isABSONObj()) {
@@ -310,6 +332,11 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
     BSONElement timeseriesMixedSchemaElem = obj[kTimeseriesBucketsMayHaveMixedSchemaDataFieldName];
     if (!timeseriesMixedSchemaElem.eoo() && timeseriesMixedSchemaElem.isBoolean()) {
         timeseriesBucketsMayHaveMixedSchemaData = timeseriesMixedSchemaElem.Bool();
+    }
+
+    BSONElement tsBucketingParametersChangedElem = obj[kTimeseriesBucketingParametersHaveChanged];
+    if (!tsBucketingParametersChangedElem.eoo() && tsBucketingParametersChangedElem.isBoolean()) {
+        timeseriesBucketingParametersHaveChanged = tsBucketingParametersChangedElem.Bool();
     }
 }
 }  // namespace mongo

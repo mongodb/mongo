@@ -29,24 +29,30 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/static_assert.hpp>
 #include <cfloat>
 #include <cinttypes>
+#include <climits>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <type_traits>
-
-#include <boost/optional.hpp>
-
-#include "mongo/bson/util/builder_fwd.h"
+#include <utility>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/decimal128.h"
@@ -737,8 +743,8 @@ public:
         const int maxSize = 32;
         char* start = _buf.grow(maxSize);
         int z = snprintf(start, maxSize, "%.16g", x);
-        verify(z >= 0);
-        verify(z < maxSize);
+        MONGO_verify(z >= 0);
+        MONGO_verify(z < maxSize);
         _buf.setlen(prev + z);
         if (strchr(start, '.') == nullptr && strchr(start, 'E') == nullptr &&
             strchr(start, 'N') == nullptr) {
@@ -805,8 +811,8 @@ private:
     StringBuilderImpl& SBNUM(T val, int maxSize, const char* macro) {
         int prev = _buf.len();
         int z = snprintf(_buf.grow(maxSize), maxSize, macro, (val));
-        verify(z >= 0);
-        verify(z < maxSize);
+        MONGO_verify(z >= 0);
+        MONGO_verify(z < maxSize);
         _buf.setlen(prev + z);
         return *this;
     }

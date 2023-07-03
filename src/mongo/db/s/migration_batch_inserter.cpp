@@ -29,8 +29,46 @@
 
 #include "mongo/db/s/migration_batch_inserter.h"
 
+#include <mutex>
+#include <type_traits>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/catalog/collection_operation_source.h"
+#include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/client.h"
+#include "mongo/db/ops/single_write_result_gen.h"
+#include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/range_deletion_util.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
-#include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/session_catalog.h"
+#include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
 
@@ -163,8 +201,7 @@ void MigrationBatchInserter::run(Status status) const try {
         ShardingStatistics::get(opCtx).countDocsClonedOnRecipient.addAndFetch(batchNumCloned);
         ShardingStatistics::get(opCtx).countBytesClonedOnRecipient.addAndFetch(batchClonedBytes);
         LOGV2(6718408,
-              "Incrementing numCloned count by {batchNumCloned} and numClonedBytes by "
-              "{batchClonedBytes}",
+              "Incrementing cloned count by  ",
               "batchNumCloned"_attr = batchNumCloned,
               "batchClonedBytes"_attr = batchClonedBytes);
         _migrationProgress->incNumCloned(batchNumCloned);

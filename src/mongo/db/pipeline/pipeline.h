@@ -29,25 +29,48 @@
 
 #pragma once
 
+#include <boost/intrusive_ptr.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <functional>
 #include <list>
+#include <memory>
+#include <set>
 #include <vector>
 
-#include <boost/intrusive_ptr.hpp>
-
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/query/async_results_merger_params_gen.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 class BSONObj;

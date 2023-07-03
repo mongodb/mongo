@@ -127,8 +127,7 @@ handle_progress(
     (void)handler;
 
     if (session->app_private != NULL) {
-        testutil_check(
-          __wt_snprintf(buf, sizeof(buf), "%s %s", (char *)session->app_private, operation));
+        testutil_snprintf(buf, sizeof(buf), "%s %s", (char *)session->app_private, operation);
         track(buf, progress);
         return (0);
     }
@@ -139,14 +138,14 @@ handle_progress(
 
 static WT_EVENT_HANDLER event_handler = {NULL, handle_message, handle_progress, NULL, NULL};
 
-#define CONFIG_APPEND(p, ...)                                               \
-    do {                                                                    \
-        size_t __len;                                                       \
-        testutil_check(__wt_snprintf_len_set(p, max, &__len, __VA_ARGS__)); \
-        if (__len > max)                                                    \
-            __len = max;                                                    \
-        p += __len;                                                         \
-        max -= __len;                                                       \
+#define CONFIG_APPEND(p, ...)                                   \
+    do {                                                        \
+        size_t __len;                                           \
+        testutil_snprintf_len_set(p, max, &__len, __VA_ARGS__); \
+        if (__len > max)                                        \
+            __len = max;                                        \
+        p += __len;                                             \
+        max -= __len;                                           \
     } while (0)
 
 /*
@@ -157,6 +156,8 @@ static void
 configure_timing_stress(char **p, size_t max)
 {
     CONFIG_APPEND(*p, ",timing_stress_for_test=[");
+    if (GV(STRESS_AGGRESSIVE_STASH_FREE))
+        CONFIG_APPEND(*p, ",aggressive_stash_free");
     if (GV(STRESS_AGGRESSIVE_SWEEP))
         CONFIG_APPEND(*p, ",aggressive_sweep");
     if (GV(STRESS_CHECKPOINT))
@@ -177,8 +178,8 @@ configure_timing_stress(char **p, size_t max)
         CONFIG_APPEND(*p, ",history_store_search");
     if (GV(STRESS_HS_SWEEP))
         CONFIG_APPEND(*p, ",history_store_sweep_race");
-    if (GV(STRESS_PREPARE_RESOLUTION))
-        CONFIG_APPEND(*p, ",prepare_resolution");
+    if (GV(STRESS_PREPARE_RESOLUTION_1))
+        CONFIG_APPEND(*p, ",prepare_resolution_1");
     if (GV(STRESS_SLEEP_BEFORE_READ_OVERFLOW_ONPAGE))
         CONFIG_APPEND(*p, ",sleep_before_read_overflow_onpage");
     if (GV(STRESS_SPLIT_1))
@@ -386,7 +387,7 @@ create_database(const char *home, WT_CONNECTION **connp)
         CONFIG_APPEND(p, ",mmap_all=1");
 
     if (GV(DISK_DIRECT_IO))
-        CONFIG_APPEND(p, ",direct_io=(data)");
+        CONFIG_APPEND(p, ",direct_io=(checkpoint,data,log)");
 
     if (GV(DISK_DATA_EXTEND))
         CONFIG_APPEND(p, ",file_extend=(data=8MB)");
@@ -555,10 +556,7 @@ create_object(TABLE *table, void *arg)
 void
 wts_create_home(void)
 {
-    char buf[MAX_FORMAT_PATH * 2];
-
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "rm -rf %s && mkdir %s", g.home, g.home));
-    testutil_checkfmt(system(buf), "database home creation (\"%s\") failed", buf);
+    testutil_recreate_dir(g.home);
 }
 
 /*
@@ -713,7 +711,7 @@ stats_data_source(TABLE *table, void *arg)
     session = args->session;
 
     testutil_assert(fprintf(fp, "\n\n====== Data source statistics: %s\n", table->uri) >= 0);
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "statistics:%s", table->uri));
+    testutil_snprintf(buf, sizeof(buf), "statistics:%s", table->uri);
     stats_data_print(session, buf, fp);
 }
 

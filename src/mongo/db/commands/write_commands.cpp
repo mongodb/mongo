@@ -28,59 +28,84 @@
  */
 
 
-#include "mongo/base/checked_cast.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
-#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_operation_source.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/commands/write_commands_common.h"
-#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/fle_crud.h"
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/doc_validation_error.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
+#include "mongo/db/ops/single_write_result_gen.h"
+#include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/tenant_migration_conflict_info.h"
-#include "mongo/db/repl/tenant_migration_decoration.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/db/storage/duplicate_key_error_info.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
-#include "mongo/db/transaction/retryable_writes_stats.h"
-#include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/timeseries/timeseries_write_util.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/transaction_validation.h"
-#include "mongo/db/update/document_diff_applier.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/logv2/log.h"
-#include "mongo/logv2/redaction.h"
-#include "mongo/s/stale_exception.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/string_map.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/safe_num.h"
+#include "mongo/util/serialization_context.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -296,8 +321,8 @@ public:
             }
 
             if (hangInsertBeforeWrite.shouldFail([&](const BSONObj& data) {
-                    const auto ns = data.getStringField("ns");
-                    return ns == request().getNamespace().toString();
+                    const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
+                    return fpNss == request().getNamespace();
                 })) {
                 hangInsertBeforeWrite.pauseWhileSet();
             }
@@ -423,15 +448,16 @@ public:
 
             invariant(!_commandObj.isEmpty());
 
-            if (const auto& shardVersion = _commandObj.getField("shardVersion");
-                !shardVersion.eoo()) {
-                bob->append(shardVersion);
-            }
 
             bob->append("find", _commandObj["update"].String());
             extractQueryDetails(_updateOpObj, bob);
             bob->append("batchSize", 1);
             bob->append("singleBatch", true);
+
+            if (const auto& shardVersion = _commandObj.getField("shardVersion");
+                !shardVersion.eoo()) {
+                bob->append(shardVersion);
+            }
         }
 
         write_ops::UpdateCommandReply typedRun(OperationContext* opCtx) final try {
@@ -442,7 +468,6 @@ public:
 
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::UpdateCommandReply updateReply;
-            OperationSource source = OperationSource::kStandard;
             if (request().getEncryptionInformation().has_value()) {
                 // Flag set here and in fle_crud.cpp since this only executes on a mongod.
                 CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
@@ -451,14 +476,10 @@ public:
                 }
             }
 
-            if (auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, request()); isTimeseries) {
-                uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                        str::stream() << "Cannot perform a multi-document transaction on a "
-                                         "time-series collection: "
-                                      << ns().toStringForErrorMsg(),
-                        !opCtx->inMultiDocumentTransaction());
-                source = OperationSource::kTimeseriesUpdate;
-            }
+            auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, request());
+            OperationSource source =
+                isTimeseries ? OperationSource::kTimeseriesUpdate : OperationSource::kStandard;
+            auto ns = request().getNamespace();
 
             long long nModified = 0;
 
@@ -466,7 +487,20 @@ public:
             // 'postProcessHandler' and should not be accessed afterwards.
             std::vector<write_ops::Upserted> upsertedInfoVec;
 
-            auto reply = write_ops_exec::performUpdates(opCtx, request(), source);
+            write_ops_exec::WriteResult reply;
+            // For retryable updates on time-series collections, we needs to run them in
+            // transactions to ensure the multiple writes are replicated atomically.
+            if (isTimeseries && !ns.isTimeseriesBucketsCollection() && opCtx->isRetryableWrite() &&
+                !opCtx->inMultiDocumentTransaction()) {
+                auto executor = serverGlobalParams.clusterRole.has(ClusterRole::None)
+                    ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
+                          opCtx->getServiceContext())
+                    : Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+                write_ops_exec::runTimeseriesRetryableUpdates(
+                    opCtx, ns, request(), executor, &reply);
+            } else {
+                reply = write_ops_exec::performUpdates(opCtx, request(), source);
+            }
 
             // Handler to process each 'SingleWriteResult'.
             auto singleWriteHandler = [&](const SingleWriteResult& opResult, int index) {
@@ -555,9 +589,6 @@ public:
             updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
             updateRequest.setExplain(verbosity);
 
-            const ExtensionsCallbackReal extensionsCallback(opCtx,
-                                                            &updateRequest.getNamespaceString());
-
             // Explains of write commands are read-only, but we take write locks so that timing
             // info is more accurate.
             const auto collection =
@@ -567,16 +598,11 @@ public:
                                   MODE_IX);
 
             if (isRequestToTimeseries) {
-                uassert(ErrorCodes::NamespaceNotFound,
-                        "Could not find time-series buckets collection for write explain",
-                        collection.getCollectionPtr());
-                auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-                uassert(ErrorCodes::InvalidOptions,
-                        "Time-series buckets collection is missing time-series options",
-                        timeseriesOptions);
+                timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
 
                 const auto& requestHint = request().getUpdates()[0].getHint();
                 if (timeseries::isHintIndexKey(requestHint)) {
+                    auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
                     updateRequest.setHint(
                         uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
                             *timeseriesOptions, requestHint)));
@@ -585,7 +611,6 @@ public:
 
             ParsedUpdate parsedUpdate(opCtx,
                                       &updateRequest,
-                                      extensionsCallback,
                                       collection.getCollectionPtr(),
                                       false /* forgoOpCounterIncrements */,
                                       isRequestToTimeseries);
@@ -594,12 +619,14 @@ public:
             auto exec = uassertStatusOK(getExecutorUpdate(
                 &CurOp::get(opCtx)->debug(), collection, &parsedUpdate, verbosity));
             auto bodyBuilder = result->getBodyBuilder();
-            Explain::explainStages(exec.get(),
-                                   collection.getCollectionPtr(),
-                                   verbosity,
-                                   BSONObj(),
-                                   _commandObj,
-                                   &bodyBuilder);
+            Explain::explainStages(
+                exec.get(),
+                collection.getCollectionPtr(),
+                verbosity,
+                BSONObj(),
+                SerializationContext::stateCommandReply(request().getSerializationContext()),
+                _commandObj,
+                &bodyBuilder);
         }
 
         BSONObj _commandObj;
@@ -756,15 +783,10 @@ public:
                     opCtx, deleteRequest.getNsString(), AcquisitionPrerequisites::kWrite),
                 MODE_IX);
             if (isRequestToTimeseries) {
-                uassert(ErrorCodes::NamespaceNotFound,
-                        "Could not find time-series buckets collection for write explain",
-                        collection.exists());
-                auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-                uassert(ErrorCodes::InvalidOptions,
-                        "Time-series buckets collection is missing time-series options",
-                        timeseriesOptions);
+                timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
 
                 if (timeseries::isHintIndexKey(firstDelete.getHint())) {
+                    auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
                     deleteRequest.setHint(
                         uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
                             *timeseriesOptions, firstDelete.getHint())));
@@ -779,12 +801,14 @@ public:
             auto exec = uassertStatusOK(getExecutorDelete(
                 &CurOp::get(opCtx)->debug(), collection, &parsedDelete, verbosity));
             auto bodyBuilder = result->getBodyBuilder();
-            Explain::explainStages(exec.get(),
-                                   collection.getCollectionPtr(),
-                                   verbosity,
-                                   BSONObj(),
-                                   _commandObj,
-                                   &bodyBuilder);
+            Explain::explainStages(
+                exec.get(),
+                collection.getCollectionPtr(),
+                verbosity,
+                BSONObj(),
+                SerializationContext::stateCommandReply(request().getSerializationContext()),
+                _commandObj,
+                &bodyBuilder);
         }
 
         const BSONObj& _commandObj;

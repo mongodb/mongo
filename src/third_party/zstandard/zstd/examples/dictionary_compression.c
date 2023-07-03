@@ -1,12 +1,22 @@
 /*
- * Copyright (c) Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
  * LICENSE file in the root directory of this source tree) and the GPLv2 (found
  * in the COPYING file in the root directory of this source tree).
  * You may select, at your option, one of the above-listed licenses.
- */
+**/
+
+/* This example deals with Dictionary compression,
+ * its counterpart is `examples/dictionary_decompression.c` .
+ * These examples presume that a dictionary already exists.
+ * The main method to create a dictionary is `zstd --train`,
+ * look at the CLI documentation for details.
+ * Another possible method is to employ dictionary training API,
+ * published in `lib/zdict.h` .
+**/
+
 #include <stdio.h>     // printf
 #include <stdlib.h>    // free
 #include <string.h>    // memset, strcat
@@ -14,7 +24,7 @@
 #include "common.h"    // Helper functions, CHECK(), and CHECK_ZSTD()
 
 /* createDict() :
-   `dictFileName` is supposed to have been created using `zstd --train` */
+** `dictFileName` is supposed already created using `zstd --train` */
 static ZSTD_CDict* createCDict_orDie(const char* dictFileName, int cLevel)
 {
     size_t dictSize;

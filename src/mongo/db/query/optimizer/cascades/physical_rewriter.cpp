@@ -29,10 +29,26 @@
 
 #include "mongo/db/query/optimizer/cascades/physical_rewriter.h"
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <iostream>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/cascades/enforcers.h"
 #include "mongo/db/query/optimizer/cascades/implementers.h"
+#include "mongo/db/query/optimizer/cascades/rewrite_queues.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer::cascades {
 

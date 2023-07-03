@@ -27,38 +27,43 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/service_context_d_test_fixture.h"
 
-#include <memory>
+#include <type_traits>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/db/catalog/catalog_control.h"
-#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_impl.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/database_holder_impl.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/global_settings.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/db/storage/storage_engine_parameters_gen.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/transport/service_entry_point.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 
@@ -100,6 +105,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
     }
 
     auto const serviceContext = getServiceContext();
+
     if (options._useMockClock) {
         // Copied from dbtests.cpp. DBTests sets up a controlled mock clock while
         // ServiceContextMongoDTest uses the system clock. Tests moved from dbtests to unittests may
@@ -129,9 +135,12 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
 
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
 
+    auto observerRegistry = std::make_unique<OpObserverRegistry>();
+    serviceContext->setOpObserver(std::move(observerRegistry));
+
     // Set up the periodic runner to allow background job execution for tests that require it.
-    auto runner = makePeriodicRunner(getServiceContext());
-    getServiceContext()->setPeriodicRunner(std::move(runner));
+    auto runner = makePeriodicRunner(serviceContext);
+    serviceContext->setPeriodicRunner(std::move(runner));
 
     storageGlobalParams.dbpath = _tempDir.path();
 
@@ -148,9 +157,8 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
     Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
     CollectionShardingStateFactory::set(
-        getServiceContext(),
-        std::make_unique<CollectionShardingStateFactoryShard>(getServiceContext()));
-    getServiceContext()->getStorageEngine()->notifyStartupComplete();
+        serviceContext, std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
+    serviceContext->getStorageEngine()->notifyStartupComplete();
 
     if (_journalListener) {
         serviceContext->getStorageEngine()->setJournalListener(_journalListener.get());

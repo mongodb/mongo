@@ -30,9 +30,13 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {

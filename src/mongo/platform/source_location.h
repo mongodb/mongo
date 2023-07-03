@@ -32,6 +32,7 @@
 #include <cstdint>
 #include <ostream>
 #include <string>
+#include <utility>
 
 #if !defined(_MSC_VER) && !defined(__clang__)  // not windows or clang
 #include <experimental/source_location>

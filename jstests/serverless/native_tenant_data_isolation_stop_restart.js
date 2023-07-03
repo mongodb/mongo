@@ -5,7 +5,6 @@
 "use strict";
 
 load('jstests/aggregation/extras/utils.js');  // For arrayEq()
-load("jstests/libs/feature_flag_util.js");    // for isEnabled
 
 const rst =
     new ReplSetTest({nodes: 3, nodeOptions: {auth: '', setParameter: {multitenancySupport: true}}});
@@ -19,8 +18,6 @@ let adminDb = primary.getDB('admin');
 assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
 assert(adminDb.auth('admin', 'pwd'));
 
-const featureFlagRequireTenantId = FeatureFlagUtil.isEnabled(adminDb, "RequireTenantID");
-
 {
     const kTenant = ObjectId();
     let testDb = primary.getDB('myDb0');
@@ -32,7 +29,7 @@ const featureFlagRequireTenantId = FeatureFlagUtil.isEnabled(adminDb, "RequireTe
     // Run findAndModify on the document.
     let fad = assert.commandWorked(testDb.runCommand(
         {findAndModify: "myColl0", query: {a: 1}, update: {$inc: {a: 10}}, '$tenant': kTenant}));
-    assert.eq({_id: 0, a: 1, b: 1}, fad.value);
+    assert.eq({_id: 0, a: 1, b: 1}, fad.value, tojson(fad));
 
     // Create a view on the collection.
     assert.commandWorked(testDb.runCommand(
@@ -62,22 +59,15 @@ const featureFlagRequireTenantId = FeatureFlagUtil.isEnabled(adminDb, "RequireTe
     // Assert we can still run findAndModify on the doc.
     fad = assert.commandWorked(testDb.runCommand(
         {findAndModify: "myColl0", query: {a: 11}, update: {$inc: {a: 10}}, '$tenant': kTenant}));
-    assert.eq({_id: 0, a: 11, b: 1}, fad.value);
+    assert.eq({_id: 0, a: 11, b: 1}, fad.value, tojson(fad));
 
+    // Check that we do find the doc when the tenantId was passed as a prefix.  Without $tenant or
+    // a security token, the tenantId MUST be prefixed in a multitenant environment.
     const findAndModPrefixed =
         primary.getDB(kTenant + '_myDb0')
             .runCommand({findAndModify: "myColl0", query: {b: 1}, update: {$inc: {b: 10}}});
-    if (!featureFlagRequireTenantId) {
-        // Check that we do find the doc when the tenantId was passed as a prefix, only if the
-        // feature flag is not enabled. In this case, the server still accepts prefixed names,
-        // and will parse the tenant from the db name.
-        assert.commandWorked(findAndModPrefixed);
-        assert.eq({_id: 0, a: 21, b: 1}, findAndModPrefixed.value);
-    } else {
-        // assert.commandFailed(findAndModPrefixed);
-        // TODO SERVER-73025 Uncomment out the check above, and remove the check below.
-        assert.eq(null, findAndModPrefixed.value);
-    }
+    assert.commandWorked(findAndModPrefixed);
+    assert.eq({_id: 0, a: 21, b: 1}, findAndModPrefixed.value, tojson(findAndModPrefixed));
 }
 
 rst.stopSet();

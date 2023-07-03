@@ -27,13 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_list_local_sessions.h"
 #include "mongo/db/pipeline/document_source_list_sessions_gen.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -112,7 +130,8 @@ std::vector<mongo::SHA256Block> mongo::listSessionsUsersToDigests(
     return ret;
 }
 
-mongo::PrivilegeVector mongo::listSessionsRequiredPrivileges(const ListSessionsSpec& spec) {
+mongo::PrivilegeVector mongo::listSessionsRequiredPrivileges(
+    const ListSessionsSpec& spec, const boost::optional<TenantId>& tenantId) {
     const auto needsPrivs = ([spec]() {
         if (spec.getAllUsers()) {
             return true;
@@ -128,7 +147,7 @@ mongo::PrivilegeVector mongo::listSessionsRequiredPrivileges(const ListSessionsS
     })();
 
     if (needsPrivs) {
-        return {Privilege(ResourcePattern::forClusterResource(), ActionType::listSessions)};
+        return {Privilege(ResourcePattern::forClusterResource(tenantId), ActionType::listSessions)};
     } else {
         return PrivilegeVector();
     }

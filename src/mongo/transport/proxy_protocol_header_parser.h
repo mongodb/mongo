@@ -30,7 +30,10 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <fmt/format.h>
 
 #ifndef _WIN32
@@ -38,6 +41,7 @@
 #endif
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/sockaddr.h"
 

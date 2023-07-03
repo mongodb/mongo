@@ -29,9 +29,36 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <deque>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_query_stats_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/query_stats_transform_algorithm_gen.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/producer_consumer_queue.h"
 
 namespace mongo {
@@ -47,10 +74,15 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::string parseTimeName, bool applyHmacToIdentifiers, std::string hmacKey)
+        LiteParsed(std::string parseTimeName,
+                   const boost::optional<TenantId>& tenantId,
+                   TransformAlgorithmEnum algorithm,
+                   std::string hmacKey)
             : LiteParsedDocumentSource(std::move(parseTimeName)),
-              _applyHmacToIdentifiers(applyHmacToIdentifiers),
-              _hmacKey(hmacKey) {}
+              _algorithm(algorithm),
+              _hmacKey(hmacKey),
+              _privileges({Privilege(ResourcePattern::forClusterResource(tenantId),
+                                     ActionType::queryStatsRead)}) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
             return stdx::unordered_set<NamespaceString>();
@@ -58,8 +90,7 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
-            return {Privilege(ResourcePattern::forClusterResource(), ActionType::queryStatsRead)};
-            ;
+            return _privileges;
         }
 
         bool allowedToPassthroughFromMongos() const final {
@@ -75,9 +106,13 @@ public:
             transactionNotSupported(kStageName);
         }
 
-        bool _applyHmacToIdentifiers;
+        bool _transformIdentifiers;
+
+        TransformAlgorithmEnum _algorithm;
 
         std::string _hmacKey;
+
+        const PrivilegeVector _privileges;
     };
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
@@ -115,17 +150,15 @@ public:
 
 private:
     DocumentSourceQueryStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                             bool applyHmacToIdentifiers = false,
+                             TransformAlgorithmEnum algorithm = TransformAlgorithmEnum::kNone,
                              std::string hmacKey = {})
-        : DocumentSource(kStageName, expCtx),
-          _applyHmacToIdentifiers(applyHmacToIdentifiers),
-          _hmacKey(hmacKey) {}
+        : DocumentSource(kStageName, expCtx), _algorithm(algorithm), _hmacKey(hmacKey) {}
 
     GetNextResult doGetNext() final;
 
     /**
-     * The current partition materialized as a set of Document instances. We pop from the queue and
-     * return DocumentSource results.
+     * The current partition materialized as a set of Document instances. We pop from the queue
+     * and return DocumentSource results.
      */
     std::deque<Document> _materializedPartition;
 
@@ -136,7 +169,12 @@ private:
     QueryStatsStore::PartitionId _currentPartition = -1;
 
     // When true, apply hmac to field names from returned query shapes.
-    bool _applyHmacToIdentifiers;
+    bool _transformIdentifiers;
+
+    // The type of algorithm to use for transform identifiers as an enum, currently only
+    // kHmacSha256
+    // ("hmac-sha-256") is supported.
+    TransformAlgorithmEnum _algorithm;
 
     /**
      * Key used for SHA-256 HMAC application on field names.

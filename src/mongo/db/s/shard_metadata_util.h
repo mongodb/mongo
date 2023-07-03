@@ -29,12 +29,16 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
 #include <string>
 #include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {
@@ -42,6 +46,7 @@ namespace mongo {
 class ChunkType;
 class NamespaceString;
 class OperationContext;
+
 class ShardCollectionType;
 class ShardDatabaseType;
 

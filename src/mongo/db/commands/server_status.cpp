@@ -29,8 +29,10 @@
 
 #include "mongo/db/commands/server_status.h"
 
-#include "mongo/db/service_context.h"
-#include "mongo/util/version.h"
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -46,7 +48,7 @@ ServerStatusSectionRegistry* ServerStatusSectionRegistry::get() {
 void ServerStatusSectionRegistry::addSection(ServerStatusSection* section) {
     // Disallow adding a section named "timing" as it is reserved for the server status command.
     dassert(section->getSectionName() != kTimingSection);
-    verify(!_runCalled.load());
+    MONGO_verify(!_runCalled.load());
     _sections[section->getSectionName()] = section;
 }
 

@@ -253,7 +253,7 @@ structs:
                 type: int
                 stability: unstable
             electionId:
-                type: int
+                type: objectid
                 optional: true
                 stability: unstable
             opTime:

@@ -29,6 +29,11 @@
 
 #pragma once
 
+#include <cstddef>
+#include <variant>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/stdx/variant.h"

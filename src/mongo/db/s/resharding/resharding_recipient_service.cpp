@@ -29,46 +29,91 @@
 
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 
+#include <absl/container/node_hash_map.h>
 #include <algorithm>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <mutex>
+#include <string>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/cancelable_operation_context.h"
-#include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/commit_quorum_options.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
-#include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/repl_index_build_state.h"
 #include "mongo/db/s/migration_destination_manager.h"
+#include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
-#include "mongo/db/s/resharding/resharding_oplog_applier.h"
+#include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
+#include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/shard_key_util.h"
-#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/db/write_block_bypass.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/s/stale_shard_version_helpers.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future_util.h"
-#include "mongo/util/optional_util.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
@@ -80,6 +125,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientDuringCloning);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientDuringOplogApplication);
 MONGO_FAIL_POINT_DEFINE(reshardingOpCtxKilledWhileRestoringMetrics);
 MONGO_FAIL_POINT_DEFINE(reshardingRecipientFailsAfterTransitionToCloning);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeBuildingIndex);
 
 namespace {
 
@@ -126,11 +172,27 @@ void buildStateDocumentCloneMetricsForUpdate(BSONObjBuilder& bob, Date_t timesta
                timestamp);
 }
 
+void buildStateDocumentBuildingIndexMetricsForUpdate(BSONObjBuilder& bob, Date_t timestamp) {
+    bob.append(getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
+               timestamp);
+    bob.append(
+        getIntervalStartFieldName<DocT>(ReshardingRecipientMetrics::kIndexBuildTimeFieldName),
+        timestamp);
+}
+
 void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob,
                                              ReshardingMetrics* metrics,
                                              Date_t timestamp) {
-    bob.append(getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
-               timestamp);
+    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        bob.append(
+            getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kIndexBuildTimeFieldName),
+            timestamp);
+    } else {
+        bob.append(
+            getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
+            timestamp);
+    }
     bob.append(
         getIntervalStartFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
         timestamp);
@@ -155,6 +217,9 @@ void buildStateDocumentMetricsForUpdate(BSONObjBuilder& bob,
         case RecipientStateEnum::kCloning:
             buildStateDocumentCloneMetricsForUpdate(bob, timestamp);
             return;
+        case RecipientStateEnum::kBuildingIndex:
+            buildStateDocumentBuildingIndexMetricsForUpdate(bob, timestamp);
+            return;
         case RecipientStateEnum::kApplying:
             buildStateDocumentApplyMetricsForUpdate(bob, metrics, timestamp);
             return;
@@ -173,8 +238,17 @@ void setMeticsAfterWrite(ReshardingMetrics* metrics,
         case RecipientStateEnum::kCloning:
             metrics->setStartFor(ReshardingMetrics::TimedPhase::kCloning, timestamp);
             return;
-        case RecipientStateEnum::kApplying:
+        case RecipientStateEnum::kBuildingIndex:
             metrics->setEndFor(ReshardingMetrics::TimedPhase::kCloning, timestamp);
+            metrics->setStartFor(ReshardingMetrics::TimedPhase::kBuildingIndex, timestamp);
+            return;
+        case RecipientStateEnum::kApplying:
+            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                metrics->setEndFor(ReshardingMetrics::TimedPhase::kBuildingIndex, timestamp);
+            } else {
+                metrics->setEndFor(ReshardingMetrics::TimedPhase::kCloning, timestamp);
+            }
             metrics->setStartFor(ReshardingMetrics::TimedPhase::kApplying, timestamp);
             return;
         case RecipientStateEnum::kStrictConsistency:
@@ -230,7 +304,8 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _dataReplicationFactory{std::move(dataReplicationFactory)},
       _critSecReason(BSON("command"
                           << "resharding_recipient"
-                          << "collection" << _metadata.getSourceNss().toString())),
+                          << "collection"
+                          << NamespaceStringUtil::serialize(_metadata.getSourceNss()))),
       _isAlsoDonor([&]() {
           auto myShardId = _externalState->myShardId(_serviceContext);
           return std::find_if(_donorShards.begin(),
@@ -259,7 +334,10 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                     _createTemporaryReshardingCollectionThenTransitionToCloning(factory);
                 })
                 .then([this, executor, abortToken, &factory] {
-                    return _cloneThenTransitionToApplying(executor, abortToken, factory);
+                    return _cloneThenTransitionToBuildingIndex(executor, abortToken, factory);
+                })
+                .then([this, executor, abortToken, &factory] {
+                    return _buildIndexThenTransitionToApplying(executor, abortToken, factory);
                 })
                 .then([this, executor, abortToken, &factory] {
                     return _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
@@ -533,6 +611,9 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
 boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode,
     MongoProcessInterface::CurrentOpSessionsMode) noexcept {
+    if (_recipientCtx.getState() == RecipientStateEnum::kBuildingIndex) {
+        _fetchBuildIndexMetrics();
+    }
     return _metrics->reportForCurrentOp();
 }
 
@@ -597,24 +678,53 @@ void ReshardingRecipientService::RecipientStateMachine::
         _externalState->ensureTempReshardingCollectionExistsWithIndexes(
             opCtx.get(), _metadata, *_cloneTimestamp);
 
-        _externalState->withShardVersionRetry(
-            opCtx.get(),
-            _metadata.getTempReshardingNss(),
-            "validating shard key index for reshardCollection"_sd,
-            [&] {
-                shardkeyutil::validateShardKeyIsNotEncrypted(
-                    opCtx.get(),
-                    _metadata.getTempReshardingNss(),
-                    ShardKeyPattern(_metadata.getReshardingKey()));
-                shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
-                    opCtx.get(),
-                    _metadata.getTempReshardingNss(),
-                    ShardKeyPattern{_metadata.getReshardingKey()},
-                    CollationSpec::kSimpleSpec,
-                    false /* unique */,
-                    true /* enforceUniquenessCheck */,
-                    shardkeyutil::ValidationBehaviorsShardCollection(opCtx.get()));
-            });
+        if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            _externalState->withShardVersionRetry(
+                opCtx.get(),
+                _metadata.getSourceNss(),
+                "validating shard key index for reshardCollection"_sd,
+                [&] {
+                    shardkeyutil::validateShardKeyIsNotEncrypted(
+                        opCtx.get(),
+                        _metadata.getSourceNss(),
+                        ShardKeyPattern(_metadata.getReshardingKey()));
+                    // This behavior in this phase is only used to validate whether this resharding
+                    // should be permitted, we need to call
+                    // validateShardKeyIndexExistsOrCreateIfPossible again in the buildIndex phase
+                    // to make sure we have the indexSpecs even after restart.
+                    shardkeyutil::ValidationBehaviorsReshardingBulkIndex behaviors;
+                    behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
+                    shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+                        opCtx.get(),
+                        _metadata.getSourceNss(),
+                        ShardKeyPattern{_metadata.getReshardingKey()},
+                        CollationSpec::kSimpleSpec,
+                        false /* unique */,
+                        true /* enforceUniquenessCheck */,
+                        behaviors);
+                });
+        } else {
+            _externalState->withShardVersionRetry(
+                opCtx.get(),
+                _metadata.getTempReshardingNss(),
+                "validating shard key index for reshardCollection"_sd,
+                [&] {
+                    shardkeyutil::validateShardKeyIsNotEncrypted(
+                        opCtx.get(),
+                        _metadata.getTempReshardingNss(),
+                        ShardKeyPattern(_metadata.getReshardingKey()));
+
+                    shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+                        opCtx.get(),
+                        _metadata.getTempReshardingNss(),
+                        ShardKeyPattern{_metadata.getReshardingKey()},
+                        CollationSpec::kSimpleSpec,
+                        false /* unique */,
+                        true /* enforceUniquenessCheck */,
+                        shardkeyutil::ValidationBehaviorsShardCollection(opCtx.get()));
+                });
+        }
 
         // We add a fake 'shardCollection' notification here so that the C2C replicator can sync the
         // resharding operation to the target cluster. The only information we have is the shard
@@ -700,7 +810,7 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
 }
 
 ExecutorFuture<void>
-ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplying(
+ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToBuildingIndex(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& abortToken,
     const CancelableOperationContextFactory& factory) {
@@ -730,7 +840,92 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
 
     return future_util::withCancellation(_dataReplication->awaitCloningDone(), abortToken)
         .thenRunOn(**executor)
-        .then([this, &factory] { _transitionToApplying(factory); });
+        .then([this, &factory] {
+            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                _transitionToBuildingIndex(factory);
+            } else {
+                _transitionToApplying(factory);
+            }
+        });
+}
+
+ExecutorFuture<void>
+ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToApplying(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& abortToken,
+    const CancelableOperationContextFactory& factory) {
+    if (_recipientCtx.getState() > RecipientStateEnum::kBuildingIndex) {
+        return ExecutorFuture(**executor);
+    }
+
+    {
+        auto opCtx = factory.makeOperationContext(&cc());
+        reshardingPauseRecipientBeforeBuildingIndex.pauseWhileSet(opCtx.get());
+    }
+
+    return future_util::withCancellation(
+               [this, &factory] {
+                   auto opCtx = factory.makeOperationContext(&cc());
+                   // We call validateShardKeyIndexExistsOrCreateIfPossible again here in case if we
+                   // restarted after creatingCollection phase, whatever indexSpec we get in that
+                   // phase will go away.
+                   shardkeyutil::ValidationBehaviorsReshardingBulkIndex behaviors;
+                   behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
+                   shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+                       opCtx.get(),
+                       _metadata.getSourceNss(),
+                       ShardKeyPattern{_metadata.getReshardingKey()},
+                       CollationSpec::kSimpleSpec,
+                       false /* unique */,
+                       true /* enforceUniquenessCheck */,
+                       behaviors);
+
+                   // Get all indexSpecs need to build.
+                   auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx.get());
+                   auto [indexSpecs, _] = _externalState->getCollectionIndexes(
+                       opCtx.get(),
+                       _metadata.getSourceNss(),
+                       _metadata.getSourceUUID(),
+                       *_cloneTimestamp,
+                       "loading indexes to create indexes on temporary resharding collection"_sd);
+                   auto shardKeyIndexSpec = behaviors.getShardKeyIndexSpec();
+                   if (shardKeyIndexSpec) {
+                       indexSpecs.push_back(*shardKeyIndexSpec);
+                   }
+                   // Build all the indexes.
+                   auto buildUUID = UUID::gen();
+                   IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions{
+                       CommitQuorumOptions(CommitQuorumOptions::kVotingMembers)};
+                   auto indexBuildFuture = indexBuildsCoordinator->startIndexBuild(
+                       opCtx.get(),
+                       _metadata.getTempReshardingNss().dbName(),
+                       // When we create the collection we use the metadata resharding UUID as the
+                       // collection UUID.
+                       _metadata.getReshardingUUID(),
+                       indexSpecs,
+                       buildUUID,
+                       IndexBuildProtocol::kTwoPhase,
+                       indexBuildOptions);
+                   if (indexBuildFuture.isOK()) {
+                       return indexBuildFuture.getValue();
+                   } else if (indexBuildFuture == ErrorCodes::IndexBuildAlreadyInProgress ||
+                              indexBuildFuture == ErrorCodes::IndexAlreadyExists) {
+                       // In case of failover, the index build could have been started by oplog
+                       // applier, so we just wait those finish.
+                       indexBuildsCoordinator->awaitNoIndexBuildInProgressForCollection(
+                           opCtx.get(), _metadata.getReshardingUUID());
+                       return SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>(
+                           ReplIndexBuildState::IndexCatalogStats());
+                   } else {
+                       return uassertStatusOK(indexBuildFuture);
+                   }
+               }(),
+               abortToken)
+        .thenRunOn(**executor)
+        .then([this, &factory](const ReplIndexBuildState::IndexCatalogStats& stats) {
+            _transitionToApplying(factory);
+        });
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
@@ -913,6 +1108,13 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToCloning(
     const CancelableOperationContextFactory& factory) {
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kCloning);
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_transitionToBuildingIndex(
+    const CancelableOperationContextFactory& factory) {
+    auto newRecipientCtx = _recipientCtx;
+    newRecipientCtx.setState(RecipientStateEnum::kBuildingIndex);
     _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
 }
 
@@ -1189,8 +1391,8 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
         if (_recipientCtx.getState() != RecipientStateEnum::kCloning) {
             // Before cloning, these values are 0. After cloning these values are written to the
             // metrics section of the recipient state document and restored during metrics
-            // initialization. This is so that applied oplog entries that add or remove documents do
-            // not affect the cloning metrics.
+            // initialization. This is so that applied oplog entries that add or remove
+            // documents do not affect the cloning metrics.
             return;
         }
         externalMetrics.documentBytesCopied = tempReshardingColl->dataSize(opCtx.get());
@@ -1282,6 +1484,20 @@ CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortS
     }
 
     return _abortSource->token();
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_fetchBuildIndexMetrics() {
+    auto opCtx = cc().getOperationContext();
+    if (!opCtx) {
+        opCtx = cc().makeOperationContext().get();
+    }
+    AutoGetCollection tempReshardingColl(opCtx, _metadata.getTempReshardingNss(), MODE_IS);
+    auto indexCatalog = tempReshardingColl->getIndexCatalog();
+    invariant(indexCatalog,
+              str::stream() << "Collection is missing index catalog: "
+                            << _metadata.getTempReshardingNss().toStringForErrorMsg());
+    _metrics->setIndexesToBuild(indexCatalog->numIndexesTotal());
+    _metrics->setIndexesBuilt(indexCatalog->numIndexesReady());
 }
 
 void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancelled) {

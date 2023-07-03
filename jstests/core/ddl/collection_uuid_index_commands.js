@@ -31,7 +31,7 @@ const validateErrorResponse = function(
 };
 
 const testCommand = function(cmd, cmdObj) {
-    const testDB = db.getSiblingDB(jsTestName());
+    const testDB = db.getSiblingDB("coll_uuid_index_cmds");
     assert.commandWorked(testDB.dropDatabase());
     const coll = testDB['coll'];
     assert.commandWorked(coll.insert({x: 1, y: 2}));

@@ -8,24 +8,44 @@ trap 'rm -rf $t' 0 1 2 3 13 15
 download_clang_format() {
     version=$1
     # FIXME-WT-10619
-    arch=$(uname -m)
-    if [ ! "$arch" = "x86_64" ]; then
-        echo "$0: unsupported architecture $arch to run clang_format"
-        return 1
-    fi
-
+    # The URLs for binaries below don't follow a common pattern (see the build/build prefixes, -1.gz suffixes)
+    # We should consider setting up a common URL format when we migrate to 12.0.1 so the script can be generalised.
+    arch_and_os="$(uname -m)-$(uname)"
     archive=dist/clang-format.tar.gz
-    sys_os=$(uname)
-    if [ "$sys_os" = "Linux" ]; then
-        curl https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-llvm-"$version"-x86_64-linux-gnu-ubuntu-20.04.tar-1.gz -o $archive
-        tar --strip=1 -C dist/ -xf $archive clang-format-llvm-"$version"-x86_64-linux-gnu-ubuntu-20.04/clang-format && rm $archive
-    elif [ "$sys_os" = "Darwin" ]; then
+
+    # Adding more clang-format binaries requires uploading them to boxes.10gen
+    # You can either get the clang-format binary from the llvm releases page
+    # (https://github.com/llvm/llvm-project/releases) or compile clang-format yourself.
+    # Place the binary in dist/ and confirm that s_clang_format runs correctly, then
+    # tar a folder containing just the clang-format binary with the format:
+    # clang-format-llvm-${version}-${arch_and_os}/
+    #     clang-format
+    # into a tarball named clang-format-llvm-${version}-${arch_and_os}.tar.gz
+    # The tarball should extract using the tar command below.
+    # This tarball can then be uploaded via a Jira request to the BUILD team.
+    case $arch_and_os in
+    "aarch64-Linux")
+        curl https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-llvm-"$version"-aarch64-linux-gnu.tar.gz -o $archive
+        tar --strip=1 -C dist/ -xf $archive clang-format-llvm-"$version"-aarch64-linux-gnu/clang-format && rm $archive
+        ;;
+    "x86_64-Darwin")
         curl https://s3.amazonaws.com/boxes.10gen.com/build/build/clang-format-llvm-"$version"-x86_64-apple-darwin.tar.gz -o $archive
         tar --strip=1 -C dist/ -xf $archive clang-format-llvm-"$version"-x86_64-apple-darwin/clang-format && rm $archive
-    else
-        echo "$0: unsupported environment $sys_os"
+        ;;
+    "arm64-Darwin")
+        # This is the same as x86_64_Darwin because those binaries run on arm with no issues.
+        curl https://s3.amazonaws.com/boxes.10gen.com/build/build/clang-format-llvm-"$version"-x86_64-apple-darwin.tar.gz -o $archive
+        tar --strip=1 -C dist/ -xf $archive clang-format-llvm-"$version"-x86_64-apple-darwin/clang-format && rm $archive
+        ;;
+    "x86_64-Linux")
+        curl https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-llvm-"$version"-x86_64-linux-gnu-ubuntu-20.04.tar-1.gz -o $archive
+        tar --strip=1 -C dist/ -xf $archive clang-format-llvm-"$version"-x86_64-linux-gnu-ubuntu-20.04/clang-format && rm $archive
+        ;;
+    *)
+        echo "$0: unsupported architecture and OS combination '$arch_and_os' to run clang_format"
         return 1
-    fi
+        ;;
+    esac
 }
 
 # Find the top-level WiredTiger directory.

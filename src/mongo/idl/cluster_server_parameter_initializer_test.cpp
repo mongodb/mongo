@@ -27,18 +27,29 @@
  *    it in the license file.
  */
 
+#include <ctime>
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/change_stream_options_manager.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands/create_gen.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/server_parameter_with_storage.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 #include "mongo/idl/cluster_server_parameter_initializer.h"
+#include "mongo/idl/cluster_server_parameter_test_gen.h"
 #include "mongo/idl/cluster_server_parameter_test_util.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

@@ -28,8 +28,29 @@
  */
 
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <map>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -152,6 +173,7 @@ protected:
         addExpectedField(RecipientStateEnum::kAwaitingFetchTimestamp);
         addExpectedField(RecipientStateEnum::kCreatingCollection);
         addExpectedField(RecipientStateEnum::kCloning);
+        addExpectedField(RecipientStateEnum::kBuildingIndex);
         addExpectedField(RecipientStateEnum::kApplying);
         addExpectedField(RecipientStateEnum::kError);
         addExpectedField(RecipientStateEnum::kStrictConsistency);

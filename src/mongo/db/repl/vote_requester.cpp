@@ -28,17 +28,28 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/repl/vote_requester.h"
-
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
 #include <memory>
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
+#include "mongo/db/repl/vote_requester.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationElection
 

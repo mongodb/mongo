@@ -116,9 +116,12 @@ else
         cat $t
     fi
 
-    if grep 'sizeof(WT_UPDATE)' $f > $t; then
+    # A static assert in verify_build.h requires using sizeof explicitly.
+    if ! expr "$f" : 'src/include/verify_build.h' > /dev/null &&
+        grep 'sizeof(WT_UPDATE)' $f > $t; then
         echo "$f: Use WT_UPDATE_SIZE rather than sizeof(WT_UPDATE)"
         cat $t
+
     fi
 
     if ! expr "$f" : 'examples/c/.*' > /dev/null &&

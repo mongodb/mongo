@@ -28,14 +28,51 @@
  */
 
 
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -179,11 +216,11 @@ StageConstraints DocumentSourceFindAndModifyImageLookup::constraints(
 }
 
 Value DocumentSourceFindAndModifyImageLookup::serialize(SerializationOptions opts) const {
-    return Value(Document{
-        {kStageName,
-         Value(Document{
-             {kIncludeCommitTransactionTimestampFieldName,
-              _includeCommitTransactionTimestamp ? opts.serializeLiteralValue(true) : Value()}})}});
+    return Value(
+        Document{{kStageName,
+                  Value(Document{{kIncludeCommitTransactionTimestampFieldName,
+                                  _includeCommitTransactionTimestamp ? opts.serializeLiteral(true)
+                                                                     : Value()}})}});
 }
 
 DepsTracker::State DocumentSourceFindAndModifyImageLookup::getDependencies(

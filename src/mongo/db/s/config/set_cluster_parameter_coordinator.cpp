@@ -28,23 +28,55 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <tuple>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/s/config/set_cluster_parameter_coordinator.h"
-
-#include "mongo/db/cancelable_operation_context.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
-#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/config/set_cluster_parameter_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/future_impl.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -205,7 +237,7 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
                 ShardingLogging::get(opCtx)->logChange(
                     opCtx,
                     "setClusterParameter.start",
-                    NamespaceString::kClusterParametersNamespace.toString(),
+                    toStringForLogging(NamespaceString::kClusterParametersNamespace),
                     _doc.getParameter(),
                     kMajorityWriteConcern,
                     catalogManager->localConfigShard(),
@@ -236,7 +268,7 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
                 ShardingLogging::get(opCtx)->logChange(
                     opCtx,
                     "setClusterParameter.end",
-                    NamespaceString::kClusterParametersNamespace.toString(),
+                    toStringForLogging(NamespaceString::kClusterParametersNamespace),
                     _doc.getParameter(),
                     kMajorityWriteConcern,
                     catalogManager->localConfigShard(),

@@ -27,24 +27,48 @@
  *    it in the license file.
  */
 
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+#include <ostream>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/abt/named_slots_mock.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/golden_test.h"
-#include "mongo/unittest/unittest.h"
-#include <vector>
+#include "mongo/unittest/golden_test_base.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::optimizer {
 namespace {

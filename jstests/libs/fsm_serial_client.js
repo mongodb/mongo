@@ -15,13 +15,13 @@ var denylist = workloadDenylist.map(function(file) {
     return workloadDir + '/' + file;
 });
 
-runWorkloadsSerially(workloadList.filter(function(file) {
+await runWorkloadsSerially(workloadList.filter(function(file) {
     return !Array.contains(denylist, file);
 }),
-                     {},
-                     {dbNamePrefix: dbNamePrefix},
-                     {
-                         keepExistingDatabases: true,
-                         dropDatabaseDenylist: fsmDbDenylist,
-                         validateCollections: validateCollectionsOnCleanup
-                     });
+                           {},
+                           {dbNamePrefix: dbNamePrefix},
+                           {
+                               keepExistingDatabases: true,
+                               dropDatabaseDenylist: fsmDbDenylist,
+                               validateCollections: validateCollectionsOnCleanup
+                           });

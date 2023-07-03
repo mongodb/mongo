@@ -29,14 +29,27 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include <algorithm>
+#include <cstddef>
+#include <deque>
+#include <functional>
+#include <memory>
 #include <queue>
+#include <string>
 
+#include "mongo/base/status.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_ranking_decision.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/container_size_helper.h"
 
 namespace mongo::plan_ranker {

@@ -29,9 +29,12 @@
 
 #pragma once
 
-#include "mongo/db/storage/temporary_record_store.h"
+#include <memory>
+#include <utility>
 
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/temporary_record_store.h"
 
 namespace mongo {
 

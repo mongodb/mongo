@@ -30,10 +30,13 @@
 #pragma once
 
 #include <boost/filesystem/path.hpp>
+#include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"

@@ -27,13 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <limits>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/query/count_request.h"
-
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/query/query_request_helper.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace count_request {

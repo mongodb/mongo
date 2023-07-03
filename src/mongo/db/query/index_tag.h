@@ -29,10 +29,15 @@
 
 #pragma once
 
+#include <cstddef>
 #include <deque>
+#include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/matcher/expression.h"
 
 namespace mongo {

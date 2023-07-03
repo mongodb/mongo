@@ -29,7 +29,10 @@
 
 
 #include "mongo/executor/async_rpc_error_info.h"
-#include "mongo/base/init.h"
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
@@ -62,6 +65,21 @@ Status unpackRPCStatus(Status status) {
     }
     if (out.isOK()) {
         out = remoteError.getRemoteCommandFirstWriteError();
+    }
+    return out;
+}
+
+Status unpackRPCStatusIgnoringWriteErrors(Status status) {
+    invariant(status == ErrorCodes::RemoteCommandExecutionError);
+    auto errorInfo = status.extraInfo<AsyncRPCErrorInfo>();
+    if (errorInfo->isLocal()) {
+        return errorInfo->asLocal();
+    }
+    invariant(errorInfo->isRemote());
+    auto remoteError = errorInfo->asRemote();
+    Status out = remoteError.getRemoteCommandResult();
+    if (out.isOK()) {
+        out = remoteError.getRemoteCommandWriteConcernError();
     }
     return out;
 }

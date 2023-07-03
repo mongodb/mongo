@@ -30,6 +30,7 @@
 #pragma once
 
 #include <memory>
+#include <utility>
 
 #include "mongo/db/client.h"
 #include "mongo/transport/session.h"

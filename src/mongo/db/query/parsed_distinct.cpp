@@ -27,20 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/parsed_distinct.h"
-
+#include <boost/cstdint.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/util/bson_extract.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/distinct_command_gen.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/max_time_ms_parser.h"
+#include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -49,6 +69,7 @@ const char ParsedDistinct::kKeyField[] = "key";
 const char ParsedDistinct::kQueryField[] = "query";
 const char ParsedDistinct::kCollationField[] = "collation";
 const char ParsedDistinct::kUnwoundArrayFieldForViewUnwind[] = "_internalUnwoundArray";
+const char ParsedDistinct::kHintField[] = "hint";
 
 namespace {
 
@@ -175,8 +196,10 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
 
     invariant(_query);
     const FindCommandRequest& findCommand = _query->getFindCommandRequest();
-    aggregationBuilder.append(
-        "aggregate", findCommand.getNamespaceOrUUID().nss().value_or(NamespaceString()).coll());
+    tassert(ErrorCodes::BadValue,
+            "Unsupported type UUID for namespace",
+            findCommand.getNamespaceOrUUID().isNamespaceString());
+    aggregationBuilder.append("aggregate", findCommand.getNamespaceOrUUID().nss().coll());
 
     // Build a pipeline that accomplishes the distinct request. The building code constructs a
     // pipeline that looks like this, assuming the distinct is on the key "a.b.c"
@@ -218,6 +241,7 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     pipelineBuilder.doneFast();
 
     aggregationBuilder.append(kCollationField, findCommand.getCollation());
+    aggregationBuilder.append(kHintField, findCommand.getHint());
 
     int maxTimeMS = findCommand.getMaxTimeMS() ? static_cast<int>(*findCommand.getMaxTimeMS()) : 0;
     if (maxTimeMS > 0) {
@@ -272,6 +296,8 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
     if (auto collation = parsedDistinct.getCollation()) {
         findCommand->setCollation(collation.value().getOwned());
     }
+
+    findCommand->setHint(parsedDistinct.getHint());
 
     // The IDL parser above does not handle generic command arguments. Since the underlying query
     // request requires the following options, manually parse and verify them here.

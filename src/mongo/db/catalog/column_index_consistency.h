@@ -31,14 +31,31 @@
 
 #include <absl/hash/hash.h>
 #include <algorithm>
+#include <boost/container_hash/extensions.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <type_traits>
 #include <vector>
 
+#include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/throttle_cursor.h"
+#include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/catalog/validate_state.h"
 #include "mongo/db/index/columns_access_method.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/column_store.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {

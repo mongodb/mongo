@@ -27,28 +27,49 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/catalog_raii.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_mock.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
-#include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_op_observer.h"
-#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
+#include "mongo/db/s/sharding_mongod_test_fixture.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog_cache_loader.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace {
@@ -149,7 +170,7 @@ public:
         _serviceContext->setOpObserver([&] {
             auto opObserver = std::make_unique<OpObserverRegistry>();
             opObserver->addObserver(
-                std::make_unique<OpObserverShardingImpl>(std::make_unique<OplogWriterMock>()));
+                std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterMock>()));
             opObserver->addObserver(std::make_unique<MigrationChunkClonerSourceOpObserver>());
             opObserver->addObserver(std::make_unique<ShardServerOpObserver>());
             return opObserver;

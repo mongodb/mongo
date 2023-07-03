@@ -29,17 +29,32 @@
 
 #include "mongo/db/dbdirectclient.h"
 
-#include <boost/core/swap.hpp>
+#include <boost/move/utility_core.hpp>
+#include <utility>
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
 #include "mongo/transport/service_entry_point.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -147,7 +162,8 @@ std::unique_ptr<DBClientCursor> DBDirectClient::find(FindCommandRequest findRequ
                                                      const ReadPreferenceSetting& readPref,
                                                      ExhaustMode exhaustMode) {
     invariant(!findRequest.getReadConcern(),
-              "passing readConcern to DBDirectClient::find() is not supported");
+              "passing readConcern to DBDirectClient::find() is not supported as it has to use the "
+              "parent operation's readConcern");
     return DBClientBase::find(std::move(findRequest), readPref, exhaustMode);
 }
 
@@ -197,7 +213,9 @@ long long DBDirectClient::count(const NamespaceStringOrUUID nsOrUuid,
                                 int limit,
                                 int skip,
                                 boost::optional<BSONObj> readConcernObj) {
-    invariant(!readConcernObj, "passing readConcern to DBDirectClient functions is not supported");
+    invariant(!readConcernObj,
+              "passing readConcern to DBDirectClient functions is not supported as it has to use "
+              "the parent operation's readConcern");
     BSONObj cmdObj = _countCmd(nsOrUuid, query, options, limit, skip, boost::none);
     auto request = OpMsgRequestBuilder::create(nsOrUuid.dbName(), cmdObj);
 

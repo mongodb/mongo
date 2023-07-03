@@ -27,18 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <algorithm>
 #include <cmath>
-#include <cstdint>
+#include <fmt/format.h>
+#include <iterator>
 #include <limits>
-#include <type_traits>
+#include <memory>
+#include <string>
 #include <typeinfo>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/str.h"  // for str::stream()!
 
 #define ASSERT_PARSES_WITH_PARSER(type, input_string, parser, expected_value) \

@@ -28,18 +28,40 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/matcher/schema/json_schema_parser.h"
-
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <array>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <functional>
 #include <memory>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement_comparator_interface.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/unordered_fields_bsonelement_comparator.h"
-#include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/matcher/doc_validation_util.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_type.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
@@ -58,9 +80,16 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
-#include "mongo/db/matcher/schema/json_pointer.h"
+#include "mongo/db/matcher/schema/json_schema_parser.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/pcre.h"
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

@@ -27,15 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/requires_index_stage.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
 RequiresIndexStage::RequiresIndexStage(const char* stageType,
                                        ExpressionContext* expCtx,
-                                       const CollectionPtr& collection,
+                                       VariantCollectionPtrOrAcquisition collection,
                                        const IndexDescriptor* indexDescriptor,
                                        WorkingSet* workingSet)
     : RequiresCollectionStage(stageType, expCtx, collection),
@@ -52,7 +55,7 @@ void RequiresIndexStage::doSaveStateRequiresCollection() {
 }
 
 void RequiresIndexStage::doRestoreStateRequiresCollection() {
-    auto desc = collection()->getIndexCatalog()->findIndexByIdent(expCtx()->opCtx, _indexIdent);
+    auto desc = collectionPtr()->getIndexCatalog()->findIndexByIdent(expCtx()->opCtx, _indexIdent);
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
             desc && !desc->getEntry()->isDropped());

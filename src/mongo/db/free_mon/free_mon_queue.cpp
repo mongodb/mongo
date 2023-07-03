@@ -27,12 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <mutex>
+#include <queue>
 
+#include "mongo/base/status.h"
 #include "mongo/db/free_mon/free_mon_queue.h"
-
-#include <chrono>
-
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/duration.h"
 

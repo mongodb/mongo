@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * findAndModify_update_queue_unindexed.js
  *
@@ -13,10 +11,12 @@
  *
  * This workload was designed to reproduce SERVER-21434.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');                  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/findAndModify_update_queue.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/findAndModify_update_queue.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Use the workload name as the database name, since the workload
     // name is assumed to be unique.
     $config.data.uniqueDBName = 'findAndModify_update_queue_unindexed';

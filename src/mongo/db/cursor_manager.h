@@ -29,21 +29,39 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <mutex>
 #include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/generic_cursor.h"
+#include "mongo/db/generic_cursor_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/platform/random.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

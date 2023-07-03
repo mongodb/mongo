@@ -39,7 +39,6 @@ const StringDataSet kConfigCollections{
     "chunks",
     "migrations",
     "mongos",
-    "movePrimaryRecipients",
     "system.preimages",
     "tags",
     "version",

@@ -183,7 +183,7 @@ main(int argc, char *argv[])
 
     /* Initialize the database with just a few records. */
     testutil_work_dir_from_path(home, sizeof(home), "WT_TEST.compact-quick-interrupt");
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
 
     testutil_check(wiredtiger_open(home, &event_handler, conn_config, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
@@ -235,7 +235,7 @@ main(int argc, char *argv[])
     testutil_check(conn->close(conn, NULL));
 
     if (!opts->preserve)
-        testutil_clean_work_dir(home);
+        testutil_remove(home);
     testutil_cleanup(opts);
     return (EXIT_SUCCESS);
 }

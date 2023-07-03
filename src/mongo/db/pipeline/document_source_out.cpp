@@ -28,21 +28,38 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/document_source_out.h"
-
 #include <fmt/format.h>
+#include <iterator>
+#include <mutex>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/client.h"
 #include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/pipeline/document_path_support.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_out.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -327,7 +344,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
 Value DocumentSourceOut::serialize(SerializationOptions opts) const {
     BSONObjBuilder bob;
     DocumentSourceOutSpec spec;
-    // TODO SERVER-74284: use SerializatonContext from expCtx and DatabaseNameUtil to serialize
+    // TODO SERVER-77000: use SerializatonContext from expCtx and DatabaseNameUtil to serialize
+    // spec.setDb(DatabaseNameUtil::serialize(
+    //     _outputNs.dbName(),
+    //     SerializationContext::stateCommandReply(pExpCtx->serializationCtxt)));
     spec.setDb(_outputNs.dbName().db());
     spec.setColl(_outputNs.coll());
     spec.setTimeseries(_timeseries);

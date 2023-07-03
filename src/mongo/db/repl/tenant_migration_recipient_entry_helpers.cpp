@@ -28,23 +28,43 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
-#include "mongo/db/catalog/database.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/ops/update.h"
-#include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/update_result.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
+#include "mongo/db/repl/tenant_migration_util.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction_resources.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
@@ -155,6 +175,11 @@ StatusWith<TenantMigrationRecipientDocument> getStateDoc(OperationContext* opCtx
                                                          const UUID& migrationUUID) {
     // Read the most up to date data.
     ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
+    // ReadConcern must also be fixed for the new scope. It will get restored when exiting this.
+    auto originalReadConcern =
+        std::exchange(repl::ReadConcernArgs::get(opCtx), repl::ReadConcernArgs());
+    ON_BLOCK_EXIT([&] { repl::ReadConcernArgs::get(opCtx) = std::move(originalReadConcern); });
+
     AutoGetCollectionForRead collection(opCtx,
                                         NamespaceString::kTenantMigrationRecipientsNamespace);
 

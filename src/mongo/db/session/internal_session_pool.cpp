@@ -28,13 +28,26 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <iterator>
+#include <memory>
+#include <mutex>
 
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/internal_session_pool.h"
-#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -97,7 +110,7 @@ boost::optional<InternalSessionPool::Session> InternalSessionPool::_acquireSessi
 }
 
 InternalSessionPool::Session InternalSessionPool::acquireSystemSession() {
-    const InternalSessionPool::Session session = [&] {
+    InternalSessionPool::Session session = [&] {
         stdx::lock_guard<Latch> lock(_mutex);
 
         const auto& systemSession = makeSystemLogicalSessionId();
@@ -116,7 +129,7 @@ InternalSessionPool::Session InternalSessionPool::acquireSystemSession() {
 
 InternalSessionPool::Session InternalSessionPool::acquireStandaloneSession(
     OperationContext* opCtx) {
-    const InternalSessionPool::Session session = [&] {
+    InternalSessionPool::Session session = [&] {
         stdx::lock_guard<Latch> lock(_mutex);
 
         const auto& userDigest = getLogicalSessionUserDigestForLoggedInUser(opCtx);
@@ -136,7 +149,7 @@ InternalSessionPool::Session InternalSessionPool::acquireStandaloneSession(
 
 InternalSessionPool::Session InternalSessionPool::acquireChildSession(
     OperationContext* opCtx, const LogicalSessionId& parentLsid) {
-    const InternalSessionPool::Session session = [&] {
+    InternalSessionPool::Session session = [&] {
         stdx::lock_guard<Latch> lock(_mutex);
 
         auto it = _childSessions.find(parentLsid);

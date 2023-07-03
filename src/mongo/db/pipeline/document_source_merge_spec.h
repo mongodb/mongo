@@ -29,13 +29,20 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <string>
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_merge_modes_gen.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo {
 class BSONObjBuilder;

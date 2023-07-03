@@ -29,9 +29,17 @@
 
 #include "mongo/s/stale_exception.h"
 
-#include "mongo/base/init.h"
+#include <boost/preprocessor/control/iif.hpp>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonelement.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -43,7 +51,7 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
 }  // namespace
 
 void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append("ns", _nss.ns());
+    bob->append("ns", NamespaceStringUtil::serialize(_nss));
     _received.serialize("vReceived", bob);
     if (_wanted)
         _wanted->serialize("vWanted", bob);
@@ -68,7 +76,7 @@ std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj)
 }
 
 void StaleEpochInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append("ns", _nss.ns());
+    bob->append("ns", NamespaceStringUtil::serialize(_nss));
     _received.serialize("vReceived", bob);
     _wanted.serialize("vWanted", bob);
 }

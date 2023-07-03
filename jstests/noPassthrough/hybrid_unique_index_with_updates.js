@@ -51,7 +51,7 @@ let setUp = function(coll) {
 let buildIndexInBackground = function(coll, expectDuplicateKeyError) {
     const createIndexFunction = function(collFullName) {
         const coll = db.getMongo().getCollection(collFullName);
-        return coll.createIndex({i: 1}, {background: true, unique: true});
+        return coll.createIndex({i: 1}, {unique: true});
     };
     const assertFunction = expectDuplicateKeyError ? function(collFullName) {
         assert.commandFailedWithCode(createIndexFunction(collFullName), ErrorCodes.DuplicateKey);

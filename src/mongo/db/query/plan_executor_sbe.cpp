@@ -27,19 +27,51 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <tuple>
 
-#include "mongo/db/query/plan_executor_sbe.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/plan_executor_sbe.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_insert_listener.h"
+#include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/resharding/resume_token_gen.h"
-#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/shared_buffer.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -71,22 +103,24 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     invariant(!_nss.isEmpty());
     invariant(_root);
 
-    if (auto slot = _rootData.outputs.getIfExists(stage_builder::PlanStageSlots::kResult); slot) {
-        _result = _root->getAccessor(_rootData.ctx, *slot);
+    auto& outputs = _rootData.staticData->outputs;
+
+    if (auto slot = outputs.getIfExists(stage_builder::PlanStageSlots::kResult)) {
+        _result = _root->getAccessor(_rootData.env.ctx, *slot);
         uassert(4822865, "Query does not have result slot.", _result);
     }
 
-    if (auto slot = _rootData.outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId); slot) {
-        _resultRecordId = _root->getAccessor(_rootData.ctx, *slot);
+    if (auto slot = outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId)) {
+        _resultRecordId = _root->getAccessor(_rootData.env.ctx, *slot);
         uassert(4822866, "Query does not have recordId slot.", _resultRecordId);
     }
 
-    sbe::RuntimeEnvironment* env = _rootData.env;
-    if (_rootData.shouldTrackLatestOplogTimestamp) {
+    auto& env = _rootData.env;
+    if (_rootData.staticData->shouldTrackLatestOplogTimestamp) {
         _oplogTs = env->getAccessor(env->getSlot("oplogTs"_sd));
     }
 
-    if (_rootData.shouldUseTailableScan) {
+    if (_rootData.staticData->shouldUseTailableScan) {
         _resumeRecordIdSlot = env->getSlot("resumeRecordId"_sd);
     }
     _minRecordIdSlot = env->getSlotIfExists("minRecordId"_sd);
@@ -149,12 +183,16 @@ void PlanExecutorSBE::saveState() {
         _root->saveState(relinquishCursor, discardSlotState);
     }
 
-    _yieldPolicy->setYieldable(nullptr);
+    if (!_yieldPolicy->usesCollectionAcquisitions()) {
+        _yieldPolicy->setYieldable(nullptr);
+    }
     _lastGetNext = BSONObj();
 }
 
 void PlanExecutorSBE::restoreState(const RestoreContext& context) {
-    _yieldPolicy->setYieldable(context.collection());
+    if (!_yieldPolicy->usesCollectionAcquisitions()) {
+        _yieldPolicy->setYieldable(context.collection());
+    }
 
     if (_isSaveRecoveryUnitAcrossCommandsEnabled) {
         _root->restoreState(false /* NOT relinquishing cursor */);
@@ -311,11 +349,9 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
 
             if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
                     [this](const BSONObj& data) {
-                        if (data.hasField("namespace") &&
-                            _nss != NamespaceString(data.getStringField("namespace"))) {
-                            return false;
-                        }
-                        return true;
+                        const auto fpNss =
+                            NamespaceStringUtil::parseFailPointData(data, "namespace"_sd);
+                        return fpNss.isEmpty() || _nss == fpNss;
                     }))) {
                 LOGV2(5567001,
                       "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point "
@@ -365,7 +401,7 @@ template PlanExecutor::ExecState PlanExecutorSBE::getNextImpl<Document>(Document
                                                                         RecordId* dlOut);
 
 Timestamp PlanExecutorSBE::getLatestOplogTimestamp() const {
-    if (_rootData.shouldTrackLatestOplogTimestamp) {
+    if (_rootData.staticData->shouldTrackLatestOplogTimestamp) {
         tassert(5567201,
                 "The '_oplogTs' accessor should be populated when "
                 "'shouldTrackLatestOplogTimestamp' is true",
@@ -386,7 +422,7 @@ Timestamp PlanExecutorSBE::getLatestOplogTimestamp() const {
 }
 
 BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
-    if (_rootData.shouldTrackResumeToken) {
+    if (_rootData.staticData->shouldTrackResumeToken) {
         invariant(_resultRecordId);
 
         auto [tag, val] = _resultRecordId->getViewOfValue();
@@ -399,11 +435,19 @@ BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
                     tag == sbe::value::TypeTags::RecordId);
             BSONObjBuilder builder;
             sbe::value::getRecordIdView(val)->serializeToken("$recordId", &builder);
+            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                auto initialSyncId =
+                    repl::ReplicationCoordinator::get(_opCtx)->getInitialSyncId(_opCtx);
+                if (initialSyncId) {
+                    initialSyncId.value().appendToBuilder(&builder, "$initialSyncId");
+                }
+            }
             return builder.obj();
         }
     }
 
-    if (_rootData.shouldTrackLatestOplogTimestamp) {
+    if (_rootData.staticData->shouldTrackLatestOplogTimestamp) {
         return ResumeTokenOplogTimestamp{getLatestOplogTimestamp()}.toBSON();
     }
 

@@ -27,23 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <absl/container/node_hash_set.h>
 #include <algorithm>
+#include <boost/none.hpp>
 #include <deque>
+#include <initializer_list>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -813,7 +830,7 @@ TEST_F(DocumentSourceGraphLookUpTest, RedactionStartWithSingleField) {
                 "connectFromField": "HASH<c>.HASH<d>",
                 "startWith": "$HASH<a>.HASH<b>",
                 "depthField": "HASH<y>",
-                "maxDepth": "?",
+                "maxDepth": "?number",
                 "restrictSearchWithMatch": {
                     "$and": [
                         {

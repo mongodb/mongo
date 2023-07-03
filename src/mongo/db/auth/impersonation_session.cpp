@@ -27,22 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/impersonation_session.h"
-
 #include <boost/optional.hpp>
-#include <tuple>
+#include <vector>
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/impersonation_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/client.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/destructor_guard.h"
 
 namespace mongo {
 
@@ -53,7 +54,8 @@ ImpersonationSessionGuard::ImpersonationSessionGuard(OperationContext* opCtx) : 
         uassert(ErrorCodes::Unauthorized,
                 "Unauthorized use of impersonation metadata.",
                 authSession->isAuthorizedForPrivilege(
-                    Privilege(ResourcePattern::forClusterResource(), ActionType::impersonate)));
+                    Privilege(ResourcePattern::forClusterResource(authSession->getUserTenantId()),
+                              ActionType::impersonate)));
         fassert(ErrorCodes::InternalError, !authSession->isImpersonating());
         if (impersonatedUsersAndRoles->getUser()) {
             fassert(ErrorCodes::InternalError,

@@ -29,6 +29,18 @@
 
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/s/index_version.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_index_catalog_cache.h"
+
 namespace mongo {
 namespace {
 

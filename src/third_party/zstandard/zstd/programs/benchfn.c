@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -229,9 +229,9 @@ BMK_runOutcome_t BMK_benchTimedFn(BMK_timedFnState_t* cont,
             cont->timeSpent_ns += (unsigned long long)loopDuration_ns;
 
             /* estimate nbLoops for next run to last approximately 1 second */
-            if (loopDuration_ns > (runBudget_ns / 50)) {
+            if (loopDuration_ns > ((double)runBudget_ns / 50)) {
                 double const fastestRun_ns = MIN(bestRunTime.nanoSecPerRun, newRunTime.nanoSecPerRun);
-                cont->nbLoops = (unsigned)(runBudget_ns / fastestRun_ns) + 1;
+                cont->nbLoops = (unsigned)((double)runBudget_ns / fastestRun_ns) + 1;
             } else {
                 /* previous run was too short : blindly increase workload by x multiplier */
                 const unsigned multiplier = 10;
@@ -239,7 +239,7 @@ BMK_runOutcome_t BMK_benchTimedFn(BMK_timedFnState_t* cont,
                 cont->nbLoops *= multiplier;
             }
 
-            if(loopDuration_ns < runTimeMin_ns) {
+            if(loopDuration_ns < (double)runTimeMin_ns) {
                 /* don't report results for which benchmark run time was too small : increased risks of rounding errors */
                 assert(completed == 0);
                 continue;

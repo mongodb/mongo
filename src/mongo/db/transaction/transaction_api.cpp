@@ -30,10 +30,27 @@
 
 #include "mongo/db/transaction/transaction_api.h"
 
+#include <algorithm>
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstdint>
 #include <fmt/format.h>
+#include <mutex>
+#include <tuple>
+#include <type_traits>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
@@ -41,30 +58,44 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_time_tracker.h"
-#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_command_gen.h"
+#include "mongo/db/read_write_concern_provenance_base_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/session/internal_session_pool.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/internal_transaction_metrics.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/inline_executor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/s/is_mongos.h"
-#include "mongo/stdx/future.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/notification.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 

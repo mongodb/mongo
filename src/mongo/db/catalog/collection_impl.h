@@ -29,8 +29,51 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/capped_visibility.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_options_gen.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/storage/durable_catalog_entry.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 
@@ -43,12 +86,6 @@ public:
                                                              const NamespaceString& nss,
                                                              BSONObj collationSpec);
 
-    // TODO SERVER-56999: We should just need one API to create Collections
-    explicit CollectionImpl(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            RecordId catalogId,
-                            const CollectionOptions& options,
-                            std::unique_ptr<RecordStore> recordStore);
 
     explicit CollectionImpl(OperationContext* opCtx,
                             const NamespaceString& nss,
@@ -62,13 +99,6 @@ public:
 
     class FactoryImpl : public Factory {
     public:
-        // TODO SERVER-56999: We should just need one API to create Collections
-        std::shared_ptr<Collection> make(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         RecordId catalogId,
-                                         const CollectionOptions& options,
-                                         std::unique_ptr<RecordStore> rs) const final;
-
         std::shared_ptr<Collection> make(
             OperationContext* opCtx,
             const NamespaceString& nss,
@@ -85,8 +115,6 @@ public:
                             const DurableCatalogEntry& catalogEntry,
                             boost::optional<Timestamp> readTimestamp) final;
     bool isInitialized() const final;
-    bool isCommitted() const final;
-    void setCommitted(bool val) final;
 
     const NamespaceString& ns() const final {
         return _ns;
@@ -209,8 +237,14 @@ public:
     bool isTemporary() const final;
 
     boost::optional<bool> getTimeseriesBucketsMayHaveMixedSchemaData() const final;
+
     void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
                                                     boost::optional<bool> setting) final;
+
+    bool timeseriesBucketingParametersMayHaveChanged() const final;
+
+    void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
+                                                 boost::optional<bool> value) final;
 
     bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const final;
 
@@ -413,8 +447,6 @@ private:
         const bool _isCapped;
         const bool _needCappedLock;
 
-        AtomicWord<bool> _committed{true};
-
         // Tracks in-progress capped inserts to inform visibility for forward scans so that no
         // uncommitted records are skipped.
         CappedVisibilityObserver _cappedObserver;
@@ -440,7 +472,6 @@ private:
     NamespaceString _ns;
     RecordId _catalogId;
     UUID _uuid;
-    bool _cachedCommitted = true;
     std::shared_ptr<SharedState> _shared;
 
     // Collection metadata cached from the DurableCatalog. Is kept separate from the SharedState

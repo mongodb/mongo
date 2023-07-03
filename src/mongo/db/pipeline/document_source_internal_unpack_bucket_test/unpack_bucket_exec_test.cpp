@@ -27,11 +27,29 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {
@@ -926,26 +944,17 @@ TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsComputedMetaProjFieldOverri
     ASSERT_BSONOBJ_EQ(array[0].getDocument().toBson(), bson);
 }
 
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
-}
-
 TEST_F(InternalUnpackBucketExecTest, RedactsCorrectly) {
     auto bson = fromjson(
         "{$_internalUnpackBucket: {include: ['a', 'b', 'c'], timeField: 'time', metaField: 'meta', "
         "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['a', 'b', 'c']}}");
-    auto array = std::vector<Value>{};
-    SerializationOptions opts;
-    opts.identifierHmacPolicy = applyHmacForTest;
-    opts.applyHmacToIdentifiers = true;
-    opts.replacementForLiteralArgs = "?";
-    DocumentSourceInternalUnpackBucket::createFromBsonInternal(bson.firstElement(), getExpCtx())
-        ->serializeToArray(array, opts);
-    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+    auto docSource = DocumentSourceInternalUnpackBucket::createFromBsonInternal(bson.firstElement(),
+                                                                                getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         "{$_internalUnpackBucket: {include: [\"HASH<a>\", \"HASH<b>\", \"HASH<c>\"], timeField: "
-        "\"HASH<time>\", metaField: \"HASH<meta>\", bucketMaxSpanSeconds: \"?\", "
+        "\"HASH<time>\", metaField: \"HASH<meta>\", bucketMaxSpanSeconds: \"?number\", "
         "computedMetaProjFields: [\"HASH<a>\", \"HASH<b>\", \"HASH<c>\"]}}",
-        array[0]);
+        redact(*docSource));
 }
 }  // namespace
 }  // namespace mongo

@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <functional>
+#include <absl/container/node_hash_map.h>
+#include <boost/exception/exception.hpp>
+#include <boost/move/utility_core.hpp>
 #include <memory>
 #include <numeric>
 #include <stack>
@@ -37,9 +37,16 @@
 #include <typeinfo>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source_bucket_auto.h"
@@ -53,10 +60,13 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_tee_consumer.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_metadata_tree.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace {

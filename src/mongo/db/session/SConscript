@@ -179,6 +179,9 @@ env.Library(
         'session_catalog_mongod.cpp',
         'session_txn_record.idl',
     ],
+    LIBDEPS=[
+        'session_catalog',
+    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/dbdirectclient',
@@ -196,6 +199,5 @@ env.Library(
         'kill_sessions',
         'logical_session_id',
         'logical_session_id_helpers',
-        'session_catalog',
     ],
 )

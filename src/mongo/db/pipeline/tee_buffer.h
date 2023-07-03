@@ -31,11 +31,15 @@
 
 #include <algorithm>
 #include <boost/intrusive_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <memory>
 #include <vector>
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {

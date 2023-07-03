@@ -29,8 +29,24 @@
 
 #pragma once
 
+#include <cstddef>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/transaction/transaction_operations.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -42,11 +58,12 @@ namespace mongo {
  * OpObserver methods.
  *
  * This class replaces OpObserverShardingImpl without deriving directly from OpObserverImpl
- * while implementing the standard OpObserver methods.
+ * while implementing the standard OpObserver methods. OpObserverShardingImpl was removed in
+ * SERVER-76271.
  *
  * See ShardServerOpObserver.
  */
-class MigrationChunkClonerSourceOpObserver : public OpObserverNoop {
+class MigrationChunkClonerSourceOpObserver final : public OpObserverNoop {
 public:
     /**
      * Write operations do shard version checking, but if an update operation runs as part of a
@@ -65,6 +82,47 @@ public:
      * Ensures that there is no movePrimary operation in progress for the given namespace.
      */
     static void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss);
+
+    void onInserts(OperationContext* opCtx,
+                   const CollectionPtr& coll,
+                   std::vector<InsertStatement>::const_iterator first,
+                   std::vector<InsertStatement>::const_iterator last,
+                   std::vector<bool> fromMigrate,
+                   bool defaultFromMigrate,
+                   OpStateAccumulator* opAccumulator = nullptr) final;
+
+    void onUpdate(OperationContext* opCtx,
+                  const OplogUpdateEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) final;
+
+    void aboutToDelete(OperationContext* opCtx,
+                       const CollectionPtr& coll,
+                       const BSONObj& docToDelete,
+                       OplogDeleteEntryArgs* args,
+                       OpStateAccumulator* opAccumulator = nullptr) final;
+
+    void onDelete(OperationContext* opCtx,
+                  const CollectionPtr& coll,
+                  StmtId stmtId,
+                  const OplogDeleteEntryArgs& args,
+                  OpStateAccumulator* opAccumulator) final;
+
+    void onUnpreparedTransactionCommit(OperationContext* opCtx,
+                                       const TransactionOperations& transactionOperations,
+                                       OpStateAccumulator* opAccumulator = nullptr) final;
+
+    void onTransactionPrepare(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        const TransactionOperations& transactionOperations,
+        const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+        size_t numberOfPrePostImagesToWrite,
+        Date_t wallClockTime) final;
+
+    void onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                        const LogicalSessionId& lsid,
+                                        const std::vector<repl::OplogEntry>& statements,
+                                        const repl::OpTime& prepareOpTime) final;
 };
 
 }  // namespace mongo

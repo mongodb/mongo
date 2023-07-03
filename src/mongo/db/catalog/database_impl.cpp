@@ -31,53 +31,86 @@
 
 #include <algorithm>
 #include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
-#include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/collection_options_gen.h"
 #include "mongo/db/catalog/drop_collection.h"
-#include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/catalog/virtual_collection_impl.h"
 #include "mongo/db/catalog/virtual_collection_options.h"
-#include "mongo/db/clientcursor.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/introspect.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/durable_catalog_entry.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_util.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/system_index.h"
+#include "mongo/db/views/resolved_view.h"
+#include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/random.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/synchronized_value.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -134,7 +167,8 @@ static const BSONObj kColumnStoreSpec = BSON("name"
                                              << "v" << 2);
 }  // namespace
 
-Status DatabaseImpl::validateDBName(StringData dbname) {
+Status DatabaseImpl::validateDBName(const DatabaseName& dbName) {
+    const auto dbname = DatabaseNameUtil::serializeForCatalog(dbName);
     if (dbname.size() <= 0)
         return Status(ErrorCodes::BadValue, "db name is empty");
 
@@ -158,7 +192,7 @@ DatabaseImpl::DatabaseImpl(const DatabaseName& dbName)
     : _name(dbName), _viewsName(NamespaceString::makeSystemDotViewsNamespace(_name)) {}
 
 void DatabaseImpl::init(OperationContext* const opCtx) {
-    Status status = validateDBName(_name.db());
+    Status status = validateDBName(_name);
 
     if (!status.isOK()) {
         LOGV2_WARNING(
@@ -367,7 +401,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
 
     invariant(nss.dbName() == _name);
 
-    if (const auto droppable = isDroppableCollection(opCtx, nss); !droppable.isOK()) {
+    if (auto droppable = isDroppableCollection(opCtx, nss); !droppable.isOK()) {
         return droppable;
     }
 
@@ -663,7 +697,8 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
     auto status = Status::OK();
     if (viewName.isOplog()) {
         status = {ErrorCodes::InvalidNamespace,
-                  str::stream() << "invalid namespace name for a view: " + viewName.toString()};
+                  str::stream() << "invalid namespace name for a view: " +
+                          viewName.toStringForErrorMsg()};
     } else {
         status = CollectionCatalog::get(opCtx)->createView(opCtx,
                                                            viewName,
@@ -673,8 +708,11 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
                                                            options.collation);
     }
 
-    audit::logCreateView(
-        opCtx->getClient(), viewName, viewOnNss.toString(), pipeline, status.code());
+    audit::logCreateView(opCtx->getClient(),
+                         viewName,
+                         NamespaceStringUtil::serialize(viewOnNss),
+                         pipeline,
+                         status.code());
     return status;
 }
 
@@ -710,10 +748,8 @@ Collection* DatabaseImpl::createVirtualCollection(OperationContext* opCtx,
  * it.
  */
 bool doesCollectionModificationsUpdateIndexes(const NamespaceString& nss) {
-    const auto& collName = nss.ns();
-    return collName != "config.transactions" &&
-        collName !=
-        repl::ReplicationConsistencyMarkersImpl::kDefaultOplogTruncateAfterPointNamespace;
+    return nss != NamespaceString::kSessionTransactionsTableNamespace &&
+        nss != NamespaceString::kDefaultOplogTruncateAfterPointNamespace;
 }
 
 Collection* DatabaseImpl::_createCollection(
@@ -768,8 +804,8 @@ Collection* DatabaseImpl::_createCollection(
             uasserted(51267, "hangAndFailAfterCreateCollectionReservesOpTime fail point enabled");
         },
         [&](const BSONObj& data) {
-            auto fpNss = data["nss"].str();
-            return fpNss.empty() || fpNss == nss.toString();
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "nss"_sd);
+            return fpNss.isEmpty() || fpNss == nss;
         });
 
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
@@ -792,13 +828,23 @@ Collection* DatabaseImpl::_createCollection(
     // Create Collection object
     auto ownedCollection = [&]() -> std::shared_ptr<Collection> {
         if (!vopts) {
+            if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
+                throwWriteConflictException(str::stream()
+                                            << "Namespace '" << nss.toStringForErrorMsg()
+                                            << "' is already in use.");
+            }
+
             auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
                 uassertStatusOK(storageEngine->getCatalog()->createCollection(
                     opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
             auto& catalogId = catalogIdRecordStorePair.first;
+
+            auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
+            auto metadata = catalogEntry->metadata;
+
             return Collection::Factory::get(opCtx)->make(
-                opCtx, nss, catalogId, optionsWithUUID, std::move(catalogIdRecordStorePair.second));
+                opCtx, nss, catalogId, metadata, std::move(catalogIdRecordStorePair.second));
         } else {
             // Virtual collection stays only in memory and its metadata need not persist on disk and
             // therefore we bypass DurableCatalog.
@@ -807,14 +853,14 @@ Collection* DatabaseImpl::_createCollection(
     }();
     auto collection = ownedCollection.get();
     ownedCollection->init(opCtx);
-    ownedCollection->setCommitted(false);
 
     CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
-    openCreateCollectionWindowFp.executeIf([&](const BSONObj& data) { sleepsecs(3); },
-                                           [&](const BSONObj& data) {
-                                               const auto collElem = data["collectionNS"];
-                                               return !collElem || nss.toString() == collElem.str();
-                                           });
+    openCreateCollectionWindowFp.executeIf(
+        [&](const BSONObj& data) { sleepsecs(3); },
+        [&](const BSONObj& data) {
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "collectionNS"_sd);
+            return fpNss.isEmpty() || nss == fpNss;
+        });
 
     BSONObj fullIdIndexSpec;
 
@@ -909,7 +955,7 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
                 "create collection {namespace} {collectionOptions}",
                 logAttrs(nss),
                 "collectionOptions"_attr = collectionOptions.toBSON());
-    if (!NamespaceString::validCollectionComponent(nss.ns()))
+    if (!NamespaceString::validCollectionComponent(nss))
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "invalid ns: " << nss.toStringForErrorMsg());
 
@@ -1009,7 +1055,7 @@ Status DatabaseImpl::userCreateVirtualNS(OperationContext* opCtx,
                 "create collection {namespace} {collectionOptions}",
                 logAttrs(nss),
                 "collectionOptions"_attr = opts.toBSON());
-    if (!NamespaceString::validCollectionComponent(nss.ns()))
+    if (!NamespaceString::validCollectionComponent(nss))
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "invalid ns: " << nss.toStringForErrorMsg());
 

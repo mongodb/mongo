@@ -28,22 +28,30 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/ftdc/controller.h"
-
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 #include <memory>
+#include <mutex>
+#include <tuple>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/ftdc/collector.h"
+#include "mongo/db/ftdc/controller.h"
 #include "mongo/db/ftdc/util.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/exit.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC

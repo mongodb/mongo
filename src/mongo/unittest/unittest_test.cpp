@@ -32,15 +32,36 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include <functional>
+#include <array>
+#include <boost/optional.hpp>
+#include <cstddef>
+#include <exception>
+#include <fmt/format.h>
 #include <limits>
+#include <memory>
+#include <optional>
+#include <ostream>
 #include <string>
+#include <type_traits>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/none_t.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/stringify.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -49,6 +70,7 @@
 
 namespace {
 namespace stdx = mongo::stdx;
+namespace mus = mongo::unittest::stringify;
 
 bool containsPattern(const std::string& pattern, const std::string& value) {
     return value.find(pattern) != std::string::npos;
@@ -210,11 +232,10 @@ public:
 
     template <template <typename...> class OptionalTemplate>
     void runFormatOptionalTest() {
-        using mongo::unittest::stringify::stringifyForAssert;
-        ASSERT_EQ(stringifyForAssert(mkOptional<OptionalTemplate, int>()), "--");
-        ASSERT_EQ(stringifyForAssert(mkOptional<OptionalTemplate, std::string>()), "--");
-        ASSERT_EQ(stringifyForAssert(mkOptional<OptionalTemplate, int>(123)), " 123");
-        ASSERT_EQ(stringifyForAssert(mkOptional<OptionalTemplate, std::string>("hey")), " hey");
+        ASSERT_EQ(mus::invoke(mkOptional<OptionalTemplate, int>()), "--");
+        ASSERT_EQ(mus::invoke(mkOptional<OptionalTemplate, std::string>()), "--");
+        ASSERT_EQ(mus::invoke(mkOptional<OptionalTemplate, int>(123)), " 123");
+        ASSERT_EQ(mus::invoke(mkOptional<OptionalTemplate, std::string>("hey")), " hey");
     }
 
     template <template <typename...> class OptionalTemplate, class None>
@@ -250,11 +271,25 @@ inline std::ostream& operator<<(std::ostream& os, const NamedColor& e) {
 }
 
 TEST_F(UnitTestFormatTest, FormatEnumClass) {
-    using mongo::unittest::stringify::stringifyForAssert;
-    ASSERT_STRING_CONTAINS(stringifyForAssert(Color::r), "Color=0");
-    ASSERT_EQ(stringifyForAssert(NamedColor::r), "r");
+    ASSERT_STRING_CONTAINS(mus::invoke(Color::r), "Color=0");
+    ASSERT_EQ(mus::invoke(NamedColor::r), "r");
     ASSERT_EQ(Color::r, Color::r);
     ASSERT_EQ(NamedColor::r, NamedColor::r);
+}
+
+namespace test_extension {
+struct X {
+    friend std::string stringifyForAssert(const X& x) {
+        return "X{" + std::to_string(x.x) + "}";
+    }
+
+    int x;
+};
+}  // namespace test_extension
+
+TEST_F(UnitTestFormatTest, FormatCustomized) {
+    test_extension::X x{123};
+    ASSERT_EQ(mus::invoke(x), "X{123}");
 }
 
 DEATH_TEST_REGEX(DeathTestSelfTest, TestDeath, "Invariant failure.*false") {

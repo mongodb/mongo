@@ -30,25 +30,57 @@
 #include "mongo/db/catalog/drop_indexes.h"
 
 #include <boost/algorithm/string/join.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <cstdint>
+#include <memory>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/client.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/curop.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/s/shard_key_index_util.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -229,35 +261,37 @@ std::vector<UUID> abortIndexBuildByIndexNames(OperationContext* opCtx,
 Status dropIndexByDescriptor(OperationContext* opCtx,
                              Collection* collection,
                              IndexCatalog* indexCatalog,
-                             const IndexDescriptor* desc) {
-    if (desc->isIdIndex()) {
+                             IndexCatalogEntry* entry) {
+    if (entry->descriptor()->isIdIndex()) {
         return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
     }
 
     // Support dropping unfinished indexes, but only if the index is 'frozen'. These indexes only
     // exist in standalone mode.
-    auto entry = indexCatalog->getEntry(desc);
     if (entry->isFrozen()) {
         invariant(!entry->isReady());
         invariant(getReplSetMemberInStandaloneMode(opCtx->getServiceContext()));
         // Return here. No need to fall through to op observer on standalone.
-        return indexCatalog->dropUnfinishedIndex(opCtx, collection, desc);
+        return indexCatalog->dropUnfinishedIndex(opCtx, collection, entry);
     }
 
     // Do not allow dropping unfinished indexes that are not frozen.
     if (!entry->isReady()) {
         return Status(ErrorCodes::IndexNotFound,
-                      str::stream()
-                          << "can't drop unfinished index with name: " << desc->indexName());
+                      str::stream() << "can't drop unfinished index with name: "
+                                    << entry->descriptor()->indexName());
     }
 
     // Log the operation first, which reserves an optime in the oplog and sets the timestamp for
     // future writes. This guarantees the durable catalog's metadata change to share the same
     // timestamp when dropping the index below.
-    opCtx->getServiceContext()->getOpObserver()->onDropIndex(
-        opCtx, collection->ns(), collection->uuid(), desc->indexName(), desc->infoObj());
+    opCtx->getServiceContext()->getOpObserver()->onDropIndex(opCtx,
+                                                             collection->ns(),
+                                                             collection->uuid(),
+                                                             entry->descriptor()->indexName(),
+                                                             entry->descriptor()->infoObj());
 
-    auto s = indexCatalog->dropIndex(opCtx, collection, desc);
+    auto s = indexCatalog->dropIndexEntry(opCtx, collection, entry);
     if (!s.isOK()) {
         return s;
     }
@@ -354,16 +388,16 @@ void dropReadyIndexes(OperationContext* opCtx,
                     opCtx, CollectionPtr(collection), indexName, collDescription.getKeyPattern()));
         }
 
-        auto desc = indexCatalog->findIndexByName(opCtx,
-                                                  indexName,
-                                                  IndexCatalog::InclusionPolicy::kReady |
-                                                      IndexCatalog::InclusionPolicy::kUnfinished |
-                                                      IndexCatalog::InclusionPolicy::kFrozen);
-        if (!desc) {
+        auto writableEntry = indexCatalog->getWritableEntryByName(
+            opCtx,
+            indexName,
+            IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished |
+                IndexCatalog::InclusionPolicy::kFrozen);
+        if (!writableEntry) {
             uasserted(ErrorCodes::IndexNotFound,
                       str::stream() << "index not found with name [" << indexName << "]");
         }
-        uassertStatusOK(dropIndexByDescriptor(opCtx, collection, indexCatalog, desc));
+        uassertStatusOK(dropIndexByDescriptor(opCtx, collection, indexCatalog, writableEntry));
     }
 }
 
@@ -531,19 +565,19 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
                                                           collDesc.getKeyPattern()));
                 }
 
-                auto desc =
-                    indexCatalog->findIndexByName(opCtx,
-                                                  indexName,
-                                                  IndexCatalog::InclusionPolicy::kReady |
-                                                      IndexCatalog::InclusionPolicy::kUnfinished |
-                                                      IndexCatalog::InclusionPolicy::kFrozen);
-                if (!desc) {
+                auto writableEntry = indexCatalog->getWritableEntryByName(
+                    opCtx,
+                    indexName,
+                    IndexCatalog::InclusionPolicy::kReady |
+                        IndexCatalog::InclusionPolicy::kUnfinished |
+                        IndexCatalog::InclusionPolicy::kFrozen);
+                if (!writableEntry) {
                     // A similar index wasn't created while we yielded the locks during abort.
                     continue;
                 }
 
                 uassertStatusOK(dropIndexByDescriptor(
-                    opCtx, collection->getWritableCollection(opCtx), indexCatalog, desc));
+                    opCtx, collection->getWritableCollection(opCtx), indexCatalog, writableEntry));
             }
 
             wuow.commit();
@@ -578,7 +612,7 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const BSONObj& cmdObj) try {
     BSONObjBuilder bob(cmdObj);
-    bob.append("$db", nss.dbName().db());
+    bob.append("$db", nss.dbName().serializeWithoutTenantPrefix());
     auto cmdObjWithDb = bob.obj();
     auto parsed = DropIndexes::parse(
         IDLParserContext{"dropIndexes", false /* apiStrict */, nss.tenantId()}, cmdObjWithDb);

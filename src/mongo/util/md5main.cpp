@@ -40,8 +40,6 @@
   2002-04-13 lpd Splits off main program into a separate file, md5main.c.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <cmath>
 #include <cstdio>
 #include <cstring>

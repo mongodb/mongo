@@ -29,21 +29,24 @@
 
 /** Unit tests for MatchMatchExpression operator implementations in match_operators.{h,cpp}. */
 
+#include <cmath>
+// IWYU pragma: no_include "ext/type_traits.h"
 #include <memory>
 
-#include "mongo/unittest/unittest.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -171,9 +174,13 @@ TEST(EqOp, MatchesElement) {
     ASSERT(eq.equivalent(&eq));
 }
 
-DEATH_TEST_REGEX(EqOp, InvalidEooOperand, "Invariant failure.*_rhs") {
-    BSONObj operand;
-    EqualityMatchExpression eq(""_sd, operand.firstElement());
+DEATH_TEST_REGEX(EqOp, InvalidEooOperand, "failure.*eoo") {
+    try {
+        BSONObj operand;
+        EqualityMatchExpression eq(""_sd, operand.firstElement());
+    } catch (...) {
+        invariant(false, "Threw when trying to construct obj from eoo element");
+    }
 }
 
 TEST(EqOp, MatchesScalar) {
@@ -342,9 +349,13 @@ TEST(LtOp, MatchesElement) {
     ASSERT(!lt.matchesSingleElement(notMatchWrongType.firstElement()));
 }
 
-DEATH_TEST_REGEX(LtOp, InvalidEooOperand, "Invariant failure.*_rhs") {
-    BSONObj operand;
-    LTMatchExpression lt(""_sd, operand.firstElement());
+DEATH_TEST_REGEX(LtOp, InvalidEooOperand, "failure.*eoo") {
+    try {
+        BSONObj operand;
+        LTMatchExpression lt(""_sd, operand.firstElement());
+    } catch (...) {
+        invariant(false, "Threw when trying to construct obj from eoo element");
+    }
 }
 
 TEST(LtOp, MatchesScalar) {
@@ -463,9 +474,13 @@ TEST(LteOp, MatchesElement) {
     ASSERT(!lte.matchesSingleElement(notMatchWrongType.firstElement()));
 }
 
-DEATH_TEST_REGEX(LteOp, InvalidEooOperand, "Invariant failure.*_rhs") {
-    BSONObj operand;
-    LTEMatchExpression lte(""_sd, operand.firstElement());
+DEATH_TEST_REGEX(LteOp, InvalidEooOperand, "failure.*eoo") {
+    try {
+        BSONObj operand;
+        LTEMatchExpression lte(""_sd, operand.firstElement());
+    } catch (...) {
+        invariant(false, "Threw when trying to construct obj from eoo element");
+    }
 }
 
 TEST(LteOp, MatchesScalar) {
@@ -564,9 +579,13 @@ TEST(LteOp, ElemMatchKey) {
     ASSERT_EQUALS("1", details.elemMatchKey());
 }
 
-DEATH_TEST_REGEX(GtOp, InvalidEooOperand, "Invariant failure.*_rhs") {
-    BSONObj operand;
-    GTMatchExpression gt(""_sd, operand.firstElement());
+DEATH_TEST_REGEX(GtOp, InvalidEooOperand, "failure.*eoo") {
+    try {
+        BSONObj operand;
+        GTMatchExpression gt(""_sd, operand.firstElement());
+    } catch (...) {
+        invariant(false, "Threw when trying to construct obj from eoo element");
+    }
 }
 
 TEST(GtOp, MatchesScalar) {
@@ -680,9 +699,13 @@ TEST(GteOp, MatchesElement) {
     ASSERT(!gte.matchesSingleElement(notMatchWrongType.firstElement()));
 }
 
-DEATH_TEST_REGEX(GteOp, InvalidEooOperand, "Invariant failure.*_rhs") {
-    BSONObj operand;
-    GTEMatchExpression gte(""_sd, operand.firstElement());
+DEATH_TEST_REGEX(GteOp, InvalidEooOperand, "failure.*eoo") {
+    try {
+        BSONObj operand;
+        GTEMatchExpression gte(""_sd, operand.firstElement());
+    } catch (...) {
+        invariant(false, "Threw when trying to construct obj from eoo element");
+    }
 }
 
 TEST(GteOp, MatchesScalar) {

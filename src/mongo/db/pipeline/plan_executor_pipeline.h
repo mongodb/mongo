@@ -29,13 +29,36 @@
 
 #pragma once
 
-#include "mongo/util/duration.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
 #include <queue>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/update_result.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/restore_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -109,6 +132,9 @@ public:
         MONGO_UNREACHABLE;
     }
     long long executeDelete() override {
+        MONGO_UNREACHABLE;
+    }
+    long long getDeleteResult() const override {
         MONGO_UNREACHABLE;
     }
     BatchedDeleteStats getBatchedDeleteStats() override {

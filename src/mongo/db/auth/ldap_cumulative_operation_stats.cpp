@@ -27,13 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/error_extra_info.h"
 #include "mongo/db/auth/ldap_cumulative_operation_stats.h"
+
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/ldap_operation_stats.h"
-#include "mongo/db/curop_metrics.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace {

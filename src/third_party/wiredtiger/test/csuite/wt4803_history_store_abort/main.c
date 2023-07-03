@@ -94,12 +94,12 @@ hs_workload(TEST_OPTS *opts, const char *hs_file_max)
      * We're going to run this workload for different configurations of file_max. So clean out the
      * work directory each time.
      */
-    testutil_make_work_dir(opts->home);
+    testutil_recreate_dir(opts->home);
 
-    testutil_check(__wt_snprintf(open_config, sizeof(open_config),
+    testutil_snprintf(open_config, sizeof(open_config),
       "create,cache_size=50MB,history_store=(file_max=%s),statistics=(all),statistics_log=(json,on_"
       "close,wait=1)",
-      hs_file_max));
+      hs_file_max);
 
     testutil_check(wiredtiger_open(opts->home, &event_handler, open_config, &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));

@@ -31,10 +31,23 @@
  * This file contains tests for sbe::LimitSkipStage.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
+#include <memory>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
+#include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::sbe {
 

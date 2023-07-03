@@ -34,10 +34,10 @@
 
 #ifndef _WIN32
 
-#include <cerrno>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/un.h>
+#include <cerrno>        // IWYU pragma: export
+#include <sys/socket.h>  // IWYU pragma: export
+#include <sys/types.h>   // IWYU pragma: export
+#include <sys/un.h>      // IWYU pragma: export
 
 #ifdef __OpenBSD__
 #include <sys/uio.h>

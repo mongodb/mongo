@@ -27,18 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/s/load_balancer_support.h"
+#include <memory>
+#include <ostream>
+#include <string>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/concurrency/locker_impl_client_observer.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/concurrency/locker_mongos_client_observer.h"
+#include "mongo/s/load_balancer_support.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/assert_that.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/matcher.h"
+#include "mongo/unittest/matcher_core.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -49,7 +58,7 @@ class LoadBalancerSupportTest : public ServiceContextTest {
 public:
     LoadBalancerSupportTest() {
         auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerMongosClientObserver>());
+        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
     }
 
     using ServiceContextTest::ServiceContextTest;

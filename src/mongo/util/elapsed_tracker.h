@@ -32,6 +32,7 @@
 #include <cstdint>
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -65,9 +66,9 @@ private:
     const int32_t _hitsBetweenMarks;
     const Milliseconds _msBetweenMarks;
 
-    AtomicWord<int32_t> _pings;
+    int32_t _pings;
 
-    AtomicWord<Date_t> _last;
+    Date_t _last;
 };
 
 }  // namespace mongo

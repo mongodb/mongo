@@ -29,11 +29,36 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
 namespace cluster_parameters {
+
+void validateParameter(OperationContext* opCtx,
+                       BSONObj doc,
+                       const boost::optional<TenantId>& tenantId);
 
 void updateParameter(OperationContext* opCtx,
                      BSONObj doc,
@@ -86,7 +111,9 @@ void doLoadAllTenantParametersFromDisk(OperationContext* opCtx,
     auto cursor = coll->getCursor(opCtx);
     for (auto doc = cursor->next(); doc; doc = cursor->next()) {
         try {
-            onEntry(opCtx, doc.get().data.toBson(), mode, tenantId);
+            auto data = doc.get().data.toBson();
+            validateParameter(opCtx, data, tenantId);
+            onEntry(opCtx, data, mode, tenantId);
         } catch (const DBException& ex) {
             failures.push_back(ex.toStatus());
         }

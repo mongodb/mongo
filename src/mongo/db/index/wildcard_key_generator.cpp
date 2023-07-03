@@ -27,16 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/index/wildcard_key_generator.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/index/wildcard_key_generator.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/projection_policies.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -67,7 +88,7 @@ void popPathComponent(BSONElement elem, bool enclosingObjIsArray, FieldRef* path
 // keys generation.
 void appendToKeyString(const std::vector<BSONElement>& elems,
                        const CollatorInterface* collator,
-                       KeyString::PooledBuilder* keyString) {
+                       key_string::PooledBuilder* keyString) {
     for (const auto& elem : elems) {
         if (collator) {
             keyString->appendBSONElement(elem, [&](StringData stringData) {
@@ -81,7 +102,7 @@ void appendToKeyString(const std::vector<BSONElement>& elems,
 
 // Append 'MinKey' to 'keyString'. Multikey path keys use 'MinKey' for non-wildcard fields.
 void appendToMultiKeyString(const std::vector<BSONElement>& elems,
-                            KeyString::PooledBuilder* keyString) {
+                            key_string::PooledBuilder* keyString) {
     for (size_t i = 0; i < elems.size(); i++) {
         keyString->appendBSONElement(kMinBSONKey.firstElement());
     }
@@ -95,7 +116,7 @@ void appendToMultiKeyString(const std::vector<BSONElement>& elems,
  */
 class SingleDocumentKeyEncoder {
 public:
-    SingleDocumentKeyEncoder(const KeyString::Version& keyStringVersion,
+    SingleDocumentKeyEncoder(const key_string::Version& keyStringVersion,
                              const Ordering& ordering,
                              const CollatorInterface* collator,
                              const boost::optional<RecordId>& id,
@@ -132,7 +153,7 @@ private:
 
     bool _addKeyForEmptyLeaf(BSONElement elem, const FieldRef& fullPath);
 
-    const KeyString::Version& _keyStringVersion;
+    const key_string::Version& _keyStringVersion;
     const Ordering& _ordering;
     const CollatorInterface* _collator;
     const boost::optional<RecordId>& _id;
@@ -183,7 +204,7 @@ void SingleDocumentKeyEncoder::traverseWildcard(BSONObj obj, bool objIsArray, Fi
 
 void SingleDocumentKeyEncoder::_addKey(BSONElement elem, const FieldRef& fullPath) {
     // Wildcard keys are of the form { "": "path.to.field", "": <collation-aware value> }.
-    KeyString::PooledBuilder keyString(_pooledBufferBuilder, _keyStringVersion, _ordering);
+    key_string::PooledBuilder keyString(_pooledBufferBuilder, _keyStringVersion, _ordering);
 
     if (!_preElems.empty()) {
         appendToKeyString(_preElems, _collator, &keyString);
@@ -215,7 +236,7 @@ void SingleDocumentKeyEncoder::_addMultiKey(const FieldRef& fullPath) {
     // 'multikeyPaths' may be nullptr if the access method is being used in an operation which does
     // not require multikey path generation.
     if (_multikeyPaths) {
-        KeyString::PooledBuilder keyString(_pooledBufferBuilder, _keyStringVersion, _ordering);
+        key_string::PooledBuilder keyString(_pooledBufferBuilder, _keyStringVersion, _ordering);
 
         if (!_preElems.empty()) {
             appendToMultiKeyString(_preElems, &keyString);
@@ -307,7 +328,7 @@ WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPat
 WildcardKeyGenerator::WildcardKeyGenerator(BSONObj keyPattern,
                                            BSONObj pathProjection,
                                            const CollatorInterface* collator,
-                                           KeyString::Version keyStringVersion,
+                                           key_string::Version keyStringVersion,
                                            Ordering ordering,
                                            boost::optional<KeyFormat> rsKeyFormat)
     : _proj(createProjectionExecutor(keyPattern, pathProjection)),
@@ -403,7 +424,7 @@ void WildcardKeyGenerator::generateKeys(SharedBufferFragmentBuilder& pooledBuffe
     // a document {a: 1} should still be indexed by this compound wildcard index {a:1, "b.$**": 1}.
     // In this case, we generate an index key {'': 1, '': MinKey, '': MinKey} for this document.
     if (keysSequence.size() == sequenceSize && (!preElems.empty() || !postElems.empty())) {
-        KeyString::PooledBuilder keyString(pooledBufferBuilder, _keyStringVersion, _ordering);
+        key_string::PooledBuilder keyString(pooledBufferBuilder, _keyStringVersion, _ordering);
 
         if (preElemsExist.any() || postElemsExist.any()) {
             if (!preElems.empty()) {

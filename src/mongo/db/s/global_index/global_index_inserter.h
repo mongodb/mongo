@@ -29,8 +29,13 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/uuid.h"
 

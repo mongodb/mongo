@@ -28,11 +28,16 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <string>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/db/repl/data_replicator_external_state_impl.h"
-
-#include "mongo/base/init.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/repl/oplog_buffer_collection.h"
@@ -40,9 +45,11 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
-#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

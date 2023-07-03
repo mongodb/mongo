@@ -8,7 +8,7 @@
           "b:27017",
           {
             "ok": 1,
-            "ismaster": true,
+            "isWritablePrimary": true,
             "msg": "isdbgrid",
             "setVersion": 1,
             "electionId": {

@@ -30,7 +30,11 @@
 #pragma once
 
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <exception>
 #include <functional>
 #include <iostream>
 #include <sstream>

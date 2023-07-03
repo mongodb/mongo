@@ -27,14 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
+#include <memory>
+#include <utility>
 
-#include "mongo/db/stats/server_read_concern_metrics.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_write_concern_provenance.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/server_read_concern_metrics.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace {

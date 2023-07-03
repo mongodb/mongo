@@ -41,6 +41,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface',
         '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
+        '$BUILD_DIR/mongo/db/query/query_shape',
         '$BUILD_DIR/mongo/db/shared_request_handling',
         '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
         '$BUILD_DIR/mongo/db/views/views',
@@ -105,14 +106,15 @@ env.Library(
 )
 
 env.Library(
-    target="cluster_cursor_manager",
+    target='cluster_cursor_manager',
     source=[
-        "cluster_cursor_manager.cpp",
+        'cluster_cursor_manager.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/generic_cursor',
         '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/db/query/query_knobs',

@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <cstdint>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
 
 namespace mongo {

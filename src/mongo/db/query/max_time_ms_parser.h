@@ -30,6 +30,9 @@
 
 #pragma once
 
+#include <cstdint>
+
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 

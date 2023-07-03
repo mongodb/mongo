@@ -27,15 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <memory>
+#include <utility>
 
-#include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/field_ref_set.h"
 #include "mongo/db/ops/write_ops_parsers.h"
-#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
+#include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/update/update_driver.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -211,23 +228,13 @@ boost::optional<Document> DocumentSourceChangeStreamAddPostImage::lookupLatestPo
 }
 
 Value DocumentSourceChangeStreamAddPostImage::serialize(SerializationOptions opts) const {
-    BSONObjBuilder builder;
-    if (opts.verbosity) {
-        BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
-        sub.append("stage"_sd, kStageName);
-        opts.serializeLiteralValue(FullDocumentMode_serializer(_fullDocumentMode))
-            .addToBsonObj(&sub, kFullDocumentFieldName);
-        sub.done();
-    } else {
-        BSONObjBuilder sub(builder.subobjStart(kStageName));
-        if (opts.replacementForLiteralArgs) {
-            sub.append(DocumentSourceChangeStreamAddPostImageSpec::kFullDocumentFieldName,
-                       *opts.replacementForLiteralArgs);
-        } else {
-            DocumentSourceChangeStreamAddPostImageSpec(_fullDocumentMode).serialize(&sub);
-        }
-        sub.done();
-    }
-    return Value(builder.obj());
+    return opts.verbosity
+        ? Value(Document{
+              {DocumentSourceChangeStream::kStageName,
+               Document{{"stage"_sd, kStageName},
+                        {kFullDocumentFieldName, FullDocumentMode_serializer(_fullDocumentMode)}}}})
+        : Value(Document{
+              {kStageName,
+               DocumentSourceChangeStreamAddPostImageSpec(_fullDocumentMode).toBSON(opts)}});
 }
 }  // namespace mongo

@@ -28,21 +28,43 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/document_source_merge.h"
-
+#include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
+#include <iosfwd>
 #include <map>
+#include <tuple>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/pipeline/document_path_support.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/pipeline/document_source_merge.h"
+#include "mongo/db/pipeline/document_source_merge_gen.h"
+#include "mongo/db/pipeline/document_source_merge_spec.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

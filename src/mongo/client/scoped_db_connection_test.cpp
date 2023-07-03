@@ -27,11 +27,27 @@
  *    it in the license file.
  */
 
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
+#include "mongo/executor/connection_pool_stats.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/assert_that.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/matcher.h"
+#include "mongo/unittest/matcher_core.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace {
@@ -59,7 +75,6 @@ private:
 TEST_F(ConnectionPoolTest, ConnectionPoolHistogramStats) {
     using namespace unittest::match;
 
-    RAIIServerParameterControllerForTest controller("featureFlagConnHealthMetrics", true);
     FailPointEnableBlock fp("injectWaitTimeForConnpoolAcquisition", BSON("sleepTimeMillis" << 60));
 
     const auto host = getServerHostAndPort().toString();

@@ -29,14 +29,34 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <limits>
+#include <memory>
+#include <mutex>
+#include <string>
+
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -51,7 +71,7 @@ const int kDelayMillis = 100;
 
 void WiredTigerOplogManager::startVisibilityThread(OperationContext* opCtx,
                                                    WiredTigerRecordStore* oplogRecordStore) {
-    invariant(!_isRunning);
+    invariant(!_isRunning.loadRelaxed());
     // Prime the oplog read timestamp.
     std::unique_ptr<SeekableRecordCursor> reverseOplogCursor =
         oplogRecordStore->getCursor(opCtx, false /* false = reverse cursor */);
@@ -85,26 +105,33 @@ void WiredTigerOplogManager::startVisibilityThread(OperationContext* opCtx,
                                           WiredTigerRecoveryUnit::get(opCtx)->getSessionCache(),
                                           oplogRecordStore);
 
-    _isRunning = true;
+    _isRunning.store(true);
     _shuttingDown = false;
 }
 
 void WiredTigerOplogManager::haltVisibilityThread() {
+    // This is called from two places; on clean shutdown and when the record store for the
+    // oplog is destroyed. We will perform the actual shutdown on the first call and the
+    // second call will be a no-op. Calling this on clean shutdown is necessary because the
+    // oplog manager makes calls into WiredTiger to retrieve the all durable timestamp. Lock
+    // Free Reads introduced shared collections which can offset when their respective
+    // destructors run. This created a scenario where the oplog manager visibility loop can
+    // be executed after the storage engine has shutdown.
+    if (!_isRunning.loadRelaxed()) {
+        return;
+    }
+
     {
         stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
-        if (!_isRunning) {
-            // This is called from two places; on clean shutdown and when the record store for the
-            // oplog is destroyed. We will perform the actual shutdown on the first call and the
-            // second call will be a no-op. Calling this on clean shutdown is necessary because the
-            // oplog manager makes calls into WiredTiger to retrieve the all durable timestamp. Lock
-            // Free Reads introduced shared collections which can offset when their respective
-            // destructors run. This created a scenario where the oplog manager visibility loop can
-            // be executed after the storage engine has shutdown.
+
+        // In between when we checked '_isRunning' above and when we acquired the mutex, it's
+        // possible another thread modified '_isRunning', so check it again.
+        if (!_isRunning.loadRelaxed()) {
             return;
         }
 
+        _isRunning.store(false);
         _shuttingDown = true;
-        _isRunning = false;
     }
 
     if (_oplogVisibilityThread.joinable()) {

@@ -31,23 +31,23 @@
    to an open socket (or logical connection if pooling on sockets) from a client.
 */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/client.h"
-
-#include <boost/functional/hash.hpp>
+#include <boost/container_hash/extensions.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <mutex>
 #include <string>
-#include <vector>
 
-#include "mongo/base/status.h"
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

@@ -1,0 +1,88 @@
+# This build variant is used to test suites that use sharded cluster fixture with config shard mode.
+# TODO (SERVER-75884): Remove this once we switch to config shard as the default.
+
+# THIS WAS COPIED FROM EVERGREEN.YML - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THAT FILE.
+variables:
+- &linux_x86_dynamic_compile_variant_dependency
+  depends_on:
+  - name: archive_dist_test_debug
+    variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
+  - name: version_gen
+    variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
+
+# THIS WAS COPIED FROM EVERGREEN.YML - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THAT FILE.
+- &linux_x86_generic_expansions
+  multiversion_platform: rhel80
+  multiversion_edition: enterprise
+  repo_edition: enterprise
+  large_distro_name: rhel80-medium
+  num_scons_link_jobs_available: 0.99
+  compile_variant: *linux_x86_dynamic_compile_variant_name
+
+# THIS WAS COPIED FROM EVERGREEN.YML - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THAT FILE.
+- &enterprise-rhel-80-64-bit-dynamic-expansions
+    <<: *linux_x86_generic_expansions
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    has_packages: false
+    jstestfuzz_num_generated_files: 40
+    jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 10
+    max_sub_suites: 5
+    idle_timeout_factor: 1.5
+    exec_timeout_factor: 1.5
+    large_distro_name: rhel80-medium
+
+buildvariants:
+- &enterprise-rhel-80-64-bit-dynamic-config-shard
+  <<: *linux_x86_dynamic_compile_variant_dependency
+  name: enterprise-rhel-80-64-bit-dynamic-config-shard
+  display_name: "* Shared Library Enterprise RHEL 8.0 (Config Shard)"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-small
+  stepback: false
+  expansions: &enterprise-rhel-80-64-bit-dynamic-config-shard-expansions
+    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
+    test_flags: >-
+      --configShard=any
+      --excludeWithAnyTags=config_shard_incompatible
+  tasks:
+  - name: aggregation_mongos_passthrough
+  - name: aggregation_one_shard_sharded_collections
+  - name: aggregation_sharded_collections_causally_consistent_passthrough
+  - name: aggregation_sharded_collections_passthrough
+  - name: causally_consistent_hedged_reads_jscore_passthrough_gen
+  - name: causally_consistent_jscore_passthrough_auth_gen
+  - name: causally_consistent_jscore_passthrough_gen
+  - name: change_streams
+  - name: change_streams_mongos_sessions_passthrough
+  - name: change_streams_multi_stmt_txn_mongos_passthrough
+  - name: change_streams_multi_stmt_txn_sharded_collections_passthrough
+  - name: change_streams_per_shard_cursor_passthrough
+  - name: fle2_sharding_high_cardinality
+  - name: fle2_sharding
+  - name: jstestfuzz_sharded_causal_consistency_gen
+  - name: jstestfuzz_sharded_continuous_stepdown_gen
+  - name: jstestfuzz_sharded_gen
+  - name: jstestfuzz_sharded_session_gen
+  - name: sharded_causally_consistent_jscore_passthrough_gen
+  - name: sharded_causally_consistent_read_concern_snapshot_passthrough_gen
+  - name: sharding_auth_gen
+  # Explicitly include instead of using tags to avoid pulling in replica_sets_multiversion_gen. This
+  # variant will be removed when config shards become the default, so this is only temporary.
+  - name: sharding_multiversion_gen
+  - name: .sharding .txns
+  # Skip csrs stepdown suite because most tests can't handle the first shard stepping down.
+  - name: .sharding .common !.csrs
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .concurrency .sharded !.large
+  - name: .concurrency .sharded .large
+    distros:
+    - rhel80-medium
+  - name: .multi_shard

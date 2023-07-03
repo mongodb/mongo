@@ -29,8 +29,11 @@
 
 #pragma once
 
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/global_index/global_index_cloning_service.h"
-
+#include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/chunk_manager.h"
 
 namespace mongo {

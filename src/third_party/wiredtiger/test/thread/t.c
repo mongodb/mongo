@@ -177,12 +177,11 @@ wt_connect(char *config_open)
     static WT_EVENT_HANDLER event_handler = {handle_error, handle_message, NULL, NULL, NULL};
     char config[512];
 
-    testutil_clean_work_dir(home);
-    testutil_make_work_dir(home);
+    testutil_recreate_dir(home);
 
-    testutil_check(__wt_snprintf(config, sizeof(config),
+    testutil_snprintf(config, sizeof(config),
       "create,statistics=(all),statistics_log=(json,on_close,wait=1),error_prefix=\"%s\",%s%s",
-      progname, config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open));
+      progname, config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open);
 
     testutil_check(wiredtiger_open(home, &event_handler, config, &conn));
 }
@@ -210,7 +209,7 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-    testutil_clean_work_dir(home);
+    testutil_remove(home);
 }
 
 /*

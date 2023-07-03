@@ -1,5 +1,7 @@
 //
 // Tests that merging chunks via mongos works/doesn't work with different chunk configurations
+// TODO SERVER-71169: Re-enable this test after shard filtering in CQF is implemented.
+// @tags: [cqf_incompatible]
 //
 (function() {
 'use strict';

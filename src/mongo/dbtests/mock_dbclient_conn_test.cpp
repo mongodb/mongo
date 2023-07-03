@@ -31,17 +31,46 @@
  * This file includes integration testing between the MockDBClientBase and MockRemoteDB.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/jsobj.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/net/socket_exception.h"
-#include "mongo/util/timer.h"
-
-#include <ctime>
+#include <cstdint>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
+#include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/socket_exception.h"
+#include "mongo/util/net/ssl_options.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 using std::string;
 using std::vector;
@@ -203,7 +232,7 @@ TEST(MockDBClientConnTest, InsertAndQueryTwice) {
 
 TEST(MockDBClientConnTest, QueryWithNoResults) {
     MockRemoteDBServer server("test");
-    const NamespaceString nss("test.user");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.user");
 
     server.insert(nss, BSON("x" << 1));
     MockDBClientConnection conn(&server);
@@ -378,7 +407,7 @@ TEST(MockDBClientConnTest, MultiNSRemove) {
 
 TEST(MockDBClientConnTest, InsertAfterRemove) {
     MockRemoteDBServer server("test");
-    const NamespaceString nss("test.user");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.user");
 
     {
         MockDBClientConnection conn(&server);
@@ -459,25 +488,25 @@ TEST(MockDBClientConnTest, CyclingCmd) {
     MockRemoteDBServer server("test");
 
     {
-        vector<mongo::StatusWith<BSONObj>> isMasterSequence;
-        isMasterSequence.push_back(BSON("set"
-                                        << "a"
-                                        << "isMaster" << true << "ok" << 1));
-        isMasterSequence.push_back(BSON("set"
-                                        << "a"
-                                        << "isMaster" << false << "ok" << 1));
-        server.setCommandReply("isMaster", isMasterSequence);
+        vector<mongo::StatusWith<BSONObj>> helloReplySequence;
+        helloReplySequence.push_back(BSON("set"
+                                          << "a"
+                                          << "isWritablePrimary" << true << "ok" << 1));
+        helloReplySequence.push_back(BSON("set"
+                                          << "a"
+                                          << "isWritablePrimary" << false << "ok" << 1));
+        server.setCommandReply("hello", helloReplySequence);
     }
 
     {
         MockDBClientConnection conn(&server);
         BSONObj response;
         ASSERT(conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
-                               BSON("isMaster" << 1),
+                               BSON("hello" << 1),
                                response));
         ASSERT_EQUALS(1, response["ok"].numberInt());
         ASSERT_EQUALS("a", response["set"].str());
-        ASSERT(response["isMaster"].trueValue());
+        ASSERT(response["isWritablePrimary"].trueValue());
 
         ASSERT_EQUALS(1U, server.getCmdCount());
     }
@@ -486,11 +515,11 @@ TEST(MockDBClientConnTest, CyclingCmd) {
         MockDBClientConnection conn(&server);
         BSONObj response;
         ASSERT(conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
-                               BSON("isMaster" << 1),
+                               BSON("hello" << 1),
                                response));
         ASSERT_EQUALS(1, response["ok"].numberInt());
         ASSERT_EQUALS("a", response["set"].str());
-        ASSERT(!response["isMaster"].trueValue());
+        ASSERT(!response["isWritablePrimary"].trueValue());
 
         ASSERT_EQUALS(2U, server.getCmdCount());
     }
@@ -499,11 +528,11 @@ TEST(MockDBClientConnTest, CyclingCmd) {
         MockDBClientConnection conn(&server);
         BSONObj response;
         ASSERT(conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
-                               BSON("isMaster" << 1),
+                               BSON("hello" << 1),
                                response));
         ASSERT_EQUALS(1, response["ok"].numberInt());
         ASSERT_EQUALS("a", response["set"].str());
-        ASSERT(response["isMaster"].trueValue());
+        ASSERT(response["isWritablePrimary"].trueValue());
 
         ASSERT_EQUALS(3U, server.getCmdCount());
     }
@@ -512,14 +541,13 @@ TEST(MockDBClientConnTest, CyclingCmd) {
 TEST(MockDBClientConnTest, MultipleStoredResponse) {
     MockRemoteDBServer server("test");
     server.setCommandReply("serverStatus", BSON("ok" << 0));
-    server.setCommandReply("isMaster", BSON("ok" << 1 << "secondary" << false));
+    server.setCommandReply("hello", BSON("ok" << 1 << "secondary" << false));
 
     MockDBClientConnection conn(&server);
     {
         BSONObj response;
         ASSERT(conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
-                               BSON("isMaster"
-                                    << "abc"),
+                               BSON("hello" << 1),
                                response));
         ASSERT(!response["secondary"].trueValue());
     }

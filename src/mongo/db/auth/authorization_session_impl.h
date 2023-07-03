@@ -29,18 +29,35 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <memory>
+#include <tuple>
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_contract.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -88,6 +105,8 @@ public:
 
     boost::optional<UserHandle> getAuthenticatedUser() override;
 
+    boost::optional<TenantId> getUserTenantId() const override;
+
     boost::optional<UserName> getAuthenticatedUserName() override;
 
     RoleNameIterator getAuthenticatedRoleNames() override;
@@ -104,8 +123,7 @@ public:
 
     void grantInternalAuthorization(OperationContext* opCtx) override;
 
-    StatusWith<PrivilegeVector> checkAuthorizedToListCollections(StringData dbname,
-                                                                 const BSONObj& cmdObj) override;
+    StatusWith<PrivilegeVector> checkAuthorizedToListCollections(const ListCollections&) override;
 
     bool isUsingLocalhostBypass() override;
 
@@ -134,7 +152,7 @@ public:
     bool isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
                                            const ActionSet& actions) override;
 
-    bool isAuthorizedForAnyActionOnAnyResourceInDB(StringData dbname) override;
+    bool isAuthorizedForAnyActionOnAnyResourceInDB(const DatabaseName&) override;
 
     bool isAuthorizedForAnyActionOnResource(const ResourcePattern& resource) override;
 
@@ -199,7 +217,6 @@ private:
     std::tuple<boost::optional<UserName>*, std::vector<RoleName>*> _getImpersonations() override {
         return std::make_tuple(&_impersonatedUserName, &_impersonatedRoleNames);
     }
-
 
     // Generates a vector of default privileges that are granted to any user,
     // regardless of which roles that user does or does not possess.

@@ -27,19 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <deque>
+#include <string>
+#include <variant>
 
-#include "mongo/db/query/sbe_multi_planner.h"
-
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/exec/histogram_server_status_metric.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/explain.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
+#include "mongo/db/exec/trial_period_utils.h"
+#include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/query/plan_cache_debug_info.h"
+#include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_explainer_factory.h"
+#include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_ranker_util.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/sbe_multi_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_proxy.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
+#include "mongo/util/tick_source.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -292,15 +316,20 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
         // explain operation, save the stats from the old tree before we discard it.
         if (_cq.getExplain()) {
             winner.data.stageData.savedStatsOnEarlyExit =
-                winner.root->getStats(true /* includeDebugInfo  */);
+                winner.root->getStats(true /* includeDebugInfo */);
         }
         winner.root = winner.clonedPlan->first->clone();
 
-        stage_builder::prepareSlotBasedExecutableTree(
-            _opCtx, winner.root.get(), &winner.data.stageData, _cq, _collections, _yieldPolicy);
+        stage_builder::prepareSlotBasedExecutableTree(_opCtx,
+                                                      winner.root.get(),
+                                                      &winner.data.stageData,
+                                                      _cq,
+                                                      _collections,
+                                                      _yieldPolicy,
+                                                      false /* preparingFromCache */);
         // Clear the results queue.
         winner.results = {};
-        winner.root->open(false);
+        winner.root->open(false /* reOpen*/);
     }
 
     // Extend the winning candidate with the agg pipeline and rebuild the execution tree. Because
@@ -322,8 +351,13 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
         // cache prior to preparation, whereas the original copy of the tree will be prepared and
         // used to execute this query.
         auto clonedPlan = std::make_pair(rootStage->clone(), plan_ranker::CandidatePlanData{data});
-        stage_builder::prepareSlotBasedExecutableTree(
-            _opCtx, rootStage.get(), &data, _cq, _collections, _yieldPolicy);
+        stage_builder::prepareSlotBasedExecutableTree(_opCtx,
+                                                      rootStage.get(),
+                                                      &data,
+                                                      _cq,
+                                                      _collections,
+                                                      _yieldPolicy,
+                                                      false /* preparingFromCache */);
         candidates[winnerIdx] =
             sbe::plan_ranker::CandidatePlan{std::move(solution),
                                             std::move(rootStage),

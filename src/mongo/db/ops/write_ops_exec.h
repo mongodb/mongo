@@ -29,19 +29,35 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <memory>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/catalog/collection_operation_source.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/ops/update_result.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec_util.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -82,7 +98,8 @@ bool handleError(OperationContext* opCtx,
                  WriteResult* out);
 
 bool getFleCrudProcessed(OperationContext* opCtx,
-                         const boost::optional<EncryptionInformation>& encryptionInfo);
+                         const boost::optional<EncryptionInformation>& encryptionInfo,
+                         const boost::optional<TenantId>& tenantId);
 
 /**
  * Returns true if caller should try to insert more documents. Does nothing else if batch is empty.
@@ -109,22 +126,22 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
  * applicable). Should be called in a writeConflictRetry loop.
  */
 UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
-                                      const NamespaceString& nsString,
+                                      const NamespaceString& nss,
                                       CurOp* curOp,
                                       OpDebug* opDebug,
                                       bool inTransaction,
                                       bool remove,
                                       bool upsert,
                                       boost::optional<BSONObj>& docFound,
-                                      const UpdateRequest* updateRequest);
+                                      const UpdateRequest& updateRequest);
 
 /**
  * Executes a findAndModify with remove:true, the returned document is placed into docFound (if
  * applicable). Should be called in a writeConflictRetry loop.
  */
 long long writeConflictRetryRemove(OperationContext* opCtx,
-                                   const NamespaceString& nsString,
-                                   DeleteRequest* deleteRequest,
+                                   const NamespaceString& nss,
+                                   const DeleteRequest& deleteRequest,
                                    CurOp* curOp,
                                    OpDebug* opDebug,
                                    bool inTransaction,
@@ -169,6 +186,18 @@ WriteResult performDeletes(OperationContext* opCtx,
 Status performAtomicTimeseriesWrites(OperationContext* opCtx,
                                      const std::vector<write_ops::InsertCommandRequest>& insertOps,
                                      const std::vector<write_ops::UpdateCommandRequest>& updateOps);
+
+/**
+ * Runs a time-series update command in a transaction and collects the write result from each
+ * statement.
+ *
+ * Assumes the update command is a retryable write and targeted on the time-series view namespace.
+ */
+void runTimeseriesRetryableUpdates(OperationContext* opCtx,
+                                   const NamespaceString& ns,
+                                   const write_ops::UpdateCommandRequest& wholeOp,
+                                   std::shared_ptr<executor::TaskExecutor> executor,
+                                   write_ops_exec::WriteResult* reply);
 
 /**
  * Populate 'opDebug' with stats describing the execution of an update operation. Illegal to call

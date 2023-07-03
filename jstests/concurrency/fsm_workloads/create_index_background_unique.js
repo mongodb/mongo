@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * create_index_background_unique.js
  *
@@ -15,7 +13,8 @@
  * ]
  */
 load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
-var $config = (function() {
+
+export const $config = (function() {
     var data = {
         prefix: "create_index_background_unique_",
         numDocsToLoad: 5000,
@@ -40,7 +39,7 @@ var $config = (function() {
 
             const res = db.runCommand({
                 createIndexes: this.getCollectionNameForThread(this.tid),
-                indexes: [{key: {x: 1}, name: "x_1", unique: true, background: true}]
+                indexes: [{key: {x: 1}, name: "x_1", unique: true}]
             });
             // Multi-statement Transactions can fail with SnapshotUnavailable if there are
             // pending catalog changes as of the transaction start (see SERVER-43018).

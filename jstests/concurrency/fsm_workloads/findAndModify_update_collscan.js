@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * findAndModify_update_collscan.js
  *
@@ -10,10 +8,10 @@
  *
  * Attempts to force a collection scan by not creating an index.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');            // for extendWorkload
-load('jstests/concurrency/fsm_workloads/findAndModify_update.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/findAndModify_update.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Do not create the { tid: 1, value: 1 } index so that a
     // collection
     // scan is performed for the query and sort operations.

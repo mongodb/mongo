@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * distinct.js
  *
@@ -8,7 +6,7 @@
  * Each thread operates on a separate collection.
  */
 
-var $config = (function() {
+export const $config = (function() {
     var data = {numDocs: 1000, prefix: 'distinct_fsm', shardKey: {i: 1}};
 
     var states = (function() {

@@ -30,34 +30,89 @@
 
 #include "mongo/db/s/sharding_ddl_util.h"
 
+#include <algorithm>
+#include <array>
+#include <boost/cstdint.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstdint>
+#include <iterator>
+#include <ostream>
+#include <string>
+#include <tuple>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/cluster_transaction_api.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/list_collections_gen.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/distinct_command_gen.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/remove_tags_gen.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_logging.h"
-#include "mongo/db/s/sharding_util.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/db/write_block_bypass.h"
-#include "mongo/logv2/log.h"
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
-#include "mongo/s/analyze_shard_key_documents_gen.h"
+#include "mongo/db/write_concern.h"
+#include "mongo/executor/async_rpc.h"
+#include "mongo/executor/async_rpc_util.h"
+#include "mongo/executor/inline_executor.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_index_catalog.h"
+#include "mongo/s/catalog/type_collection_gen.h"
+#include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
-#include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/set_allow_migrations_gen.h"
-#include "mongo/s/write_ops/batch_write_exec.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/read_through_cache.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 
@@ -106,34 +161,6 @@ Status sharding_ddl_util_deserializeErrorStatusFromBSON(const BSONElement& bsonE
 namespace sharding_ddl_util {
 namespace {
 
-void updateTags(OperationContext* opCtx,
-                const std::shared_ptr<Shard>& configShard,
-                const NamespaceString& fromNss,
-                const NamespaceString& toNss,
-                const WriteConcernOptions& writeConcern) {
-    const auto query = BSON(TagsType::ns(fromNss.ns().toString()));
-    const auto update = BSON("$set" << BSON(TagsType::ns(toNss.ns().toString())));
-
-    BatchedCommandRequest request([&] {
-        write_ops::UpdateCommandRequest updateOp(TagsType::ConfigNS);
-        updateOp.setUpdates({[&] {
-            write_ops::UpdateOpEntry entry;
-            entry.setQ(query);
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
-            entry.setUpsert(false);
-            entry.setMulti(true);
-            return entry;
-        }()});
-        return updateOp;
-    }());
-    request.setWriteConcern(writeConcern.toBSON());
-
-    auto response = configShard->runBatchWriteCommand(
-        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
-
-    uassertStatusOK(response.toStatus());
-}
-
 void deleteChunks(OperationContext* opCtx,
                   const std::shared_ptr<Shard>& configShard,
                   const UUID& collectionUUID,
@@ -180,8 +207,9 @@ void deleteCollection(OperationContext* opCtx,
         // Remove config.collection entry. Query by 'ns' AND 'uuid' so that the remove can be
         // resolved with an IXSCAN (thanks to the index on '_id') and is idempotent (thanks to the
         // 'uuid')
-        const auto deleteCollectionQuery = BSON(
-            CollectionType::kNssFieldName << nss.ns() << CollectionType::kUuidFieldName << uuid);
+        const auto deleteCollectionQuery =
+            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)
+                                               << CollectionType::kUuidFieldName << uuid);
 
         write_ops::DeleteCommandRequest deleteOp(CollectionType::ConfigNS);
         deleteOp.setDeletes({[&]() {
@@ -306,10 +334,12 @@ void checkCollectionUUIDConsistencyAcrossShards(
     const std::vector<mongo::ShardId>& shardIds,
     std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     const BSONObj filterObj = BSON("name" << nss.coll());
-    BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << filterObj);
-
-    auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, nss.db().toString(), cmdObj, shardIds, **executor);
+    ListCollections command;
+    command.setFilter(filterObj);
+    command.setDbName(nss.dbName());
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ListCollections>>(
+        command, **executor, CancellationToken::uncancelable());
+    auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 
     struct MismatchedShard {
         std::string shardId;
@@ -356,10 +386,12 @@ void checkTargetCollectionDoesNotExistInCluster(
     const std::vector<mongo::ShardId>& shardIds,
     std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     const BSONObj filterObj = BSON("name" << toNss.coll());
-    BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << filterObj);
-
-    auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, toNss.db(), cmdObj, shardIds, **executor);
+    ListCollections command;
+    command.setFilter(filterObj);
+    command.setDbName(toNss.dbName());
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ListCollections>>(
+        command, **executor, CancellationToken::uncancelable());
+    auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 
     std::vector<std::string> shardsContainingTargetCollection;
     for (const auto& cmdResponse : responses) {
@@ -393,26 +425,9 @@ void linearizeCSRSReads(OperationContext* opCtx) {
     uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
         opCtx,
         "Linearize CSRS reads",
-        NamespaceString::kServerConfigurationNamespace.ns(),
+        NamespaceStringUtil::serialize(NamespaceString::kServerConfigurationNamespace),
         {},
         ShardingCatalogClient::kMajorityWriteConcern));
-}
-
-std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
-    OperationContext* opCtx,
-    StringData dbName,
-    const BSONObj& command,
-    const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor) {
-
-    // The AsyncRequestsSender ignore impersonation metadata so we need to manually attach them to
-    // the command
-    BSONObjBuilder bob(command);
-    rpc::writeAuthDataToImpersonatedUserMetadata(opCtx, &bob);
-    WriteBlockBypass::get(opCtx).writeAsMetadata(&bob);
-    auto authenticatedCommand = bob.obj();
-    return sharding_util::sendCommandToShards(
-        opCtx, dbName, authenticatedCommand, shardIds, executor);
 }
 
 void removeTagsMetadataFromConfig(OperationContext* opCtx,
@@ -459,34 +474,6 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx, const BSONOb
                       << filter);
 }
 
-void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
-                                                const std::shared_ptr<Shard>& configShard,
-                                                const NamespaceString& nss,
-                                                const WriteConcernOptions& writeConcern) {
-    // Remove config.tags entries
-    const auto query = BSON(TagsType::ns(nss.ns().toString()));
-    const auto hint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
-
-    BatchedCommandRequest request([&] {
-        write_ops::DeleteCommandRequest deleteOp(TagsType::ConfigNS);
-        deleteOp.setDeletes({[&] {
-            write_ops::DeleteOpEntry entry;
-            entry.setQ(query);
-            entry.setMulti(true);
-            entry.setHint(hint);
-            return entry;
-        }()});
-        return deleteOp;
-    }());
-
-    request.setWriteConcern(writeConcern.toBSON());
-
-    auto response = configShard->runBatchWriteCommand(
-        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
-
-    uassertStatusOK(response.toStatus());
-}
-
 void removeCollAndChunksMetadataFromConfig(
     OperationContext* opCtx,
     const std::shared_ptr<Shard>& configShard,
@@ -515,149 +502,6 @@ void removeCollAndChunksMetadataFromConfig(
     deleteChunks(opCtx, configShard, uuid, writeConcern);
 
     deleteShardingIndexCatalogMetadata(opCtx, configShard, uuid, writeConcern);
-}
-
-bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx,
-                                                         const std::shared_ptr<Shard>& configShard,
-                                                         ShardingCatalogClient* catalogClient,
-                                                         const NamespaceString& nss,
-                                                         const WriteConcernOptions& writeConcern) {
-    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-    IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
-
-    ON_BLOCK_EXIT(
-        [&] { Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss); });
-
-    // This always runs on the config server and is expected to use a local transaction.
-    bool useClusterTransaction = false;
-
-    try {
-        auto coll =
-            catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
-
-        removeCollAndChunksMetadataFromConfig(opCtx,
-                                              configShard,
-                                              catalogClient,
-                                              coll,
-                                              writeConcern,
-                                              {} /* osi */,
-                                              useClusterTransaction);
-        return true;
-    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // The collection is not sharded or doesn't exist
-        return false;
-    }
-}
-
-void shardedRenameMetadata(OperationContext* opCtx,
-                           const std::shared_ptr<Shard>& configShard,
-                           ShardingCatalogClient* catalogClient,
-                           CollectionType fromCollType,
-                           const NamespaceString& toNss,
-                           const WriteConcernOptions& writeConcern) {
-    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-
-    auto fromNss = fromCollType.getNss();
-    auto fromUUID = fromCollType.getUuid();
-
-    // Delete eventual "TO" chunk/collection entries referring a dropped collection
-    try {
-        auto coll =
-            catalogClient->getCollection(opCtx, toNss, repl::ReadConcernLevel::kLocalReadConcern);
-
-        if (coll.getUuid() == fromCollType.getUuid()) {
-            // shardedRenameMetadata() was already completed in a previous commit attempt.
-            return;
-        }
-
-        // Delete "TO" chunk/collection entries referring a dropped collection
-        removeCollAndChunksMetadataFromConfig_notIdempotent(
-            opCtx, configShard, catalogClient, toNss, writeConcern);
-    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // The "TO" collection is not sharded or doesn't exist
-    }
-
-    // This always runs on the config server and is expected to use a local transaction.
-    bool useClusterTransaction = false;
-
-    // Delete "FROM" from config.collections.
-    // Run Transaction 1 - delete source collection
-    // Note: in case of empty osi the transaction performing the deletion will use a new osi.
-    deleteCollection(opCtx, fromNss, fromUUID, writeConcern, {}, nullptr, useClusterTransaction);
-
-    // Update "FROM" tags to "TO".
-    updateTags(opCtx, configShard, fromNss, toNss, writeConcern);
-
-    auto renamedCollPlacementInfo = [&]() {
-        // Use the content of config.chunks to obtain the placement of the collection being renamed.
-        // The request is equivalent to 'configDb.chunks.distinct("shard", {uuid:collectionUuid})'.
-        DistinctCommandRequest distinctRequest(ChunkType::ConfigNS);
-        distinctRequest.setKey(ChunkType::shard.name());
-        distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << fromUUID));
-
-        auto reply = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
-            DatabaseName::kConfig.toString(),
-            distinctRequest.toBSON({}),
-            Shard::RetryPolicy::kIdempotent));
-
-        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(reply));
-        std::vector<ShardId> shardIds;
-        for (const auto& valueElement : reply.response.getField("values").Array()) {
-            shardIds.emplace_back(valueElement.String());
-        }
-
-        // Compose a placement info object based on the retrieved information; the timestamp
-        // field may be disregarded, since it will be overwritten by the caller before being
-        // consumed.
-        NamespacePlacementType placementInfo(fromNss, Timestamp(), std::move(shardIds));
-        placementInfo.setUuid(fromUUID);
-        return placementInfo;
-    }();
-
-    // Rename namespace and bump timestamp in the original collection and placement entries of
-    // "FROM".
-    fromCollType.setNss(toNss);
-    auto now = VectorClock::get(opCtx)->getTime();
-    auto newTimestamp = now.clusterTime().asTimestamp();
-    fromCollType.setTimestamp(newTimestamp);
-    fromCollType.setEpoch(OID::gen());
-
-    renamedCollPlacementInfo.setNss(toNss);
-    renamedCollPlacementInfo.setTimestamp(newTimestamp);
-
-    // Use the modified entries to insert collection and placement entries for "TO".
-    auto transactionChain = [collInfo = std::move(fromCollType),
-                             placementInfo = std::move(renamedCollPlacementInfo)](
-                                const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-        write_ops::InsertCommandRequest insertConfigCollectionDoc(CollectionType::ConfigNS,
-                                                                  {collInfo.toBSON()});
-        return txnClient.runCRUDOp(insertConfigCollectionDoc, {0} /*stmtIds*/)
-            .thenRunOn(txnExec)
-            .then([&](const BatchedCommandResponse& insertCollResponse) {
-                uassertStatusOK(insertCollResponse.toStatus());
-                if (insertCollResponse.getN() == 0) {
-                    BatchedCommandResponse noOpResponse;
-                    noOpResponse.setStatus(Status::OK());
-                    noOpResponse.setN(0);
-                    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
-                }
-                write_ops::InsertCommandRequest insertPlacementEntry(
-                    NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});
-                return txnClient.runCRUDOp(insertPlacementEntry, {1} /*stmtIds*/);
-            })
-            .thenRunOn(txnExec)
-            .then([&](const BatchedCommandResponse& insertPlacementResponse) {
-                uassertStatusOK(insertPlacementResponse.toStatus());
-            })
-            .semi();
-    };
-
-    // Run Transaction 2 - insert target collection and placement entries
-    // Note: in case of empty osi the transaction performing the deletion will use a new osi.
-    runTransactionOnShardingCatalog(
-        opCtx, std::move(transactionChain), writeConcern, {}, useClusterTransaction);
 }
 
 void checkCatalogConsistencyAcrossShardsForRename(
@@ -784,14 +628,15 @@ void resumeMigrations(OperationContext* opCtx,
 
 bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) {
     auto collDoc =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-                            opCtx,
-                            ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
-                            repl::ReadConcernLevel::kMajorityReadConcern,
-                            CollectionType::ConfigNS,
-                            BSON(CollectionType::kNssFieldName << nss.ns()),
-                            BSONObj(),
-                            1))
+        uassertStatusOK(
+            Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
+                repl::ReadConcernLevel::kMajorityReadConcern,
+                CollectionType::ConfigNS,
+                BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
+                BSONObj(),
+                1))
             .docs;
 
     uassert(ErrorCodes::NamespaceNotFound,
@@ -819,21 +664,20 @@ void performNoopRetryableWriteOnShards(OperationContext* opCtx,
                                        const OperationSessionInfo& osi,
                                        const std::shared_ptr<executor::TaskExecutor>& executor) {
     const auto updateOp = buildNoopWriteRequestCommand();
-
-    sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx,
-        updateOp.getDbName().db(),
-        CommandHelpers::appendMajorityWriteConcern(updateOp.toBSON(osi.toBSON())),
-        shardIds,
-        executor);
+    async_rpc::GenericArgs args;
+    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<write_ops::UpdateCommandRequest>>(
+        updateOp, executor, CancellationToken::uncancelable(), args);
+    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 void performNoopMajorityWriteLocally(OperationContext* opCtx) {
     const auto updateOp = buildNoopWriteRequestCommand();
 
     DBDirectClient client(opCtx);
-    const auto commandResponse = client.runCommand(
-        OpMsgRequest::fromDBAndBody(updateOp.getDbName().db(), updateOp.toBSON({})));
+    const auto commandResponse =
+        client.runCommand(OpMsgRequestBuilder::create(updateOp.getDbName(), updateOp.toBSON({})));
 
     const auto commandReply = commandResponse->getCommandReply();
     uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
@@ -855,18 +699,19 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
                                                   bool fromMigrate) {
     ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
     dropCollectionParticipant.setFromMigrate(fromMigrate);
-
-    const auto cmdObj =
-        CommandHelpers::appendMajorityWriteConcern(dropCollectionParticipant.toBSON({}));
-
-    sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, nss.db(), cmdObj.addFields(osi.toBSON()), shardIds, executor);
+    async_rpc::GenericArgs args;
+    async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrDropCollectionParticipant>>(
+        dropCollectionParticipant, executor, CancellationToken::uncancelable(), args);
+    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const NamespaceString& to) {
     return BSON("command"
                 << "rename"
-                << "from" << from.toString() << "to" << to.toString());
+                << "from" << NamespaceStringUtil::serialize(from) << "to"
+                << NamespaceStringUtil::serialize(to));
 }
 
 void runTransactionOnShardingCatalog(OperationContext* opCtx,

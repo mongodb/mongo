@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <string>
@@ -36,6 +37,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

@@ -29,12 +29,23 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/hedging_mode_gen.h"
 #include "mongo/client/read_preference_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
@@ -123,7 +134,9 @@ struct ReadPreferenceSetting {
     ReadPreferenceSetting(ReadPreference pref, Seconds maxStalenessSeconds);
     ReadPreferenceSetting(ReadPreference pref, TagSet tags);
     explicit ReadPreferenceSetting(ReadPreference pref);
-    ReadPreferenceSetting() : ReadPreferenceSetting(ReadPreference::PrimaryOnly) {}
+    ReadPreferenceSetting() : ReadPreferenceSetting(ReadPreference::PrimaryOnly) {
+        _usedDefaultReadPrefValue = true;
+    }
 
     inline bool equals(const ReadPreferenceSetting& other) const {
         auto hedgingModeEquals = [](const boost::optional<HedgingMode>& hedgingModeA,
@@ -168,7 +181,9 @@ struct ReadPreferenceSetting {
         toContainingBSON(&bob);
         return bob.obj();
     }
-
+    bool usedDefaultReadPrefValue() const {
+        return _usedDefaultReadPrefValue;
+    }
     /**
      * Parses a ReadPreferenceSetting from a BSON document of the form:
      * { mode: <mode>, tags: <array of tags>, maxStalenessSeconds: Number, hedge: <hedgingMode>}.
@@ -226,6 +241,9 @@ struct ReadPreferenceSetting {
      * Either way, it must be that a node opTime of X implies ClusterTime >= X.
      */
     Timestamp minClusterTime{};
+
+private:
+    bool _usedDefaultReadPrefValue = false;
 };
 
 }  // namespace mongo

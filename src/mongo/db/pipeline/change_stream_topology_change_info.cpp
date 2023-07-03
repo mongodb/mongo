@@ -29,7 +29,8 @@
 
 #include "mongo/db/pipeline/change_stream_topology_change_info.h"
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {

@@ -27,19 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
-#include "mongo/util/str.h"
-#include <string>
+#include "mongo/util/str.h"  // IWYU pragma: keep
+#include <string>            // IWYU pragma: keep
 
 namespace mongo {
 
-#ifdef _WIN32
 // Generate windows event name for shutdown signal
 std::string getShutdownSignalName(int processId) {
     const char* strEventNamePrefix = "Global\\Mongo_";
 
     return str::stream() << strEventNamePrefix << processId;
 }
-#endif
+
 }  // namespace mongo

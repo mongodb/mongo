@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include <cstddef>
 #include <limits>
 #include <vector>
 
 #include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
 
 namespace mongo::optimizer::ce {
 

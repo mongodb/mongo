@@ -27,14 +27,27 @@
  *    it in the license file.
  */
 
+#include <absl/container/node_hash_map.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/crypto/mechanism_scram.h"
+#include "mongo/crypto/sha256_block.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
+#include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

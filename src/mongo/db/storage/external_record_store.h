@@ -29,10 +29,29 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/mutable/damage_vector.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/virtual_collection_options.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 class ExternalRecordStore : public RecordStore {

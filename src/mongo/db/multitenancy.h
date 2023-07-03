@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/tenant_id.h"

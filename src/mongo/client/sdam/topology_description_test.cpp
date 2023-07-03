@@ -28,14 +28,28 @@
  */
 
 
-#include "mongo/client/sdam/sdam_test_base.h"
-#include "mongo/client/sdam/topology_description.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <cstddef>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
+#include "mongo/client/sdam/sdam_test_base.h"
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/server_description_builder.h"
+#include "mongo/client/sdam/topology_description.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/death_test.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/rpc/topology_version_gen.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

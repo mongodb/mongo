@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Tests concurrent time-series inserts, with enough batches and data to force buckets to be closed
  * due to the memory usage threshold.
@@ -11,7 +9,7 @@
  * ]
  */
 
-var $config = (function() {
+export const $config = (function() {
     const timeFieldName = 'time';
     const metaFieldName = 'tag';
     const numDocs = 100;

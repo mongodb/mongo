@@ -29,24 +29,42 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <functional>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
 class OperationContext;
+
 class RemoteCommandTargeter;
 
 /**
@@ -304,6 +322,8 @@ private:
      * Identifier of the shard as obtained from the configuration data (i.e. shard0000).
      */
     const ShardId _id;
+
+    friend class ConfigShardWrapper;
 };
 
 }  // namespace mongo

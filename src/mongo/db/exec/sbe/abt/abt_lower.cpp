@@ -28,6 +28,29 @@
  */
 
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
+
+#include <absl/container/inlined_vector.h>
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <map>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/abt/named_slots.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
@@ -47,7 +70,18 @@
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/containers.h"
+#include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::optimizer {
 
@@ -1061,7 +1095,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
 
         sbe::ScanCallbacks callbacks({}, {}, {});
         if (n.useParallelScan()) {
-            return sbe::makeS<sbe::ParallelScanStage>(nss.uuid().value(),
+            return sbe::makeS<sbe::ParallelScanStage>(nss.uuid(),
                                                       rootSlot,
                                                       scanRidSlot,
                                                       boost::none,
@@ -1085,7 +1119,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
             }
             MONGO_UNREACHABLE;
         }();
-        return sbe::makeS<sbe::ScanStage>(nss.uuid().value(),
+        return sbe::makeS<sbe::ScanStage>(nss.uuid(),
                                           rootSlot,
                                           scanRidSlot,
                                           boost::none,
@@ -1137,17 +1171,17 @@ std::unique_ptr<sbe::EExpression> SBENodeLowering::convertBoundsToExpr(
         ksFnArgs.emplace_back(exprLower.optimize(expr));
     }
 
-    KeyString::Discriminator discriminator;
+    key_string::Discriminator discriminator;
     // For a reverse scan, we start from the high bound and iterate until the low bound.
     if (isLower != reversed) {
         // For the start point, we want to seek ExclusiveBefore iff the bound is inclusive,
         // so that values equal to the seek value are included.
-        discriminator = bound.isInclusive() ? KeyString::Discriminator::kExclusiveBefore
-                                            : KeyString::Discriminator::kExclusiveAfter;
+        discriminator = bound.isInclusive() ? key_string::Discriminator::kExclusiveBefore
+                                            : key_string::Discriminator::kExclusiveAfter;
     } else {
         // For the end point we want the opposite.
-        discriminator = bound.isInclusive() ? KeyString::Discriminator::kExclusiveAfter
-                                            : KeyString::Discriminator::kExclusiveBefore;
+        discriminator = bound.isInclusive() ? key_string::Discriminator::kExclusiveAfter
+                                            : key_string::Discriminator::kExclusiveBefore;
     }
 
     ksFnArgs.emplace_back(sbe::makeE<sbe::EConstant>(
@@ -1214,7 +1248,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n,
     // Unused.
     boost::optional<sbe::value::SlotId> resultSlot;
 
-    return sbe::makeS<sbe::SimpleIndexScanStage>(nss.uuid().value(),
+    return sbe::makeS<sbe::SimpleIndexScanStage>(nss.uuid(),
                                                  indexDefName,
                                                  !reverse,
                                                  resultSlot,
@@ -1251,7 +1285,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SeekNode& n,
 
     sbe::ScanCallbacks callbacks({}, {}, {});
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
-    return sbe::makeS<sbe::ScanStage>(nss.uuid().value(),
+    return sbe::makeS<sbe::ScanStage>(nss.uuid(),
                                       rootSlot,
                                       seekRidSlot,
                                       boost::none,

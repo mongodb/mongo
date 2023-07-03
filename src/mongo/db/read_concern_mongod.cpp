@@ -28,28 +28,71 @@
  */
 
 
+#include <iterator>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <ostream>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/shim.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/read_concern.h"
 #include "mongo/db/read_concern_mongod_gen.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -287,11 +330,11 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
                               const repl::ReadConcernArgs& readConcernArgs,
                               const DatabaseName& dbName,
                               bool allowAfterClusterTime) {
-    // If we are in a direct client within a transaction, then we may be holding locks, so it is
-    // illegal to wait for read concern. This is fine, since the outer operation should have handled
-    // waiting for read concern. We don't want to ignore prepare conflicts because reads in
-    // transactions should block on prepared transactions.
-    if (opCtx->getClient()->isInDirectClient() && opCtx->inMultiDocumentTransaction()) {
+    // If we are in a direct client that's holding a global lock, then this means it is illegal to
+    // wait for read concern. This is fine, since the outer operation should have handled waiting
+    // for read concern. We don't want to ignore prepare conflicts because reads in transactions
+    // should block on prepared transactions.
+    if (opCtx->getClient()->isInDirectClient() && opCtx->lockState()->isLocked()) {
         return Status::OK();
     }
 
@@ -461,6 +504,11 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
 
 Status waitForLinearizableReadConcernImpl(OperationContext* opCtx,
                                           const Milliseconds readConcernTimeout) {
+    // If we are in a direct client that's holding a global lock, then this means this is a
+    // sub-operation of the parent. In this case we delegate the wait to the parent.
+    if (opCtx->getClient()->isInDirectClient() && opCtx->lockState()->isLocked()) {
+        return Status::OK();
+    }
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangBeforeLinearizableReadConcern, opCtx, "hangBeforeLinearizableReadConcern", [opCtx]() {
             LOGV2(20994,
@@ -513,6 +561,12 @@ Status waitForLinearizableReadConcernImpl(OperationContext* opCtx,
 Status waitForSpeculativeMajorityReadConcernImpl(
     OperationContext* opCtx, repl::SpeculativeMajorityReadInfo speculativeReadInfo) {
     invariant(speculativeReadInfo.isSpeculativeRead());
+
+    // If we are in a direct client that's holding a global lock, then this means this is a
+    // sub-operation of the parent. In this case we delegate the wait to the parent.
+    if (opCtx->getClient()->isInDirectClient() && opCtx->lockState()->isLocked()) {
+        return Status::OK();
+    }
 
     // Select the timestamp to wait on. A command may have selected a specific timestamp to wait on.
     // If not, then we use the timestamp selected by the read source.

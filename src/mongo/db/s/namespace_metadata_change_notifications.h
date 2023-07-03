@@ -29,10 +29,15 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <list>
 #include <map>
+#include <memory>
+#include <utility>
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/notification.h"
 
@@ -73,12 +78,21 @@ public:
 
         ~ScopedNotification() {
             if (_token) {
-                _notifications->_unregisterNotificationToken(std::move(_token));
+                _notifications->_unregisterNotificationToken(*_token);
             }
         }
 
         void get(OperationContext* opCtx) {
             _token->notify.get(opCtx);
+        }
+
+        std::shared_ptr<NamespaceMetadataChangeNotifications::NotificationToken> getToken() {
+            return _token;
+        }
+
+        void replaceToken(
+            std::shared_ptr<NamespaceMetadataChangeNotifications::NotificationToken> newToken) {
+            _token = std::move(newToken);
         }
 
     private:
@@ -93,10 +107,17 @@ public:
     ScopedNotification createNotification(const NamespaceString& nss);
 
     /**
-     * Goes through all registered notifications for this namespace signals them and removes them
-     * from the registry atomically.
+     * If the commit time is greater than the current one for this namespace, updates the
+     * notification commit time and signals any notifications that haven't already been notified.
      */
-    void notifyChange(const NamespaceString& nss);
+    void notifyChange(const NamespaceString& nss, const Timestamp& commitTime);
+
+    /**
+     * Blocks until the notification in `notif` is ready and then returns the current commitTime
+     * associated with the namespace and replaces the notification token so that any newer commit
+     * times will notify this waiter again.
+     */
+    Timestamp get(OperationContext* opCtx, ScopedNotification& notif);
 
 private:
     using NotificationsList = std::list<std::shared_ptr<NotificationToken>>;
@@ -112,10 +133,13 @@ private:
             itToErase;
     };
 
-    void _unregisterNotificationToken(std::shared_ptr<NotificationToken> token);
+    void _unregisterNotificationToken(const NotificationToken& token);
+
+    void _unregisterNotificationToken_inlock(WithLock, const NotificationToken& token);
 
     Mutex _mutex = MONGO_MAKE_LATCH("NamespaceMetadataChangeNotifications::_mutex");
-    std::map<NamespaceString, NotificationsList> _notificationsList;
+    // The timestamp represents the latest commitTime for a given namespace seen via notifyChange.
+    std::map<NamespaceString, std::pair<Timestamp, NotificationsList>> _notificationsList;
 };
 
 }  // namespace mongo

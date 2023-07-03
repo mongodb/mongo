@@ -30,8 +30,14 @@
 #pragma once
 
 #include <boost/filesystem/operations.hpp>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
 
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
@@ -84,6 +90,8 @@ private:
 
     PeriodicJobAnchor _job;
 
+    // Copy of the dbpath which is always safe to access.
+    std::string _dbpath;
     // This mutex protects _actions and the entire run loop of the disk space monitor.
     Mutex _mutex = MONGO_MAKE_LATCH("DiskSpaceMonitor::_mutex");
     std::vector<std::unique_ptr<Action>> _actions;

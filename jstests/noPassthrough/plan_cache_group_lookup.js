@@ -2,7 +2,7 @@
  * Test that plans with $group and $lookup lowered to SBE are cached and invalidated correctly.
  * @tags: [
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
- *   cqf_incompatible,
+ *   cqf_experimental_incompatible,
  * ]
  */
 (function() {

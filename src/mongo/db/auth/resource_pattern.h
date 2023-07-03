@@ -29,14 +29,21 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 #include <iosfwd>
 #include <string>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/action_type_gen.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -55,21 +62,12 @@ class ResourcePattern {
 
 public:
     // TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
-    // forAnyResource() - Remove boost::none default.
-    // forAnyNormalResource() - Remove boost::none default.
-    // forClusterResource() - Remove boost::none default.
-    // forDatabaseName() - Remove `StringData` variant.
-    // forCollectionName() - Remove variant without tenantId arg.
-    // forAnySystemBuckets() - Remove boost::none default.
-    // forAnySystemBucketsInDatabase() - Remove `StringData` variant.
-    // forAnySystemBucketsInAnyDatabase() - Remove variant without tenantId arg.
-    // forExactSystemBucketsCollection() - Remove variant with discrete db/coll args.
     // databaseToMatch() - Remove in favor of dbNameToMatch.
 
     /**
      * Returns a pattern that matches absolutely any resource.
      */
-    static ResourcePattern forAnyResource(const boost::optional<TenantId>& tenantId = boost::none) {
+    static ResourcePattern forAnyResource(const boost::optional<TenantId>& tenantId) {
         return ResourcePattern(MatchTypeEnum::kMatchAnyResource, tenantId);
     }
 
@@ -77,16 +75,14 @@ public:
      * Returns a pattern that matches any database or collection resource except collections for
      * which ns.isSystem().
      */
-    static ResourcePattern forAnyNormalResource(
-        const boost::optional<TenantId>& tenantId = boost::none) {
+    static ResourcePattern forAnyNormalResource(const boost::optional<TenantId>& tenantId) {
         return ResourcePattern(MatchTypeEnum::kMatchAnyNormalResource, tenantId);
     }
 
     /**
      * Returns a pattern that matches the "cluster" resource.
      */
-    static ResourcePattern forClusterResource(
-        const boost::optional<TenantId>& tenantId = boost::none) {
+    static ResourcePattern forClusterResource(const boost::optional<TenantId>& tenantId) {
         return ResourcePattern(MatchTypeEnum::kMatchClusterResource, tenantId);
     }
 
@@ -95,13 +91,9 @@ public:
      * "ns" for which ns.isSystem() is false and ns.db() == dbname.
      */
     static ResourcePattern forDatabaseName(const DatabaseName& dbName) {
-        return ResourcePattern(MatchTypeEnum::kMatchDatabaseName, NamespaceString(dbName));
-    }
-
-    static ResourcePattern forDatabaseName(StringData dbName) {
         return ResourcePattern(
             MatchTypeEnum::kMatchDatabaseName,
-            NamespaceString::createNamespaceStringForAuth(boost::none, dbName, ""));
+            NamespaceString::createNamespaceStringForAuth(dbName.tenantId(), dbName.db(), ""_sd));
     }
 
     /**
@@ -115,10 +107,6 @@ public:
             NamespaceString::createNamespaceStringForAuth(tenantId, ""_sd, collectionName));
     }
 
-    static ResourcePattern forCollectionName(StringData collectionName) {
-        return forCollectionName(boost::none, collectionName);
-    }
-
     /**
      * Returns a pattern that matches the given exact namespace string.
      */
@@ -130,8 +118,7 @@ public:
      * Returns a pattern that matches any collection with the prefix "system.buckets." in any
      * database.
      */
-    static ResourcePattern forAnySystemBuckets(
-        const boost::optional<TenantId>& tenantId = boost::none) {
+    static ResourcePattern forAnySystemBuckets(const boost::optional<TenantId>& tenantId) {
         return ResourcePattern(MatchTypeEnum::kMatchAnySystemBucketResource, tenantId);
     }
 
@@ -142,12 +129,6 @@ public:
     static ResourcePattern forAnySystemBucketsInDatabase(const DatabaseName& dbName) {
         return ResourcePattern(MatchTypeEnum::kMatchAnySystemBucketInDBResource,
                                NamespaceString(dbName));
-    }
-
-    static ResourcePattern forAnySystemBucketsInDatabase(StringData dbName) {
-        return ResourcePattern(
-            MatchTypeEnum::kMatchAnySystemBucketInDBResource,
-            NamespaceString::createNamespaceStringForAuth(boost::none, dbName, ""));
     }
 
     /**
@@ -161,23 +142,15 @@ public:
             NamespaceString::createNamespaceStringForAuth(boost::none, "", collectionName));
     }
 
-    static ResourcePattern forAnySystemBucketsInAnyDatabase(StringData collectionName) {
-        return forAnySystemBucketsInAnyDatabase(boost::none, collectionName);
-    }
-
     /**
      * Returns a pattern that matches a collection with the name
      * "<dbName>.system.buckets.<collectionName>"
      */
     static ResourcePattern forExactSystemBucketsCollection(const NamespaceString& nss) {
-        invariant(!nss.coll().startsWith("system.buckets."));
+        uassert(ErrorCodes::InvalidNamespace,
+                "Invalid namespace '{}.system.buckets.{}'"_format(nss.db(), nss.coll()),
+                !nss.coll().startsWith("system.buckets."));
         return ResourcePattern(MatchTypeEnum::kMatchExactSystemBucketResource, nss);
-    }
-
-    static ResourcePattern forExactSystemBucketsCollection(StringData dbName,
-                                                           StringData collectionName) {
-        return forExactSystemBucketsCollection(
-            NamespaceString::createNamespaceStringForAuth(boost::none, dbName, collectionName));
     }
 
     /**
@@ -298,11 +271,24 @@ public:
     std::string toString() const;
 
     bool operator==(const ResourcePattern& other) const {
-        if (_matchType != other._matchType)
-            return false;
-        if (_ns != other._ns)
-            return false;
-        return true;
+        return (_matchType == other._matchType) && (_ns == other._ns);
+    }
+
+    bool operator<(const ResourcePattern& other) const {
+        if (_matchType < other._matchType) {
+            return true;
+        }
+        return (_matchType == other._matchType) && (_ns < other._ns);
+    }
+
+    /**
+     * Perform an equality comparison ignoring the TenantID component of NamespaceString.
+     * This is necessary during migration of ResourcePattern to be tenant aware.
+     * TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
+     */
+    bool matchesIgnoringTenant(const ResourcePattern& other) const {
+        return (_matchType == other._matchType) && (_ns.db() == other._ns.db()) &&
+            (_ns.coll() == other._ns.coll());
     }
 
     template <typename H>

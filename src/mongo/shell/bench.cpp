@@ -29,23 +29,48 @@
 
 #include "mongo/shell/bench.h"
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <exception>
+#include <mutex>
 #include <string>
+#include <utility>
 
 #include "mongo/base/shim.h"
-#include "mongo/client/dbclient_cursor.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/client/read_preference_gen.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/scripting/bson_template_evaluator.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/md5.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
-#include "mongo/util/version.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -113,7 +138,7 @@ BSONObj fixQuery(const BSONObj& obj, BsonTemplateEvaluator& btl) {
         return obj;
 
     BSONObjBuilder b(obj.objsize() + 128);
-    verify(BsonTemplateEvaluator::StatusSuccess == btl.evaluate(obj, b));
+    MONGO_verify(BsonTemplateEvaluator::StatusSuccess == btl.evaluate(obj, b));
     return b.obj();
 }
 
@@ -209,8 +234,7 @@ int runQueryWithReadCommands(DBClientBase* conn,
                              Milliseconds delayBeforeGetMore,
                              BSONObj readPrefObj,
                              BSONObj* objOut) {
-    const auto dbName =
-        findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).dbName();
+    const auto dbName = findCommand->getNamespaceOrUUID().dbName();
 
     BSONObj findCommandResult;
     BSONObj findCommandObj = findCommand->toBSON(readPrefObj);
@@ -243,9 +267,10 @@ int runQueryWithReadCommands(DBClientBase* conn,
     while (cursorResponse.getCursorId() != 0) {
         sleepFor(delayBeforeGetMore);
 
+        invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
         GetMoreCommandRequest getMoreRequest(
             cursorResponse.getCursorId(),
-            findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).coll().toString());
+            findCommand->getNamespaceOrUUID().nss().coll().toString());
         getMoreRequest.setBatchSize(findCommand->getBatchSize());
         BSONObj getMoreCommandResult;
         uassert(ErrorCodes::CommandFailed,
@@ -840,7 +865,7 @@ void BenchRunState::tellWorkersToCollectStats() {
 
 void BenchRunState::assertFinished() const {
     stdx::lock_guard<Latch> lk(_mutex);
-    verify(0 == _numUnstartedWorkers + _numActiveWorkers);
+    MONGO_verify(0 == _numUnstartedWorkers + _numActiveWorkers);
 }
 
 bool BenchRunState::shouldWorkerFinish() const {
@@ -853,7 +878,7 @@ bool BenchRunState::shouldWorkerCollectStats() const {
 
 void BenchRunState::onWorkerStarted() {
     stdx::lock_guard<Latch> lk(_mutex);
-    verify(_numUnstartedWorkers > 0);
+    MONGO_verify(_numUnstartedWorkers > 0);
     --_numUnstartedWorkers;
     ++_numActiveWorkers;
     if (_numUnstartedWorkers == 0) {
@@ -863,7 +888,7 @@ void BenchRunState::onWorkerStarted() {
 
 void BenchRunState::onWorkerFinished() {
     stdx::lock_guard<Latch> lk(_mutex);
-    verify(_numActiveWorkers > 0);
+    MONGO_verify(_numActiveWorkers > 0);
     --_numActiveWorkers;
     if (_numActiveWorkers + _numUnstartedWorkers == 0) {
         _stateChangeCondition.notify_all();
@@ -907,7 +932,7 @@ bool BenchRunWorker::shouldCollectStats() const {
  * Executes the workload on a worker thread. This is the main routine for benchRunXXX() benchmarks.
  */
 void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
-    verify(conn);
+    MONGO_verify(conn);
     long long count = 0;
     Timer timer;
 
@@ -1084,7 +1109,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                            "namespace"_attr = this->ns,
                            "expected"_attr = this->expectedDoc,
                            "got"_attr = result);
-                verify(false);
+                MONGO_verify(false);
             }
         } break;
         case OpType::COMMAND: {
@@ -1198,7 +1223,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                            "namespace"_attr = this->ns,
                            "expected"_attr = this->expected,
                            "got"_attr = count);
-                verify(false);
+                MONGO_verify(false);
             }
             LOGV2_DEBUG(22798, 5, "Result from benchRun thread [query]", "count"_attr = count);
         } break;
@@ -1578,7 +1603,7 @@ BSONObj BenchRunner::benchRunSync(const BSONObj& argsFake, void* data) {
  * give each worker all the entries to be executed round-robin until the 'seconds' timer expires.
  */
 BSONObj BenchRunner::benchRunOnce(const BSONObj& argsFake, void* data) {
-    verify(argsFake.firstElement().isABSONObj());
+    MONGO_verify(argsFake.firstElement().isABSONObj());
     BSONObj args = argsFake.firstElement().Obj();
 
     // Add a config field to indicate this variant.
@@ -1594,7 +1619,7 @@ BSONObj BenchRunner::benchRunOnce(const BSONObj& argsFake, void* data) {
  * benchRun( { ops : [] , host : XXX , db : XXXX , parallel : 5 , seconds : 5 }
  */
 BSONObj BenchRunner::benchStart(const BSONObj& argsFake, void* data) {
-    verify(argsFake.firstElement().isABSONObj());
+    MONGO_verify(argsFake.firstElement().isABSONObj());
     BSONObj args = argsFake.firstElement().Obj();
 
     // Get new BenchRunner object

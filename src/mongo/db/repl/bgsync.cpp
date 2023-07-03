@@ -30,33 +30,61 @@
 
 #include "mongo/db/repl/bgsync.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+// IWYU pragma: no_include "cxxabi.h"
+#include <chrono>
+#include <exception>
 #include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/util/bson_extract.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/client/connection_pool.h"
+#include "mongo/client/dbclient_base.h"
+#include "mongo/client/dbclient_connection.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/data_replicator_external_state_impl.h"
-#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/oplog_interface_remote.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rollback_source_impl.h"
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shutdown_in_progress_quiesce_info.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
@@ -800,10 +828,8 @@ void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
     StorageInterface* storageInterface,
     OplogInterfaceRemote::GetConnectionFn getConnection) {
 
-    OplogInterfaceRemote remoteOplog(source,
-                                     getConnection,
-                                     NamespaceString::kRsOplogNamespace.ns(),
-                                     rollbackRemoteOplogQueryBatchSize.load());
+    OplogInterfaceRemote remoteOplog(
+        source, getConnection, rollbackRemoteOplogQueryBatchSize.load());
 
     {
         stdx::lock_guard<Latch> lock(_mutex);
@@ -843,10 +869,8 @@ void BackgroundSync::_fallBackOnRollbackViaRefetch(
     OplogInterface* localOplog,
     OplogInterfaceRemote::GetConnectionFn getConnection) {
 
-    RollbackSourceImpl rollbackSource(getConnection,
-                                      source,
-                                      NamespaceString::kRsOplogNamespace.ns(),
-                                      rollbackRemoteOplogQueryBatchSize.load());
+    RollbackSourceImpl rollbackSource(
+        getConnection, source, rollbackRemoteOplogQueryBatchSize.load());
 
     rollback(opCtx, *localOplog, rollbackSource, requiredRBID, _replCoord, _replicationProcess);
 }

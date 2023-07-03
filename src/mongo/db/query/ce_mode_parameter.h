@@ -31,6 +31,8 @@
 
 #include <string>
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/db/tenant_id.h"
 

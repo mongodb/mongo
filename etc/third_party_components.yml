@@ -255,13 +255,6 @@ components:
     team_owner: "Query"
     upgrade_suppression: TODO SERVER-64574
 
-  "mpark-variant-devel":
-    homepage_url: https://github.com/mpark/variant
-    open_hub_url: N/A
-    release_monitoring_id: 18301
-    local_directory_path: src/third_party/variant-1.4.0
-    team_owner: "Service Architecture"
-
   nlohmann.json.decomposed:
     homepage_url: https://github.com/nlohmann/json
     open_hub_url: https://www.openhub.net/p/nlohmann_json

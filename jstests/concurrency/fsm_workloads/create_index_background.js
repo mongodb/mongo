@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * create_index_background.js
  *
@@ -15,7 +13,7 @@
  */
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         nDocumentsToSeed: 1000,
         nDocumentsToCreate: 200,
@@ -68,7 +66,7 @@ var $config = (function() {
                     return coll.find({crud: {$exists: true}}).itcount() > 0;
                 }, 'No documents with "crud" field have been inserted or updated', 60 * 1000);
 
-                let createOptions = {background: true};
+                let createOptions = {};
                 let filter = this.getPartialFilterExpression();
                 if (filter !== undefined) {
                     createOptions['partialFilterExpression'] = filter;

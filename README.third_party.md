@@ -54,11 +54,10 @@ a notice will be included in
 | [Unicode]                  | Unicode-DFS-2015  | 8.0.0             |          ✗           |                ✗                |
 | [libunwind]                | MIT               | 1.6.2 + changes   |                      |                ✗                |
 | [Valgrind]                 | BSD-3-Clause<sup>\[<a href="#note_vg" id="ref_vg">1</a>]</sup> | 3.17.0 | |             ✗                |
-| [variant]                  | BSL-1.0           | 1.4.0             |                      |                ✗                |
 | [wiredtiger]               |                   | <sup>\[<a href="#note_wt" id="ref_wt">2</a>]</sup> | ✗ |  ✗                |
 | [yaml-cpp]                 | MIT               | 0.6.2             |                      |                ✗                |
 | [Zlib]                     | Zlib              | 1.2.13            |          ✗           |                ✗                |
-| [Zstandard]                | BSD-3-Clause      | 1.5.2             |          ✗           |                ✗                |
+| [Zstandard]                | BSD-3-Clause      | 1.5.5             |          ✗           |                ✗                |
 
 [abseil-cpp]: https://github.com/abseil/abseil-cpp
 [ASIO]: https://github.com/chriskohlhoff/asio
@@ -88,7 +87,6 @@ a notice will be included in
 [Unicode]: http://www.unicode.org/versions/enumeratedversions.html
 [libunwind]: http://www.nongnu.org/libunwind/
 [Valgrind]: http://valgrind.org/downloads/current.html
-[variant]: https://github.com/mpark/variant
 [wiredtiger]: https://github.com/wiredtiger/wiredtiger
 [yaml-cpp]: https://github.com/jbeder/yaml-cpp/releases
 [Zlib]: https://zlib.net/

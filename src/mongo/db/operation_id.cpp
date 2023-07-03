@@ -29,6 +29,10 @@
 
 #include "mongo/db/operation_id.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include <absl/container/node_hash_set.h>
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

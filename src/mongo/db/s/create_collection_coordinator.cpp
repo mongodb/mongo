@@ -28,42 +28,112 @@
  */
 
 
-#include "mongo/db/s/create_collection_coordinator_document_gen.h"
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <list>
+#include <mutex>
+#include <set>
+#include <tuple>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
-#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/cluster_transaction_api.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/create_gen.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/persistent_task_store.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/create_collection_coordinator.h"
+#include "mongo/db/s/create_collection_coordinator_document_gen.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/remove_chunks_gen.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_key_util.h"
+#include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/timeseries/catalog_helper.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/transaction/transaction_api.h"
+#include "mongo/db/write_concern.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/async_requests_sender.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
+#include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/index_version.h"
+#include "mongo/s/shard_util.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/s/write_ops/batch_write_exec.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -86,7 +156,7 @@ OptionsAndIndexes getCollectionOptionsAndIndexes(OperationContext* opCtx,
     BSONObjBuilder optionsBob;
 
     auto all =
-        localClient.getCollectionInfos(nssOrUUID.dbName(), BSON("info.uuid" << *nssOrUUID.uuid()));
+        localClient.getCollectionInfos(nssOrUUID.dbName(), BSON("info.uuid" << nssOrUUID.uuid()));
 
     // There must be a collection at this time.
     invariant(!all.empty());
@@ -334,7 +404,7 @@ void insertChunks(OperationContext* opCtx,
 
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        cluster::write(newOpCtx.get(), insertRequest, &stats, &response);
+        cluster::write(newOpCtx.get(), insertRequest, nullptr /* nss */, &stats, &response);
         uassertStatusOK(response.toStatus());
     }
 }
@@ -536,10 +606,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             cleanupPartialChunksFromPreviousAttempt(
                                 opCtx, *uuid, getNewSession(opCtx));
 
-                            broadcastDropCollection(opCtx,
-                                                    NamespaceString{nss().toString()},
-                                                    **executor,
-                                                    getNewSession(opCtx));
+                            broadcastDropCollection(opCtx, nss(), **executor, getNewSession(opCtx));
                         }
                     }
                 }
@@ -584,7 +651,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 _createCollectionAndIndexes(opCtx, shardKeyPattern);
 
                 audit::logShardCollection(opCtx->getClient(),
-                                          nss().toString(),
+                                          NamespaceStringUtil::serialize(nss()),
                                           *_request.getShardKey(),
                                           _request.getUnique().value_or(false));
 
@@ -916,22 +983,8 @@ bool CreateCollectionCoordinator::_timeseriesNssResolvedByCommandHandler() const
 }
 
 void CreateCollectionCoordinator::_acquireCriticalSections(OperationContext* opCtx) {
-    // TODO SERVER-68084 call ShardingRecoveryService without the try/catch block
-    try {
-        ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
-            opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
-    } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
-        if (_timeseriesNssResolvedByCommandHandler()) {
-            throw;
-        }
-
-        // In case we acquisition was rejected because it targets an existing view, the critical
-        // section is not needed and the error can be dropped because:
-        //   1. We will not shard the view namespace
-        //   2. This collection will remain a view since we are holding the DDL coll lock and
-        //   thus the collection can't be dropped.
-        _doc.setDisregardCriticalSectionOnOriginalNss(true);
-    }
+    ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
+        opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
     if (!_timeseriesNssResolvedByCommandHandler()) {
         // Preventively acquire the critical section protecting the buckets namespace that the
@@ -944,11 +997,8 @@ void CreateCollectionCoordinator::_acquireCriticalSections(OperationContext* opC
 
 void CreateCollectionCoordinator::_promoteCriticalSectionsToBlockReads(
     OperationContext* opCtx) const {
-    // TODO SERVER-68084 call ShardingRecoveryService without the if blocks.
-    if (!_doc.getDisregardCriticalSectionOnOriginalNss()) {
-        ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
-            opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
-    }
+    ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
+        opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
     if (!_timeseriesNssResolvedByCommandHandler()) {
         const auto bucketsNamespace = originalNss().makeTimeseriesBucketsNamespace();
@@ -959,18 +1009,12 @@ void CreateCollectionCoordinator::_promoteCriticalSectionsToBlockReads(
 
 void CreateCollectionCoordinator::_releaseCriticalSections(OperationContext* opCtx,
                                                            bool throwIfReasonDiffers) {
-    // TODO SERVER-68084 call ShardingRecoveryService without the try/catch block.
-    try {
-        ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
-            opCtx,
-            originalNss(),
-            _critSecReason,
-            ShardingCatalogClient::kMajorityWriteConcern,
-            throwIfReasonDiffers);
-    } catch (ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
-        // Ignore the error (when it is raised, we can assume that no critical section for the view
-        // was previously acquired).
-    }
+    ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+        opCtx,
+        originalNss(),
+        _critSecReason,
+        ShardingCatalogClient::kMajorityWriteConcern,
+        throwIfReasonDiffers);
 
     if (!_timeseriesNssResolvedByCommandHandler()) {
         const auto bucketsNamespace = originalNss().makeTimeseriesBucketsNamespace();
@@ -996,40 +1040,6 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(
 
     // We need to implicitly create a timeseries view and underlying bucket collection.
     if (_collectionEmpty && _request.getTimeseries()) {
-        // TODO SERVER-68084 Remove viewLock and the whole if section that constructs it while
-        // releasing the critical section on the originalNss.
-        boost::optional<AutoGetCollection> viewLock;
-        if (auto criticalSectionAcquiredOnOriginalNss =
-                !_doc.getDisregardCriticalSectionOnOriginalNss();
-            !_timeseriesNssResolvedByCommandHandler() && criticalSectionAcquiredOnOriginalNss) {
-            // This is the subcase of a not yet existing pair of view (originalNss)+ bucket (nss)
-            // timeseries collection that the DDL will have to create. Due to the current
-            // constraints of the code:
-            // - Such creation cannot be performed while holding the critical section over the views
-            // namespace (once the view gets created, the CS will not be releasable); instead,
-            // exclusive access must be enforced through a collection lock
-            // - The critical section cannot be released while holding a collection lock, so this
-            // operation must be performed first (leaving a small window open to data races)
-            ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
-                opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
-            _doc.setDisregardCriticalSectionOnOriginalNss(true);
-            viewLock.emplace(opCtx,
-                             originalNss(),
-                             LockMode::MODE_X,
-                             AutoGetCollection::Options{}.viewMode(
-                                 auto_get_collection::ViewMode::kViewsPermitted));
-            // Once the exclusive access has been reacquired, ensure that no data race occurred.
-            auto catalog = CollectionCatalog::get(opCtx);
-            if (catalog->lookupView(opCtx, originalNss()) ||
-                catalog->lookupCollectionByNamespace(opCtx, originalNss())) {
-                _completeOnError = true;
-                uasserted(ErrorCodes::NamespaceExists,
-                          str::stream() << "A conflicting DDL operation was completed while trying "
-                                           "to shard collection: "
-                                        << originalNss().toStringForErrorMsg());
-            }
-        }
-
         const auto viewName = nss().getTimeseriesViewNamespace();
         auto createCmd = makeCreateCommand(viewName, collation, *_request.getTimeseries());
 
@@ -1205,10 +1215,8 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
     const auto& placementVersion = _initialChunks->chunks.back().getVersion();
 
     if (_request.getTimeseries()) {
-        TimeseriesOptions timeseriesOptions = *_request.getTimeseries();
-        (void)timeseries::validateAndSetBucketingParameters(timeseriesOptions);
         TypeCollectionTimeseriesFields timeseriesFields;
-        timeseriesFields.setTimeseriesOptions(std::move(timeseriesOptions));
+        timeseriesFields.setTimeseriesOptions(*_request.getTimeseries());
         coll->setTimeseriesFields(std::move(timeseriesFields));
     }
 
@@ -1273,10 +1281,11 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
         }
 
         auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardid));
-        shard->runFireAndForgetCommand(opCtx,
-                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                       DatabaseName::kAdmin.toString(),
-                                       BSON("_flushRoutingTableCacheUpdates" << nss().ns()));
+        shard->runFireAndForgetCommand(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            DatabaseName::kAdmin.toString(),
+            BSON("_flushRoutingTableCacheUpdates" << NamespaceStringUtil::serialize(nss())));
     }
 
     LOGV2(5277901,
@@ -1299,11 +1308,12 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
 
 void CreateCollectionCoordinator::_logStartCreateCollection(OperationContext* opCtx) {
     BSONObjBuilder collectionDetail;
+    const auto serializedNss = NamespaceStringUtil::serialize(originalNss());
     collectionDetail.append("shardKey", *_request.getShardKey());
-    collectionDetail.append("collection", originalNss().ns());
+    collectionDetail.append("collection", serializedNss);
     collectionDetail.append("primary", ShardingState::get(opCtx)->shardId().toString());
     ShardingLogging::get(opCtx)->logChange(
-        opCtx, "shardCollection.start", originalNss().ns(), collectionDetail.obj());
+        opCtx, "shardCollection.start", serializedNss, collectionDetail.obj());
 }
 
 void CreateCollectionCoordinator::_logEndCreateCollection(OperationContext* opCtx) {
@@ -1315,8 +1325,10 @@ void CreateCollectionCoordinator::_logEndCreateCollection(OperationContext* opCt
     if (_initialChunks)
         collectionDetail.appendNumber("numChunks",
                                       static_cast<long long>(_initialChunks->chunks.size()));
-    ShardingLogging::get(opCtx)->logChange(
-        opCtx, "shardCollection.end", originalNss().ns(), collectionDetail.obj());
+    ShardingLogging::get(opCtx)->logChange(opCtx,
+                                           "shardCollection.end",
+                                           NamespaceStringUtil::serialize(originalNss()),
+                                           collectionDetail.obj());
 }
 
 }  // namespace mongo

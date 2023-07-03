@@ -131,12 +131,28 @@ class TestBinder(testcase.IDLTestcase):
         spec = self.assert_bind(
             textwrap.dedent("""
         global:
-            cpp_namespace: 'something'
+            cpp_namespace: 'mongo'
             cpp_includes:
                 - 'bar'
                 - 'foo'"""))
-        self.assertEqual(spec.globals.cpp_namespace, "something")
+        self.assertEqual(spec.globals.cpp_namespace, "mongo")
         self.assertListEqual(spec.globals.cpp_includes, ['bar', 'foo'])
+
+        spec = self.assert_bind(
+            textwrap.dedent("""
+        global:
+            cpp_namespace: 'mongo::nested'
+        """))
+        self.assertEqual(spec.globals.cpp_namespace, "mongo::nested")
+
+    def test_global_negatives(self):
+        # type: () -> None
+        """Postive global tests."""
+        self.assert_bind_fail(
+            textwrap.dedent("""
+        global:
+            cpp_namespace: 'something'
+        """), idl.errors.ERROR_ID_BAD_CPP_NAMESPACE)
 
     def test_type_positive(self):
         # type: () -> None
@@ -1587,6 +1603,18 @@ class TestBinder(testcase.IDLTestcase):
                     v3: 2
             """))
 
+        # Test int - non continuous
+        self.assert_bind(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                type: int
+                values:
+                    v1: 0
+                    v3: 2
+            """))
+
         # Test string
         self.assert_bind(
             textwrap.dedent("""
@@ -1614,18 +1642,6 @@ class TestBinder(testcase.IDLTestcase):
                 values:
                     v1: 0
             """), idl.errors.ERROR_ID_ENUM_BAD_TYPE)
-
-        # Test int - non continuous
-        self.assert_bind_fail(
-            textwrap.dedent("""
-        enums:
-            foo:
-                description: foo
-                type: int
-                values:
-                    v1: 0
-                    v3: 2
-            """), idl.errors.ERROR_ID_ENUM_NON_CONTINUOUS_RANGE)
 
         # Test int - dups
         self.assert_bind_fail(

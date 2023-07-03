@@ -29,8 +29,22 @@
 
 #pragma once
 
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/type_traits/decay.hpp>
+#include <cstdint>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/duplicate_key_tracker.h"
@@ -38,9 +52,16 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/skipped_record_tracker.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/yieldable.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 
@@ -98,6 +119,7 @@ public:
      * On success, `numKeysOut` if non-null will contain the number of keys added or removed.
      */
     Status sideWrite(OperationContext* opCtx,
+                     const IndexCatalogEntry* indexCatalogEntry,
                      const KeyStringSet& keys,
                      const KeyStringSet& multikeyMetadataKeys,
                      const MultikeyPaths& multikeyPaths,
@@ -114,6 +136,7 @@ public:
      * that will be removed.
      */
     Status sideWrite(OperationContext* opCtx,
+                     const IndexCatalogEntry* indexCatalogEntry,
                      const std::vector<column_keygen::CellPatch>& keys,
                      int64_t* numKeysWrittenOut,
                      int64_t* numKeysDeletedOut);
@@ -122,14 +145,17 @@ public:
      * Given a duplicate key, record the key for later verification by a call to
      * checkDuplicateKeyConstraints();
      */
-    Status recordDuplicateKey(OperationContext* opCtx, const KeyString::Value& key) const;
+    Status recordDuplicateKey(OperationContext* opCtx,
+                              const IndexCatalogEntry* indexCatalogEntry,
+                              const key_string::Value& key) const;
 
     /**
      * Returns Status::OK if all previously recorded duplicate key constraint violations have been
      * resolved for the index. Returns a DuplicateKey error if there are still duplicate key
      * constraint violations on the index.
      */
-    Status checkDuplicateKeyConstraints(OperationContext* opCtx) const;
+    Status checkDuplicateKeyConstraints(OperationContext* opCtx,
+                                        const IndexCatalogEntry* indexCatalogEntry) const;
 
 
     /**
@@ -142,6 +168,7 @@ public:
      */
     Status drainWritesIntoIndex(OperationContext* opCtx,
                                 const CollectionPtr& coll,
+                                const IndexCatalogEntry* indexCatalogEntry,
                                 const InsertDeleteOptions& options,
                                 TrackDuplicates trackDups,
                                 DrainYieldPolicy drainYieldPolicy);
@@ -164,6 +191,7 @@ public:
     Status retrySkippedRecords(
         OperationContext* opCtx,
         const CollectionPtr& collection,
+        const IndexCatalogEntry* indexCatalogEntry,
         RetrySkippedRecordMode mode = RetrySkippedRecordMode::kKeyGenerationAndInsertion);
 
     /**
@@ -198,6 +226,7 @@ private:
 
     Status _applyWrite(OperationContext* opCtx,
                        const CollectionPtr& coll,
+                       const IndexCatalogEntry* indexCatalogEntry,
                        const BSONObj& doc,
                        const InsertDeleteOptions& options,
                        TrackDuplicates trackDups,
@@ -209,16 +238,18 @@ private:
     /**
      * Yield lock manager locks and abandon the current storage engine snapshot.
      */
-    void _yield(OperationContext* opCtx, const Yieldable* yieldable);
+    void _yield(OperationContext* opCtx,
+                const IndexCatalogEntry* indexCatalogEntry,
+                const Yieldable* yieldable);
 
     void _checkDrainPhaseFailPoint(OperationContext* opCtx,
+                                   const IndexCatalogEntry* indexCatalogEntry,
                                    FailPoint* fp,
                                    long long iteration) const;
 
-    Status _finishSideWrite(OperationContext* opCtx, const std::vector<BSONObj>& toInsert);
-
-    // The entry for the index that is being built.
-    const IndexCatalogEntry* _indexCatalogEntry;
+    Status _finishSideWrite(OperationContext* opCtx,
+                            const IndexCatalogEntry* indexCatalogEntry,
+                            const std::vector<BSONObj>& toInsert);
 
     // This temporary record store records intercepted keys that will be written into the index by
     // calling drainWritesIntoIndex(). It is owned by the interceptor and dropped along with it.
