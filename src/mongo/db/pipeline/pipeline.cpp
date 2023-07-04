@@ -217,14 +217,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseCommon(
     PipelineValidatorCallback validator,
     std::function<BSONObj(T)> getElemFunc) {
 
-    // Before parsing the pipeline, make sure it's not so long that it will make us run out of
-    // memory.
-    uassert(7749501,
-            str::stream() << "Pipeline length must be no longer than "
-                          << internalPipelineLengthLimit << " stages.",
-            static_cast<int>(rawPipeline.size()) <= internalPipelineLengthLimit);
-
     SourceContainer stages;
+
     for (auto&& stageElem : rawPipeline) {
         auto parsedSources = DocumentSource::parse(expCtx, getElemFunc(stageElem));
         stages.insert(stages.end(), parsedSources.begin(), parsedSources.end());
@@ -285,7 +279,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::create(
 }
 
 void Pipeline::validateCommon(bool alreadyOptimized) const {
-    uassert(5054701,
+    uassert(ErrorCodes::FailedToParse,
             str::stream() << "Pipeline length must be no longer than "
                           << internalPipelineLengthLimit << " stages",
             static_cast<int>(_sources.size()) <= internalPipelineLengthLimit);

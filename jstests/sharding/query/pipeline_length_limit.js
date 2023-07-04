@@ -10,29 +10,6 @@ function testLimits(testDB, lengthLimit) {
     let maxLength = lengthLimit;
     let tooLarge = lengthLimit + 1;
 
-    // Test that the enforced pre-parse length limit is the same as the post-parse limit.
-    // We use $count because it is desugared into two separate stages, so it will pass the pre-parse
-    // limit but fail after.
-    let kPreParseErrCode = 7749501;
-    let kPostParseErrCode = 5054701;
-
-    // 1. This test case will pass the pre-parse enforcer but fail after.
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: "test",
-        cursor: {},
-        pipeline: new Array(maxLength).fill({$count: "thecount"})
-    }),
-                                 kPostParseErrCode);
-
-    // 2. This test case should be caught by the pre-parse enforcer, and the error code reflects
-    // that.
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: "test",
-        cursor: {},
-        pipeline: new Array(tooLarge).fill({$count: "thecount"})
-    }),
-                                 kPreParseErrCode);
-
     assert.commandWorked(testDB.runCommand({
         aggregate: "test",
         cursor: {},
@@ -43,7 +20,7 @@ function testLimits(testDB, lengthLimit) {
         cursor: {},
         pipeline: new Array(tooLarge).fill({$project: {_id: 1}})
     }),
-                                 kPreParseErrCode);
+                                 ErrorCodes.FailedToParse);
     testDB.setLogLevel(1);
 
     assert.commandWorked(testDB.runCommand({
@@ -59,7 +36,7 @@ function testLimits(testDB, lengthLimit) {
         pipeline:
             [{$unionWith: {coll: "test", pipeline: new Array(tooLarge).fill({$project: {_id: 1}})}}]
     }),
-                                 kPreParseErrCode);
+                                 ErrorCodes.FailedToParse);
 
     assert.commandWorked(testDB.runCommand({
         aggregate: "test",
@@ -71,7 +48,7 @@ function testLimits(testDB, lengthLimit) {
         cursor: {},
         pipeline: [{$facet: {foo: new Array(tooLarge).fill({$project: {_id: 1}}), bar: []}}]
     }),
-                                 kPreParseErrCode);
+                                 ErrorCodes.FailedToParse);
 
     assert.commandWorked(testDB.runCommand(
         {update: "test", updates: [{q: {}, u: new Array(maxLength).fill({$project: {_id: 1}})}]}));
@@ -79,7 +56,7 @@ function testLimits(testDB, lengthLimit) {
         update: "test",
         updates: [{q: {}, u: new Array(tooLarge).fill({$project: {_id: 1}})}]
     }),
-                                 kPreParseErrCode);
+                                 ErrorCodes.FailedToParse);
 
     const collname = "test";
 
@@ -164,7 +141,7 @@ function testLimits(testDB, lengthLimit) {
                 {from: "test", as: "as", pipeline: new Array(tooLarge).fill({$project: {_id: 1}})}
         }]
     }),
-                                 [kPostParseErrCode, kPreParseErrCode]);
+                                 ErrorCodes.FailedToParse);
 }
 
 function runTest(lengthLimit, mongosConfig = {}, mongodConfig = {}) {
