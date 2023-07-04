@@ -191,6 +191,7 @@ __wt_hs_verify(WT_SESSION_IMPL *session)
         }
 
         WT_ERR(__wt_open_cursor(session, uri_data, NULL, NULL, &ds_cursor));
+        __wt_free(session, uri_data);
         F_SET(ds_cursor, WT_CURSOR_RAW_OK);
 
         /* Note that the following call moves the hs cursor internally. */
