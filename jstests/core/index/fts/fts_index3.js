@@ -110,6 +110,11 @@ assert.commandWorked(coll.update({}, {$set: {"a.language": "en"}}));
 assert.eq(0, coll.find({$text: {$search: "testing", $language: "es"}}).itcount());
 assert.eq(1, coll.find({$text: {$search: "testing", $language: "en"}}).itcount());
 
+// SERVER-78238: index with a dotted path should not index fields with a dot inside that make it
+// look like a dotted path.
+assert.commandWorked(coll.insert({"a.b": "ignored"}));
+assert.eq(0, coll.find({$text: {$search: "ignored"}}).itcount());
+
 // 10) Same as #9, but with a wildcard text index.
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
@@ -120,6 +125,11 @@ assert.eq(0, coll.find({$text: {$search: "testing", $language: "en"}}).itcount()
 assert.commandWorked(coll.update({}, {$set: {"a.language": "en"}}));
 assert.eq(0, coll.find({$text: {$search: "testing", $language: "es"}}).itcount());
 assert.eq(1, coll.find({$text: {$search: "testing", $language: "en"}}).itcount());
+
+// SERVER-78238: index with a wildcard should not index fields with a dot inside or starting with $.
+assert.commandWorked(coll.insert({"a.b": "ignored"}));
+assert.commandWorked(coll.insert({"$personal": "ignored"}));
+assert.eq(0, coll.find({$text: {$search: "ignored"}}).itcount());
 
 // 11) Create a text index on a single field with a custom language override, insert a document,
 // update the language of the document (so as to change the stemming), and verify that $text with

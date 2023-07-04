@@ -109,6 +109,11 @@ FTSIteratorValue FTSElementIterator::advance() {
             continue;
         }
 
+        // SERVER-78238: fields whose name contains a dot or starts with a '$' are not indexable.
+        if (fieldName.find_first_of('.') != string::npos || fieldName.starts_with('$')) {
+            continue;
+        }
+
         // Compose the dotted name of the current field:
         // 1. parent path empty (top level): use the current field name
         // 2. parent path non-empty and obj is an array: use the parent path
