@@ -1844,22 +1844,22 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
                                               &imageToWrite);
     invariant(numOplogEntries > 0);
 
-    // Write change stream pre-images. At this point the pre-images will be written at the
-    // transaction commit timestamp as driven (implicitly) by the last written "applyOps" oplog
-    // entry.
-    writeChangeStreamPreImagesForTransaction(
-        opCtx, statements, applyOpsOplogSlotAndOperationAssignment, wallClockTime);
-
-    if (imageToWrite) {
-        writeToImageCollection(opCtx, *opCtx->getLogicalSessionId(), *imageToWrite);
-    }
-
     repl::OpTime commitOpTime = oplogSlots[numOplogEntries - 1];
     invariant(!commitOpTime.isNull());
     if (opAccumulator) {
         opAccumulator->opTime.writeOpTime = commitOpTime;
         opAccumulator->opTime.wallClockTime = wallClockTime;
     }
+
+    if (imageToWrite) {
+        writeToImageCollection(opCtx, *opCtx->getLogicalSessionId(), *imageToWrite);
+    }
+
+    // Write change stream pre-images. At this point the pre-images will be written at the
+    // transaction commit timestamp as driven (implicitly) by the last written "applyOps" oplog
+    // entry.
+    writeChangeStreamPreImagesForTransaction(
+        opCtx, statements, applyOpsOplogSlotAndOperationAssignment, wallClockTime);
 }
 
 void OpObserverImpl::onBatchedWriteStart(OperationContext* opCtx) {
