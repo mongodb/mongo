@@ -31,7 +31,6 @@
 
 #include <boost/optional.hpp>
 #include <functional>
-#include <memory>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
@@ -51,9 +50,6 @@
 
 namespace mongo {
 
-class OperationContext;
-class RouterExecStage;
-
 /**
  * The resulting ClusterClientCursor will take ownership of the existing remote cursor, generating
  * results based on the cursor's current state.
@@ -65,48 +61,14 @@ class RouterExecStage;
 struct ClusterClientCursorParams {
     ClusterClientCursorParams(NamespaceString nss,
                               APIParameters apiParameters,
-                              boost::optional<ReadPreferenceSetting> readPref = boost::none,
-                              boost::optional<repl::ReadConcernArgs> readConcernArgs = boost::none)
-        : nsString(std::move(nss)), apiParameters(std::move(apiParameters)) {
-        if (readPref) {
-            readPreference = std::move(readPref.get());
-        }
-        if (readConcernArgs) {
-            readConcern = std::move(readConcernArgs.get());
-        }
-    }
+                              boost::optional<ReadPreferenceSetting> readPreference = boost::none,
+                              boost::optional<repl::ReadConcernArgs> readConcern = boost::none);
 
     /**
      * Extracts the subset of fields here needed by the AsyncResultsMerger. The returned
      * AsyncResultsMergerParams will assume ownership of 'remotes'.
      */
-    AsyncResultsMergerParams extractARMParams() {
-        AsyncResultsMergerParams armParams;
-        if (!sortToApplyOnRouter.isEmpty()) {
-            armParams.setSort(sortToApplyOnRouter);
-        }
-        armParams.setCompareWholeSortKey(compareWholeSortKeyOnRouter);
-        armParams.setRemotes(std::move(remotes));
-        armParams.setTailableMode(tailableMode);
-        armParams.setBatchSize(batchSize);
-        armParams.setNss(nsString);
-        armParams.setAllowPartialResults(isAllowPartialResults);
-
-        OperationSessionInfoFromClient sessionInfo;
-        boost::optional<LogicalSessionFromClient> lsidFromClient;
-
-        if (lsid) {
-            lsidFromClient.emplace(lsid->getId());
-            lsidFromClient->setUid(lsid->getUid());
-        }
-
-        sessionInfo.setSessionId(lsidFromClient);
-        sessionInfo.setTxnNumber(txnNumber);
-        sessionInfo.setAutocommit(isAutoCommit);
-        armParams.setOperationSessionInfo(sessionInfo);
-
-        return armParams;
-    }
+    AsyncResultsMergerParams extractARMParams();
 
     // Namespace against which the cursors exist.
     NamespaceString nsString;

@@ -253,7 +253,8 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
         }
 
         if (opCtx->getTxnNumber()) {
-            cmdBuilder.append(OperationSessionInfo::kTxnNumberFieldName, *opCtx->getTxnNumber());
+            cmdBuilder.append(OperationSessionInfoFromClient::kTxnNumberFieldName,
+                              *opCtx->getTxnNumber());
         }
         if (shardId == sampleShardId) {
             analyze_shard_key::appendSampleId(&cmdBuilder, *sampleId);

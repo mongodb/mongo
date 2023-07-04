@@ -296,7 +296,7 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
                                    << WriteConcernOptions::Majority));
     if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
         txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
-        bob.append(OperationSessionInfo::kTxnRetryCounterFieldName, *txnRetryCounter);
+        bob.append(OperationSessionInfoFromClient::kTxnRetryCounterFieldName, *txnRetryCounter);
     }
     apiParams.appendInfo(&bob);
     auto prepareObj = prepareTransaction.toBSON(bob.obj());
@@ -521,7 +521,7 @@ Future<void> sendCommit(ServiceContext* service,
                                    << WriteConcernOptions::Majority));
     if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
         txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
-        bob.append(OperationSessionInfo::kTxnRetryCounterFieldName, *txnRetryCounter);
+        bob.append(OperationSessionInfoFromClient::kTxnRetryCounterFieldName, *txnRetryCounter);
     }
     apiParams.appendInfo(&bob);
     auto commitObj = commitTransaction.toBSON(bob.obj());
@@ -565,7 +565,7 @@ Future<void> sendAbort(ServiceContext* service,
                                    << WriteConcernOptions::Majority));
     if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
         txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
-        bob.append(OperationSessionInfo::kTxnRetryCounterFieldName, *txnRetryCounter);
+        bob.append(OperationSessionInfoFromClient::kTxnRetryCounterFieldName, *txnRetryCounter);
     }
     apiParams.appendInfo(&bob);
     auto abortObj = abortTransaction.toBSON(bob.obj());

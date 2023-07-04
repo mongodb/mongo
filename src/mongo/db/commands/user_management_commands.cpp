@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <boost/optional.hpp>
 #include <cstdint>
 #include <functional>
@@ -143,7 +142,6 @@
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
-
 
 namespace mongo {
 namespace {
@@ -777,13 +775,17 @@ public:
 
     UMCTransaction(OperationContext* opCtx,
                    StringData forCommand,
-                   const boost::optional<TenantId>& tenant) {
-        // Don't transactionalize on standalone.
-        _isReplSet = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
-            repl::ReplicationCoordinator::modeReplSet;
-
-        // Subclient used by transaction operations.
-        _client = opCtx->getServiceContext()->makeClient(forCommand.toString());
+                   const boost::optional<TenantId>& tenant)
+        :  // Don't transactionalize on standalone.
+          _isReplSet{repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
+                     repl::ReplicationCoordinator::modeReplSet},
+          // Subclient used by transaction operations.
+          _client{opCtx->getServiceContext()->makeClient(forCommand.toString())},
+          _dbName{DatabaseNameUtil::deserialize(tenant, kAdminDB)},
+          _sessionInfo{LogicalSessionFromClient(UUID::gen())} {
+        _sessionInfo.setTxnNumber(0);
+        _sessionInfo.setStartTransaction(true);
+        _sessionInfo.setAutocommit(false);
 
         // TODO(SERVER-74660): Please revisit if this thread could be made killable.
         {
@@ -796,14 +798,9 @@ public:
             as->grantInternalAuthorization(_client.get());
         }
 
-        _dbName = DatabaseNameUtil::deserialize(tenant, kAdminDB);
-
         AlternativeClientRegion clientRegion(_client);
-        _sessionInfo.setStartTransaction(true);
-        _sessionInfo.setTxnNumber(0);
-        _sessionInfo.setSessionId(LogicalSessionFromClient(UUID::gen()));
-        _sessionInfo.setAutocommit(false);
     }
+
     ~UMCTransaction() {
         if (_state == TransactionState::kStarted) {
             abort().ignore();
