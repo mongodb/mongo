@@ -98,7 +98,7 @@ OpMsg runCommandInLocalTxn(OperationContext* opCtx,
         bob.append("startTransaction", true);
     }
     bob.append("autocommit", false);
-    bob.append(OperationSessionInfo::kTxnNumberFieldName, txnNumber);
+    bob.append(OperationSessionInfoFromClient::kTxnNumberFieldName, txnNumber);
 
     BSONObjBuilder lsidBuilder(bob.subobjStart("lsid"));
     opCtx->getLogicalSessionId()->serialize(&bob);
@@ -167,7 +167,7 @@ BSONObj commitOrAbortTransaction(OperationContext* opCtx,
     BSONObjBuilder bob;
     bob.append(cmdName, true);
     bob.append("autocommit", false);
-    bob.append(OperationSessionInfo::kTxnNumberFieldName, txnNumber);
+    bob.append(OperationSessionInfoFromClient::kTxnNumberFieldName, txnNumber);
     bob.append(WriteConcernOptions::kWriteConcernField, writeConcern.toBSON());
 
     BSONObjBuilder lsidBuilder(bob.subobjStart("lsid"));

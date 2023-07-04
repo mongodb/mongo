@@ -31,7 +31,6 @@
 
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/s/query/establish_cursors.h"
 
 namespace mongo {

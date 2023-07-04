@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,49 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/session/logical_session_id.h"
+#include "mongo/s/query/cluster_client_cursor_params.h"
 
 namespace mongo {
 
-LogicalSessionId makeLogicalSessionIdForTest() {
-    LogicalSessionId lsid;
+ClusterClientCursorParams::ClusterClientCursorParams(
+    NamespaceString nss,
+    APIParameters apiParameters,
+    boost::optional<ReadPreferenceSetting> readPreference,
+    boost::optional<repl::ReadConcernArgs> readConcern)
+    : nsString(std::move(nss)),
+      apiParameters(std::move(apiParameters)),
+      readPreference(std::move(readPreference)),
+      readConcern(std::move(readConcern)) {}
 
-    lsid.setId(UUID::gen());
-    lsid.setUid(SHA256Block::computeHash({}));
+AsyncResultsMergerParams ClusterClientCursorParams::extractARMParams() {
+    AsyncResultsMergerParams armParams;
+    if (!sortToApplyOnRouter.isEmpty()) {
+        armParams.setSort(sortToApplyOnRouter);
+    }
+    armParams.setCompareWholeSortKey(compareWholeSortKeyOnRouter);
+    armParams.setRemotes(std::move(remotes));
+    armParams.setTailableMode(tailableMode);
+    armParams.setBatchSize(batchSize);
+    armParams.setNss(nsString);
+    armParams.setAllowPartialResults(isAllowPartialResults);
 
-    return lsid;
-}
+    if (lsid) {
+        OperationSessionInfoFromClient sessionInfo([&] {
+            LogicalSessionFromClient lsidFromClient(lsid->getId());
+            lsidFromClient.setUid(lsid->getUid());
+            return lsidFromClient;
+        }());
+        sessionInfo.setTxnNumber(txnNumber);
+        sessionInfo.setAutocommit(isAutoCommit);
+        armParams.setOperationSessionInfo(sessionInfo);
+    }
 
-LogicalSessionId makeLogicalSessionIdWithTxnNumberAndUUIDForTest(
-    boost::optional<LogicalSessionId> parentLsid, boost::optional<TxnNumber> parentTxnNumber) {
-    auto lsid = parentLsid ? LogicalSessionId(parentLsid->getId(), parentLsid->getUid())
-                           : makeLogicalSessionIdForTest();
-    lsid.setTxnUUID(UUID::gen());
-    lsid.setTxnNumber(parentTxnNumber ? *parentTxnNumber : 0);
-    return lsid;
-}
-
-LogicalSessionId makeLogicalSessionIdWithTxnUUIDForTest(
-    boost::optional<LogicalSessionId> parentLsid) {
-    auto lsid = parentLsid ? LogicalSessionId(parentLsid->getId(), parentLsid->getUid())
-                           : makeLogicalSessionIdForTest();
-    lsid.setTxnUUID(UUID::gen());
-    return lsid;
-}
-
-LogicalSessionRecord makeLogicalSessionRecordForTest() {
-    LogicalSessionRecord record{};
-
-    record.setId(makeLogicalSessionIdForTest());
-
-    return record;
-}
-
-OperationSessionInfoFromClient::OperationSessionInfoFromClient(
-    LogicalSessionFromClient lsidFromClient) {
-    setSessionId(std::move(lsidFromClient));
+    return armParams;
 }
 
 }  // namespace mongo

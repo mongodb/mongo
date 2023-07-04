@@ -739,7 +739,7 @@ private:
     BSONObjBuilder _extraFieldsBuilder;
     std::shared_ptr<CommandInvocation> _invocation;
     LogicalTime _startOperationTime;
-    OperationSessionInfoFromClient _sessionOptions;
+    OperationSessionInfoFromClient _sessionOptions{OperationSessionInfoFromClient::noSession()};
     boost::optional<RunCommandOpTimes> _runCommandOpTimes;
     boost::optional<ResourceConsumption::ScopedMetricsCollector> _scopedMetrics;
     boost::optional<ImpersonationSessionGuard> _impersonationSessionGuard;

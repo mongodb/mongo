@@ -134,23 +134,24 @@ bool runCommandWithSession(DBClientBase* conn,
     for (const auto& cmdArg : cmdObj) {
         uassert(ErrorCodes::IllegalOperation,
                 "Command cannot contain session id",
-                cmdArg.fieldName() != OperationSessionInfo::kSessionIdFieldName);
+                cmdArg.fieldName() != OperationSessionInfoFromClient::kSessionIdFieldName);
         uassert(ErrorCodes::IllegalOperation,
                 "Command cannot contain transaction id",
-                cmdArg.fieldName() != OperationSessionInfo::kTxnNumberFieldName);
+                cmdArg.fieldName() != OperationSessionInfoFromClient::kTxnNumberFieldName);
 
         cmdObjWithLsidBuilder.append(cmdArg);
     }
 
     {
         BSONObjBuilder lsidBuilder(
-            cmdObjWithLsidBuilder.subobjStart(OperationSessionInfo::kSessionIdFieldName));
+            cmdObjWithLsidBuilder.subobjStart(OperationSessionInfoFromClient::kSessionIdFieldName));
         lsid->serialize(&lsidBuilder);
         lsidBuilder.doneFast();
     }
 
     if (txnNumber) {
-        cmdObjWithLsidBuilder.append(OperationSessionInfo::kTxnNumberFieldName, *txnNumber);
+        cmdObjWithLsidBuilder.append(OperationSessionInfoFromClient::kTxnNumberFieldName,
+                                     *txnNumber);
     }
 
     if (options & kMultiStatementTransactionOption) {

@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
+#include <boost/optional.hpp>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -90,7 +89,6 @@
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
-
 
 namespace mongo {
 namespace {
@@ -724,26 +722,26 @@ public:
 
     UMCTransaction(OperationContext* opCtx,
                    StringData forCommand,
-                   const boost::optional<TenantId>& tenant) {
-        // Don't transactionalize on standalone.
-        _isReplSet = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
-            repl::ReplicationCoordinator::modeReplSet;
+                   const boost::optional<TenantId>& tenant)
+        :  // Don't transactionalize on standalone.
+          _isReplSet{repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
+                     repl::ReplicationCoordinator::modeReplSet},
+          // Subclient used by transaction operations.
+          _client{opCtx->getServiceContext()->makeClient(forCommand.toString())},
+          _dbName{DatabaseNameUtil::deserialize(tenant, kAdminDB)},
+          _sessionInfo{LogicalSessionFromClient(UUID::gen())} {
+        _sessionInfo.setTxnNumber(0);
+        _sessionInfo.setStartTransaction(true);
+        _sessionInfo.setAutocommit(false);
 
-        // Subclient used by transaction operations.
-        _client = opCtx->getServiceContext()->makeClient(forCommand.toString());
         auto as = AuthorizationSession::get(_client.get());
         if (as) {
             as->grantInternalAuthorization(_client.get());
         }
 
-        _dbName = DatabaseNameUtil::deserialize(tenant, kAdminDB);
-
         AlternativeClientRegion clientRegion(_client);
-        _sessionInfo.setStartTransaction(true);
-        _sessionInfo.setTxnNumber(0);
-        _sessionInfo.setSessionId(LogicalSessionFromClient(UUID::gen()));
-        _sessionInfo.setAutocommit(false);
     }
+
     ~UMCTransaction() {
         if (_state == TransactionState::kStarted) {
             abort().ignore();

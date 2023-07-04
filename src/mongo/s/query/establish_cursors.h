@@ -45,8 +45,6 @@
 
 namespace mongo {
 
-class CursorResponse;
-
 /**
  * Establishes cursors on the remote shards by issuing requests in parallel, using the readPref to
  * select a host within each shard.
