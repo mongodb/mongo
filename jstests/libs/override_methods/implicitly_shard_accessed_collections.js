@@ -61,6 +61,11 @@ DB.prototype.getCollection = function() {
     try {
         TestData.doNotOverrideReadPreference = true;
         collStats = this.runCommand({collStats: collection.getName()});
+        if (!collStats.ok && collStats.codeName == "CommandNotSupportedOnView") {
+            // In case we catch CommandNotSupportedOnView it means the collection was actually a
+            // view and should be returned without attempting to shard it (which is not allowed)
+            return collection;
+        }
     } finally {
         TestData.doNotOverrideReadPreference = testDataDoNotOverrideReadPreferenceOriginal;
     }
