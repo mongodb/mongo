@@ -12,7 +12,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
+import {isShardMergeEnabled, makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
@@ -37,7 +37,7 @@ const kTenant2 = ObjectId().str;
 
 // Insert some documents before migration start so that this collection gets cloned by file cloner.
 const collName = "testColl";
-const tenantDB0 = tenantMigrationTest.tenantDB(kTenant0, "DB");
+const tenantDB0 = makeTenantDB(kTenant0, "DB");
 assert.commandWorked(donorPrimary.getDB(tenantDB0)[collName].insert({_id: 0}));
 
 const failpoint = "pauseTenantMigrationBeforeLeavingDataSyncState";
@@ -65,10 +65,10 @@ assert.commandWorked(donorPrimary.getDB(tenantDB0)[collName].update({_id: 0}, {'
 assert.commandWorked(donorPrimary.getDB(tenantDB0)[collName].insert({_id: 1}));
 
 // Add new tenant collections.
-const tenantDB1 = tenantMigrationTest.tenantDB(kTenant1, "DB");
+const tenantDB1 = makeTenantDB(kTenant1, "DB");
 tenantMigrationTest.insertDonorDB(tenantDB1, collName);
 
-const tenantDB2 = tenantMigrationTest.tenantDB(kTenant2, "DB");
+const tenantDB2 = makeTenantDB(kTenant2, "DB");
 tenantMigrationTest.insertDonorDB(tenantDB2, collName);
 
 // Resume migration.

@@ -15,6 +15,7 @@
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     isShardMergeEnabled,
+    makeTenantDB,
     makeX509OptionsForTest
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
@@ -52,7 +53,7 @@ const tenantMigrationTest = new TenantMigrationTest(
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
 const tenantId = ObjectId();
-const tenantDB = tenantMigrationTest.tenantDB(tenantId.str, "DB");
+const tenantDB = makeTenantDB(tenantId.str, "DB");
 const collName = "testColl";
 
 // Do a majority write.

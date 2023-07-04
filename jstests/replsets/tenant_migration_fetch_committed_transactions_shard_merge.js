@@ -14,9 +14,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    isShardMergeEnabled,
-} from "jstests/replsets/libs/tenant_migration_util.js";
+import {isShardMergeEnabled, makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/replsets/rslib.js");
@@ -28,8 +26,8 @@ const transactionsNS = "config.transactions";
 const collName = "testColl";
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-const tenantDB = tenantMigrationTest.tenantDB(tenantId, "testDB");
-const otherTenantDB = tenantMigrationTest.tenantDB(otherTenantId, "testDB");
+const tenantDB = makeTenantDB(tenantId, "testDB");
+const otherTenantDB = makeTenantDB(otherTenantId, "testDB");
 const tenantNS = `${tenantDB}.${collName}`;
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();

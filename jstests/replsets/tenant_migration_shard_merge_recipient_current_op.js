@@ -18,6 +18,7 @@ import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.j
 import {
     forgetMigrationAsync,
     isShardMergeEnabled,
+    makeTenantDB
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
@@ -55,7 +56,7 @@ const dbsToClone = ["db0", "db1", "db2"];
 const collsToClone = ["coll0", "coll1"];
 const docs = [...Array(10).keys()].map((i) => ({x: i}));
 for (const db of dbsToClone) {
-    const tenantDB = tenantMigrationTest.tenantDB(kTenantId, db);
+    const tenantDB = makeTenantDB(kTenantId, db);
     for (const coll of collsToClone) {
         tenantMigrationTest.insertDonorDB(tenantDB, coll, docs);
     }

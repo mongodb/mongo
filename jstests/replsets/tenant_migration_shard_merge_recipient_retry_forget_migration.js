@@ -17,6 +17,7 @@ import {
     getCertificateAndPrivateKey,
     isShardMergeEnabled,
     kProtocolShardMerge,
+    makeTenantDB
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
@@ -42,7 +43,7 @@ const tenantId = ObjectId();
 const recipientCertificateForDonor =
     getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
 
-const dbName = tenantMigrationTest.tenantDB(tenantId.str, "test");
+const dbName = makeTenantDB(tenantId.str, "test");
 const collName = "coll";
 
 // Not doing a migration before writing to the recipient to mimic that a migration has completed and

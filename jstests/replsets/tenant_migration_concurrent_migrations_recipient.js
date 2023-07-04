@@ -15,6 +15,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
 
@@ -30,7 +31,7 @@ const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 const tenantIds = [...Array(50).keys()].map(() => ObjectId().str);
 let migrationOptsArray = [];
 tenantIds.forEach((tenantId) => {
-    const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const dbName = makeTenantDB(tenantId, "testDB");
     const collName = "testColl";
     tenantMigrationTest.insertDonorDB(dbName, collName, [{_id: 1}]);
     const migrationId = UUID();

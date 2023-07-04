@@ -16,6 +16,7 @@
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     isShardMergeEnabled,
+    makeTenantDB,
     runMigrationAsync
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
@@ -42,8 +43,8 @@ if (!isShardMergeEnabled(donorPrimary.getDB("admin"))) {
 
 const kTenant1Id = ObjectId().str;
 const kTenant2Id = ObjectId().str;
-const kTenant1DbName = tenantMigrationTest.tenantDB(kTenant1Id, "testDB");
-const kTenant2DbName = tenantMigrationTest.tenantDB(kTenant2Id, "testDB");
+const kTenant1DbName = makeTenantDB(kTenant1Id, "testDB");
+const kTenant2DbName = makeTenantDB(kTenant2Id, "testDB");
 const kEmptyCollName = "testEmptyColl";
 const kNonEmptyCollName = "testNonEmptyColl";
 const kNewCollName1 = "testNewColl1";

@@ -18,6 +18,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/aggregation/extras/utils.js");
 load("jstests/libs/fail_point_util.js");
@@ -62,7 +63,7 @@ const assertTransactionEntries = (donorTxnEntries, recipientTxnEntries) => {
 (() => {
     jsTestLog("Test retrying after successfully updating entries");
 
-    const tenantDB = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const tenantDB = makeTenantDB(tenantId, "testDB");
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
@@ -128,7 +129,7 @@ const assertTransactionEntries = (donorTxnEntries, recipientTxnEntries) => {
     jsTestLog("Test retrying in the middle of updating entries");
 
     tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), sharedOptions: {nodes: 1}});
-    const tenantDB = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const tenantDB = makeTenantDB(tenantId, "testDB");
     const collName1 = `${collName}1`;
     const collName2 = `${collName}2`;
 
@@ -197,7 +198,7 @@ const assertTransactionEntries = (donorTxnEntries, recipientTxnEntries) => {
     jsTestLog("Test retrying with a new transaction in the middle of updating entries");
 
     tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), sharedOptions: {nodes: 1}});
-    const tenantDB = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const tenantDB = makeTenantDB(tenantId, "testDB");
     const collName1 = `${collName}1`;
     const collName2 = `${collName}2`;
 

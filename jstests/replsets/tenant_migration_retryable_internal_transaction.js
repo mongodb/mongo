@@ -12,6 +12,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
 
@@ -20,7 +21,7 @@ const tenantMigrationTest = new TenantMigrationTest(
 
 const kMigrationId = UUID();
 const kTenantId = ObjectId().str;
-const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDb");
+const kDbName = makeTenantDB(kTenantId, "testDb");
 const kCollName = "testColl";
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(kMigrationId),

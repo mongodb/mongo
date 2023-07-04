@@ -14,7 +14,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
+import {isShardMergeEnabled, makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
@@ -37,7 +37,7 @@ if (!isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
 jsTestLog(
     "Test that recipient state is correctly set to 'learned filenames' after creating the backup cursor");
 const tenantId = ObjectId();
-const tenantDB = tenantMigrationTest.tenantDB(tenantId.str, "DB");
+const tenantDB = makeTenantDB(tenantId.str, "DB");
 const collName = "testColl";
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();

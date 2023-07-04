@@ -22,6 +22,7 @@
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     isShardMergeEnabled,
+    makeTenantDB,
     makeX509OptionsForTest
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
@@ -85,7 +86,7 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRs
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 const kTenantId = ObjectId().str;
 const migrationId = UUID();
-const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
+const kDbName = makeTenantDB(kTenantId, "testDB");
 const kCollName = "retryable_write_secondary_oplog_application";
 const kNs = `${kDbName}.${kCollName}`;
 

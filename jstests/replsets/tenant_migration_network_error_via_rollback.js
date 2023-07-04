@@ -17,9 +17,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    makeX509OptionsForTest,
-} from "jstests/replsets/libs/tenant_migration_util.js";
+import {makeTenantDB, makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
@@ -65,7 +63,7 @@ function runTest({failPointName, failPointData = {}, batchSize = 10 * 1000}) {
     });
 
     const tenantId = ObjectId().str;
-    const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const dbName = makeTenantDB(tenantId, "testDB");
     const collName = "testColl";
 
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();

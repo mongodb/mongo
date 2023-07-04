@@ -12,9 +12,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    makeX509OptionsForTest,
-} from "jstests/replsets/libs/tenant_migration_util.js";
+import {makeTenantDB, makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/fail_point_util.js");
@@ -53,7 +51,7 @@ const tenantMigrationTest =
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
 const tenantId = ObjectId().str;
-const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+const dbName = makeTenantDB(tenantId, "testDB");
 
 // The first collection on donor side already has the multi-key index.
 const collName1 = "multiKeyColl_1";

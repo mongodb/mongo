@@ -18,7 +18,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {forgetMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
+import {forgetMigrationAsync, makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
@@ -50,7 +50,7 @@ const dbsToClone = ["db0", "db1", "db2"];
 const collsToClone = ["coll0", "coll1"];
 const docs = [...Array(10).keys()].map((i) => ({x: i}));
 for (const db of dbsToClone) {
-    const tenantDB = tenantMigrationTest.tenantDB(kTenantId, db);
+    const tenantDB = makeTenantDB(kTenantId, db);
     for (const coll of collsToClone) {
         tenantMigrationTest.insertDonorDB(tenantDB, coll, docs);
     }
@@ -313,7 +313,7 @@ forgetMigrationThread.start();
     assert.eq(dbsToClone.length, currOp.databases.databasesToClone, tojson(res));
     assert.eq(dbsToClone.length, currOp.databases.databasesCloned, tojson(res));
     for (const db of dbsToClone) {
-        const tenantDB = tenantMigrationTest.tenantDB(kTenantId, db);
+        const tenantDB = makeTenantDB(kTenantId, db);
         assert(currOp.databases.hasOwnProperty(tenantDB), tojson(res));
         const dbStats = currOp.databases[tenantDB];
         assert.eq(0, dbStats.clonedCollectionsBeforeFailover, tojson(res));

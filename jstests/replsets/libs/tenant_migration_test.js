@@ -601,13 +601,6 @@ export class TenantMigrationTest {
     }
 
     /**
-     * Crafts a tenant database name.
-     */
-    tenantDB(tenantId, dbName) {
-        return `${tenantId}_${dbName}`;
-    }
-
-    /**
      * Returns the TenantMigrationAccessBlocker serverStatus output for the migration or shard merge
      * for the given node.
      */

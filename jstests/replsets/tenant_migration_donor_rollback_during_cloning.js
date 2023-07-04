@@ -16,7 +16,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
+import {makeTenantDB, makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");           // for 'extractUUIDFromObject'
@@ -88,7 +88,7 @@ function runTest(tenantId,
         readPreference: {mode: 'secondary'}
     };
 
-    firstFailpointData.database = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    firstFailpointData.database = makeTenantDB(tenantId, "testDB");
     // The failpoints correspond to the instants right before and after the 'list*' call that the
     // recipient cloners make.
     const fpBeforeListCall =
@@ -154,7 +154,7 @@ function runTest(tenantId,
     // into a non-tenant DB, so this data will not be migrated but will still advance the cluster
     // time.
     tenantMigrationTest.insertDonorDB(
-        tenantMigrationTest.tenantDB(ObjectId().str, 'alternateDB'),
+        makeTenantDB(ObjectId().str, 'alternateDB'),
         'alternateColl',
         [{x: "Tom Petty", y: "Free Fallin"}, {x: "Sushin Shyam", y: "Cherathukal"}]);
 
@@ -186,14 +186,14 @@ function runTest(tenantId,
 
 // Creates a collection on the donor.
 function listCollectionsSetupFunction(tenantId, tenantMigrationTest) {
-    const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const dbName = makeTenantDB(tenantId, "testDB");
     tenantMigrationTest.insertDonorDB(dbName, 'testColl');
 }
 
 // Creates another collection on the donor, that isn't majority committed due to replication being
 // halted.
 function listCollectionsWhilePausedFunction(tenantId, syncSourceNode, tenantMigrationTest) {
-    const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const dbName = makeTenantDB(tenantId, "testDB");
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     const donorTemporaryColl = donorPrimary.getDB(dbName).getCollection('tempColl');
 
@@ -215,7 +215,7 @@ function listCollectionsWhilePausedFunction(tenantId, syncSourceNode, tenantMigr
 // Makes sure that the collection that the donor RST failed to replicate does not exist on the
 // recipient.
 function listCollectionsPostMigrationFunction(tenantId, tenantMigrationTest) {
-    const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const dbName = makeTenantDB(tenantId, "testDB");
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
     const collNames = recipientPrimary.getDB(dbName).getCollectionNames();
@@ -225,14 +225,14 @@ function listCollectionsPostMigrationFunction(tenantId, tenantMigrationTest) {
 
 // Create a database on the donor RST.
 function listDatabasesSetupFunction(tenantId, tenantMigrationTest) {
-    const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const dbName = makeTenantDB(tenantId, "testDB");
     tenantMigrationTest.insertDonorDB(dbName, 'testColl');
 }
 
 // Create another database on the donor RST. This database doesn't exist on a majority of donor RST
 // nodes, as replication has been paused.
 function listDatabasesWhilePausedFunction(tenantId, syncSourceNode, tenantMigrationTest) {
-    const dbTemp = tenantMigrationTest.tenantDB(tenantId, "tempDB");
+    const dbTemp = makeTenantDB(tenantId, "tempDB");
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     const donorTemporaryColl = donorPrimary.getDB(dbTemp).getCollection('tempColl');
 
@@ -259,11 +259,11 @@ function listDatabasesPostMigrationFunction(tenantId, tenantMigrationTest) {
     const dbNames = recipientPrimary.adminCommand(
         {listDatabases: 1, nameOnly: true, filter: {"name": new RegExp("^" + tenantId)}});
     assert.eq(1, dbNames.databases.length, dbNames);
-    assert.eq(dbNames.databases[0].name, tenantMigrationTest.tenantDB(tenantId, "testDB"), dbNames);
+    assert.eq(dbNames.databases[0].name, makeTenantDB(tenantId, "testDB"), dbNames);
 }
 
 function listIndexesSetupFunction(tenantId, tenantMigrationTest) {
-    const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const dbName = makeTenantDB(tenantId, "testDB");
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     const donorColl = donorPrimary.getDB(dbName)['testColl'];
 
@@ -289,7 +289,7 @@ function listIndexesSetupFunction(tenantId, tenantMigrationTest) {
 }
 
 function listIndexesWhilePausedFunction(tenantId, syncSourceNode, tenantMigrationTest) {
-    const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const dbName = makeTenantDB(tenantId, "testDB");
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     const donorDB = donorPrimary.getDB(dbName);
     const donorColl = donorDB['testColl'];
@@ -320,7 +320,7 @@ function listIndexesWhilePausedFunction(tenantId, syncSourceNode, tenantMigratio
 }
 
 function listIndexesPostMigrationFunction(tenantId, tenantMigrationTest) {
-    const dbTest = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const dbTest = makeTenantDB(tenantId, "testDB");
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
     const testColl = recipientPrimary.getDB(dbTest)['testColl'];
 

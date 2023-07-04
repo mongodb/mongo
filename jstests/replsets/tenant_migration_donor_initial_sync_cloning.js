@@ -25,6 +25,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load('jstests/replsets/rslib.js');  // for waitForNewlyAddedRemovalForNodeToBeCommitted
@@ -49,7 +50,7 @@ const migrationOpts = {
     migrationIdString: extractUUIDFromObject(UUID()),
     tenantId: tenantId
 };
-const dbName = tenantMigrationTest.tenantDB(tenantId, testDBName);
+const dbName = makeTenantDB(tenantId, testDBName);
 const donorRst = tenantMigrationTest.getDonorRst();
 const originalDonorPrimary = tenantMigrationTest.getDonorPrimary();
 

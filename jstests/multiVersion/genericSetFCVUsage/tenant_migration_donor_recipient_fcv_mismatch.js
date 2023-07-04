@@ -8,7 +8,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
+import {isShardMergeEnabled, makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");       // for 'extractUUIDFromObject'
 load("jstests/libs/parallelTester.js");  // for 'Thread'
@@ -17,7 +17,7 @@ function runTest(downgradeFCV) {
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
     const tenantId = ObjectId().str;
-    const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const dbName = makeTenantDB(tenantId, "testDB");
     const collName = "testColl";
 
     const donorPrimary = tenantMigrationTest.getDonorPrimary();

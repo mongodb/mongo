@@ -8,7 +8,7 @@ export const kProtocolMultitenantMigrations = "multitenant migrations";
 /**
  * Crafts a tenant database name.
  */
-export function tenantDB(tenantId, dbName) {
+export function makeTenantDB(tenantId, dbName) {
     return `${tenantId}_${dbName}`;
 }
 

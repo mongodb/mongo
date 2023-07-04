@@ -16,7 +16,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
+import {makeTenantDB, makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
@@ -55,7 +55,7 @@ const donorRst = tenantMigrationTest.getDonorRst();
 const donorPrimary = donorRst.getPrimary();
 
 const tenantId = ObjectId().str;
-const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+const dbName = makeTenantDB(tenantId, "testDB");
 const collName = "testColl";
 
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();

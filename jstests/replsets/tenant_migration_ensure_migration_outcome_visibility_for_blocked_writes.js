@@ -13,6 +13,7 @@
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
+    makeTenantDB,
     makeX509OptionsForTest,
     runMigrationAsync
 } from "jstests/replsets/libs/tenant_migration_util.js";
@@ -70,7 +71,7 @@ function insertDocument(primaryHost, dbName, collName) {
     };
     const donorRstArgs = createRstArgs(donorRst);
 
-    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = makeTenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -126,7 +127,7 @@ function insertDocument(primaryHost, dbName, collName) {
     };
     const donorRstArgs = createRstArgs(donorRst);
 
-    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = makeTenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 

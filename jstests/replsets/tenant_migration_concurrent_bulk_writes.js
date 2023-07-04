@@ -12,8 +12,9 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
 import {
+    isShardMergeEnabled,
+    makeTenantDB,
     makeX509OptionsForTest,
     runMigrationAsync
 } from "jstests/replsets/libs/tenant_migration_util.js";
@@ -178,7 +179,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
         tenantId,
     };
 
-    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = makeTenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -231,7 +232,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     };
     const donorRstArgs = createRstArgs(donorRst);
 
-    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = makeTenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -295,7 +296,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     };
     const donorRstArgs = createRstArgs(donorRst);
 
-    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = makeTenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -363,7 +364,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
         tenantId,
     };
 
-    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = makeTenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -410,7 +411,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     };
     const donorRstArgs = createRstArgs(donorRst);
 
-    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = makeTenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -466,7 +467,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     };
     const donorRstArgs = createRstArgs(donorRst);
 
-    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = makeTenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -530,7 +531,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     };
     const donorRstArgs = createRstArgs(donorRst);
 
-    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = makeTenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -582,7 +583,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     };
     const donorRstArgs = createRstArgs(donorRst);
 
-    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = makeTenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -632,7 +633,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
         tenantId,
     };
 
-    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = makeTenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
@@ -671,7 +672,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
         tenantId,
     };
 
-    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+    const dbName = makeTenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 

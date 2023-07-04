@@ -13,7 +13,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
+import {isShardMergeEnabled, makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
@@ -115,7 +115,7 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
     jsTest.log("Test that the TTL does not delete documents on recipient during cloning");
 
     const tenantId = ObjectId().str;
-    const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const dbName = makeTenantDB(tenantId, "testDB");
 
     const migrationId = UUID();
     const migrationOpts = {
@@ -172,7 +172,7 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
         "Test that the TTL does not delete documents on recipient before migration is forgotten");
 
     const tenantId = ObjectId().str;
-    const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const dbName = makeTenantDB(tenantId, "testDB");
 
     const migrationId = UUID();
     const migrationOpts = {

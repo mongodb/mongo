@@ -16,9 +16,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    runMigrationAsync,
-} from "jstests/replsets/libs/tenant_migration_util.js";
+import {makeTenantDB, runMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/clustered_collections/clustered_collection_util.js");  // ClusteredCollectionUtil
 load("jstests/libs/parallelTester.js");                                   // Thread()
@@ -28,7 +26,7 @@ load('jstests/replsets/rslib.js');                                        // 'cr
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 const kTenantId = ObjectId().str;
-const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
+const kDbName = makeTenantDB(kTenantId, "testDB");
 const kEmptyCollName = "testEmptyColl";
 const kNonEmptyCollName = "testNonEmptyColl";
 

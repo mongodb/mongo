@@ -12,6 +12,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 load("jstests/libs/uuid_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
@@ -21,7 +22,7 @@ const migrationOpts = {
     migrationIdString: extractUUIDFromObject(UUID()),
     tenantId: tenantId
 };
-const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+const dbName = makeTenantDB(tenantId, "testDB");
 
 // Collection names for the collections with "v: 1" and "v: 2" '_id' indexes.
 const collWithV1Index = "testCollV1";

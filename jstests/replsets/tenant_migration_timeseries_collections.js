@@ -11,6 +11,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 load("jstests/libs/uuid_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
@@ -18,7 +19,7 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
 const tenantId = ObjectId().str;
-const tsDB = tenantMigrationTest.tenantDB(tenantId, "tsDB");
+const tsDB = makeTenantDB(tenantId, "tsDB");
 const collName = "tsColl";
 const donorTSDB = donorPrimary.getDB(tsDB);
 assert.commandWorked(donorTSDB.createCollection(collName, {timeseries: {timeField: "time"}}));

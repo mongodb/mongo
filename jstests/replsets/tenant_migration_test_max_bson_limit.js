@@ -11,6 +11,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
@@ -44,7 +45,7 @@ const migrationOpts = {
     tenantId,
 };
 
-const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
+const dbName = makeTenantDB(tenantId, kTenantDefinedDbName);
 const primary = tenantMigrationTest.getDonorPrimary();
 const primaryDB = primary.getDB(dbName);
 const numWriteOps =

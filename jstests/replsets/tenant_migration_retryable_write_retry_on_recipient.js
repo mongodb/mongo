@@ -14,6 +14,7 @@
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     isShardMergeEnabled,
+    makeTenantDB,
     runMigrationAsync
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
@@ -25,7 +26,7 @@ load("jstests/replsets/rslib.js");  // 'createRstArgs'
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 const kTenantId = ObjectId().str;
-const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDb");
+const kDbName = makeTenantDB(kTenantId, "testDb");
 const kCollNameBefore = "testCollBefore";
 const kCollNameDuring = "testCollDuring";
 

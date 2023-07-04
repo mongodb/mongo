@@ -15,6 +15,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
@@ -24,9 +25,9 @@ const transactionsNS = "config.transactions";
 const collName = "testColl";
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-const tenantDB = tenantMigrationTest.tenantDB(tenantId, "testDB");
-const nonTenantDB = tenantMigrationTest.tenantDB(ObjectId().str, "testDB");
-const tenantNS = `${tenantDB}.${collName}`;
+const kTenantDB = makeTenantDB(tenantId, "testDB");
+const kNonTenantDB = makeTenantDB(ObjectId().str, "testDB");
+const kTenantNS = `${kTenantDB}.${collName}`;
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
@@ -53,15 +54,15 @@ function validateTransactionEntryonRecipient(sessionId) {
     }));
 }
 
-assert.commandWorked(donorPrimary.getCollection(tenantNS).insert([{_id: 0, x: 0}, {_id: 1, x: 1}],
-                                                                 {writeConcern: {w: "majority"}}));
+assert.commandWorked(donorPrimary.getCollection(kTenantNS).insert([{_id: 0, x: 0}, {_id: 1, x: 1}],
+                                                                  {writeConcern: {w: "majority"}}));
 
 let sessionIdBeforeMigration;
 {
     jsTestLog("Run and commit a transaction prior to the migration");
     const session = donorPrimary.startSession({causalConsistency: false});
     sessionIdBeforeMigration = session.getSessionId();
-    const sessionDb = session.getDatabase(tenantDB);
+    const sessionDb = session.getDatabase(kTenantDB);
     const sessionColl = sessionDb.getCollection(collName);
 
     session.startTransaction({writeConcern: {w: "majority"}});
@@ -77,7 +78,7 @@ assert.eq(1, donorPrimary.getCollection(transactionsNS).find().itcount());
 {
     jsTestLog("Run and abort a transaction prior to the migration");
     const session = donorPrimary.startSession({causalConsistency: false});
-    const sessionDb = session.getDatabase(tenantDB);
+    const sessionDb = session.getDatabase(kTenantDB);
     const sessionColl = sessionDb.getCollection(collName);
 
     session.startTransaction({writeConcern: {w: "majority"}});
@@ -99,7 +100,7 @@ assert.eq(2, donorPrimary.getCollection(transactionsNS).find().itcount());
 {
     jsTestLog("Run and commit a transaction that does not belong to the tenant");
     const session = donorPrimary.startSession({causalConsistency: false});
-    const sessionDb = session.getDatabase(nonTenantDB);
+    const sessionDb = session.getDatabase(kNonTenantDB);
     const sessionColl = sessionDb.getCollection(collName);
 
     session.startTransaction({writeConcern: {w: "majority"}});

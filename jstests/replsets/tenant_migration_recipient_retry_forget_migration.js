@@ -16,7 +16,10 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {getCertificateAndPrivateKey} from "jstests/replsets/libs/tenant_migration_util.js";
+import {
+    getCertificateAndPrivateKey,
+    makeTenantDB
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
 load("jstests/libs/parallelTester.js");   // For Thread()
@@ -29,7 +32,7 @@ const tenantId = ObjectId().str;
 const recipientCertificateForDonor =
     getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
 
-const dbName = tenantMigrationTest.tenantDB(tenantId, "test");
+const dbName = makeTenantDB(tenantId, "test");
 const collName = "coll";
 
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();

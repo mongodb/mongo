@@ -3,7 +3,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
+import {makeTenantDB, makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
@@ -40,7 +40,7 @@ export function setUpMigrationSyncSourceTest() {
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
 
     const tenantId = ObjectId().str;
-    const tenantDB = tenantMigrationTest.tenantDB(tenantId, "DB");
+    const tenantDB = makeTenantDB(tenantId, "DB");
     const collName = "testColl";
 
     const donorPrimary = tenantMigrationTest.getDonorPrimary();

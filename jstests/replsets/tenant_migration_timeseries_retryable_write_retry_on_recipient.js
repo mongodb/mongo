@@ -17,7 +17,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {runMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
+import {makeTenantDB, runMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");  // for 'Thread'
@@ -30,7 +30,7 @@ function testRetryOnRecipient(ordered) {
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
     const kTenantId = ObjectId().str;
-    const kDbName = tenantMigrationTest.tenantDB(kTenantId, "tsDb");
+    const kDbName = makeTenantDB(kTenantId, "tsDb");
     const kCollNameBefore = "tsCollBefore";
     const kCollNameDuring = "tsCollDuring";
 

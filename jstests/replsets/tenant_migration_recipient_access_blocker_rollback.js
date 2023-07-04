@@ -17,6 +17,7 @@
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     getCertificateAndPrivateKey,
+    makeTenantDB,
     makeX509OptionsForTest
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
@@ -59,7 +60,7 @@ function runRollbackAfterMigrationCommitted(tenantId) {
     };
 
     // Populate the donor side with data.
-    const dbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
+    const dbName = makeTenantDB(kTenantId, "testDB");
     const collName = "testColl";
     const numDocs = 20;
     tenantMigrationTest.insertDonorDB(
@@ -128,7 +129,7 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
     const recipientCertificateForDonor =
         getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
 
-    const dbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
+    const dbName = makeTenantDB(kTenantId, "testDB");
     const collName = "testColl";
 
     const originalPrimary = recipientRst.getPrimary();

@@ -12,7 +12,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {checkTenantDBHashes} from "jstests/replsets/libs/tenant_migration_util.js";
+import {checkTenantDBHashes, makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
@@ -21,7 +21,7 @@ const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), quickGarbageCollection: true});
 
 const kTenantId = ObjectId().str;
-const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
+const kDbName = makeTenantDB(kTenantId, "testDB");
 const kCollName = "testColl";
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();

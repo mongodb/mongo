@@ -17,7 +17,8 @@ import {
     getCertificateAndPrivateKey,
     isShardMergeEnabled,
     kProtocolShardMerge,
-    makeX509OptionsForTest,
+    makeTenantDB,
+    makeX509OptionsForTest
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/uuid_util.js");           // For extractUUIDFromObject().
@@ -70,7 +71,7 @@ function runRollbackAfterMigrationCommitted() {
     };
 
     // Populate the donor side with data.
-    const dbName = tenantMigrationTest.tenantDB(kTenantId.str, "testDB");
+    const dbName = makeTenantDB(kTenantId.str, "testDB");
     const collName = "testColl";
     const numDocs = 20;
     tenantMigrationTest.insertDonorDB(
@@ -139,7 +140,7 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand() {
     const recipientCertificateForDonor =
         getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
 
-    const dbName = tenantMigrationTest.tenantDB(kTenantId.str, "testDB");
+    const dbName = makeTenantDB(kTenantId.str, "testDB");
     const collName = "testColl";
 
     const originalPrimary = recipientRst.getPrimary();

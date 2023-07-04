@@ -22,13 +22,14 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 const tenantId = ObjectId().str;
-const tenantDB = tenantMigrationTest.tenantDB(tenantId, "testDB");
+const tenantDB = makeTenantDB(tenantId, "testDB");
 const collName = "testColl";
 const tenantNS = `${tenantDB}.${collName}`;
 const transactionsNS = "config.transactions";

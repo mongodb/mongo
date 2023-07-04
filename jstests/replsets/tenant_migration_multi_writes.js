@@ -13,9 +13,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    makeX509OptionsForTest,
-} from "jstests/replsets/libs/tenant_migration_util.js";
+import {makeTenantDB, makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
@@ -48,7 +46,7 @@ const donorPrimary = donorRst.getPrimary();
 const kCollName = "testColl";
 const kTenantDefinedDbName = "0";
 const kTenantId = ObjectId().str;
-const kDbName = tenantMigrationTest.tenantDB(kTenantId, kTenantDefinedDbName);
+const kDbName = makeTenantDB(kTenantId, kTenantDefinedDbName);
 
 const kRecords = 500;
 const kUpdateCycles = 600;

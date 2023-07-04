@@ -16,7 +16,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {runMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
+import {makeTenantDB, runMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");           // for 'extractUUIDFromObject'
@@ -27,7 +27,7 @@ load("jstests/replsets/rslib.js");           // 'createRstArgs'
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 const tenantId = ObjectId().str;
-const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+const dbName = makeTenantDB(tenantId, "testDB");
 const collName = "testColl";
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();

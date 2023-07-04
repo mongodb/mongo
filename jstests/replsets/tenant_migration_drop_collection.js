@@ -19,6 +19,7 @@
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
+    makeTenantDB,
     makeX509OptionsForTest,
     runMigrationAsync
 } from "jstests/replsets/libs/tenant_migration_util.js";
@@ -46,7 +47,7 @@ function runDropTest({failPointName, failPointData, expectedLog, createNew}) {
         new TenantMigrationTest({name: jsTestName(), recipientRst: recipientRst});
 
     const tenantId = ObjectId().str;
-    const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
+    const dbName = makeTenantDB(tenantId, "testDB");
     const collName = "testColl";
 
     const donorPrimary = tenantMigrationTest.getDonorPrimary();

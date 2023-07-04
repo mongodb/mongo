@@ -15,9 +15,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    runMigrationAsync,
-} from "jstests/replsets/libs/tenant_migration_util.js";
+import {makeTenantDB, runMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
@@ -27,7 +25,7 @@ load('jstests/replsets/rslib.js');  // 'createRstArgs'
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 const kTenantId = ObjectId().str;
-const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
+const kDbName = makeTenantDB(kTenantId, "testDB");
 const kCollName = "testColl";
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();

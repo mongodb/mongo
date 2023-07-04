@@ -13,7 +13,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
+import {isShardMergeEnabled, makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");  // For extractUUIDFromObject().
@@ -34,7 +34,7 @@ tmt.insertDonorDB(`${tenantId}_db`, collName);
 const donorPrimary = tmt.getDonorPrimary();
 const recipientPrimary = tmt.getRecipientPrimary();
 
-const kRelatedDbNameDonor = tmt.tenantDB(tenantId, "donorDb");
+const kRelatedDbNameDonor = makeTenantDB(tenantId, "donorDb");
 
 // Note: including this explicit early return here due to the fact that multiversion
 // suites will execute this test without featureFlagShardMerge enabled (despite the
