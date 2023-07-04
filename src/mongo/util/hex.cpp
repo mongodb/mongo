@@ -111,7 +111,7 @@ std::string decode(StringData s) {
 }  // namespace hexblob
 
 std::string hexdump(StringData data) {
-    MONGO_verify(data.size() < 1000000);
+    tassert(7781000, "Data length exceeds maximum buffer size", data.size() < kHexDumpMaxSize);
     std::string out;
     out.reserve(3 * data.size());
     char sep = 0;

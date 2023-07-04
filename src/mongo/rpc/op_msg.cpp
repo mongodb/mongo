@@ -262,8 +262,11 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
         "invalid message: {ex_code} {ex} -- {hexdump_message_singleData_view2ptr_message_size}",
         "ex_code"_attr = ex.code(),
         "ex"_attr = redact(ex),
+        // Using std::min to reduce the size of the output and ensure we do not throw in hexdump()
+        // because of the exceeded length.
         "hexdump_message_singleData_view2ptr_message_size"_attr =
-            redact(hexdump(message.singleData().view2ptr(), message.size())));
+            redact(hexdump(message.singleData().view2ptr(),
+                           std::min(static_cast<size_t>(message.size()), kHexDumpMaxSize - 1))));
     throw;
 }
 

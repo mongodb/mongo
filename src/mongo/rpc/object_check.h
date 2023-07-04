@@ -71,7 +71,7 @@ struct Validator<BSONObj> {
                 ", length: " + std::to_string(length) +
                 // Using std::min with hex dump length, too, to ensure we do not throw in hexdump()
                 // because of exceeded length and miss out on the core dump of the fassert below.
-                ", hex dump: " + hexdump(ptr, std::min(length, (size_t)(1000000 - 1)));
+                ", hex dump: " + hexdump(ptr, std::min(length, kHexDumpMaxSize - 1));
             Status builtStatus(ErrorCodes::InvalidBSON, redact(msg));
             fassertFailedWithStatus(50761, builtStatus);
         }
