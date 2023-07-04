@@ -82,6 +82,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
@@ -432,13 +433,13 @@ Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* v
 
     // Invalidate catalog cache if the chunk manager version is stale.
     if (cri.cm.getVersion().isOlderThan(shardVersion.placementVersion())) {
-        uasserted(StaleConfigInfo(ns,
-                                  cri.getCollectionVersion(),
-                                  boost::none /* wanted */,
-                                  ShardingState::get(opCtx)->shardId()),
+        catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+            ns, boost::none /* wanted */, ShardId());
+
+        uasserted(ShardCannotRefreshDueToLocksHeldInfo(ns),
                   str::stream()
-                      << "Sharding information of collection " << ns.toStringForErrorMsg()
-                      << " is currently stale and needs to be recovered from the config server");
+                      << "Routing information for collection " << ns.toStringForErrorMsg()
+                      << " is currently stale and needs to be refreshed from the config server");
     }
 
     // Retrieve the shard id for the given shard key value.
