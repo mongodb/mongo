@@ -261,7 +261,7 @@ TEST_F(ChangeCollectionExpiredChangeRemoverTest, VerifyLastExpiredDocument) {
     // Get the document found at 'maxExpiredRecordId' and test it against 'lastExpiredDocument'.
     auto scanExecutor =
         InternalPlanner::collectionScan(opCtx,
-                                        &changeCollection,
+                                        changeCollection,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         InternalPlanner::Direction::FORWARD,
                                         boost::none,

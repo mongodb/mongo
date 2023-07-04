@@ -149,7 +149,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
         AlternativeClientRegion acr(newClient);
         const auto dbProfilingNS = NamespaceString::makeSystemDotProfileNamespace(ns.dbName());
 
-        boost::optional<ScopedCollectionAcquisition> profileCollection;
+        boost::optional<CollectionAcquisition> profileCollection;
         while (true) {
             profileCollection.emplace(
                 acquireCollection(newCtx.get(),

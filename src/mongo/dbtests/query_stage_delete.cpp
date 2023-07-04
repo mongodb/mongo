@@ -177,7 +177,7 @@ public:
             std::move(deleteStageParams),
             &ws,
             coll,
-            new CollectionScan(_expCtx.get(), &coll, collScanParams, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), coll, collScanParams, &ws, nullptr));
 
         const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage.getSpecificStats());
 

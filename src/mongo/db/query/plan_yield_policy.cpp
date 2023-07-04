@@ -269,8 +269,8 @@ void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
     }
 
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
-    ScopeGuard disposeYieldedTransactionResourcesScopeGuard(
-        [&yieldedTransactionResources] { yieldedTransactionResources.dispose(); });
+    ScopeGuard yieldFailedScopeGuard(
+        [&] { yieldedTransactionResources.transitionTransactionResourcesToFailedState(opCtx); });
 
     if (_callbacks) {
         _callbacks->duringYield(opCtx);
@@ -280,7 +280,7 @@ void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
         whileYieldingFn();
     }
 
-    disposeYieldedTransactionResourcesScopeGuard.dismiss();
+    yieldFailedScopeGuard.dismiss();
     try {
         restoreTransactionResourcesToOperationContext(opCtx,
                                                       std::move(yieldedTransactionResources));

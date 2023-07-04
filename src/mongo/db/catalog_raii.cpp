@@ -450,8 +450,7 @@ struct CollectionWriter::SharedImpl {
     std::function<Collection*()> _writableCollectionInitializer;
 };
 
-CollectionWriter::CollectionWriter(OperationContext* opCtx,
-                                   ScopedCollectionAcquisition* acquisition)
+CollectionWriter::CollectionWriter(OperationContext* opCtx, CollectionAcquisition* acquisition)
     : _acquisition(acquisition),
       _collection(&_storedCollection),
       _managed(true),

@@ -270,7 +270,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
         auto shardFilterer = [&]() -> std::unique_ptr<ShardFilterer> {
             if (collections.isAcquisition()) {
                 return std::make_unique<ShardFiltererImpl>(
-                    *collections.getMainAcquisition()->getShardingFilter());
+                    *collections.getMainAcquisition().getShardingFilter());
             } else {
                 const auto& collection = collections.getMainCollection();
                 tassert(6108307,

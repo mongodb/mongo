@@ -1689,8 +1689,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
 
     return getExecutor(
         opCtx,
-        stdx::holds_alternative<const ScopedCollectionAcquisition*>(coll.get())
-            ? MultipleCollectionAccessor{stdx::get<const ScopedCollectionAcquisition*>(coll.get())}
+        stdx::holds_alternative<CollectionAcquisition>(coll.get())
+            ? MultipleCollectionAccessor{stdx::get<CollectionAcquisition>(coll.get())}
             : MultipleCollectionAccessor{coll.getCollectionPtr()},
         std::move(canonicalQuery),
         std::move(extractAndAttachPipelineStages),
@@ -1792,7 +1792,7 @@ StatusWith<std::unique_ptr<projection_ast::Projection>> makeProjection(const BSO
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     OpDebug* opDebug,
-    const ScopedCollectionAcquisition& coll,
+    CollectionAcquisition coll,
     ParsedDelete* parsedDelete,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     const auto& collectionPtr = coll.getCollectionPtr();
@@ -1864,7 +1864,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         return plan_executor_factory::make(expCtx,
                                            std::move(ws),
                                            std::make_unique<EOFStage>(expCtx.get()),
-                                           &coll,
+                                           coll,
                                            policy,
                                            false, /* whether we must return owned data */
                                            nss);
@@ -1900,7 +1900,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                 LOGV2_DEBUG(20928, 2, "Using idhack", "query"_attr = redact(unparsedQuery));
 
                 auto idHackStage = std::make_unique<IDHackStage>(
-                    expCtx.get(), unparsedQuery["_id"].wrap(), ws.get(), &coll, descriptor);
+                    expCtx.get(), unparsedQuery["_id"].wrap(), ws.get(), coll, descriptor);
                 std::unique_ptr<DeleteStage> root =
                     std::make_unique<DeleteStage>(expCtx.get(),
                                                   std::move(deleteStageParams),
@@ -1910,7 +1910,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                 return plan_executor_factory::make(expCtx,
                                                    std::move(ws),
                                                    std::move(root),
-                                                   &coll,
+                                                   coll,
                                                    policy,
                                                    false /* whether owned BSON must be returned */);
             }
@@ -1952,7 +1952,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     const size_t defaultPlannerOptions = QueryPlannerParams::DEFAULT;
     ClassicPrepareExecutionHelper helper{
-        opCtx, &coll, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
+        opCtx, coll, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
     auto executionResult = helper.prepare();
 
     if (!executionResult.isOK()) {
@@ -2008,7 +2008,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     return plan_executor_factory::make(std::move(cq),
                                        std::move(ws),
                                        std::move(root),
-                                       &coll,
+                                       coll,
                                        policy,
                                        defaultPlannerOptions,
                                        NamespaceString(),
@@ -2021,7 +2021,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
-    const ScopedCollectionAcquisition& coll,
+    CollectionAcquisition coll,
     ParsedUpdate* parsedUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     const auto& collectionPtr = coll.getCollectionPtr();
@@ -2156,7 +2156,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     const size_t defaultPlannerOptions = QueryPlannerParams::DEFAULT;
     ClassicPrepareExecutionHelper helper{
-        opCtx, &coll, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
+        opCtx, coll, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
     auto executionResult = helper.prepare();
 
     if (!executionResult.isOK()) {
@@ -2213,7 +2213,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     return plan_executor_factory::make(std::move(cq),
                                        std::move(ws),
                                        std::move(root),
-                                       &coll,
+                                       coll,
                                        policy,
                                        defaultPlannerOptions,
                                        NamespaceString(),

@@ -149,7 +149,7 @@ private:
      */
     bool _deleteExpiredWithIndex(OperationContext* opCtx,
                                  TTLCollectionCache* ttlCollectionCache,
-                                 const ScopedCollectionAcquisition& collection,
+                                 const CollectionAcquisition& collection,
                                  std::string indexName);
 
     /*
@@ -165,7 +165,7 @@ private:
      */
     bool _deleteExpiredWithCollscan(OperationContext* opCtx,
                                     TTLCollectionCache* ttlCollectionCache,
-                                    const ScopedCollectionAcquisition& collection);
+                                    const CollectionAcquisition& collection);
 
     // Protects the state below.
     mutable Mutex _stateMutex = MONGO_MAKE_LATCH("TTLMonitorStateMutex");

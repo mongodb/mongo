@@ -88,7 +88,7 @@ bool shouldRestartDeleteIfNoLongerMatches(const DeleteStageParams* params) {
 DeleteStage::DeleteStage(ExpressionContext* expCtx,
                          std::unique_ptr<DeleteStageParams> params,
                          WorkingSet* ws,
-                         const ScopedCollectionAcquisition& collection,
+                         CollectionAcquisition collection,
                          PlanStage* child)
     : DeleteStage(kStageType.rawData(), expCtx, std::move(params), ws, collection, child) {}
 
@@ -96,7 +96,7 @@ DeleteStage::DeleteStage(const char* stageType,
                          ExpressionContext* expCtx,
                          std::unique_ptr<DeleteStageParams> params,
                          WorkingSet* ws,
-                         const ScopedCollectionAcquisition& collection,
+                         CollectionAcquisition collection,
                          PlanStage* child)
     : RequiresWritableCollectionStage(stageType, expCtx, collection),
       _params(std::move(params)),

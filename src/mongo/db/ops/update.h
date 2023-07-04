@@ -41,7 +41,7 @@ namespace mongo {
 
 class CanonicalQuery;
 class OperationContext;
-class ScopedCollectionAcquisition;
+class CollectionAcquisition;
 class UpdateDriver;
 
 /**
@@ -50,7 +50,7 @@ class UpdateDriver;
  * Caller must hold the appropriate database locks.
  */
 UpdateResult update(OperationContext* opCtx,
-                    ScopedCollectionAcquisition& coll,
+                    CollectionAcquisition& coll,
                     const UpdateRequest& request);
 
 }  // namespace mongo

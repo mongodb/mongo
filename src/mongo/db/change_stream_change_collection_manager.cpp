@@ -584,14 +584,14 @@ void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
 
 boost::optional<ChangeCollectionPurgingJobMetadata>
 ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
-    OperationContext* opCtx, const ScopedCollectionAcquisition& changeCollection) {
+    OperationContext* opCtx, const CollectionAcquisition& changeCollection) {
     auto findWallTimeAndRecordIdForFirstDocument = [&](InternalPlanner::Direction direction)
         -> boost::optional<std::pair<long long, RecordId>> {
         BSONObj currChangeDoc;
         RecordId currRecordId;
 
         auto scanExecutor = InternalPlanner::collectionScan(
-            opCtx, &changeCollection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, direction);
+            opCtx, changeCollection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, direction);
         switch (scanExecutor->getNext(&currChangeDoc, &currRecordId)) {
             case PlanExecutor::IS_EOF:
                 return boost::none;
@@ -614,7 +614,7 @@ ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
 
 size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocumentsWithCollScan(
     OperationContext* opCtx,
-    const ScopedCollectionAcquisition& changeCollection,
+    const CollectionAcquisition& changeCollection,
     RecordIdBound maxRecordIdBound,
     Date_t expirationTime) {
     auto params = std::make_unique<DeleteStageParams>();
@@ -661,13 +661,13 @@ size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocume
 namespace {
 std::shared_ptr<ChangeCollectionTruncateMarkers> initialiseTruncateMarkers(
     OperationContext* opCtx,
-    const ScopedCollectionAcquisition& changeCollection,
+    const CollectionAcquisition& changeCollection,
     ConcurrentSharedValuesMap<UUID, ChangeCollectionTruncateMarkers, UUID::Hash>& truncateMap) {
     const auto& ns = changeCollection.nss();
 
     auto minBytesPerMarker = gChangeCollectionTruncateMarkersMinBytes;
 
-    YieldableCollectionIterator iterator{opCtx, &changeCollection};
+    YieldableCollectionIterator iterator{opCtx, changeCollection};
 
     CollectionTruncateMarkers::InitialSetOfMarkers initialSetOfMarkers =
         CollectionTruncateMarkers::createFromCollectionIterator(
@@ -688,7 +688,7 @@ std::shared_ptr<ChangeCollectionTruncateMarkers> initialiseTruncateMarkers(
                                                     minBytesPerMarker);
 
     auto backScan = InternalPlanner::collectionScan(opCtx,
-                                                    &changeCollection,
+                                                    changeCollection,
                                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                     InternalPlanner::BACKWARD);
     // Update the truncate markers with the last collection entry's RecordId and wall time.
@@ -708,9 +708,7 @@ std::shared_ptr<ChangeCollectionTruncateMarkers> initialiseTruncateMarkers(
 }  // namespace
 
 size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocumentsWithTruncate(
-    OperationContext* opCtx,
-    const ScopedCollectionAcquisition& changeCollection,
-    Date_t expirationTime) {
+    OperationContext* opCtx, const CollectionAcquisition& changeCollection, Date_t expirationTime) {
     auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
     auto& truncateMap = changeCollectionManager._tenantTruncateMarkersMap;
 

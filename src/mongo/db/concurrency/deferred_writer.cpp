@@ -96,7 +96,7 @@ Status DeferredWriter::_makeCollection(OperationContext* opCtx) {
     }
 }
 
-StatusWith<ScopedCollectionAcquisition> DeferredWriter::_getCollection(OperationContext* opCtx) {
+StatusWith<CollectionAcquisition> DeferredWriter::_getCollection(OperationContext* opCtx) {
     while (true) {
         {
             auto collection =

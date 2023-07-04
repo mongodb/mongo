@@ -224,7 +224,7 @@ public:
      */
     static boost::optional<ChangeCollectionPurgingJobMetadata>
     getChangeCollectionPurgingJobMetadata(OperationContext* opCtx,
-                                          const ScopedCollectionAcquisition& changeCollection);
+                                          const CollectionAcquisition& changeCollection);
 
     /**
      * Removes documents from a change collection whose wall time is less than the
@@ -235,7 +235,7 @@ public:
      */
     static size_t removeExpiredChangeCollectionsDocumentsWithCollScan(
         OperationContext* opCtx,
-        const ScopedCollectionAcquisition& changeCollection,
+        const CollectionAcquisition& changeCollection,
         RecordIdBound maxRecordIdBound,
         Date_t expirationTime);
 
@@ -249,7 +249,7 @@ public:
      */
     static size_t removeExpiredChangeCollectionsDocumentsWithTruncate(
         OperationContext* opCtx,
-        const ScopedCollectionAcquisition& changeCollection,
+        const CollectionAcquisition& changeCollection,
         Date_t expirationTime);
 
 private:

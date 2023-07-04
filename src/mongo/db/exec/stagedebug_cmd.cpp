@@ -201,13 +201,13 @@ public:
 
         // Add a fetch at the top for the user so we can get obj back for sure.
         unique_ptr<PlanStage> rootFetch = std::make_unique<FetchStage>(
-            expCtx.get(), ws.get(), std::move(userRoot), nullptr, &collection);
+            expCtx.get(), ws.get(), std::move(userRoot), nullptr, collection);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(expCtx,
                                         std::move(ws),
                                         std::move(rootFetch),
-                                        &collection,
+                                        collection,
                                         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                         false /* whether owned BSON must be returned */);
         fassert(28536, statusWithPlanExecutor.getStatus());
@@ -226,7 +226,7 @@ public:
     }
 
     PlanStage* parseQuery(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          const ScopedCollectionAcquisition& collection,
+                          CollectionAcquisition collection,
                           BSONObj obj,
                           WorkingSet* workingSet,
                           const NamespaceString& nss,
@@ -316,7 +316,7 @@ public:
             params.direction = nodeArgs["direction"].numberInt();
             params.shouldDedup = desc->getEntry()->isMultikey(opCtx, collectionPtr);
 
-            return new IndexScan(expCtx.get(), &collection, params, workingSet, matcher);
+            return new IndexScan(expCtx.get(), collection, params, workingSet, matcher);
         } else if ("andHash" == nodeName) {
             uassert(
                 16921, "Nodes argument must be provided to AND", nodeArgs["nodes"].isABSONObj());
@@ -394,7 +394,7 @@ public:
                     "Can't parse sub-node of FETCH: " + nodeArgs["node"].Obj().toString(),
                     nullptr != subNode);
             return new FetchStage(
-                expCtx.get(), workingSet, std::move(subNode), matcher, &collection);
+                expCtx.get(), workingSet, std::move(subNode), matcher, collection);
         } else if ("limit" == nodeName) {
             uassert(16937,
                     "Limit stage doesn't have a filter (put it on the child)",
@@ -435,7 +435,7 @@ public:
                 params.direction = CollectionScanParams::BACKWARD;
             }
 
-            return new CollectionScan(expCtx.get(), &collection, params, workingSet, matcher);
+            return new CollectionScan(expCtx.get(), collection, params, workingSet, matcher);
         } else if ("mergeSort" == nodeName) {
             uassert(
                 16971, "Nodes argument must be provided to sort", nodeArgs["nodes"].isABSONObj());

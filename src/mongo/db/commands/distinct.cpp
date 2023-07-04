@@ -213,8 +213,8 @@ public:
 
         const auto acquisitionRequest = CollectionOrViewAcquisitionRequest::fromOpCtx(
             opCtx, nss, AcquisitionPrerequisites::kRead);
-        boost::optional<ScopedCollectionOrViewAcquisition> collectionOrView =
-            supportsLockFreeRead(opCtx)
+        boost::optional<CollectionOrViewAcquisition> collectionOrView =
+            shard_role_details::supportsLockFreeRead(opCtx)
             ? acquireCollectionOrViewWithoutTakingLocks(opCtx, acquisitionRequest)
             : acquireCollectionOrView(opCtx, acquisitionRequest, LockMode::MODE_IS);
 
@@ -258,7 +258,7 @@ public:
         const auto& collection = collectionOrView->getCollectionPtr();
 
         auto executor = uassertStatusOK(getExecutorDistinct(
-            &collectionOrView->getCollection(), QueryPlannerParams::DEFAULT, &parsedDistinct));
+            collectionOrView->getCollection(), QueryPlannerParams::DEFAULT, &parsedDistinct));
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(executor.get(),
@@ -299,8 +299,8 @@ public:
         const auto acquisitionRequest = CollectionOrViewAcquisitionRequest::fromOpCtx(
             opCtx, nssOrUUID, AcquisitionPrerequisites::kRead);
 
-        boost::optional<ScopedCollectionOrViewAcquisition> collectionOrView =
-            supportsLockFreeRead(opCtx)
+        boost::optional<CollectionOrViewAcquisition> collectionOrView =
+            shard_role_details::supportsLockFreeRead(opCtx)
             ? acquireCollectionOrViewWithoutTakingLocks(opCtx, acquisitionRequest)
             : acquireCollectionOrView(opCtx, acquisitionRequest, LockMode::MODE_IS);
         const auto nss = collectionOrView->nss();
@@ -378,7 +378,7 @@ public:
             opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
         auto executor = getExecutorDistinct(
-            &collectionOrView->getCollection(), QueryPlannerParams::DEFAULT, &parsedDistinct);
+            collectionOrView->getCollection(), QueryPlannerParams::DEFAULT, &parsedDistinct);
         uassertStatusOK(executor.getStatus());
 
         {

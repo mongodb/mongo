@@ -262,7 +262,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWithCollectionScan(
     OperationContext* opCtx,
-    const ScopedCollectionAcquisition& coll,
+    CollectionAcquisition coll,
     std::unique_ptr<DeleteStageParams> params,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     Direction direction,
@@ -316,7 +316,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     auto executor = plan_executor_factory::make(expCtx,
                                                 std::move(ws),
                                                 std::move(root),
-                                                &coll,
+                                                coll,
                                                 yieldPolicy,
                                                 false /* whether owned BSON must be returned */
     );
@@ -363,7 +363,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWithIndexScan(
     OperationContext* opCtx,
-    const ScopedCollectionAcquisition& coll,
+    CollectionAcquisition coll,
     std::unique_ptr<DeleteStageParams> params,
     const IndexDescriptor* descriptor,
     const BSONObj& startKey,
@@ -404,7 +404,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     auto executor = plan_executor_factory::make(expCtx,
                                                 std::move(ws),
                                                 std::move(root),
-                                                &coll,
+                                                coll,
                                                 yieldPolicy,
                                                 false /* whether owned BSON must be returned */
     );
@@ -441,7 +441,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::shardKeyIn
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWithShardKeyIndexScan(
     OperationContext* opCtx,
-    const ScopedCollectionAcquisition& coll,
+    CollectionAcquisition coll,
     std::unique_ptr<DeleteStageParams> params,
     const ShardKeyIndex& shardKeyIdx,
     const BSONObj& startKey,
@@ -483,7 +483,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     auto executor = plan_executor_factory::make(expCtx,
                                                 std::move(ws),
                                                 std::move(root),
-                                                &coll,
+                                                coll,
                                                 yieldPolicy,
                                                 false /* whether owned BSON must be returned */
     );
@@ -493,7 +493,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWithIdHack(
     OperationContext* opCtx,
-    const ScopedCollectionAcquisition& collection,
+    CollectionAcquisition collection,
     const UpdateStageParams& params,
     const IndexDescriptor* descriptor,
     const BSONObj& key,
@@ -506,7 +506,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
         opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionPtr->ns());
 
     auto idHackStage =
-        std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), &collection, descriptor);
+        std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), collection, descriptor);
 
     const bool isUpsert = params.request->isUpsert();
     auto root = (isUpsert ? std::make_unique<UpsertStage>(
@@ -517,7 +517,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
     auto executor = plan_executor_factory::make(expCtx,
                                                 std::move(ws),
                                                 std::move(root),
-                                                &collection,
+                                                collection,
                                                 yieldPolicy,
                                                 false /* whether owned BSON must be returned */);
     invariant(executor.getStatus());

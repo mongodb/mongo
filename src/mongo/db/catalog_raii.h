@@ -344,6 +344,9 @@ protected:
     Collection* _writableColl = nullptr;
 };
 
+class CollectionAcquisition;
+class ScopedLocalCatalogWriteFence;
+
 /**
  * RAII-style class to handle the lifetime of writable Collections.
  * It does not take any locks, concurrency needs to be handled separately using explicit locks or
@@ -353,20 +356,16 @@ protected:
  * It is safe to re-use an instance for multiple WriteUnitOfWorks or to destroy it before the active
  * WriteUnitOfWork finishes.
  */
-class ScopedCollectionAcquisition;
-
-class ScopedLocalCatalogWriteFence;
-
 class CollectionWriter final {
 public:
     // This constructor indicates to the shard role subsystem that the subsequent code enters into
     // local DDL land and that the content of the local collection should not be trusted until it
     // goes out of scope.
     //
-    // See the comments on ScopedCollectionAcquisition for more details.
+    // See the comments on CollectionAcquisition for more details.
     //
     // TODO (SERVER-73766): Only this constructor should remain in use
-    CollectionWriter(OperationContext* opCtx, ScopedCollectionAcquisition* acquisition);
+    CollectionWriter(OperationContext* opCtx, CollectionAcquisition* acquisition);
 
     // Gets the collection from the catalog for the provided uuid
     CollectionWriter(OperationContext* opCtx, const UUID& uuid);
@@ -409,8 +408,8 @@ public:
 
 private:
     // This group of values is only operated on for code paths that go through the
-    // `ScopedCollectionAcquisition` constructor.
-    ScopedCollectionAcquisition* _acquisition = nullptr;
+    // `CollectionAcquisition` constructor.
+    CollectionAcquisition* _acquisition = nullptr;
     std::unique_ptr<ScopedLocalCatalogWriteFence> _fence;
 
     // If this class is instantiated with the constructors that take UUID or nss we need somewhere

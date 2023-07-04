@@ -71,8 +71,8 @@ void PlanExecutor::checkFailPointPlanExecAlwaysFails() {
 const CollectionPtr& VariantCollectionPtrOrAcquisition::getCollectionPtr() const {
     return *stdx::visit(OverloadedVisitor{
                             [](const CollectionPtr* collectionPtr) { return collectionPtr; },
-                            [](const ScopedCollectionAcquisition* collectionAcquisition) {
-                                return &collectionAcquisition->getCollectionPtr();
+                            [](const CollectionAcquisition& collectionAcquisition) {
+                                return &collectionAcquisition.getCollectionPtr();
                             },
                         },
                         _collectionPtrOrAcquisition);
@@ -88,8 +88,8 @@ boost::optional<ScopedCollectionFilter> VariantCollectionPtrOrAcquisition::getSh
                 return scopedCss->getOwnershipFilter(
                     opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
             },
-            [](const ScopedCollectionAcquisition* acq) -> boost::optional<ScopedCollectionFilter> {
-                return acq->getShardingFilter();
+            [](const CollectionAcquisition& acq) -> boost::optional<ScopedCollectionFilter> {
+                return acq.getShardingFilter();
             }},
         _collectionPtrOrAcquisition);
 }

@@ -60,7 +60,7 @@
 namespace mongo {
 
 UpdateResult update(OperationContext* opCtx,
-                    ScopedCollectionAcquisition& coll,
+                    CollectionAcquisition& coll,
                     const UpdateRequest& request) {
     // Explain should never use this helper.
     invariant(!request.explain());

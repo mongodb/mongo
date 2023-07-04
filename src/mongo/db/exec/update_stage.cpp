@@ -131,7 +131,7 @@ CollectionUpdateArgs::StoreDocOption getStoreDocMode(const UpdateRequest& update
 UpdateStage::UpdateStage(ExpressionContext* expCtx,
                          const UpdateStageParams& params,
                          WorkingSet* ws,
-                         const ScopedCollectionAcquisition& collection,
+                         CollectionAcquisition collection,
                          PlanStage* child)
     : UpdateStage(expCtx, params, ws, collection) {
     // We should never reach here if the request is an upsert.
@@ -143,7 +143,7 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
 UpdateStage::UpdateStage(ExpressionContext* expCtx,
                          const UpdateStageParams& params,
                          WorkingSet* ws,
-                         const ScopedCollectionAcquisition& collection)
+                         CollectionAcquisition collection)
     : RequiresWritableCollectionStage(kStageType.rawData(), expCtx, collection),
       _params(params),
       _ws(ws),

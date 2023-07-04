@@ -94,7 +94,7 @@ public:
      */
     static CollectionTruncateMarkers::InitialSetOfMarkers createInitialMarkersScanning(
         OperationContext* opCtx,
-        const ScopedCollectionAcquisition& collPtr,
+        const CollectionAcquisition& collPtr,
         const UUID& nsUUID,
         int64_t minBytesPerMarker);
 

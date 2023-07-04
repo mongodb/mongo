@@ -79,11 +79,16 @@ TransactionResources::~TransactionResources() {
     invariant(!locker);
     invariant(acquiredCollections.empty());
     invariant(acquiredViews.empty());
+    invariant(collectionAcquisitionReferences == 0);
+    invariant(viewAcquisitionReferences == 0);
     invariant(!yielded);
 }
 
 TransactionResources& TransactionResources::get(OperationContext* opCtx) {
     auto& transactionResources = getTransactionResources(opCtx);
+    invariant(transactionResources,
+              "Cannot obtain TransactionResources as they've been detached from the opCtx in order "
+              "to yield");
     return *transactionResources;
 }
 
@@ -106,12 +111,27 @@ AcquiredCollection& TransactionResources::addAcquiredCollection(
     if (!readConcern) {
         readConcern = acquiredCollection.prerequisites.readConcern;
     }
+
+    invariant(state != State::FAILED, "Cannot make a new acquisition in the FAILED state");
+    invariant(state != State::YIELDED, "Cannot make a new acquisition in the YIELDED state");
+
     assertReadConcernsAreEquivalent(*readConcern, acquiredCollection.prerequisites.readConcern);
+
+    if (state == State::EMPTY) {
+        state = State::ACTIVE;
+    }
 
     return acquiredCollections.emplace_back(std::move(acquiredCollection));
 }
 
 const AcquiredView& TransactionResources::addAcquiredView(AcquiredView&& acquiredView) {
+    invariant(state != State::FAILED, "Cannot make a new acquisition in the FAILED state");
+    invariant(state != State::YIELDED, "Cannot make a new acquisition in the YIELDED state");
+
+    if (state == State::EMPTY) {
+        state = State::ACTIVE;
+    }
+
     return acquiredViews.emplace_back(std::move(acquiredView));
 }
 

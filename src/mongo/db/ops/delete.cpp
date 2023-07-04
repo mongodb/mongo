@@ -44,7 +44,7 @@
 namespace mongo {
 
 long long deleteObjects(OperationContext* opCtx,
-                        const ScopedCollectionAcquisition& collection,
+                        const CollectionAcquisition& collection,
                         BSONObj pattern,
                         bool justOne,
                         bool god,
@@ -66,7 +66,7 @@ long long deleteObjects(OperationContext* opCtx,
 }
 
 DeleteResult deleteObject(OperationContext* opCtx,
-                          const ScopedCollectionAcquisition& collection,
+                          const CollectionAcquisition& collection,
                           const DeleteRequest& request) {
     ParsedDelete parsedDelete(opCtx, &request, collection.getCollectionPtr());
     uassertStatusOK(parsedDelete.parseRequest());

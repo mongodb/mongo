@@ -121,7 +121,7 @@ public:
                        std::unique_ptr<DeleteStageParams> params,
                        std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
                        WorkingSet* ws,
-                       const ScopedCollectionAcquisition& collection,
+                       CollectionAcquisition collection,
                        PlanStage* child);
     ~BatchedDeleteStage();
 

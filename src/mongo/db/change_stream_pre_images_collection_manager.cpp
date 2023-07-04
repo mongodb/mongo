@@ -106,7 +106,7 @@ const auto getPreImagesCollectionManager =
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getDeleteExpiredPreImagesExecutor(
     OperationContext* opCtx,
-    const ScopedCollectionAcquisition& preImageColl,
+    CollectionAcquisition preImageColl,
     const MatchExpression* filterPtr,
     Timestamp maxRecordIdTimestamp,
     UUID currentCollectionUUID) {
@@ -124,7 +124,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getDeleteExpiredPreImagesEx
 
     return InternalPlanner::deleteWithCollectionScan(
         opCtx,
-        preImageColl,
+        std::move(preImageColl),
         std::move(params),
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         InternalPlanner::Direction::FORWARD,
@@ -330,7 +330,7 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
 
 size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithCollScanCommon(
     OperationContext* opCtx,
-    const ScopedCollectionAcquisition& preImageColl,
+    const CollectionAcquisition& preImageColl,
     const MatchExpression* filterPtr,
     Timestamp maxRecordIdTimestamp) {
     size_t numberOfRemovals = 0;

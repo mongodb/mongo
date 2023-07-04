@@ -174,7 +174,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                                        PlanYieldPolicy::YieldThroughAcquisitions>(
                                       *coll ? coll : nullptr);
                               },
-                              [](const ScopedCollectionAcquisition* coll) {
+                              [](const CollectionAcquisition& coll) {
                                   return stdx::variant<const Yieldable*,
                                                        PlanYieldPolicy::YieldThroughAcquisitions>(
                                       PlanYieldPolicy::YieldThroughAcquisitions{});

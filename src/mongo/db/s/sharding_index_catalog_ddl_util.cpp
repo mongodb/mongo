@@ -75,7 +75,7 @@ namespace {
  * Remove all indexes by uuid.
  */
 void deleteShardingIndexCatalogEntries(OperationContext* opCtx,
-                                       const ScopedCollectionAcquisition& collection,
+                                       const CollectionAcquisition& collection,
                                        const UUID& uuid) {
     mongo::deleteObjects(
         opCtx, collection, BSON(IndexCatalogType::kCollectionUUIDFieldName << uuid), false);

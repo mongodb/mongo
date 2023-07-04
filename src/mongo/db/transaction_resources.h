@@ -158,6 +158,10 @@ struct AcquiredCollection {
     // was unable to restore it on rollback.
     bool invalidated;
 
+    // Maintains a reference count to how many references there are to this acquisition by the
+    // CollectionAcquisition class.
+    mutable int64_t refCount = 0;
+
     // Used by the ScopedLocalCatalogWriteFence to track the lifetime of AcquiredCollection.
     // ScopedLocalCatalogWriteFence will hold a weak_ptr pointing to 'sharedImpl'. The 'onRollback'
     // handler it installs will use that weak_ptr to determine if the AcquiredCollection is still
@@ -174,6 +178,10 @@ struct AcquiredView {
     boost::optional<Lock::CollectionLock> collectionLock;
 
     std::shared_ptr<const ViewDefinition> viewDefinition;
+
+    // Maintains a reference count to how many references there are to this acquisition by the
+    // ViewAcquisition class.
+    mutable int64_t refCount = 0;
 };
 
 /**
@@ -241,6 +249,24 @@ struct TransactionResources {
      */
     void assertNoAcquiredCollections() const;
 
+    /**
+     * Transaction resources can only be in one of 4 states:
+     * - EMPTY: This state is equivalent to a brand new constructed transaction resources which have
+     *   never received an acquisition.
+     * - ACTIVE: There is at least one acquisition in use and the resources have not been yielded.
+     * - YIELDED: The resources are either yielded or in the process of reacquisition after a yield.
+     * - FAILED: The reacquisition after a yield failed, we cannot perform any new acquisitions and
+     *   the operation must release all acquisitions. The operation must effectively cancel the
+     *   current operation.
+     *
+     * The set of valid transitions are:
+     * - EMPTY <-> ACTIVE <-> YIELDED
+     * - YIELDED -> FAILED -> EMPTY
+     */
+    enum class State { EMPTY, ACTIVE, YIELDED, FAILED };
+
+    State state{State::EMPTY};
+
     ////////////////////////////////////////////////////////////////////////////////////////
     // Global resources (cover all collections for the operation)
 
@@ -257,6 +283,11 @@ struct TransactionResources {
     // Set of all collections which are currently acquired
     std::list<AcquiredCollection> acquiredCollections;
     std::list<AcquiredView> acquiredViews;
+
+    // Reference counters used for controlling how many references there are to the
+    // TransactionResources object.
+    int64_t collectionAcquisitionReferences = 0;
+    int64_t viewAcquisitionReferences = 0;
 
     ////////////////////////////////////////////////////////////////////////////////////////
     // Yield/restore logic

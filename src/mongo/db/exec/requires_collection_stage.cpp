@@ -44,7 +44,7 @@ void RequiresCollectionStage::doSaveState() {
 void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
     if (context.type() == RestoreContext::RestoreType::kExternal) {
         // Restore the CollectionPtr only if we're still using the legacy approach. If we're using
-        // ScopedCollectionAcquisition it means the restoration is performed outside of this method
+        // CollectionAcquisition it means the restoration is performed outside of this method
         // and the pointers are still valid since it will survive across external yields.
         if (_collection.isCollectionPtr()) {
             // RequiresCollectionStage requires a collection to be provided in restore. However, it

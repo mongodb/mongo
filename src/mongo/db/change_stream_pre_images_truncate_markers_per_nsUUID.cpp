@@ -163,7 +163,7 @@ PreImagesTruncateMarkersPerNsUUID::createInitialMarkersFromSamples(
 CollectionTruncateMarkers::InitialSetOfMarkers
 PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
     OperationContext* opCtx,
-    const ScopedCollectionAcquisition& collAcq,
+    const CollectionAcquisition& collAcq,
     const UUID& nsUUID,
     int64_t minBytesPerMarker) {
     Timer scanningTimer;
@@ -177,7 +177,7 @@ PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
     RecordId maxRecordId = maxRecordIdBound.recordId();
 
     auto exec = InternalPlanner::collectionScan(opCtx,
-                                                &collAcq,
+                                                collAcq,
                                                 PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                 InternalPlanner::Direction::FORWARD,
                                                 boost::none,

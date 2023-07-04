@@ -159,9 +159,7 @@ int64_t getRecordsAccountedFor(
 //  (2) For each 'nsUUID', the samples will be ordered as they appear in the underlying pre-images
 //  collection.
 NsUUIDToSamplesMap gatherOrderedSamplesAcrossNsUUIDs(
-    OperationContext* opCtx,
-    const ScopedCollectionAcquisition& preImagesCollection,
-    int64_t numSamples) {
+    OperationContext* opCtx, const CollectionAcquisition& preImagesCollection, int64_t numSamples) {
     // First, try to obtain 1 sample per 'nsUUID'.
     NsUUIDToSamplesMap samplesMap;
     sampleLastRecordPerNsUUID(
@@ -173,7 +171,7 @@ NsUUIDToSamplesMap gatherOrderedSamplesAcrossNsUUIDs(
     auto samplingLogIntervalSeconds = gCollectionSamplingLogIntervalSeconds.load();
     auto numSamplesRemaining = numSamples - numLastRecords;
     auto exec = InternalPlanner::sampleCollection(
-        opCtx, &preImagesCollection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+        opCtx, preImagesCollection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 
     BSONObj doc;
     RecordId rId;
@@ -318,7 +316,7 @@ void distributeUnaccountedBytesAndRecords(
 PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTenantScanning(
     OperationContext* opCtx,
     boost::optional<TenantId> tenantId,
-    const ScopedCollectionAcquisition& preImagesCollection) {
+    const CollectionAcquisition& preImagesCollection) {
     auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
 
     PreImagesTruncateManager::TenantTruncateMarkers truncateMap;
@@ -366,7 +364,7 @@ PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTena
 PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTenantSampling(
     OperationContext* opCtx,
     boost::optional<TenantId> tenantId,
-    const ScopedCollectionAcquisition& preImagesCollection,
+    const CollectionAcquisition& preImagesCollection,
     InitialSamplingEstimates&& initialEstimates) {
 
     uint64_t numSamples =
@@ -426,7 +424,7 @@ PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTena
 PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTenant(
     OperationContext* opCtx,
     boost::optional<TenantId> tenantId,
-    const ScopedCollectionAcquisition& preImageCollection) {
+    const CollectionAcquisition& preImageCollection) {
     auto minBytesPerMarker = gPreImagesCollectionTruncateMarkersMinBytes;
     auto rs = preImageCollection.getCollectionPtr()->getRecordStore();
     long long numRecords = rs->numRecords(opCtx);
@@ -529,7 +527,7 @@ void truncateExpiredMarkersForNsUUID(
 void PreImagesTruncateManager::ensureMarkersInitialized(
     OperationContext* opCtx,
     boost::optional<TenantId> tenantId,
-    const ScopedCollectionAcquisition& preImagesColl) {
+    const CollectionAcquisition& preImagesColl) {
 
     auto tenantTruncateMarkers = _tenantMap.find(tenantId);
     if (!tenantTruncateMarkers) {
@@ -652,7 +650,7 @@ void PreImagesTruncateManager::updateMarkersOnInsert(OperationContext* opCtx,
 void PreImagesTruncateManager::_registerAndInitialiseMarkersForTenant(
     OperationContext* opCtx,
     boost::optional<TenantId> tenantId,
-    const ScopedCollectionAcquisition& preImagesCollection) {
+    const CollectionAcquisition& preImagesCollection) {
     // First register the 'tenantId' in the '_tenantMap' without any truncate markers. This allows
     // for concurrent inserts to be temporarily create their own truncate markers while
     // initialisation proceeds.

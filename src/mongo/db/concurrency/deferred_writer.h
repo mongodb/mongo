@@ -47,7 +47,7 @@
 
 namespace mongo {
 
-class ScopedCollectionAcquisition;
+class CollectionAcquisition;
 
 class ThreadPool;
 
@@ -143,7 +143,7 @@ private:
     /**
      * Ensure that the backing collection exists, and pass back a lock and handle to it.
      */
-    StatusWith<ScopedCollectionAcquisition> _getCollection(OperationContext* opCtx);
+    StatusWith<CollectionAcquisition> _getCollection(OperationContext* opCtx);
 
     /**
      * The method that the worker thread will run.

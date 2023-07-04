@@ -115,14 +115,14 @@ public:
     DeleteStage(ExpressionContext* expCtx,
                 std::unique_ptr<DeleteStageParams> params,
                 WorkingSet* ws,
-                const ScopedCollectionAcquisition& collection,
+                CollectionAcquisition collection,
                 PlanStage* child);
 
     DeleteStage(const char* stageType,
                 ExpressionContext* expCtx,
                 std::unique_ptr<DeleteStageParams> params,
                 WorkingSet* ws,
-                const ScopedCollectionAcquisition& collection,
+                CollectionAcquisition collection,
                 PlanStage* child);
 
     bool isEOF();

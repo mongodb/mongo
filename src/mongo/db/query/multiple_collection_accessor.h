@@ -73,8 +73,7 @@ public:
     explicit MultipleCollectionAccessor(const CollectionPtr& mainColl)
         : MultipleCollectionAccessor(&mainColl) {}
 
-    explicit MultipleCollectionAccessor(const ScopedCollectionAcquisition* mainAcq)
-        : _mainAcq(mainAcq) {}
+    explicit MultipleCollectionAccessor(CollectionAcquisition mainAcq) : _mainAcq(mainAcq) {}
 
     bool hasMainCollection() const {
         return (_mainColl && _mainColl->get()) || (_mainAcq && _mainAcq->exists());
@@ -93,11 +92,11 @@ public:
     }
 
     bool isAcquisition() const {
-        return _mainAcq;
+        return bool(_mainAcq);
     }
 
-    const ScopedCollectionAcquisition* getMainAcquisition() const {
-        return _mainAcq;
+    const CollectionAcquisition& getMainAcquisition() const {
+        return *_mainAcq;
     }
 
     const CollectionPtr& lookupCollection(const NamespaceString& nss) const {
@@ -113,7 +112,7 @@ public:
 
     void clear() {
         _mainColl = &CollectionPtr::null;
-        _mainAcq = nullptr;
+        _mainAcq.reset();
         _secondaryColls.clear();
     }
 
@@ -130,7 +129,7 @@ public:
 
 private:
     const CollectionPtr* _mainColl{&CollectionPtr::null};
-    const ScopedCollectionAcquisition* _mainAcq{};
+    boost::optional<CollectionAcquisition> _mainAcq;
 
     // Tracks whether any secondary namespace is a view or sharded based on information captured
     // at the time of lock acquisition. This is used to determine if a $lookup is eligible for

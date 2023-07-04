@@ -119,15 +119,15 @@ class RequiresWritableCollectionStage : public RequiresCollectionStage {
 public:
     RequiresWritableCollectionStage(const char* stageType,
                                     ExpressionContext* expCtx,
-                                    const ScopedCollectionAcquisition& coll)
-        : RequiresCollectionStage(stageType, expCtx, &coll), _collectionAcquisition(coll) {}
+                                    CollectionAcquisition coll)
+        : RequiresCollectionStage(stageType, expCtx, coll), _collectionAcquisition(coll) {}
 
-    const ScopedCollectionAcquisition& collectionAcquisition() const {
+    const CollectionAcquisition& collectionAcquisition() const {
         return _collectionAcquisition;
     }
 
 private:
-    const ScopedCollectionAcquisition& _collectionAcquisition;
+    const CollectionAcquisition _collectionAcquisition;
 };
 
 }  // namespace mongo

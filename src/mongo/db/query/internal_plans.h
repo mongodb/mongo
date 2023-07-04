@@ -64,7 +64,7 @@ class CollectionPtr;
 class IndexDescriptor;
 class OperationContext;
 class PlanStage;
-class ScopedCollectionAcquisition;
+class CollectionAcquisition;
 class WorkingSet;
 struct UpdateStageParams;
 
@@ -131,7 +131,7 @@ public:
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> deleteWithCollectionScan(
         OperationContext* opCtx,
-        const ScopedCollectionAcquisition& collection,
+        CollectionAcquisition collection,
         std::unique_ptr<DeleteStageParams> deleteStageParams,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         Direction direction = FORWARD,
@@ -163,7 +163,7 @@ public:
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> deleteWithIndexScan(
         OperationContext* opCtx,
-        const ScopedCollectionAcquisition& collection,
+        CollectionAcquisition collection,
         std::unique_ptr<DeleteStageParams> params,
         const IndexDescriptor* descriptor,
         const BSONObj& startKey,
@@ -197,7 +197,7 @@ public:
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> deleteWithShardKeyIndexScan(
         OperationContext* opCtx,
-        const ScopedCollectionAcquisition& collection,
+        CollectionAcquisition collection,
         std::unique_ptr<DeleteStageParams> params,
         const ShardKeyIndex& shardKeyIdx,
         const BSONObj& startKey,
@@ -211,7 +211,7 @@ public:
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> updateWithIdHack(
         OperationContext* opCtx,
-        const ScopedCollectionAcquisition& collection,
+        CollectionAcquisition collection,
         const UpdateStageParams& params,
         const IndexDescriptor* descriptor,
         const BSONObj& key,

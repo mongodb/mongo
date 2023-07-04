@@ -232,16 +232,14 @@ public:
 
     // Uses the default _expCtx tied to the test suite.
     std::unique_ptr<BatchedDeleteStage> makeBatchedDeleteStage(
-        WorkingSet* ws,
-        const ScopedCollectionAcquisition& coll,
-        CanonicalQuery* deleteParamsFilter = nullptr) {
+        WorkingSet* ws, CollectionAcquisition coll, CanonicalQuery* deleteParamsFilter = nullptr) {
         return makeBatchedDeleteStage(ws, coll, _expCtx.get(), deleteParamsFilter);
     }
 
     // Defaults batch params to be test defaults for targetBatchTimeMS and targetBatchDocs.
     std::unique_ptr<BatchedDeleteStage> makeBatchedDeleteStage(
         WorkingSet* ws,
-        const ScopedCollectionAcquisition& coll,
+        CollectionAcquisition coll,
         ExpressionContext* expCtx,
         CanonicalQuery* deleteParamsFilter = nullptr) {
 
@@ -254,7 +252,7 @@ public:
 
     std::unique_ptr<BatchedDeleteStage> makeBatchedDeleteStage(
         WorkingSet* ws,
-        const ScopedCollectionAcquisition& coll,
+        CollectionAcquisition coll,
         ExpressionContext* expCtx,
         std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
         CanonicalQuery* deleteParamsFilter = nullptr) {
@@ -271,7 +269,7 @@ public:
             std::move(batchedDeleteParams),
             ws,
             coll,
-            new CollectionScan(expCtx, &coll, collScanParams, ws, nullptr));
+            new CollectionScan(expCtx, coll, collScanParams, ws, nullptr));
     }
 
 protected:

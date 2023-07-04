@@ -296,7 +296,7 @@ bool Helpers::getLast(OperationContext* opCtx, const NamespaceString& nss, BSONO
 }
 
 UpdateResult Helpers::upsert(OperationContext* opCtx,
-                             ScopedCollectionAcquisition& coll,
+                             CollectionAcquisition& coll,
                              const BSONObj& o,
                              bool fromMigrate) {
     BSONElement e = o["_id"];
@@ -306,7 +306,7 @@ UpdateResult Helpers::upsert(OperationContext* opCtx,
 }
 
 UpdateResult Helpers::upsert(OperationContext* opCtx,
-                             ScopedCollectionAcquisition& coll,
+                             CollectionAcquisition& coll,
                              const BSONObj& filter,
                              const BSONObj& updateMod,
                              bool fromMigrate) {
@@ -327,7 +327,7 @@ UpdateResult Helpers::upsert(OperationContext* opCtx,
 }
 
 void Helpers::update(OperationContext* opCtx,
-                     ScopedCollectionAcquisition& coll,
+                     CollectionAcquisition& coll,
                      const BSONObj& filter,
                      const BSONObj& updateMod,
                      bool fromMigrate) {
@@ -347,16 +347,14 @@ void Helpers::update(OperationContext* opCtx,
 }
 
 Status Helpers::insert(OperationContext* opCtx,
-                       const ScopedCollectionAcquisition& coll,
+                       const CollectionAcquisition& coll,
                        const BSONObj& doc) {
     OldClientContext context(opCtx, coll.nss());
     return collection_internal::insertDocument(
         opCtx, coll.getCollectionPtr(), InsertStatement{doc}, &CurOp::get(opCtx)->debug());
 }
 
-void Helpers::putSingleton(OperationContext* opCtx,
-                           ScopedCollectionAcquisition& coll,
-                           BSONObj obj) {
+void Helpers::putSingleton(OperationContext* opCtx, CollectionAcquisition& coll, BSONObj obj) {
     OldClientContext context(opCtx, coll.nss());
 
     auto request = UpdateRequest();
@@ -386,7 +384,7 @@ BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
     return kpBuilder.obj();
 }
 
-void Helpers::emptyCollection(OperationContext* opCtx, const ScopedCollectionAcquisition& coll) {
+void Helpers::emptyCollection(OperationContext* opCtx, const CollectionAcquisition& coll) {
     OldClientContext context(opCtx, coll.nss());
     repl::UnreplicatedWritesBlock uwb(opCtx);
     deleteObjects(opCtx, coll, BSONObj(), false);

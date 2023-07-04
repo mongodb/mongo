@@ -445,7 +445,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
         auto status = writeConflictRetry(opCtx, "applyOplogEntryOrGroupedInserts_CRUD", nss, [&] {
             // Need to throw instead of returning a status for it to be properly ignored.
             try {
-                boost::optional<ScopedCollectionAcquisition> coll;
+                boost::optional<CollectionAcquisition> coll;
                 Database* db = nullptr;
 
                 // If the collection UUID does not resolve, acquire the collection using the

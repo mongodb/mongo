@@ -1443,7 +1443,7 @@ void logOplogConstraintViolation(OperationContext* opCtx,
 // @return failure status if an update should have happened and the document DNE.
 // See replset initial sync code.
 Status applyOperation_inlock(OperationContext* opCtx,
-                             ScopedCollectionAcquisition& collectionAcquisition,
+                             CollectionAcquisition& collectionAcquisition,
                              const OplogEntryOrGroupedInserts& opOrGroupedInserts,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,

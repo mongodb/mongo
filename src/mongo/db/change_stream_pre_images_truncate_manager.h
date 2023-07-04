@@ -89,7 +89,7 @@ public:
      */
     void ensureMarkersInitialized(OperationContext* opCtx,
                                   boost::optional<TenantId> tenantId,
-                                  const ScopedCollectionAcquisition& preImagesColl);
+                                  const CollectionAcquisition& preImagesColl);
 
     /*
      * Truncates expired pre-images spanning the 'preImagesColl' associated with the 'tenantId'.
@@ -122,10 +122,9 @@ public:
 private:
     friend class PreImagesTruncateManagerTest;
 
-    void _registerAndInitialiseMarkersForTenant(
-        OperationContext* opCtx,
-        boost::optional<TenantId> tenantId,
-        const ScopedCollectionAcquisition& preImagesCollection);
+    void _registerAndInitialiseMarkersForTenant(OperationContext* opCtx,
+                                                boost::optional<TenantId> tenantId,
+                                                const CollectionAcquisition& preImagesCollection);
     /**
      * Similar to the 'TenantTruncateMarkers' type, but with an added wrapper which enables copy on
      * write semantics.

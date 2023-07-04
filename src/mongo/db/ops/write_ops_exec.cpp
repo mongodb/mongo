@@ -364,7 +364,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
 }
 
 void insertDocumentsAtomically(OperationContext* opCtx,
-                               const ScopedCollectionAcquisition& collection,
+                               const CollectionAcquisition& collection,
                                std::vector<InsertStatement>::iterator begin,
                                std::vector<InsertStatement>::iterator end,
                                bool fromMigrate) {
@@ -612,7 +612,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
     }
 
-    boost::optional<ScopedCollectionAcquisition> collection;
+    boost::optional<CollectionAcquisition> collection;
     auto acquireCollection = [&] {
         while (true) {
             collection.emplace(mongo::acquireCollection(
@@ -1184,7 +1184,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
     }
 
-    const ScopedCollectionAcquisition collection = [&]() {
+    const CollectionAcquisition collection = [&]() {
         const auto acquisitionRequest = CollectionAcquisitionRequest::fromOpCtx(
             opCtx, ns, AcquisitionPrerequisites::kWrite, opCollectionUUID);
         while (true) {

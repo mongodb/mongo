@@ -56,6 +56,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/decorable.h"
@@ -63,21 +64,15 @@
 
 namespace mongo {
 
-class CollectionPtr;
-class BSONObj;
-class PlanStage;
-class RecordId;
-class ScopedCollectionAcquisition;
-
-// TODO: SERVER-76397 Remove this once we use ScopedCollectionAcquisition everywhere.
+// TODO: SERVER-76397 Remove this once we use CollectionAcquisition everywhere.
 class VariantCollectionPtrOrAcquisition {
 public:
     VariantCollectionPtrOrAcquisition(const CollectionPtr* collectionPtr)
         : _collectionPtrOrAcquisition(collectionPtr) {}
-    VariantCollectionPtrOrAcquisition(const ScopedCollectionAcquisition* collection)
+    VariantCollectionPtrOrAcquisition(CollectionAcquisition collection)
         : _collectionPtrOrAcquisition(collection) {}
 
-    const stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*>& get() const {
+    const stdx::variant<const CollectionPtr*, CollectionAcquisition>& get() {
         return _collectionPtrOrAcquisition;
     };
 
@@ -88,19 +83,17 @@ public:
     }
 
     bool isAcquisition() const {
-        return stdx::holds_alternative<const ScopedCollectionAcquisition*>(
-            _collectionPtrOrAcquisition);
+        return stdx::holds_alternative<CollectionAcquisition>(_collectionPtrOrAcquisition);
     }
 
-    const ScopedCollectionAcquisition* getAcquisition() const {
-        return stdx::get<const ScopedCollectionAcquisition*>(_collectionPtrOrAcquisition);
+    const CollectionAcquisition& getAcquisition() const {
+        return stdx::get<CollectionAcquisition>(_collectionPtrOrAcquisition);
     }
 
     boost::optional<ScopedCollectionFilter> getShardingFilter(OperationContext* opCtx) const;
 
 private:
-    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*>
-        _collectionPtrOrAcquisition;
+    stdx::variant<const CollectionPtr*, CollectionAcquisition> _collectionPtrOrAcquisition;
 };
 
 /**

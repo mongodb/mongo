@@ -89,14 +89,14 @@ private:
                               const repl::OplogEntry& op) const;
     // Applies an insert operation
     void _applyInsert_inlock(OperationContext* opCtx,
-                             ScopedCollectionAcquisition& outputColl,
-                             ScopedCollectionAcquisition& stashColl,
+                             CollectionAcquisition& outputColl,
+                             CollectionAcquisition& stashColl,
                              const repl::OplogEntry& op) const;
 
     // Applies an update operation
     void _applyUpdate_inlock(OperationContext* opCtx,
-                             ScopedCollectionAcquisition& outputColl,
-                             ScopedCollectionAcquisition& stashColl,
+                             CollectionAcquisition& outputColl,
+                             CollectionAcquisition& stashColl,
                              const repl::OplogEntry& op) const;
 
     // Applies a delete operation

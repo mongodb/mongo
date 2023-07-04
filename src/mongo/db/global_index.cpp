@@ -243,7 +243,7 @@ void dropContainer(OperationContext* opCtx, const UUID& indexUUID) {
 }
 
 void insertKey(OperationContext* opCtx,
-               const ScopedCollectionAcquisition& container,
+               const CollectionAcquisition& container,
                const BSONObj& key,
                const BSONObj& docKey) {
     const auto indexEntry = buildIndexEntry(key, docKey);
@@ -285,7 +285,7 @@ void insertKey(OperationContext* opCtx,
 }
 
 void deleteKey(OperationContext* opCtx,
-               const ScopedCollectionAcquisition& container,
+               const CollectionAcquisition& container,
                const BSONObj& key,
                const BSONObj& docKey) {
     const auto indexEntry = buildIndexEntry(key, docKey);

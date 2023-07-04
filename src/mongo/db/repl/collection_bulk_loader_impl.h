@@ -108,7 +108,7 @@ private:
 
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
-    ScopedCollectionAcquisition _acquisition;
+    CollectionAcquisition _acquisition;
     NamespaceString _nss;
     std::unique_ptr<MultiIndexBlock> _idIndexBlock;
     std::unique_ptr<MultiIndexBlock> _secondaryIndexesBlock;

@@ -145,7 +145,7 @@ public:
                           TimeseriesModifyParams&& params,
                           WorkingSet* ws,
                           std::unique_ptr<PlanStage> child,
-                          const ScopedCollectionAcquisition& coll,
+                          CollectionAcquisition coll,
                           BucketUnpacker bucketUnpacker,
                           std::unique_ptr<MatchExpression> residualPredicate,
                           std::unique_ptr<MatchExpression> originalPredicate = nullptr);

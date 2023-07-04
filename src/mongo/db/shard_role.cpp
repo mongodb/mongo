@@ -316,11 +316,11 @@ SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
         std::move(collOrView), std::move(collectionDescription), std::move(optOwnershipFilter)};
 }
 
-ScopedCollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks(
+CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks(
     OperationContext* opCtx,
     const CollectionCatalog& catalog,
     ResolvedNamespaceOrViewAcquisitionRequestsMap sortedAcquisitionRequests) {
-    ScopedCollectionOrViewAcquisitions acquisitions;
+    CollectionOrViewAcquisitions acquisitions;
     for (auto& acquisitionRequest : sortedAcquisitionRequests) {
         tassert(7328900,
                 "Cannot acquire for write without locks",
@@ -330,6 +330,12 @@ ScopedCollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakin
 
         auto& prerequisites = acquisitionRequest.second.prerequisites;
         auto& txnResources = TransactionResources::get(opCtx);
+
+        invariant(txnResources.state != shard_role_details::TransactionResources::State::YIELDED,
+                  "Cannot make a new acquisition in the YIELDED state");
+        invariant(txnResources.state != shard_role_details::TransactionResources::State::FAILED,
+                  "Cannot make a new acquisition in the FAILED state");
+
         auto snapshotedServices = acquireServicesSnapshot(opCtx, catalog, prerequisites);
         const bool isCollection =
             std::holds_alternative<CollectionPtr>(snapshotedServices.collectionPtrOrView);
@@ -367,19 +373,19 @@ ScopedCollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakin
                      std::move(snapshotedServices.ownershipFilter),
                      std::move(std::get<CollectionPtr>(snapshotedServices.collectionPtrOrView))});
 
-            ScopedCollectionAcquisition scopedAcquisition(opCtx, acquiredCollection);
-            acquisitions.emplace(prerequisites.nss, std::move(scopedAcquisition));
+            CollectionAcquisition acquisition(txnResources, acquiredCollection);
+            acquisitions.emplace(prerequisites.nss, std::move(acquisition));
         } else {
             // It's a view.
-            auto& acquiredView = TransactionResources::get(opCtx).addAcquiredView(
+            auto& acquiredView = txnResources.addAcquiredView(
                 {prerequisites,
                  std::move(acquisitionRequest.second.dbLock),
                  std::move(acquisitionRequest.second.collLock),
                  std::move(std::get<std::shared_ptr<const ViewDefinition>>(
                      snapshotedServices.collectionPtrOrView))});
 
-            ScopedViewAcquisition scopedAcquisition(opCtx, acquiredView);
-            acquisitions.emplace(prerequisites.nss, std::move(scopedAcquisition));
+            ViewAcquisition acquisition(txnResources, acquiredView);
+            acquisitions.emplace(prerequisites.nss, std::move(acquisition));
         }
     }
 
@@ -558,97 +564,201 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
     return CollectionAcquisitionRequest(nssOrUUID, placementConcern, readConcern, operationType);
 }
 
-ScopedCollectionAcquisition::ScopedCollectionAcquisition(
-    OperationContext* opCtx, shard_role_details::AcquiredCollection& acquiredCollection)
-    : _txnResources(&TransactionResources::get(opCtx)), _acquiredCollection(acquiredCollection) {}
+CollectionAcquisition::CollectionAcquisition(
+    shard_role_details::TransactionResources& txnResources,
+    shard_role_details::AcquiredCollection& acquiredCollection)
+    : _txnResources(&txnResources), _acquiredCollection(&acquiredCollection) {
+    _txnResources->collectionAcquisitionReferences++;
+    _acquiredCollection->refCount++;
+}
 
-ScopedCollectionAcquisition::ScopedCollectionAcquisition(ScopedCollectionOrViewAcquisition&& other)
-    : _txnResources(
-          (invariant(other.isCollection()),
-           get<ScopedCollectionAcquisition>(other._collectionOrViewAcquisition)._txnResources)),
-      _acquiredCollection(get<ScopedCollectionAcquisition>(other._collectionOrViewAcquisition)
-                              ._acquiredCollection) {
-    get<ScopedCollectionAcquisition>(other._collectionOrViewAcquisition)._txnResources = nullptr;
+CollectionAcquisition::CollectionAcquisition(const CollectionAcquisition& other)
+    : _txnResources(other._txnResources), _acquiredCollection(other._acquiredCollection) {
+    _txnResources->collectionAcquisitionReferences++;
+    _acquiredCollection->refCount++;
+}
+
+CollectionAcquisition::CollectionAcquisition(CollectionAcquisition&& other)
+    : _txnResources(other._txnResources), _acquiredCollection(other._acquiredCollection) {
+    other._txnResources = nullptr;
+    other._acquiredCollection = nullptr;
+}
+
+CollectionAcquisition& CollectionAcquisition::operator=(const CollectionAcquisition& other) {
+    this->~CollectionAcquisition();
+    _txnResources = other._txnResources;
+    _acquiredCollection = other._acquiredCollection;
+    _txnResources->collectionAcquisitionReferences++;
+    _acquiredCollection->refCount++;
+    return *this;
+}
+
+CollectionAcquisition& CollectionAcquisition::operator=(CollectionAcquisition&& other) {
+    this->~CollectionAcquisition();
+    _txnResources = other._txnResources;
+    other._txnResources = nullptr;
+    _acquiredCollection = other._acquiredCollection;
+    other._acquiredCollection = nullptr;
+    return *this;
+}
+
+CollectionAcquisition::CollectionAcquisition(CollectionOrViewAcquisition&& other) {
+    invariant(other.isCollection());
+    auto& acquisition = get<CollectionAcquisition>(other._collectionOrViewAcquisition);
+    _txnResources = acquisition._txnResources;
+    acquisition._txnResources = nullptr;
+    _acquiredCollection = acquisition._acquiredCollection;
+    acquisition._acquiredCollection = nullptr;
     other._collectionOrViewAcquisition = std::monostate();
 }
 
-ScopedCollectionAcquisition::~ScopedCollectionAcquisition() {
-    if (!_txnResources)
+CollectionAcquisition::~CollectionAcquisition() {
+    if (!_txnResources) {
         return;
+    }
 
     auto& transactionResources = *_txnResources;
 
-    transactionResources.acquiredCollections.remove_if(
-        [this](const shard_role_details::AcquiredCollection& txnResourceAcquiredColl) {
-            return &txnResourceAcquiredColl == &_acquiredCollection;
-        });
+    // If the TransactionResources have failed to restore or yield we've released all the resources.
+    // Our reference to the acquisition is invalid and we've already removed it from the list of
+    // acquisitions.
+    if (transactionResources.state == shard_role_details::TransactionResources::State::ACTIVE) {
+        auto currentRefCount = --_acquiredCollection->refCount;
+        if (currentRefCount == 0)
+            transactionResources.acquiredCollections.remove_if(
+                [&](const shard_role_details::AcquiredCollection& txnResourceAcquiredColl) {
+                    return &txnResourceAcquiredColl == _acquiredCollection;
+                });
+    }
 
+    transactionResources.collectionAcquisitionReferences--;
     if (transactionResources.acquiredCollections.empty() &&
         transactionResources.acquiredViews.empty()) {
         transactionResources.releaseAllResourcesOnCommitOrAbort();
+        transactionResources.state = shard_role_details::TransactionResources::State::EMPTY;
     }
 }
 
-UUID ScopedCollectionAcquisition::uuid() const {
+const NamespaceString& CollectionAcquisition::nss() const {
+    return _acquiredCollection->prerequisites.nss;
+}
+
+bool CollectionAcquisition::exists() const {
+    return bool(_acquiredCollection->collectionPtr);
+}
+
+UUID CollectionAcquisition::uuid() const {
     invariant(exists(),
               str::stream() << "Collection " << nss().toStringForErrorMsg()
                             << " doesn't exist, so its UUID cannot be obtained");
-    return _acquiredCollection.collectionPtr->uuid();
+    return _acquiredCollection->collectionPtr->uuid();
 }
 
-const ScopedCollectionDescription& ScopedCollectionAcquisition::getShardingDescription() const {
+const ScopedCollectionDescription& CollectionAcquisition::getShardingDescription() const {
     // The collectionDescription will only not be set if the caller as acquired the acquisition
     // using the kLocalCatalogOnlyWithPotentialDataLoss placement concern
-    invariant(_acquiredCollection.collectionDescription);
-    return *_acquiredCollection.collectionDescription;
+    invariant(_acquiredCollection->collectionDescription);
+    return *_acquiredCollection->collectionDescription;
 }
 
-const boost::optional<ScopedCollectionFilter>& ScopedCollectionAcquisition::getShardingFilter()
-    const {
+const boost::optional<ScopedCollectionFilter>& CollectionAcquisition::getShardingFilter() const {
     // The collectionDescription will only not be set if the caller has acquired the acquisition
     // using the kLocalCatalogOnlyWithPotentialDataLoss placement concern
     tassert(7740800,
             "Getting shard filter on non-sharded or invalid collection",
-            _acquiredCollection.collectionDescription &&
-                _acquiredCollection.collectionDescription->isSharded());
-    return _acquiredCollection.ownershipFilter;
+            _acquiredCollection->collectionDescription &&
+                _acquiredCollection->collectionDescription->isSharded());
+    return _acquiredCollection->ownershipFilter;
 }
 
-const CollectionPtr& ScopedCollectionAcquisition::getCollectionPtr() const {
+const CollectionPtr& CollectionAcquisition::getCollectionPtr() const {
     tassert(ErrorCodes::InternalError,
             "Collection acquisition has been invalidated",
-            !_acquiredCollection.invalidated);
-    return _acquiredCollection.collectionPtr;
+            !_acquiredCollection->invalidated);
+    return _acquiredCollection->collectionPtr;
 }
 
-ScopedViewAcquisition::ScopedViewAcquisition(OperationContext* opCtx,
-                                             const shard_role_details::AcquiredView& acquiredView)
-    : _txnResources(&TransactionResources::get(opCtx)), _acquiredView(acquiredView) {}
+ViewAcquisition::ViewAcquisition(shard_role_details::TransactionResources& txnResources,
+                                 const shard_role_details::AcquiredView& acquiredView)
+    : _txnResources(&txnResources), _acquiredView(&acquiredView) {
+    _txnResources->viewAcquisitionReferences++;
+    _acquiredView->refCount++;
+}
 
-ScopedViewAcquisition::~ScopedViewAcquisition() {
-    if (!_txnResources)
+ViewAcquisition::ViewAcquisition(const ViewAcquisition& other)
+    : _txnResources(other._txnResources), _acquiredView(other._acquiredView) {
+    _txnResources->viewAcquisitionReferences++;
+    _acquiredView->refCount++;
+}
+
+ViewAcquisition::ViewAcquisition(ViewAcquisition&& other)
+    : _txnResources(other._txnResources), _acquiredView(other._acquiredView) {
+    other._txnResources = nullptr;
+    other._acquiredView = nullptr;
+}
+
+ViewAcquisition& ViewAcquisition::operator=(const ViewAcquisition& other) {
+    this->~ViewAcquisition();
+    _txnResources = other._txnResources;
+    _acquiredView = other._acquiredView;
+    _txnResources->viewAcquisitionReferences++;
+    _acquiredView->refCount++;
+    return *this;
+}
+
+ViewAcquisition& ViewAcquisition::operator=(ViewAcquisition&& other) {
+    this->~ViewAcquisition();
+    _txnResources = other._txnResources;
+    _acquiredView = other._acquiredView;
+    other._txnResources = nullptr;
+    other._acquiredView = nullptr;
+    return *this;
+}
+
+ViewAcquisition::~ViewAcquisition() {
+    if (!_txnResources) {
         return;
+    }
 
     auto& transactionResources = *_txnResources;
 
-    transactionResources.acquiredViews.remove_if(
-        [this](const shard_role_details::AcquiredView& txnResourceAcquiredView) {
-            return &txnResourceAcquiredView == &_acquiredView;
-        });
+    // If the TransactionResources have failed to restore or yield we've released all the resources.
+    // Our reference to the acquisition is invalid and we've already removed it from the list of
+    // acquisitions.
+    if (transactionResources.state == shard_role_details::TransactionResources::State::ACTIVE) {
+        auto currentRefCount = --_acquiredView->refCount;
+        if (currentRefCount == 0) {
+            transactionResources.acquiredViews.remove_if(
+                [&](const shard_role_details::AcquiredView& txnResourceAcquiredView) {
+                    return &txnResourceAcquiredView == _acquiredView;
+                });
+        }
+    }
 
+    transactionResources.viewAcquisitionReferences--;
     if (transactionResources.acquiredCollections.empty() &&
         transactionResources.acquiredViews.empty()) {
         transactionResources.releaseAllResourcesOnCommitOrAbort();
+        transactionResources.state = shard_role_details::TransactionResources::State::EMPTY;
     }
 }
 
-ScopedCollectionAcquisition acquireCollection(OperationContext* opCtx,
-                                              CollectionAcquisitionRequest acquisitionRequest,
-                                              LockMode mode) {
-    return ScopedCollectionAcquisition(acquireCollectionOrView(opCtx, acquisitionRequest, mode));
+const NamespaceString& ViewAcquisition::nss() const {
+    return _acquiredView->prerequisites.nss;
 }
 
-ScopedCollectionAcquisitions acquireCollections(
+const ViewDefinition& ViewAcquisition::getViewDefinition() const {
+    invariant(_acquiredView->viewDefinition);
+    return *_acquiredView->viewDefinition;
+}
+
+CollectionAcquisition acquireCollection(OperationContext* opCtx,
+                                        CollectionAcquisitionRequest acquisitionRequest,
+                                        LockMode mode) {
+    return CollectionAcquisition(acquireCollectionOrView(opCtx, acquisitionRequest, mode));
+}
+
+CollectionAcquisitions acquireCollections(
     OperationContext* opCtx,
     std::vector<CollectionAcquisitionRequest> acquisitionRequests,
     LockMode mode) {
@@ -661,8 +771,8 @@ ScopedCollectionAcquisitions acquireCollections(
     // Acquire the collections
     auto acquisitions = acquireCollectionsOrViews(opCtx, namespaceOrViewAcquisitionRequests, mode);
 
-    // Transform the acquisitions to ScopedCollectionAcquisitions
-    ScopedCollectionAcquisitions collectionAcquisitions;
+    // Transform the acquisitions to CollectionAcquisitions
+    CollectionAcquisitions collectionAcquisitions;
     for (auto& acquisition : acquisitions) {
         // It must be a collection, because that's what the acquisition request stated.
         invariant(acquisition.second.isCollection());
@@ -671,14 +781,14 @@ ScopedCollectionAcquisitions acquireCollections(
     return collectionAcquisitions;
 }
 
-ScopedCollectionOrViewAcquisition acquireCollectionOrView(
+CollectionOrViewAcquisition acquireCollectionOrView(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest, LockMode mode) {
     auto acquisition = acquireCollectionsOrViews(opCtx, {std::move(acquisitionRequest)}, mode);
     invariant(acquisition.size() == 1);
     return std::move(acquisition.begin()->second);
 }
 
-ScopedCollectionOrViewAcquisition acquireCollectionOrViewWithoutTakingLocks(
+CollectionOrViewAcquisition acquireCollectionOrViewWithoutTakingLocks(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest) {
     auto acquisition =
         acquireCollectionsOrViewsWithoutTakingLocks(opCtx, {std::move(acquisitionRequest)});
@@ -814,7 +924,7 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap generateSortedAcquisitionRequests(
 }
 }  // namespace shard_role_details
 
-ScopedCollectionOrViewAcquisitions acquireCollectionsOrViews(
+CollectionOrViewAcquisitions acquireCollectionsOrViews(
     OperationContext* opCtx,
     std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests,
     LockMode mode) {
@@ -933,7 +1043,7 @@ ScopedCollectionOrViewAcquisitions acquireCollectionsOrViews(
     }
 }
 
-ScopedCollectionOrViewAcquisitions acquireCollectionsOrViewsWithoutTakingLocks(
+CollectionOrViewAcquisitions acquireCollectionsOrViewsWithoutTakingLocks(
     OperationContext* opCtx, std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests) {
     if (acquisitionRequests.size() == 0) {
         return {};
@@ -977,7 +1087,7 @@ ScopedCollectionOrViewAcquisitions acquireCollectionsOrViewsWithoutTakingLocks(
     }
 }
 
-ScopedCollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
+CollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
     OperationContext* opCtx, const NamespaceString& nss, LockMode mode) {
     invariant(!OperationShardingState::isComingFromRouter(opCtx));
 
@@ -1007,12 +1117,12 @@ ScopedCollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDat
     shard_role_details::AcquiredCollection& acquiredCollection = txnResources.addAcquiredCollection(
         {prerequisites, std::move(dbLock), std::move(collLock), std::move(coll)});
 
-    return ScopedCollectionAcquisition(opCtx, acquiredCollection);
+    return CollectionAcquisition(txnResources, acquiredCollection);
 }
 
 ScopedLocalCatalogWriteFence::ScopedLocalCatalogWriteFence(OperationContext* opCtx,
-                                                           ScopedCollectionAcquisition* acquisition)
-    : _opCtx(opCtx), _acquiredCollection(&acquisition->_acquiredCollection) {
+                                                           CollectionAcquisition* acquisition)
+    : _opCtx(opCtx), _acquiredCollection(acquisition->_acquiredCollection) {
     // Clear the collectionPtr from the acquisition to indicate that it should not be used until
     // the caller is done with the DDL modifications
     _acquiredCollection->collectionPtr = CollectionPtr();
@@ -1061,25 +1171,33 @@ void ScopedLocalCatalogWriteFence::_updateAcquiredLocalCollection(
     }
 }
 
-YieldedTransactionResources::YieldedTransactionResources(
-    std::unique_ptr<TransactionResources> yieldedResources)
-    : _yieldedResources(std::move(yieldedResources)) {}
-
-void YieldedTransactionResources::dispose() {
-    if (!_yieldedResources)
-        return;
-
-    _yieldedResources->releaseAllResourcesOnCommitOrAbort();
-    _yieldedResources.reset();
-}
-
 YieldedTransactionResources::~YieldedTransactionResources() {
     invariant(!_yieldedResources);
 }
 
+YieldedTransactionResources::YieldedTransactionResources(
+    std::unique_ptr<shard_role_details::TransactionResources> yieldedResources,
+    shard_role_details::TransactionResources::State originalState)
+    : _yieldedResources(std::move(yieldedResources)), _originalState(originalState) {}
+
+void YieldedTransactionResources::transitionTransactionResourcesToFailedState(
+    OperationContext* opCtx) {
+    if (_yieldedResources) {
+        _yieldedResources->releaseAllResourcesOnCommitOrAbort();
+        _yieldedResources->state = shard_role_details::TransactionResources::State::FAILED;
+        TransactionResources::attachToOpCtx(opCtx, std::move(_yieldedResources));
+    }
+}
+
 YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx) {
     auto& transactionResources = TransactionResources::get(opCtx);
-    invariant(!transactionResources.yielded);
+    invariant(
+        !(transactionResources.yielded ||
+          transactionResources.state == shard_role_details::TransactionResources::State::YIELDED));
+
+    invariant(transactionResources.state ==
+                  shard_role_details::TransactionResources::State::ACTIVE ||
+              transactionResources.state == shard_role_details::TransactionResources::State::EMPTY);
 
     for (auto& acquisition : transactionResources.acquiredCollections) {
         // Yielding kLocalCatalogOnlyWithPotentialDataLoss acquisitions is not allowed.
@@ -1100,7 +1218,10 @@ YieldedTransactionResources yieldTransactionResourcesFromOperationContext(Operat
     transactionResources.yielded.emplace(
         TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
 
-    return YieldedTransactionResources(TransactionResources::detachFromOpCtx(opCtx));
+    auto originalState = std::exchange(transactionResources.state,
+                                       shard_role_details::TransactionResources::State::YIELDED);
+
+    return YieldedTransactionResources(TransactionResources::detachFromOpCtx(opCtx), originalState);
 }
 
 void restoreTransactionResourcesToOperationContext(
@@ -1114,7 +1235,10 @@ void restoreTransactionResourcesToOperationContext(
     auto& transactionResources = TransactionResources::get(opCtx);
 
     // On failure to restore, release the yielded resources.
-    ScopeGuard scopeGuard([&] { transactionResources.releaseAllResourcesOnCommitOrAbort(); });
+    ScopeGuard scopeGuard([&] {
+        transactionResources.releaseAllResourcesOnCommitOrAbort();
+        transactionResources.state = shard_role_details::TransactionResources::State::FAILED;
+    });
 
     auto restoreFn = [&] {
         // Reacquire locks
@@ -1225,6 +1349,8 @@ void restoreTransactionResourcesToOperationContext(
         }
     }();
 
+    transactionResources.state = yieldedResourcesHolder._originalState;
+
     if (!opCtx->inMultiDocumentTransaction()) {
         CollectionCatalog::stash(opCtx, catalog);
     }
@@ -1233,6 +1359,7 @@ void restoreTransactionResourcesToOperationContext(
 }
 
 // TODO SERVER-77067 simplify conditions
+namespace shard_role_details {
 bool supportsLockFreeRead(OperationContext* opCtx) {
     // Lock-free reads are not supported:
     //   * in multi-document transactions.
@@ -1242,5 +1369,6 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
         !opCtx->lockState()->isWriteLocked() &&
         !(opCtx->recoveryUnit()->isActive() && !opCtx->isLockFreeReadsOp());
 }
+}  // namespace shard_role_details
 
 }  // namespace mongo

@@ -126,8 +126,7 @@ struct DefaultClonerImpl::BatchHandler {
         : lastLog(0), opCtx(opCtx), _dbName(dbName), numSeen(0), saveLast(0) {}
 
     void operator()(DBClientCursor& cursor) {
-        const auto acquireCollectionFn =
-            [&](OperationContext* opCtx) -> ScopedCollectionAcquisition {
+        const auto acquireCollectionFn = [&](OperationContext* opCtx) -> CollectionAcquisition {
             return acquireCollection(
                 opCtx,
                 CollectionAcquisitionRequest(nss,
@@ -151,7 +150,7 @@ struct DefaultClonerImpl::BatchHandler {
         auto databaseHolder = DatabaseHolder::get(opCtx);
         auto db = databaseHolder->openDb(opCtx, dbName);
         auto catalog = CollectionCatalog::get(opCtx);
-        boost::optional<ScopedCollectionAcquisition> collection = acquireCollectionFn(opCtx);
+        boost::optional<CollectionAcquisition> collection = acquireCollectionFn(opCtx);
         if (!collection->exists()) {
             writeConflictRetry(opCtx, "createCollection", nss, [&] {
                 opCtx->checkForInterrupt();

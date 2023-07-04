@@ -97,7 +97,7 @@ MONGO_FAIL_POINT_DEFINE(throwInternalErrorInDeleteRange);
  * the range failed.
  */
 StatusWith<int> deleteNextBatch(OperationContext* opCtx,
-                                const ScopedCollectionAcquisition& collection,
+                                const CollectionAcquisition& collection,
                                 BSONObj const& keyPattern,
                                 ChunkRange const& range,
                                 int numDocsToRemovePerBatch) {

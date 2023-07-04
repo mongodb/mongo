@@ -201,7 +201,7 @@ public:
             uassert(ErrorCodes::CommandNotSupportedOnView,
                     "can't re-index a view",
                     !collOrViewAcquisition.isView());
-            return ScopedCollectionAcquisition(std::move(collOrViewAcquisition));
+            return CollectionAcquisition(std::move(collOrViewAcquisition));
         }();
         uassert(ErrorCodes::NamespaceNotFound, "collection does not exist", acquisition.exists());
 

@@ -113,7 +113,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     size_t plannerOptions,
     NamespaceString nss,
     PlanYieldPolicy::YieldPolicy yieldPolicy) {
-    stdx::visit([](const auto& ptr) { dassert(ptr); }, collection.get());
+    stdx::visit(OverloadedVisitor{[](const CollectionPtr* ptr) { dassert(ptr); },
+                                  [](const CollectionAcquisition& acq) {
+                                  }},
+                collection.get());
 
     try {
         auto execImpl = new PlanExecutorImpl(opCtx,

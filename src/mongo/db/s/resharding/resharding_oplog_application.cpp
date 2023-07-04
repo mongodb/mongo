@@ -276,8 +276,8 @@ void ReshardingOplogApplicationRules::_applyInsertOrUpdate(
 }
 
 void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCtx,
-                                                          ScopedCollectionAcquisition& outputColl,
-                                                          ScopedCollectionAcquisition& stashColl,
+                                                          CollectionAcquisition& outputColl,
+                                                          CollectionAcquisition& stashColl,
                                                           const repl::OplogEntry& op) const {
     /**
      * The rules to apply ordinary insert operations are as follows:
@@ -368,8 +368,8 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
 }
 
 void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCtx,
-                                                          ScopedCollectionAcquisition& outputColl,
-                                                          ScopedCollectionAcquisition& stashColl,
+                                                          CollectionAcquisition& outputColl,
+                                                          CollectionAcquisition& stashColl,
                                                           const repl::OplogEntry& op) const {
     /**
      * The rules to apply ordinary update operations are as follows:

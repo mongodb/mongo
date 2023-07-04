@@ -706,7 +706,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
 
 bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
                                          TTLCollectionCache* ttlCollectionCache,
-                                         const ScopedCollectionAcquisition& collection,
+                                         const CollectionAcquisition& collection,
                                          std::string indexName) {
     const auto& collectionPtr = collection.getCollectionPtr();
     if (!collectionPtr->isIndexPresent(indexName)) {
@@ -805,7 +805,7 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
 
 bool TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
                                             TTLCollectionCache* ttlCollectionCache,
-                                            const ScopedCollectionAcquisition& collection) {
+                                            const CollectionAcquisition& collection) {
     const auto& collectionPtr = collection.getCollectionPtr();
     const auto& collOptions = collectionPtr->getCollectionOptions();
     uassert(5400701,

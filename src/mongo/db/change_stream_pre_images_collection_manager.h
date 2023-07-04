@@ -180,11 +180,10 @@ private:
      *
      * Returns the number of pre-image documents removed.
      */
-    size_t _deleteExpiredPreImagesWithCollScanCommon(
-        OperationContext* opCtx,
-        const ScopedCollectionAcquisition& preImageColl,
-        const MatchExpression* filterPtr,
-        Timestamp maxRecordIdTimestamp);
+    size_t _deleteExpiredPreImagesWithCollScanCommon(OperationContext* opCtx,
+                                                     const CollectionAcquisition& preImageColl,
+                                                     const MatchExpression* filterPtr,
+                                                     Timestamp maxRecordIdTimestamp);
 
     /**
      * Removes expired pre-images in a single tenant environment.
