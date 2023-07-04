@@ -384,6 +384,8 @@ void RoutingTableHistory::setAllShardsRefreshed() {
 Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
                                           const BSONObj& collation,
                                           bool bypassIsFieldHashedCheck) const {
+    tassert(7626418, "Expected routing table to be initialized", _rt->optRt);
+
     const bool hasSimpleCollation = (collation.isEmpty() && !_rt->optRt->getDefaultCollator()) ||
         SimpleBSONObjComparator::kInstance.evaluate(collation == CollationSpec::kSimpleSpec);
     if (!hasSimpleCollation) {
@@ -418,6 +420,8 @@ Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
 }
 
 bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& shardId) const {
+    tassert(7626419, "Expected routing table to be initialized", _rt->optRt);
+
     if (shardKey.isEmpty())
         return false;
 
@@ -434,6 +438,8 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
                                        const BSONObj& max,
                                        std::set<ShardId>* shardIds,
                                        std::set<ChunkRange>* chunkRanges) const {
+    tassert(7626420, "Expected routing table to be initialized", _rt->optRt);
+
     // If our range is [MinKey, MaxKey], we can simply return all shard ids right away. However,
     // this optimization does not apply when we are reading from a snapshot because
     // _placementVersions contains shards with chunks and is built based on the last refresh.
@@ -467,6 +473,8 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
 }
 
 bool ChunkManager::rangeOverlapsShard(const ChunkRange& range, const ShardId& shardId) const {
+    tassert(7626421, "Expected routing table to be initialized", _rt->optRt);
+
     bool overlapFound = false;
 
     _rt->optRt->forEachOverlappingChunk(
@@ -484,6 +492,8 @@ bool ChunkManager::rangeOverlapsShard(const ChunkRange& range, const ShardId& sh
 
 boost::optional<Chunk> ChunkManager::getNextChunkOnShard(const BSONObj& shardKey,
                                                          const ShardId& shardId) const {
+    tassert(7626422, "Expected routing table to be initialized", _rt->optRt);
+
     boost::optional<Chunk> optChunk;
     forEachChunk(
         [&](const Chunk& chunk) {
@@ -499,6 +509,8 @@ boost::optional<Chunk> ChunkManager::getNextChunkOnShard(const BSONObj& shardKey
 }
 
 ShardId ChunkManager::getMinKeyShardIdWithSimpleCollation() const {
+    tassert(7626423, "Expected routing table to be initialized", _rt->optRt);
+
     auto minKey = getShardKeyPattern().getKeyPattern().globalMin();
     return findIntersectingChunkWithSimpleCollation(minKey).getShardId();
 }

@@ -574,18 +574,22 @@ public:
     // Methods only supported on sharded collections (caller must check isSharded())
 
     const ShardKeyPattern& getShardKeyPattern() const {
+        tassert(7626400, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getShardKeyPattern();
     }
 
     const CollatorInterface* getDefaultCollator() const {
+        tassert(7626401, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getDefaultCollator();
     }
 
     bool isUnique() const {
+        tassert(7626402, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->isUnique();
     }
 
     ChunkVersion getVersion() const {
+        tassert(7626403, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getVersion();
     }
 
@@ -594,6 +598,7 @@ public:
      * ShardInvalidatedForTargeting exception if the shard is marked as stale.
      */
     ChunkVersion getVersion(const ShardId& shardId) const {
+        tassert(7626404, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getVersion(shardId);
     }
 
@@ -602,6 +607,7 @@ public:
      * ShardInvalidatedForTargeting exception if the shard is marked as stale.
      */
     Timestamp getMaxValidAfter(const ShardId& shardId) const {
+        tassert(7626405, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getMaxValidAfter(shardId);
     }
 
@@ -611,11 +617,13 @@ public:
      * based on the returned version, use getVersion() instead.
      */
     ChunkVersion getVersionForLogging(const ShardId& shardId) const {
+        tassert(7626406, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getVersionForLogging(shardId);
     }
 
     template <typename Callable>
     void forEachChunk(Callable&& handler, const BSONObj& shardKey = BSONObj()) const {
+        tassert(7626407, "Expected routing table to be initialized", _rt->optRt);
         _rt->optRt->forEachChunk(
             [this, handler = std::forward<Callable>(handler)](const auto& chunkInfo) mutable {
                 if (!handler(Chunk{*chunkInfo, _clusterTime}))
@@ -665,6 +673,7 @@ public:
      * Same as findIntersectingChunk, but assumes the simple collation.
      */
     Chunk findIntersectingChunkWithSimpleCollation(const BSONObj& shardKey) const {
+        tassert(7626408, "Expected routing table to be initialized", _rt->optRt);
         return findIntersectingChunk(shardKey, CollationSpec::kSimpleSpec);
     }
 
@@ -689,6 +698,7 @@ public:
      * Returns the ids of all shards on which the collection has any chunks.
      */
     void getAllShardIds(std::set<ShardId>* all) const {
+        tassert(7626409, "Expected routing table to be initialized", _rt->optRt);
         _rt->optRt->getAllShardIds(all);
     }
 
@@ -696,6 +706,7 @@ public:
      * Returns the chunk ranges of all shards on which the collection has any chunks.
      */
     void getAllChunkRanges(std::set<ChunkRange>* all) const {
+        tassert(7626410, "Expected routing table to be initialized", _rt->optRt);
         _rt->optRt->getAllChunkRanges(all);
     }
 
@@ -703,6 +714,7 @@ public:
      * Returns the number of shards on which the collection has any chunks
      */
     size_t getNShardsOwningChunks() const {
+        tassert(7626411, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getNShardsOwningChunks();
     }
 
@@ -713,26 +725,32 @@ public:
     static ChunkManager makeAtTime(const ChunkManager& cm, Timestamp clusterTime);
 
     bool uuidMatches(const UUID& uuid) const {
+        tassert(7626412, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->uuidMatches(uuid);
     }
 
     const UUID& getUUID() const {
+        tassert(7626413, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getUUID();
     }
 
     const NamespaceString& getNss() const {
+        tassert(7626414, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->nss();
     }
 
     const boost::optional<TypeCollectionTimeseriesFields>& getTimeseriesFields() const {
+        tassert(7626415, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getTimeseriesFields();
     }
 
     const boost::optional<TypeCollectionReshardingFields>& getReshardingFields() const {
+        tassert(7626416, "Expected routing table to be initialized", _rt->optRt);
         return _rt->optRt->getReshardingFields();
     }
 
     const RoutingTableHistory& getRoutingTableHistory_ForTest() const {
+        tassert(7626417, "Expected routing table to be initialized", _rt->optRt);
         return *_rt->optRt;
     }
 
