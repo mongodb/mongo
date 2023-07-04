@@ -120,6 +120,8 @@ public:
 
     BSONObj toBSON() const;
 
+    std::string toString() const;
+
 private:
     ChunkVector::const_iterator _findIntersectingChunk(const BSONObj& shardKey,
                                                        bool isMaxInclusive = true) const;
