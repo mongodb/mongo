@@ -49,6 +49,7 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/serverless/multitenancy_check.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -87,8 +88,8 @@ enum class Section : uint8_t {
 constexpr int kCrc32Size = 4;
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
-// All fields including size, requestId, and responseTo must already be set. The size must already
-// include the final 4-byte checksum.
+// All fields including size, requestId, and responseTo must already be set. The size must
+// already include the final 4-byte checksum.
 uint32_t calculateChecksum(const Message& message) {
     if (message.operation() != dbMsg) {
         return 0;
@@ -172,7 +173,8 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
     // The sections begin after the flags and before the checksum (if present).
     BufReader sectionsBuf(message.singleData().data() + sizeof(flags), dataSize);
 
-    // TODO some validation may make more sense in the IDL parser. I've tagged them with comments.
+    // TODO some validation may make more sense in the IDL parser. I've tagged them with
+    // comments.
     bool haveBody = false;
     OpMsg msg;
     BSONObj securityToken;
@@ -184,16 +186,17 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
                 haveBody = true;
                 msg.body = sectionsBuf.read<Validated<BSONObj>>();
 
-                uassert(ErrorCodes::InvalidOptions,
-                        "Multitenancy not enabled, cannot set $tenant in command body",
-                        gMultitenancySupport || !msg.body["$tenant"_sd]);
+                if (auto* multitenancyCheck = MultitenancyCheck::getPtr()) {
+                    multitenancyCheck->checkDollarTenantField(msg.body);
+                }
                 break;
             }
 
             case Section::kDocSequence: {
-                // We use an O(N^2) algorithm here and an O(N*M) algorithm below. These are fastest
-                // for the current small values of N, but would be problematic if it is large.
-                // If we need more document sequences, raise the limit and use a better algorithm.
+                // We use an O(N^2) algorithm here and an O(N*M) algorithm below. These are
+                // fastest for the current small values of N, but would be problematic if it is
+                // large. If we need more document sequences, raise the limit and use a better
+                // algorithm.
                 uassert(ErrorCodes::TooManyDocumentSequences,
                         "Too many document sequences in OP_MSG",
                         msg.sequences.size() < 2);  // Limit is <=2 since we are about to add one.

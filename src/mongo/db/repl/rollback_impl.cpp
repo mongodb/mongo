@@ -815,8 +815,7 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
             newCount = countFromScan;
         }
 
-        auto status =
-            _storageInterface->setCollectionCount(opCtx, {nss.db().toString(), uuid}, newCount);
+        auto status = _storageInterface->setCollectionCount(opCtx, {nss.dbName(), uuid}, newCount);
         if (!status.isOK()) {
             // We ignore errors here because crashing or leaving rollback would only leave
             // collection counts more inaccurate.
