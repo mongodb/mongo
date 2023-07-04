@@ -2399,8 +2399,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
                 auto ns = cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db(), o))->ns();
 
-                // TODO (SERVER-74953): Turn the 'mode == OplogApplication::Mode::kInitialSync' if
-                // condition below into an invariant and remove the trailing 'else' block.
                 if (mode == OplogApplication::Mode::kInitialSync) {
                     // Aborting an index build involves writing to the catalog. This write needs to
                     // be timestamped. It will be given 'writeTime' as the commit timestamp.
