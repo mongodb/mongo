@@ -1156,7 +1156,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenChildSessionIsNotCheckedOut) {
     runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
 }
 
-TEST_F(SessionCatalogTest, KillingChildSessionDoesNotInterruptParentSession) {
+TEST_F(SessionCatalogTest, KillingChildSessionInterruptsParentSession) {
     auto runTest = [&](const LogicalSessionId& parentLsid, const LogicalSessionId& childLsid) {
         auto killToken = [this, &parentLsid, &childLsid] {
             assertCanCheckoutSession(childLsid);
@@ -1167,8 +1167,9 @@ TEST_F(SessionCatalogTest, KillingChildSessionDoesNotInterruptParentSession) {
 
             auto killToken = catalog()->killSession(childLsid);
 
-            // Make sure the owning operation context is not interrupted.
-            opCtx->checkForInterrupt();
+            // Make sure the owning operation context is interrupted.
+            ASSERT_THROWS_CODE(
+                opCtx->checkForInterrupt(), AssertionException, ErrorCodes::Interrupted);
 
             // Make sure that the checkOutForKill call will wait for the owning operation context to
             // check the session back in
