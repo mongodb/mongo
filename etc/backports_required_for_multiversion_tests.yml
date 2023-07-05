@@ -400,6 +400,8 @@ last-continuous:
     ticket: SERVER-77386
   - test_file: jstests/core/timeseries/timeseries_resume_after.js
     ticket: SERVER-77386
+  - test_file: jstests/replsets/reaping_config_txns_interrupt.js
+    ticket: SERVER-78187
   suites: null
 last-lts:
   all:
@@ -883,4 +885,6 @@ last-lts:
     ticket: SERVER-60466
   - test_file: jstests/sharding/transfer_mods_large_batches.js
     ticket: SERVER-78414
+  - test_file: jstests/replsets/reaping_config_txns_interrupt.js
+    ticket: SERVER-78187
   suites: null

@@ -17,7 +17,9 @@ const rst = new ReplSetTest({
             ttlMonitorEnabled: false,
             disableLogicalSessionCacheRefresh: false,
             TransactionRecordMinimumLifetimeMinutes: 0,
-            logicalSessionRefreshMillis
+            logicalSessionRefreshMillis,
+            // Make the eager reaping occur more frequently.
+            internalSessionsReapThreshold: 5,
         }
     }
 });

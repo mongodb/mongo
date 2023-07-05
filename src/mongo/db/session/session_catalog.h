@@ -182,6 +182,11 @@ private:
         Session parentSession;
         LogicalSessionIdMap<Session> childSessions;
 
+        // The latest client txnNumber that has successfully started running on this logical
+        // session. This is set to kUninitializedTxnNumber initially, and is updated every time an
+        // opCtx that starts a new client txnNumber checks this logical session back in.
+        TxnNumber lastClientTxnNumberStarted = kUninitializedTxnNumber;
+
         // Signaled when the state becomes available. Uses the transaction table's mutex to protect
         // the state transitions.
         stdx::condition_variable availableCondVar;
@@ -389,6 +394,14 @@ public:
      */
     const LogicalSessionId& getSessionId() const {
         return _session->_sessionId;
+    }
+
+    /**
+     * The latest client txnNumber that has successfully started running on the logical session that
+     * this transaction session corresponds to.
+     */
+    TxnNumber getLastClientTxnNumberStarted() const {
+        return _sri->lastClientTxnNumberStarted;
     }
 
     /**

@@ -369,6 +369,8 @@ void SessionCatalog::_releaseSession(
             return willReap;
         });
 
+        sri->lastClientTxnNumberStarted = txnNumber;
+
         LOGV2_DEBUG(6685200,
                     4,
                     "Erased child sessions",
@@ -420,16 +422,9 @@ SessionCatalog::KillToken ObservableSession::kill(ErrorCodes::Error reason) cons
     ++_sri->killsRequested;
 
     if (firstKiller && hasCurrentOperation()) {
-        // Interrupt the current OperationContext if its running on the transaction session
-        // that is being killed or if we are killing the parent transaction session.
         invariant(_clientLock.owns_lock());
-        const auto checkedOutLsid = _sri->checkoutOpCtx->getLogicalSessionId();
-        const auto lsidToKill = getSessionId();
-        const bool isKillingParentSession = isParentSessionId(lsidToKill);
-        if (isKillingParentSession || (checkedOutLsid == lsidToKill)) {
-            const auto serviceContext = _sri->checkoutOpCtx->getServiceContext();
-            serviceContext->killOperation(_clientLock, _sri->checkoutOpCtx, reason);
-        }
+        const auto serviceContext = _sri->checkoutOpCtx->getServiceContext();
+        serviceContext->killOperation(_clientLock, _sri->checkoutOpCtx, reason);
     }
 
     return SessionCatalog::KillToken(getSessionId());
