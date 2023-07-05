@@ -86,6 +86,7 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/str_trim_utils.h"
 #include "mongo/db/storage/column_store.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
@@ -4036,6 +4037,26 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArrays(Ari
     return {true, resTag, resVal};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTrim(ArityType arity,
+                                                                     bool trimLeft,
+                                                                     bool trimRight) {
+    auto [ownedChars, tagChars, valChars] = getFromStack(1);
+    auto [ownedInput, tagInput, valInput] = getFromStack(0);
+
+    if (!value::isString(tagInput)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto replacementChars = !value::isNullish(tagChars)
+        ? str_trim_utils::extractCodePointsFromChars(value::getStringView(tagChars, valChars))
+        : str_trim_utils::kDefaultTrimWhitespaceChars;
+    auto inputString = value::getStringView(tagInput, valInput);
+
+    auto [strTag, strValue] = sbe::value::makeNewString(
+        str_trim_utils::doTrim(inputString, replacementChars, trimLeft, trimRight));
+    return {true, strTag, strValue};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggConcatArraysCapped(
     ArityType arity) {
     auto [ownArr, tagArr, valArr] = getFromStack(0);
@@ -6935,6 +6956,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinToUpper(arity);
         case Builtin::toLower:
             return builtinToLower(arity);
+        case Builtin::trim:
+            return builtinTrim(arity, true, true);
+        case Builtin::ltrim:
+            return builtinTrim(arity, true, false);
+        case Builtin::rtrim:
+            return builtinTrim(arity, false, true);
         case Builtin::coerceToBool:
             return builtinCoerceToBool(arity);
         case Builtin::coerceToString:
@@ -7260,6 +7287,12 @@ std::string builtinToString(Builtin b) {
             return "toUpper";
         case Builtin::toLower:
             return "toLower";
+        case Builtin::trim:
+            return "trim";
+        case Builtin::ltrim:
+            return "ltrim";
+        case Builtin::rtrim:
+            return "rtrim";
         case Builtin::coerceToBool:
             return "coerceToBool";
         case Builtin::coerceToString:

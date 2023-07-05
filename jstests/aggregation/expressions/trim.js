@@ -5,6 +5,7 @@
 "use strict";
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode, testExpression and
                                               // testExpressionWithCollation.
+load("jstests/libs/sbe_assert_error_override.js");
 
 const coll = db.trim_expressions;
 
@@ -81,10 +82,48 @@ assert.eq(
         {_id: 4, proof: null},
     ]);
 
-// Test that errors are reported correctly.
-assertErrorCode(coll, [{$project: {x: {$trim: " x "}}}], 50696);
-assertErrorCode(coll, [{$project: {x: {$trim: {input: 4}}}}], 50699);
-assertErrorCode(coll, [{$project: {x: {$trim: {input: {$add: [4, 2]}}}}}], 50699);
-assertErrorCode(coll, [{$project: {x: {$trim: {input: "$_id"}}}}], 50699);
-assertErrorCode(coll, [{$project: {x: {$trim: {input: " x ", chars: "$_id"}}}}], 50700);
+// Semantically same as the tests above but non-constant input for 'chars'
+coll.drop();
+assert.commandWorked(coll.insert([
+    {_id: 0, proof: "Left as an exercise for the reader∎", extra: "∎"},
+    {_id: 1, proof: "∎∃ proof∎", extra: "∎"},
+    {
+        _id: 2,
+        proof: "Just view the problem as a continuous DAG whose elements are taylor series∎",
+        extra: "∎"
+    },
+    {_id: 3, proof: null},
+    {_id: 4},
+]));
+assert.eq(
+    coll.aggregate(
+            [{$sort: {_id: 1}}, {$project: {proof: {$rtrim: {input: "$proof", chars: "$extra"}}}}])
+        .toArray(),
+    [
+        {_id: 0, proof: "Left as an exercise for the reader"},
+        {_id: 1, proof: "∎∃ proof"},
+        {
+            _id: 2,
+            proof: "Just view the problem as a continuous DAG whose elements are taylor series"
+        },
+        {_id: 3, proof: null},
+        {_id: 4, proof: null},
+    ]);
+
+coll.drop();
+assert.commandWorked(coll.insert([
+    {_id: 0, nonObject: " x "},
+    {_id: 1, constantNum: 4},
+]));
+
+// Test that errors are reported correctly (for all of $trim, $ltrim, $rtrim).
+for (const op of ["$trim", "$ltrim", "$rtrim"]) {
+    assertErrorCode(coll, [{$project: {x: {[op]: {}}}}], 50695);
+    assertErrorCode(coll, [{$project: {x: {[op]: "$nonObject"}}}], 50696);
+    assertErrorCode(coll, [{$project: {x: {[op]: {input: "$constantNum"}}}}], 50699);
+    assertErrorCode(
+        coll, [{$project: {x: {[op]: {input: {$add: ["$constantNum", "$constantNum"]}}}}}], 50699);
+    assertErrorCode(coll, [{$project: {x: {[op]: {input: "$_id"}}}}], 50699);
+    assertErrorCode(coll, [{$project: {x: {[op]: {input: "$nonObject", chars: "$_id"}}}}], 50700);
+}
 }());

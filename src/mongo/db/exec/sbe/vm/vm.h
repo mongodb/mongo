@@ -696,6 +696,9 @@ enum class Builtin : uint8_t {
     coerceToString,
     concat,
     concatArrays,
+    trim,
+    ltrim,
+    rtrim,
 
     // Agg function to concatenate arrays, failing when the accumulator reaches a specified size.
     aggConcatArraysCapped,
@@ -1664,6 +1667,9 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinRound(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinConcat(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinConcatArrays(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinTrim(ArityType arity,
+                                                               bool trimLeft,
+                                                               bool trimRight);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggConcatArraysCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnion(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnionCapped(ArityType arity);

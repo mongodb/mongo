@@ -3085,7 +3085,59 @@ public:
         generateStringCaseConversionExpression(_context, "toUpper");
     }
     void visit(const ExpressionTrim* expr) final {
-        unsupportedExpression("$trim");
+        tassert(5156301,
+                "trim expressions must have spots in their children vector for 'input' and "
+                "'chars' fields",
+                expr->getChildren().size() == 2);
+        auto numProvidedArgs = 1;
+        if (expr->hasCharactersExpr())  // 'chars' is not null
+            ++numProvidedArgs;
+        _context->ensureArity(numProvidedArgs);
+
+        auto inputName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto charsName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto charsString =
+            numProvidedArgs == 2 ? _context->popABTExpr() : optimizer::Constant::null();
+        auto inputString = _context->popABTExpr();
+        auto trimBuiltinName = expr->getTrimTypeString();
+
+        auto checkCharsNotNullString = makeNot(optimizer::make<optimizer::BinaryOp>(
+            optimizer::Operations::Or,
+            generateABTNullOrMissing(charsName),
+            makeABTFunction("isString"_sd, makeVariable(charsName))));
+
+        /*
+           Trim Functionality (invariant that 'input' has been provided, otherwise would've failed
+           at parse time)
+
+           if ('input' is not a string) {
+                ->  fail with error code 5156302
+           }
+           else if ('chars' is provided but is not a string) {
+                ->  fail with error code 5156303
+           }
+           else {
+                -> make an ABT function for the correct $trim variant with 'input' and 'chars'
+                   parameters
+           }
+        */
+        auto trimFunc = buildABTMultiBranchConditional(
+            ABTCaseValuePair{
+                makeNot(makeABTFunction("isString"_sd, makeVariable(inputName))),
+                makeABTFail(ErrorCodes::Error{5156302},
+                            "$" + trimBuiltinName + " input expression must be a string")},
+            ABTCaseValuePair{std::move(checkCharsNotNullString),
+                             makeABTFail(ErrorCodes::Error{5156303},
+                                         "$" + trimBuiltinName +
+                                             " chars expression must be a string if provided")},
+            makeABTFunction(trimBuiltinName, makeVariable(inputName), makeVariable(charsName)));
+
+        pushABT(optimizer::make<optimizer::Let>(
+            std::move(inputName),
+            std::move(inputString),
+            optimizer::make<optimizer::Let>(
+                std::move(charsName), std::move(charsString), std::move(trimFunc))));
     }
     void visit(const ExpressionTrunc* expr) final {
         visitRoundTruncExpression(expr);

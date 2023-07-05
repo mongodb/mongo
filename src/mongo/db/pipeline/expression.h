@@ -3619,9 +3619,7 @@ public:
                    boost::intrusive_ptr<Expression> charactersToTrim)
         : Expression(expCtx, {std::move(input), std::move(charactersToTrim)}),
           _trimType(trimType),
-          _name(name.toString()) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
-    }
+          _name(name.toString()) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     boost::intrusive_ptr<Expression> optimize() final;
@@ -3638,33 +3636,16 @@ public:
         return visitor->visit(this);
     }
 
+    /* Returns "trim"/"ltrim"/"rtrim" based on the expression name without the $ sign. */
+    std::string getTrimTypeString() const {
+        return _name.substr(1, _name.size());
+    }
+
+    bool hasCharactersExpr() const {
+        return _children[_kCharacters] != nullptr;
+    }
+
 private:
-    /**
-     * Returns true if the unicode character found at index 'indexIntoInput' of 'input' is equal to
-     * 'testCP'.
-     */
-    static bool codePointMatchesAtIndex(const StringData& input,
-                                        std::size_t indexIntoInput,
-                                        const StringData& testCP);
-
-    /**
-     * Given the input string and the code points to trim from that string, returns a substring of
-     * 'input' with any code point from 'trimCPs' trimmed from the left.
-     */
-    static StringData trimFromLeft(StringData input, const std::vector<StringData>& trimCPs);
-
-    /**
-     * Given the input string and the code points to trim from that string, returns a substring of
-     * 'input' with any code point from 'trimCPs' trimmed from the right.
-     */
-    static StringData trimFromRight(StringData input, const std::vector<StringData>& trimCPs);
-
-    /**
-     * Returns the trimmed version of 'input', with all code points in 'trimCPs' removed from the
-     * front, back, or both - depending on _trimType.
-     */
-    StringData doTrim(StringData input, const std::vector<StringData>& trimCPs) const;
-
     static constexpr size_t _kInput = 0;
     static constexpr size_t _kCharacters = 1;  // Optional, null if not specified.
 

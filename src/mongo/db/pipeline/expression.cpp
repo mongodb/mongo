@@ -81,6 +81,8 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/str_trim_utils.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/stats/counters.h"
@@ -6022,74 +6024,6 @@ intrusive_ptr<Expression> ExpressionTrim::parse(ExpressionContext* const expCtx,
     return new ExpressionTrim(expCtx, trimType, name, input, characters);
 }
 
-namespace {
-const std::vector<StringData> kDefaultTrimWhitespaceChars = {
-    "\0"_sd,      // Null character. Avoid using "\u0000" syntax to work around a gcc bug:
-                  // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53690.
-    "\u0020"_sd,  // Space
-    "\u0009"_sd,  // Horizontal tab
-    "\u000A"_sd,  // Line feed/new line
-    "\u000B"_sd,  // Vertical tab
-    "\u000C"_sd,  // Form feed
-    "\u000D"_sd,  // Horizontal tab
-    "\u00A0"_sd,  // Non-breaking space
-    "\u1680"_sd,  // Ogham space mark
-    "\u2000"_sd,  // En quad
-    "\u2001"_sd,  // Em quad
-    "\u2002"_sd,  // En space
-    "\u2003"_sd,  // Em space
-    "\u2004"_sd,  // Three-per-em space
-    "\u2005"_sd,  // Four-per-em space
-    "\u2006"_sd,  // Six-per-em space
-    "\u2007"_sd,  // Figure space
-    "\u2008"_sd,  // Punctuation space
-    "\u2009"_sd,  // Thin space
-    "\u200A"_sd   // Hair space
-};
-
-/**
- * Assuming 'charByte' is the beginning of a UTF-8 code point, returns the number of bytes that
- * should be used to represent the code point. Said another way, computes how many continuation
- * bytes are expected to be present after 'charByte' in a UTF-8 encoded string.
- */
-inline size_t numberOfBytesForCodePoint(char charByte) {
-    if ((charByte & 0b11111000) == 0b11110000) {
-        return 4;
-    } else if ((charByte & 0b11110000) == 0b11100000) {
-        return 3;
-    } else if ((charByte & 0b11100000) == 0b11000000) {
-        return 2;
-    } else {
-        return 1;
-    }
-}
-
-/**
- * Returns a vector with one entry per code point to trim, or throws an exception if 'utf8String'
- * contains invalid UTF-8.
- */
-std::vector<StringData> extractCodePointsFromChars(StringData utf8String,
-                                                   StringData expressionName) {
-    std::vector<StringData> codePoints;
-    std::size_t i = 0;
-    while (i < utf8String.size()) {
-        uassert(50698,
-                str::stream() << "Failed to parse \"chars\" argument to " << expressionName
-                              << ": Detected invalid UTF-8. Got continuation byte when expecting "
-                                 "the start of a new code point.",
-                !str::isUTF8ContinuationByte(utf8String[i]));
-        codePoints.push_back(utf8String.substr(i, numberOfBytesForCodePoint(utf8String[i])));
-        i += numberOfBytesForCodePoint(utf8String[i]);
-    }
-    uassert(50697,
-            str::stream()
-                << "Failed to parse \"chars\" argument to " << expressionName
-                << ": Detected invalid UTF-8. Missing expected continuation byte at end of string.",
-            i <= utf8String.size());
-    return codePoints;
-}
-}  // namespace
-
 Value ExpressionTrim::evaluate(const Document& root, Variables* variables) const {
     auto unvalidatedInput = _children[_kInput]->evaluate(root, variables);
     if (unvalidatedInput.nullish()) {
@@ -6103,7 +6037,11 @@ Value ExpressionTrim::evaluate(const Document& root, Variables* variables) const
     const StringData input(unvalidatedInput.getStringData());
 
     if (!_children[_kCharacters]) {
-        return Value(doTrim(input, kDefaultTrimWhitespaceChars));
+        return Value(
+            str_trim_utils::doTrim(input,
+                                   str_trim_utils::kDefaultTrimWhitespaceChars,
+                                   _trimType == TrimType::kBoth || _trimType == TrimType::kLeft,
+                                   _trimType == TrimType::kBoth || _trimType == TrimType::kRight));
     }
     auto unvalidatedUserChars = _children[_kCharacters]->evaluate(root, variables);
     if (unvalidatedUserChars.nullish()) {
@@ -6115,65 +6053,11 @@ Value ExpressionTrim::evaluate(const Document& root, Variables* variables) const
                           << typeName(unvalidatedUserChars.getType()) << ") instead.",
             unvalidatedUserChars.getType() == BSONType::String);
 
-    return Value(
-        doTrim(input, extractCodePointsFromChars(unvalidatedUserChars.getStringData(), _name)));
-}
-
-bool ExpressionTrim::codePointMatchesAtIndex(const StringData& input,
-                                             std::size_t indexOfInput,
-                                             const StringData& testCP) {
-    for (size_t i = 0; i < testCP.size(); ++i) {
-        if (indexOfInput + i >= input.size() || input[indexOfInput + i] != testCP[i]) {
-            return false;
-        }
-    }
-    return true;
-};
-
-StringData ExpressionTrim::trimFromLeft(StringData input, const std::vector<StringData>& trimCPs) {
-    std::size_t bytesTrimmedFromLeft = 0u;
-    while (bytesTrimmedFromLeft < input.size()) {
-        // Look for any matching code point to trim.
-        auto matchingCP = std::find_if(trimCPs.begin(), trimCPs.end(), [&](auto& testCP) {
-            return codePointMatchesAtIndex(input, bytesTrimmedFromLeft, testCP);
-        });
-        if (matchingCP == trimCPs.end()) {
-            // Nothing to trim, stop here.
-            break;
-        }
-        bytesTrimmedFromLeft += matchingCP->size();
-    }
-    return input.substr(bytesTrimmedFromLeft);
-}
-
-StringData ExpressionTrim::trimFromRight(StringData input, const std::vector<StringData>& trimCPs) {
-    std::size_t bytesTrimmedFromRight = 0u;
-    while (bytesTrimmedFromRight < input.size()) {
-        std::size_t indexToTrimFrom = input.size() - bytesTrimmedFromRight;
-        auto matchingCP = std::find_if(trimCPs.begin(), trimCPs.end(), [&](auto& testCP) {
-            if (indexToTrimFrom < testCP.size()) {
-                // We've gone off the left of the string.
-                return false;
-            }
-            return codePointMatchesAtIndex(input, indexToTrimFrom - testCP.size(), testCP);
-        });
-        if (matchingCP == trimCPs.end()) {
-            // Nothing to trim, stop here.
-            break;
-        }
-        bytesTrimmedFromRight += matchingCP->size();
-    }
-    return input.substr(0, input.size() - bytesTrimmedFromRight);
-}
-
-StringData ExpressionTrim::doTrim(StringData input, const std::vector<StringData>& trimCPs) const {
-    if (_trimType == TrimType::kBoth || _trimType == TrimType::kLeft) {
-        input = trimFromLeft(input, trimCPs);
-    }
-    if (_trimType == TrimType::kBoth || _trimType == TrimType::kRight) {
-        input = trimFromRight(input, trimCPs);
-    }
-    return input;
+    return Value(str_trim_utils::doTrim(
+        input,
+        str_trim_utils::extractCodePointsFromChars(unvalidatedUserChars.getStringData()),
+        _trimType == TrimType::kBoth || _trimType == TrimType::kLeft,
+        _trimType == TrimType::kBoth || _trimType == TrimType::kRight));
 }
 
 boost::intrusive_ptr<Expression> ExpressionTrim::optimize() {
