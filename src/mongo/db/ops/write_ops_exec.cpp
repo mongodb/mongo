@@ -1526,7 +1526,13 @@ WriteResult performUpdates(OperationContext* opCtx,
                 containsRetry = source != OperationSource::kTimeseriesUpdate ||
                     originalNs.isTimeseriesBucketsCollection();
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
-                out.results.emplace_back(parseOplogEntryForUpdate(*entry));
+                // Returns the '_id' of the user measurement for time-series upserts.
+                boost::optional<BSONElement> upsertedId;
+                if (entry->getOpType() == repl::OpTypeEnum::kInsert &&
+                    source == OperationSource::kTimeseriesUpdate) {
+                    upsertedId = entry->getObject()["control"]["min"]["_id"];
+                }
+                out.results.emplace_back(parseOplogEntryForUpdate(*entry, upsertedId));
                 out.retriedStmtIds.push_back(stmtId);
                 continue;
             }

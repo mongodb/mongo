@@ -59,8 +59,10 @@ bool isWouldChangeOwningShardSentinelOplogEntry(const OplogEntryType& oplogEntry
  * the single write result that would have been returned by the statement that would have resulted
  * in the given oplog entry. The oplog entries are assumed to be properly formed and have the
  * correct op type.
+ * Uses the 'upsertedId' for an upsert operation if it's provided.
  */
-SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry);
+SingleWriteResult parseOplogEntryForUpdate(
+    const repl::OplogEntry& entry, const boost::optional<BSONElement>& upsertedId = boost::none);
 
 /**
  * Populates the passed-in builder with the result of a findAndModify based on the oplog entries

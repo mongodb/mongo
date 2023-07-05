@@ -270,7 +270,8 @@ static constexpr StringData kWouldChangeOwningShardRetryContext =
     "move shards and succeeded but transaction history was not generated so the original reply "
     "cannot be recreated."_sd;
 
-SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry) {
+SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry,
+                                           const boost::optional<BSONElement>& upsertedId) {
     SingleWriteResult res;
     // Upserts are stored as inserts.
     if (entry.getOpType() == repl::OpTypeEnum::kInsert) {
@@ -278,7 +279,7 @@ SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry) {
         res.setNModified(0);
 
         BSONObjBuilder upserted;
-        upserted.append(entry.getObject()["_id"]);
+        upserted.append(upsertedId ? *upsertedId : entry.getObject()["_id"]);
         res.setUpsertedId(upserted.obj());
     } else if (entry.getOpType() == repl::OpTypeEnum::kUpdate ||
                entry.getOpType() == repl::OpTypeEnum::kDelete) {
