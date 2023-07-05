@@ -39,6 +39,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/lock_info_gen.h"
 #include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
@@ -47,12 +48,10 @@
 
 namespace mongo {
 
-/**
- * Admin command to display global lock information
- * TODO(SERVER-61211): Convert to IDL.
- */
-class CmdLockInfo : public BasicCommand {
+class CmdLockInfo : public TypedCommand<CmdLockInfo> {
 public:
+    using Request = LockInfo;
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
@@ -69,28 +68,37 @@ public:
         return "show all lock info on the server";
     }
 
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj&) const final {
-        bool isAuthorized = AuthorizationSession::get(opCtx->getClient())
-                                ->isAuthorizedForActionsOnResource(
-                                    ResourcePattern::forClusterResource(dbName.tenantId()),
-                                    ActionType::serverStatus);
-        return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
-    }
+    class Invocation final : public MinimalInvocationBase {
+    public:
+        using MinimalInvocationBase::MinimalInvocationBase;
 
-    CmdLockInfo() : BasicCommand("lockInfo") {}
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName&,
-             const BSONObj& jsobj,
-             BSONObjBuilder& result) {
-        auto lockToClientMap = LockManager::getLockToClientMap(opCtx->getServiceContext());
-        LockManager::get(opCtx)->getLockInfoBSON(lockToClientMap, &result);
-        if (jsobj["includeStorageEngineDump"].trueValue()) {
-            opCtx->getServiceContext()->getStorageEngine()->dump();
+    private:
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::serverStatus));
         }
-        return true;
-    }
+
+        NamespaceString ns() const override {
+            return NamespaceString(request().getDbName());
+        }
+
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
+            auto lockToClientMap = LockManager::getLockToClientMap(opCtx->getServiceContext());
+            auto result = reply->getBodyBuilder();
+            LockManager::get(opCtx)->getLockInfoBSON(lockToClientMap, &result);
+            const auto& includeStorageEngineDump = request().getIncludeStorageEngineDump();
+            if (includeStorageEngineDump) {
+                opCtx->getServiceContext()->getStorageEngine()->dump();
+            }
+        }
+    };
 } cmdLockInfo;
 }  // namespace mongo

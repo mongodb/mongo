@@ -254,6 +254,18 @@ env.Library(
 )
 
 env.Library(
+    target='lock_info_command',
+    source=[
+        'lock_info.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+    ],
+)
+
+env.Library(
     target='create_command',
     source=[
         'create.idl',
@@ -466,6 +478,7 @@ env.Library(
         'list_collections_filter',
         'list_databases_command',
         'list_databases_for_all_tenants_command',
+        'lock_info_command',
         'rename_collection_idl',
         'test_commands_enabled',
         'validate_db_metadata_command',
