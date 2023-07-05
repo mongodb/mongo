@@ -54,5 +54,5 @@ namespace mongo {
  * (an empty array) is not useful here since it won't pass geo validation checks. As a workaround,
  * this custom serializer determines a parseable value for each shape or point type.
  */
-BSONObj geoCustomSerialization(const BSONObj& obj, SerializationOptions opts);
+void geoCustomSerialization(BSONObjBuilder* bob, const BSONObj& obj, SerializationOptions opts);
 }  // namespace mongo

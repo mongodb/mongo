@@ -172,9 +172,8 @@ void appendGeometrySubObject(BSONObjBuilder* bob,
 }
 }  // namespace
 
-BSONObj geoCustomSerialization(const BSONObj& obj, SerializationOptions opts) {
+void geoCustomSerialization(BSONObjBuilder* bob, const BSONObj& obj, SerializationOptions opts) {
     BSONElement outerElem = obj.firstElement();
-    BSONObjBuilder bob;
 
     // Legacy GeoNear query.
     if (outerElem.type() == mongo::Array) {
@@ -186,9 +185,9 @@ BSONObj geoCustomSerialization(const BSONObj& obj, SerializationOptions opts) {
             // Alternatively, a legacy query can have a $maxDistance suboperator to make it more
             // explicit. None of these values are enums so it is fine to treat them as literals
             // during redaction.
-            appendLegacyGeoLiteral(&bob, it.next(), opts);
+            appendLegacyGeoLiteral(bob, it.next(), opts);
         }
-        return bob.obj();
+        return;
     }
 
     // Non-legacy geo expressions have embedded objects that have to be traversed.
@@ -204,10 +203,10 @@ BSONObj geoCustomSerialization(const BSONObj& obj, SerializationOptions opts) {
             // $minDistance and $maxDistance fields that could be included outside the primary geo
             // object in those edge cases (e.g., {$nearSphere: {type: 'Point', coordinates: [1,2]},
             // $minDistance: 10}).
-            opts.appendLiteral(&bob, elem);
+            opts.appendLiteral(bob, elem);
         } else {
             StringData fieldName = elem.fieldNameStringData();
-            BSONObjBuilder subObj = BSONObjBuilder(bob.subobjStart(fieldName));
+            BSONObjBuilder subObj = BSONObjBuilder(bob->subobjStart(fieldName));
             BSONObjIterator embedded_it(elem.embeddedObject());
 
             while (embedded_it.more()) {
@@ -224,7 +223,7 @@ BSONObj geoCustomSerialization(const BSONObj& obj, SerializationOptions opts) {
                                            BSON_ARRAY(opts.serializeLiteral(asArray[0])
                                                       << opts.serializeLiteral(asArray[1])));
                     } else {
-                        BSONObjBuilder nestedSubObj = bob.subobjStart("$geometry");
+                        BSONObjBuilder nestedSubObj = bob->subobjStart("$geometry");
                         appendGeometrySubObject(&nestedSubObj, argElem.Obj(), opts);
                         nestedSubObj.doneFast();
                     }
@@ -244,6 +243,5 @@ BSONObj geoCustomSerialization(const BSONObj& obj, SerializationOptions opts) {
             subObj.doneFast();
         }
     }
-    return bob.obj();
 }
 }  // namespace mongo

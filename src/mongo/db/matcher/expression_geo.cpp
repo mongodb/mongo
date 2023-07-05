@@ -455,13 +455,13 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
     _debugStringAttachTagInfo(&debug);
 }
 
-BSONObj GeoMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
+void GeoMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                       SerializationOptions opts) const {
     if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-        return geoCustomSerialization(_rawObj, opts);
+        geoCustomSerialization(bob, _rawObj, opts);
+        return;
     }
-    BSONObjBuilder subobj;
-    subobj.appendElements(_rawObj);
-    return subobj.obj();
+    bob->appendElements(_rawObj);
 }
 
 bool GeoMatchExpression::equivalent(const MatchExpression* other) const {
@@ -511,13 +511,13 @@ void GeoNearMatchExpression::debugString(StringBuilder& debug, int indentationLe
     _debugStringAttachTagInfo(&debug);
 }
 
-BSONObj GeoNearMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
+void GeoNearMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                           SerializationOptions opts) const {
     if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-        return geoCustomSerialization(_rawObj, opts);
+        geoCustomSerialization(bob, _rawObj, opts);
+        return;
     }
-    BSONObjBuilder objBuilder;
-    objBuilder.appendElements(_rawObj);
-    return objBuilder.obj();
+    bob->appendElements(_rawObj);
 }
 
 bool GeoNearMatchExpression::equivalent(const MatchExpression* other) const {

@@ -126,7 +126,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob, SerializationOptions opts) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -230,7 +230,7 @@ public:
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
-    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob, SerializationOptions opts) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 
@@ -291,7 +291,7 @@ public:
     // These won't be called.
     //
 
-    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final {
+    void appendSerializedRightHandSide(BSONObjBuilder* bob, SerializationOptions opts) const final {
         MONGO_UNREACHABLE;
     }
 
