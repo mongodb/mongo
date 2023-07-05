@@ -523,6 +523,8 @@ error_codes:
     
     - {code: 398, name: StreamTerminated, categories: [CloseConnectionError]}
 
+    - {code: 403, name: UnsupportedShardingEventNotification}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

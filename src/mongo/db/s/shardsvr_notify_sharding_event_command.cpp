@@ -76,17 +76,14 @@ public:
                     "_shardsvrNotifyShardingEvent can only run on shard servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
-            switch (request().getEventType()) {
-                case EventTypeEnum::kDatabasesAdded: {
-                    const auto event = DatabasesAdded::parse(
-                        IDLParserContext("_shardsvrNotifyShardingEvent"), request().getDetails());
-                    notifyChangeStreamsOnDatabaseAdded(opCtx, event);
-
-                } break;
-
-                default:
-                    uasserted(ErrorCodes::InvalidOptions, "Unsupported sharding event type");
+            if (request().getEventType() == notify_sharding_event::kDatabasesAdded) {
+                const auto event = DatabasesAdded::parse(
+                    IDLParserContext("_shardsvrNotifyShardingEvent"), request().getDetails());
+                notifyChangeStreamsOnDatabaseAdded(opCtx, event);
+                return;
             }
+
+            MONGO_UNREACHABLE;
         }
 
     private:
