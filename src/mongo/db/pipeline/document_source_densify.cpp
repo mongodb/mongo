@@ -331,10 +331,19 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::densifyExplicitRang
                            RangeStatement(_range.getStep(),
                                           ExplicitBounds(bounds.first, bounds.second),
                                           _range.getUnit()));
+    } else if (_current < bounds.first) {
+        // All the documents we saw were below the explicit range, so _current is below the range.
+        // Densification starts at the first bounds, so _current is no longer relevant.
+        createDocGenerator(bounds.first,
+                           RangeStatement(_range.getStep(),
+                                          ExplicitBounds(bounds.first, bounds.second),
+                                          _range.getUnit()));
+
     } else if (_current->increment(_range) >= bounds.second) {
         _densifyState = DensifyState::kDensifyDone;
         return DocumentSource::GetNextResult::makeEOF();
     } else {
+        // _current is somewhere in the middle of the range.
         auto lowerBound = _current->increment(_range);
         createDocGenerator(lowerBound,
                            RangeStatement(_range.getStep(),

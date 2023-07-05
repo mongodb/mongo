@@ -104,4 +104,24 @@ for (let i = 0; i < densifyUnits.length; i++) {
         runDensifyRangeTest({step, bounds: [10, 45]});
     }
 }
+
+// Run a test where there are no documents in the range to ensure we don't generate anything before
+// the range.
+coll.drop();
+let documents = [
+    {"date": ISODate("2022-10-29T23:00:00Z")},
+];
+coll.insert(documents);
+let stage = {
+    field: "date",
+    range: {
+        step: 1,
+        unit: "month",
+        bounds: [
+            ISODate("2022-10-31T23:00:00.000Z"),
+            ISODate("2022-11-30T23:00:00.000Z"),
+        ],
+    },
+};
+testDensifyStage(stage, coll, "Ensure no docs before range");
 })();
