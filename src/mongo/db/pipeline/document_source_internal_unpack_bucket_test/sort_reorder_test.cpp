@@ -95,6 +95,7 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortLimit) {
     pipeline->optimizePipeline();
 
     auto serialized = pipeline->serializeToBson();
+    auto container = pipeline->getSources();
 
     // $match and $sort are now before $_internalUnpackBucket, with a new $limit added before and
     // after the stage.
@@ -104,6 +105,12 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortLimit) {
     ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[2]);
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[3]);
     ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[4]);
+
+    // The following assertions ensure that the first limit is absorbed by the sort. When we call
+    // serializeToArray on DocumentSourceSort, it tries to pull the limit out of sort as its own
+    // additional stage. The container from pipeline->getSources(), on the other hand, preserves the
+    // original pipeline with limit absorbed into sort. Therefore, there should only be 4 stages
+    ASSERT_EQ(4, container.size());
 }
 
 }  // namespace

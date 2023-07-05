@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/util/make_data_structure.h"
@@ -47,17 +48,22 @@ namespace {
 
 using InternalUnpackBucketLimitReorderTest = AggregationContextFixture;
 
-TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForOnlyLimit) {
-    auto unpackSpecObj = fromjson(R"({
+auto unpackSpecObj = fromjson(R"({
             $_internalUnpackBucket: { 
                 exclude: [], timeField: 'foo', 
                 metaField: 'meta1', 
                 bucketMaxSpanSeconds: 3600
             }
         })");
-    auto limitObj = fromjson("{$limit: 2}");
+auto limitObj2 = fromjson("{$limit: 2}");
+auto limitObj10 = fromjson("{$limit: 10}");
+auto limitObj5 = fromjson("{$limit: 5}");
+auto matchObj = fromjson("{$match: {'_id': 2}}");
+auto sortObj = fromjson("{$sort: {'meta1.a': 1, 'meta1.b': -1}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, limitObj), getExpCtx());
+// Simple test to push limit down.
+TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForOnlyLimit) {
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, limitObj2), getExpCtx());
     pipeline->optimizePipeline();
 
     auto serialized = pipeline->serializeToBson();
@@ -69,14 +75,24 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForOnlyLimit) {
     ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[2]);
 }
 
-TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithMatch) {
-    auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta1', "
-        "bucketMaxSpanSeconds: 3600}}");
-    auto limitObj = fromjson("{$limit: 2}");
-    auto matchSpecObj = fromjson("{$match: {meta1: {$gt: 2}}}");
+// Test that when there are multiple limits in a row, they are merged into one taking the smallest
+// limit value ({$limit: 2} in this case) and pushed down.
+TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForMultipleLimits) {
+    auto pipeline =
+        Pipeline::parse(makeVector(unpackSpecObj, limitObj10, limitObj2, limitObj5), getExpCtx());
+    pipeline->optimizePipeline();
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, limitObj, matchSpecObj), getExpCtx());
+    auto serialized = pipeline->serializeToBson();
+
+    ASSERT_EQ(3, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[0]);
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[2]);
+}
+
+// Test that the stages after $limit are also preserved.
+TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithMatch) {
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, limitObj2, matchObj), getExpCtx());
     pipeline->optimizePipeline();
 
     auto serialized = pipeline->serializeToBson();
@@ -86,7 +102,90 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithMatch) {
     ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[0]);
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[2]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {meta1: {$gt: 2}}}"), serialized[3]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {'_id': 2}}"), serialized[3]);
+}
+
+// Test that limit is not pushed down if it comes after match.
+TEST_F(InternalUnpackBucketLimitReorderTest, NoOptimizeForMatchBeforeLimit) {
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, matchObj, limitObj2), getExpCtx());
+    pipeline->optimizePipeline();
+
+    auto serialized = pipeline->serializeToBson();
+
+    // Using hasField rather than matching whole json to check that the stages are what we expect
+    // because the match push down changes the shape of the original $match and
+    // $_internalUnpackBucket.
+    ASSERT_EQ(3, serialized.size());
+    ASSERT(serialized[0].hasField("$match"));
+    ASSERT(serialized[1].hasField("$_internalUnpackBucket"));
+    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[2]);
+}
+
+// Test that the sort that was pushed up absorbs the limit, while preserving the original limit.
+TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSort) {
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, sortObj, limitObj2), getExpCtx());
+    pipeline->optimizePipeline();
+
+    auto serialized = pipeline->serializeToBson();
+    auto container = pipeline->getSources();
+
+    // The following assertions ensure that the first limit is absorbed by the sort. The serialized
+    // array has 4 stages even though the first limit is absorbed by the sort, because
+    // serializeToArray adds a limit stage when the $sort has a $limit.
+    ASSERT_EQ(4, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sort: {'meta.a': 1, 'meta.b': -1}}"), serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[1]);
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[2]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[3]);
+
+    ASSERT_EQ(3, container.size());
+    auto firstSort = dynamic_cast<DocumentSourceSort*>(container.begin()->get());
+    ASSERT(firstSort->hasLimit());
+    ASSERT_EQ(2, *firstSort->getLimit());
+}
+
+// Test for sort with multiple limits in increasing limit values.
+TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSortAndTwoLimitsIncreasing) {
+    auto pipeline =
+        Pipeline::parse(makeVector(unpackSpecObj, sortObj, limitObj5, limitObj10), getExpCtx());
+    pipeline->optimizePipeline();
+
+    auto serialized = pipeline->serializeToBson();
+    auto container = pipeline->getSources();
+
+    ASSERT_EQ(4, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sort: {'meta.a': 1, 'meta.b': -1}}"), serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 5}"), serialized[1]);
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[2]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 5}"), serialized[3]);
+
+    ASSERT_EQ(3, container.size());
+    auto firstSort = dynamic_cast<DocumentSourceSort*>(container.begin()->get());
+    ASSERT(firstSort->hasLimit());
+    ASSERT_EQ(5, *firstSort->getLimit());
+}
+
+// Test for sort with multiple limits in decreasing limit values. In this case, the last limit
+// {$limit: 2} would eventually replace the {$limit: 10} after {$limit: 10} is pushed up.
+TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSortAndTwoLimitsDecreasing) {
+    auto pipeline =
+        Pipeline::parse(makeVector(unpackSpecObj, sortObj, limitObj10, limitObj2), getExpCtx());
+    pipeline->optimizePipeline();
+
+    auto serialized = pipeline->serializeToBson();
+    auto container = pipeline->getSources();
+
+    ASSERT_EQ(4, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$sort: {'meta.a': 1, 'meta.b': -1}}"), serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[1]);
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[2]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[3]);
+
+    ASSERT_EQ(3, container.size());
+    auto firstSort = dynamic_cast<DocumentSourceSort*>(container.begin()->get());
+    ASSERT(firstSort->hasLimit());
+    ASSERT_EQ(2, *firstSort->getLimit());
 }
 
 }  // namespace

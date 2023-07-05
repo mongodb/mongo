@@ -138,6 +138,18 @@ auto getIncludeExcludeProjectAndType(DocumentSource* src) {
 }
 
 /**
+ * Creates a new DocumentSourceSort by pulling out the logic for getting maxMemoryUsageBytes.
+ */
+boost::intrusive_ptr<DocumentSourceSort> createNewSortWithMemoryUsage(
+    const DocumentSourceSort& sort, const SortPattern& pattern, long long limit) {
+    boost::optional<uint64_t> maxMemoryUsageBytes;
+    if (auto sortStatsPtr = dynamic_cast<const SortStats*>(sort.getSpecificStats())) {
+        maxMemoryUsageBytes = sortStatsPtr->maxMemoryUsageBytes;
+    }
+    return DocumentSourceSort::create(sort.getContext(), pattern, limit, maxMemoryUsageBytes);
+}
+
+/**
  * Checks if a sort stage's pattern following our internal unpack bucket is suitable to be reordered
  * before us. The sort stage must refer exclusively to the meta field or any subfields.
  *
@@ -241,13 +253,7 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
         updatedPattern.insert(updatedPattern.begin(), patternPart);
     }
 
-    boost::optional<uint64_t> maxMemoryUsageBytes;
-    if (auto sortStatsPtr = dynamic_cast<const SortStats*>(sort.getSpecificStats())) {
-        maxMemoryUsageBytes = sortStatsPtr->maxMemoryUsageBytes;
-    }
-
-    return DocumentSourceSort::create(
-        sort.getContext(), SortPattern{std::move(updatedPattern)}, 0, maxMemoryUsageBytes);
+    return createNewSortWithMemoryUsage(sort, SortPattern{std::move(updatedPattern)}, 0);
 }
 
 /**
@@ -1257,9 +1263,10 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
                 // and return a pointer to the preceding stage.
                 auto sortForReorder = createMetadataSortForReorder(*sortPtr);
 
-                // If the original sort had a limit, we will not preserve that in the swapped sort.
-                // Instead we will add a $limit to the end of the pipeline to keep the number of
-                // expected results.
+                // If the original sort had a limit that did not come from the limit value that we
+                // just added above, we will not preserve that limit in the swapped sort. Instead we
+                // will add a $limit to the end of the pipeline to keep the number of expected
+                // results.
                 if (auto limit = sortPtr->getLimit(); limit && *limit != 0) {
                     container->push_back(DocumentSourceLimit::create(pExpCtx, *limit));
                 }
@@ -1315,14 +1322,6 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         }
     }
 
-    // If there is a $limit stage right after $_internalUnpackBucket, add a $limit stage above the
-    // _internalUnpackBucket stage so that we don't fetch buckets that are not necessary
-    if (auto limitPtr = dynamic_cast<DocumentSourceLimit*>(std::next(itr)->get());
-        limitPtr && !_eventFilter) {
-        container->insert(itr, DocumentSourceLimit::create(getContext(), limitPtr->getLimit()));
-        return std::next(itr);
-    }
-
     // Optimize the pipeline after this stage to merge $match stages and push them forward, and to
     // take advantage of $expr rewrite optimizations.
     if (!_optimizedEndOfPipeline) {
@@ -1359,6 +1358,21 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
             return itr;
         }
     }
+
+    // If the next stage is a limit, then push the limit above to avoid fetching more buckets than
+    // necessary.
+    // If _eventFilter is true, a match was present which may impact the number of
+    // documents we return from limit, hence we don't want to push limit.
+    // If _triedLimitPushDown is true, we have already done a limit push down and don't want to
+    // push again to avoid an infinite loop.
+    if (!_eventFilter && !_triedLimitPushDown) {
+        if (auto limitPtr = dynamic_cast<DocumentSourceLimit*>(std::next(itr)->get()); limitPtr) {
+            _triedLimitPushDown = true;
+            container->insert(itr, DocumentSourceLimit::create(getContext(), limitPtr->getLimit()));
+            return container->begin();
+        }
+    }
+
     {
         // Check if we can avoid unpacking if we have a group stage with min/max aggregates.
         auto [success, result] = rewriteGroupByMinMax(itr, container);

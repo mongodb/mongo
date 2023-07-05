@@ -318,5 +318,6 @@ private:
     bool _optimizedEndOfPipeline = false;
     bool _triedInternalizeProject = false;
     bool _triedLastpointRewrite = false;
+    bool _triedLimitPushDown = false;
 };
 }  // namespace mongo
