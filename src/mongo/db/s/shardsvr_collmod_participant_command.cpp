@@ -141,7 +141,7 @@ public:
             auto performViewChange = request().getPerformViewChange();
             uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
                 opCtx, ns(), cmd, performViewChange, &builder));
-            return CollModReply::parse(IDLParserContext("CollModReply"), builder.obj());
+            auto response = CollModReply::parse(IDLParserContext("CollModReply"), builder.obj());
 
             // Since no write that generated a retryable write oplog entry with this sessionId and
             // txnNumber happened, we need to make a dummy write so that the session gets durably
@@ -154,6 +154,7 @@ public:
                             BSON("$inc" << BSON("count" << 1)),
                             true /* upsert */,
                             false /* multi */);
+            return response;
         }
 
     private:
