@@ -1805,10 +1805,39 @@ buildvariants:
 
   - name: atlas-like-replica.2022-10
     display_name: M60-like-replica.2022-10 3-Node ReplSet
-    cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+    # TODO SERVER-74399 Reduce frequency back to baseline.
+    # cron: &atlas-like-repl-cron "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+    cron: &atlas-like-repl-cron "0 0 * * *"  # Every day at 00:00
     modules: *modules
     expansions:
       mongodb_setup: atlas-like-replica.2022-10
+      infrastructure_provisioning: M60-like-replica.2023-04
+      infrastructure_provisioning_release: 2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: -arm64
+    run_on:
+      - "rhel70-perf-M60-like"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:  # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup.
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: tpcc
+      - name: tpcc_majority
+      - name: linkbench
+      - name: linkbench2
+
+  - name: atlas-like-replica-query-stats.2022-10
+    display_name: M60-like-replica.2022-10 3-Node ReplSet (Query Stats)
+    cron: *atlas-like-repl-cron
+    modules: *modules
+    expansions:
+      mongodb_setup: atlas-like-replica-query-stats.2022-10
       infrastructure_provisioning: M60-like-replica.2023-04
       infrastructure_provisioning_release: 2022-11
       workload_setup: 2022-11
@@ -2303,6 +2332,7 @@ buildvariants:
     tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
       - name: ycsb_60GB
       - name: ycsb_60GB.long
       - name: crud_workloads_majority
@@ -2492,6 +2522,7 @@ buildvariants:
     tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
       - name: ycsb_60GB
       - name: ycsb_60GB.long
       - name: crud_workloads_majority
@@ -2734,6 +2765,7 @@ buildvariants:
     tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
       - name: crud_workloads_majority
       - name: crud_workloads_w1
       - name: mixed_workloads
@@ -3411,6 +3443,7 @@ buildvariants:
     tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
       - name: ycsb_60GB
       - name: ycsb_60GB.long
       - name: crud_workloads_majority
