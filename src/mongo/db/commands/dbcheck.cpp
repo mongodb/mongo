@@ -213,6 +213,19 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                 "When featureFlagSecondaryIndexChecksInDbCheck is not enabled, the validateMode "
                 "parameter cannot be set.",
                 !invocation.getValidateMode());
+    } else {
+        if (invocation.getValidateMode() == mongo::DbCheckValidationModeEnum::extraIndexKeysCheck) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "When validateMode is set to extraIndexKeysCheck, the secondaryIndex parameter "
+                    "must be set.",
+                    invocation.getSecondaryIndex());
+        } else {
+            uassert(ErrorCodes::InvalidOptions,
+                    "When validateMode is set to dataConsistency or "
+                    "dataConsistencyAndMissingIndexKeysCheck, the secondaryIndex parameter cannot "
+                    "be set.",
+                    !invocation.getSecondaryIndex());
+        }
     }
 
     NamespaceString nss(

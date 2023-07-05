@@ -133,6 +133,10 @@ structs:
         description: The type of consistency checks that dbCheck will run.
         type: DbCheckValidationMode
         optional: true
+      secondaryIndex:
+        description: The name of the index to run extra index keys check on.
+        type: string
+        optional: true
 
   DbCheckAllInvocation:
     description: "Command object for database-wide form of dbCheck invocation"

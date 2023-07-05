@@ -49,6 +49,28 @@ function testInvalidParameter() {
         validateMode: "invalidParam",
     }),
                                  ErrorCodes.BadValue);
+
+    // secondaryIndex field must be specified when validateMode is extraIndexKeysCheck.
+    assert.commandFailedWithCode(db.runCommand({
+        dbCheck: colName,
+        validateMode: "extraIndexKeysCheck",
+    }),
+                                 ErrorCodes.InvalidOptions);
+
+    // secondaryIndex field cannot be specified when validateMode is dataConsistency or
+    // dataConsistencyAndMissingIndexKeysCheck.
+    assert.commandFailedWithCode(db.runCommand({
+        dbCheck: colName,
+        validateMode: "dataConsistency",
+        secondaryIndex: "secondaryIndex",
+    }),
+                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(db.runCommand({
+        dbCheck: colName,
+        validateMode: "dataConsistencyAndMissingIndexKeysCheck",
+        secondaryIndex: "secondaryIndex",
+    }),
+                                 ErrorCodes.InvalidOptions);
 }
 
 function testValidParameter() {
@@ -70,6 +92,7 @@ function testValidParameter() {
     assert.commandWorked(db.runCommand({
         dbCheck: colName,
         validateMode: "extraIndexKeysCheck",
+        secondaryIndex: "secondaryIndex",
     }));
 }
 
