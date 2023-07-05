@@ -481,10 +481,6 @@ void CreateCollectionCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuild
 }
 
 const NamespaceString& CreateCollectionCoordinator::nss() const {
-    if (_timeseriesNssResolvedByCommandHandler()) {
-        return originalNss();
-    }
-
     // Rely on the resolved request parameters to retrieve the nss to be targeted by the
     // coordinator.
     stdx::lock_guard lk{_docMutex};
@@ -547,24 +543,11 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                         opCtx, getNewSession(opCtx), **executor);
 
-                    if (_timeseriesNssResolvedByCommandHandler() ||
-                        _doc.getTranslatedRequestParams()) {
+                    if (_doc.getTranslatedRequestParams()) {
 
-                        const auto shardKeyPattern = ShardKeyPattern(
-                            _timeseriesNssResolvedByCommandHandler()
-                                ? *_request.getShardKey()
-                                : _doc.getTranslatedRequestParams()->getKeyPattern());
-                        const auto collation = _timeseriesNssResolvedByCommandHandler()
-                            ? resolveCollationForUserQueries(opCtx, nss(), _request.getCollation())
-                            : _doc.getTranslatedRequestParams()->getCollation();
-
-                        if (_timeseriesNssResolvedByCommandHandler()) {
-                            // If the request is being re-attempted after a binary upgrade, the UUID
-                            // could have not been previously checked. Do it now.
-                            AutoGetCollection coll{opCtx, nss(), MODE_IS};
-                            checkCollectionUUIDMismatch(
-                                opCtx, nss(), coll.getCollection(), _request.getCollectionUUID());
-                        }
+                        const auto shardKeyPattern =
+                            ShardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
+                        const auto& collation = _doc.getTranslatedRequestParams()->getCollation();
 
                         // Check if the collection was already sharded by a past request
                         if (auto createCollectionResponseOpt =
@@ -615,35 +598,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
                 _acquireCriticalSections(opCtx);
 
+                // Translate request parameters and persist them in the coordiantor document
                 _doc.setTranslatedRequestParams(_translateRequestParameters(opCtx));
-
-                // Check if the collection was already sharded by a past request
-                if (auto createCollectionResponseOpt =
-                        sharding_ddl_util::checkIfCollectionAlreadySharded(
-                            opCtx,
-                            nss(),
-                            _doc.getTranslatedRequestParams()->getKeyPattern().toBSON(),
-                            _doc.getTranslatedRequestParams()->getCollation(),
-                            _request.getUnique().value_or(false))) {
-
-                    // A previous request already created and committed the collection
-                    // but there was a stepdown before completing the execution of the coordinator.
-                    // Ensure that the change stream event gets emitted at least once.
-                    notifyChangeStreamsOnShardCollection(
-                        opCtx,
-                        nss(),
-                        *createCollectionResponseOpt->getCollectionUUID(),
-                        _request.toBSON(),
-                        CommitPhase::kSuccessful);
-
-                    // Return any previously acquired resource.
-                    _releaseCriticalSections(opCtx);
-
-                    _result = createCollectionResponseOpt;
-                    return;
-                }
-
-                // Persist the coordinator document including the translated request params
                 _updateStateDocument(opCtx, CreateCollectionCoordinatorDocument(_doc));
 
                 ShardKeyPattern shardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
@@ -710,8 +666,7 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
     // If the request is part of a C2C synchronisation, the check on the received UUID must be
     // performed first to honor the contract with mongosync (see SERVER-67885 for details).
     if (_request.getCollectionUUID()) {
-        if (AutoGetCollection stdColl{opCtx, originalNss(), MODE_IS};
-            stdColl || _timeseriesNssResolvedByCommandHandler()) {
+        if (AutoGetCollection stdColl{opCtx, originalNss(), MODE_IS}; stdColl) {
             checkCollectionUUIDMismatch(
                 opCtx, originalNss(), *stdColl, _request.getCollectionUUID());
         } else {
@@ -723,15 +678,6 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
             checkCollectionUUIDMismatch(
                 opCtx, originalNss(), *timeseriesColl, _request.getCollectionUUID());
         }
-    }
-
-    if (_timeseriesNssResolvedByCommandHandler()) {
-        // It is OK to access information directly from the request object.
-        const auto shardKeyPattern = ShardKeyPattern(*_request.getShardKey()).toBSON();
-        const auto collation =
-            resolveCollationForUserQueries(opCtx, nss(), _request.getCollation());
-        return sharding_ddl_util::checkIfCollectionAlreadySharded(
-            opCtx, nss(), shardKeyPattern, collation, _request.getUnique().value_or(false));
     }
 
     // Check is there is a standard sharded collection that matches the original request parameters
@@ -902,7 +848,7 @@ TranslatedRequestParams CreateCollectionCoordinator::_translateRequestParameters
 
     auto targetingStandardCollection = !_request.getTimeseries() && !existingBucketsColl;
 
-    if (_timeseriesNssResolvedByCommandHandler() || targetingStandardCollection) {
+    if (targetingStandardCollection) {
         const auto& resolvedNamespace = originalNss();
         performCheckOnCollectionUUID(resolvedNamespace);
         uassert(ErrorCodes::InvalidNamespace,
@@ -978,21 +924,17 @@ TranslatedRequestParams CreateCollectionCoordinator::_translateRequestParameters
         resolveCollationForUserQueries(opCtx, resolvedNamespace, _request.getCollation()));
 }
 
-bool CreateCollectionCoordinator::_timeseriesNssResolvedByCommandHandler() const {
-    return operationType() == DDLCoordinatorTypeEnum::kCreateCollectionPre61Compatible;
-}
-
 void CreateCollectionCoordinator::_acquireCriticalSections(OperationContext* opCtx) {
     ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
         opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
-    if (!_timeseriesNssResolvedByCommandHandler()) {
-        // Preventively acquire the critical section protecting the buckets namespace that the
-        // creation of a timeseries collection would require.
-        const auto bucketsNamespace = originalNss().makeTimeseriesBucketsNamespace();
-        ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
-            opCtx, bucketsNamespace, _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
-    }
+    // Preventively acquire the critical section protecting the buckets namespace that the
+    // creation of a timeseries collection would require.
+    ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
+        opCtx,
+        originalNss().makeTimeseriesBucketsNamespace(),
+        _critSecReason,
+        ShardingCatalogClient::kMajorityWriteConcern);
 }
 
 void CreateCollectionCoordinator::_promoteCriticalSectionsToBlockReads(
@@ -1000,11 +942,11 @@ void CreateCollectionCoordinator::_promoteCriticalSectionsToBlockReads(
     ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
         opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
-    if (!_timeseriesNssResolvedByCommandHandler()) {
-        const auto bucketsNamespace = originalNss().makeTimeseriesBucketsNamespace();
-        ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
-            opCtx, bucketsNamespace, _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
-    }
+    ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
+        opCtx,
+        originalNss().makeTimeseriesBucketsNamespace(),
+        _critSecReason,
+        ShardingCatalogClient::kMajorityWriteConcern);
 }
 
 void CreateCollectionCoordinator::_releaseCriticalSections(OperationContext* opCtx,
@@ -1016,15 +958,12 @@ void CreateCollectionCoordinator::_releaseCriticalSections(OperationContext* opC
         ShardingCatalogClient::kMajorityWriteConcern,
         throwIfReasonDiffers);
 
-    if (!_timeseriesNssResolvedByCommandHandler()) {
-        const auto bucketsNamespace = originalNss().makeTimeseriesBucketsNamespace();
-        ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
-            opCtx,
-            bucketsNamespace,
-            _critSecReason,
-            ShardingCatalogClient::kMajorityWriteConcern,
-            throwIfReasonDiffers);
-    }
+    ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+        opCtx,
+        originalNss().makeTimeseriesBucketsNamespace(),
+        _critSecReason,
+        ShardingCatalogClient::kMajorityWriteConcern,
+        throwIfReasonDiffers);
 }
 
 void CreateCollectionCoordinator::_createCollectionAndIndexes(

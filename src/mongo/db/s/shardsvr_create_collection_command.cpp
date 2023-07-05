@@ -43,12 +43,8 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/create_collection_coordinator.h"
@@ -59,11 +55,9 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -72,61 +66,6 @@
 
 namespace mongo {
 namespace {
-
-void translateToTimeseriesCollection(OperationContext* opCtx,
-                                     NamespaceString* nss,
-                                     CreateCollectionRequest* createCmdRequest) {
-    auto bucketsNs = nss->makeTimeseriesBucketsNamespace();
-    // Hold reference to the catalog for collection lookup without locks to be safe.
-    auto catalog = CollectionCatalog::get(opCtx);
-    auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketsNs);
-
-    // If the 'system.buckets' exists or 'timeseries' parameters are passed in, we know that
-    // we are trying shard a timeseries collection.
-    if (bucketsColl || createCmdRequest->getTimeseries()) {
-
-        if (bucketsColl) {
-            uassert(6235600,
-                    str::stream() << "the collection '" << bucketsNs.toStringForErrorMsg()
-                                  << "' does not have 'timeseries' options",
-                    bucketsColl->getTimeseriesOptions());
-
-            if (createCmdRequest->getTimeseries()) {
-                uassert(6235601,
-                        str::stream()
-                            << "the 'timeseries' spec provided must match that of the existing '"
-                            << nss->toStringForErrorMsg() << "' collection",
-                        timeseries::optionsAreEqual(*createCmdRequest->getTimeseries(),
-                                                    *bucketsColl->getTimeseriesOptions()));
-            } else {
-                createCmdRequest->setTimeseries(bucketsColl->getTimeseriesOptions());
-            }
-        }
-
-        auto timeField = createCmdRequest->getTimeseries()->getTimeField();
-        auto metaField = createCmdRequest->getTimeseries()->getMetaField();
-        BSONObjIterator iter{*createCmdRequest->getShardKey()};
-        while (auto elem = iter.next()) {
-            if (elem.fieldNameStringData() == timeField) {
-                uassert(6235602,
-                        str::stream() << "the time field '" << timeField
-                                      << "' can be only at the end of the shard key pattern",
-                        !iter.more());
-            } else {
-                uassert(6235603,
-                        str::stream() << "only the time field or meta field can be "
-                                         "part of shard key pattern",
-                        metaField &&
-                            (elem.fieldNameStringData() == *metaField ||
-                             elem.fieldNameStringData().startsWith(*metaField + ".")));
-            }
-        }
-        *nss = bucketsNs;
-        createCmdRequest->setShardKey(
-            uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
-                *createCmdRequest->getTimeseries(), *createCmdRequest->getShardKey())));
-    }
-}
 
 class ShardsvrCreateCollectionCommand final : public TypedCommand<ShardsvrCreateCollectionCommand> {
 public:
@@ -167,10 +106,7 @@ public:
                     request().getShardKey());
 
             const auto createCollectionCoordinator = [&] {
-                FixedFCVRegion fcvRegion(opCtx);
-                auto nssToForward = ns();
                 auto requestToForward = request().getCreateCollectionRequest();
-                auto coordinatorType = DDLCoordinatorTypeEnum::kCreateCollection;
                 // Validates and sets missing time-series options fields automatically.
                 if (requestToForward.getTimeseries()) {
                     auto timeseriesOptions = *requestToForward.getTimeseries();
@@ -178,15 +114,11 @@ public:
                         timeseries::validateAndSetBucketingParameters(timeseriesOptions));
                     requestToForward.setTimeseries(std::move(timeseriesOptions));
                 }
-                if (!feature_flags::gCreateCollectionCoordinatorV3.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
-                    translateToTimeseriesCollection(opCtx, &nssToForward, &requestToForward);
-                    coordinatorType = DDLCoordinatorTypeEnum::kCreateCollectionPre61Compatible;
-                }
 
                 auto coordinatorDoc = [&] {
                     auto doc = CreateCollectionCoordinatorDocument();
-                    doc.setShardingDDLCoordinatorMetadata({{nssToForward, coordinatorType}});
+                    doc.setShardingDDLCoordinatorMetadata(
+                        {{ns(), DDLCoordinatorTypeEnum::kCreateCollection}});
                     doc.setCreateCollectionRequest(requestToForward);
                     return doc.toBSON();
                 }();

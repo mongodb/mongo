@@ -390,9 +390,6 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
         })
         .then([this, executor, token, anchor = shared_from_this()] {
             if (!_firstExecution ||
-                // The Feature flag is disabled
-                !feature_flags::gImplicitDDLTimeseriesNssTranslation.isEnabled(
-                    serverGlobalParams.featureCompatibility) ||
                 // this DDL operation operates on a DB
                 originalNss().coll().empty() ||
                 // this DDL operation operates directly on a bucket nss

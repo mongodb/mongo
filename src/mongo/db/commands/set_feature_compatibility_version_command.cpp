@@ -1217,15 +1217,6 @@ private:
         }
 
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-            // If we are downgrading to a version that doesn't support implicit translation of
-            // Timeseries collection in sharding DDL Coordinators we need to drain all ongoing
-            // coordinators
-            if (feature_flags::gImplicitDDLTimeseriesNssTranslation
-                    .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
-                                                                  originalVersion)) {
-                ShardingDDLCoordinatorService::getService(opCtx)
-                    ->waitForOngoingCoordinatorsToFinish(opCtx);
-            }
             _dropInternalShardingIndexCatalogCollection(
                 opCtx,
                 requestedVersion,

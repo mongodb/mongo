@@ -113,10 +113,6 @@ private:
 
     TranslatedRequestParams _translateRequestParameters(OperationContext* opCtx);
 
-    // TODO SERVER-68008 Remove once 7.0 becomes last LTS; when the function appears in if clauses,
-    // modify the code assuming that a "false" value gets returned
-    bool _timeseriesNssResolvedByCommandHandler() const;
-
     void _acquireCriticalSections(OperationContext* opCtx);
 
     void _promoteCriticalSectionsToBlockReads(OperationContext* opCtx) const;

@@ -117,16 +117,6 @@ public:
 
             auto dropCollCoordinator = [&] {
                 FixedFCVRegion fixedFcvRegion{opCtx};
-                const auto targetNss = [&] {
-                    if (!feature_flags::gImplicitDDLTimeseriesNssTranslation.isEnabled(
-                            *fixedFcvRegion)) {
-                        // If 'ns()' is a sharded time-series view collection, 'targetNs' is a
-                        // namespace for time-series buckets collection. For all other collections,
-                        // 'targetNs' is equal to 'ns()'.
-                        return CollectionRoutingInfoTargeter(opCtx, ns()).getNS();
-                    }
-                    return ns();
-                }();
                 // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
                 const DDLCoordinatorTypeEnum coordType =
                     feature_flags::gDropCollectionHoldingCriticalSection.isEnabled(*fixedFcvRegion)
@@ -134,7 +124,7 @@ public:
                     : DDLCoordinatorTypeEnum::kDropCollectionPre70Compatible;
 
                 auto coordinatorDoc = DropCollectionCoordinatorDocument();
-                coordinatorDoc.setShardingDDLCoordinatorMetadata({{targetNss, coordType}});
+                coordinatorDoc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
                 coordinatorDoc.setCollectionUUID(request().getCollectionUUID());
 
                 auto service = ShardingDDLCoordinatorService::getService(opCtx);
