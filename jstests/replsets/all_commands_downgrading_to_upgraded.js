@@ -1545,8 +1545,6 @@ const allCommands = {
     transitionFromDedicatedConfigServer: {
         // TODO SERVER-74867: Remove the skip once 7.0 is lastLTS.
         skip: commandIsDisabledOnLastLTS,
-        // TODO SERVER-66060: Remove check when this feature flag is removed.
-        checkFeatureFlag: "CatalogShard",
         command: {transitionFromDedicatedConfigServer: 1},
         isShardedOnly: true,
         isAdminCommand: true,
@@ -1554,8 +1552,6 @@ const allCommands = {
     transitionToDedicatedConfigServer: {
         // TODO SERVER-74867: Remove the skip once 7.0 is lastLTS.
         skip: commandIsDisabledOnLastLTS,
-        // TODO SERVER-66060: Remove check when this feature flag is removed.
-        checkFeatureFlag: "CatalogShard",
         command: {transitionToDedicatedConfigServer: 1},
         isShardedOnly: true,
         isAdminCommand: true,

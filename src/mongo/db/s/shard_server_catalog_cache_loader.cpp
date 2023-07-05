@@ -374,13 +374,6 @@ void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx, S
         opCtx, {LogicalTime::fromOperationTime(cmdResponse.response), boost::none}));
 }
 
-// TODO: SERVER-74105 remove
-bool shouldSkipStoringLocally() {
-    // Note: cannot use isExclusivelyConfigSvrRole as it ignores fcv.
-    return serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-        !gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility);
-}
-
 }  // namespace
 
 ShardServerCatalogCacheLoader::ShardServerCatalogCacheLoader(
@@ -567,13 +560,6 @@ void ShardServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opC
                               << " because the node's replication role changed.",
                 _role == ReplicaSetRole::Primary && _term == initialTerm);
 
-        uassert(StaleConfigInfo(nss,
-                                ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
-                                boost::none,
-                                getSelfShardId(opCtx)),
-                "config server is not storing cached metadata",
-                !shouldSkipStoringLocally());
-
         auto it = _collAndChunkTaskLists.find(nss);
 
         // If there are no tasks for the specified namespace, everything must have been completed
@@ -620,7 +606,7 @@ void ShardServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opC
             opCtx->waitForConditionOrInterrupt(*condVar, lg, [&]() {
                 const auto it = _collAndChunkTaskLists.find(nss);
                 return it == _collAndChunkTaskLists.end() || it->second.empty() ||
-                    it->second.front().taskNum != activeTaskNum || shouldSkipStoringLocally();
+                    it->second.front().taskNum != activeTaskNum;
             });
         }
     }
@@ -640,10 +626,6 @@ void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx
                               << dbName.toString()
                               << " because the node's replication role changed.",
                 _role == ReplicaSetRole::Primary && _term == initialTerm);
-
-        uassert(StaleDbRoutingVersion(dbName.toString(), DatabaseVersion::makeFixed(), boost::none),
-                "config server is not storing cached metadata",
-                !shouldSkipStoringLocally());
 
         auto it = _dbTaskLists.find(dbName.toString());
 
@@ -692,7 +674,7 @@ void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx
             opCtx->waitForConditionOrInterrupt(*condVar, lg, [&]() {
                 const auto it = _dbTaskLists.find(dbName.toString());
                 return it == _dbTaskLists.end() || it->second.empty() ||
-                    it->second.front().taskNum != activeTaskNum || shouldSkipStoringLocally();
+                    it->second.front().taskNum != activeTaskNum;
             });
         }
     }
@@ -702,11 +684,6 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion) {
-
-    if (shouldSkipStoringLocally()) {
-        return _configServerLoader->getChunksSince(nss, catalogCacheSinceVersion).getNoThrow();
-    }
-
     Timer t;
     auto nssNotif = _forcePrimaryCollectionRefreshAndWaitForReplication(opCtx, nss);
     LOGV2_FOR_CATALOG_REFRESH(5965800,
@@ -727,16 +704,8 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
     long long termScheduled) {
-    const auto decidedToSkipStoringLocally = shouldSkipStoringLocally();
-
     // Get the max version the loader has.
     const auto maxLoaderVersion = [&] {
-        // If we are not storing locally, use the requested version to prevent fetching the entire
-        // routing table everytime.
-        if (decidedToSkipStoringLocally) {
-            return catalogCacheSinceVersion;
-        }
-
         {
             stdx::lock_guard<Latch> lock(_mutex);
             auto taskListIt = _collAndChunkTaskLists.find(nss);
@@ -757,8 +726,7 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     auto swCollectionAndChangedChunks =
         _configServerLoader->getChunksSince(nss, maxLoaderVersion).getNoThrow();
 
-    if (swCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound &&
-        !decidedToSkipStoringLocally) {
+    if (swCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound) {
         _ensureMajorityPrimaryAndScheduleCollAndChunksTask(
             opCtx,
             nss,
@@ -792,9 +760,8 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
                           << "'."};
     }
 
-    if (!decidedToSkipStoringLocally &&
-        (collAndChunks.changedChunks.back().getVersion().isNotComparableWith(maxLoaderVersion) ||
-         maxLoaderVersion.isOlderThan(collAndChunks.changedChunks.back().getVersion()))) {
+    if (collAndChunks.changedChunks.back().getVersion().isNotComparableWith(maxLoaderVersion) ||
+        maxLoaderVersion.isOlderThan(collAndChunks.changedChunks.back().getVersion())) {
         _ensureMajorityPrimaryAndScheduleCollAndChunksTask(
             opCtx,
             nss,
@@ -812,10 +779,6 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
         "oldCollectionPlacementVersion"_attr = maxLoaderVersion,
         "refreshedCollectionPlacementVersion"_attr =
             collAndChunks.changedChunks.back().getVersion());
-
-    if (decidedToSkipStoringLocally) {
-        return swCollectionAndChangedChunks;
-    }
 
     // Metadata was found remotely
     // -- otherwise we would have received NamespaceNotFound rather than Status::OK().
@@ -854,10 +817,6 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
 
 StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_runSecondaryGetDatabase(
     OperationContext* opCtx, StringData dbName) {
-    if (shouldSkipStoringLocally()) {
-        return _configServerLoader->getDatabase(dbName).getNoThrow();
-    }
-
     Timer t;
     forcePrimaryDatabaseRefreshAndWaitForReplication(opCtx, dbName);
     LOGV2_FOR_CATALOG_REFRESH(5965801,
@@ -1068,10 +1027,6 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndChun
 void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(OperationContext* opCtx,
                                                                             StringData dbName,
                                                                             DBTask task) {
-    if (shouldSkipStoringLocally()) {
-        return;
-    }
-
     {
         stdx::lock_guard<Latch> lock(_mutex);
 

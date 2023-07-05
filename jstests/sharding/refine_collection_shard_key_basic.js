@@ -306,11 +306,9 @@ assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}),
     ErrorCodes.NamespaceNotSharded);
 
-// Should fail because operation can't run on config server
-const isConfigShardEnabled = ConfigShardUtil.isEnabledIgnoringFCV(st);
 assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: "config.collections", key: {_id: 1, aKey: 1}}),
-    isConfigShardEnabled ? ErrorCodes.NamespaceNotSharded : ErrorCodes.NoShardingEnabled);
+    ErrorCodes.NamespaceNotSharded);
 
 enableShardingAndShardColl({_id: 1});
 

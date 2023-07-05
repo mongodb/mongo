@@ -4,7 +4,7 @@
  * server is also a shard server, we want to make sure that we can't use the localhost exception to
  * create two users.
  *
- * @tags: [requires_fcv_70, featureFlagCatalogShard, featureFlagTransitionToCatalogShard]
+ * @tags: [requires_fcv_70, featureFlagTransitionToCatalogShard]
  */
 (function() {
 "use strict";

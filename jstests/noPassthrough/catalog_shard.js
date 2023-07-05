@@ -4,7 +4,6 @@
  * @tags: [
  *   requires_persistence,
  *   requires_fcv_70,
- *   featureFlagCatalogShard,
  *   featureFlagTransitionToCatalogShard,
  * ]
  */

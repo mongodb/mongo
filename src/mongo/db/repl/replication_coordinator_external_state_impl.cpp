@@ -997,10 +997,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepUp(_service);
         TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
 
-        // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
-        if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
-            CatalogCacheLoader::get(_service).onStepUp();
-        }
+        CatalogCacheLoader::get(_service).onStepUp();
     }
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         if (ShardingState::get(opCtx)->enabled()) {
@@ -1103,9 +1100,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         }
     }
 
-    // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
-    if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe() &&
-        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
         !ShardingState::get(opCtx)->enabled()) {
         // Note this must be called after the config server has created the cluster ID and also
         // after the onStepUp logic for the shard role because this triggers sharding state

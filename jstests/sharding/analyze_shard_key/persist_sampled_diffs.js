@@ -177,10 +177,9 @@ function testDiffs(rst, testCase, expectSampling) {
     // Force samples to get persisted even though query sampling is not enabled.
     QuerySamplingUtil.skipActiveSamplingCheckWhenPersistingSamples(st);
 
-    const isConfigShardEnabled = ConfigShardUtil.isEnabledIgnoringFCV(st);
     for (const testCase of testCases) {
         testDiffs(st.rs0, testCase, true /* expectSampling */);
-        testDiffs(st.configRS, testCase, isConfigShardEnabled /* expectSampling */);
+        testDiffs(st.configRS, testCase, true /* expectSampling */);
     }
 
     st.stop();

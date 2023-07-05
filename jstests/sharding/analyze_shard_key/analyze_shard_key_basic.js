@@ -222,14 +222,12 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
         testCases.push({conn: node, isSupported: true, isPrimaryShardMongod: false});
     });
 
-    // The analyzeShardKey command is not supported on dedicated configsvr mongods.
-    const isConfigShardEnabled = ConfigShardUtil.isEnabledIgnoringFCV(st);
     st.configRS.nodes.forEach(node => {
         // If config shard mode isn't enabled, don't expect a sharded collection since the config
         // server isn't enabled as a shard and won't have chunks.
         testCases.push({
             conn: node,
-            isSupported: isConfigShardEnabled,
+            isSupported: true,
             // The config server is shard0 in config shard mode.
             isPrimaryShardMongod: TestData.configShard,
             doNotExpectColl: !TestData.configShard

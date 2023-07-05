@@ -117,9 +117,6 @@ public:
         uassert(7368402,
                 "The transition to config shard feature is disabled",
                 gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe());
-        uassert(7467203,
-                "The config shard feature is disabled",
-                gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));
 
         uassert(ErrorCodes::IllegalOperation,
                 "_configsvrTransitionToDedicatedConfigServer can only be run on config servers",

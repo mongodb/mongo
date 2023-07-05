@@ -88,10 +88,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(7467202,
-                    "The config shard feature is disabled",
-                    gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));
-
             uassert(
                 ErrorCodes::IllegalOperation,
                 "_configsvrTransitionFromDedicatedConfigServer can only be run on config servers",

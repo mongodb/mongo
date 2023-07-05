@@ -16,10 +16,6 @@ const supportedTestCases = [
     {collectionExists: false, markForSampling: true, expectSampling: false},
 ];
 
-const unsupportedTestCases = [
-    {collectionExists: true, markForSampling: true, expectSampling: false},
-];
-
 // Make the periodic job for writing sampled queries have a period of 1 second to speed up the test.
 const queryAnalysisWriterIntervalSecs = 1;
 
@@ -228,11 +224,9 @@ function testInsertCmd(rst) {
     testFindAndModifyCmd(st.rs0, supportedTestCases);
     testInsertCmd(st.rs0);
 
-    const configTests =
-        ConfigShardUtil.isEnabledIgnoringFCV(st) ? supportedTestCases : unsupportedTestCases;
-    testUpdateCmd(st.configRS, configTests);
-    testDeleteCmd(st.configRS, configTests);
-    testFindAndModifyCmd(st.configRS, configTests);
+    testUpdateCmd(st.configRS, supportedTestCases);
+    testDeleteCmd(st.configRS, supportedTestCases);
+    testFindAndModifyCmd(st.configRS, supportedTestCases);
     testInsertCmd(st.configRS);
 
     st.stop();

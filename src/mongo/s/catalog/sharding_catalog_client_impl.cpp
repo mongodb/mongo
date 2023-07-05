@@ -519,14 +519,6 @@ std::vector<BSONObj> ShardingCatalogClientImpl::runCatalogAggregation(
     aggRequest.setWriteConcern(WriteConcernOptions());
 
     const auto readPref = [&]() -> ReadPreferenceSetting {
-        // (Ignore FCV check): Config servers always use ShardRemote for themselves in 7.0.
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-            !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
-            // When the feature flag is on, the config server may read from any node in its replica
-            // set, so we should use the typical config server read preference.
-            return {};
-        }
-
         const auto vcTime = VectorClock::get(opCtx)->getTime();
         ReadPreferenceSetting readPref{kConfigReadSelector};
         readPref.minClusterTime = vcTime.configTime().asTimestamp();
@@ -943,16 +935,8 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getAllNssThatHaveZonesFo
 
     // Run the aggregation
     const auto readConcern = [&]() -> repl::ReadConcernArgs {
-        // (Ignore FCV check): Config servers always use ShardRemote for themselves in 7.0.
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-            !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
-            // When the feature flag is on, the config server may read from a secondary which may
-            // need to wait for replication, so we should use afterClusterTime.
-            return {repl::ReadConcernLevel::kMajorityReadConcern};
-        } else {
-            const auto time = VectorClock::get(opCtx)->getTime();
-            return {time.configTime(), repl::ReadConcernLevel::kMajorityReadConcern};
-        }
+        const auto time = VectorClock::get(opCtx)->getTime();
+        return {time.configTime(), repl::ReadConcernLevel::kMajorityReadConcern};
     }();
 
     auto aggResult = runCatalogAggregation(opCtx, aggRequest, readConcern);
@@ -1574,16 +1558,8 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
 
     // Run the aggregation
     const auto readConcern = [&]() -> repl::ReadConcernArgs {
-        // (Ignore FCV check): Config servers always use ShardRemote for themselves in 7.0.
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-            !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
-            // When the feature flag is on, the config server may read from a secondary which may
-            // need to wait for replication, so we should use afterClusterTime.
-            return {repl::ReadConcernLevel::kSnapshotReadConcern};
-        } else {
-            const auto vcTime = VectorClock::get(opCtx)->getTime();
-            return {vcTime.configTime(), repl::ReadConcernLevel::kSnapshotReadConcern};
-        }
+        const auto vcTime = VectorClock::get(opCtx)->getTime();
+        return {vcTime.configTime(), repl::ReadConcernLevel::kSnapshotReadConcern};
     }();
 
     auto aggrResult = runCatalogAggregation(opCtx, aggRequest, readConcern);

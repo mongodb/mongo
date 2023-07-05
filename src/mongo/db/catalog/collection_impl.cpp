@@ -194,13 +194,6 @@ Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceStri
         return validationStatus;
     }
 
-    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-        !gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility)) {
-        return {
-            ErrorCodes::InvalidOptions,
-            "changeStreamPreAndPostImages collection option is not supported on config servers"};
-    }
-
     return Status::OK();
 }
 

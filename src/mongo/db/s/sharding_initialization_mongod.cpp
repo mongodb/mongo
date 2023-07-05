@@ -594,10 +594,7 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
 }
 
 void ShardingInitializationMongoD::onSetCurrentConfig(OperationContext* opCtx) {
-    if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
-        !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
-        // Only config servers capable of acting as a shard set up the config shard in their shard
-        // registry with a real connection string.
+    if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         return;
     }
 
@@ -623,31 +620,23 @@ void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCt
     const auto service = opCtx->getServiceContext();
 
     auto configCS = []() -> boost::optional<ConnectionString> {
-        if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
-            // When the config server can operate as a shard, it sets up a ShardRemote for the
-            // config shard, which is created later after loading the local replica set config.
-            return boost::none;
-        }
-        return {ConnectionString::forLocal()};
+        // When the config server can operate as a shard, it sets up a ShardRemote for the
+        // config shard, which is created later after loading the local replica set config.
+        return boost::none;
     }();
 
-    if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
-        CatalogCacheLoader::set(service,
-                                std::make_unique<ShardServerCatalogCacheLoader>(
-                                    std::make_unique<ConfigServerCatalogCacheLoader>()));
+    CatalogCacheLoader::set(service,
+                            std::make_unique<ShardServerCatalogCacheLoader>(
+                                std::make_unique<ConfigServerCatalogCacheLoader>()));
 
-        // This is only called in startup when there shouldn't be replication state changes, but to
-        // be safe we take the RSTL anyway.
-        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        bool isReplSet =
-            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-        bool isStandaloneOrPrimary =
-            !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
-        CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
-    } else {
-        CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
-    }
+    // This is only called in startup when there shouldn't be replication state changes, but to
+    // be safe we take the RSTL anyway.
+    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    bool isStandaloneOrPrimary =
+        !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
+    CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
 
     initializeGlobalShardingStateForMongoD(opCtx, configCS);
 

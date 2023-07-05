@@ -72,16 +72,8 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             ChunkVersion sinceVersion) {
     const auto readConcern = [&]() -> repl::ReadConcernArgs {
-        // (Ignore FCV check): This is in mongos so we expect to ignore FCV.
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-            !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
-            // When the feature flag is on, the config server may read from a secondary which may
-            // need to wait for replication, so we should use afterClusterTime.
-            return {repl::ReadConcernLevel::kSnapshotReadConcern};
-        } else {
-            const auto vcTime = VectorClock::get(opCtx)->getTime();
-            return {vcTime.configTime(), repl::ReadConcernLevel::kSnapshotReadConcern};
-        }
+        const auto vcTime = VectorClock::get(opCtx)->getTime();
+        return {vcTime.configTime(), repl::ReadConcernLevel::kSnapshotReadConcern};
     }();
 
     auto collAndChunks = Grid::get(opCtx)->catalogClient()->getCollectionAndChunks(

@@ -16,10 +16,6 @@ const supportedTestCases = [
     {collectionExists: false, markForSampling: true, expectSampling: false},
 ];
 
-const unsupportedTestCases = [
-    {collectionExists: true, markForSampling: true, expectSampling: false},
-];
-
 // Test with empty, non-empty and missing filter and/or collation to verify that query sampling
 // doesn't require filter or collation to be non-empty.
 const filterCollationTestCases = [
@@ -185,12 +181,10 @@ function testAggregateCmd(rst, testCases) {
     testDistinctCmd(st.rs0, supportedTestCases);
     testAggregateCmd(st.rs0, supportedTestCases);
 
-    const configTests =
-        ConfigShardUtil.isEnabledIgnoringFCV(st) ? supportedTestCases : unsupportedTestCases;
-    testFindCmd(st.configRS, configTests);
-    testCountCmd(st.configRS, configTests);
-    testDistinctCmd(st.configRS, configTests);
-    testAggregateCmd(st.configRS, configTests);
+    testFindCmd(st.configRS, supportedTestCases);
+    testCountCmd(st.configRS, supportedTestCases);
+    testDistinctCmd(st.configRS, supportedTestCases);
+    testAggregateCmd(st.configRS, supportedTestCases);
 
     st.stop();
 }

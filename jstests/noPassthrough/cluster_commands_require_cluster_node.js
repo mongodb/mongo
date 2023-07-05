@@ -95,20 +95,11 @@ function runTestCaseExpectSuccess(conn, testCase) {
         runTestCaseExpectFail(st.s, testCase, ErrorCodes.CommandNotFound);
     }
 
-    //
-    // Cluster commands are allowed on a config shard enabled config server.
-    //
-
-    const isConfigShardEnabled = ConfigShardUtil.isEnabledIgnoringFCV(st);
     for (let testCase of clusterCommandsCases) {
-        if (isConfigShardEnabled) {
-            if (testCase.expectedErr) {
-                runTestCaseExpectFail(st.rs0.getPrimary(), testCase, testCase.expectedErr);
-            } else {
-                runTestCaseExpectSuccess(st.rs0.getPrimary(), testCase);
-            }
+        if (testCase.expectedErr) {
+            runTestCaseExpectFail(st.rs0.getPrimary(), testCase, testCase.expectedErr);
         } else {
-            runTestCaseExpectFail(st.configRS.getPrimary(), testCase, ErrorCodes.NoShardingEnabled);
+            runTestCaseExpectSuccess(st.rs0.getPrimary(), testCase);
         }
     }
 

@@ -431,26 +431,6 @@ public:
                 const auto fcvChangeRegion(
                     FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
 
-                // If configShard is enabled and there is an entry in config.shards with _id:
-                // ShardId::kConfigServerId then the config server is a config shard.
-                auto isConfigShard =
-                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-                    !ShardingCatalogManager::get(opCtx)
-                         ->findOneConfigDocument(opCtx,
-                                                 NamespaceString::kConfigsvrShardsNamespace,
-                                                 BSON("_id" << ShardId::kConfigServerId.toString()))
-                         .isEmpty();
-
-                uassert(ErrorCodes::CannotDowngrade,
-                        "Cannot downgrade featureCompatibilityVersion to {} "
-                        "with a config shard as it is not supported in earlier versions. "
-                        "Please transition the config server to dedicated mode using the "
-                        "transitionToDedicatedConfigServer command."_format(
-                            multiversion::toString(requestedVersion)),
-                        !isConfigShard ||
-                            gFeatureFlagCatalogShard.isEnabledOnVersion(requestedVersion));
-
                 uassert(ErrorCodes::Error(6744303),
                         "Failing setFeatureCompatibilityVersion before reaching the FCV "
                         "transitional stage due to 'failBeforeTransitioning' failpoint set",
@@ -514,14 +494,10 @@ public:
                 _sendSetFCVRequestToShards(
                     opCtx, request, changeTimestamp, SetFCVPhaseEnum::kStart);
 
-                // (Ignore FCV check): This feature flag is intentional to only check if it is
-                // enabled on this binary so the config server can be a shard.
-                if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
-                    // The config server may also be a shard, so have it run any shard server tasks.
-                    // Run this after sending the first phase to shards so they enter the transition
-                    // state even if this throws.
-                    _shardServerPhase1Tasks(opCtx, requestedVersion);
-                }
+                // The config server may also be a shard, so have it run any shard server tasks.
+                // Run this after sending the first phase to shards so they enter the transition
+                // state even if this throws.
+                _shardServerPhase1Tasks(opCtx, requestedVersion);
             }
 
             uassert(ErrorCodes::Error(7555202),
@@ -1126,11 +1102,6 @@ private:
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-            if (gFeatureFlagCatalogShard.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
-                    requestedVersion, originalVersion)) {
-                _assertNoCollectionsHaveChangeStreamsPrePostImages(opCtx);
-            }
-
             if (feature_flags::gGlobalIndexesShardingCatalog
                     .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
                                                                   originalVersion)) {

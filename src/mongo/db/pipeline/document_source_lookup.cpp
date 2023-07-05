@@ -487,16 +487,6 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeStat
         // This stage will only be on the shards pipeline if $lookup on sharded foreign collections
         // is allowed.
         hostRequirement = HostTypeRequirement::kAnyShard;
-    } else if (_fromNs == NamespaceString::kConfigsvrCollectionsNamespace &&
-               // (Ignore FCV check): If the config shard feature flag is enabled, the config
-               // server should have the components necessary to handle a merge. Config servers are
-               // upgraded first and downgraded last, so if any server is running the latest binary,
-               // we can assume the conifg servers are too.
-               !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
-        // This is an unsharded collection, but the primary shard would be the config server, and
-        // the config servers are not prepared to take queries. Instead, we'll merge on any of the
-        // other shards.
-        hostRequirement = HostTypeRequirement::kAnyShard;
     } else {
         // If the pipeline is unsplit or this stage is on the merging part of the pipeline,
         // when $lookup on sharded foreign collections is allowed, the foreign collection is

@@ -1458,8 +1458,7 @@ let MongosAPIParametersUtil = (function() {
         assert.commandWorked(st.rs0.getPrimary().adminCommand({serverStatus: 1}))
             .storageEngine.supportsCommittedReads;
 
-    const isConfigShardEnabled = ConfigShardUtil.isEnabledIgnoringFCV(st) &&
-        ConfigShardUtil.isTransitionEnabledIgnoringFCV(st);
+    const isConfigShardEnabled = ConfigShardUtil.isTransitionEnabledIgnoringFCV(st);
 
     (() => {
         // Validate test cases for all commands. Ensure there is at least one test case for every

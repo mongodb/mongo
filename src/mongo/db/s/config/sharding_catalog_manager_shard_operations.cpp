@@ -828,15 +828,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         // while blocking on the network).
         FixedFCVRegion fcvRegion(opCtx);
 
-        // Prevent the race where an FCV downgrade happens concurrently with the configShard
-        // being added and the FCV downgrade finishes before the configShard is added.
-        uassert(
-            5563604,
-            "Cannot add config shard because it is not supported in featureCompatibilityVersion: {}"_format(
-                multiversion::toString(serverGlobalParams.featureCompatibility.getVersion())),
-            gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility) ||
-                !isConfigShard);
-
         uassert(5563603,
                 "Cannot add shard while in upgrading/downgrading FCV state",
                 !fcvRegion->isUpgradingOrDowngrading());

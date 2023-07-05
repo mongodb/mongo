@@ -97,11 +97,6 @@ function runTest(rst, validationTest, shardName) {
         const {aggCmdObj} =
             makeAnalyzeShardKeyAggregateCmdObj(validationTest.collName, {id: 1}, st.shard0.name);
         assert.commandWorked(shard0Primary.getDB(validationTest.dbName).runCommand(aggCmdObj));
-        if (!ConfigShardUtil.isEnabledIgnoringFCV(st)) {
-            assert.commandFailedWithCode(
-                configPrimary.getDB(validationTest.dbName).runCommand(aggCmdObj),
-                ErrorCodes.IllegalOperation);
-        }
     }
 
     runTest(st.rs0, validationTest, st.shard0.name);

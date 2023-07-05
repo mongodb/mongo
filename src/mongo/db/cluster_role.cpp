@@ -34,8 +34,7 @@
 namespace mongo {
 
 bool ClusterRole::has(const ClusterRole& other) const {
-    if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
-        _value == ClusterRole::ConfigServer) {
+    if (_value == ClusterRole::ConfigServer) {
         return other._value == ClusterRole::ConfigServer ||
             other._value == ClusterRole::ShardServer;
     }

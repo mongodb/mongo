@@ -1332,11 +1332,6 @@ void setUpObservers(ServiceContext* serviceContext) {
     }
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
-            opObserverRegistry->addObserver(
-                std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
-        }
-
         opObserverRegistry->addObserver(std::make_unique<ConfigServerOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
         if (!gMultitenancySupport) {

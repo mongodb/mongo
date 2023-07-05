@@ -123,9 +123,6 @@ ShardRegistry::ShardRegistry(ServiceContext* service,
 
     if (_initConfigServerCS) {
         invariant(_initConfigServerCS->isValid());
-    } else {
-        // (Ignore FCV check): This is in mongos so we expect to ignore FCV.
-        invariant(gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe());
     }
 
     _threadPool.startup();

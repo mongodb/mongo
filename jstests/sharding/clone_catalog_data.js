@@ -166,8 +166,6 @@ TestData.skipCheckMetadataConsistency = true;
     }),
                                  ErrorCodes.InvalidOptions);
 
-    const isConfigShardEnabled = ConfigShardUtil.isEnabledIgnoringFCV(st);
-
     if (TestData.configShard) {
         // The config server is a shard and already has collections for the database.
         assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
@@ -176,22 +174,14 @@ TestData.skipCheckMetadataConsistency = true;
             writeConcern: {w: "majority"}
         }),
                                      ErrorCodes.NamespaceExists);
-    } else if (isConfigShardEnabled) {
-        // The config server is dedicated but supports config shard mode, so it can accept shaded
+    } else {
+        // The config server is dedicated but supports config shard mode, so it can accept sharded
         // commands.
         assert.commandWorked(st.configRS.getPrimary().adminCommand({
             _shardsvrCloneCatalogData: 'test',
             from: fromShard.host,
             writeConcern: {w: "majority"}
         }));
-    } else {
-        // A dedicated non-config shard supporting config server cannot run the command.
-        assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
-            _shardsvrCloneCatalogData: 'test',
-            from: fromShard.host,
-            writeConcern: {w: "majority"}
-        }),
-                                     ErrorCodes.NoShardingEnabled);
     }
 
     // Check that the command fails when failing to specify a source.
