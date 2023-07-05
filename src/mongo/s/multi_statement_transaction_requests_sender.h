@@ -59,7 +59,8 @@ public:
         const DatabaseName& dbName,
         const std::vector<AsyncRequestsSender::Request>& requests,
         const ReadPreferenceSetting& readPreference,
-        Shard::RetryPolicy retryPolicy);
+        Shard::RetryPolicy retryPolicy,
+        AsyncRequestsSender::ShardHostMap designatedHostsMap = {});
 
     ~MultiStatementTransactionRequestsSender();
 

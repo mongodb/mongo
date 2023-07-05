@@ -137,9 +137,14 @@ public:
         boost::optional<HostAndPort> shardHostAndPort;
     };
 
+    typedef stdx::unordered_map<ShardId, HostAndPort> ShardHostMap;
+
     /**
      * Constructs a new AsyncRequestsSender. The OperationContext* and TaskExecutor* must remain
      * valid for the lifetime of the ARS.
+     *
+     * The designatedHostsMap overrides the read preference for the shards specified, and requires
+     * those shards target only the host in the map.
      */
     AsyncRequestsSender(OperationContext* opCtx,
                         std::shared_ptr<executor::TaskExecutor> executor,
@@ -147,7 +152,8 @@ public:
                         const std::vector<AsyncRequestsSender::Request>& requests,
                         const ReadPreferenceSetting& readPreference,
                         Shard::RetryPolicy retryPolicy,
-                        std::unique_ptr<ResourceYielder> resourceYielder);
+                        std::unique_ptr<ResourceYielder> resourceYielder,
+                        const ShardHostMap& designatedHostsMap);
 
     /**
      * Returns true if responses for all requests have been returned via next().
@@ -186,7 +192,10 @@ private:
         /**
          * Creates a new uninitialized remote state with a command to send.
          */
-        RemoteData(AsyncRequestsSender* ars, ShardId shardId, BSONObj cmdObj);
+        RemoteData(AsyncRequestsSender* ars,
+                   ShardId shardId,
+                   BSONObj cmdObj,
+                   HostAndPort designatedHost);
 
         /**
          * Returns a SemiFuture containing a shard object associated with this remote.
@@ -261,6 +270,9 @@ private:
 
         // The command object to send to the remote host.
         BSONObj _cmdObj;
+
+        // The designated host and port to send the command to, if provided.  Otherwise is empty().
+        HostAndPort _designatedHostAndPort;
 
         // The exact host on which the remote command was run. Is unset until a request has been
         // sent.

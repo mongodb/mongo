@@ -45,6 +45,7 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/util/net/hostandport.h"
@@ -71,6 +72,9 @@ namespace mongo {
  * @param allowPartialResults: If true, unreachable hosts are ignored, and only cursors established
  *                             on reachable hosts are returned.
  *
+ * @param designatedHostsMap: A map of hosts to be targeted for particular shards, overriding
+ *                            the read preference setting.
+ *
  */
 std::vector<RemoteCursor> establishCursors(
     OperationContext* opCtx,
@@ -80,7 +84,8 @@ std::vector<RemoteCursor> establishCursors(
     const std::vector<std::pair<ShardId, BSONObj>>& remotes,
     bool allowPartialResults,
     Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kIdempotent,
-    std::vector<OperationKey> providedOpKeys = {});
+    std::vector<OperationKey> providedOpKeys = {},
+    AsyncRequestsSender::ShardHostMap designatedHostsMap = {});
 
 /**
  * Establishes cursors on every host in the remote shards by issuing requests in parallel with the

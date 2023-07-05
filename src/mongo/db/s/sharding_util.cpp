@@ -111,7 +111,8 @@ std::vector<AsyncRequestsSender::Response> processShardResponses(
                                 requests,
                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                 Shard::RetryPolicy::kIdempotentOrCursorInvalidated,
-                                nullptr /* resourceYielder */);
+                                nullptr /* resourceYielder */,
+                                {} /* designatedHostsMap */);
 
         while (!ars.done()) {
             // Retrieve the responses and throw at the first failure.

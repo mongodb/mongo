@@ -255,7 +255,8 @@ void ReshardingCoordinatorCleaner::_cleanOnParticipantShards(
         createShardCleanupRequests(_originalCollectionNss, _reshardingUUID, doc),
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         Shard::RetryPolicy::kIdempotent,
-        nullptr /* resourceYielder */);
+        nullptr /* resourceYielder */,
+        {} /* designatedHostsMap */);
 
     while (!ars.done()) {
         auto arsResponse = ars.next();

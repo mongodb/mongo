@@ -80,7 +80,8 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
                                          const std::vector<AsyncRequestsSender::Request>& requests,
                                          const ReadPreferenceSetting& readPreference,
                                          Shard::RetryPolicy retryPolicy,
-                                         std::unique_ptr<ResourceYielder> resourceYielder)
+                                         std::unique_ptr<ResourceYielder> resourceYielder,
+                                         const ShardHostMap& designatedHostsMap)
     : _opCtx(opCtx),
       _db(dbName.toString()),
       _readPreference(readPreference),
@@ -97,7 +98,12 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
     _remotes.reserve(requests.size());
     for (const auto& request : requests) {
         // Kick off requests immediately.
-        _remotes.emplace_back(this, request.shardId, request.cmdObj).executeRequest();
+        auto designatedHostIter = designatedHostsMap.find(request.shardId);
+        auto designatedHost = designatedHostIter != designatedHostsMap.end()
+            ? designatedHostIter->second
+            : HostAndPort();
+        _remotes.emplace_back(this, request.shardId, request.cmdObj, std::move(designatedHost))
+            .executeRequest();
     }
 
     CurOp::get(_opCtx)->ensureRecordRemoteOpWait();
@@ -194,8 +200,12 @@ AsyncRequestsSender::Request::Request(ShardId shardId, BSONObj cmdObj)
 
 AsyncRequestsSender::RemoteData::RemoteData(AsyncRequestsSender* ars,
                                             ShardId shardId,
-                                            BSONObj cmdObj)
-    : _ars(ars), _shardId(std::move(shardId)), _cmdObj(std::move(cmdObj)) {}
+                                            BSONObj cmdObj,
+                                            HostAndPort designatedHostAndPort)
+    : _ars(ars),
+      _shardId(std::move(shardId)),
+      _cmdObj(std::move(cmdObj)),
+      _designatedHostAndPort(std::move(designatedHostAndPort)) {}
 
 SemiFuture<std::shared_ptr<Shard>> AsyncRequestsSender::RemoteData::getShard() noexcept {
     return Grid::get(getGlobalServiceContext())
@@ -222,7 +232,17 @@ auto AsyncRequestsSender::RemoteData::scheduleRequest()
     -> SemiFuture<RemoteCommandOnAnyCallbackArgs> {
     return getShard()
         .thenRunOn(*_ars->_subBaton)
-        .then([this](auto&& shard) {
+        .then([this](auto&& shard) -> SemiFuture<std::vector<HostAndPort>> {
+            if (!_designatedHostAndPort.empty()) {
+                const auto& connStr = shard->getTargeter()->connectionString();
+                const auto& servers = connStr.getServers();
+                uassert(ErrorCodes::HostNotFound,
+                        str::stream() << "Host " << _designatedHostAndPort
+                                      << " is not a host in shard " << shard->getId(),
+                        std::find(servers.begin(), servers.end(), _designatedHostAndPort) !=
+                            servers.end());
+                return std::vector<HostAndPort>{_designatedHostAndPort};
+            }
             return shard->getTargeter()->findHosts(_ars->_readPreference,
                                                    CancellationToken::uncancelable());
         })

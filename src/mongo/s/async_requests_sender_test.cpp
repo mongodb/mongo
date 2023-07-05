@@ -81,6 +81,8 @@ public:
 
             std::unique_ptr<RemoteCommandTargeterMock> targeter(
                 std::make_unique<RemoteCommandTargeterMock>());
+            _targeters.push_back(targeter.get());
+
             targeter->setConnectionStringReturnValue(ConnectionString(kTestShardHosts[i]));
             targeter->setFindHostReturnValue(kTestShardHosts[i]);
 
@@ -90,6 +92,9 @@ public:
 
         setupShards(shards);
     }
+
+protected:
+    std::vector<RemoteCommandTargeterMock*> _targeters;  // Targeters are owned by the factory.
 };
 
 TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenYielding) {
@@ -124,7 +129,8 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenYielding) {
                                    requests,
                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                    Shard::RetryPolicy::kNoRetry,
-                                   std::make_unique<ThrowyResourceYielder>());
+                                   std::make_unique<ThrowyResourceYielder>(),
+                                   {} /* designatedHostsMap */);
 
     // Issue blocking waits on a different thread.
     auto future = launchAsync([&]() {
@@ -185,7 +191,8 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenUnyielding) {
                                    requests,
                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                    Shard::RetryPolicy::kNoRetry,
-                                   std::make_unique<ThrowyResourceYielder>());
+                                   std::make_unique<ThrowyResourceYielder>(),
+                                   {} /* designatedHostsMap */);
 
     auto firstResponseProcessed = unittest::Barrier(2);
 
@@ -254,7 +261,8 @@ TEST_F(AsyncRequestsSenderTest, ExceptionWhileWaitingDoesNotSkipUnyield) {
                                    requests,
                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                    Shard::RetryPolicy::kNoRetry,
-                                   std::move(yielder));
+                                   std::move(yielder),
+                                   {} /* designatedHostsMap */);
 
     // Issue blocking wait on a different thread.
     auto future = launchAsync([&]() {
@@ -272,5 +280,102 @@ TEST_F(AsyncRequestsSenderTest, ExceptionWhileWaitingDoesNotSkipUnyield) {
     ASSERT_EQ(yielderPointer->timesYielded, 1);
     ASSERT_EQ(yielderPointer->timesUnyielded, 1);
 }
+
+TEST_F(AsyncRequestsSenderTest, DesignatedHostChosen) {
+    std::vector<AsyncRequestsSender::Request> requests;
+    requests.emplace_back(kTestShardIds[0],
+                          BSON("find"
+                               << "bar"));
+    requests.emplace_back(kTestShardIds[1],
+                          BSON("find"
+                               << "bar"));
+    requests.emplace_back(kTestShardIds[2],
+                          BSON("find"
+                               << "bar"));
+
+    AsyncRequestsSender::ShardHostMap designatedHosts;
+
+    auto shard1Secondary = HostAndPort("SecondaryHostShard1", 12345);
+    _targeters[1]->setConnectionStringReturnValue(
+        ConnectionString::forReplicaSet("shard1_rs"_sd, {kTestShardHosts[1], shard1Secondary}));
+    designatedHosts[kTestShardIds[1]] = shard1Secondary;
+    auto ars = AsyncRequestsSender(operationContext(),
+                                   executor(),
+                                   kTestNss.db(),
+                                   requests,
+                                   ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                   Shard::RetryPolicy::kNoRetry,
+                                   nullptr /* no yielder */,
+                                   designatedHosts);
+
+    auto future = launchAsync([&]() {
+        auto response = ars.next();
+        ASSERT(response.swResponse.getStatus().isOK());
+        ASSERT_EQ(response.shardId, kTestShardIds[0]);
+        ASSERT_EQ(response.shardHostAndPort, kTestShardHosts[0]);
+
+        response = ars.next();
+        ASSERT(response.swResponse.getStatus().isOK());
+        ASSERT_EQ(response.shardId, kTestShardIds[1]);
+        ASSERT_EQ(response.shardHostAndPort, shard1Secondary);
+
+        response = ars.next();
+        ASSERT(response.swResponse.getStatus().isOK());
+        ASSERT_EQ(response.shardId, kTestShardIds[2]);
+        ASSERT_EQ(response.shardHostAndPort, kTestShardHosts[2]);
+    });
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        ASSERT_EQ(request.target, kTestShardHosts[0]);
+        return CursorResponse(kTestNss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        ASSERT_EQ(request.target, shard1Secondary);
+        return CursorResponse(kTestNss, 0LL, {BSON("x" << 2)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        ASSERT_EQ(request.target, kTestShardHosts[2]);
+        return CursorResponse(kTestNss, 0LL, {BSON("x" << 3)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+    future.default_timed_get();
+}
+
+TEST_F(AsyncRequestsSenderTest, DesignatedHostMustBeInShard) {
+    std::vector<AsyncRequestsSender::Request> requests;
+    requests.emplace_back(kTestShardIds[0],
+                          BSON("find"
+                               << "bar"));
+    requests.emplace_back(kTestShardIds[1],
+                          BSON("find"
+                               << "bar"));
+    requests.emplace_back(kTestShardIds[2],
+                          BSON("find"
+                               << "bar"));
+
+    AsyncRequestsSender::ShardHostMap designatedHosts;
+    designatedHosts[kTestShardIds[1]] = HostAndPort("HostNotInShard", 12345);
+    auto ars = AsyncRequestsSender(operationContext(),
+                                   executor(),
+                                   kTestNss.db(),
+                                   requests,
+                                   ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                   Shard::RetryPolicy::kNoRetry,
+                                   nullptr /* no yielder */,
+                                   designatedHosts);
+
+    // We see the error immediately, because it happens in construction.
+    auto response = ars.next();
+    ASSERT_EQ(response.swResponse.getStatus(), ErrorCodes::HostNotFound);
+    ASSERT_EQ(response.shardId, kTestShardIds[1]);
+}
+
 }  // namespace
 }  // namespace mongo

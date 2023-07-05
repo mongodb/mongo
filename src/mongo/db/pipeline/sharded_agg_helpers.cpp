@@ -250,6 +250,7 @@ std::vector<RemoteCursor> establishShardCursors(
     const BSONObj& cmdObj,
     const boost::optional<analyze_shard_key::TargetedSampleId>& sampleId,
     const ReadPreferenceSetting& readPref,
+    AsyncRequestsSender::ShardHostMap designatedHostsMap,
     bool targetEveryShardServer) {
     LOGV2_DEBUG(20904,
                 1,
@@ -262,6 +263,8 @@ std::vector<RemoteCursor> establishShardCursors(
     invariant(cri || mustRunOnAllShards);
 
     if (targetEveryShardServer) {
+        // If we are running on all shard servers we should never designate a particular server.
+        invariant(designatedHostsMap.empty());
         if (MONGO_unlikely(shardedAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
             LOGV2(
                 7355704,
@@ -326,7 +329,9 @@ std::vector<RemoteCursor> establishShardCursors(
                             readPref,
                             requests,
                             false /* do not allow partial results */,
-                            getDesiredRetryPolicy(opCtx));
+                            getDesiredRetryPolicy(opCtx),
+                            {} /* providedOpKeys */,
+                            designatedHostsMap);
 }
 
 std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -1103,7 +1108,8 @@ DispatchShardPipelineResults dispatchShardPipeline(
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     boost::optional<ExplainOptions::Verbosity> explain,
     ShardTargetingPolicy shardTargetingPolicy,
-    boost::optional<BSONObj> readConcern) {
+    boost::optional<BSONObj> readConcern,
+    AsyncRequestsSender::ShardHostMap designatedHostsMap) {
     auto expCtx = pipeline->getContext();
 
     // The process is as follows:
@@ -1271,6 +1277,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                             targetedCommand,
                                             targetedSampleId,
                                             ReadPreferenceSetting::get(opCtx),
+                                            designatedHostsMap,
                                             targetEveryShardServer);
 
         } catch (const ExceptionFor<ErrorCodes::StaleConfig>& e) {

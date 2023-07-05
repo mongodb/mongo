@@ -92,13 +92,15 @@ public:
                       std::shared_ptr<executor::TaskExecutor> executor,
                       const NamespaceString& nss,
                       bool allowPartialResults,
-                      std::vector<OperationKey> providedOpKeys)
+                      std::vector<OperationKey> providedOpKeys,
+                      AsyncRequestsSender::ShardHostMap designatedHostsMap)
         : _opCtx(opCtx),
           _executor{std::move(executor)},
           _nss(nss),
           _allowPartialResults(allowPartialResults),
           _defaultOpKey{UUID::gen()},
-          _providedOpKeys(std::move(providedOpKeys)) {}
+          _providedOpKeys(std::move(providedOpKeys)),
+          _designatedHostsMap(std::move(designatedHostsMap)) {}
 
     /**
      * Make a RequestSender and thus send requests.
@@ -164,6 +166,7 @@ private:
     boost::optional<Status> _maybeFailure;
     std::vector<RemoteCursor> _remoteCursors;
     std::vector<HostAndPort> _remotesToClean;
+    AsyncRequestsSender::ShardHostMap _designatedHostsMap;
 };
 
 void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
@@ -200,7 +203,13 @@ void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
     }
 
     // Send the requests
-    _ars.emplace(_opCtx, _executor, _nss.dbName(), std::move(requests), readPref, retryPolicy);
+    _ars.emplace(_opCtx,
+                 _executor,
+                 _nss.dbName(),
+                 std::move(requests),
+                 readPref,
+                 retryPolicy,
+                 _designatedHostsMap);
 }
 
 void CursorEstablisher::waitForResponse() noexcept {
@@ -420,9 +429,14 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                                            const std::vector<std::pair<ShardId, BSONObj>>& remotes,
                                            bool allowPartialResults,
                                            Shard::RetryPolicy retryPolicy,
-                                           std::vector<OperationKey> providedOpKeys) {
-    auto establisher =
-        CursorEstablisher(opCtx, executor, nss, allowPartialResults, std::move(providedOpKeys));
+                                           std::vector<OperationKey> providedOpKeys,
+                                           AsyncRequestsSender::ShardHostMap designatedHostsMap) {
+    auto establisher = CursorEstablisher(opCtx,
+                                         executor,
+                                         nss,
+                                         allowPartialResults,
+                                         std::move(providedOpKeys),
+                                         std::move(designatedHostsMap));
     establisher.sendRequests(readPref, remotes, retryPolicy);
     establisher.waitForResponses();
     establisher.checkForFailedRequests();
