@@ -241,12 +241,12 @@ void WiredTigerRecoveryUnit::setTxnModified() {
 }
 
 boost::optional<int64_t> WiredTigerRecoveryUnit::getOplogVisibilityTs() {
-    if (!_isOplogReader) {
-        return boost::none;
-    }
-
     getSession();
     return _oplogVisibleTs;
+}
+
+void WiredTigerRecoveryUnit::setOplogVisibilityTs(boost::optional<int64_t> oplogVisibleTs) {
+    _oplogVisibleTs = oplogVisibleTs;
 }
 
 WiredTigerSession* WiredTigerRecoveryUnit::getSession() {
@@ -275,12 +275,6 @@ void WiredTigerRecoveryUnit::doAbandonSnapshot() {
 void WiredTigerRecoveryUnit::preallocateSnapshot() {
     // Begin a new transaction, if one is not already started.
     getSession();
-}
-
-void WiredTigerRecoveryUnit::preallocateSnapshotForOplogRead() {
-    // Indicate that we are an oplog reader before opening the snapshot
-    setIsOplogReader();
-    preallocateSnapshot();
 }
 
 void WiredTigerRecoveryUnit::_txnClose(bool commit) {
@@ -410,7 +404,6 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     _prepareTimestamp = Timestamp();
     _durableTimestamp = Timestamp();
     _roundUpPreparedTimestamps = RoundUpPreparedTimestamps::kNoRound;
-    _isOplogReader = false;
     _oplogVisibleTs = boost::none;
     _orderedCommit = true;  // Default value is true; we assume all writes are ordered.
     if (_untimestampedWriteAssertionLevel !=
@@ -509,9 +502,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
 
     switch (_timestampReadSource) {
         case ReadSource::kNoTimestamp: {
-            if (_isOplogReader) {
-                _oplogVisibleTs = static_cast<std::int64_t>(_oplogManager->getOplogReadTimestamp());
-            }
+            _oplogVisibleTs = static_cast<std::int64_t>(_oplogManager->getOplogReadTimestamp());
             WiredTigerBeginTxnBlock(session,
                                     _prepareConflictBehavior,
                                     _roundUpPreparedTimestamps,

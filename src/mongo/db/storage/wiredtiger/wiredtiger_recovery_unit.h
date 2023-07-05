@@ -88,7 +88,6 @@ public:
     bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx, bool stableCheckpoint) override;
 
     void preallocateSnapshot() override;
-    void preallocateSnapshotForOplogRead() override;
 
     Status majorityCommittedSnapshotAvailable() const override;
 
@@ -166,13 +165,6 @@ public:
     // ---- WT STUFF
 
     WiredTigerSession* getSession();
-    void setIsOplogReader() {
-        _isOplogReader = true;
-    }
-
-    bool getIsOplogReader() const {
-        return _isOplogReader;
-    }
 
     /**
      * Enter a period of wait or computation during which there are no WT calls.
@@ -202,6 +194,7 @@ public:
     void setTxnModified();
 
     boost::optional<int64_t> getOplogVisibilityTs() override;
+    void setOplogVisibilityTs(boost::optional<int64_t> oplogVisibilityTs) override;
 
     static WiredTigerRecoveryUnit* get(OperationContext* opCtx) {
         return checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
@@ -295,7 +288,9 @@ private:
     UntimestampedWriteAssertionLevel _untimestampedWriteAssertionLevel =
         UntimestampedWriteAssertionLevel::kEnforce;
     std::unique_ptr<Timer> _timer;
-    bool _isOplogReader = false;
+    // The guaranteed 'no holes' point in the oplog. Forward cursor oplog reads can only read up to
+    // this timestamp if they want to avoid missing any entries in the oplog that may not yet have
+    // committed ('holes'). @see WiredTigerOplogManager::getOplogReadTimestamp
     boost::optional<int64_t> _oplogVisibleTs = boost::none;
     bool _gatherWriteContextForDebugging = false;
     std::vector<BSONObj> _writeContextForDebugging;

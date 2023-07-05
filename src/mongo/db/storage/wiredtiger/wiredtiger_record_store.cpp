@@ -209,6 +209,8 @@ WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(Operatio
             fmt::format("Cannot create oplog of size less than {} bytes", numTruncateMarkersToKeep),
             minBytesPerTruncateMarker > 0);
 
+    // We need to read the whole oplog, override the recoveryUnit's oplogVisibleTimestamp.
+    ScopedOplogVisibleTimestamp scopedOplogVisibleTimestamp(opCtx->recoveryUnit(), boost::none);
     UnyieldableCollectionIterator iterator(opCtx, rs);
     auto initialSetOfMarkers = CollectionTruncateMarkers::createFromCollectionIterator(
         opCtx,
@@ -2293,7 +2295,6 @@ bool WiredTigerRecordStoreCursorBase::isVisible(const RecordId& id) {
 void WiredTigerRecordStoreCursorBase::initCappedVisibility(OperationContext* opCtx) {
     if (_isOplog) {
         auto wtRu = WiredTigerRecoveryUnit::get(opCtx);
-        wtRu->setIsOplogReader();
         if (_forward) {
             _oplogVisibleTs = wtRu->getOplogVisibilityTs();
         }
@@ -2435,11 +2436,6 @@ void StandardWiredTigerRecordStore::setKey(WT_CURSOR* cursor, const CursorKey* k
 
 std::unique_ptr<SeekableRecordCursor> StandardWiredTigerRecordStore::getCursor(
     OperationContext* opCtx, bool forward) const {
-    if (_isOplog && forward) {
-        WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(opCtx);
-        wru->setIsOplogReader();
-    }
-
     return std::make_unique<WiredTigerRecordStoreStandardCursor>(opCtx, *this, forward);
 }
 

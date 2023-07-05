@@ -541,12 +541,8 @@ const NamespaceString& AutoGetCollectionForRead::getNss() const {
 
 namespace {
 
-void openSnapshot(OperationContext* opCtx, bool isForOplogRead) {
-    if (isForOplogRead) {
-        opCtx->recoveryUnit()->preallocateSnapshotForOplogRead();
-    } else {
-        opCtx->recoveryUnit()->preallocateSnapshot();
-    }
+void openSnapshot(OperationContext* opCtx) {
+    opCtx->recoveryUnit()->preallocateSnapshot();
 }
 
 /**
@@ -648,7 +644,7 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
         // catalog.
         establishCappedSnapshotIfNeeded(opCtx, catalogBeforeSnapshot, nsOrUUID);
 
-        openSnapshot(opCtx, nss.isOplog());
+        openSnapshot(opCtx);
 
         const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
         const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);

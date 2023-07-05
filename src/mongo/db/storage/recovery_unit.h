@@ -292,16 +292,6 @@ public:
     virtual void preallocateSnapshot() {}
 
     /**
-     * Like preallocateSnapshot() above but also indicates that the snapshot will be used for
-     * reading the oplog.
-     *
-     * StorageEngines may not implement this in which case it works like preallocateSnapshot.
-     */
-    virtual void preallocateSnapshotForOplogRead() {
-        preallocateSnapshot();
-    }
-
-    /**
      * Returns whether or not a majority commmitted snapshot is available. If no snapshot has yet
      * been marked as Majority Committed, returns a status with error code
      * ReadConcernMajorityNotAvailableYet. After this returns successfully, at any point where
@@ -525,6 +515,7 @@ public:
     virtual boost::optional<int64_t> getOplogVisibilityTs() {
         return boost::none;
     }
+    virtual void setOplogVisibilityTs(boost::optional<int64_t> oplogVisibilityTs) {}
 
     /**
      * Pinning informs callers not to change the ReadSource on this RecoveryUnit. Callers are
@@ -934,6 +925,33 @@ public:
 
 private:
     RecoveryUnit* const _recoveryUnit;
+};
+
+
+/**
+ * RAII-style class to override the oplog visible timestamp of the WiredTigerRecoveryUnit while it's
+ * in scope.
+ */
+class ScopedOplogVisibleTimestamp {
+public:
+    ScopedOplogVisibleTimestamp(RecoveryUnit* recoveryUnit, boost::optional<int64_t> oplogVisibleTs)
+        : _recoveryUnit(recoveryUnit),
+          _originalOplogVisibleTs(recoveryUnit->getOplogVisibilityTs()) {
+        _recoveryUnit->setOplogVisibilityTs(oplogVisibleTs);
+    }
+
+    ScopedOplogVisibleTimestamp(const ScopedOplogVisibleTimestamp&) = delete;
+    ScopedOplogVisibleTimestamp& operator=(const ScopedOplogVisibleTimestamp&) = delete;
+    ScopedOplogVisibleTimestamp(ScopedOplogVisibleTimestamp&&) = delete;
+    ScopedOplogVisibleTimestamp& operator=(ScopedOplogVisibleTimestamp&&) = delete;
+
+    ~ScopedOplogVisibleTimestamp() {
+        _recoveryUnit->setOplogVisibilityTs(_originalOplogVisibleTs);
+    }
+
+private:
+    RecoveryUnit* _recoveryUnit;
+    boost::optional<int64_t> _originalOplogVisibleTs;
 };
 
 }  // namespace mongo
