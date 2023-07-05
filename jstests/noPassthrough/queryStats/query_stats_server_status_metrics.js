@@ -11,9 +11,6 @@ function runTestWithMongodOptions(mongodOptions, test, testOptions) {
     const conn = MongoRunner.runMongod(mongodOptions);
     const testDB = conn.getDB('test');
     const coll = testDB[jsTestName()];
-    // Make sure the collection exists.
-    // TODO SERVER-77262 This shouldn't be necessary.
-    assert.commandWorked(coll.insertOne({}));
 
     test(conn, testDB, coll, testOptions);
 
