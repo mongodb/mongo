@@ -54,19 +54,29 @@ Status validateNamespace(const NamespaceString& nss) {
 }
 
 StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
-    if (CollectionCatalog::get(opCtx)->lookupView(opCtx, nss)) {
-        return Status{ErrorCodes::CommandNotSupportedOnView, "The namespace corresponds to a view"};
-    }
+    AutoGetCollectionForReadMaybeLockFree collection(
+        opCtx,
+        nss,
+        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
 
-    AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, nss);
+    if (auto view = collection.getView()) {
+        if (view->timeseries()) {
+            return Status{ErrorCodes::IllegalOperation,
+                          "Operation not supported for a timeseries collection"};
+        }
+        return Status{ErrorCodes::CommandNotSupportedOnView, "Operation not supported for a view"};
+    }
     if (!collection) {
         return Status{ErrorCodes::NamespaceNotFound,
                       str::stream() << "The namespace does not exist"};
     }
     if (collection->getCollectionOptions().encryptedFieldConfig.has_value()) {
-        return Status{ErrorCodes::IllegalOperation,
-                      str::stream() << "The collection has queryable encryption enabled"};
+        return Status{
+            ErrorCodes::IllegalOperation,
+            str::stream()
+                << "Operation not supported for a collection with queryable encryption enabled"};
     }
+
     return collection->uuid();
 }
 

@@ -80,7 +80,11 @@ public:
             _collDDLLock.emplace(ddlLockManager->lock(
                 opCtx, nss.ns(), lockReason, DDLLockManager::kDefaultLockTimeout));
         } else {
-            _autoColl.emplace(opCtx, nss, MODE_IX);
+            _autoColl.emplace(opCtx,
+                              nss,
+                              MODE_IX,
+                              AutoGetCollection::Options{}.viewMode(
+                                  auto_get_collection::ViewMode::kViewsPermitted));
         }
     }
 

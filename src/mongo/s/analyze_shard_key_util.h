@@ -61,11 +61,11 @@ constexpr int kMaxBSONObjSizePerInsertBatch = BSONObjMaxUserSize - 2 * 1024 * 10
 Status validateNamespace(const NamespaceString& nss);
 
 /*
- * If the namespace doesn't exist locally, returns a NamespaceNotFound error. If the namespace
- * corresponds to a view, returns a CommandNotSupportedOnView error. If the collection has
- * queryable encryption enabled, returns an IllegalOperation error. Throws DBException on any error
- * that occurs during the validation. If the validation passed, returns an OK status and the
- * collection UUID for the collection when the validation occurred.
+ * If the namespace doesn't exist locally, returns a NamespaceNotFound error. If the collection is a
+ * timeseries collection or has queryable encryption enabled, returns an IllegalOperation error. If
+ * the namespace corresponds to a view, returns a CommandNotSupportedOnView error. Throws
+ * DBException on any error that occurs during the validation. If the validation passed, returns an
+ * OK status and the collection UUID for the collection when the validation occurred.
  */
 StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx, const NamespaceString& nss);
 
