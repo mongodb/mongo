@@ -898,13 +898,18 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
             "renaming system.js collection or renaming to system.js is not allowed",
             !source.isSystemDotJavascript() && !target.isSystemDotJavascript());
 
-    if (!source.isOutTmpBucketsCollection() && source.isTimeseriesBucketsCollection() &&
-        !AuthorizationSession::get(opCtx->getClient())
-             ->isAuthorizedForActionsOnResource(
-                 ResourcePattern::forClusterResource(target.tenantId()),
-                 ActionType::setUserWriteBlockMode)) {
-        uasserted(ErrorCodes::IllegalOperation,
-                  "Renaming system.buckets collections is not allowed");
+    if (!source.isOutTmpBucketsCollection() && source.isTimeseriesBucketsCollection()) {
+        uassert(ErrorCodes::IllegalOperation,
+                "Renaming system.buckets collections is not allowed",
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(target.tenantId()),
+                        ActionType::setUserWriteBlockMode));
+
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "Cannot rename time-series buckets collection {" << source.ns()
+                              << "} to a non-time-series buckets namespace {" << target.ns() << "}",
+                target.isTimeseriesBucketsCollection());
     }
 }
 

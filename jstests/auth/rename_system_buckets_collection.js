@@ -25,6 +25,14 @@ function renameBucketsCollection(adminDB, username, shouldSucceed) {
     jsTestLog("Testing system.buckets renaming with username: " + username);
     assert(adminDB.auth(username, 'password'));
 
+    // No privilege grants the ability to rename a system.buckets collection to a non-bucket
+    // namespace.
+    assert.commandFailed(testDB.adminCommand({
+        renameCollection: `${testDB}.${bucketsCollName}`,
+        to: `${testDB}.${collName}`,
+        dropTarget: false
+    }));
+
     const res = testDB.adminCommand({
         renameCollection: `${testDB}.${bucketsCollName}`,
         to: `${testDB}.${targetBucketsCollName}`,
@@ -45,7 +53,7 @@ function runTest(conn) {
     adminDB.createUser({user: 'admin', pwd: 'admin', roles: ['root']});
     assert.eq(1, adminDB.auth("admin", "admin"));
 
-    // Create roles with ability to rename system.buckets collections
+    // Create roles with ability to rename system.buckets collections.
     adminDB.createRole({
         role: "renameBucketsOnly",
         privileges: [{
@@ -60,7 +68,7 @@ function runTest(conn) {
         roles: []
     });
 
-    // Create test users
+    // Create test users.
     adminDB.createUser(
         {user: 'userAdmin', pwd: 'password', roles: ['userAdminAnyDatabase', 'renameBucketsOnly']});
 
