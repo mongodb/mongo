@@ -411,6 +411,8 @@ last-continuous:
     ticket: SERVER-77386
   - test_file: jstests/core/timeseries/timeseries_resume_after.js
     ticket: SERVER-77386
+  - test_file: jstests/sharding/analyze_shard_key/timeseries.js
+    ticket: SERVER-78595
   suites: null
 last-lts:
   all:
@@ -910,4 +912,6 @@ last-lts:
     ticket: SERVER-78414
   - test_file: jstests/core/query/elemmatch/elemmatch_or_pushdown_paths.js
     ticket: SERVER-74954
+  - test_file: jstests/sharding/analyze_shard_key/timeseries.js
+    ticket: SERVER-78595
   suites: null

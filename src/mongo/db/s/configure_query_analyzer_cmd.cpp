@@ -128,7 +128,11 @@ public:
             _collDDLLock.emplace(
                 opCtx, nss, lockReason, MODE_X, DDLLockManager::kDefaultLockTimeout);
         } else {
-            _autoColl.emplace(opCtx, nss, MODE_IX);
+            _autoColl.emplace(opCtx,
+                              nss,
+                              MODE_IX,
+                              AutoGetCollection::Options{}.viewMode(
+                                  auto_get_collection::ViewMode::kViewsPermitted));
         }
     }
 
