@@ -5165,6 +5165,8 @@ tasks:
       args:
       - "src/evergreen/external_auth_oidc_setup.sh"
   - func: "run tests"
+    vars:
+      resmoke_jobs_max: ${external_auth_oidc_jobs_max|1}
 
 - <<: *task_template
   name: external_auth_windows
