@@ -160,12 +160,6 @@ bool OperationContext::hasDeadlineExpired() const {
         return true;
     }
 
-    // TODO: Remove once all OperationContexts are properly connected to Clients and ServiceContexts
-    // in tests.
-    if (MONGO_unlikely(!getClient() || !getServiceContext())) {
-        return false;
-    }
-
     const auto now = getServiceContext()->getFastClockSource()->now();
     return now >= getDeadline();
 }
@@ -233,17 +227,11 @@ bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
 }  // namespace
 
 Status OperationContext::checkForInterruptNoAssert() noexcept {
-    // TODO: Remove the MONGO_likely(hasClientAndServiceContext) once all operation contexts are
-    // constructed with clients.
-    const auto hasClientAndServiceContext = getClient() && getServiceContext();
-
-    if (MONGO_likely(hasClientAndServiceContext) && getClient()->getKilled() &&
-        !_isExecutingShutdown) {
+    if (getClient()->getKilled() && !_isExecutingShutdown) {
         return Status(ErrorCodes::ClientMarkedKilled, "client has been killed");
     }
 
-    if (MONGO_likely(hasClientAndServiceContext) && getServiceContext()->getKillAllOperations() &&
-        !_isExecutingShutdown) {
+    if (getServiceContext()->getKillAllOperations() && !_isExecutingShutdown) {
         return Status(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
     }
 
