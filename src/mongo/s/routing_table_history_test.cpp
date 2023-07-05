@@ -35,11 +35,24 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_writes_tracker.h"
+#include "mongo/s/chunks_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+using chunks_test_util::assertEqualChunkInfo;
+using chunks_test_util::calculateCollVersion;
+using chunks_test_util::calculateIntermediateShardKey;
+using chunks_test_util::calculateShardVersions;
+using chunks_test_util::genChunkVector;
+using chunks_test_util::genRandomChunkVector;
+using chunks_test_util::getShardId;
+using chunks_test_util::performRandomChunkOperations;
+
 namespace {
+
+PseudoRandom _random{SecureRandom().nextInt64()};
 
 const ShardId kThisShard("thisShard");
 const NamespaceString kNss("TestDB", "TestColl");
@@ -143,62 +156,48 @@ void assertCorrectBytesWritten(const RoutingTableHistory& rt,
     });
 }
 
-/**
- * Test fixture for tests that need to start with a fresh routing table with
- * only a single chunk in it, with bytes already written to that chunk object.
- */
 class RoutingTableHistoryTest : public unittest::Test {
 public:
-    void setUp() override {
-        const OID epoch = OID::gen();
-        const Timestamp kRouting(100, 0);
-        ChunkVersion version{1, 0, epoch, boost::none /* timestamp */};
-
-        auto initChunk =
-            ChunkType{kNss,
-                      ChunkRange{_shardKeyPattern.globalMin(), _shardKeyPattern.globalMax()},
-                      version,
-                      kThisShard};
-
-        _rt.emplace(RoutingTableHistory::makeNew(kNss,
-                                                 UUID::gen(),
-                                                 _shardKeyPattern,
-                                                 nullptr,
-                                                 false,
-                                                 epoch,
-                                                 boost::none /* timestamp */,
-                                                 boost::none /* timeseriesFields */,
-                                                 boost::none,
-                                                 true,
-                                                 {initChunk}));
-        ASSERT_EQ(_rt->numChunks(), 1ull);
-
-        // Should only be one
-        _rt->forEachChunk([&](const auto& chunkInfo) {
-            auto writesTracker = chunkInfo->getWritesTracker();
-            writesTracker->addBytesWritten(_bytesInOriginalChunk);
-            return true;
-        });
-    }
-
     const KeyPattern& getShardKeyPattern() const {
         return _shardKeyPattern;
     }
 
-    uint64_t getBytesInOriginalChunk() const {
-        return _bytesInOriginalChunk;
+    const OID& collEpoch() const {
+        return _epoch;
     }
 
-    const RoutingTableHistory& getInitialRoutingTable() const {
-        return *_rt;
+    const boost::optional<Timestamp>& collTimestamp() const {
+        return _collTimestamp;
     }
 
-private:
-    uint64_t _bytesInOriginalChunk{4ull};
+    const UUID& collUUID() const {
+        return _collUUID;
+    }
 
-    boost::optional<RoutingTableHistory> _rt;
+    std::vector<ChunkType> genRandomChunkVector(size_t minNumChunks = 1,
+                                                size_t maxNumChunks = 30) const {
+        return chunks_test_util::genRandomChunkVector(kNss, _epoch, maxNumChunks, minNumChunks);
+    }
 
-    KeyPattern _shardKeyPattern{BSON("a" << 1)};
+    RoutingTableHistory makeNewRt(const std::vector<ChunkType>& chunks) const {
+        return RoutingTableHistory::makeNew(kNss,
+                                            _collUUID,
+                                            _shardKeyPattern,
+                                            nullptr,
+                                            false,
+                                            _epoch,
+                                            _collTimestamp,
+                                            boost::none /* timeseriesFields */,
+                                            boost::none /* reshardingFields */,
+                                            true,
+                                            chunks);
+    }
+
+protected:
+    KeyPattern _shardKeyPattern{chunks_test_util::kShardKeyPattern};
+    const OID _epoch{OID::gen()};
+    const boost::optional<Timestamp> _collTimestamp;
+    const UUID _collUUID{UUID::gen()};
 };
 
 /**
@@ -209,13 +208,27 @@ class RoutingTableHistoryTestThreeInitialChunks : public RoutingTableHistoryTest
 public:
     void setUp() override {
         RoutingTableHistoryTest::setUp();
+
         _initialChunkBoundaryPoints = {getShardKeyPattern().globalMin(),
                                        BSON("a" << 10),
                                        BSON("a" << 20),
                                        getShardKeyPattern().globalMax()};
-        _rt.emplace(splitChunk(RoutingTableHistoryTest::getInitialRoutingTable(),
-                               _initialChunkBoundaryPoints));
+        ChunkVersion version{1, 0, collEpoch(), collTimestamp()};
+        auto chunks = genChunkVector(kNss, _initialChunkBoundaryPoints, version, 1 /* numShards */);
+
+        _rt.emplace(makeNewRt(chunks));
+
         ASSERT_EQ(_rt->numChunks(), 3ull);
+
+        _rt->forEachChunk([&](const auto& chunkInfo) {
+            auto writesTracker = chunkInfo->getWritesTracker();
+            writesTracker->addBytesWritten(_bytesInOriginalChunk);
+            return true;
+        });
+    }
+
+    uint64_t getBytesInOriginalChunk() const {
+        return _bytesInOriginalChunk;
     }
 
     const RoutingTableHistory& getInitialRoutingTable() const {
@@ -227,24 +240,465 @@ public:
     }
 
 private:
+    uint64_t _bytesInOriginalChunk{4ull};
+
     boost::optional<RoutingTableHistory> _rt;
 
     std::vector<BSONObj> _initialChunkBoundaryPoints;
 };
 
-TEST_F(RoutingTableHistoryTest, SplittingOnlyChunkCopiesBytesWrittenToAllSubchunks) {
-    auto minKey = BSON("a" << 10);
-    auto maxKey = BSON("a" << 20);
-    auto newChunkBoundaryPoints = {
-        getShardKeyPattern().globalMin(), minKey, maxKey, getShardKeyPattern().globalMax()};
+/*
+ * Test creation of a Routing Table with randomly generated chunks
+ */
+TEST_F(RoutingTableHistoryTest, RandomCreateBasic) {
+    const auto chunks = genRandomChunkVector();
+    const auto expectedShardVersions = calculateShardVersions(chunks);
+    const auto expectedCollVersion = calculateCollVersion(expectedShardVersions);
 
-    auto rt = splitChunk(getInitialRoutingTable(), newChunkBoundaryPoints);
-    ASSERT_EQ(rt.numChunks(), 3ull);
+    // Create a new routing table from the randomly generated chunks
+    auto rt = makeNewRt(chunks);
+
+    // Checks basic getter of routing table return correct values
+    ASSERT_EQ(kNss, rt.nss());
+    ASSERT_EQ(ShardKeyPattern(getShardKeyPattern()).toString(), rt.getShardKeyPattern().toString());
+    ASSERT_EQ(chunks.size(), rt.numChunks());
+
+    // Check that chunks have correct info
+    size_t i = 0;
+    rt.forEachChunk([&](const auto& chunkInfo) {
+        assertEqualChunkInfo(ChunkInfo{chunks[i++]}, *chunkInfo);
+        return true;
+    });
+    ASSERT_EQ(i, chunks.size());
+
+    // Checks collection version is correct
+    ASSERT_EQ(expectedCollVersion, rt.getVersion());
+
+    // Checks version for each chunk
+    for (const auto& [shardId, shardVersion] : expectedShardVersions) {
+        ASSERT_EQ(shardVersion, rt.getVersion(shardId));
+    }
+
+    ASSERT_EQ(expectedShardVersions.size(), rt.getNShardsOwningChunks());
+
+    std::set<ShardId> expectedShardIds;
+    for (const auto& [shardId, shardVersion] : expectedShardVersions) {
+        expectedShardIds.insert(shardId);
+    }
+    std::set<ShardId> shardIds;
+    rt.getAllShardIds(&shardIds);
+    ASSERT(expectedShardIds == shardIds);
+}
+
+/*
+ * Test replacement of timestamp
+ */
+TEST_F(RoutingTableHistoryTest, RandomUpdateReplacingTimestamp) {
+    const auto chunks = genRandomChunkVector();
+    const auto expectedShardVersions = calculateShardVersions(chunks);
+    const auto expectedCollVersion = calculateCollVersion(expectedShardVersions);
+
+    // Create a new routing table from the randomly generated chunks
+    auto initialRt = makeNewRt(chunks);
+
+    const auto timestamp = Timestamp(123, 0);
+    auto rt = initialRt.makeUpdatedReplacingTimestamp(timestamp);
+
+    auto chunkWithTimestamp = chunks;
+
+    for (auto& chunk : chunkWithTimestamp) {
+        const auto& oldVersion = chunk.getVersion();
+        chunk.setVersion(ChunkVersion(
+            oldVersion.majorVersion(), oldVersion.minorVersion(), oldVersion.epoch(), timestamp));
+    }
+
+    // Checks basic getter of routing table return correct values
+    ASSERT_EQ(kNss, rt.nss());
+    ASSERT_EQ(ShardKeyPattern(getShardKeyPattern()).toString(), rt.getShardKeyPattern().toString());
+    ASSERT_EQ(chunks.size(), rt.numChunks());
+
+    // Check that chunks have correct info
+    size_t i = 0;
+    rt.forEachChunk([&](const auto& chunkInfo) {
+        assertEqualChunkInfo(ChunkInfo{chunkWithTimestamp[i++]}, *chunkInfo);
+        return true;
+    });
+    ASSERT_EQ(i, chunks.size());
+
+    // Checks collection version is correct
+    ASSERT_EQ(expectedCollVersion, rt.getVersion());
+
+    // Checks timestamp is correct
+    ASSERT(timestamp == rt.getVersion().getTimestamp());
+
+    // Checks version for each chunk
+    for (const auto& [shardId, shardVersion] : expectedShardVersions) {
+        ASSERT_EQ(shardVersion, rt.getVersion(shardId));
+        ASSERT(timestamp == rt.getVersion(shardId).getTimestamp());
+    }
+
+    ASSERT_EQ(expectedShardVersions.size(), rt.getNShardsOwningChunks());
+
+    std::set<ShardId> expectedShardIds;
+    for (const auto& [shardId, shardVersion] : expectedShardVersions) {
+        expectedShardIds.insert(shardId);
+    }
+    std::set<ShardId> shardIds;
+    rt.getAllShardIds(&shardIds);
+    ASSERT(expectedShardIds == shardIds);
+}
+
+/*
+ * Test that creation of Routing Table with chunks that do not cover the entire shard key space
+ * fails.
+ *
+ * The gap is produced by removing a random chunks from the randomly generated chunk list. Thus it
+ * also cover the case for which min/max key is missing.
+ */
+TEST_F(RoutingTableHistoryTest, RandomCreateWithMissingChunkFail) {
+    auto chunks = genRandomChunkVector(2 /*minNumChunks*/);
+
+    {
+        // Chunks gap are detected only if the gap is between chunks belonging to different shards,
+        // thus associate each chunk to a different shard.
+        // TODO SERVER-77090: stop forcing chunks on different shards
+        for (size_t i = 0; i < chunks.size(); i++) {
+            chunks[i].setShard(getShardId(i));
+        }
+    }
+
+    // Remove one random chunk to simulate a gap in the shardkey
+    chunks.erase(chunks.begin() + _random.nextInt64(chunks.size()));
+
+    // Create a new routing table from the randomly generated chunks
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ConflictingOperationInProgress);
+}
+
+/*
+ * Test that creation of Routing Table with chunks that do not cover the entire shard key space
+ * fails.
+ *
+ * The gap is produced by shrinking the range of a random chunk.
+ */
+TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkGapFail) {
+    auto chunks = genRandomChunkVector(2 /*minNumChunks*/);
+
+    {
+        // Chunks gap are detected only if the gap is between chunks belonging to different shards,
+        // thus associate each chunk to a different shard.
+        // TODO SERVER-77090: stop forcing chunks on different shards
+        for (size_t i = 0; i < chunks.size(); i++) {
+            chunks[i].setShard(getShardId(i));
+        }
+    }
+
+    auto& shrinkedChunk = chunks.at(_random.nextInt64(chunks.size()));
+    auto intermediateKey =
+        calculateIntermediateShardKey(shrinkedChunk.getMin(), shrinkedChunk.getMax());
+    if (_random.nextInt64(2)) {
+        // Shrink right bound
+        shrinkedChunk.setMax(intermediateKey);
+    } else {
+        // Shrink left bound
+        shrinkedChunk.setMin(intermediateKey);
+    }
+
+    // Create a new routing table from the randomly generated chunks
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ConflictingOperationInProgress);
+}
+
+/*
+ * Updating ChunkMap with gaps must fail
+ */
+TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkGapFail) {
+    auto chunks = genRandomChunkVector();
+
+    {
+        // Chunks gap are detected only if the gap is between chunks belonging to different shards,
+        // thus associate each chunk to a different shard.
+        // TODO SERVER-77090: stop forcing chunks on different shards
+        for (size_t i = 0; i < chunks.size(); i++) {
+            chunks[i].setShard(getShardId(i));
+        }
+    }
+
+    // Create a new routing table from the randomly generated chunks
+    auto rt = makeNewRt(chunks);
+    auto collVersion = rt.getVersion();
+
+    auto shrinkedChunk = chunks.at(_random.nextInt64(chunks.size()));
+    auto intermediateKey =
+        calculateIntermediateShardKey(shrinkedChunk.getMin(), shrinkedChunk.getMax());
+    if (_random.nextInt64(2)) {
+        // Shrink right bound
+        shrinkedChunk.setMax(intermediateKey);
+    } else {
+        // Shrink left bound
+        shrinkedChunk.setMin(intermediateKey);
+    }
+
+    // Bump chunk version
+    collVersion.incMajor();
+    shrinkedChunk.setVersion(collVersion);
+
+    ASSERT_THROWS_CODE(rt.makeUpdated(boost::none, true, {std::move(shrinkedChunk)}),
+                       AssertionException,
+                       ErrorCodes::ConflictingOperationInProgress);
+}
+
+/*
+ * Creating a Routing Table with overlapping chunks must fail.
+ */
+TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkOverlapFail) {
+    auto chunks = genRandomChunkVector(2 /* minNumChunks */);
+
+    {
+        // Chunks overlaps are detected only if the overlap is between chunks belonging to different
+        // shards, thus associate each chunk to a different shard.
+        // TODO SERVER-77090: stop forcing chunks on different shards
+        for (size_t i = 0; i < chunks.size(); i++) {
+            chunks[i].setShard(getShardId(i));
+        }
+    }
+
+    auto chunkToExtendIt = chunks.begin() + _random.nextInt64(chunks.size());
+
+    // Current implementation does not fail if the overlap between two chunks is complete
+    // (e.g. [0, 5] and [0, 10])
+    // thus we need to generate a semi overlap between two chunks
+    // (e.g. [0, 5] and [3, 10])
+    // TODO SERVER-77090: extend check to cover for complete overlaps
+
+    const auto canExtendLeft = chunkToExtendIt > chunks.begin();
+    const auto extendRight =
+        !canExtendLeft || ((chunkToExtendIt < std::prev(chunks.end())) && _random.nextInt64(2));
+    const auto extendLeft = !extendRight;
+    if (extendRight) {
+        // extend right bound
+        chunkToExtendIt->setMax(calculateIntermediateShardKey(
+            chunkToExtendIt->getMax(), std::next(chunkToExtendIt)->getMax()));
+    }
+
+    if (extendLeft) {
+        invariant(canExtendLeft);
+        // extend left bound
+        chunkToExtendIt->setMin(calculateIntermediateShardKey(std::prev(chunkToExtendIt)->getMin(),
+                                                              chunkToExtendIt->getMin()));
+    }
+
+    // Create a new routing table from the randomly generated chunks
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ConflictingOperationInProgress);
+}
+
+/*
+ * Updating a ChunkMap with overlapping chunks must fail.
+ */
+TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkOverlapFail) {
+    auto chunks = genRandomChunkVector(2 /* minNumChunks */);
+
+    {
+        // Chunks overlaps are detected only if the overlap is between chunks belonging to different
+        // shards, thus associate each chunk to a different shard.
+        // TODO SERVER-77090: stop forcing chunks on different shards
+        for (size_t i = 0; i < chunks.size(); i++) {
+            chunks[i].setShard(getShardId(i));
+        }
+    }
+    // Create a new routing table from the randomly generated chunks
+    auto rt = makeNewRt(chunks);
+    auto collVersion = rt.getVersion();
+
+    auto chunkToExtendIt = chunks.begin() + _random.nextInt64(chunks.size());
+
+    // Current implementation does not fail if the overlap between two chunks is complete
+    // (e.g. [0, 5] and [0, 10])
+    // thus we need to generate a semi overlap between two chunks
+    // (e.g. [0, 5] and [3, 10])
+    // TODO SERVER-77090: extend check to cover for complete overlaps
+
+    const auto canExtendLeft = chunkToExtendIt > chunks.begin();
+    const auto extendRight =
+        !canExtendLeft || (chunkToExtendIt < std::prev(chunks.end()) && _random.nextInt64(2));
+    const auto extendLeft = !extendRight;
+    if (extendRight) {
+        // extend right bound
+        chunkToExtendIt->setMax(calculateIntermediateShardKey(
+            chunkToExtendIt->getMax(), std::next(chunkToExtendIt)->getMax()));
+    }
+
+    if (extendLeft) {
+        invariant(canExtendLeft);
+        // extend left bound
+        chunkToExtendIt->setMin(calculateIntermediateShardKey(std::prev(chunkToExtendIt)->getMin(),
+                                                              chunkToExtendIt->getMin()));
+    }
+
+    // Bump chunk version
+    collVersion.incMajor();
+    chunkToExtendIt->setVersion(collVersion);
+
+    ASSERT_THROWS_CODE(rt.makeUpdated(boost::none, true, {*chunkToExtendIt}),
+                       AssertionException,
+                       ErrorCodes::ConflictingOperationInProgress);
+}
+
+/*
+ * Creating a Routing Table with wrong min key must fail.
+ */
+TEST_F(RoutingTableHistoryTest, RandomCreateWrongMinFail) {
+    auto chunks = genRandomChunkVector();
+
+    chunks.begin()->setMin(BSON("a" << std::numeric_limits<int64_t>::min()));
+
+    // Create a new routing table from the randomly generated chunks
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ConflictingOperationInProgress);
+}
+
+/*
+ * Creating a Routing Table with wrong max key must fail.
+ */
+TEST_F(RoutingTableHistoryTest, RandomCreateWrongMaxFail) {
+    auto chunks = genRandomChunkVector();
+
+    chunks.begin()->setMax(BSON("a" << std::numeric_limits<int64_t>::max()));
+
+    // Create a new routing table from the randomly generated chunks
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ConflictingOperationInProgress);
+}
+
+/*
+ * Creating a Routing Table with mismatching epoch must fail.
+ */
+TEST_F(RoutingTableHistoryTest, RandomCreateMismatchingEpochFail) {
+    auto chunks = genRandomChunkVector();
+
+    // Change epoch on a random chunk
+    auto chunkIt = chunks.begin() + _random.nextInt64(chunks.size());
+    const auto& oldVersion = chunkIt->getVersion();
+    ChunkVersion newVersion{
+        oldVersion.majorVersion(), oldVersion.minorVersion(), OID::gen(), collTimestamp()};
+    chunkIt->setVersion(newVersion);
+
+    // Create a new routing table from the randomly generated chunks
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ConflictingOperationInProgress);
+}
+
+/*
+ * Updating a Routing Table with mismatching epoch must fail.
+ */
+TEST_F(RoutingTableHistoryTest, RandomUpdateMismatchingEpochFail) {
+    auto chunks = genRandomChunkVector();
+
+    // Create a new routing table from the randomly generated chunks
+    auto rt = makeNewRt(chunks);
+
+    // Change epoch on a random chunk
+    auto chunkIt = chunks.begin() + _random.nextInt64(chunks.size());
+    const auto& oldVersion = chunkIt->getVersion();
+    ChunkVersion newVersion{
+        oldVersion.majorVersion(), oldVersion.minorVersion(), OID::gen(), collTimestamp()};
+    chunkIt->setVersion(newVersion);
+
+    ASSERT_THROWS_CODE(rt.makeUpdated(boost::none, true, {*chunkIt}),
+                       AssertionException,
+                       ErrorCodes::ConflictingOperationInProgress);
+}
+
+
+/*
+ * Test update of the Routing Table with randomly generated changed chunks.
+ */
+TEST_F(RoutingTableHistoryTest, RandomUpdate) {
+    auto initialChunks = genRandomChunkVector();
+
+    const auto initialShardVersions = calculateShardVersions(initialChunks);
+    const auto initialCollVersion = calculateCollVersion(initialShardVersions);
+
+    // Create a new routing table from the randomly generated initialChunks
+    auto initialRt = makeNewRt(initialChunks);
+
+    auto chunks = initialChunks;
+    const auto maxNumChunkOps = 2 * initialChunks.size();
+    const auto numChunkOps = _random.nextInt32(maxNumChunkOps);
+
+    performRandomChunkOperations(&chunks, numChunkOps);
+
+    std::vector<ChunkType> updatedChunks;
+    for (const auto& chunk : chunks) {
+        if (!chunk.getVersion().isOlderOrEqualThan(initialCollVersion)) {
+            updatedChunks.push_back(chunk);
+        }
+    }
+
+    const auto expectedShardVersions = calculateShardVersions(chunks);
+    const auto expectedCollVersion = calculateCollVersion(expectedShardVersions);
+
+    auto rt = initialRt.makeUpdated(boost::none, true, updatedChunks);
+
+    // Checks basic getter of routing table return correct values
+    ASSERT_EQ(kNss, rt.nss());
+    ASSERT_EQ(ShardKeyPattern(getShardKeyPattern()).toString(), rt.getShardKeyPattern().toString());
+    ASSERT_EQ(chunks.size(), rt.numChunks());
+
+    // Check that chunks have correct info
+    size_t i = 0;
+    rt.forEachChunk([&](const auto& chunkInfo) {
+        assertEqualChunkInfo(ChunkInfo{chunks[i++]}, *chunkInfo);
+        return true;
+    });
+    ASSERT_EQ(i, chunks.size());
+
+    // Checks collection version is correct
+    ASSERT_EQ(expectedCollVersion, rt.getVersion());
+
+    // Checks version for each shard
+    for (const auto& [shardId, shardVersion] : expectedShardVersions) {
+        ASSERT_EQ(shardVersion, rt.getVersion(shardId));
+    }
+
+    ASSERT_EQ(expectedShardVersions.size(), rt.getNShardsOwningChunks());
+
+    std::set<ShardId> expectedShardIds;
+    for (const auto& [shardId, shardVersion] : expectedShardVersions) {
+        expectedShardIds.insert(shardId);
+    }
+    std::set<ShardId> shardIds;
+    rt.getAllShardIds(&shardIds);
+    ASSERT(expectedShardIds == shardIds);
+}
+
+TEST_F(RoutingTableHistoryTest, SplittingOnlyChunkCopiesBytesWrittenToAllSubchunks) {
+    ChunkVersion version{1, 0, collEpoch(), collTimestamp()};
+
+    const ChunkType initialChunk{
+        kNss,
+        ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
+        version,
+        kThisShard};
+
+    auto rt = makeNewRt({initialChunk});
+    ASSERT_EQ(1, rt.numChunks());
+
+    // Set the 4 written bytes in each chunk
+    const size_t bytesInOriginalChunk{4};
+    rt.forEachChunk([&](const auto& chunkInfo) {
+        chunkInfo->getWritesTracker()->addBytesWritten(bytesInOriginalChunk);
+        return true;
+    });
+
+    version.incMinor();
+    auto newChunks = genChunkVector(kNss,
+                                    {getShardKeyPattern().globalMin(),
+                                     BSON("a" << 10),
+                                     BSON("a" << 20),
+                                     getShardKeyPattern().globalMax()},
+                                    version,
+                                    1 /*numShards*/);
+    auto newRt = rt.makeUpdated(boost::none, true, newChunks);
+    ASSERT_EQ(3, newRt.numChunks());
 
     rt.forEachChunk([&](const auto& chunkInfo) {
-        auto writesTracker = chunkInfo->getWritesTracker();
-        auto bytesWritten = writesTracker->getBytesWritten();
-        ASSERT_EQ(bytesWritten, getBytesInOriginalChunk());
+        ASSERT_EQ(bytesInOriginalChunk, chunkInfo->getWritesTracker()->getBytesWritten());
         return true;
     });
 }
@@ -325,9 +779,52 @@ TEST_F(RoutingTableHistoryTestThreeInitialChunks,
                               expectedBytesInChunksNotSplit);
 }
 
+TEST_F(RoutingTableHistoryTest, AllowMigrationFlag) {
+    auto chunks = genRandomChunkVector();
+
+    auto makeUpdatedChunk = [&](const ChunkVersion& oldVersion) {
+        auto updatedChunk = chunks[_random.nextInt64(chunks.size())];
+        updatedChunk.setVersion({oldVersion.majorVersion() + 1,
+                                 oldVersion.minorVersion(),
+                                 collEpoch(),
+                                 collTimestamp()});
+        return updatedChunk;
+    };
+
+    for (auto initialAllowMigrationsValue : std::vector<bool>{false, true}) {
+
+        auto allowMigrationsValue = initialAllowMigrationsValue;
+        auto rt = RoutingTableHistory::makeNew(kNss,
+                                               collUUID(),
+                                               getShardKeyPattern(),
+                                               nullptr,
+                                               false,
+                                               collEpoch(),
+                                               collTimestamp(),
+                                               boost::none /* timeseriesFields */,
+                                               boost::none /* reshardingFields */,
+                                               allowMigrationsValue,
+                                               chunks);
+        ASSERT_EQ(allowMigrationsValue, rt.allowMigrations());
+
+        // Create an updated routing table with flipped allowMigration flag
+        allowMigrationsValue = !allowMigrationsValue;
+        rt = rt.makeUpdated(boost::none /* reshardingFields */,
+                            allowMigrationsValue,
+                            {makeUpdatedChunk(rt.getVersion())});
+        ASSERT_EQ(allowMigrationsValue, rt.allowMigrations());
+
+        // Change back the allow migration flag to the original value
+        allowMigrationsValue = !allowMigrationsValue;
+        rt = rt.makeUpdated(boost::none /* reshardingFields */,
+                            allowMigrationsValue,
+                            {makeUpdatedChunk(rt.getVersion())});
+        ASSERT_EQ(allowMigrationsValue, rt.allowMigrations());
+    }
+}
+
 TEST_F(RoutingTableHistoryTest, TestSplits) {
-    const OID epoch = OID::gen();
-    ChunkVersion version{1, 0, epoch, boost::none /* timestamp */};
+    ChunkVersion version{1, 0, collEpoch(), collTimestamp()};
 
     auto chunkAll =
         ChunkType{kNss,
@@ -335,85 +832,63 @@ TEST_F(RoutingTableHistoryTest, TestSplits) {
                   version,
                   kThisShard};
 
-    auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
-                                           getShardKeyPattern(),
-                                           nullptr,
-                                           false,
-                                           epoch,
-                                           boost::none /* timestamp */,
-                                           boost::none /* timeseriesFields */,
-                                           boost::none,
-                                           true,
-                                           {chunkAll});
+    auto rt = makeNewRt({chunkAll});
 
     std::vector<ChunkType> chunks1 = {
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
-                  ChunkVersion{2, 1, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 1, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
-                  ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 2, collEpoch(), collTimestamp()},
                   kThisShard}};
 
     auto rt1 = rt.makeUpdated(boost::none, true, chunks1);
-    auto v1 = ChunkVersion{2, 2, epoch, boost::none /* timestamp */};
+    auto v1 = ChunkVersion{2, 2, collEpoch(), collTimestamp()};
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
 
     std::vector<ChunkType> chunks2 = {
         ChunkType{kNss,
                   ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
-                  ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 2, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << -1)},
-                  ChunkVersion{3, 1, epoch, boost::none /* timestamp */},
+                  ChunkVersion{3, 1, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{BSON("a" << -1), BSON("a" << 0)},
-                  ChunkVersion{3, 2, epoch, boost::none /* timestamp */},
+                  ChunkVersion{3, 2, collEpoch(), collTimestamp()},
                   kThisShard}};
 
     auto rt2 = rt1.makeUpdated(boost::none, true, chunks2);
-    auto v2 = ChunkVersion{3, 2, epoch, boost::none /* timestamp */};
+    auto v2 = ChunkVersion{3, 2, collEpoch(), collTimestamp()};
     ASSERT_EQ(v2, rt2.getVersion(kThisShard));
 }
 
 TEST_F(RoutingTableHistoryTest, TestReplaceEmptyChunk) {
-    const OID epoch = OID::gen();
-
     std::vector<ChunkType> initialChunks = {
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
-                  ChunkVersion{1, 0, epoch, boost::none /* timestamp */},
+                  ChunkVersion{1, 0, collEpoch(), collTimestamp()},
                   kThisShard}};
 
-    auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
-                                           getShardKeyPattern(),
-                                           nullptr,
-                                           false,
-                                           epoch,
-                                           boost::none /* timestamp */,
-                                           boost::none /* timeseriesFields */,
-                                           boost::none,
-                                           true,
-                                           initialChunks);
+    auto rt = makeNewRt(initialChunks);
     ASSERT_EQ(rt.numChunks(), 1);
 
     std::vector<ChunkType> changedChunks = {
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
-                  ChunkVersion{2, 1, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 1, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
-                  ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 2, collEpoch(), collTimestamp()},
                   kThisShard}};
 
     auto rt1 = rt.makeUpdated(boost::none, true, changedChunks);
-    auto v1 = ChunkVersion{2, 2, epoch, boost::none /* timestamp */};
+    auto v1 = ChunkVersion{2, 2, collEpoch(), collTimestamp()};
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);
 
@@ -432,239 +907,180 @@ TEST_F(RoutingTableHistoryTest, TestReplaceEmptyChunk) {
 }
 
 TEST_F(RoutingTableHistoryTest, TestUseLatestVersions) {
-    const OID epoch = OID::gen();
-
     std::vector<ChunkType> initialChunks = {
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
-                  ChunkVersion{1, 0, epoch, boost::none /* timestamp */},
+                  ChunkVersion{1, 0, collEpoch(), collTimestamp()},
                   kThisShard}};
 
-    auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
-                                           getShardKeyPattern(),
-                                           nullptr,
-                                           false,
-                                           epoch,
-                                           boost::none /* timestamp */,
-                                           boost::none /* timeseriesFields */,
-                                           boost::none,
-                                           true,
-                                           initialChunks);
+    auto rt = makeNewRt(initialChunks);
     ASSERT_EQ(rt.numChunks(), 1);
 
     std::vector<ChunkType> changedChunks = {
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
-                  ChunkVersion{1, 0, epoch, boost::none /* timestamp */},
+                  ChunkVersion{1, 0, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
-                  ChunkVersion{2, 1, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 1, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
-                  ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 2, collEpoch(), collTimestamp()},
                   kThisShard}};
 
     auto rt1 = rt.makeUpdated(boost::none, true, changedChunks);
-    auto v1 = ChunkVersion{2, 2, epoch, boost::none /* timestamp */};
+    auto v1 = ChunkVersion{2, 2, collEpoch(), collTimestamp()};
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);
 }
 
 TEST_F(RoutingTableHistoryTest, TestOutOfOrderVersion) {
-    const OID epoch = OID::gen();
-
     std::vector<ChunkType> initialChunks = {
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
-                  ChunkVersion{2, 1, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 1, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
-                  ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 2, collEpoch(), collTimestamp()},
                   kThisShard}};
 
-    auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
-                                           getShardKeyPattern(),
-                                           nullptr,
-                                           false,
-                                           epoch,
-                                           boost::none /* timestamp */,
-                                           boost::none /* timeseriesFields */,
-                                           boost::none,
-                                           true,
-                                           initialChunks);
+    auto rt = makeNewRt(initialChunks);
     ASSERT_EQ(rt.numChunks(), 2);
 
     std::vector<ChunkType> changedChunks = {
         ChunkType{kNss,
                   ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
-                  ChunkVersion{3, 0, epoch, boost::none /* timestamp */},
+                  ChunkVersion{3, 0, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
-                  ChunkVersion{3, 1, epoch, boost::none /* timestamp */},
+                  ChunkVersion{3, 1, collEpoch(), collTimestamp()},
                   kThisShard}};
 
     auto rt1 = rt.makeUpdated(boost::none, true, changedChunks);
-    auto v1 = ChunkVersion{3, 1, epoch, boost::none /* timestamp */};
+    auto v1 = ChunkVersion{3, 1, collEpoch(), collTimestamp()};
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);
 
     auto chunk1 = rt1.findIntersectingChunk(BSON("a" << 0));
-    ASSERT_EQ(chunk1->getLastmod(), ChunkVersion(3, 0, epoch, boost::none /* timestamp */));
+    ASSERT_EQ(chunk1->getLastmod(), ChunkVersion(3, 0, collEpoch(), collTimestamp()));
     ASSERT_EQ(chunk1->getMin().woCompare(BSON("a" << 0)), 0);
     ASSERT_EQ(chunk1->getMax().woCompare(getShardKeyPattern().globalMax()), 0);
 }
 
 TEST_F(RoutingTableHistoryTest, TestMergeChunks) {
-    const OID epoch = OID::gen();
-
     std::vector<ChunkType> initialChunks = {
         ChunkType{kNss,
                   ChunkRange{BSON("a" << 0), BSON("a" << 10)},
-                  ChunkVersion{2, 0, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 0, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
-                  ChunkVersion{2, 1, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 1, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{BSON("a" << 10), getShardKeyPattern().globalMax()},
-                  ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 2, collEpoch(), collTimestamp()},
                   kThisShard}};
 
-    auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
-                                           getShardKeyPattern(),
-                                           nullptr,
-                                           false,
-                                           epoch,
-                                           boost::none,
-                                           boost::none /* timestamp */,
-                                           boost::none /* timeseriesFields */,
-                                           true,
-                                           initialChunks);
+    auto rt = makeNewRt(initialChunks);
+
     ASSERT_EQ(rt.numChunks(), 3);
-    ASSERT_EQ(rt.getVersion(), ChunkVersion(2, 2, epoch, boost::none /* timestamp */));
+    ASSERT_EQ(rt.getVersion(), ChunkVersion(2, 2, collEpoch(), collTimestamp()));
 
     std::vector<ChunkType> changedChunks = {
         ChunkType{kNss,
                   ChunkRange{BSON("a" << 10), getShardKeyPattern().globalMax()},
-                  ChunkVersion{3, 0, epoch, boost::none /* timestamp */},
+                  ChunkVersion{3, 0, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 10)},
-                  ChunkVersion{3, 1, epoch, boost::none /* timestamp */},
+                  ChunkVersion{3, 1, collEpoch(), collTimestamp()},
                   kThisShard}};
 
     auto rt1 = rt.makeUpdated(boost::none, true, changedChunks);
-    auto v1 = ChunkVersion{3, 1, epoch, boost::none /* timestamp */};
+    auto v1 = ChunkVersion{3, 1, collEpoch(), collTimestamp()};
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);
 }
 
 TEST_F(RoutingTableHistoryTest, TestMergeChunksOrdering) {
-    const OID epoch = OID::gen();
-
     std::vector<ChunkType> initialChunks = {
         ChunkType{kNss,
                   ChunkRange{BSON("a" << -10), getShardKeyPattern().globalMax()},
-                  ChunkVersion{2, 0, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 0, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << -500)},
-                  ChunkVersion{2, 1, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 1, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{BSON("a" << -500), BSON("a" << -10)},
-                  ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 2, collEpoch(), collTimestamp()},
                   kThisShard}};
 
-    auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
-                                           getShardKeyPattern(),
-                                           nullptr,
-                                           false,
-                                           epoch,
-                                           boost::none /* timestamp */,
-                                           boost::none /* timeseriesFields */,
-                                           boost::none,
-                                           true,
-                                           initialChunks);
+    auto rt = makeNewRt(initialChunks);
     ASSERT_EQ(rt.numChunks(), 3);
-    ASSERT_EQ(rt.getVersion(), ChunkVersion(2, 2, epoch, boost::none /* timestamp */));
+    ASSERT_EQ(rt.getVersion(), ChunkVersion(2, 2, collEpoch(), collTimestamp()));
 
     std::vector<ChunkType> changedChunks = {
         ChunkType{kNss,
                   ChunkRange{BSON("a" << -500), BSON("a" << -10)},
-                  ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 2, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << -10)},
-                  ChunkVersion{3, 1, epoch, boost::none /* timestamp */},
+                  ChunkVersion{3, 1, collEpoch(), collTimestamp()},
                   kThisShard}};
 
     auto rt1 = rt.makeUpdated(boost::none, true, changedChunks);
-    auto v1 = ChunkVersion{3, 1, epoch, boost::none /* timestamp */};
+    auto v1 = ChunkVersion{3, 1, collEpoch(), collTimestamp()};
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);
 
     auto chunk1 = rt1.findIntersectingChunk(BSON("a" << -500));
-    ASSERT_EQ(chunk1->getLastmod(), ChunkVersion(3, 1, epoch, boost::none /* timestamp */));
+    ASSERT_EQ(chunk1->getLastmod(), ChunkVersion(3, 1, collEpoch(), collTimestamp()));
     ASSERT_EQ(chunk1->getMin().woCompare(getShardKeyPattern().globalMin()), 0);
     ASSERT_EQ(chunk1->getMax().woCompare(BSON("a" << -10)), 0);
 }
 
 TEST_F(RoutingTableHistoryTest, TestFlatten) {
-    const OID epoch = OID::gen();
-
     std::vector<ChunkType> initialChunks = {
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 10)},
-                  ChunkVersion{2, 0, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 0, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{BSON("a" << 10), BSON("a" << 20)},
-                  ChunkVersion{2, 1, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 1, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{BSON("a" << 20), getShardKeyPattern().globalMax()},
-                  ChunkVersion{2, 2, epoch, boost::none /* timestamp */},
+                  ChunkVersion{2, 2, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), getShardKeyPattern().globalMax()},
-                  ChunkVersion{3, 0, epoch, boost::none /* timestamp */},
+                  ChunkVersion{3, 0, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 10)},
-                  ChunkVersion{4, 0, epoch, boost::none /* timestamp */},
+                  ChunkVersion{4, 0, collEpoch(), collTimestamp()},
                   kThisShard},
         ChunkType{kNss,
                   ChunkRange{BSON("a" << 10), getShardKeyPattern().globalMax()},
-                  ChunkVersion{4, 1, epoch, boost::none /* timestamp */},
+                  ChunkVersion{4, 1, collEpoch(), collTimestamp()},
                   kThisShard},
     };
 
-    auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
-                                           getShardKeyPattern(),
-                                           nullptr,
-                                           false,
-                                           epoch,
-                                           boost::none /* timestamp */,
-                                           boost::none /* timeseriesFields */,
-                                           boost::none,
-                                           true,
-                                           initialChunks);
+    auto rt = makeNewRt(initialChunks);
     ASSERT_EQ(rt.numChunks(), 2);
-    ASSERT_EQ(rt.getVersion(), ChunkVersion(4, 1, epoch, boost::none /* timestamp */));
+    ASSERT_EQ(rt.getVersion(), ChunkVersion(4, 1, collEpoch(), collTimestamp()));
 
     auto chunk1 = rt.findIntersectingChunk(BSON("a" << 0));
-    ASSERT_EQ(chunk1->getLastmod(), ChunkVersion(4, 0, epoch, boost::none /* timestamp */));
+    ASSERT_EQ(chunk1->getLastmod(), ChunkVersion(4, 0, collEpoch(), collTimestamp()));
     ASSERT_EQ(chunk1->getMin().woCompare(getShardKeyPattern().globalMin()), 0);
     ASSERT_EQ(chunk1->getMax().woCompare(BSON("a" << 10)), 0);
 }

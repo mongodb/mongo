@@ -276,6 +276,19 @@ BSONObj ChunkMap::toBSON() const {
     return builder.obj();
 }
 
+std::string ChunkMap::toString() const {
+    StringBuilder sb;
+
+    sb << "Chunks (" << size() << "):\n";
+    for (const auto& chunkInfoPtr : _chunkMap) {
+        sb << "\t" << chunkInfoPtr->toString() << '\n';
+    }
+
+    sb << "Collection version:" << _collectionVersion.toString() << '\n';
+
+    return sb.str();
+}
+
 ChunkMap::ChunkVector::const_iterator ChunkMap::_findIntersectingChunk(const BSONObj& shardKey,
                                                                        bool isMaxInclusive) const {
     auto shardKeyString = ShardKeyPattern::toKeyString(shardKey);
@@ -733,11 +746,7 @@ std::string RoutingTableHistory::toString() const {
     StringBuilder sb;
     sb << "RoutingTableHistory: " << _nss.ns() << " key: " << _shardKeyPattern.toString() << '\n';
 
-    sb << "Chunks:\n";
-    _chunkMap.forEach([&sb](const auto& chunk) {
-        sb << "\t" << chunk->toString() << '\n';
-        return true;
-    });
+    sb << _chunkMap.toString();
 
     sb << "Shard versions:\n";
     for (const auto& entry : _shardVersions) {
