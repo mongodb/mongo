@@ -90,9 +90,12 @@ using TransactionResources = shard_role_details::TransactionResources;
 
 namespace {
 
+enum class ResolutionType { kUUID, kNamespace };
+
 struct ResolvedNamespaceOrViewAcquisitionRequest {
     // Populated in the first phase of collection(s) acquisition.
     AcquisitionPrerequisites prerequisites;
+    ResolutionType resolvedBy;
 
     // Populated only for locked acquisitions in the second phase of collection(s) acquisition.
     std::shared_ptr<Lock::DBLock> dbLock;
@@ -143,9 +146,6 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
 
     for (const auto& ar : acquisitionRequests) {
         if (ar.nss) {
-            auto coll = catalog.lookupCollectionByNamespace(opCtx, *ar.nss);
-            checkCollectionUUIDMismatch(opCtx, *ar.nss, coll, ar.uuid);
-
             AcquisitionPrerequisites prerequisites(*ar.nss,
                                                    ar.uuid,
                                                    ar.readConcern,
@@ -154,7 +154,8 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
                                                    ar.viewMode);
 
             ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
-                prerequisites, nullptr, boost::none};
+                prerequisites, ResolutionType::kNamespace, nullptr, boost::none};
+
             sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, *ar.nss),
                                               std::move(resolvedAcquisitionRequest));
         } else if (ar.dbname) {
@@ -170,7 +171,7 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
                                                    ar.viewMode);
 
             ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
-                prerequisites, nullptr, boost::none};
+                prerequisites, ResolutionType::kUUID, nullptr, boost::none};
 
             sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, coll->ns()),
                                               std::move(resolvedAcquisitionRequest));
@@ -245,7 +246,7 @@ std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireLocalC
     auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
     auto coll = CollectionPtr(
         catalog.establishConsistentCollection(opCtx, NamespaceStringOrUUID(nss), readTimestamp));
-    checkCollectionUUIDMismatch(opCtx, nss, coll, prerequisites.uuid);
+    checkCollectionUUIDMismatch(opCtx, catalog, nss, coll, prerequisites.uuid);
 
     if (coll) {
         verifyDbAndCollection(opCtx, nss, coll, prerequisites.operationType);
@@ -901,21 +902,24 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap generateSortedAcquisitionRequests(
 
     int counter = 0;
     for (const auto& ar : acquisitionRequests) {
-        NamespaceStringOrUUID nssOrUUID =
-            ar.nss ? NamespaceStringOrUUID(*ar.nss) : NamespaceStringOrUUID(*ar.dbname, *ar.uuid);
+        auto resolvedBy = ar.nss ? ResolutionType::kNamespace : ResolutionType::kUUID;
+
+        NamespaceStringOrUUID nssOrUUID = resolvedBy == ResolutionType::kNamespace
+            ? NamespaceStringOrUUID(*ar.nss)
+            : NamespaceStringOrUUID(*ar.dbname, *ar.uuid);
 
         auto coll = catalog.establishConsistentCollection(opCtx, nssOrUUID, readTimestamp);
 
-        if (!ar.nss) {
+        if (resolvedBy == ResolutionType::kUUID) {
             validateResolvedCollectionByUUID(opCtx, ar, coll);
         }
 
-        const auto& nss = ar.nss ? *ar.nss : coll->ns();
+        const auto& nss = resolvedBy == ResolutionType::kNamespace ? *ar.nss : coll->ns();
         AcquisitionPrerequisites prerequisites(
             nss, ar.uuid, ar.readConcern, ar.placementConcern, ar.operationType, ar.viewMode);
 
         ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
-            prerequisites, nullptr, boost::none, lockFreeReadsResources};
+            prerequisites, resolvedBy, nullptr, boost::none, lockFreeReadsResources};
         // We don't care about ordering in this case, use a mock ResourceId as the key.
         sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, counter++),
                                           std::move(resolvedAcquisitionRequest));
@@ -934,12 +938,6 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
 
     validateRequests(acquisitionRequests);
 
-    // We shouldn't have an open snapshot unless we are in a multi document transaction or a
-    // previous acquisition opened and stashed it already.
-    // TODO enable invariant when everything uses acquisitions.
-
-    bool inMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
-
     while (true) {
         // Optimistically populate the nss and uuid parts of the resolved acquisition requests and
         // sort them
@@ -950,8 +948,8 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
         // namespace or view requests in sorted order. However, there is still no guarantee that the
         // nss <-> uuid mapping won't change from underneath.
         //
-        // Lock the collection locks in the sorted order and recheck the UUIDS. If it throws
-        // CollectionUUIDMismatch, we need to start over.
+        // Lock the collection locks in the sorted order and recheck the UUIDS. If it fails, we need
+        // to start over.
         const auto& dbName = sortedAcquisitionRequests.begin()->second.prerequisites.nss.dbName();
         Lock::DBLockSkipOptions dbLockOptions = [&]() {
             Lock::DBLockSkipOptions dbLockOptions;
@@ -996,36 +994,31 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
             sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
         });
 
-        // Recheck UUIDs. For writes in multi document transactions we need to use the latest
-        // catalog and throw a WW conflict if UUIDs don't match. In all other cases we use the
-        // current catalog and retry the loop.
-        const auto& currentCatalog = CollectionCatalog::get(opCtx);
-        const auto& latestCatalog = CollectionCatalog::latest(opCtx);
+        checkShardingPlacement(opCtx, acquisitionRequests);
+
+        // Recheck UUIDs. We only do this for resolutions performed via UUID exclusively as
+        // otherwise we have the correct mapping between nss <-> uuid since the nss is already the
+        // user provided one. Note that multi-document transactions will get a WCE thrown later
+        // during the checks performed by verifyDbAndCollection if the collection metadata has
+        // changed.
+        bool hasOptimisticResolutionFailed = false;
         for (auto& ar : sortedAcquisitionRequests) {
             const auto& prerequisites = ar.second.prerequisites;
-            auto changedUUID = [&](auto& catalog) {
-                const auto coll = catalog->lookupCollectionByNamespace(opCtx, prerequisites.nss);
-                if (prerequisites.uuid && (!coll || coll->uuid() != prerequisites.uuid)) {
-                    return true;
-                }
-                return false;
-            };
-            bool writeInMultiDocumentTransaction = inMultiDocumentTransaction &&
-                prerequisites.operationType == AcquisitionPrerequisites::OperationType::kWrite;
-            if (changedUUID(writeInMultiDocumentTransaction ? latestCatalog : currentCatalog)) {
-                if (writeInMultiDocumentTransaction) {
-                    throwWriteConflictException(
-                        str::stream() << "Unable to write to collection '"
-                                      << prerequisites.nss.toStringForErrorMsg()
-                                      << "' due to catalog changes; please retry the operation");
-                } else {
-                    // Retry optimistic resolution.
-                    continue;
-                }
+            if (ar.second.resolvedBy != ResolutionType::kUUID) {
+                continue;
+            }
+            const auto& currentCatalog = CollectionCatalog::get(opCtx);
+            const auto coll = currentCatalog->lookupCollectionByNamespace(opCtx, prerequisites.nss);
+            if (prerequisites.uuid && (!coll || coll->uuid() != prerequisites.uuid)) {
+                hasOptimisticResolutionFailed = true;
+                break;
             }
         }
 
-        checkShardingPlacement(opCtx, acquisitionRequests);
+        if (MONGO_unlikely(hasOptimisticResolutionFailed)) {
+            // Retry optimistic resolution.
+            continue;
+        }
 
         // Open a consistent catalog snapshot if needed.
         bool openSnapshot = !opCtx->recoveryUnit()->isActive();

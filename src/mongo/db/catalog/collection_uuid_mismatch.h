@@ -55,13 +55,14 @@ void checkCollectionUUIDMismatch(OperationContext* opCtx,
  * Same as above, but with the catalog passed explicitly.
  */
 void checkCollectionUUIDMismatch(OperationContext* opCtx,
-                                 const std::shared_ptr<const CollectionCatalog>& catalog,
+                                 const CollectionCatalog& catalog,
                                  const NamespaceString& ns,
                                  const Collection* coll,
                                  const boost::optional<UUID>& uuid);
 
+
 void checkCollectionUUIDMismatch(OperationContext* opCtx,
-                                 const std::shared_ptr<const CollectionCatalog>& catalog,
+                                 const CollectionCatalog& catalog,
                                  const NamespaceString& ns,
                                  const CollectionPtr& coll,
                                  const boost::optional<UUID>& uuid);
