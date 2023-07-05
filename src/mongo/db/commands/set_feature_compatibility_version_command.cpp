@@ -721,7 +721,6 @@ private:
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
             _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion, actualVersion);
-            _initializePlacementHistory(opCtx, requestedVersion, actualVersion);
             _dropConfigMigrationsCollection(opCtx);
         }
 
@@ -911,17 +910,6 @@ private:
                 return entry;
             }()});
             client.update(update);
-        }
-    }
-
-    // TODO SERVER-68217 remove once v7.0 becomes last-lts
-    void _initializePlacementHistory(
-        OperationContext* opCtx,
-        const multiversion::FeatureCompatibilityVersion requestedVersion,
-        const multiversion::FeatureCompatibilityVersion actualVersion) {
-        if (feature_flags::gHistoricalPlacementShardingCatalog
-                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, actualVersion)) {
-            ShardingCatalogManager::get(opCtx)->initializePlacementHistory(opCtx);
         }
     }
 

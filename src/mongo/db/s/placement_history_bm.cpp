@@ -197,10 +197,6 @@ private:
 }  // namespace
 
 void BM_initPlacementHistory(benchmark::State& state) {
-
-    RAIIServerParameterControllerForTest featureFlagHistoricalPlacementShardingCatalog{
-        "featureFlagHistoricalPlacementShardingCatalog", true};
-
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
 
     BenchmarkConfigServerTestFixture fixture;

@@ -90,20 +90,6 @@ public:
 
             const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
 
-            if (!feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                auto shardsWithOpTime = uassertStatusOK(catalogClient->getAllShards(
-                    opCtx, repl::ReadConcernLevel::kMajorityReadConcern));
-                std::vector<ShardId> shardIds;
-                std::transform(shardsWithOpTime.value.begin(),
-                               shardsWithOpTime.value.end(),
-                               std::back_inserter(shardIds),
-                               [](const ShardType& s) { return s.getName(); });
-                HistoricalPlacement historicalPlacement{std::move(shardIds), false};
-                ConfigsvrGetHistoricalPlacementResponse response(std::move(historicalPlacement));
-                return response;
-            }
-
             boost::optional<NamespaceString> targetedNs = request().getTargetWholeCluster()
                 ? (boost::optional<NamespaceString>)boost::none
                 : nss;

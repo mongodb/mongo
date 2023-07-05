@@ -88,11 +88,6 @@ public:
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-            uassert(ErrorCodes::TemporarilyUnavailable,
-                    "feature compatibility version 7.0 or later is required to run this command",
-                    feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-
             ShardingCatalogManager::get(opCtx)->initializePlacementHistory(opCtx);
         }
 

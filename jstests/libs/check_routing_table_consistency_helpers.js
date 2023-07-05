@@ -241,20 +241,6 @@ var RoutingTableConsistencyChecker = (function() {
                 'Skipping check of routing table consistency - access to admin collections is not authorized');
         }
 
-        // TODO (SERVER-68217): Remove this try/catch block once 7.0 becomes last LTS.
-        try {
-            const historicalPlacementMetadataDataAvailable = FeatureFlagUtil.isPresentAndEnabled(
-                mongos.getDB('config'), "HistoricalPlacementShardingCatalog");
-            if (!historicalPlacementMetadataDataAvailable) {
-                jsTest.log(
-                    'Skipping consistency check of config.placementHistory: feature disabled');
-                return;
-            }
-        } catch (err) {
-            jsTest.log(`Skipping consistency check of config.placementHistory: "${err}"`);
-            return;
-        }
-
         try {
             jsTest.log('Checking consistency of config.placementHistory against the routing table');
             checkHistoricalPlacementMetadataConsistency(mongos);
