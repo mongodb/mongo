@@ -413,7 +413,7 @@ last-continuous:
     ticket: SERVER-77386
   - test_file: jstests/sharding/analyze_shard_key/timeseries.js
     ticket: SERVER-78595
-  - test_file: jstests/replsets/reaping_config_txns_interrupt.js
+  - test_file: jstests/replsets/config_txns_reaping_interrupt.js
     ticket: SERVER-78187
   suites: null
 last-lts:
@@ -916,6 +916,6 @@ last-lts:
     ticket: SERVER-74954
   - test_file: jstests/sharding/analyze_shard_key/timeseries.js
     ticket: SERVER-78595
-  - test_file: jstests/replsets/reaping_config_txns_interrupt.js
+  - test_file: jstests/replsets/config_txns_reaping_interrupt.js
     ticket: SERVER-78187
   suites: null
