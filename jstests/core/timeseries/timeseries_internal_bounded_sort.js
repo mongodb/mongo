@@ -13,11 +13,6 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
-if (!TimeseriesTest.bucketUnpackWithSortEnabled(db.getMongo())) {
-    jsTestLog("Skipping test because 'BucketUnpackWithSort' is disabled.");
-    quit();
-}
-
 const coll = db.timeseries_internal_bounded_sort;
 const buckets = db['system.buckets.' + coll.getName()];
 coll.drop();

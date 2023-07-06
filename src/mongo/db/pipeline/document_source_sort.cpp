@@ -157,16 +157,17 @@ REGISTER_DOCUMENT_SOURCE(sort,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceSort::createFromBson,
                          AllowedWithApiStrict::kAlways);
-REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
-    _internalBoundedSort,
-    LiteParsedDocumentSourceDefault::parse,
-    DocumentSourceSort::parseBoundedSort,
-    ::mongo::getTestCommandsEnabled() ? AllowedWithApiStrict::kNeverInVersion1
-                                      : AllowedWithApiStrict::kInternal,
-    ::mongo::getTestCommandsEnabled() ? AllowedWithClientType::kAny
-                                      : AllowedWithClientType::kInternal,
-    feature_flags::gFeatureFlagBucketUnpackWithSort,
-    feature_flags::gFeatureFlagBucketUnpackWithSort.isEnabledAndIgnoreFCVUnsafeAtStartup());
+REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(_internalBoundedSort,
+                                       LiteParsedDocumentSourceDefault::parse,
+                                       DocumentSourceSort::parseBoundedSort,
+                                       ::mongo::getTestCommandsEnabled()
+                                           ? AllowedWithApiStrict::kNeverInVersion1
+                                           : AllowedWithApiStrict::kInternal,
+                                       ::mongo::getTestCommandsEnabled()
+                                           ? AllowedWithClientType::kAny
+                                           : AllowedWithClientType::kInternal,
+                                       boost::none,
+                                       true);
 
 DocumentSource::GetNextResult::ReturnStatus DocumentSourceSort::timeSorterPeek() {
     if (_timeSorterNextDoc) {

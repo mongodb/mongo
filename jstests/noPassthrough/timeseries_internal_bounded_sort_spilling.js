@@ -10,12 +10,8 @@
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
 const kSmallMemoryLimit = 1024;
-const conn = MongoRunner.runMongod({
-    setParameter: {
-        internalQueryMaxBlockingSortMemoryUsageBytes: kSmallMemoryLimit,
-        featureFlagBucketUnpackWithSort: true
-    }
-});
+const conn = MongoRunner.runMongod(
+    {setParameter: {internalQueryMaxBlockingSortMemoryUsageBytes: kSmallMemoryLimit}});
 
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);

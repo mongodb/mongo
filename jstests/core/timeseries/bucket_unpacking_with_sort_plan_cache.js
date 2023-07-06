@@ -29,12 +29,6 @@ import {
     getAggPlanStage,
     getPlanCacheKeyFromExplain
 } from "jstests/libs/analyze_plan.js";
-import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-
-if (!TimeseriesTest.bucketUnpackWithSortEnabled(db.getMongo())) {
-    jsTestLog("Skipping test because 'BucketUnpackWithSort' is disabled.");
-    quit();
-}
 
 const fields = ["a", "b", "i"];
 

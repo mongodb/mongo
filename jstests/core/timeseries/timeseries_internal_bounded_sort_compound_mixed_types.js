@@ -11,13 +11,7 @@
  *   requires_timeseries,
  * ]
  */
-import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
-
-if (!TimeseriesTest.bucketUnpackWithSortEnabled(db.getMongo())) {
-    jsTestLog("Skipping test because 'BucketUnpackWithSort' is disabled.");
-    quit();
-}
 
 const coll = db.timeseries_internal_bounded_sort_compound_mixed_types;
 const buckets = db['system.buckets.' + coll.getName()];

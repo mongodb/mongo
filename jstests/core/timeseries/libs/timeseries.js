@@ -45,11 +45,6 @@ export var TimeseriesTest = class {
         return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesMetricIndexes");
     }
 
-    // TODO SERVER-69324 remove this helper.
-    static bucketUnpackWithSortEnabled(conn) {
-        return FeatureFlagUtil.isPresentAndEnabled(conn, "BucketUnpackWithSort");
-    }
-
     // TODO SERVER-68058 remove this helper.
     static arbitraryUpdatesEnabled(conn) {
         return FeatureFlagUtil.isPresentAndEnabled(conn, "TimeseriesUpdatesSupport");
