@@ -426,8 +426,7 @@ public:
     void setAllowMigrationsAndBumpOneChunk(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            const boost::optional<UUID>& collectionUUID,
-                                           bool allowMigrations,
-                                           const std::string& cmdName);
+                                           bool allowMigrations);
 
     /**
      * Bump the minor version of the newest chunk on each shard
