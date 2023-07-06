@@ -202,6 +202,9 @@ private:
             invariant(session);
             _client = std::make_shared<AsyncDBClient>(hp, std::move(session), nullptr);
         }
+        ~LeasedStream() {
+            _fixture->_streamDestroyedCalls.fetchAndAdd(1);
+        }
         AsyncDBClient* getClient() override {
             return _client.get();
         }
@@ -221,11 +224,12 @@ private:
     };
 
 protected:
-    // Track the success/used/failure calls across LeasedStreams created via this fixture.
-    // Accessible to children so tests can read them directly.
+    // Track the success/used/failure/destruction calls across LeasedStreams created via this
+    // fixture. Accessible to children so tests can read them directly.
     AtomicWord<size_t> _indicateSuccessCalls{0};
     AtomicWord<size_t> _indicateUsedCalls{0};
     AtomicWord<size_t> _indicateFailureCalls{0};
+    AtomicWord<size_t> _streamDestroyedCalls{0};
 };
 
 

@@ -58,6 +58,7 @@
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
@@ -408,5 +409,54 @@ TEST_F(PinnedConnectionTaskExecutorTest, StreamFailureShutsDownAndCancels) {
     ASSERT_EQ(_indicateFailureCalls.load(), 1);
     pinnedTE->join();
 }
+
+/**
+ * We want to test the following sequence:
+ *  (1) A command is scheduled.
+ *  (2) The command fails due to a network error.
+ *  (3) The command is notified of the failure (its onResponse callback is invoked).
+ *
+ *  We want to ensure that the stream used by PCTE is destroyed _before_ the command is
+ *  notified of the failure. This allows the underlying NetworkInterface to
+ *  observe the failure on the initial stream & correctly update internally before it might
+ *  be asked to provide another stream to i.e. retry the command.
+ */
+TEST_F(PinnedConnectionTaskExecutorTest, EnsureStreamDestroyedBeforeCommandCompleted) {
+    auto pinnedTE = makePinnedConnTaskExecutor();
+    HostAndPort remote("mock");
+
+    auto rcr = makeRCR(remote, BSON("forTest" << 0));
+    auto pf = makePromiseFuture<void>();
+    ASSERT_EQ(_streamDestroyedCalls.load(), 0);
+    unittest::ThreadAssertionMonitor monitor;
+    auto completionCallback = [&](const TaskExecutor::RemoteCommandCallbackArgs& args) {
+        monitor.exec([&]() {
+            // Ensure the stream was destroyed before we are notified of the command completing.
+            ASSERT_EQ(_streamDestroyedCalls.load(), 1);
+            pf.promise.setWith([&] { return args.response.status; });
+            monitor.notifyDone();
+        });
+    };
+
+    ASSERT_OK(pinnedTE->scheduleRemoteCommand(rcr, std::move(completionCallback)));
+
+    int32_t responseToId;
+    expectSinkMessage([&](Message m) {
+        responseToId = m.header().getId();
+        assertMessageBodyAndDBName(m, BSON("hello" << 1), BSON("forTest" << 0), "admin");
+        return Status::OK();
+    });
+
+    // Fail the first request
+    Status testFailure{ErrorCodes::BadValue, "test failure"};
+    expectSourceMessage([&]() { return testFailure; });
+
+    // Ensure we ran the completion callback.
+    monitor.wait();
+
+    auto localErr = pf.future.getNoThrow();
+    ASSERT_EQ(localErr, testFailure);
+}
+
 }  // namespace
 }  // namespace mongo::executor
