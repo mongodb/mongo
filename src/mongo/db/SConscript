@@ -2012,6 +2012,19 @@ env.Library(
 )
 
 env.Library(
+    target='keys_collection_util',
+    source=[
+        'keys_collection_util.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        'dbhelpers',
+        'keys_collection_document',
+    ],
+)
+
+env.Library(
     target='keys_collection_client_direct',
     source=[
         'keys_collection_client_direct.cpp',

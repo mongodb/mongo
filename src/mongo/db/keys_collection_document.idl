@@ -84,6 +84,7 @@ structs:
             migrationId:
                 type: uuid
                 description: "The id of the tenant migration that inserted this key."
+                optional: true
             ttlExpiresAt:
                 type: date
                 description: >-
