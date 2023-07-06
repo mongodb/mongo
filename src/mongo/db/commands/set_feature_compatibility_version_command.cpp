@@ -601,15 +601,6 @@ private:
             getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
         const auto isDowngrading = originalVersion > requestedVersion;
         const auto isUpgrading = originalVersion < requestedVersion;
-        // TODO SERVER-68008: Remove collMod draining mechanism after 7.0 becomes last LTS.
-        if (isDowngrading &&
-            feature_flags::gCollModCoordinatorV3.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
-                requestedVersion, originalVersion)) {
-            // Drain all running collMod v3 coordinator because they produce backward
-            // incompatible on disk metadata
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx, DDLCoordinatorTypeEnum::kCollMod);
-        }
 
         // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
         if (isDowngrading &&

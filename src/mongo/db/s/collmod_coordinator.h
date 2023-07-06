@@ -110,9 +110,6 @@ private:
 
     void _saveShardingInfoOnCoordinatorIfNecessary(OperationContext* opCtx);
 
-    // TODO SERVER-68008 Remove once 7.0 becomes last LTS
-    bool _isPre61Compatible() const;
-
     const mongo::CollModRequest _request;
 
     boost::optional<BSONObj> _result;

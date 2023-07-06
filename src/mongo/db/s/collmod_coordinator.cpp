@@ -144,11 +144,6 @@ void CollModCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const
     cmdInfoBuilder->appendElements(_request.toBSON());
 };
 
-// TODO SERVER-68008 Remove once 7.0 becomes last LTS
-bool CollModCoordinator::_isPre61Compatible() const {
-    return operationType() == DDLCoordinatorTypeEnum::kCollModPre61Compatible;
-}
-
 void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
     OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor) {
     auto shardsAndConfigsvr = [&] {
@@ -229,9 +224,6 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
             }
         })
         .then([this, executor = executor, anchor = shared_from_this()] {
-            if (_isPre61Compatible()) {
-                return;
-            }
             _buildPhaseHandler(
                 Phase::kFreezeMigrations, [this, executor = executor, anchor = shared_from_this()] {
                     auto opCtxHolder = cc().makeOperationContext();
@@ -257,30 +249,9 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
-
-                if (_isPre61Compatible() && _collInfo->isSharded) {
-                    const auto migrationsAlreadyBlockedForBucketNss =
-                        hasTimeSeriesBucketingUpdate(_request) &&
-                        _doc.getMigrationsAlreadyBlockedForBucketNss();
-
-                    if (!migrationsAlreadyBlockedForBucketNss) {
-                        const auto& collUUID = sharding_ddl_util::getCollectionUUID(
-                            opCtx, _collInfo->nsForTargeting, true /* allowViews */);
-                        _doc.setCollUUID(collUUID);
-                        sharding_ddl_util::stopMigrations(
-                            opCtx, _collInfo->nsForTargeting, collUUID, getNewSession(opCtx));
-                    }
-                }
-
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_collInfo->isSharded && hasTimeSeriesBucketingUpdate(_request)) {
-                    if (_isPre61Compatible()) {
-                        auto newDoc = _doc;
-                        newDoc.setMigrationsAlreadyBlockedForBucketNss(true);
-                        _updateStateDocument(opCtx, std::move(newDoc));
-                    }
-
                     ShardsvrParticipantBlock blockCRUDOperationsRequest(_collInfo->nsForTargeting);
                     blockCRUDOperationsRequest.setBlockType(
                         CriticalSectionBlockTypeEnum::kReadsAndWrites);
@@ -340,11 +311,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                                 return;
                             } else if (allowMigrations) {
                                 // Previous run on a different node completed, but we lost the
-                                // result in the stepdown. Restart from stage in which we disallow
-                                // migrations.
-                                auto newPhase = _isPre61Compatible() ? Phase::kBlockShards
-                                                                     : Phase::kFreezeMigrations;
-                                _enterPhase(newPhase);
+                                // result in the stepdown. Restart from kFreezeMigrations.
+                                _enterPhase(Phase::kFreezeMigrations);
                                 uasserted(ErrorCodes::Interrupted,
                                           "Retriable error to move to previous stage");
                             }

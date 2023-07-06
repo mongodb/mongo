@@ -56,8 +56,6 @@ enums:
             kRefineCollectionShardKey: "refineCollectionShardKey"
             kSetAllowMigrations: "setAllowMigrations"
             kCollMod: "collMod_V3"
-            # TODO SERVER-68008: Remove once 7.0 becomes last LTS
-            kCollModPre61Compatible: "collMod_V2"
             kReshardCollection: "reshardCollection"
             # Note: the V3 refers to the coordinator version, not the FLE2 protocol version
             kCompactStructuredEncryptionData: "compactStructuredEncryptionData_V3"
