@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -78,12 +80,25 @@
 #include "mongo/util/decorable.h"
 
 namespace mongo {
-namespace {
 
-class ClusterBulkWriteCmd : public BulkWriteCmdVersion1Gen<ClusterBulkWriteCmd> {
+template <typename Impl>
+class ClusterBulkWriteCmd : public Command {
 public:
+    ClusterBulkWriteCmd(StringData name) : Command(name) {}
+
     bool adminOnly() const final {
         return true;
+    }
+
+    const std::set<std::string>& apiVersions() const {
+        return Impl::getApiVersions();
+    }
+
+    std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
+                                             const OpMsgRequest& request) final {
+        auto parsedRequest =
+            BulkWriteCommandRequest::parse(IDLParserContext{"clusterBulkWriteParse"}, request);
+        return std::make_unique<Invocation>(this, request, std::move(parsedRequest));
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -114,45 +129,60 @@ public:
         return "command to apply inserts, updates and deletes in bulk";
     }
 
-    class Invocation final : public InvocationBaseGen {
+    class Invocation : public CommandInvocation {
     public:
-        using InvocationBaseGen::InvocationBaseGen;
+        Invocation(const ClusterBulkWriteCmd* command,
+                   const OpMsgRequest& request,
+                   BulkWriteCommandRequest bulkRequest)
+            : CommandInvocation(command),
+              _opMsgRequest{&request},
+              _request{std::move(bulkRequest)} {}
 
-        bool supportsWriteConcern() const final {
-            return true;
+        const BulkWriteCommandRequest& getBulkRequest() const {
+            return _request;
         }
 
-        NamespaceString ns() const final {
-            return NamespaceString(request().getDbName());
-        }
-
-        Reply typedRun(OperationContext* opCtx) final {
-            uassert(
-                ErrorCodes::CommandNotSupported,
-                "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
-                gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
-
-            bulk_write_common::validateRequest(request(), opCtx->isRetryableWrite());
-
-            auto replyItems = cluster::bulkWrite(opCtx, request());
-            return _populateCursorReply(opCtx, std::move(replyItems));
-        }
-
-        void doCheckAuthorization(OperationContext* opCtx) const final try {
-            uassert(ErrorCodes::Unauthorized,
-                    "unauthorized",
-                    AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForPrivileges(bulk_write_common::getPrivileges(request())));
-        } catch (const DBException& e) {
-            NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(e.code());
-            throw;
+        bool getBypass() const {
+            return _request.getBypassDocumentValidation();
         }
 
     private:
-        Reply _populateCursorReply(OperationContext* opCtx,
-                                   std::vector<BulkWriteReplyItem> replyItems) {
-            const auto& req = request();
-            auto reqObj = unparsedRequest().body;
+        void preRunImplHook(OperationContext* opCtx) const {
+            Impl::checkCanRunHere(opCtx);
+        }
+
+        void doCheckAuthorizationHook(AuthorizationSession* authzSession) const {
+            Impl::doCheckAuthorization(authzSession, getBypass(), getBulkRequest());
+        }
+
+        NamespaceString ns() const final {
+            return NamespaceString(_request.getDbName());
+        }
+
+        bool supportsWriteConcern() const override {
+            return true;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            try {
+                doCheckAuthorizationHook(AuthorizationSession::get(opCtx->getClient()));
+            } catch (const DBException& e) {
+                NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(e.code());
+                throw;
+            }
+        }
+
+        const ClusterBulkWriteCmd* command() const {
+            return static_cast<const ClusterBulkWriteCmd*>(definition());
+        }
+
+        BulkWriteCommandReply _populateCursorReply(
+            OperationContext* opCtx,
+            BulkWriteCommandRequest& bulkRequest,
+            const OpMsgRequest& unparsedRequest,
+            std::vector<BulkWriteReplyItem> replyItems) const {
+            const auto& req = bulkRequest;
+            auto reqObj = unparsedRequest.body;
 
             const NamespaceString cursorNss =
                 NamespaceString::makeBulkWriteNSS(req.getDollarTenant());
@@ -163,7 +193,7 @@ public:
 
             long long batchSize = std::numeric_limits<long long>::max();
             if (req.getCursor() && req.getCursor()->getBatchSize()) {
-                params.batchSize = request().getCursor()->getBatchSize();
+                params.batchSize = req.getCursor()->getBatchSize();
                 batchSize = *req.getCursor()->getBatchSize();
             }
             params.originatingCommandObj = reqObj.getOwned();
@@ -227,9 +257,39 @@ public:
                     cursorId, std::vector<BulkWriteReplyItem>(std::move(replyItems))),
                 0 /* TODO SERVER-76267: correctly populate numErrors */);
         }
+
+        bool runImpl(OperationContext* opCtx,
+                     const OpMsgRequest& request,
+                     BulkWriteCommandRequest& bulkRequest,
+                     BSONObjBuilder& result) const {
+            BulkWriteCommandReply response;
+
+            uassert(
+                ErrorCodes::CommandNotSupported,
+                "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
+                gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
+
+            bulk_write_common::validateRequest(bulkRequest, opCtx->isRetryableWrite());
+
+            auto replyItems = cluster::bulkWrite(opCtx, bulkRequest);
+            response = _populateCursorReply(opCtx, bulkRequest, request, std::move(replyItems));
+            result.appendElements(response.toBSON());
+            return true;
+        }
+
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) {
+            preRunImplHook(opCtx);
+
+            BSONObjBuilder bob = result->getBodyBuilder();
+            bool ok = runImpl(opCtx, *_opMsgRequest, _request, bob);
+            if (!ok) {
+                CommandHelpers::appendSimpleCommandStatus(bob, ok);
+            }
+        }
+
+        const OpMsgRequest* _opMsgRequest;
+        BulkWriteCommandRequest _request;
     };
+};
 
-} clusterBulkWriteCmd;
-
-}  // namespace
 }  // namespace mongo

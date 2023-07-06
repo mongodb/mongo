@@ -152,7 +152,14 @@ DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
         transport::ServiceExecutorContext::set(client.get(), std::move(seCtx));
     }
 
-    const auto opMsgRequest = OpMsgRequest::fromDBAndBody(kNss.db(), cmd);
+    OpMsgRequest opMsgRequest;
+
+    // If bulkWrite then append adminDB.
+    if (cmd.firstElementFieldNameStringData() == "bulkWrite") {
+        opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin.db(), cmd);
+    } else {
+        opMsgRequest = OpMsgRequest::fromDBAndBody(kNss.db(), cmd);
+    }
 
     AlternativeClientRegion acr(client);
     auto rec = std::make_shared<RequestExecutionContext>(opCtx.get(), opMsgRequest.serialize());

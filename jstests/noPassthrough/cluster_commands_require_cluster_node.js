@@ -26,6 +26,7 @@ const clusterCommandsCases = [
     },
     {cmd: {clusterInsert: kCollName, documents: [{x: 1}]}},
     {cmd: {clusterUpdate: kCollName, updates: [{q: {doesNotExist: 1}, u: {x: 1}}]}},
+    // TODO SERVER-52419 add test for bulkWrite.
 ];
 
 function runTestCaseExpectFail(conn, testCase, code) {

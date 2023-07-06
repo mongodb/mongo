@@ -50,6 +50,7 @@ namespace {
 StringMap<std::string> clusterCommandTranslations = {
     {"abortTransaction", "clusterAbortTransaction"},
     {"aggregate", "clusterAggregate"},
+    {"bulkWrite", "clusterBulkWrite"},
     {"commitTransaction", "clusterCommitTransaction"},
     {"delete", "clusterDelete"},
     {"find", "clusterFind"},

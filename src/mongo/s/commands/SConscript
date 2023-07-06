@@ -33,7 +33,7 @@ env.Library(
         'cluster_abort_transaction_cmd_s.cpp',
         'cluster_analyze_cmd.cpp',
         'cluster_build_info.cpp',
-        'cluster_bulk_write_cmd.cpp',
+        'cluster_bulk_write_cmd_s.cpp',
         'cluster_cleanup_reshard_collection_cmd.cpp',
         'cluster_coll_stats_cmd.cpp',
         'cluster_collection_mod_cmd.cpp',
@@ -264,6 +264,7 @@ env.CppUnitTest(
     target='s_commands_test',
     source=[
         'cluster_aggregate_test.cpp',
+        'cluster_bulk_write_test.cpp',
         'cluster_command_test_fixture.cpp',
         'cluster_delete_test.cpp',
         'cluster_distinct_test.cpp',

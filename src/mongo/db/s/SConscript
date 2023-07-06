@@ -396,6 +396,7 @@ env.Library(
         'cleanup_structured_encryption_data_coordinator.idl',
         'clone_catalog_data_command.cpp',
         'cluster_abort_transaction_cmd_d.cpp',
+        'cluster_bulk_write_cmd_d.cpp',
         'cluster_commit_transaction_cmd_d.cpp',
         'cluster_count_cmd_d.cpp',
         'cluster_find_cmd_d.cpp',

@@ -4981,6 +4981,25 @@ export const authCommandsLib = {
           ]
         },
         {
+          testname: "clusterBulkWrite",
+          command: {
+            clusterBulkWrite: 1,
+            ops: [
+              {insert: 0, document: {skey: "MongoDB"}},
+              {insert: 1, document: {skey: "MongoDB"}}],
+            nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
+          },
+          skipSharded: true,
+          testcases: [
+            {
+              runOnDb: adminDbName,
+              roles: {__system: 1},
+              privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+              expectFail: true,
+            },
+          ]
+        },
+        {
           testname: "clusterDelete",
           command: {clusterDelete: "foo", deletes: [{q: {}, limit: 1}]},
           skipSharded: true,
