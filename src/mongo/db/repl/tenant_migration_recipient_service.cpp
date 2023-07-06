@@ -1890,7 +1890,8 @@ void TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKe
                        Query().readPref(_readPreference.pref, _readPreference.tags.getTagBSON()));
     while (cursor->more()) {
         const auto doc = cursor->nextSafe().getOwned();
-        keyDocs.push_back(keys_collection_util::makeExternalClusterTimeKeyDoc(doc, _migrationUuid));
+        keyDocs.push_back(keys_collection_util::makeExternalClusterTimeKeyDoc(
+            doc, _migrationUuid, boost::none /* expireAt */));
     }
 
     auto opCtx = cc().makeOperationContext();

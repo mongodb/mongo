@@ -31,6 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/fetcher.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/logical_session_cache.h"
@@ -601,10 +602,11 @@ private:
      * Runs a command against a "shard" that is not yet in the cluster and thus not present in the
      * ShardRegistry.
      */
-    StatusWith<Shard::CommandResponse> _runCommandForAddShard(OperationContext* opCtx,
-                                                              RemoteCommandTargeter* targeter,
-                                                              StringData dbName,
-                                                              const BSONObj& cmdObj);
+    StatusWith<Shard::CommandResponse> _runCommandForAddShard(
+        OperationContext* opCtx,
+        std::shared_ptr<RemoteCommandTargeter> targeter,
+        StringData dbName,
+        const BSONObj& cmdObj);
 
     /**
      * Helper method for running a count command against the config server with appropriate error
@@ -667,6 +669,27 @@ private:
      * TODO SERVER-53283: Remove once 5.0 becomes last-lts.
      */
     void _upgradeDatabasesEntriesTo50(OperationContext* opCtx);
+
+    using FetcherDocsCallbackFn = std::function<bool(const std::vector<BSONObj>& batch)>;
+    using FetcherStatusCallbackFn = std::function<void(const Status& status)>;
+
+    /**
+     * Creates a Fetcher task for fetching documents in the given collection on the given shard.
+     * After the task is scheduled, applies 'processDocsCallback' to each fetched batch and
+     * 'processStatusCallback' to the fetch status.
+     */
+    std::unique_ptr<Fetcher> _createFetcher(OperationContext* opCtx,
+                                            std::shared_ptr<RemoteCommandTargeter> targeter,
+                                            const NamespaceString& nss,
+                                            const repl::ReadConcernLevel& readConcernLevel,
+                                            FetcherDocsCallbackFn processDocsCallback,
+                                            FetcherStatusCallbackFn processStatusCallback);
+
+    /**
+     * Gets the cluster time keys on the given shard and then saves them locally.
+     */
+    Status _pullClusterTimeKeys(OperationContext* opCtx,
+                                std::shared_ptr<RemoteCommandTargeter> targeter);
 
     /**
      * Downgrades the config.databases entries to prior 4.9 version. More specifically, it removes

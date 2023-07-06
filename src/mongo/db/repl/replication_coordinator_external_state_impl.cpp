@@ -932,7 +932,8 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
         const bool scheduleAsyncRefresh = true;
         resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);
-    } else {  // unsharded
+    }
+    if (serverGlobalParams.clusterRole == ClusterRole::None) {  // unsharded
         if (auto validator = LogicalTimeValidator::get(_service)) {
             validator->enableKeyGenerator(opCtx, true);
         }

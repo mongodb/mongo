@@ -47,3 +47,16 @@ server_parameters:
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: balancerMigrationsThrottlingMs
         default: 1000 # 1 sec
+
+    newShardExistingClusterTimeKeysExpirationSecs:
+        description: >-
+            The amount of time in seconds that the config server should wait before removing the
+            key documents fetched from a replica set when it gets added to the cluster
+            as a shard.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gNewShardExistingClusterTimeKeysExpirationSecs
+        default:
+            expr: 7 * 24 * 3600 # 1 week
+        validator:
+            gte: 1
