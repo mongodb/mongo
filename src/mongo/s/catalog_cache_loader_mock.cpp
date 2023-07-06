@@ -67,6 +67,10 @@ void CatalogCacheLoaderMock::onStepUp() {
     MONGO_UNREACHABLE;
 }
 
+void CatalogCacheLoaderMock::onReplicationRollback() {
+    MONGO_UNREACHABLE;
+}
+
 void CatalogCacheLoaderMock::shutDown() {}
 
 void CatalogCacheLoaderMock::notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,

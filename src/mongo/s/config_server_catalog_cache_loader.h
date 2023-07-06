@@ -54,6 +54,7 @@ public:
     void initializeReplicaSetRole(bool isPrimary) override;
     void onStepDown() override;
     void onStepUp() override;
+    void onReplicationRollback() override;
     void shutDown() override;
     void notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
                                                 const Timestamp& commitTime) override;
