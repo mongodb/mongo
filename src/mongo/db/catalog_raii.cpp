@@ -319,7 +319,6 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         _autoDb.refreshDbReferenceIfNull(opCtx);
     }
 
-    checkCollectionUUIDMismatch(opCtx, _resolvedNss, _coll, options._expectedUUID);
     verifyDbAndCollection(
         opCtx, modeColl, nsOrUUID, _resolvedNss, _coll.get(), _autoDb.getDb(), verifyWriteEligible);
     for (auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
@@ -350,6 +349,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         if (collDesc.isSharded()) {
             _coll.setShardKeyPattern(collDesc.getKeyPattern());
         }
+
+        checkCollectionUUIDMismatch(opCtx, catalog, _resolvedNss, _coll, options._expectedUUID);
 
         return;
     }
@@ -405,6 +406,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                           << "version attached to the request must be unset, UNSHARDED or IGNORED",
             !receivedShardVersion || *receivedShardVersion == ShardVersion::UNSHARDED() ||
                 ShardVersion::isPlacementVersionIgnored(*receivedShardVersion));
+
+    checkCollectionUUIDMismatch(opCtx, catalog, _resolvedNss, _coll, options._expectedUUID);
 }
 
 Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx) {
