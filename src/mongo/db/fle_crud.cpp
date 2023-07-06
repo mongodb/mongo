@@ -1104,8 +1104,6 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
         // Check the user did not remove/destroy the __safeContent__ array. If there are no
         // indexed fields, then there will not be a safeContent array in the document.
         FLEClientCrypto::validateTagsArray(newDocument);
-    } else {
-        return updateReply;
     }
 
     // Step 6 ----
@@ -1368,8 +1366,6 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
         // Check the user did not remove/destroy the __safeContent__ array. If there are no
         // indexed fields, then there will not be a safeContent array in the document.
         FLEClientCrypto::validateTagsArray(newDocument);
-    } else {
-        return reply;
     }
 
     // Step 6 ----
