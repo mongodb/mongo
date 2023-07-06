@@ -106,8 +106,10 @@ public:
         stdx::unique_lock lk(_mu);
         do {
             _cv.wait(lk, [&] { return _done || _ex; });
-            if (_ex)
+            if (_ex) {
+                _done = true;
                 std::rethrow_exception(std::exchange(_ex, nullptr));
+            }
         } while (!_done);
     }
 
