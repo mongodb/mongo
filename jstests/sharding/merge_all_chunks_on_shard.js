@@ -43,13 +43,16 @@ function setOnCurrentShardSince(mongoS, coll, extraQuery, refTimestamp, offsetIn
     const collUuid = sessionConfigDB.collections.findOne({_id: coll.getFullName()}).uuid;
     const query = Object.assign({uuid: collUuid}, extraQuery);
     const newValue = new Timestamp(refTimestamp.getTime() + offsetInSeconds, 0);
-    assert.commandWorked(sessionConfigDB.chunks.updateMany(
-        query, [{
-            $set: {
-                "onCurrentShardSince": newValue,
-                "history": [{validAfter: newValue, shard: "$shard"}]
-            }
-        }]));
+    const chunks = sessionConfigDB.chunks.find(query);
+    chunks.forEach((chunk) => {
+        assert.commandWorked(sessionConfigDB.chunks.updateOne(
+            {_id: chunk._id}, [{
+                $set: {
+                    "onCurrentShardSince": newValue,
+                    "history": [{validAfter: newValue, shard: "$shard"}]
+                }
+            }]));
+    });
 }
 
 /* Set jumbo flag to true */
