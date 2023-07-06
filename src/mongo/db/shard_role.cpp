@@ -323,12 +323,6 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
     ResolvedNamespaceOrViewAcquisitionRequestsMap sortedAcquisitionRequests) {
     CollectionOrViewAcquisitions acquisitions;
     for (auto& acquisitionRequest : sortedAcquisitionRequests) {
-        tassert(7328900,
-                "Cannot acquire for write without locks",
-                acquisitionRequest.second.prerequisites.operationType ==
-                        AcquisitionPrerequisites::kRead ||
-                    acquisitionRequest.second.collLock);
-
         auto& prerequisites = acquisitionRequest.second.prerequisites;
         auto& txnResources = TransactionResources::get(opCtx);
 
@@ -514,6 +508,16 @@ std::shared_ptr<const CollectionCatalog> stashConsistentCatalog(
     return catalog;
 }
 
+// TODO SERVER-77067 simplify conditions
+bool supportsLockFreeRead(OperationContext* opCtx) {
+    // Lock-free reads are not supported:
+    //   * in multi-document transactions.
+    //   * under an IX lock (nested reads under IX lock holding operations).
+    //   * if a storage txn is already open w/o the lock-free reads operation flag set.
+    return !storageGlobalParams.disableLockFreeReads && !opCtx->inMultiDocumentTransaction() &&
+        !opCtx->lockState()->isWriteLocked() &&
+        !(opCtx->recoveryUnit()->isActive() && !opCtx->isLockFreeReadsOp());
+}
 }  // namespace
 
 CollectionOrViewAcquisitionRequest CollectionOrViewAcquisitionRequest::fromOpCtx(
@@ -789,10 +793,15 @@ CollectionOrViewAcquisition acquireCollectionOrView(
     return std::move(acquisition.begin()->second);
 }
 
-CollectionOrViewAcquisition acquireCollectionOrViewWithoutTakingLocks(
+CollectionAcquisition acquireCollectionMaybeLockFree(
+    OperationContext* opCtx, CollectionAcquisitionRequest acquisitionRequest) {
+    return CollectionAcquisition(acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest));
+}
+
+CollectionOrViewAcquisition acquireCollectionOrViewMaybeLockFree(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest) {
     auto acquisition =
-        acquireCollectionsOrViewsWithoutTakingLocks(opCtx, {std::move(acquisitionRequest)});
+        acquireCollectionsOrViewsMaybeLockFree(opCtx, {std::move(acquisitionRequest)});
     invariant(acquisition.size() == 1);
     return std::move(acquisition.begin()->second);
 }
@@ -926,6 +935,50 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap generateSortedAcquisitionRequests(
     }
     return sortedAcquisitionRequests;
 }
+
+CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
+    OperationContext* opCtx, std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests) {
+    if (acquisitionRequests.size() == 0) {
+        return {};
+    }
+
+    validateRequests(acquisitionRequests);
+
+    // We shouldn't have an open snapshot unless a previous lock-free acquisition opened and
+    // stashed it already.
+    invariant(!opCtx->recoveryUnit()->isActive() || opCtx->isLockFreeReadsOp());
+
+    auto lockFreeReadsResources = takeGlobalLock(opCtx, acquisitionRequests);
+
+    // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
+    catalog_helper::setAutoGetCollectionWaitFailpointExecute(
+        [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); });
+
+    // Make sure the sharding placement is correct before opening the storage snapshot, we will
+    // check it again after opening it to make sure it is consistent. This is specially
+    // important in secondaries since they can be lagging and might not be aware of the latests
+    // routing changes.
+    checkShardingPlacement(opCtx, acquisitionRequests);
+
+    // Open a consistent catalog snapshot if needed.
+    bool openSnapshot = !opCtx->recoveryUnit()->isActive();
+    auto catalog = openSnapshot ? stashConsistentCatalog(opCtx, acquisitionRequests)
+                                : CollectionCatalog::get(opCtx);
+
+    try {
+        // Second sharding placement check.
+        checkShardingPlacement(opCtx, acquisitionRequests);
+
+        auto sortedAcquisitionRequests = shard_role_details::generateSortedAcquisitionRequests(
+            opCtx, *catalog, acquisitionRequests, std::move(lockFreeReadsResources));
+        return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
+            opCtx, *catalog, std::move(sortedAcquisitionRequests));
+    } catch (...) {
+        if (openSnapshot && !opCtx->lockState()->inAWriteUnitOfWork())
+            opCtx->recoveryUnit()->abandonSnapshot();
+        throw;
+    }
+}
 }  // namespace shard_role_details
 
 CollectionOrViewAcquisitions acquireCollectionsOrViews(
@@ -1036,47 +1089,20 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
     }
 }
 
-CollectionOrViewAcquisitions acquireCollectionsOrViewsWithoutTakingLocks(
+CollectionOrViewAcquisitions acquireCollectionsOrViewsMaybeLockFree(
     OperationContext* opCtx, std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests) {
-    if (acquisitionRequests.size() == 0) {
-        return {};
-    }
+    const bool allAcquisitionsForRead =
+        std::all_of(acquisitionRequests.begin(), acquisitionRequests.end(), [](const auto& ar) {
+            return ar.operationType == AcquisitionPrerequisites::kRead;
+        });
+    tassert(7740500, "Cannot acquire for write without locks", allAcquisitionsForRead);
 
-    validateRequests(acquisitionRequests);
-
-    // We shouldn't have an open snapshot unless a previous lock-free acquisition opened and
-    // stashed it already.
-    invariant(!opCtx->recoveryUnit()->isActive() || opCtx->isLockFreeReadsOp());
-
-    auto lockFreeReadsResources = takeGlobalLock(opCtx, acquisitionRequests);
-
-    // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
-    catalog_helper::setAutoGetCollectionWaitFailpointExecute(
-        [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); });
-
-    // Make sure the sharding placement is correct before opening the storage snapshot, we will
-    // check it again after opening it to make sure it is consistent. This is specially
-    // important in secondaries since they can be lagging and might not be aware of the latests
-    // routing changes.
-    checkShardingPlacement(opCtx, acquisitionRequests);
-
-    // Open a consistent catalog snapshot if needed.
-    bool openSnapshot = !opCtx->recoveryUnit()->isActive();
-    auto catalog = openSnapshot ? stashConsistentCatalog(opCtx, acquisitionRequests)
-                                : CollectionCatalog::get(opCtx);
-
-    try {
-        // Second sharding placement check.
-        checkShardingPlacement(opCtx, acquisitionRequests);
-
-        auto sortedAcquisitionRequests = shard_role_details::generateSortedAcquisitionRequests(
-            opCtx, *catalog, acquisitionRequests, std::move(lockFreeReadsResources));
-        return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
-            opCtx, *catalog, std::move(sortedAcquisitionRequests));
-    } catch (...) {
-        if (openSnapshot && !opCtx->lockState()->inAWriteUnitOfWork())
-            opCtx->recoveryUnit()->abandonSnapshot();
-        throw;
+    if (supportsLockFreeRead(opCtx)) {
+        return shard_role_details::acquireCollectionsOrViewsLockFree(
+            opCtx, std::move(acquisitionRequests));
+    } else {
+        const auto lockMode = opCtx->inMultiDocumentTransaction() ? MODE_IX : MODE_IS;
+        return acquireCollectionsOrViews(opCtx, std::move(acquisitionRequests), lockMode);
     }
 }
 
@@ -1350,18 +1376,5 @@ void restoreTransactionResourcesToOperationContext(
 
     scopeGuard.dismiss();
 }
-
-// TODO SERVER-77067 simplify conditions
-namespace shard_role_details {
-bool supportsLockFreeRead(OperationContext* opCtx) {
-    // Lock-free reads are not supported:
-    //   * in multi-document transactions.
-    //   * under an IX lock (nested reads under IX lock holding operations).
-    //   * if a storage txn is already open w/o the lock-free reads operation flag set.
-    return !storageGlobalParams.disableLockFreeReads && !opCtx->inMultiDocumentTransaction() &&
-        !opCtx->lockState()->isWriteLocked() &&
-        !(opCtx->recoveryUnit()->isActive() && !opCtx->isLockFreeReadsOp());
-}
-}  // namespace shard_role_details
 
 }  // namespace mongo

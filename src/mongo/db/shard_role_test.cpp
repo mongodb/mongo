@@ -323,8 +323,8 @@ TEST_F(ShardRoleTest, AcquisitionWithInvalidNamespaceFails) {
 
         // Without locks
         ASSERT_THROWS_CODE(
-            acquireCollectionsOrViewsWithoutTakingLocks(
-                opCtx(), {{nss, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite}}),
+            acquireCollectionsOrViewsMaybeLockFree(
+                opCtx(), {{nss, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kRead}}),
             DBException,
             ErrorCodes::InvalidNamespace);
     };
@@ -341,9 +341,9 @@ TEST_F(ShardRoleTest, AcquisitionWithInvalidNamespaceFails) {
 
         // Without locks
         ASSERT_THROWS_CODE(
-            acquireCollectionsOrViewsWithoutTakingLocks(
+            acquireCollectionsOrViewsMaybeLockFree(
                 opCtx(),
-                {{nssOrUuid, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite}}),
+                {{nssOrUuid, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kRead}}),
             DBException,
             ErrorCodes::InvalidNamespace);
     };
@@ -389,11 +389,11 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithCorrectPlacementVersion) {
     // Without locks.
     {
         const auto acquisitions =
-            acquireCollectionsOrViewsWithoutTakingLocks(opCtx(),
-                                                        {{nssUnshardedCollection1,
-                                                          placementConcern,
-                                                          repl::ReadConcernArgs(),
-                                                          AcquisitionPrerequisites::kRead}});
+            acquireCollectionsOrViewsMaybeLockFree(opCtx(),
+                                                   {{nssUnshardedCollection1,
+                                                     placementConcern,
+                                                     repl::ReadConcernArgs(),
+                                                     AcquisitionPrerequisites::kRead}});
 
         ASSERT_EQ(1, acquisitions.size());
         ASSERT_EQ(nssUnshardedCollection1, acquisitions.begin()->first);
@@ -434,13 +434,13 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithIncorrectPlacementVersionThrows) {
 
     // Without locks.
     ASSERT_THROWS_WITH_CHECK(
-        acquireCollectionsOrViewsWithoutTakingLocks(opCtx(),
-                                                    {{
-                                                        nssUnshardedCollection1,
-                                                        placementConcern,
-                                                        repl::ReadConcernArgs(),
-                                                        AcquisitionPrerequisites::kRead,
-                                                    }}),
+        acquireCollectionsOrViewsMaybeLockFree(opCtx(),
+                                               {{
+                                                   nssUnshardedCollection1,
+                                                   placementConcern,
+                                                   repl::ReadConcernArgs(),
+                                                   AcquisitionPrerequisites::kRead,
+                                               }}),
         ExceptionFor<ErrorCodes::StaleDbVersion>,
         validateException);
 }
@@ -473,11 +473,11 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenShardDoesNotKnowThePlacementVersio
                              validateException);
 
     ASSERT_THROWS_WITH_CHECK(
-        acquireCollectionsOrViewsWithoutTakingLocks(opCtx(),
-                                                    {{nssUnshardedCollection1,
-                                                      placementConcern,
-                                                      repl::ReadConcernArgs(),
-                                                      AcquisitionPrerequisites::kRead}}),
+        acquireCollectionsOrViewsMaybeLockFree(opCtx(),
+                                               {{nssUnshardedCollection1,
+                                                 placementConcern,
+                                                 repl::ReadConcernArgs(),
+                                                 AcquisitionPrerequisites::kRead}}),
         ExceptionFor<ErrorCodes::StaleDbVersion>,
         validateException);
 }
@@ -513,11 +513,11 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenCriticalSectionIsActiveThrows) {
                                  ExceptionFor<ErrorCodes::StaleDbVersion>,
                                  validateException);
         ASSERT_THROWS_WITH_CHECK(
-            acquireCollectionsOrViewsWithoutTakingLocks(opCtx(),
-                                                        {{nssUnshardedCollection1,
-                                                          placementConcern,
-                                                          repl::ReadConcernArgs(),
-                                                          AcquisitionPrerequisites::kRead}}),
+            acquireCollectionsOrViewsMaybeLockFree(opCtx(),
+                                                   {{nssUnshardedCollection1,
+                                                     placementConcern,
+                                                     repl::ReadConcernArgs(),
+                                                     AcquisitionPrerequisites::kRead}}),
             ExceptionFor<ErrorCodes::StaleDbVersion>,
             validateException);
     }
@@ -556,7 +556,7 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithoutSpecifyingPlacementVersion) {
 
     // Without locks.
     {
-        const auto acquisitions = acquireCollectionsOrViewsWithoutTakingLocks(
+        const auto acquisitions = acquireCollectionsOrViewsMaybeLockFree(
             opCtx(),
             {CollectionAcquisitionRequest::fromOpCtx(
                 opCtx(), nssUnshardedCollection1, AcquisitionPrerequisites::kRead)});
@@ -636,11 +636,11 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithCorrectPlacementVersion) {
     // Without locks.
     {
         const auto acquisitions =
-            acquireCollectionsOrViewsWithoutTakingLocks(opCtx(),
-                                                        {{nssShardedCollection1,
-                                                          placementConcern,
-                                                          repl::ReadConcernArgs(),
-                                                          AcquisitionPrerequisites::kRead}});
+            acquireCollectionsOrViewsMaybeLockFree(opCtx(),
+                                                   {{nssShardedCollection1,
+                                                     placementConcern,
+                                                     repl::ReadConcernArgs(),
+                                                     AcquisitionPrerequisites::kRead}});
 
         ASSERT_EQ(1, acquisitions.size());
         ASSERT_TRUE(acquisitions.at(nssShardedCollection1).isCollection());
@@ -677,13 +677,13 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithIncorrectPlacementVersionThrows) {
                              validateException);
 
     ASSERT_THROWS_WITH_CHECK(
-        acquireCollectionsOrViewsWithoutTakingLocks(opCtx(),
-                                                    {{
-                                                        nssShardedCollection1,
-                                                        placementConcern,
-                                                        repl::ReadConcernArgs(),
-                                                        AcquisitionPrerequisites::kRead,
-                                                    }}),
+        acquireCollectionsOrViewsMaybeLockFree(opCtx(),
+                                               {{
+                                                   nssShardedCollection1,
+                                                   placementConcern,
+                                                   repl::ReadConcernArgs(),
+                                                   AcquisitionPrerequisites::kRead,
+                                               }}),
         ExceptionFor<ErrorCodes::StaleConfig>,
         validateException);
 }
@@ -717,11 +717,11 @@ TEST_F(ShardRoleTest, AcquireShardedCollWhenShardDoesNotKnowThePlacementVersionT
                              ExceptionFor<ErrorCodes::StaleConfig>,
                              validateException);
     ASSERT_THROWS_WITH_CHECK(
-        acquireCollectionsOrViewsWithoutTakingLocks(opCtx(),
-                                                    {{nssShardedCollection1,
-                                                      placementConcern,
-                                                      repl::ReadConcernArgs(),
-                                                      AcquisitionPrerequisites::kRead}}),
+        acquireCollectionsOrViewsMaybeLockFree(opCtx(),
+                                               {{nssShardedCollection1,
+                                                 placementConcern,
+                                                 repl::ReadConcernArgs(),
+                                                 AcquisitionPrerequisites::kRead}}),
         ExceptionFor<ErrorCodes::StaleConfig>,
         validateException);
 }
@@ -757,11 +757,11 @@ TEST_F(ShardRoleTest, AcquireShardedCollWhenCriticalSectionIsActiveThrows) {
                                  ExceptionFor<ErrorCodes::StaleConfig>,
                                  validateException);
         ASSERT_THROWS_WITH_CHECK(
-            acquireCollectionsOrViewsWithoutTakingLocks(opCtx(),
-                                                        {{nssShardedCollection1,
-                                                          placementConcern,
-                                                          repl::ReadConcernArgs(),
-                                                          AcquisitionPrerequisites::kRead}}),
+            acquireCollectionsOrViewsMaybeLockFree(opCtx(),
+                                                   {{nssShardedCollection1,
+                                                     placementConcern,
+                                                     repl::ReadConcernArgs(),
+                                                     AcquisitionPrerequisites::kRead}}),
             ExceptionFor<ErrorCodes::StaleConfig>,
             validateException);
     }
@@ -809,7 +809,7 @@ TEST_F(ShardRoleTest, AcquireCollectionNonExistentNamespace) {
 
     // Without locks.
     {
-        auto acquisitions = acquireCollectionsOrViewsWithoutTakingLocks(
+        auto acquisitions = acquireCollectionsOrViewsMaybeLockFree(
             opCtx(),
             {CollectionAcquisitionRequest::fromOpCtx(
                 opCtx(), inexistentNss, AcquisitionPrerequisites::kRead)});
@@ -846,11 +846,11 @@ TEST_F(ShardRoleTest, AcquireInexistentCollectionWithWrongPlacementThrowsBecause
                              ExceptionFor<ErrorCodes::StaleDbVersion>,
                              validateException);
     ASSERT_THROWS_WITH_CHECK(
-        acquireCollectionsOrViewsWithoutTakingLocks(opCtx(),
-                                                    {{inexistentNss,
-                                                      placementConcern,
-                                                      repl::ReadConcernArgs(),
-                                                      AcquisitionPrerequisites::kRead}}),
+        acquireCollectionsOrViewsMaybeLockFree(opCtx(),
+                                               {{inexistentNss,
+                                                 placementConcern,
+                                                 repl::ReadConcernArgs(),
+                                                 AcquisitionPrerequisites::kRead}}),
         ExceptionFor<ErrorCodes::StaleDbVersion>,
         validateException);
 }
@@ -912,6 +912,41 @@ TEST_F(ShardRoleTest, WritesOnMultiDocTransactionsUseLatestCatalog) {
                            MODE_IX),
                        DBException,
                        ErrorCodes::WriteConflict);
+}
+
+// ---------------------------------------------------------------------------
+// MaybeLockFree
+TEST_F(ShardRoleTest, AcquireCollectionMaybeLockFreeTakesLocksWhenInMultiDocTransaction) {
+    opCtx()->setInMultiDocumentTransaction();
+    const auto acquisition =
+        acquireCollectionMaybeLockFree(opCtx(),
+                                       {nssUnshardedCollection1,
+                                        {dbVersionTestDb, ShardVersion::UNSHARDED()},
+                                        repl::ReadConcernArgs(),
+                                        AcquisitionPrerequisites::kRead});
+    ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nssUnshardedCollection1, MODE_IS));
+}
+
+TEST_F(ShardRoleTest, AcquireCollectionMaybeLockFreeDoesNotTakeLocksWhenNotInMultiDocTransaction) {
+    const auto acquisition =
+        acquireCollectionMaybeLockFree(opCtx(),
+                                       {nssUnshardedCollection1,
+                                        {dbVersionTestDb, ShardVersion::UNSHARDED()},
+                                        repl::ReadConcernArgs(),
+                                        AcquisitionPrerequisites::kRead});
+    ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nssUnshardedCollection1, MODE_IS));
+}
+
+DEATH_TEST_REGEX_F(ShardRoleTest,
+                   AcquireCollectionMaybeLockFreeAllowedOnlyForRead,
+                   "Tripwire assertion") {
+    ASSERT_THROWS_CODE(acquireCollectionMaybeLockFree(opCtx(),
+                                                      {nssUnshardedCollection1,
+                                                       {dbVersionTestDb, ShardVersion::UNSHARDED()},
+                                                       repl::ReadConcernArgs(),
+                                                       AcquisitionPrerequisites::kWrite}),
+                       DBException,
+                       7740500);
 }
 
 // ---------------------------------------------------------------------------
@@ -1043,11 +1078,11 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDWithShardVersionAttachedThrows) {
                        DBException,
                        ErrorCodes::IncompatibleShardingMetadata);
     ASSERT_THROWS_CODE(
-        acquireCollectionsOrViewsWithoutTakingLocks(opCtx(),
-                                                    {{NamespaceStringOrUUID(dbNameTestDb, uuid),
-                                                      placementConcern,
-                                                      repl::ReadConcernArgs(),
-                                                      AcquisitionPrerequisites::kRead}}),
+        acquireCollectionsOrViewsMaybeLockFree(opCtx(),
+                                               {{NamespaceStringOrUUID(dbNameTestDb, uuid),
+                                                 placementConcern,
+                                                 repl::ReadConcernArgs(),
+                                                 AcquisitionPrerequisites::kRead}}),
         DBException,
         ErrorCodes::IncompatibleShardingMetadata);
 }
@@ -1089,7 +1124,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByNssAndWrongExpectedUUIDThrows) {
         ExceptionFor<ErrorCodes::CollectionUUIDMismatch>,
         validateException);
     ASSERT_THROWS_WITH_CHECK(
-        acquireCollectionsOrViewsWithoutTakingLocks(
+        acquireCollectionsOrViewsMaybeLockFree(
             opCtx(),
             {{nss, wrongUuid, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kRead}}),
         ExceptionFor<ErrorCodes::CollectionUUIDMismatch>,
@@ -1191,13 +1226,13 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithoutLocks) {
 
     PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
     const auto acquisitions =
-        acquireCollectionsOrViewsWithoutTakingLocks(opCtx(),
-                                                    {{
-                                                        nss,
-                                                        placementConcern,
-                                                        repl::ReadConcernArgs(),
-                                                        AcquisitionPrerequisites::kRead,
-                                                    }});
+        acquireCollectionsOrViewsMaybeLockFree(opCtx(),
+                                               {{
+                                                   nss,
+                                                   placementConcern,
+                                                   repl::ReadConcernArgs(),
+                                                   AcquisitionPrerequisites::kRead,
+                                               }});
 
     ASSERT_EQ(1, acquisitions.size());
     ASSERT_TRUE(acquisitions.at(nss).isCollection());
@@ -1597,13 +1632,13 @@ TEST_F(ShardRoleTest, RestoreChangesReadSourceAfterStepUp) {
 
     PlacementConcern placementConcern{dbVersionTestDb, ShardVersion::UNSHARDED()};
     const auto acquisitions =
-        acquireCollectionsOrViewsWithoutTakingLocks(opCtx(),
-                                                    {{
-                                                        nssUnshardedCollection1,
-                                                        placementConcern,
-                                                        repl::ReadConcernArgs(),
-                                                        AcquisitionPrerequisites::kRead,
-                                                    }});
+        acquireCollectionsOrViewsMaybeLockFree(opCtx(),
+                                               {{
+                                                   nssUnshardedCollection1,
+                                                   placementConcern,
+                                                   repl::ReadConcernArgs(),
+                                                   AcquisitionPrerequisites::kRead,
+                                               }});
 
     // Our read source should have been updated to kLastApplied.
     ASSERT_EQUALS(RecoveryUnit::ReadSource::kLastApplied,

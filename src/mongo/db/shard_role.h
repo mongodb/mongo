@@ -341,10 +341,6 @@ CollectionAcquisitions acquireCollections(
 CollectionOrViewAcquisition acquireCollectionOrView(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest, LockMode mode);
 
-// TODO SERVER-77405 Rename and make it delegate to locked version when lock-free is not possible.
-CollectionOrViewAcquisition acquireCollectionOrViewWithoutTakingLocks(
-    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest);
-
 CollectionOrViewAcquisitions acquireCollectionsOrViews(
     OperationContext* opCtx,
     std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests,
@@ -352,9 +348,19 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
 
 /**
  * Same semantics as `acquireCollectionsOrViews` above, but will not acquire or hold any of the
- * 2-phase hierarchical locks.
+ * 2-phase hierarchical locks if allowed for this operation. The conditions required for the
+ * acquisition to be lock-free are:
+ *    * The operation is not a multi-document transaction.
+ *    * The global lock is not write locked.
+ *    * No storage transaction is already open, or if it is, it has to be for a lock free operation.
  */
-CollectionOrViewAcquisitions acquireCollectionsOrViewsWithoutTakingLocks(
+CollectionAcquisition acquireCollectionMaybeLockFree(
+    OperationContext* opCtx, CollectionAcquisitionRequest acquisitionRequest);
+
+CollectionOrViewAcquisition acquireCollectionOrViewMaybeLockFree(
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest);
+
+CollectionOrViewAcquisitions acquireCollectionsOrViewsMaybeLockFree(
     OperationContext* opCtx, std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests);
 
 /**
@@ -436,16 +442,6 @@ YieldedTransactionResources yieldTransactionResourcesFromOperationContext(Operat
 
 void restoreTransactionResourcesToOperationContext(
     OperationContext* opCtx, YieldedTransactionResources yieldedResourcesHolder);
-
-/**
- * TODO SERVER-77405 remove, make internal only.
- *
- * Performs some checks to determine whether the operation is compatible with a lock-free read.
- * Multi-doc transactions are not supported, nor are operations performing a write.
- */
-namespace shard_role_details {
-bool supportsLockFreeRead(OperationContext* opCtx);
-}
 
 namespace shard_role_details {
 class SnapshotAttempt {

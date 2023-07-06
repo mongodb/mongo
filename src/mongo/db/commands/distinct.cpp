@@ -214,9 +214,7 @@ public:
         const auto acquisitionRequest = CollectionOrViewAcquisitionRequest::fromOpCtx(
             opCtx, nss, AcquisitionPrerequisites::kRead);
         boost::optional<CollectionOrViewAcquisition> collectionOrView =
-            shard_role_details::supportsLockFreeRead(opCtx)
-            ? acquireCollectionOrViewWithoutTakingLocks(opCtx, acquisitionRequest)
-            : acquireCollectionOrView(opCtx, acquisitionRequest, LockMode::MODE_IS);
+            acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
         const CollatorInterface* defaultCollator = collectionOrView->getCollectionPtr()
@@ -300,9 +298,7 @@ public:
             opCtx, nssOrUUID, AcquisitionPrerequisites::kRead);
 
         boost::optional<CollectionOrViewAcquisition> collectionOrView =
-            shard_role_details::supportsLockFreeRead(opCtx)
-            ? acquireCollectionOrViewWithoutTakingLocks(opCtx, acquisitionRequest)
-            : acquireCollectionOrView(opCtx, acquisitionRequest, LockMode::MODE_IS);
+            acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
         const auto nss = collectionOrView->nss();
 
         if (!tracker) {
