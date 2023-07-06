@@ -434,19 +434,24 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
 }
 
 void Balancer::_consumeActionStreamLoop() {
-    ScopeGuard onExitCleanup([this] {
-        _defragmentationPolicy->interruptAllDefragmentations();
-        _autoMergerPolicy->disable();
-    });
-
     Client::initThread("BalancerSecondary");
     auto opCtx = cc().makeOperationContext();
     executor::ScopedTaskExecutor executor(
         Grid::get(opCtx.get())->getExecutorPool()->getFixedExecutor());
 
-    // The scoped task executor kills callbacks on destruction which may lead to
-    // _outstandingStreamingOps being non-zero after a step down. Reset it to 0 here on step up.
-    _outstandingStreamingOps.store(0);
+    ScopeGuard onExitCleanup([this, &executor] {
+        _defragmentationPolicy->interruptAllDefragmentations();
+        _autoMergerPolicy->disable();
+        // Explicitly cancel and drain any outstanding streaming action already dispatched to the
+        // task executor.
+        executor->shutdown();
+        executor->join();
+        // When shutting down, the task executor may or may not invoke the
+        // applyActionResponseTo()callback for canceled streaming actions: to ensure a consistent
+        // state of the balancer after a step down, _outstandingStreamingOps needs then to be reset
+        // to 0 once all the tasks have been drained.
+        _outstandingStreamingOps.store(0);
+    });
 
     // Lambda function for applying action response
     auto applyActionResponseTo = [this](const BalancerStreamAction& action,
