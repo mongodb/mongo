@@ -44,7 +44,7 @@ ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(BSONObj keyDoc,
 
 /*
  * Upserts the given ExternalKeysCollectionDocuments into the
- * config.external_validation_keys collection, and returns the optime for the inserts.
+ * config.external_validation_keys collection, and returns the optime for the upserts.
  */
 repl::OpTime storeExternalClusterTimeKeyDocs(OperationContext* opCtx,
                                              std::vector<ExternalKeysCollectionDocument> keyDocs);

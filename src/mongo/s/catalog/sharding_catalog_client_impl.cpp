@@ -412,6 +412,45 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
     return AggregateCommandRequest(CollectionType::ConfigNS, std::move(serializedPipeline));
 }
 
+/**
+ * Returns keys for the given purpose and have an expiresAt value greater than newerThanThis on the
+ * given shard.
+ */
+template <typename KeyDocumentType>
+StatusWith<std::vector<KeyDocumentType>> _getNewKeys(OperationContext* opCtx,
+                                                     std::shared_ptr<Shard> shard,
+                                                     const NamespaceString& nss,
+                                                     StringData purpose,
+                                                     const LogicalTime& newerThanThis,
+                                                     repl::ReadConcernLevel readConcernLevel) {
+    BSONObjBuilder queryBuilder;
+    queryBuilder.append("purpose", purpose);
+    queryBuilder.append("expiresAt", BSON("$gt" << newerThanThis.asTimestamp()));
+
+    auto findStatus = shard->exhaustiveFindOnConfig(opCtx,
+                                                    kConfigReadSelector,
+                                                    readConcernLevel,
+                                                    nss,
+                                                    queryBuilder.obj(),
+                                                    BSON("expiresAt" << 1),
+                                                    boost::none);
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+    const auto& objs = findStatus.getValue().docs;
+
+    std::vector<KeyDocumentType> keyDocs;
+    keyDocs.reserve(objs.size());
+    for (auto&& obj : objs) {
+        try {
+            keyDocs.push_back(KeyDocumentType::parse(IDLParserErrorContext("keyDoc"), obj));
+        } catch (...) {
+            return exceptionToStatus();
+        }
+    }
+    return keyDocs;
+}
+
 }  // namespace
 
 ShardingCatalogClientImpl::ShardingCatalogClientImpl() = default;
@@ -1304,41 +1343,32 @@ StatusWith<repl::OpTimeWith<vector<BSONObj>>> ShardingCatalogClientImpl::_exhaus
                                              response.getValue().opTime);
 }
 
-StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNewKeys(
+StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNewInternalKeys(
     OperationContext* opCtx,
     StringData purpose,
     const LogicalTime& newerThanThis,
     repl::ReadConcernLevel readConcernLevel) {
-    auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    return _getNewKeys<KeysCollectionDocument>(opCtx,
+                                               configShard,
+                                               NamespaceString::kKeysCollectionNamespace,
+                                               purpose,
+                                               newerThanThis,
+                                               readConcernLevel);
+}
 
-    BSONObjBuilder queryBuilder;
-    queryBuilder.append("purpose", purpose);
-    queryBuilder.append("expiresAt", BSON("$gt" << newerThanThis.asTimestamp()));
-
-    auto findStatus = config->exhaustiveFindOnConfig(opCtx,
-                                                     kConfigReadSelector,
-                                                     readConcernLevel,
-                                                     NamespaceString::kKeysCollectionNamespace,
-                                                     queryBuilder.obj(),
-                                                     BSON("expiresAt" << 1),
-                                                     boost::none);
-
-    if (!findStatus.isOK()) {
-        return findStatus.getStatus();
-    }
-
-    const auto& keyDocs = findStatus.getValue().docs;
-    std::vector<KeysCollectionDocument> keys;
-    keys.reserve(keyDocs.size());
-    for (auto&& keyDoc : keyDocs) {
-        try {
-            keys.push_back(KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), keyDoc));
-        } catch (...) {
-            return exceptionToStatus();
-        }
-    }
-
-    return keys;
+StatusWith<std::vector<ExternalKeysCollectionDocument>>
+ShardingCatalogClientImpl::getAllExternalKeys(OperationContext* opCtx,
+                                              StringData purpose,
+                                              repl::ReadConcernLevel readConcernLevel) {
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    return _getNewKeys<ExternalKeysCollectionDocument>(
+        opCtx,
+        configShard,
+        NamespaceString::kExternalKeysCollectionNamespace,
+        purpose,
+        LogicalTime(),
+        readConcernLevel);
 }
 
 }  // namespace mongo
