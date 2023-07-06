@@ -135,7 +135,8 @@ structs:
                 stability: unstable
             return:
                 description: "When set to 'post', returns the modified document
-                              rather than the original. Default is to return the original ('pre')."
+                              rather than the original. 'pre' returns the original.
+                              Default is to not return either."
                 type: string
                 optional: true
                 validator:
@@ -158,13 +159,13 @@ structs:
                 validator: { gte: 0 }
                 stability: unstable
             filter:
-                description: "The query that matches documents to update. Uses the same query
+                description: "The query that matches documents to delete. Uses the same query
                               selectors as used in the 'find' operation."
                 type: object
                 stability: unstable
             multi:
-                description: "If true, updates all documents that meet the query criteria. If false,
-                              limits the update to one document which meets the query criteria." 
+                description: "If true, deletes all documents that meet the query criteria. If false,
+                              limits the delete to one document which meets the query criteria." 
                 type: bool
                 default: false
                 stability: unstable
