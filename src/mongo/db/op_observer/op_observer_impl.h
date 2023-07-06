@@ -237,10 +237,10 @@ public:
         Timestamp commitTimestamp,
         const std::vector<repl::ReplOperation>& statements) noexcept final;
 
-    std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
+    void preTransactionPrepare(
         OperationContext* opCtx,
-        const std::vector<OplogSlot>& reservedSlots,
         const TransactionOperations& transactionOperations,
+        const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         Date_t wallClockTime) final;
 
     void onTransactionPrepare(

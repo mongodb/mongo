@@ -1263,13 +1263,16 @@ protected:
         auto txnOps = txnParticipant().retrieveCompletedTransactionOperations(opCtx());
         auto currentTime = Date_t::now();
         auto applyOpsAssignment =
-            opObserver().preTransactionPrepare(opCtx(), reservedSlots, *txnOps, currentTime);
+            txnOps->getApplyOpsInfo(reservedSlots,
+                                    getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
+                                    getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
+                                    /*prepare=*/true);
+        opObserver().preTransactionPrepare(opCtx(), *txnOps, applyOpsAssignment, currentTime);
         opCtx()->recoveryUnit()->setPrepareTimestamp(prepareOpTime.getTimestamp());
-        ASSERT(applyOpsAssignment);
         opObserver().onTransactionPrepare(opCtx(),
                                           reservedSlots,
                                           *txnOps,
-                                          *applyOpsAssignment,
+                                          applyOpsAssignment,
                                           numberOfPrePostImagesToWrite,
                                           currentTime);
     }

@@ -191,15 +191,6 @@ void OplogApplierImplOpObserver::onCollMod(OperationContext* opCtx,
     onCollModFn(opCtx, nss, uuid, collModCmd, oldCollOptions, indexInfo);
 }
 
-std::unique_ptr<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>
-OplogApplierImplOpObserver::preTransactionPrepare(
-    OperationContext* opCtx,
-    const std::vector<OplogSlot>& reservedSlots,
-    const TransactionOperations& transactionOperations,
-    Date_t wallClockTime) {
-    return std::make_unique<ApplyOpsOplogSlotAndOperationAssignment>(/*prepare=*/true);
-}
-
 void OplogApplierImplTest::setUp() {
     ServiceContextMongoDTest::setUp();
 

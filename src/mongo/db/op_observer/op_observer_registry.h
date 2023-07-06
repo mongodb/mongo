@@ -524,24 +524,15 @@ public:
                 opCtx, commitOplogEntryOpTime, commitTimestamp, statements);
     }
 
-    std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
+    void preTransactionPrepare(
         OperationContext* opCtx,
-        const std::vector<OplogSlot>& reservedSlots,
         const TransactionOperations& transactionOperations,
+        const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         Date_t wallClockTime) override {
-        std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment>
-            applyOpsOplogSlotAndOperationAssignment;
         for (auto&& observer : _observers) {
-            auto applyOpsAssignment = observer->preTransactionPrepare(
-                opCtx, reservedSlots, transactionOperations, wallClockTime);
-            tassert(6278501,
-                    "More than one OpObserver returned operation to \"applyOps\" assignment",
-                    !(applyOpsAssignment && applyOpsOplogSlotAndOperationAssignment));
-            if (applyOpsAssignment) {
-                applyOpsOplogSlotAndOperationAssignment = std::move(applyOpsAssignment);
-            }
+            observer->preTransactionPrepare(
+                opCtx, transactionOperations, applyOpsOperationAssignment, wallClockTime);
         }
-        return applyOpsOplogSlotAndOperationAssignment;
     }
 
     void onTransactionPrepare(

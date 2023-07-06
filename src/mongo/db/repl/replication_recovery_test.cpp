@@ -87,7 +87,6 @@
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
-#include "mongo/db/transaction/transaction_operations.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -182,17 +181,6 @@ public:
             OpObserver::Times::get(opCtx).reservedOpTimes.push_back(dropOpTime);
         }
         return {};
-    }
-
-    /**
-     * Called when we prepare a multi-doc transaction using the TransactionParticipant.
-     */
-    std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
-        OperationContext* opCtx,
-        const std::vector<OplogSlot>& reservedSlots,
-        const TransactionOperations& transactionOperations,
-        Date_t wallClockTime) override {
-        return std::make_unique<ApplyOpsOplogSlotAndOperationAssignment>(/*prepare=*/false);
     }
 
     const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};

@@ -167,12 +167,6 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
 
 class OpObserverMock : public OpObserverNoop {
 public:
-    std::unique_ptr<OpObserver::ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
-        OperationContext* opCtx,
-        const std::vector<OplogSlot>& reservedSlots,
-        const TransactionOperations& transactionOperations,
-        Date_t wallClockTime) override;
-
     void onTransactionPrepare(
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
@@ -223,14 +217,6 @@ public:
 
     const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 };
-
-std::unique_ptr<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>
-OpObserverMock::preTransactionPrepare(OperationContext* opCtx,
-                                      const std::vector<OplogSlot>& reservedSlots,
-                                      const TransactionOperations& transactionOperations,
-                                      Date_t wallClockTime) {
-    return std::make_unique<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>(/*prepare=*/true);
-}
 
 void OpObserverMock::onTransactionPrepare(
     OperationContext* opCtx,

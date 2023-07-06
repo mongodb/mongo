@@ -59,9 +59,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/op_observer/op_observer_noop.h"
-#include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/member_state.h"
@@ -86,7 +83,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
-#include "mongo/db/transaction/transaction_operations.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -101,24 +97,6 @@
 
 namespace mongo {
 namespace {
-
-/**
- * OpObserver for OplogApplierImpl test fixture.
- */
-class ReshardingOplogSessionApplicationOpObserver : public OpObserverNoop {
-public:
-    /**
-     * Called when OplogApplierImpl prepares a multi-doc transaction using the
-     * TransactionParticipant.
-     */
-    std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
-        OperationContext* opCtx,
-        const std::vector<OplogSlot>& reservedSlots,
-        const TransactionOperations& transactionOperations,
-        Date_t wallClockTime) override {
-        return std::make_unique<ApplyOpsOplogSlotAndOperationAssignment>(/*prepare=*/false);
-    }
-};
 
 class ReshardingOplogSessionApplicationTest : public ServiceContextMongoDTest {
 public:
@@ -144,13 +122,6 @@ public:
             auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
             mongoDSessionCatalog->onStepUp(opCtx.get());
         }
-
-        // Set up an OpObserver to ensure that preparing a multi-doc transaction has
-        // a valid description for mapping transaction operations to applyOps entries.
-        auto opObserverRegistry =
-            dynamic_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
-        opObserverRegistry->addObserver(
-            std::make_unique<ReshardingOplogSessionApplicationOpObserver>());
 
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
     }

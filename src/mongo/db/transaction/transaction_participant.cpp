@@ -1774,23 +1774,27 @@ TransactionParticipant::Participant::prepareTransaction(
             hangAfterReservingPrepareTimestamp.pauseWhileSet();
         }
     }
+    auto applyOpsOplogSlotAndOperationAssignment = completedTransactionOperations->getApplyOpsInfo(
+        reservedSlots,
+        getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
+        getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
+        /*prepare=*/true);
+
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     const auto wallClockTime = opCtx->getServiceContext()->getFastClockSource()->now();
-    auto applyOpsOplogSlotAndOperationAssignment = opObserver->preTransactionPrepare(
-        opCtx, reservedSlots, *completedTransactionOperations, wallClockTime);
+    opObserver->preTransactionPrepare(opCtx,
+                                      *completedTransactionOperations,
+                                      applyOpsOplogSlotAndOperationAssignment,
+                                      wallClockTime);
 
     opCtx->recoveryUnit()->setPrepareTimestamp(prepareOplogSlot.getTimestamp());
     opCtx->getWriteUnitOfWork()->prepare();
     p().needToWriteAbortEntry = true;
 
-    tassert(6278510,
-            "Operation assignments to applyOps entries should be present",
-            applyOpsOplogSlotAndOperationAssignment);
-
     opObserver->onTransactionPrepare(opCtx,
                                      reservedSlots,
                                      *completedTransactionOperations,
-                                     *applyOpsOplogSlotAndOperationAssignment,
+                                     applyOpsOplogSlotAndOperationAssignment,
                                      p().transactionOperations.getNumberOfPrePostImagesToWrite(),
                                      wallClockTime);
 

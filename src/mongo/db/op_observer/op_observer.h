@@ -533,25 +533,20 @@ public:
      * This method is called before an atomic transaction is prepared. It must be called when a
      * transaction is active.
      *
-     * Optionally returns a representation of "applyOps" entries to be written and oplog slots to be
-     * used for writing pre- and post- image oplog entries for a transaction. Only one OpObserver in
-     * the system should return the representation of "applyOps" entries. The returned value is
-     * passed to 'onTransactionPrepare()'.
-     *
-     * The 'reservedSlots' is a list of oplog slots reserved for the oplog entries in a transaction.
-     * The last reserved slot represents the prepareOpTime used for the prepare oplog entry.
-     *
-     * The 'wallClockTime' is the time to record as wall clock time on oplog entries resulting from
-     * transaction preparation.
-     *
      * The 'transactionOperations' contains the list of CRUD operations to be applied in this
      * transaction. The operations may be modified by setting pre-image and post-image oplog entry
      * timestamps.
+     *
+     * The 'applyOpsOperationAssignment' contains a representation of "applyOps" entries and oplog
+     * slots to be used for writing pre- and post- image oplog entries for a transaction.
+     *
+     * The 'wallClockTime' is the time to record as wall clock time on oplog entries resulting from
+     * transaction preparation.
      */
-    virtual std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
+    virtual void preTransactionPrepare(
         OperationContext* opCtx,
-        const std::vector<OplogSlot>& reservedSlots,
         const TransactionOperations& transactionOperations,
+        const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         Date_t wallClockTime) = 0;
 
     /**
@@ -565,8 +560,8 @@ public:
      * this transaction.
      *
      * The 'applyOpsOperationAssignment' contains a representation of "applyOps" entries and oplog
-     * slots to be used for writing pre- and post- image oplog entries for a transaction. A value
-     * returned by 'preTransactionPrepare()' should be passed as 'applyOpsOperationAssignment'.
+     * slots to be used for writing pre- and post- image oplog entries for a transaction.
+     * The same "applyOps" information should be passed to 'preTransactionPrepare()'.
      *
      * The 'numberOfPrePostImagesToWrite' is the number of CRUD operations that have a pre-image
      * to write as a noop oplog entry. The op observer will reserve oplog slots for these

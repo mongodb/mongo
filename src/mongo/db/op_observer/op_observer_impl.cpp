@@ -1975,21 +1975,14 @@ void OpObserverImpl::onPreparedTransactionCommit(
         opCtx, &oplogEntry, DurableTxnStateEnum::kCommitted, _oplogWriter.get());
 }
 
-std::unique_ptr<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>
-OpObserverImpl::preTransactionPrepare(OperationContext* opCtx,
-                                      const std::vector<OplogSlot>& reservedSlots,
-                                      const TransactionOperations& transactionOperations,
-                                      Date_t wallClockTime) {
-    auto applyOpsOplogSlotAndOperationAssignment = transactionOperations.getApplyOpsInfo(
-        reservedSlots,
-        getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
-        getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
-        /*prepare=*/true);
+void OpObserverImpl::preTransactionPrepare(
+    OperationContext* opCtx,
+    const TransactionOperations& transactionOperations,
+    const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+    Date_t wallClockTime) {
     const auto& statements = transactionOperations.getOperationsForOpObserver();
     writeChangeStreamPreImagesForTransaction(
-        opCtx, statements, applyOpsOplogSlotAndOperationAssignment, wallClockTime);
-    return std::make_unique<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>(
-        std::move(applyOpsOplogSlotAndOperationAssignment));
+        opCtx, statements, applyOpsOperationAssignment, wallClockTime);
 }
 
 void OpObserverImpl::onTransactionPrepare(
