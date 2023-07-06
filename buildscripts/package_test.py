@@ -308,10 +308,6 @@ def iterate_over_downloads() -> Generator[Dict[str, Any], None, None]:
 
 
 def get_tools_package(arch_name: str, os_name: str) -> Optional[str]:
-    # TODO: MONGOSH-1308 - we need to sub the arch alias until package
-    # architectures are named consistently with the server packages
-    if arch_name == "aarch64" and os_name != "amazon2":
-        arch_name = "arm64"
     for download in current_tools_releases["versions"][0]["downloads"]:
         if download["name"] == os_name and download["arch"] == arch_name:
             return download["package"]["url"]
@@ -319,6 +315,8 @@ def get_tools_package(arch_name: str, os_name: str) -> Optional[str]:
 
 
 def get_mongosh_package(arch_name: str, os_name: str) -> Optional[str]:
+    # TODO: MONGOSH-1308 - we need to sub the arch alias until package
+    # architectures are named consistently with the server packages
     if arch_name == "aarch64":
         arch_name = "arm64"
     if arch_name in ("x86_64", "amd64"):
