@@ -45,7 +45,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -95,7 +94,6 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
-#include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -1561,36 +1559,6 @@ void writeChangeStreamPreImagesForApplyOpsEntries(
         }
         ++applyOpsIndex;
     }
-}
-
-/**
- * Returns maximum number of operations to pack into a single oplog entry,
- * when multi-oplog format for transactions is in use.
- *
- * Stop packing when either number of transaction operations is reached, or when the
- * next one would make the total size of operations larger than the maximum BSON Object
- * User Size. We rely on the headroom between BSONObjMaxUserSize and
- * BSONObjMaxInternalSize to cover the BSON overhead and the other "applyOps" entry
- * fields. But if a single operation in the set exceeds BSONObjMaxUserSize, we still fit
- * it, as a single max-length operation should be able to be packed into an "applyOps"
- * entry.
- */
-std::size_t getMaxNumberOfTransactionOperationsInSingleOplogEntry() {
-    tassert(6278503,
-            "gMaxNumberOfTransactionOperationsInSingleOplogEntry should be positive number",
-            gMaxNumberOfTransactionOperationsInSingleOplogEntry > 0);
-    return static_cast<std::size_t>(gMaxNumberOfTransactionOperationsInSingleOplogEntry);
-}
-
-/**
- * Returns maximum size (bytes) of operations to pack into a single oplog entry,
- * when multi-oplog format for transactions is in use.
- *
- * Refer to getMaxNumberOfTransactionOperationsInSingleOplogEntry() comments for a
- * description on packing transaction operations into "applyOps" entries.
- */
-std::size_t getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes() {
-    return static_cast<std::size_t>(BSONObjMaxUserSize);
 }
 
 /**

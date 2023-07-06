@@ -3633,4 +3633,15 @@ void TransactionParticipant::Participant::_registerUpdateCacheOnCommit(
     });
 }
 
+std::size_t getMaxNumberOfTransactionOperationsInSingleOplogEntry() {
+    tassert(6278503,
+            "gMaxNumberOfTransactionOperationsInSingleOplogEntry should be positive number",
+            gMaxNumberOfTransactionOperationsInSingleOplogEntry > 0);
+    return static_cast<std::size_t>(gMaxNumberOfTransactionOperationsInSingleOplogEntry);
+}
+
+std::size_t getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes() {
+    return static_cast<std::size_t>(BSONObjMaxUserSize);
+}
+
 }  // namespace mongo
