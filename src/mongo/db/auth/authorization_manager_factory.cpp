@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,27 +27,12 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
+#include "authorization_manager_factory.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/service_context.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/platform/basic.h"
 
 namespace mongo {
-namespace {
 
-class ClusterCursorStats final : public ServerStatusMetric {
-public:
-    void appendTo(BSONObjBuilder& b, StringData leafName) const override {
-        Grid::get(getGlobalServiceContext())->getCursorManager()->stats();
-    }
-};
+std::unique_ptr<AuthorizationManagerFactory> globalAuthzManagerFactory;
 
-ClusterCursorStats& clusterCursorStats =
-    addMetricToTree("cluster.cursor.stats", std::make_unique<ClusterCursorStats>());
-
-}  // namespace
 }  // namespace mongo

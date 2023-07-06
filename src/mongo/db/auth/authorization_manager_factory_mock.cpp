@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,27 +27,32 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
+#include "mongo/platform/basic.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/service_context.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/db/auth/authorization_manager_factory_mock.h"
+#include "mongo/db/auth/authorization_manager_impl.h"
+#include "mongo/db/auth/authz_manager_external_state_mock.h"
 
 namespace mongo {
+
+std::unique_ptr<AuthorizationManager> AuthorizationManagerFactoryMock::createRouter(
+    ServiceContext* service) {
+    return std::make_unique<AuthorizationManagerImpl>(
+        service, std::make_unique<AuthzManagerExternalStateMock>());
+}
+
+std::unique_ptr<AuthorizationManager> AuthorizationManagerFactoryMock::createShard(
+    ServiceContext* service) {
+    return std::make_unique<AuthorizationManagerImpl>(
+        service, std::make_unique<AuthzManagerExternalStateMock>());
+}
+
 namespace {
 
-class ClusterCursorStats final : public ServerStatusMetric {
-public:
-    void appendTo(BSONObjBuilder& b, StringData leafName) const override {
-        Grid::get(getGlobalServiceContext())->getCursorManager()->stats();
-    }
-};
-
-ClusterCursorStats& clusterCursorStats =
-    addMetricToTree("cluster.cursor.stats", std::make_unique<ClusterCursorStats>());
+MONGO_INITIALIZER(RegisterGlobalAuthzManagerFactoryMock)(InitializerContext* initializer) {
+    globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+}
 
 }  // namespace
+
 }  // namespace mongo

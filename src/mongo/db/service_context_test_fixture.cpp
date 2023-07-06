@@ -32,6 +32,7 @@
 #include <utility>
 
 #include "mongo/client/replica_set_monitor_manager.h"
+#include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/util/clock_source_mock.h"
 
@@ -47,6 +48,10 @@ ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest() {
     auto serviceContext = ServiceContext::make();
     WireSpec::getWireSpec(serviceContext.get()).initialize(WireSpec::Specification{});
     setGlobalServiceContext(std::move(serviceContext));
+
+    auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+    AuthorizationManager::set(getGlobalServiceContext(),
+                              globalAuthzManagerFactory->createShard(getGlobalServiceContext()));
 }
 
 ScopedGlobalServiceContextForTest::~ScopedGlobalServiceContextForTest() {

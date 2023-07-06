@@ -44,16 +44,4 @@ void AuthzSessionExternalStateMongos::startRequest(OperationContext* opCtx) {
     _checkShouldAllowLocalhost(opCtx);
 }
 
-namespace {
-
-std::unique_ptr<AuthzSessionExternalState> authzSessionExternalStateCreateImpl(
-    AuthorizationManager* authzManager) {
-    return std::make_unique<AuthzSessionExternalStateMongos>(authzManager);
-}
-
-auto authzSessionExternalStateCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
-    AuthzSessionExternalState::create, authzSessionExternalStateCreateImpl);
-
-}  // namespace
-
 }  // namespace mongo

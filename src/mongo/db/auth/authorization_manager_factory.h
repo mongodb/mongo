@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,27 +27,30 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
+#pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
 
 namespace mongo {
-namespace {
 
-class ClusterCursorStats final : public ServerStatusMetric {
+/**
+ * Factory class for generating the correct authorization manager for the
+ * process. createRouter creates an authorization manager that connects to
+ * config servers to get authorization information, and createShard creates
+ * an authorization manager that may search locally for authorization
+ * information unless the user is registered to $external.
+ */
+
+class AuthorizationManagerFactory {
+
 public:
-    void appendTo(BSONObjBuilder& b, StringData leafName) const override {
-        Grid::get(getGlobalServiceContext())->getCursorManager()->stats();
-    }
+    virtual ~AuthorizationManagerFactory() = default;
+
+    virtual std::unique_ptr<AuthorizationManager> createRouter(ServiceContext* service) = 0;
+    virtual std::unique_ptr<AuthorizationManager> createShard(ServiceContext* service) = 0;
 };
 
-ClusterCursorStats& clusterCursorStats =
-    addMetricToTree("cluster.cursor.stats", std::make_unique<ClusterCursorStats>());
+extern std::unique_ptr<AuthorizationManagerFactory> globalAuthzManagerFactory;
 
-}  // namespace
 }  // namespace mongo
