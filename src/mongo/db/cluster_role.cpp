@@ -28,21 +28,36 @@
  */
 
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
-#include "mongo/db/feature_flag.h"
+
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-bool ClusterRole::has(const ClusterRole& other) const {
-    if (_value == ClusterRole::ConfigServer) {
-        return other._value == ClusterRole::ConfigServer ||
-            other._value == ClusterRole::ShardServer;
+ClusterRole::ClusterRole(Value role) : _roleMask(role) {}
+
+ClusterRole::ClusterRole(std::initializer_list<Value> roles) : _roleMask(None) {
+    for (const auto role : roles) {
+        _roleMask |= role;
     }
-
-    return _value == other._value;
+    invariant(!hasExclusively(ClusterRole::ConfigServer),
+              "Role cannot be set to config server only");
 }
 
-bool ClusterRole::exclusivelyHasShardRole() {
-    return _value == ClusterRole::ShardServer;
+ClusterRole& ClusterRole::operator=(const ClusterRole& rhs) {
+    if (this != &rhs) {
+        _roleMask = rhs._roleMask;
+    }
+    invariant(!hasExclusively(ClusterRole::ConfigServer),
+              "Role cannot be set to config server only");
+    return *this;
 }
+
+bool ClusterRole::has(const ClusterRole& role) const {
+    return role._roleMask == None ? _roleMask == None : _roleMask & role._roleMask;
+}
+
+bool ClusterRole::hasExclusively(const ClusterRole& role) const {
+    return _roleMask == role._roleMask;
+}
+
 }  // namespace mongo

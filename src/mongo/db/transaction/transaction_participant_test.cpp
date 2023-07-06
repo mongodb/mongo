@@ -1935,7 +1935,7 @@ class ConfigTxnParticipantTest : public ShardedClusterParticipantTest {
 protected:
     void setUp() final {
         TxnParticipantTest::setUp();
-        serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+        serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     }
 
     void tearDown() final {

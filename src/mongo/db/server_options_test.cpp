@@ -956,21 +956,79 @@ TEST(SetupOptions, ForkOptionAlwaysFalseWithNoforkEnvVar) {
 }
 #endif
 
-TEST(ClusterRole, Equality) {
-    ASSERT_TRUE(ClusterRole(ClusterRole::None).has(ClusterRole::None));
-    ASSERT_TRUE(!ClusterRole(ClusterRole::None).has(ClusterRole::ConfigServer));
-    ASSERT_TRUE(!ClusterRole(ClusterRole::None).has(ClusterRole::ShardServer));
+TEST(ClusterRole, MonoRole) {
+    const ClusterRole noRole{ClusterRole::None};
+    ASSERT_TRUE(noRole.has(ClusterRole::None));
+    ASSERT_FALSE(noRole.has(ClusterRole::ShardServer));
+    ASSERT_FALSE(noRole.has(ClusterRole::ConfigServer));
+    ASSERT_FALSE(noRole.has(ClusterRole::RouterServer));
+    ASSERT_TRUE(noRole.hasExclusively(ClusterRole::None));
+    ASSERT_FALSE(noRole.hasExclusively(ClusterRole::ShardServer));
+    ASSERT_FALSE(noRole.hasExclusively(ClusterRole::ConfigServer));
+    ASSERT_FALSE(noRole.hasExclusively(ClusterRole::RouterServer));
 
-    ASSERT_TRUE(!ClusterRole(ClusterRole::ConfigServer).has(ClusterRole::None));
-    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer).has(ClusterRole::ConfigServer));
-    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer).has(ClusterRole::ShardServer));
+    const ClusterRole shardRole{ClusterRole::ShardServer};
+    ASSERT_FALSE(shardRole.has(ClusterRole::None));
+    ASSERT_TRUE(shardRole.has(ClusterRole::ShardServer));
+    ASSERT_FALSE(shardRole.has(ClusterRole::ConfigServer));
+    ASSERT_FALSE(shardRole.has(ClusterRole::RouterServer));
+    ASSERT_FALSE(shardRole.hasExclusively(ClusterRole::None));
+    ASSERT_TRUE(shardRole.hasExclusively(ClusterRole::ShardServer));
+    ASSERT_FALSE(shardRole.hasExclusively(ClusterRole::ConfigServer));
+    ASSERT_FALSE(shardRole.hasExclusively(ClusterRole::RouterServer));
 
-    ASSERT_TRUE(!ClusterRole(ClusterRole::ShardServer).has(ClusterRole::None));
-    ASSERT_TRUE(!ClusterRole(ClusterRole::ShardServer).has(ClusterRole::ConfigServer));
-    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer).has(ClusterRole::ShardServer));
+    const ClusterRole routerRole{ClusterRole::RouterServer};
+    ASSERT_FALSE(routerRole.has(ClusterRole::None));
+    ASSERT_FALSE(routerRole.has(ClusterRole::ShardServer));
+    ASSERT_FALSE(routerRole.has(ClusterRole::ConfigServer));
+    ASSERT_TRUE(routerRole.has(ClusterRole::RouterServer));
+    ASSERT_FALSE(routerRole.hasExclusively(ClusterRole::None));
+    ASSERT_FALSE(routerRole.hasExclusively(ClusterRole::ShardServer));
+    ASSERT_FALSE(routerRole.hasExclusively(ClusterRole::ConfigServer));
+    ASSERT_TRUE(routerRole.hasExclusively(ClusterRole::RouterServer));
+}
 
-    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer).exclusivelyHasShardRole());
-    ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).exclusivelyHasShardRole());
+TEST(ClusterRole, MultiRole) {
+    const ClusterRole shardAndConfigRole{ClusterRole::ShardServer, ClusterRole::ConfigServer};
+    ASSERT_FALSE(shardAndConfigRole.has(ClusterRole::None));
+    ASSERT_TRUE(shardAndConfigRole.has(ClusterRole::ShardServer));
+    ASSERT_TRUE(shardAndConfigRole.has(ClusterRole::ConfigServer));
+    ASSERT_FALSE(shardAndConfigRole.has(ClusterRole::RouterServer));
+    ASSERT_FALSE(shardAndConfigRole.hasExclusively(ClusterRole::None));
+    ASSERT_FALSE(shardAndConfigRole.hasExclusively(ClusterRole::ShardServer));
+    ASSERT_FALSE(shardAndConfigRole.hasExclusively(ClusterRole::ConfigServer));
+    ASSERT_FALSE(shardAndConfigRole.hasExclusively(ClusterRole::RouterServer));
+
+    const ClusterRole shardAndRouterRole{ClusterRole::ShardServer, ClusterRole::RouterServer};
+    ASSERT_FALSE(shardAndRouterRole.has(ClusterRole::None));
+    ASSERT_TRUE(shardAndRouterRole.has(ClusterRole::ShardServer));
+    ASSERT_FALSE(shardAndRouterRole.has(ClusterRole::ConfigServer));
+    ASSERT_TRUE(shardAndRouterRole.has(ClusterRole::RouterServer));
+    ASSERT_FALSE(shardAndRouterRole.hasExclusively(ClusterRole::None));
+    ASSERT_FALSE(shardAndRouterRole.hasExclusively(ClusterRole::ShardServer));
+    ASSERT_FALSE(shardAndRouterRole.hasExclusively(ClusterRole::ConfigServer));
+    ASSERT_FALSE(shardAndRouterRole.hasExclusively(ClusterRole::RouterServer));
+
+    const ClusterRole configAndRouterRole{ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    ASSERT_FALSE(configAndRouterRole.has(ClusterRole::None));
+    ASSERT_FALSE(configAndRouterRole.has(ClusterRole::ShardServer));
+    ASSERT_TRUE(configAndRouterRole.has(ClusterRole::ConfigServer));
+    ASSERT_TRUE(configAndRouterRole.has(ClusterRole::RouterServer));
+    ASSERT_FALSE(configAndRouterRole.hasExclusively(ClusterRole::None));
+    ASSERT_FALSE(configAndRouterRole.hasExclusively(ClusterRole::ShardServer));
+    ASSERT_FALSE(configAndRouterRole.hasExclusively(ClusterRole::ConfigServer));
+    ASSERT_FALSE(configAndRouterRole.hasExclusively(ClusterRole::RouterServer));
+
+    const ClusterRole anyRole{
+        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    ASSERT_FALSE(anyRole.has(ClusterRole::None));
+    ASSERT_TRUE(anyRole.has(ClusterRole::ShardServer));
+    ASSERT_TRUE(anyRole.has(ClusterRole::ConfigServer));
+    ASSERT_TRUE(anyRole.has(ClusterRole::RouterServer));
+    ASSERT_FALSE(anyRole.hasExclusively(ClusterRole::None));
+    ASSERT_FALSE(anyRole.hasExclusively(ClusterRole::ShardServer));
+    ASSERT_FALSE(anyRole.hasExclusively(ClusterRole::ConfigServer));
+    ASSERT_FALSE(anyRole.hasExclusively(ClusterRole::RouterServer));
 }
 
 #if !defined(_WIN32) && !(defined(__APPLE__) && TARGET_OS_TV)

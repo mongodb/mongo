@@ -629,7 +629,7 @@ Status storeMongodOptions(const moe::Environment& params) {
                                            "--replSet to start the node as a replica set.");
         }
         if (clusterRoleParam == "configsvr") {
-            serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+            serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
             // Config server requires majority read concern.
             uassert(5324702,
                     str::stream() << "Cannot initialize config server with "

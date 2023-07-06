@@ -909,7 +909,7 @@ TEST(ReplSetConfig, ConfigServerField) {
     ASSERT_FALSE(configBSON.hasField("configsvr"));
 
     // Configs in which configsvr is not the same as the --configsvr flag are invalid.
-    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
 
     ASSERT_OK(config.validate());
@@ -1116,7 +1116,7 @@ TEST(ReplSetConfig, ConfigServerFieldDefaults) {
                                         OID::gen()));
     ASSERT_FALSE(config2.getConfigServer());
 
-    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
 
     ReplSetConfig config3;
@@ -1487,7 +1487,7 @@ TEST(ReplSetConfig, CheckConfigServerCantHaveSecondaryDelaySecs) {
 }
 
 TEST(ReplSetConfig, CheckConfigServerMustHaveTrueForWriteConcernMajorityJournalDefault) {
-    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
     ReplSetConfig configA;
     configA = ReplSetConfig::parse(BSON("_id"

@@ -241,7 +241,7 @@ Status initializeGlobalShardingState(
 }
 
 void loadCWWCFromConfigServerForReplication(OperationContext* opCtx) {
-    if (!serverGlobalParams.clusterRole.exclusivelyHasShardRole()) {
+    if (!serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
         // Cluster wide read/write concern in a sharded cluster lives on the config server, so a
         // config server node's local cache will be correct and explicitly checking for a default
         // write concern via remote command is unnecessary.

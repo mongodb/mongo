@@ -2384,7 +2384,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordShardIdentityRollbackFo
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsConfigVersionRollback) {
-    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     const auto uuid = UUID::gen();
     const auto nss = VersionType::ConfigNS;
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
@@ -2419,7 +2419,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordConfigVersionRollbackFo
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordConfigVersionRollbackForNonInsert) {
-    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     const auto uuid = UUID::gen();
     const auto nss = VersionType::ConfigNS;
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);

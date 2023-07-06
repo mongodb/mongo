@@ -376,7 +376,7 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
     // In sharded queryableBackupMode mode, we ignore the shardIdentity document on disk and instead
     // *require* a shardIdentity document to be passed through --overrideShardIdentity
     if (storageGlobalParams.queryableBackupMode) {
-        if (serverGlobalParams.clusterRole.exclusivelyHasShardRole()) {
+        if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
             uassert(ErrorCodes::InvalidOptions,
                     "If started with --shardsvr in queryableBackupMode, a shardIdentity document "
                     "must be provided through --overrideShardIdentity",
@@ -754,7 +754,7 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
     bool isStandaloneOrPrimary =
         !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
 
-    if (serverGlobalParams.clusterRole.exclusivelyHasShardRole()) {
+    if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
         // A config server added as a shard would have already set this up at startup.
         if (storageGlobalParams.queryableBackupMode) {
             CatalogCacheLoader::set(service, std::make_unique<ReadOnlyCatalogCacheLoader>());

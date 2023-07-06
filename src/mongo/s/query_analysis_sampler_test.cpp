@@ -33,6 +33,7 @@
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include <future>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <string>
@@ -442,9 +443,9 @@ public:
         serverGlobalParams.clusterRole = ClusterRole::None;
     }
 
-    void setUpRole(ClusterRole role, bool isReplEnabled = true) {
+    void setUpRole(std::initializer_list<ClusterRole::Value> roles, bool isReplEnabled = true) {
         setMongos(false);
-        serverGlobalParams.clusterRole = role;
+        serverGlobalParams.clusterRole = roles;
 
         auto replCoord = [&] {
             if (isReplEnabled) {
@@ -533,22 +534,22 @@ private:
 };
 
 TEST_F(QueryAnalysisSamplerTest, CanGetOnShardServer) {
-    setUpRole(ClusterRole::ShardServer);
+    setUpRole({ClusterRole::ShardServer});
     QueryAnalysisSampler::get(operationContext());
 }
 
 TEST_F(QueryAnalysisSamplerTest, CanGetOnStandaloneReplicaSet) {
-    setUpRole(ClusterRole::None);
+    setUpRole({ClusterRole::None});
     QueryAnalysisSampler::get(operationContext());
 }
 
 TEST_F(QueryAnalysisSamplerTest, CanGetOnConfigServer) {
-    setUpRole(ClusterRole::ConfigServer);
+    setUpRole({ClusterRole::ShardServer, ClusterRole::ConfigServer});
     QueryAnalysisSampler::get(operationContext());
 }
 
 DEATH_TEST_F(QueryAnalysisSamplerTest, CannotGetOnStandaloneMongod, "invariant") {
-    setUpRole(ClusterRole::None, false /* isReplEnabled */);
+    setUpRole({ClusterRole::None}, false /* isReplEnabled */);
     QueryAnalysisSampler::get(operationContext());
 }
 
@@ -740,113 +741,113 @@ TEST_F(QueryAnalysisSamplerQueryStatsTest,
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_NotCountInsertsTrackedByOpCounters) {
-    setUpRole(ClusterRole::None);
+    setUpRole({ClusterRole::None});
     testInsertsTrackedByOpCounters(false /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_CountUpdatesTrackedByOpCounters) {
-    setUpRole(ClusterRole::None);
+    setUpRole({ClusterRole::None});
     testUpdatesTrackedByOpCounters(true /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsReplSetMongod_CountFindAndModify) {
-    setUpRole(ClusterRole::None);
+    setUpRole({ClusterRole::None});
     testFindAndModify(true /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_CountDeletesTrackedByOpCounters) {
-    setUpRole(ClusterRole::None);
+    setUpRole({ClusterRole::None});
     testDeletesTrackedByOpCounters(true /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_CountQueriesTrackedByOpCounters) {
-    setUpRole(ClusterRole::None);
+    setUpRole({ClusterRole::None});
     testQueriesTrackedByOpCounters(true /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_NotCountCommandsTrackedByOpCounters) {
-    setUpRole(ClusterRole::None);
+    setUpRole({ClusterRole::None});
     testCommandsTrackedByOpCounters(false /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsReplSetMongod_CountAggregates) {
-    setUpRole(ClusterRole::None);
+    setUpRole({ClusterRole::None});
     testAggregates(true /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsReplSetMongod_CountCounts) {
-    setUpRole(ClusterRole::None);
+    setUpRole({ClusterRole::None});
     testCounts(true /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsReplSetMongod_CountDistincts) {
-    setUpRole(ClusterRole::None);
+    setUpRole({ClusterRole::None});
     testDistincts(true /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsReplSetMongod_NotCountNestedAggregatesTrackedByOpCounters) {
-    setUpRole(ClusterRole::None);
+    setUpRole({ClusterRole::None});
     testNestedAggregates(false /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountInsertsTrackedByOpCounters) {
-    setUpRole(ClusterRole::ShardServer);
+    setUpRole({ClusterRole::ShardServer});
     testInsertsTrackedByOpCounters(false /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountUpdatesTrackedByOpCounters) {
-    setUpRole(ClusterRole::ShardServer);
+    setUpRole({ClusterRole::ShardServer});
     testUpdatesTrackedByOpCounters(false /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountDeletesTrackedByOpCounters) {
-    setUpRole(ClusterRole::ShardServer);
+    setUpRole({ClusterRole::ShardServer});
     testDeletesTrackedByOpCounters(false /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsShardSvrMongod_NotCountFindAndModify) {
-    setUpRole(ClusterRole::ShardServer);
+    setUpRole({ClusterRole::ShardServer});
     testFindAndModify(false /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountQueriesTrackedByOpCounters) {
-    setUpRole(ClusterRole::ShardServer);
+    setUpRole({ClusterRole::ShardServer});
     testQueriesTrackedByOpCounters(false /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_NotCountCommandsTrackedByOpCounters) {
-    setUpRole(ClusterRole::ShardServer);
+    setUpRole({ClusterRole::ShardServer});
     testCommandsTrackedByOpCounters(false /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsShardSvrMongod_NotCountAggregates) {
-    setUpRole(ClusterRole::ShardServer);
+    setUpRole({ClusterRole::ShardServer});
     testAggregates(false /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsShardSvrMongod_NotCountCounts) {
-    setUpRole(ClusterRole::ShardServer);
+    setUpRole({ClusterRole::ShardServer});
     testCounts(false /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest, RefreshQueryStatsShardSvrMongod_NotCountDistincts) {
-    setUpRole(ClusterRole::ShardServer);
+    setUpRole({ClusterRole::ShardServer});
     testDistincts(false /* shouldCount */);
 }
 
 TEST_F(QueryAnalysisSamplerQueryStatsTest,
        RefreshQueryStatsShardSvrMongod_CountNestedAggregatesTrackedByOpCounters) {
-    setUpRole(ClusterRole::ShardServer);
+    setUpRole({ClusterRole::ShardServer});
     testNestedAggregates(true /* shouldCount */);
 }
 

@@ -47,12 +47,12 @@ public:
     ReadWriteConcernDefaultsServerStatus() : ServerStatusSection("defaultRWConcern") {}
 
     bool includeByDefault() const override {
-        return !serverGlobalParams.clusterRole.exclusivelyHasShardRole();
+        return !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer);
     }
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        if (serverGlobalParams.clusterRole.exclusivelyHasShardRole() ||
+        if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer) ||
             !repl::ReplicationCoordinator::get(opCtx)->isReplEnabled()) {
             return {};
         }

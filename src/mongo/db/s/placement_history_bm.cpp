@@ -197,7 +197,7 @@ private:
 }  // namespace
 
 void BM_initPlacementHistory(benchmark::State& state) {
-    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
     BenchmarkConfigServerTestFixture fixture;
 

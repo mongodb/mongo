@@ -97,7 +97,7 @@ private:
 void ShardLocalTest::setUp() {
     ServiceContextMongoDTest::setUp();
     _opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
-    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     _shardLocal = std::make_unique<ShardLocal>(ShardId::kConfigServerId);
     const repl::ReplSettings replSettings = {};
     repl::ReplicationCoordinator::set(
