@@ -296,6 +296,8 @@ last-continuous:
     ticket: SERVER-78414
   - test_file: jstests/sharding/multi_writes_with_shard_version_ignored_dont_bubble_up_critical_section.js
     ticket: SERVER-61127
+  - test_file: jstests/sharding/cluster_time_across_add_shard.js
+    ticket: SERVER-60466
   suites: null
 last-lts:
   all:
@@ -669,4 +671,6 @@ last-lts:
     ticket: SERVER-78414
   - test_file: jstests/sharding/multi_writes_with_shard_version_ignored_dont_bubble_up_critical_section.js
     ticket: SERVER-61127
+  - test_file: jstests/sharding/cluster_time_across_add_shard.js
+    ticket: SERVER-60466
   suites: null

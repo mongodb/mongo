@@ -196,6 +196,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     // The shard registry must be started once the grid is initialized
     grid->shardRegistry()->startupPeriodicReloader(opCtx);
 
+    // Start up the cluster time keys manager with a sharded keys client.
     auto keysCollectionClient =
         std::make_unique<KeysCollectionClientSharded>(grid->catalogClient());
     auto keyManager =

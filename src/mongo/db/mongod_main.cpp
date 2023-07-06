@@ -701,7 +701,18 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                 makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")));
 
             Grid::get(startupOpCtx.get())->setShardingInitialized();
-        } else if (replSettings.usingReplSets()) {  // standalone replica set
+        }
+
+        if (replSettings.usingReplSets() &&
+            (serverGlobalParams.clusterRole == ClusterRole::None ||
+             !Grid::get(startupOpCtx.get())->isShardingInitialized())) {
+            // If this is a mongod in a standalone replica set or a shardsvr replica set that has
+            // not initialized its sharding identity, start up the cluster time keys manager with a
+            // local/direct keys client. The keys client must use local read concern if the storage
+            // engine can't support majority read concern. If this is a mongod in a configsvr or
+            // shardsvr replica set that has initialized its sharding identity, the keys manager is
+            // by design initialized separately with a sharded keys client when the sharding state
+            // is initialized.
             auto keysCollectionClient = std::make_unique<KeysCollectionClientDirect>();
             auto keyManager = std::make_shared<KeysCollectionManager>(
                 KeysCollectionManager::kKeyManagerPurposeString,
@@ -711,7 +722,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
             LogicalTimeValidator::set(startupOpCtx->getServiceContext(),
                                       std::make_unique<LogicalTimeValidator>(keyManager));
+        }
 
+        if (replSettings.usingReplSets() && serverGlobalParams.clusterRole == ClusterRole::None) {
             ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(serviceContext)->startup();
         }
 

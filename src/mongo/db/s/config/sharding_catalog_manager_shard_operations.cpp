@@ -41,7 +41,6 @@
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/client/fetcher.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
@@ -54,6 +53,7 @@
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
+#include "mongo/db/keys_collection_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
@@ -61,8 +61,10 @@
 #include "mongo/db/repl/hello_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
+#include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
@@ -105,6 +107,8 @@ const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{
 const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kNoTimeout};
+
+const Seconds kRemoteCommandTimeout{60};
 
 /**
  * Generates a unique name to be given to a newly added shard.
@@ -153,7 +157,7 @@ StatusWith<std::string> generateNewShardName(OperationContext* opCtx) {
 
 StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShard(
     OperationContext* opCtx,
-    RemoteCommandTargeter* targeter,
+    std::shared_ptr<RemoteCommandTargeter> targeter,
     StringData dbName,
     const BSONObj& cmdObj) {
     auto swHost = targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
@@ -163,7 +167,7 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
     auto host = std::move(swHost.getValue());
 
     executor::RemoteCommandRequest request(
-        host, dbName.toString(), cmdObj, rpc::makeEmptyMetadata(), opCtx, Seconds(60));
+        host, dbName.toString(), cmdObj, rpc::makeEmptyMetadata(), opCtx, kRemoteCommandTimeout);
 
     executor::RemoteCommandResponse response =
         Status(ErrorCodes::InternalError, "Internal error running command");
@@ -319,8 +323,8 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     std::shared_ptr<RemoteCommandTargeter> targeter,
     const std::string* shardProposedName,
     const ConnectionString& connectionString) {
-    auto swCommandResponse = _runCommandForAddShard(
-        opCtx, targeter.get(), NamespaceString::kAdminDb, BSON("hello" << 1));
+    auto swCommandResponse =
+        _runCommandForAddShard(opCtx, targeter, NamespaceString::kAdminDb, BSON("hello" << 1));
     if (swCommandResponse.getStatus() == ErrorCodes::IncompatibleServerVersion) {
         return swCommandResponse.getStatus().withReason(
             str::stream() << "Cannot add " << connectionString.toString()
@@ -525,7 +529,7 @@ Status ShardingCatalogManager::_dropSessionsCollection(
     }
 
     auto swCommandResponse = _runCommandForAddShard(
-        opCtx, targeter.get(), NamespaceString::kLogicalSessionsNamespace.db(), builder.done());
+        opCtx, targeter, NamespaceString::kLogicalSessionsNamespace.db(), builder.done());
     if (!swCommandResponse.isOK()) {
         return swCommandResponse.getStatus();
     }
@@ -543,7 +547,7 @@ StatusWith<std::vector<std::string>> ShardingCatalogManager::_getDBNamesListFrom
 
     auto swCommandResponse =
         _runCommandForAddShard(opCtx,
-                               targeter.get(),
+                               targeter,
                                NamespaceString::kAdminDb,
                                BSON("listDatabases" << 1 << "nameOnly" << true));
     if (!swCommandResponse.isOK()) {
@@ -653,6 +657,11 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             "collection from the shard manually and try again.");
     }
 
+    auto pullKeysStatus = _pullClusterTimeKeys(opCtx, targeter);
+    if (!pullKeysStatus.isOK()) {
+        return pullKeysStatus;
+    }
+
     // If a name for a shard wasn't provided, generate one
     if (shardType.getName().empty()) {
         auto result = generateNewShardName(opCtx);
@@ -669,7 +678,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     // Helper function that runs a command on the to-be shard and returns the status
     auto runCmdOnNewShard = [this, &opCtx, &targeter](const BSONObj& cmd) -> Status {
         auto swCommandResponse =
-            _runCommandForAddShard(opCtx, targeter.get(), NamespaceString::kAdminDb, cmd);
+            _runCommandForAddShard(opCtx, targeter, NamespaceString::kAdminDb, cmd);
         if (!swCommandResponse.isOK()) {
             return swCommandResponse.getStatus();
         }
@@ -691,10 +700,10 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     }
 
     // Set the user-writes blocking state on the new shard.
-    _setUserWriteBlockingStateOnNewShard(opCtx, targeter.get());
+    _setUserWriteBlockingStateOnNewShard(opCtx, targeter);
 
     // Determine the set of cluster parameters to be used.
-    _standardizeClusterParameters(opCtx, targeter.get());
+    _standardizeClusterParameters(opCtx, targeter);
 
     {
         // Keep the FCV stable across checking the FCV, sending setFCV to the new shard and writing
@@ -720,7 +729,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         auto versionResponse =
             _runCommandForAddShard(opCtx,
-                                   targeter.get(),
+                                   targeter,
                                    NamespaceString::kAdminDb,
                                    setFcvCmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField
                                                          << opCtx->getWriteConcern().toBSON())));
@@ -1058,8 +1067,8 @@ StatusWith<long long> ShardingCatalogManager::_runCountCommandOnConfig(Operation
     return result;
 }
 
-void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(OperationContext* opCtx,
-                                                                  RemoteCommandTargeter* targeter) {
+void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(
+    OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
     // Delete all the config.user_writes_critical_sections documents from the new shard.
     {
         write_ops::DeleteCommandRequest deleteOp(
@@ -1125,6 +1134,109 @@ void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(OperationConte
     });
 }
 
+std::unique_ptr<Fetcher> ShardingCatalogManager::_createFetcher(
+    OperationContext* opCtx,
+    std::shared_ptr<RemoteCommandTargeter> targeter,
+    const NamespaceString& nss,
+    const repl::ReadConcernLevel& readConcernLevel,
+    FetcherDocsCallbackFn processDocsCallback,
+    FetcherStatusCallbackFn processStatusCallback) {
+    auto host = uassertStatusOK(
+        targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
+
+    FindCommandRequest findCommand(nss);
+    const auto readConcern =
+        repl::ReadConcernArgs(boost::optional<repl::ReadConcernLevel>(readConcernLevel));
+    findCommand.setReadConcern(readConcern.toBSONInner());
+    const Milliseconds maxTimeMS =
+        std::min(opCtx->getRemainingMaxTimeMillis(), Milliseconds(kRemoteCommandTimeout));
+    findCommand.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
+
+    auto fetcherCallback = [processDocsCallback,
+                            processStatusCallback](const Fetcher::QueryResponseStatus& dataStatus,
+                                                   Fetcher::NextAction* nextAction,
+                                                   BSONObjBuilder* getMoreBob) {
+        // Throw out any accumulated results on error.
+        if (!dataStatus.isOK()) {
+            processStatusCallback(dataStatus.getStatus());
+            return;
+        }
+        const auto& data = dataStatus.getValue();
+
+        try {
+            if (!processDocsCallback(data.documents)) {
+                *nextAction = Fetcher::NextAction::kNoAction;
+            }
+        } catch (DBException& ex) {
+            processStatusCallback(ex.toStatus());
+            return;
+        }
+        processStatusCallback(Status::OK());
+
+        if (!getMoreBob) {
+            return;
+        }
+        getMoreBob->append("getMore", data.cursorId);
+        getMoreBob->append("collection", data.nss.coll());
+    };
+
+    return std::make_unique<Fetcher>(_executorForAddShard.get(),
+                                     host,
+                                     nss.db().toString(),
+                                     findCommand.toBSON({}),
+                                     fetcherCallback,
+                                     BSONObj(), /* metadata tracking, only used for shards */
+                                     maxTimeMS, /* command network timeout */
+                                     maxTimeMS /* getMore network timeout */);
+}
+
+Status ShardingCatalogManager::_pullClusterTimeKeys(
+    OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
+    Status fetchStatus =
+        Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
+    std::vector<ExternalKeysCollectionDocument> keyDocs;
+
+    auto expireAt = opCtx->getServiceContext()->getFastClockSource()->now() +
+        Seconds(gNewShardExistingClusterTimeKeysExpirationSecs.load());
+    auto fetcher = _createFetcher(
+        opCtx,
+        targeter,
+        NamespaceString::kKeysCollectionNamespace,
+        repl::ReadConcernLevel::kLocalReadConcern,
+        [&](const std::vector<BSONObj>& docs) -> bool {
+            for (const BSONObj& doc : docs) {
+                keyDocs.push_back(keys_collection_util::makeExternalClusterTimeKeyDoc(
+                    doc.getOwned(), boost::none /* migrationId */, expireAt));
+            }
+            return true;
+        },
+        [&](const Status& status) { fetchStatus = status; });
+
+    auto scheduleStatus = fetcher->schedule();
+    if (!scheduleStatus.isOK()) {
+        return scheduleStatus;
+    }
+
+    auto joinStatus = fetcher->join(opCtx);
+    if (!joinStatus.isOK()) {
+        return joinStatus;
+    }
+
+    if (keyDocs.empty()) {
+        return fetchStatus;
+    }
+
+    auto opTime = keys_collection_util::storeExternalClusterTimeKeyDocs(opCtx, std::move(keyDocs));
+    auto waitStatus = WaitForMajorityService::get(opCtx->getServiceContext())
+                          .waitUntilMajority(opTime, opCtx->getCancellationToken())
+                          .getNoThrow();
+    if (!waitStatus.isOK()) {
+        return waitStatus;
+    }
+
+    return fetchStatus;
+}
+
 void ShardingCatalogManager::_setClusterParametersLocally(OperationContext* opCtx,
                                                           const std::vector<BSONObj>& parameters) {
     DBDirectClient client(opCtx);
@@ -1144,78 +1256,40 @@ void ShardingCatalogManager::_setClusterParametersLocally(OperationContext* opCt
     }
 }
 
-void ShardingCatalogManager::_pullClusterParametersFromNewShard(OperationContext* opCtx,
-                                                                RemoteCommandTargeter* targeter) {
+void ShardingCatalogManager::_pullClusterParametersFromNewShard(
+    OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
     LOGV2(6538600, "Pulling cluster parameters from new shard");
 
     // We can safely query the cluster parameters because the replica set must have been started
     // with --shardsvr in order to add it into the cluster, and in this mode no setClusterParameter
     // can be called on the replica set directly.
-    auto host = uassertStatusOK(
-        targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
-
-    const Milliseconds maxTimeMS =
-        std::min(opCtx->getRemainingMaxTimeMillis(), Milliseconds(Seconds{30}));
-    BSONObjBuilder findCmdBuilder;
-    {
-        FindCommandRequest findCommand(NamespaceString::kClusterParametersNamespace);
-        auto readConcern = repl::ReadConcernArgs(
-            boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kMajorityReadConcern));
-        findCommand.setReadConcern(readConcern.toBSONInner());
-        findCommand.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
-        findCommand.serialize(BSONObj(), &findCmdBuilder);
-    }
 
     // If for some reason the callback never gets invoked, we will return this status in response.
-    Status status =
+    Status fetchStatus =
         Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
-
     std::vector<BSONObj> parameters;
-    auto fetcherCallback =
-        [this, &status, &parameters](const Fetcher::QueryResponseStatus& dataStatus,
-                                     Fetcher::NextAction* nextAction,
-                                     BSONObjBuilder* getMoreBob) {
-            // Throw out any accumulated results on error
-            if (!dataStatus.isOK()) {
-                status = dataStatus.getStatus();
-                return;
-            }
-            const auto& data = dataStatus.getValue();
 
-            for (const BSONObj& doc : data.documents) {
-                parameters.push_back(doc.getOwned());
-            }
+    auto fetcher = _createFetcher(opCtx,
+                                  targeter,
+                                  NamespaceString::kClusterParametersNamespace,
+                                  repl::ReadConcernLevel::kMajorityReadConcern,
+                                  [&parameters](const std::vector<BSONObj>& docs) -> bool {
+                                      for (const BSONObj& doc : docs) {
+                                          parameters.push_back(doc.getOwned());
+                                      }
+                                      return true;
+                                  },
+                                  [&fetchStatus](const Status& status) { fetchStatus = status; });
 
-            status = Status::OK();
-
-            if (!getMoreBob) {
-                return;
-            }
-            getMoreBob->append("getMore", data.cursorId);
-            getMoreBob->append("collection", data.nss.coll());
-        };
-
-    Fetcher fetcher(_executorForAddShard.get(),
-                    std::move(host),
-                    NamespaceString::kClusterParametersNamespace.db().toString(),
-                    findCmdBuilder.obj(),
-                    fetcherCallback,
-                    BSONObj(), /* metadata tracking, only used for shards */
-                    maxTimeMS, /* command network timeout */
-                    maxTimeMS /* getMore network timeout */);
-
-    uassertStatusOK(fetcher.schedule());
-
-    uassertStatusOK(fetcher.join(opCtx));
-
-    uassertStatusOK(status);
-
+    uassertStatusOK(fetcher->schedule());
+    uassertStatusOK(fetcher->join(opCtx));
+    uassertStatusOK(fetchStatus);
     _setClusterParametersLocally(opCtx, parameters);
 }
 
 void ShardingCatalogManager::_pushClusterParametersToNewShard(
     OperationContext* opCtx,
-    RemoteCommandTargeter* targeter,
+    std::shared_ptr<RemoteCommandTargeter> targeter,
     const std::vector<BSONObj>& clusterParameters) {
     LOGV2(6360600, "Pushing cluster parameters into new shard");
 
@@ -1251,8 +1325,8 @@ void ShardingCatalogManager::_pushClusterParametersToNewShard(
     }
 }
 
-void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opCtx,
-                                                           RemoteCommandTargeter* targeter) {
+void ShardingCatalogManager::_standardizeClusterParameters(
+    OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
     if (!gFeatureFlagClusterWideConfig.isEnabled(serverGlobalParams.featureCompatibility))
         return;
 
