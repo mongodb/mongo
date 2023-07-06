@@ -143,7 +143,7 @@ TEST_F(AsyncShardVersionRetry, ExhaustedRetriesShouldThrowOriginalException) {
     auto future = shardVersionRetry(
         service(), nss(), catalogCache, desc(), getExecutor(), token, [&](OperationContext*) {
             if (++tries < 2 * kMaxNumStaleVersionRetries) {
-                uassert(StaleDbRoutingVersion(nss().db().toString(),
+                uassert(StaleDbRoutingVersion(nss().db_forTest().toString(),
                                               DatabaseVersion(UUID::gen(), Timestamp(2, 3)),
                                               DatabaseVersion(UUID::gen(), Timestamp(5, 3))),
                         "testX",

@@ -414,6 +414,14 @@ public:
         return StringData{_data.data() + offset, _dbNameOffsetEnd()};
     }
 
+    /**
+     * This function must only be used in unit tests.
+     */
+    StringData db_forTest() const {
+        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
+        return StringData{_data.data() + offset, _dbNameOffsetEnd()};
+    }
+
     DatabaseName dbName() const {
         auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
         return DatabaseName{_data.substr(0, offset + _dbNameOffsetEnd()),

@@ -169,7 +169,7 @@ private:
 class RenameRangeDeletionsTest : public RangeDeleterTest {
 public:
     const NamespaceString kToNss =
-        NamespaceString::createNamespaceString_forTest(kNss.db(), "toColl");
+        NamespaceString::createNamespaceString_forTest(kNss.db_forTest(), "toColl");
 
     void setUp() override {
         RangeDeleterTest::setUp();

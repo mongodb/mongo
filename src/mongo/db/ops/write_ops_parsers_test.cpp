@@ -229,7 +229,7 @@ TEST(CommandWriteOpsParsers, SingleInsert) {
     const BSONObj obj = BSON("x" << 1);
     auto cmd = BSON("insert" << ns.coll() << "documents" << BSON_ARRAY(obj));
     for (bool seq : {false, true}) {
-        auto request = toOpMsg(ns.db(), cmd, seq);
+        auto request = toOpMsg(ns.db_forTest(), cmd, seq);
         const auto op = InsertOp::parse(request);
         ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
@@ -243,7 +243,7 @@ TEST(CommandWriteOpsParsers, EmptyMultiInsertFails) {
     const auto ns = NamespaceString::createNamespaceString_forTest("test", "foo");
     auto cmd = BSON("insert" << ns.coll() << "documents" << BSONArray());
     for (bool seq : {false, true}) {
-        auto request = toOpMsg(ns.db(), cmd, seq);
+        auto request = toOpMsg(ns.db_forTest(), cmd, seq);
         ASSERT_THROWS_CODE(InsertOp::parse(request), AssertionException, ErrorCodes::InvalidLength);
     }
 }
@@ -254,7 +254,7 @@ TEST(CommandWriteOpsParsers, RealMultiInsert) {
     const BSONObj obj1 = BSON("x" << 1);
     auto cmd = BSON("insert" << ns.coll() << "documents" << BSON_ARRAY(obj0 << obj1));
     for (bool seq : {false, true}) {
-        auto request = toOpMsg(ns.db(), cmd, seq);
+        auto request = toOpMsg(ns.db_forTest(), cmd, seq);
         const auto op = InsertOp::parse(request);
         ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
@@ -274,7 +274,7 @@ TEST(CommandWriteOpsParsers, MultiInsertWithStmtId) {
     auto cmd =
         BSON("insert" << ns.coll() << "documents" << BSON_ARRAY(obj0 << obj1) << "stmtId" << 10);
     for (bool seq : {false, true}) {
-        auto request = toOpMsg(ns.db(), cmd, seq);
+        auto request = toOpMsg(ns.db_forTest(), cmd, seq);
         const auto op = InsertOp::parse(request);
         ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
@@ -294,7 +294,7 @@ TEST(CommandWriteOpsParsers, MultiInsertWithStmtIdsArray) {
     auto cmd = BSON("insert" << ns.coll() << "documents" << BSON_ARRAY(obj0 << obj1) << "stmtIds"
                              << BSON_ARRAY(15 << 17));
     for (bool seq : {false, true}) {
-        auto request = toOpMsg(ns.db(), cmd, seq);
+        auto request = toOpMsg(ns.db_forTest(), cmd, seq);
         const auto op = InsertOp::parse(request);
         ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
@@ -321,7 +321,7 @@ TEST(CommandWriteOpsParsers, UpdateCommandRequest) {
                          << "multi" << multi << "upsert" << upsert << "collation" << collation);
             auto cmd = BSON("update" << ns.coll() << "updates" << BSON_ARRAY(rawUpdate));
             for (bool seq : {false, true}) {
-                auto request = toOpMsg(ns.db(), cmd, seq);
+                auto request = toOpMsg(ns.db_forTest(), cmd, seq);
                 auto op = UpdateOp::parse(request);
                 ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
                 ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
@@ -358,7 +358,7 @@ TEST(CommandWriteOpsParsers, UpdateWithPipeline) {
                                       << "upsert" << upsert << "collation" << collation);
             auto cmd = BSON("update" << ns.coll() << "updates" << BSON_ARRAY(rawUpdate));
             for (bool seq : {false, true}) {
-                auto request = toOpMsg(ns.db(), cmd, seq);
+                auto request = toOpMsg(ns.db_forTest(), cmd, seq);
                 auto op = UpdateOp::parse(request);
                 ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
                 ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
@@ -391,7 +391,7 @@ TEST(CommandWriteOpsParsers, Remove) {
             BSON("q" << query << "limit" << (multi ? 0 : 1) << "collation" << collation);
         auto cmd = BSON("delete" << ns.coll() << "deletes" << BSON_ARRAY(rawDelete));
         for (bool seq : {false, true}) {
-            auto request = toOpMsg(ns.db(), cmd, seq);
+            auto request = toOpMsg(ns.db_forTest(), cmd, seq);
             auto op = DeleteOp::parse(request);
             ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
             ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());

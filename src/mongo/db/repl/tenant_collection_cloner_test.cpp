@@ -996,7 +996,7 @@ TEST_F(TenantCollectionClonerTest, ResumeFromRenamedCollection) {
 
     // Simulate that the collection already exists under a different name with no index and no data.
     const NamespaceString oldNss =
-        NamespaceString::createNamespaceString_forTest(_nss.db(), "testcoll_old");
+        NamespaceString::createNamespaceString_forTest(_nss.db_forTest(), "testcoll_old");
     ASSERT_OK(createCollection(oldNss, _options));
 
     _mockServer->setCommandReply("count", createCountResponse(1));

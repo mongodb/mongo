@@ -180,7 +180,7 @@ public:
             UUID::gen(),
             sourceNss,
             sourceUUID,
-            resharding::constructTemporaryReshardingNss(sourceNss.db(), sourceUUID),
+            resharding::constructTemporaryReshardingNss(sourceNss.db_forTest(), sourceUUID),
             BSON("newKey" << 1));
         commonMetadata.setStartTime(getServiceContext()->getFastClockSource()->now());
 

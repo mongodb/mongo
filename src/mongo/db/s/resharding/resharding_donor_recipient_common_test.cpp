@@ -689,10 +689,10 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
     OperationContext* opCtx = operationContext();
     NamespaceString sourceNss1 = NamespaceString::createNamespaceString_forTest("db", "one");
     NamespaceString tempReshardingNss1 =
-        resharding::constructTemporaryReshardingNss(sourceNss1.db(), UUID::gen());
+        resharding::constructTemporaryReshardingNss(sourceNss1.db_forTest(), UUID::gen());
     NamespaceString sourceNss2 = NamespaceString::createNamespaceString_forTest("db", "two");
     NamespaceString tempReshardingNss2 =
-        resharding::constructTemporaryReshardingNss(sourceNss2.db(), UUID::gen());
+        resharding::constructTemporaryReshardingNss(sourceNss2.db_forTest(), UUID::gen());
     ShardId shardId1 = ShardId{"recipient1"};
     ShardId shardId2 = ShardId{"recipient2"};
     ReshardingDonorDocument doc1 =

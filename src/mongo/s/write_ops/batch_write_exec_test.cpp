@@ -106,7 +106,7 @@ const int kMaxRoundsWithoutProgress = 5;
 BSONObj expectInsertsReturnStaleVersionErrorsBase(const NamespaceString& nss,
                                                   const std::vector<BSONObj>& expected,
                                                   const executor::RemoteCommandRequest& request) {
-    ASSERT_EQUALS(nss.db(), request.dbname);
+    ASSERT_EQUALS(nss.db_forTest(), request.dbname);
 
     const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
     const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
@@ -151,7 +151,7 @@ BSONObj expectInsertsReturnStaleVersionErrorsBase(const NamespaceString& nss,
 BSONObj expectInsertsReturnStaleDbVersionErrorsBase(const NamespaceString& nss,
                                                     const std::vector<BSONObj>& expected,
                                                     const executor::RemoteCommandRequest& request) {
-    ASSERT_EQUALS(nss.db(), request.dbname);
+    ASSERT_EQUALS(nss.db_forTest(), request.dbname);
 
     const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
     const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
@@ -180,7 +180,7 @@ BSONObj expectInsertsReturnStaleDbVersionErrorsBase(const NamespaceString& nss,
         errorBuilder.append("code", int(ErrorCodes::StaleDbVersion));
 
         auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
-        errorBuilder.append("db", nss.db());
+        errorBuilder.append("db", nss.db_forTest());
         errorBuilder.append("vReceived", dbVersion.toBSON());
         errorBuilder.append("vWanted", dbVersion.makeUpdated().toBSON());
 
@@ -203,7 +203,7 @@ BSONObj expectInsertsReturnTenantMigrationAbortedErrorsBase(
     const std::vector<BSONObj>& expected,
     const executor::RemoteCommandRequest& request,
     int numberOfFailedOps) {
-    ASSERT_EQUALS(nss.db(), request.dbname);
+    ASSERT_EQUALS(nss.db_forTest(), request.dbname);
 
     const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
     const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
@@ -299,7 +299,7 @@ public:
     void expectInsertsReturnSuccess(std::vector<BSONObj>::const_iterator expectedFrom,
                                     std::vector<BSONObj>::const_iterator expectedTo) {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQUALS(nss.db(), request.dbname);
+            ASSERT_EQUALS(nss.db_forTest(), request.dbname);
 
             const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
             const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
@@ -348,7 +348,7 @@ public:
                                   const BatchedCommandResponse& errResponse) {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             try {
-                ASSERT_EQUALS(nss.db(), request.dbname);
+                ASSERT_EQUALS(nss.db_forTest(), request.dbname);
 
                 const auto opMsgRequest(
                     OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
@@ -2504,7 +2504,7 @@ public:
 
     void expectInsertsReturnTransientTxnErrors(const std::vector<BSONObj>& expected) {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQUALS(nss.db(), request.dbname);
+            ASSERT_EQUALS(nss.db_forTest(), request.dbname);
 
             const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
             const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));

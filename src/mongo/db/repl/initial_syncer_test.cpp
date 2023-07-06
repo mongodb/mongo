@@ -3643,7 +3643,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
         // sync source.  We must do this setup before responding to the FCV, to avoid a race.
         NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.a");
         _mockServer->setCommandReply("listDatabases",
-                                     makeListDatabasesResponse({nss.db().toString()}));
+                                     makeListDatabasesResponse({nss.db_forTest().toString()}));
 
         // Set up data for "a"
         _mockServer->assignCollectionUuid(nss.ns_forTest(), *_options1.uuid);
@@ -4333,7 +4333,7 @@ TEST_F(InitialSyncerTest,
         // sync source.  We must do this setup before responding to the FCV, to avoid a race.
         NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.a");
         _mockServer->setCommandReply("listDatabases",
-                                     makeListDatabasesResponse({nss.db().toString()}));
+                                     makeListDatabasesResponse({nss.db_forTest().toString()}));
 
 
         // Set up data for "a"
@@ -4540,7 +4540,7 @@ TEST_F(InitialSyncerTest, TestRemainingInitialSyncEstimatedMillisMetric) {
         // We do not populate database 'b' with data as we don't actually complete initial sync in
         // this test.
         _mockServer->setCommandReply("listDatabases",
-                                     makeListDatabasesResponse({nss.db().toString(), "b"}));
+                                     makeListDatabasesResponse({nss.db_forTest().toString(), "b"}));
         // The AllDatabaseCloner post stage calls dbStats to record initial sync progress
         // metrics. This will be used to calculate both the data size of "a" and "b".
         _mockServer->setCommandReply("dbStats", BSON("dataSize" << dbSize));
@@ -4787,7 +4787,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         // listDatabases: a
         NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.a");
         _mockServer->setCommandReply("listDatabases",
-                                     makeListDatabasesResponse({nss.db().toString()}));
+                                     makeListDatabasesResponse({nss.db_forTest().toString()}));
         // The AllDatabaseCloner post stage calls dbStats to record initial sync progress metrics.
         _mockServer->setCommandReply("dbStats", BSON("dataSize" << 10));
 
@@ -5164,7 +5164,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
             // listDatabases
             NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.a");
             _mockServer->setCommandReply("listDatabases",
-                                         makeListDatabasesResponse({nss.db().toString()}));
+                                         makeListDatabasesResponse({nss.db_forTest().toString()}));
 
             // listCollections for "a"
             // listCollections data has to be broken up or it will trigger BSONObjTooLarge

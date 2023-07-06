@@ -95,7 +95,7 @@ TEST(ChangeStreamEventTransformTest, TestDefaultUpdateTransform) {
         {DocumentSourceChangeStream::kCollectionUuidField, testUuid()},
         {DocumentSourceChangeStream::kWallTimeField, Date_t()},
         {DocumentSourceChangeStream::kNamespaceField,
-         Document{{"db", nss.db()}, {"coll", nss.coll()}}},
+         Document{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DocumentSourceChangeStream::kDocumentKeyField, documentKey},
         {
             "updateDescription",
@@ -135,7 +135,7 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {
         {DocumentSourceChangeStream::kClusterTimeField, kDefaultTs},
         {DocumentSourceChangeStream::kWallTimeField, Date_t()},
         {DocumentSourceChangeStream::kNamespaceField,
-         Document{{"db", viewNss.db()}, {"coll", viewNss.coll()}}},
+         Document{{"db", viewNss.db_forTest()}, {"coll", viewNss.coll()}}},
         {DocumentSourceChangeStream::kOperationDescriptionField, opDescription}};
 
     ASSERT_DOCUMENT_EQ(
@@ -174,7 +174,7 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewOnSingleCollection) {
         {DocumentSourceChangeStream::kWallTimeField, Date_t()},
         {DocumentSourceChangeStream::kFullDocumentField, Document(document)},
         {DocumentSourceChangeStream::kNamespaceField,
-         Document{{"db", systemViewNss.db()}, {"coll", systemViewNss.coll()}}},
+         Document{{"db", systemViewNss.db_forTest()}, {"coll", systemViewNss.coll()}}},
         {DocumentSourceChangeStream::kDocumentKeyField, documentKey}};
 
     ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry), expectedDoc);

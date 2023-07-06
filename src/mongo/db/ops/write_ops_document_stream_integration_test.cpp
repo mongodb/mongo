@@ -63,7 +63,7 @@ TEST(WriteOpsDocSeq, InsertDocStreamWorks) {
     ASSERT_EQ(conn->count(ns), 0u);
 
     OpMsgRequest request;
-    request.body = BSON("insert" << ns.coll() << "$db" << ns.db());
+    request.body = BSON("insert" << ns.coll() << "$db" << ns.db_forTest());
     request.sequences = {{"documents",
                           {
                               BSON("_id" << 1),

@@ -588,8 +588,8 @@ TEST_F(RenameCollectionTest, RenameCollectionReturnsNotWritablePrimaryIfNotPrima
 TEST_F(RenameCollectionTest, TargetCollectionNameLong) {
     _createCollection(_opCtx.get(), _sourceNss);
     const std::string targetCollectionName(255, 'a');
-    NamespaceString longTargetNss =
-        NamespaceString::createNamespaceString_forTest(_sourceNss.db(), targetCollectionName);
+    NamespaceString longTargetNss = NamespaceString::createNamespaceString_forTest(
+        _sourceNss.db_forTest(), targetCollectionName);
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, longTargetNss, {}));
 }
 
@@ -977,7 +977,7 @@ void _testRenameCollectionAcrossDatabaseOplogEntries(
     std::vector<std::string>* oplogEntries,
     bool forApplyOps,
     const std::vector<std::string>& expectedOplogEntries) {
-    ASSERT_NOT_EQUALS(sourceNss.db(), targetNss.db());
+    ASSERT_NOT_EQUALS(sourceNss.db_forTest(), targetNss.db_forTest());
     _createCollection(opCtx, sourceNss);
     _createIndexOnEmptyCollection(opCtx, sourceNss, "a_1");
     _insertDocument(opCtx, sourceNss, BSON("_id" << 0));

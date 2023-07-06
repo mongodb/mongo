@@ -400,7 +400,7 @@ public:
             {DSChangeStream::kClusterTimeField, ts},
             {DSChangeStream::kCollectionUuidField, expandedEvents ? V{testUuid()} : Value()},
             {DSChangeStream::kWallTimeField, Date_t()},
-            {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+            {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
             {DSChangeStream::kDocumentKeyField, V{documentKey}},
             {"updateDescription", upateMod},
         };
@@ -691,7 +691,7 @@ TEST_F(ChangeStreamStageTest, TransformInsertDocKeyXAndId) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"x", 2}, {"_id", 1}}},  // Note _id <-> x reversal.
     };
     checkTransformation(insert, expectedInsert);
@@ -721,7 +721,7 @@ TEST_F(ChangeStreamStageTest, TransformInsertDocKeyIdAndX) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"x", 2}, {"_id", 1}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},  // _id first
     };
     checkTransformation(insert, expectedInsert);
@@ -742,7 +742,7 @@ TEST_F(ChangeStreamStageTest, TransformInsertDocKeyJustId) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
     };
     checkTransformation(insert, expectedInsert);
@@ -778,7 +778,7 @@ TEST_F(ChangeStreamStageTest, TransformInsertFromMigrateShowMigrations) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"x", 2}, {"_id", 1}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},  // _id first
     };
     checkTransformation(insert, expectedInsert, spec);
@@ -1012,7 +1012,7 @@ TEST_F(ChangeStreamStageTest, TransformReplace) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}, {"y", 1}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
     };
     checkTransformation(replace, expectedReplace);
@@ -1037,7 +1037,7 @@ TEST_F(ChangeStreamStageTest, TransformReplaceShowExpandedEvents) {
         {DSChangeStream::kCollectionUuidField, testUuid()},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}, {"y", 1}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
     };
     checkTransformation(replace, expectedReplace, kShowExpandedEventsSpec);
@@ -1059,7 +1059,7 @@ TEST_F(ChangeStreamStageTest, TransformDelete) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
     };
     checkTransformation(deleteEntry, expectedDelete);
@@ -1092,7 +1092,7 @@ TEST_F(ChangeStreamStageTest, TransformDeleteShowExpandedEvents) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kCollectionUuidField, testUuid()},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
     };
     checkTransformation(deleteEntry, expectedDelete, kShowExpandedEventsSpec);
@@ -1137,7 +1137,7 @@ TEST_F(ChangeStreamStageTest, TransformDeleteFromMigrateShowMigrations) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
     };
 
@@ -1153,7 +1153,7 @@ TEST_F(ChangeStreamStageTest, TransformDrop) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDropCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     Document expectedInvalidate{
         {DSChangeStream::kIdField,
@@ -1180,7 +1180,7 @@ TEST_F(ChangeStreamStageTest, TransformDropShowExpandedEvents) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kCollectionUuidField, testUuid()},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
 
     Document expectedInvalidate{
@@ -1214,7 +1214,7 @@ TEST_F(ChangeStreamStageTest, TransformCreate) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kCollectionUuidField, testUuid()},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kOperationDescriptionField, Value(expectedOpDescription)},
     };
 
@@ -1226,16 +1226,17 @@ TEST_F(ChangeStreamStageTest, TransformRename) {
     OplogEntry rename = createCommand(
         BSON("renameCollection" << nss.ns_forTest() << "to" << otherColl.ns_forTest()), testUuid());
 
-    const auto opDesc = Value(D{{"to", D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}}});
+    const auto opDesc =
+        Value(D{{"to", D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
-         D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
+         D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}},
         {DSChangeStream::kIdField,
          makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     Document expectedInvalidate{
         {DSChangeStream::kIdField,
@@ -1261,19 +1262,19 @@ TEST_F(ChangeStreamStageTest, TransformRenameShowExpandedEvents) {
                       testUuid());
 
     const auto opDesc = V{
-        D{{"to", D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
+        D{{"to", D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}},
           {"dropTarget", dropTarget}},
     };
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
-         D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
+         D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}},
         {DSChangeStream::kIdField,
          makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kCollectionUuidField, testUuid()},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kOperationDescriptionField, opDesc},
     };
     Document expectedInvalidate{
@@ -1315,15 +1316,16 @@ TEST_F(ChangeStreamStageTest, TransformRenameTarget) {
     OplogEntry rename = createCommand(
         BSON("renameCollection" << otherColl.ns_forTest() << "to" << nss.ns_forTest()), testUuid());
 
-    const auto opDesc = Value(D{{"to", D{{"db", nss.db()}, {"coll", nss.coll()}}}});
+    const auto opDesc = Value(D{{"to", D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}}});
     Document expectedRename{
-        {DSChangeStream::kRenameTargetNssField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kRenameTargetNssField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kIdField,
          makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
+        {DSChangeStream::kNamespaceField,
+         D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}},
     };
     Document expectedInvalidate{
         {DSChangeStream::kIdField,
@@ -1360,7 +1362,7 @@ TEST_F(ChangeStreamStageTest, TransformNewShardDetectedLegacyFormat) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kNewShardDetectedOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
 
     getExpCtx()->needsMerge = true;
@@ -1387,7 +1389,7 @@ TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kCollectionUuidField, testUuid()},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kOperationDescriptionField, opDesc},
     };
 
@@ -1421,7 +1423,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardBeginLegacyFormat) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kCollectionUuidField, uuid},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kOperationDescriptionField, opDesc},
     };
     checkTransformation(reshardingBegin, expectedReshardingBegin, spec);
@@ -1450,7 +1452,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardBegin) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kCollectionUuidField, uuid},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kOperationDescriptionField, opDesc},
     };
     checkTransformation(reshardingBegin, expectedReshardingBegin, spec);
@@ -1459,7 +1461,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardBegin) {
 TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUpLegacyFormat) {
     auto existingUuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
-    auto temporaryNs = resharding::constructTemporaryReshardingNss(nss.db(), existingUuid);
+    auto temporaryNs = resharding::constructTemporaryReshardingNss(nss.db_forTest(), existingUuid);
 
     const auto o2FieldInLegacyFormat = BSON("type"
                                             << "reshardDoneCatchUp"
@@ -1488,7 +1490,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUpLegacyFormat) {
         {DSChangeStream::kCollectionUuidField, reshardingUuid},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kNamespaceField,
-         D{{"db", temporaryNs.db()}, {"coll", temporaryNs.coll()}}},
+         D{{"db", temporaryNs.db_forTest()}, {"coll", temporaryNs.coll()}}},
         {DSChangeStream::kOperationDescriptionField, opDesc},
     };
 
@@ -1498,7 +1500,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUpLegacyFormat) {
 TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
     auto existingUuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
-    auto temporaryNs = resharding::constructTemporaryReshardingNss(nss.db(), existingUuid);
+    auto temporaryNs = resharding::constructTemporaryReshardingNss(nss.db_forTest(), existingUuid);
 
     ReshardDoneCatchUpChangeEventO2Field o2Field{temporaryNs, reshardingUuid};
     auto reshardDoneCatchUp = makeOplogEntry(OpTypeEnum::kNoop,
@@ -1525,7 +1527,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
         {DSChangeStream::kCollectionUuidField, reshardingUuid},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kNamespaceField,
-         D{{"db", temporaryNs.db()}, {"coll", temporaryNs.coll()}}},
+         D{{"db", temporaryNs.db_forTest()}, {"coll", temporaryNs.coll()}}},
         {DSChangeStream::kOperationDescriptionField, opDesc},
     };
 
@@ -1743,7 +1745,7 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 123}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{}},
     };
 
@@ -2426,7 +2428,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
         {"applyOps",
          Value{std::vector<Document>{
              Document{{"op", "c"_sd},
-                      {"ns", nss.db() + ".$cmd"},
+                      {"ns", nss.db_forTest() + ".$cmd"},
                       {"ui", testUuid()},
                       {"o", Value{Document{{"create", nss.coll()}, {"idIndex", idIndexDef}}}},
                       {"ts", Timestamp(0, 1)}},
@@ -2436,7 +2438,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
                       {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}},
              Document{
                  {"op", "c"_sd},
-                 {"ns", nss.db() + ".$cmd"},
+                 {"ns", nss.db_forTest() + ".$cmd"},
                  {"ui", UUID::gen()},
                  // Operation on another collection which should be skipped.
                  {"o", Value{Document{{"create", "otherCollection"_sd}, {"idIndex", idIndexDef}}}}},
@@ -2504,7 +2506,7 @@ TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDropCollectionOpType},
         {DSChangeStream::kClusterTimeField, ts},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     checkTransformation(dropColl, expectedDrop);
 
@@ -2516,16 +2518,17 @@ TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
         boost::none,
         opTime);
 
-    const auto opDesc = Value(D{{"to", D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}}});
+    const auto opDesc =
+        Value(D{{"to", D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
-         D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
+         D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}},
         {DSChangeStream::kIdField,
          makeResumeToken(ts, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, ts},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     checkTransformation(rename, expectedRename);
 }
@@ -2747,7 +2750,7 @@ TEST_F(ChangeStreamStageTest, CloseCursorOnInvalidateEntries) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDropCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     Document expectedInvalidate{
         {DSChangeStream::kIdField,
@@ -2820,7 +2823,7 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyWhenNoO2FieldIn
         {DSChangeStream::kClusterTimeField, ts},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 2}, {"shardKey", 3}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
     };
     checkTransformation(
@@ -2867,7 +2870,7 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldUseO2FieldInOplog) {
         {DSChangeStream::kClusterTimeField, ts},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 2}, {"shardKey", 3}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}, {"shardKey", 3}}},
     };
     // When o2 is present in the oplog entry, we should use its value for the document key, even if
@@ -2912,15 +2915,16 @@ TEST_F(ChangeStreamStageTest, RenameFromSystemToUserCollectionShouldIncludeNotif
         testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
-    const auto opDesc = Value(D{{"to", D{{"db", nss.db()}, {"coll", nss.coll()}}}});
+    const auto opDesc = Value(D{{"to", D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}}});
     Document expectedRename{
-        {DSChangeStream::kRenameTargetNssField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kRenameTargetNssField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kIdField,
          makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
+        {DSChangeStream::kNamespaceField,
+         D{{"db", systemColl.db_forTest()}, {"coll", systemColl.coll()}}},
     };
     checkTransformation(rename, expectedRename);
 }
@@ -2934,16 +2938,17 @@ TEST_F(ChangeStreamStageTest, RenameFromUserToSystemCollectionShouldIncludeNotif
         testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
-    const auto opDesc = Value(D{{"to", D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}}});
+    const auto opDesc =
+        Value(D{{"to", D{{"db", systemColl.db_forTest()}, {"coll", systemColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
-         D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
+         D{{"db", systemColl.db_forTest()}, {"coll", systemColl.coll()}}},
         {DSChangeStream::kIdField,
          makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     checkTransformation(rename, expectedRename);
 }
@@ -3025,7 +3030,7 @@ TEST_F(ChangeStreamStageDBTest, TransformInsert) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"x", 2}, {"_id", 1}}},  // Note _id <-> x reversal.
     };
     checkTransformation(insert, expectedInsert);
@@ -3048,7 +3053,7 @@ TEST_F(ChangeStreamStageDBTest, TransformInsertShowExpandedEvents) {
         {DSChangeStream::kCollectionUuidField, testUuid()},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"x", 2}, {"_id", 1}}},  // Note _id <-> x reversal.
     };
     checkTransformation(insert, expectedInsert, kShowExpandedEventsSpec);
@@ -3073,7 +3078,8 @@ TEST_F(ChangeStreamStageDBTest, InsertOnOtherCollections) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", otherNss.db()}, {"coll", otherNss.coll()}}},
+        {DSChangeStream::kNamespaceField,
+         D{{"db", otherNss.db_forTest()}, {"coll", otherNss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"x", 2}, {"_id", 1}}},  // Note _id <-> x reversal.
     };
     checkTransformation(insertOtherColl, expectedInsert);
@@ -3134,7 +3140,7 @@ TEST_F(ChangeStreamStageDBTest, TransformsEntriesForLegalClientCollectionsWithSy
             {DSChangeStream::kClusterTimeField, kDefaultTs},
             {DSChangeStream::kWallTimeField, Date_t()},
             {DSChangeStream::kFullDocumentField, D{{"_id", 1}}},
-            {DSChangeStream::kNamespaceField, D{{"db", ns.db()}, {"coll", ns.coll()}}},
+            {DSChangeStream::kNamespaceField, D{{"db", ns.db_forTest()}, {"coll", ns.coll()}}},
             {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
         };
         checkTransformation(insert, expectedInsert);
@@ -3209,7 +3215,7 @@ TEST_F(ChangeStreamStageDBTest, TransformReplace) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}, {"y", 1}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
     };
     checkTransformation(replace, expectedReplace);
@@ -3231,7 +3237,7 @@ TEST_F(ChangeStreamStageDBTest, TransformDelete) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
     };
     checkTransformation(deleteEntry, expectedDelete);
@@ -3277,7 +3283,7 @@ TEST_F(ChangeStreamStageDBTest, TransformDeleteFromMigrateShowMigrations) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
     };
 
@@ -3292,7 +3298,7 @@ TEST_F(ChangeStreamStageDBTest, TransformDrop) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDropCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     checkTransformation(dropColl, expectedDrop);
 }
@@ -3302,16 +3308,17 @@ TEST_F(ChangeStreamStageDBTest, TransformRename) {
     OplogEntry rename = createCommand(
         BSON("renameCollection" << nss.ns_forTest() << "to" << otherColl.ns_forTest()), testUuid());
 
-    const auto opDesc = Value(D{{"to", D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}}});
+    const auto opDesc =
+        Value(D{{"to", D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
-         D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
+         D{{"db", otherColl.db_forTest()}, {"coll", otherColl.coll()}}},
         {DSChangeStream::kIdField,
          makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     checkTransformation(rename, expectedRename);
 }
@@ -3326,7 +3333,7 @@ TEST_F(ChangeStreamStageDBTest, TransformDropDatabase) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDropDatabaseOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}}},
     };
     Document expectedInvalidate{
         {DSChangeStream::kIdField,
@@ -3353,7 +3360,7 @@ TEST_F(ChangeStreamStageDBTest, TransformDropDatabaseShowExpandedEvents) {
         {DSChangeStream::kOperationTypeField, DSChangeStream::kDropDatabaseOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}}},
     };
     Document expectedInvalidate{
         {DSChangeStream::kIdField,
@@ -3399,16 +3406,18 @@ TEST_F(ChangeStreamStageDBTest, RenameFromSystemToUserCollectionShouldIncludeNot
         testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
-    const auto opDesc = Value(D{{"to", D{{"db", renamedColl.db()}, {"coll", renamedColl.coll()}}}});
+    const auto opDesc =
+        Value(D{{"to", D{{"db", renamedColl.db_forTest()}, {"coll", renamedColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
-         D{{"db", renamedColl.db()}, {"coll", renamedColl.coll()}}},
+         D{{"db", renamedColl.db_forTest()}, {"coll", renamedColl.coll()}}},
         {DSChangeStream::kIdField,
          makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
+        {DSChangeStream::kNamespaceField,
+         D{{"db", systemColl.db_forTest()}, {"coll", systemColl.coll()}}},
     };
     checkTransformation(rename, expectedRename);
 }
@@ -3422,16 +3431,17 @@ TEST_F(ChangeStreamStageDBTest, RenameFromUserToSystemCollectionShouldIncludeNot
         testUuid());
 
     // Note that the collection rename does *not* have the queued invalidated field.
-    const auto opDesc = Value(D{{"to", D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}}});
+    const auto opDesc =
+        Value(D{{"to", D{{"db", systemColl.db_forTest()}, {"coll", systemColl.coll()}}}});
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
-         D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
+         D{{"db", systemColl.db_forTest()}, {"coll", systemColl.coll()}}},
         {DSChangeStream::kIdField,
          makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kRenameCollectionOpType)},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
     };
     checkTransformation(rename, expectedRename);
 }
@@ -3479,7 +3489,7 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldNotIncludeShardKeyWhenNoO2Field
         {DSChangeStream::kClusterTimeField, ts},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 2}, {"shardKey", 3}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
     };
     checkTransformation(
@@ -3521,7 +3531,7 @@ TEST_F(ChangeStreamStageDBTest, DocumentKeyShouldUseO2FieldInOplog) {
         {DSChangeStream::kClusterTimeField, ts},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 2}, {"shardKey", 3}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}, {"shardKey", 3}}},
     };
     // When o2 is present in the oplog entry, we should use its value for the document key, even if
@@ -3589,7 +3599,7 @@ TEST_F(ChangeStreamStageDBTest, ResumeAfterWithTokenFromDropDatabase) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
     };
     checkTransformation(
@@ -3624,7 +3634,7 @@ TEST_F(ChangeStreamStageDBTest, StartAfterSucceedsEvenIfResumeTokenDoesNotContai
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kWallTimeField, Date_t()},
         {DSChangeStream::kFullDocumentField, D{{"_id", 2}}},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
         {DSChangeStream::kDocumentKeyField, D{{"_id", 2}}},
     };
     checkTransformation(

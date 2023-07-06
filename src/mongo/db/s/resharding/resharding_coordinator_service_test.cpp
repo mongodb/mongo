@@ -432,7 +432,7 @@ public:
             opCtx->getServiceContext()->getPreciseClockSource()->now());
         client.insert(CollectionType::ConfigNS, originalNssCatalogEntry.toBSON());
 
-        DatabaseType dbDoc(coordinatorDoc.getSourceNss().db().toString(),
+        DatabaseType dbDoc(coordinatorDoc.getSourceNss().db_forTest().toString(),
                            coordinatorDoc.getDonorShards().front().getId(),
                            DatabaseVersion{UUID::gen(), Timestamp(1, 1)});
         client.insert(NamespaceString::kConfigDatabasesNamespace, dbDoc.toBSON());

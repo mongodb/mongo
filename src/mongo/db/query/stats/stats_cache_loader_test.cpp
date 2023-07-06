@@ -112,7 +112,8 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsScalar) {
     // Initalize stats collection.
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "stats");
     std::string statsColl(StatsCacheLoader::kStatsPrefix + "." + nss.coll());
-    NamespaceString statsNss = NamespaceString::createNamespaceString_forTest(nss.db(), statsColl);
+    NamespaceString statsNss =
+        NamespaceString::createNamespaceString_forTest(nss.db_forTest(), statsColl);
     createStatsCollection(statsNss);
 
     // Write serialized stats path to collection.
@@ -181,7 +182,8 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsArray) {
     // Initalize stats collection.
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "stats");
     std::string statsColl(StatsCacheLoader::kStatsPrefix + "." + nss.coll());
-    NamespaceString statsNss = NamespaceString::createNamespaceString_forTest(nss.db(), statsColl);
+    NamespaceString statsNss =
+        NamespaceString::createNamespaceString_forTest(nss.db_forTest(), statsColl);
     createStatsCollection(statsNss);
 
     // Write serialized stats path to collection.

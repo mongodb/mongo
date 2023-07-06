@@ -771,7 +771,7 @@ TEST_F(TxnParticipantTest, PrepareSucceedsWithNestedLocks) {
 
 TEST_F(TxnParticipantTest, PrepareFailsOnTemporaryCollection) {
     NamespaceString tempCollNss =
-        NamespaceString::createNamespaceString_forTest(kNss.db(), "tempCollection");
+        NamespaceString::createNamespaceString_forTest(kNss.db_forTest(), "tempCollection");
     UUID tempCollUUID = UUID::gen();
 
     // Create a temporary collection so that we can write to it.

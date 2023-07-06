@@ -524,7 +524,7 @@ TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorAppliesToChangeStreamAgg
     // is the only factor that determines the success or failure of isResumableChangeStreamError().
     auto cmdObj = BSON("aggregate" << nss().coll() << "pipeline"
                                    << BSON_ARRAY(BSON("$changeStream" << BSONObj())) << "cursor"
-                                   << BSONObj() << "$db" << nss().db());
+                                   << BSONObj() << "$db" << nss().db_forTest());
     auto aggRequest =
         uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(nss(), cmdObj));
     ASSERT_TRUE(LiteParsedPipeline(aggRequest).hasChangeStream());
@@ -563,7 +563,7 @@ TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorDoesNotApplyToNonResumab
     // is the only factor that determines the success or failure of isResumableChangeStreamError().
     auto cmdObj = BSON("aggregate" << nss().coll() << "pipeline"
                                    << BSON_ARRAY(BSON("$changeStream" << BSONObj())) << "cursor"
-                                   << BSONObj() << "$db" << nss().db());
+                                   << BSONObj() << "$db" << nss().db_forTest());
     auto aggRequest =
         uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(nss(), cmdObj));
     ASSERT_TRUE(LiteParsedPipeline(aggRequest).hasChangeStream());
@@ -602,7 +602,7 @@ TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorDoesNotApplyToNonChangeS
     // is the only factor that determines the success or failure of isResumableChangeStreamError().
     auto cmdObj =
         BSON("aggregate" << nss().coll() << "pipeline" << BSON_ARRAY(BSON("$match" << BSONObj()))
-                         << "cursor" << BSONObj() << "$db" << nss().db());
+                         << "cursor" << BSONObj() << "$db" << nss().db_forTest());
     auto aggRequest =
         uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(nss(), cmdObj));
     ASSERT_FALSE(LiteParsedPipeline(aggRequest).hasChangeStream());

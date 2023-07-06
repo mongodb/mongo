@@ -2310,12 +2310,12 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
     // Empty temporary collections generate createIndexes oplog entry even if the node
     // supports 2 phase index build.
     const auto createIndexesDocument =
-        queryOplog(BSON("ns" << renamedNss.db() + ".$cmd"
+        queryOplog(BSON("ns" << renamedNss.db_forTest() + ".$cmd"
                              << "o.createIndexes" << BSON("$exists" << true) << "o.name"
                              << "b_1"));
     const auto tmpCollName =
         createIndexesDocument.getObjectField("o").getStringField("createIndexes");
-    tmpName = NamespaceString::createNamespaceString_forTest(renamedNss.db(), tmpCollName);
+    tmpName = NamespaceString::createNamespaceString_forTest(renamedNss.db_forTest(), tmpCollName);
     indexCommitTs = createIndexesDocument["ts"].timestamp();
     const Timestamp indexCreateInitTs = queryOplog(BSON("op"
                                                         << "c"
@@ -2419,12 +2419,12 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
     // Confirm that startIndexBuild and abortIndexBuild oplog entries have been written to the
     // oplog.
     auto indexStartDocument =
-        queryOplog(BSON("ns" << nss.db() + ".$cmd"
+        queryOplog(BSON("ns" << nss.db_forTest() + ".$cmd"
                              << "o.startIndexBuild" << nss.coll() << "o.indexes.0.name"
                              << "a_1"));
     auto indexStartTs = indexStartDocument["ts"].timestamp();
     auto indexAbortDocument =
-        queryOplog(BSON("ns" << nss.db() + ".$cmd"
+        queryOplog(BSON("ns" << nss.db_forTest() + ".$cmd"
                              << "o.abortIndexBuild" << nss.coll() << "o.indexes.0.name"
                              << "a_1"));
     auto indexAbortTs = indexAbortDocument["ts"].timestamp();
@@ -3065,7 +3065,8 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
 
     const Timestamp systemViewsCreateTs = queryOplog(BSON("op"
                                                           << "c"
-                                                          << "ns" << (viewNss.db() + ".$cmd")
+                                                          << "ns"
+                                                          << (viewNss.db_forTest() + ".$cmd")
                                                           << "o.create"
                                                           << "system.views"))["ts"]
                                               .timestamp();

@@ -199,7 +199,7 @@ protected:
                 nss,
                 collUuid,
                 SampledCommandNameEnum::kUpdate,
-                cmd.toBSON(BSON("$db" << nss.db().toString())),
+                cmd.toBSON(BSON("$db" << nss.db_forTest().toString())),
                 Date_t::now() +
                     mongo::Milliseconds(
                         analyze_shard_key::gQueryAnalysisSampleExpirationSecs.load() * 1000)};
@@ -215,7 +215,7 @@ protected:
                 nss,
                 collUuid,
                 SampledCommandNameEnum::kDelete,
-                cmd.toBSON(BSON("$db" << nss.db().toString())),
+                cmd.toBSON(BSON("$db" << nss.db_forTest().toString())),
                 Date_t::now() +
                     mongo::Milliseconds(
                         analyze_shard_key::gQueryAnalysisSampleExpirationSecs.load() * 1000)};
@@ -239,7 +239,7 @@ protected:
                 nss,
                 collUuid,
                 SampledCommandNameEnum::kFindAndModify,
-                cmd.toBSON(BSON("$db" << nss.db().toString())),
+                cmd.toBSON(BSON("$db" << nss.db_forTest().toString())),
                 Date_t::now() +
                     mongo::Milliseconds(
                         analyze_shard_key::gQueryAnalysisSampleExpirationSecs.load() * 1000)};

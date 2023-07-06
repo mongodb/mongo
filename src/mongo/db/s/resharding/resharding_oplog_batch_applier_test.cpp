@@ -424,7 +424,7 @@ private:
     const ShardId _otherDonorId{"otherDonorId"};
 
     const NamespaceString _outputNss =
-        resharding::constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
+        resharding::constructTemporaryReshardingNss(_sourceNss.db_forTest(), _sourceUUID);
     const NamespaceString _myStashNss =
         resharding::getLocalConflictStashNamespace(_sourceUUID, _myDonorId);
     const NamespaceString _otherStashNss =

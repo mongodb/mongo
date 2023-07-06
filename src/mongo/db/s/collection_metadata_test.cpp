@@ -145,7 +145,7 @@ protected:
             reshardingFields.setRecipientFields(std::move(recipientFields));
         } else if (state == CoordinatorStateEnum::kBlockingWrites) {
             TypeCollectionDonorFields donorFields{
-                resharding::constructTemporaryReshardingNss(kNss.db(), existingUuid),
+                resharding::constructTemporaryReshardingNss(kNss.db_forTest(), existingUuid),
                 KeyPattern{BSON("newKey" << 1)},
                 {kThisShard, kOtherShard}};
             reshardingFields.setDonorFields(std::move(donorFields));

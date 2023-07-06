@@ -125,7 +125,7 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenYielding) {
 
     auto ars = AsyncRequestsSender(operationContext(),
                                    executor(),
-                                   kTestNss.db(),
+                                   kTestNss.db_forTest(),
                                    requests,
                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                    Shard::RetryPolicy::kNoRetry,
@@ -187,7 +187,7 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenUnyielding) {
 
     auto ars = AsyncRequestsSender(operationContext(),
                                    executor(),
-                                   kTestNss.db(),
+                                   kTestNss.db_forTest(),
                                    requests,
                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                    Shard::RetryPolicy::kNoRetry,
@@ -257,7 +257,7 @@ TEST_F(AsyncRequestsSenderTest, ExceptionWhileWaitingDoesNotSkipUnyield) {
     auto yielderPointer = yielder.get();
     auto ars = AsyncRequestsSender(operationContext(),
                                    executor(),
-                                   kTestNss.db(),
+                                   kTestNss.db_forTest(),
                                    requests,
                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                    Shard::RetryPolicy::kNoRetry,

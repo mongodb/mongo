@@ -270,7 +270,7 @@ protected:
         env.version = ShardVersionFactory::make(ChunkVersion(gen, {1, 0}),
                                                 boost::optional<CollectionIndexes>(boost::none));
         env.tempNss = NamespaceString::createNamespaceString_forTest(
-            kNss.db(),
+            kNss.db_forTest(),
             fmt::format("{}{}",
                         NamespaceString::kTemporaryReshardingCollectionPrefix,
                         env.sourceUuid.toString()));
@@ -295,7 +295,7 @@ protected:
         coll.setAllowMigrations(false);
 
         _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(
-            DatabaseType(kNss.db().toString(), kShardList[0].getName(), env.dbVersion));
+            DatabaseType(kNss.db_forTest().toString(), kShardList[0].getName(), env.dbVersion));
         _mockCatalogCacheLoader->setCollectionRefreshValues(
             kNss,
             coll,
@@ -313,7 +313,7 @@ protected:
                          "y"),
             boost::none);
 
-        ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kNss.db(), boost::none));
+        ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kNss.db_forTest(), boost::none));
         forceShardFilteringMetadataRefresh(opCtx, kNss);
 
         if (refreshTempNss)

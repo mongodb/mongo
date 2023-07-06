@@ -230,7 +230,7 @@ protected:
     const NamespaceString _sourceNss =
         NamespaceString::createNamespaceString_forTest("test"_sd, "collection_being_resharded"_sd);
     const NamespaceString tempNss =
-        resharding::constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
+        resharding::constructTemporaryReshardingNss(_sourceNss.db_forTest(), _sourceUUID);
     const UUID _sourceUUID = UUID::gen();
     const ReshardingSourceId _sourceId{UUID::gen(), _myShardName};
     const DatabaseVersion _sourceDbVersion{UUID::gen(), Timestamp(1, 1)};

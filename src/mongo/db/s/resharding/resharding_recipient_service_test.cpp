@@ -316,7 +316,7 @@ public:
             UUID::gen(),
             sourceNss,
             sourceUUID,
-            resharding::constructTemporaryReshardingNss(sourceNss.db(), sourceUUID),
+            resharding::constructTemporaryReshardingNss(sourceNss.db_forTest(), sourceUUID),
             newShardKeyPattern());
         commonMetadata.setStartTime(getServiceContext()->getFastClockSource()->now());
 

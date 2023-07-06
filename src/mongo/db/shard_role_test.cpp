@@ -1326,7 +1326,7 @@ TEST_F(ShardRoleTest, RestoreForWriteInvalidatesAcquisitionIfPlacementConcernDbV
                              ExceptionFor<ErrorCodes::StaleDbVersion>,
                              [&](const DBException& ex) {
                                  const auto exInfo = ex.extraInfo<StaleDbRoutingVersion>();
-                                 ASSERT_EQ(nss.db(), exInfo->getDb());
+                                 ASSERT_EQ(nss.db_forTest(), exInfo->getDb());
                                  ASSERT_EQ(dbVersionTestDb, exInfo->getVersionReceived());
                                  ASSERT_EQ(newDbVersion, exInfo->getVersionWanted());
                                  ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());

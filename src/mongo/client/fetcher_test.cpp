@@ -970,7 +970,7 @@ TEST_F(FetcherTest, EmptyGetMoreRequestAfterFirstBatchMakesFetcherInactiveAndKil
         request = noi->getRequest();
     }
 
-    ASSERT_EQUALS(nss.db(), request.dbname);
+    ASSERT_EQUALS(nss.db_forTest(), request.dbname);
     auto&& cmdObj = request.cmdObj;
     auto firstElement = cmdObj.firstElement();
     ASSERT_EQUALS("killCursors", firstElement.fieldNameStringData());
@@ -1045,7 +1045,7 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
         auto noi = net->getNextReadyRequest();
         auto request = noi->getRequest();
 
-        ASSERT_EQUALS(nss.db(), request.dbname);
+        ASSERT_EQUALS(nss.db_forTest(), request.dbname);
         auto&& cmdObj = request.cmdObj;
         auto firstElement = cmdObj.firstElement();
         ASSERT_EQUALS("killCursors", firstElement.fieldNameStringData());

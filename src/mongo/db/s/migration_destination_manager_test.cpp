@@ -211,7 +211,8 @@ TEST_F(MigrationDestinationManagerNetworkTest,
                             << BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                                         << "_id_"))};
 
-            std::string listCollectionsNs = str::stream() << nss.db() << "$cmd.listCollections";
+            std::string listCollectionsNs = str::stream()
+                << nss.db_forTest() << "$cmd.listCollections";
             return BSON(
                 "ok" << 1 << "cursor"
                      << BSON("id" << 0LL << "ns" << listCollectionsNs << "firstBatch" << colls));

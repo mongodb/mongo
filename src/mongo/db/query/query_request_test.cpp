@@ -1283,7 +1283,7 @@ TEST(QueryRequestTest, ConvertToAggregationSucceeds) {
     auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
@@ -1301,7 +1301,7 @@ TEST(QueryRequestTest, ConvertToAggregationOmitsExplain) {
     auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT_FALSE(ar.getValue().getExplain());
@@ -1316,7 +1316,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithHintSucceeds) {
     const auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT_BSONOBJ_EQ(findCommand.getHint(), ar.getValue().getHint().value_or(BSONObj()));
@@ -1398,7 +1398,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenSucceeds) {
     findCommand.setHint(BSON("$natural" << 1));
     const auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg);
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(ar.getValue().getRequestResumeToken());
@@ -1422,7 +1422,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithPipeline) {
     auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
@@ -1450,7 +1450,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithBatchSize) {
     auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
@@ -1471,7 +1471,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithMaxTimeMS) {
     const BSONObj cmdObj = agg.getValue();
     ASSERT_EQ(cmdObj["maxTimeMS"].Int(), 9);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), cmdObj).body;
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db_forTest(), cmdObj).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
@@ -1488,7 +1488,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithCollationSucceeds) {
     auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
@@ -1521,7 +1521,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithLegacyRuntimeConstantsSucceeds) {
     auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(ar.getValue().getLegacyRuntimeConstants().has_value());
@@ -1535,7 +1535,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseTrueSucceeds) {
     const auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg.getStatus());
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(ar.getValue().getAllowDiskUse().has_value());
@@ -1548,7 +1548,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseFalseSucceeds) {
     const auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg.getStatus());
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db_forTest(), agg.getValue()).body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(ar.getValue().getAllowDiskUse().has_value());

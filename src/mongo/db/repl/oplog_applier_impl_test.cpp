@@ -216,7 +216,7 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
 TEST_F(OplogApplierImplTest,
        applyOplogEntryOrGroupedInsertsInsertDocumentCollectionLookupByUUIDFails) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    createDatabase(_opCtx.get(), nss.db());
+    createDatabase(_opCtx.get(), nss.db_forTest());
     NamespaceString otherNss =
         NamespaceString::createNamespaceString_forTest(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kInsert, otherNss, kUuid);
@@ -228,7 +228,7 @@ TEST_F(OplogApplierImplTest,
 TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
        applyOplogEntryOrGroupedInsertsDeleteDocumentCollectionLookupByUUIDFails) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    createDatabase(_opCtx.get(), nss.db());
+    createDatabase(_opCtx.get(), nss.db_forTest());
     NamespaceString otherNss =
         NamespaceString::createNamespaceString_forTest(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, kUuid);
@@ -247,7 +247,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
 TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
        applyOplogEntryOrGroupedInsertsDeleteDocumentCollectionLookupByUUIDFails) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    createDatabase(_opCtx.get(), nss.db());
+    createDatabase(_opCtx.get(), nss.db_forTest());
     NamespaceString otherNss =
         NamespaceString::createNamespaceString_forTest(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, kUuid);
@@ -258,7 +258,7 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentCollectionMissing) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    createDatabase(_opCtx.get(), nss.db());
+    createDatabase(_opCtx.get(), nss.db_forTest());
     // Even though the collection doesn't exist, this is handled in the actual application function,
     // which in the case of this test just ignores such errors. This tests mostly that we don't
     // implicitly create the collection.
@@ -272,7 +272,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentCollec
 TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
        applyOplogEntryOrGroupedInsertsDeleteDocumentCollectionMissing) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    createDatabase(_opCtx.get(), nss.db());
+    createDatabase(_opCtx.get(), nss.db_forTest());
     // Even though the collection doesn't exist, this is handled in the actual application function,
     // which in the case of this test just ignores such errors. This tests mostly that we don't
     // implicitly create the collection.
@@ -293,7 +293,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
 TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
        applyOplogEntryOrGroupedInsertsDeleteDocumentCollectionMissing) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
-    createDatabase(_opCtx.get(), nss.db());
+    createDatabase(_opCtx.get(), nss.db_forTest());
     // With steady state constraints enabled, attempting to delete from a missing collection is an
     // error.
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
@@ -3573,10 +3573,10 @@ TEST_F(IdempotencyTest, CreateCollectionWithView) {
     ASSERT_OK(
         runOpInitialSync(makeCreateCollectionOplogEntry(nextOpTime(), viewNss, options.toBSON())));
 
-    auto viewDoc =
-        BSON("_id" << NamespaceString::createNamespaceString_forTest(_nss.db(), "view").ns_forTest()
-                   << "viewOn" << _nss.coll() << "pipeline"
-                   << fromjson("[ { '$project' : { 'x' : 1 } } ]"));
+    auto viewDoc = BSON(
+        "_id"
+        << NamespaceString::createNamespaceString_forTest(_nss.db_forTest(), "view").ns_forTest()
+        << "viewOn" << _nss.coll() << "pipeline" << fromjson("[ { '$project' : { 'x' : 1 } } ]"));
     auto insertViewOp = makeInsertDocumentOplogEntry(nextOpTime(), viewNss, viewDoc);
     auto dropColl = makeCommandOplogEntry(nextOpTime(), _nss, BSON("drop" << _nss.coll()));
 

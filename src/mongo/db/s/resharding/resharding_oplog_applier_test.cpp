@@ -314,7 +314,7 @@ public:
 
     void loadCatalogCacheValues() {
         _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(
-            DatabaseType(kAppliedToNs.db().toString(), _cm->dbPrimary(), _cm->dbVersion()));
+            DatabaseType(kAppliedToNs.db_forTest().toString(), _cm->dbPrimary(), _cm->dbVersion()));
         std::vector<ChunkType> chunks;
         _cm->forEachChunk([&](const auto& chunk) {
             chunks.emplace_back(

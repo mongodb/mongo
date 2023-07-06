@@ -475,7 +475,7 @@ protected:
             const OpMsgRequest request = [&] {
                 typename T::Request incr(ns);
                 incr.setI(i);
-                return incr.serialize(BSON("$db" << ns.db()));
+                return incr.serialize(BSON("$db" << ns.db_forTest()));
             }();
 
             auto opCtx = _client->makeOperationContext();

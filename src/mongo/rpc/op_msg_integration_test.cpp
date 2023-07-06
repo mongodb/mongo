@@ -389,7 +389,7 @@ void exhaustGetMoreTest(bool enableChecksum) {
     // Issue a find request to open a cursor but return 0 documents. Specify a sort in order to
     // guarantee their return order.
     auto findCmd = BSON("find" << nss.coll() << "batchSize" << 0 << "sort" << BSON("_id" << 1));
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), findCmd);
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db_forTest(), findCmd);
     auto request = opMsgRequest.serialize();
 
     Message reply;
@@ -406,7 +406,7 @@ void exhaustGetMoreTest(bool enableChecksum) {
     int batchSize = 2;
     GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
     getMoreRequest.setBatchSize(batchSize);
-    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), getMoreRequest.toBSON({}));
+    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db_forTest(), getMoreRequest.toBSON({}));
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -475,7 +475,7 @@ TEST(OpMsg, FindIgnoresExhaust) {
 
     // Issue a find request with exhaust flag. Returns 0 documents.
     auto findCmd = BSON("find" << nss.coll() << "batchSize" << 0);
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), findCmd);
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db_forTest(), findCmd);
     auto request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -507,7 +507,7 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
 
     // Issue a find request to open a cursor but return 0 documents.
     auto findCmd = BSON("find" << nss.coll() << "batchSize" << 0);
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), findCmd);
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db_forTest(), findCmd);
     auto request = opMsgRequest.serialize();
 
     Message reply;
@@ -524,7 +524,7 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
     int batchSize = 2;
     GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
     getMoreRequest.setBatchSize(batchSize);
-    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), getMoreRequest.toBSON({}));
+    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db_forTest(), getMoreRequest.toBSON({}));
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -555,7 +555,7 @@ TEST(OpMsg, MongosIgnoresExhaustForGetMore) {
     // Issue a find request to open a cursor but return 0 documents. Specify a sort in order to
     // guarantee their return order.
     auto findCmd = BSON("find" << nss.coll() << "batchSize" << 0 << "sort" << BSON("_id" << 1));
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), findCmd);
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db_forTest(), findCmd);
     auto request = opMsgRequest.serialize();
 
     Message reply;
@@ -569,7 +569,7 @@ TEST(OpMsg, MongosIgnoresExhaustForGetMore) {
     int batchSize = 2;
     GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
     getMoreRequest.setBatchSize(batchSize);
-    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), getMoreRequest.toBSON({}));
+    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db_forTest(), getMoreRequest.toBSON({}));
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 
@@ -608,7 +608,7 @@ TEST(OpMsg, ExhaustWorksForAggCursor) {
     // guarantee their return order.
     auto aggCmd = BSON("aggregate" << nss.coll() << "cursor" << BSON("batchSize" << 0) << "pipeline"
                                    << BSON_ARRAY(BSON("$sort" << BSON("_id" << 1))));
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), aggCmd);
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db_forTest(), aggCmd);
     auto request = opMsgRequest.serialize();
 
     Message reply;
@@ -623,7 +623,7 @@ TEST(OpMsg, ExhaustWorksForAggCursor) {
     int batchSize = 2;
     GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
     getMoreRequest.setBatchSize(batchSize);
-    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), getMoreRequest.toBSON({}));
+    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db_forTest(), getMoreRequest.toBSON({}));
     request = opMsgRequest.serialize();
     OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
 

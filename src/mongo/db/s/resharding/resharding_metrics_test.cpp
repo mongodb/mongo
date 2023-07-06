@@ -142,7 +142,7 @@ public:
                                           kTestNamespace,
                                           getSourceCollectionId(),
                                           resharding::constructTemporaryReshardingNss(
-                                              kTestNamespace.db(), getSourceCollectionId()),
+                                              kTestNamespace.db_forTest(), getSourceCollectionId()),
                                           kShardKey};
         metadata.setStartTime(getClockSource()->now() - kRunningTime);
         return metadata;

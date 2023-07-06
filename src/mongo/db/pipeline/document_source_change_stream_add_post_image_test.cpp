@@ -149,7 +149,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingDocumentK
         Document{{"_id", makeResumeToken(0)},
                  {"operationType", "update"_sd},
                  {"fullDocument", Document{{"_id", 0}}},
-                 {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}},
+                 {"ns", Document{{"db", expCtx->ns.db_forTest()}, {"coll", expCtx->ns.coll()}}}},
         expCtx);
 
     lookupChangeStage->setSource(mockLocalSource.get());
@@ -172,7 +172,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingOperation
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"fullDocument", Document{{"_id", 0}}},
-                 {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}},
+                 {"ns", Document{{"db", expCtx->ns.db_forTest()}, {"coll", expCtx->ns.coll()}}}},
         expCtx);
 
     lookupChangeStage->setSource(mockLocalSource.get());
@@ -298,7 +298,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOn
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
-                 {"ns", Document{{"db", expCtx->ns.db()}, {"coll", "irrelevant"_sd}}}},
+                 {"ns", Document{{"db", expCtx->ns.db_forTest()}, {"coll", "irrelevant"_sd}}}},
         expCtx);
 
     lookupChangeStage->setSource(mockLocalSource.get());
@@ -310,7 +310,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOn
         (Document{{"_id", makeResumeToken(0)},
                   {"documentKey", Document{{"_id", 0}}},
                   {"operationType", "update"_sd},
-                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", "irrelevant"_sd}}},
+                  {"ns", Document{{"db", expCtx->ns.db_forTest()}, {"coll", "irrelevant"_sd}}},
                   {"fullDocument", Document{{"_id", 0}}}}));
 }
 
@@ -325,7 +325,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfDocumentKeyIsNot
         Document{{"_id", makeResumeToken(0)},
                  {"documentKey", Document{{"_id", 0}}},
                  {"operationType", "update"_sd},
-                 {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}},
+                 {"ns", Document{{"db", expCtx->ns.db_forTest()}, {"coll", expCtx->ns.coll()}}}},
         expCtx);
 
     lookupChangeStage->setSource(mockLocalSource.get());
@@ -351,13 +351,13 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
         {Document{{"_id", makeResumeToken(0)},
                   {"documentKey", Document{{"_id", 0}}},
                   {"operationType", "insert"_sd},
-                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}},
+                  {"ns", Document{{"db", expCtx->ns.db_forTest()}, {"coll", expCtx->ns.coll()}}},
                   {"fullDocument", Document{{"_id", 0}}}},
          DocumentSource::GetNextResult::makePauseExecution(),
          Document{{"_id", makeResumeToken(1)},
                   {"documentKey", Document{{"_id", 1}}},
                   {"operationType", "update"_sd},
-                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}}},
+                  {"ns", Document{{"db", expCtx->ns.db_forTest()}, {"coll", expCtx->ns.coll()}}}},
          DocumentSource::GetNextResult::makePauseExecution()},
         expCtx);
 
@@ -376,7 +376,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
         (Document{{"_id", makeResumeToken(0)},
                   {"documentKey", Document{{"_id", 0}}},
                   {"operationType", "insert"_sd},
-                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}},
+                  {"ns", Document{{"db", expCtx->ns.db_forTest()}, {"coll", expCtx->ns.coll()}}},
                   {"fullDocument", Document{{"_id", 0}}}}));
 
     ASSERT_TRUE(lookupChangeStage->getNext().isPaused());
@@ -388,7 +388,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
         (Document{{"_id", makeResumeToken(1)},
                   {"documentKey", Document{{"_id", 1}}},
                   {"operationType", "update"_sd},
-                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", expCtx->ns.coll()}}},
+                  {"ns", Document{{"db", expCtx->ns.db_forTest()}, {"coll", expCtx->ns.coll()}}},
                   {"fullDocument", Document{{"_id", 1}}}}));
 
     ASSERT_TRUE(lookupChangeStage->getNext().isPaused());

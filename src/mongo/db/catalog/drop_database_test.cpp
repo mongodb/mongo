@@ -392,7 +392,7 @@ TEST_F(DropDatabaseTest,
     // Update ReplicationCoordinatorMock so that awaitReplication() fails.
     _replCoord->setAwaitReplicationReturnValueFunction(
         [this](OperationContext*, const repl::OpTime&) {
-            _removeDatabaseFromCatalog(_opCtx.get(), _nss.db());
+            _removeDatabaseFromCatalog(_opCtx.get(), _nss.db_forTest());
             return repl::ReplicationCoordinator::StatusAndDuration(
                 Status(ErrorCodes::WriteConcernFailed, ""), Milliseconds(0));
         });
@@ -405,7 +405,7 @@ TEST_F(DropDatabaseTest,
     // Update ReplicationCoordinatorMock so that awaitReplication() fails.
     _replCoord->setAwaitReplicationReturnValueFunction(
         [this](OperationContext*, const repl::OpTime&) {
-            _removeDatabaseFromCatalog(_opCtx.get(), _nss.db());
+            _removeDatabaseFromCatalog(_opCtx.get(), _nss.db_forTest());
             return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
         });
 
@@ -417,7 +417,7 @@ TEST_F(DropDatabaseTest,
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
     ASSERT_EQUALS(status.reason(),
                   std::string(str::stream()
-                              << "Could not drop database " << _nss.db()
+                              << "Could not drop database " << _nss.db_forTest()
                               << " because it does not exist after dropping 1 collection(s)."));
 
     ASSERT_FALSE(AutoGetDb(_opCtx.get(), _nss.dbName(), MODE_X).getDb());
@@ -441,7 +441,7 @@ TEST_F(DropDatabaseTest,
     auto status = dropDatabaseForApplyOps(_opCtx.get(), _nss.dbName());
     ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, status);
     ASSERT_EQUALS(status.reason(),
-                  std::string(str::stream() << "Could not drop database " << _nss.db()
+                  std::string(str::stream() << "Could not drop database " << _nss.db_forTest()
                                             << " because we transitioned from PRIMARY to SECONDARY"
                                             << " while waiting for 1 pending collection drop(s)."));
 

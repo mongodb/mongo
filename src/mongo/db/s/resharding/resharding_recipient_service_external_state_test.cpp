@@ -138,7 +138,7 @@ public:
                                const HostAndPort& expectedHost) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.cmdObj.firstElementFieldName(), "listCollections"_sd);
-            ASSERT_EQUALS(nss.db(), request.dbname);
+            ASSERT_EQUALS(nss.db_forTest(), request.dbname);
             ASSERT_EQUALS(expectedHost, request.target);
             ASSERT_BSONOBJ_EQ(request.cmdObj["filter"].Obj(), BSON("info.uuid" << uuid));
             ASSERT(request.cmdObj.hasField("databaseVersion"));
@@ -147,7 +147,8 @@ public:
                                    << "local"
                                    << "afterClusterTime" << kDefaultFetchTimestamp));
 
-            std::string listCollectionsNs = str::stream() << nss.db() << "$cmd.listCollections";
+            std::string listCollectionsNs = str::stream()
+                << nss.db_forTest() << "$cmd.listCollections";
             return BSON("ok" << 1 << "cursor"
                              << BSON("id" << 0LL << "ns" << listCollectionsNs << "firstBatch"
                                           << collectionsDocs));
@@ -160,7 +161,7 @@ public:
                            const HostAndPort& expectedHost) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.cmdObj.firstElementFieldName(), "listIndexes"_sd);
-            ASSERT_EQUALS(nss.db(), request.dbname);
+            ASSERT_EQUALS(nss.db_forTest(), request.dbname);
             ASSERT_EQUALS(expectedHost, request.target);
             ASSERT_EQ(unittest::assertGet(UUID::parse(request.cmdObj.firstElement())), uuid);
             ASSERT(request.cmdObj.hasField("shardVersion"));
@@ -251,7 +252,7 @@ public:
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.cmdObj.firstElementFieldNameStringData(), expectedCmdName);
             return createErrorCursorResponse(
-                Status(StaleDbRoutingVersion(nss.db().toString(),
+                Status(StaleDbRoutingVersion(nss.db_forTest().toString(),
                                              DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
                                              boost::none),
                        "dummy stale db version error"));

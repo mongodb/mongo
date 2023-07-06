@@ -111,7 +111,7 @@ void initTestCollection(DBClientBase* conn) {
     for (int i = 0; i < 10; i++) {
         auto insertCmd =
             BSON("insert" << testNSS.coll() << "documents" << BSON_ARRAY(BSON("a" << i)));
-        auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody(testNSS.db(), insertCmd));
+        auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody(testNSS.db_forTest(), insertCmd));
         ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
     }
 }
@@ -426,7 +426,7 @@ TEST(CurrentOpExhaustCursorTest, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
     for (int i = 0; i < 5; i++) {
         auto insertCmd =
             BSON("insert" << testNSS.coll() << "documents" << BSON_ARRAY(BSON("a" << i)));
-        auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody(testNSS.db(), insertCmd));
+        auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody(testNSS.db_forTest(), insertCmd));
         ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
     }
 
@@ -470,7 +470,7 @@ TEST(CurrentOpExhaustCursorTest, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
     for (int i = 5; i < 8; i++) {
         auto insertCmd =
             BSON("insert" << testNSS.coll() << "documents" << BSON_ARRAY(BSON("a" << i)));
-        auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody(testNSS.db(), insertCmd));
+        auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody(testNSS.db_forTest(), insertCmd));
         ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
     }
 
