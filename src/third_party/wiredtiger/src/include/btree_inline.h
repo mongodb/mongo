@@ -579,10 +579,10 @@ __wt_cache_page_image_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 
     if (WT_PAGE_IS_INTERNAL(page))
         __wt_cache_decr_check_uint64(
-          session, &cache->bytes_image_intl, page->dsk->mem_size, "WT_CACHE.bytes_image");
+          session, &cache->bytes_image_intl, page->dsk_alloc_size, "WT_CACHE.bytes_image");
     else
         __wt_cache_decr_check_uint64(
-          session, &cache->bytes_image_leaf, page->dsk->mem_size, "WT_CACHE.bytes_image");
+          session, &cache->bytes_image_leaf, page->dsk_alloc_size, "WT_CACHE.bytes_image");
 }
 
 /*
@@ -596,9 +596,9 @@ __wt_cache_page_image_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 
     cache = S2C(session)->cache;
     if (WT_PAGE_IS_INTERNAL(page))
-        (void)__wt_atomic_add64(&cache->bytes_image_intl, page->dsk->mem_size);
+        (void)__wt_atomic_add64(&cache->bytes_image_intl, page->dsk_alloc_size);
     else
-        (void)__wt_atomic_add64(&cache->bytes_image_leaf, page->dsk->mem_size);
+        (void)__wt_atomic_add64(&cache->bytes_image_leaf, page->dsk_alloc_size);
 }
 
 /*
