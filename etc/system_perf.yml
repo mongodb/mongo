@@ -1711,7 +1711,7 @@ buildvariants:
   - name: linux-intel-1-node-replSet-classic-query-engine
     display_name: Linux Intel 1-Node ReplSet (Classic Query Engine)
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    cron: &linux-1-node-repl-cron  "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2192,7 +2192,7 @@ buildvariants:
 
   - name: linux-intel-1-node-replSet-sampling-bonsai
     display_name: Linux Intel 1-Node ReplSet (Bonsai with Sampling CE)
-    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    cron: *linux-1-node-repl-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2211,7 +2211,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-sampling-bonsai.2022-11
     display_name: Linux 1-Node ReplSet (Bonsai with Sampling CE) 2022-11
-    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    cron: *linux-1-node-repl-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2231,7 +2231,7 @@ buildvariants:
 
   - name: linux-intel-1-node-replSet-heuristic-bonsai
     display_name: Linux Intel 1-Node ReplSet (Bonsai with Heuristic CE)
-    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    cron: *linux-1-node-repl-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2250,7 +2250,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-heuristic-bonsai.2022-11
     display_name: Linux 1-Node ReplSet (Bonsai with Heuristic CE) 2022-11
-    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    cron: *linux-1-node-repl-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2271,7 +2271,7 @@ buildvariants:
   - name: linux-1-node-replSet-classic-query-engine.2022-11
     display_name: Linux 1-Node ReplSet (Classic Query Engine) 2022-11
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    cron: *linux-1-node-repl-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2387,7 +2387,7 @@ buildvariants:
 
   - name: linux-1-node-replSet.2022-11
     display_name: Linux 1-Node ReplSet 2022-11
-    cron: &linux-1-node-repl-cron "0 0 * * 4"  # 00:00 on Thursday
+    cron: *linux-1-node-repl-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
