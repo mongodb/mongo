@@ -41,6 +41,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/keys_collection_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -1889,11 +1890,11 @@ void TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKe
                        Query().readPref(_readPreference.pref, _readPreference.tags.getTagBSON()));
     while (cursor->more()) {
         const auto doc = cursor->nextSafe().getOwned();
-        keyDocs.push_back(
-            tenant_migration_util::makeExternalClusterTimeKeyDoc(_migrationUuid, doc));
+        keyDocs.push_back(keys_collection_util::makeExternalClusterTimeKeyDoc(doc, _migrationUuid));
     }
 
-    tenant_migration_util::storeExternalClusterTimeKeyDocs(std::move(keyDocs));
+    auto opCtx = cc().makeOperationContext();
+    keys_collection_util::storeExternalClusterTimeKeyDocs(opCtx.get(), std::move(keyDocs));
 }
 
 void TenantMigrationRecipientService::Instance::_compareRecipientAndDonorFCV() const {
