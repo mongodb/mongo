@@ -3619,7 +3619,9 @@ public:
                    boost::intrusive_ptr<Expression> charactersToTrim)
         : Expression(expCtx, {std::move(input), std::move(charactersToTrim)}),
           _trimType(trimType),
-          _name(name.toString()) {}
+          _name(name.toString()) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     boost::intrusive_ptr<Expression> optimize() final;
