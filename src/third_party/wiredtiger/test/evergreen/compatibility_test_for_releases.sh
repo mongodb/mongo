@@ -1000,7 +1000,9 @@ fi
 
 if [ "$older" = true ]; then
     for b in ${older_release_branches[@]}; do
-        (run_format $b "fix row var")
+        # FLCS scenarios are not added as they only work from 6.0+. This should be updated when the
+        # tested older branches support FLCS.
+        (run_format $b "row var")
     done
 fi
 
@@ -1028,8 +1030,10 @@ fi
 
 if [ "$older" = true ]; then
     for i in ${!older_release_branches[@]}; do
+        # FLCS scenarios are not added as they only work from 6.0+. This should be updated when the
+        # tested older branches support FLCS.
         [[ $((i+1)) < ${#older_release_branches[@]} ]] && \
-        (verify_test_format ${older_release_branches[$i]} ${older_release_branches[$((i+1))]} "fix row var" true)
+        (verify_test_format ${older_release_branches[$i]} ${older_release_branches[$((i+1))]} "row var" true)
     done
 fi
 
