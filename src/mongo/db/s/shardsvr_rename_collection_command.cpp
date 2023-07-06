@@ -104,6 +104,13 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
+            uassert(ErrorCodes::IllegalOperation,
+                    "Can't rename a collection in the config database",
+                    !fromNss.isConfigDB());
+            uassert(ErrorCodes::IllegalOperation,
+                    "Can't rename a collection in the admin database",
+                    !fromNss.isAdminDB());
+
             validateNamespacesForRenameCollection(opCtx, fromNss, toNss);
 
             auto renameCollectionCoordinator = [&]() {
