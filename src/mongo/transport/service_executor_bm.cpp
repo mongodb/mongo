@@ -181,7 +181,10 @@ BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleAndWait)->ThreadRange
 BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ChainedSchedule)
     ->Range(1, kMaxChainSize)
     ->ThreadRange(1, kMaxThreads);
+#else
+BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleTask)->ThreadRange(1, 1);
 #endif
+
 
 }  // namespace
 }  // namespace mongo::transport
