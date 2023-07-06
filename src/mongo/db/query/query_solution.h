@@ -520,7 +520,7 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     // Name of the namespace.
-    std::string name;
+    NamespaceString nss;
 
     // If present, this parameter sets the start point of a forward scan or the end point of a
     // reverse scan.

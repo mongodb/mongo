@@ -373,7 +373,7 @@ void CollectionScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "COLLSCAN\n";
     addIndent(ss, indent + 1);
-    *ss << "ns = " << name << '\n';
+    *ss << "ns = " << toStringForLogging(nss) << '\n';
     if (nullptr != filter) {
         addIndent(ss, indent + 1);
         *ss << "filter = " << filter->debugString();
@@ -385,7 +385,7 @@ std::unique_ptr<QuerySolutionNode> CollectionScanNode::clone() const {
     auto copy = std::make_unique<CollectionScanNode>();
     cloneBaseData(copy.get());
 
-    copy->name = this->name;
+    copy->nss = this->nss;
     copy->tailable = this->tailable;
     copy->direction = this->direction;
     copy->isClustered = this->isClustered;

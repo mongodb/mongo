@@ -476,7 +476,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
 
     // Make the (only) node, a collection scan.
     auto csn = std::make_unique<CollectionScanNode>();
-    csn->name = nss.ns().toString();
+    csn->nss = nss;
     csn->filter = root->clone();
     csn->tailable = tailable;
     csn->shouldTrackLatestOplogTimestamp =
