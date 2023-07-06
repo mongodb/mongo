@@ -1,8 +1,5 @@
 // Test that $setWindowFields inside $facet correctly propagates its state when it encounters paused
 // execution.
-(function() {
-"use strict";
-
 const coll = db.window_inside_facet;
 coll.drop();
 
@@ -74,4 +71,3 @@ expected = {
     facet2: [{count: 6}]
 };
 assert.docEq(expected, result, "$setWindowFields without sort failed.");
-}());

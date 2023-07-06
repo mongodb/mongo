@@ -5,9 +5,6 @@
  * @tags: [requires_fcv_70]
  */
 
-(function() {
-"use strict";
-
 function runAnalyzerDocTest(conn) {
     const configColl = conn.getCollection("config.queryAnalyzers");
     const dbName = "testDb";
@@ -52,4 +49,3 @@ function runMongosDocTest(conn) {
     runAnalyzerDocTest(primary);
     rst.stopSet();
 }
-})();

@@ -1,9 +1,11 @@
 // Validate that if the endpoint says permanently delete that the state
 // document is deleted and replicated properly
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {
+    FAULT_PERMANENTLY_DELETE_AFTER_3,
+    FreeMonWebServer,
+    WaitForFreeMonServerStatusState,
+    WaitForRegistration,
+} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer(FAULT_PERMANENTLY_DELETE_AFTER_3, true);
 
@@ -52,4 +54,3 @@ WaitForFreeMonServerStatusState(rst.getSecondary(), 'enabled');
 rst.stopSet();
 
 mock_web.stop();
-})();

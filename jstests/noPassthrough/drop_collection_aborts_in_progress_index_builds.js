@@ -1,10 +1,7 @@
 /**
  * Tests that the "drop" command can abort in-progress index builds.
  */
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/index_build.js");
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const mongodOptions = {};
 const conn = MongoRunner.runMongod(mongodOptions);
@@ -54,4 +51,3 @@ awaitSecondIndexBuild();
 awaitDrop();
 
 MongoRunner.stopMongod(conn);
-}());

@@ -8,8 +8,7 @@
  *     does_not_support_transactions
  * ]
  */
-
-"use strict";
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     const initData = {

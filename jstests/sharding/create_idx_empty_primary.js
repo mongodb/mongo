@@ -1,9 +1,6 @@
 /**
  * Test to make sure that the createIndex command gets sent to shards that own chunks.
  */
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 2});
 assert.commandWorked(st.s.adminCommand({enablesharding: 'test'}));
 st.ensurePrimaryShard('test', st.shard1.shardName);
@@ -30,4 +27,3 @@ indexes = st.rs1.getPrimary().getDB('test').user.getIndexes();
 assert.eq(1, indexes.length);
 
 st.stop();
-})();

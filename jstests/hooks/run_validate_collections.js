@@ -1,8 +1,7 @@
 // Runner for validateCollections that runs full validation on all collections when loaded into
 // the mongo shell.
-
 import {CollectionValidator} from "jstests/hooks/validate_collections.js";
-load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
 assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
 const topology = DiscoverTopology.findConnectedNodes(db.getMongo());

@@ -11,7 +11,7 @@
  *     requires_timeseries,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.window_functions_on_timeseries_coll;

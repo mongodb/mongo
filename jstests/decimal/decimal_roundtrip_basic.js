@@ -1,7 +1,5 @@
 // Tests doing simple round-trip operations from the shell.
 
-(function() {
-"use strict";
 var col = db.roundtrip_basic;
 col.drop();
 
@@ -49,4 +47,3 @@ checkDecimals("-Infinity", ["-Infinity"]);
 checkDecimals("9999999999999999999999999999999999E6111",
               ["9999999999999999999999999999999999E6111"]);
 checkDecimals("1E-6176", ["1E-6176"]);
-}());

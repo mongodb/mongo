@@ -6,9 +6,6 @@
  *   requires_fcv_60,
  * ]
  */
-(function() {
-'use strict';
-
 const st = new ShardingTest({shards: 2});
 const mongos = st.s;
 
@@ -69,4 +66,3 @@ assert.eq(res.expectedCollection, unshardedColl.getName());
 assert.eq(res.actualCollection, shardedColl.getName());
 
 st.stop();
-})();

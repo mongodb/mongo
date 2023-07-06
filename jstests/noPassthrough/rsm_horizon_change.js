@@ -2,9 +2,6 @@
  * Tests that split horizon reconfig results in unknown ServerDescription in
  * StreamableReplicaSetMonitor.
  */
-(function() {
-'use strict';
-
 const st = new ShardingTest(
     {mongos: [{setParameter: {replicaSetMonitorProtocol: "streamable"}}], config: 1, shards: 0});
 const configRSPrimary = st.configRS.getPrimary();
@@ -39,4 +36,3 @@ checkLog.contains(st.s, unknownServerDescriptionRegex);
 jsTest.log("Verify that the RSM eventually has the right topology description again");
 checkLog.contains(st.s, knownTopologyChangeRegex);
 st.stop();
-})();

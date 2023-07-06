@@ -19,7 +19,7 @@
  * ]
  */
 
-load("jstests/aggregation/extras/utils.js");  // For getExplainedPipelineFromAggregation
+import {getExplainedPipelineFromAggregation} from "jstests/aggregation/extras/utils.js";
 
 const collName = "timeseries_bucket_unpacking_with_limit";
 const coll = db[collName];

@@ -9,10 +9,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load('jstests/libs/uuid_util.js');
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 function entriesInContainer(primary, uuid) {
     return primary.getDB("system")
@@ -643,4 +640,3 @@ assert.commandFailedWithCode(adminDB.runCommand({_shardsvrWriteGlobalIndexKeys: 
 
 session.endSession();
 rst.stopSet();
-})();

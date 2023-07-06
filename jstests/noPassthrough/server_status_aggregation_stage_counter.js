@@ -4,9 +4,6 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
 // In memory map of stage names to their counters. Used to verify that serverStatus is
 // incrementing the appropriate stages correctly across multiple pipelines.
 let countersWeExpectToIncreaseMap = {};
@@ -153,4 +150,3 @@ st.shardColl(coll, {_id: 1}, {_id: "hashed"});
 runTests(db, coll);
 
 st.stop();
-}());

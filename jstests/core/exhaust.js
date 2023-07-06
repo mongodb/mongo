@@ -6,10 +6,7 @@
 //   no_selinux
 // ]
 
-(function() {
-'use strict';
-
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 var coll = db.exhaustColl;
 coll.drop();
@@ -70,5 +67,4 @@ assert.eq(Math.min(101, TestData.batchSize || Infinity),
 assert.eq(50,
           coll.find().addOption(DBQuery.Option.exhaust).limit(-numDocs).batchSize(50).itcount());
 assert.eq(1, coll.find().addOption(DBQuery.Option.exhaust).limit(-1).itcount());
-}());
 }());

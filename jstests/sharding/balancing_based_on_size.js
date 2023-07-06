@@ -3,11 +3,8 @@
  * for a collection on each node, converging when the size difference becomes small.
  */
 
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const maxChunkSizeMB = 1;
 const st = new ShardingTest({
@@ -93,4 +90,3 @@ const chunksAfterNoopRound = findChunksUtil.findChunksByNs(st.config, ns).toArra
 assert.eq(chunksBeforeNoopRound, chunksAfterNoopRound);
 
 st.stop();
-})();

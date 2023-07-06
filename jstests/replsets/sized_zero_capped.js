@@ -1,9 +1,6 @@
 // Ensure replicating a createCollection command with capped:true and size:0 does not cause a
 // SECONDARY to crash. (see SERVER-18792)
 
-(function() {
-"use strict";
-
 var name = "sized_zero_capped";
 var replTest = new ReplSetTest({name: name, nodes: 3});
 var nodes = replTest.nodeList();
@@ -26,4 +23,3 @@ var secondary = replTest.getSecondary();
 assert.commandWorked(secondary.getDB(name).runCommand({ping: 1}));
 
 replTest.stopSet();
-}());

@@ -1,7 +1,7 @@
 // Merge the two options objects.  Used as a helper when we are trying to actually compare options
 // despite the fact that our test framework adds extra stuff to it.  Anything set in the second
 // options object overrides the first options object.  The two objects must have the same structure.
-function mergeOptions(obj1, obj2) {
+export function mergeOptions(obj1, obj2) {
     var obj3 = {};
     for (var attrname in obj1) {
         if (typeof obj1[attrname] === "object" && typeof obj2[attrname] !== "undefined") {
@@ -39,8 +39,9 @@ function mergeOptions(obj1, obj2) {
 //
 // testGetCmdLineOptsMongod({ port : 10000 }, { "parsed" : { "net" : { "port" : 10000 } } });
 //
-var getCmdLineOptsBaseMongod;
-function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
+export var getCmdLineOptsBaseMongod;
+
+export function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
     // Get the options object returned by "getCmdLineOpts" when we spawn a mongod using our test
     // framework without passing any additional options.  We need this because the framework adds
     // options of its own, and we only want to compare against the options we care about.
@@ -134,10 +135,9 @@ function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
 //
 // testGetCmdLineOptsMongos({ port : 10000 }, { "parsed" : { "net" : { "port" : 10000 } } });
 //
-var getCmdLineOptsBaseMongos;
-function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
-    "use strict";
+export var getCmdLineOptsBaseMongos;
 
+export function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
     // Get the options object returned by "getCmdLineOpts" when we spawn a mongos using our test
     // framework without passing any additional options.  We need this because the framework adds
     // options of its own, and we only want to compare against the options we care about.
@@ -217,6 +217,6 @@ function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
 // Example:
 //
 // testGetCmdLineOptsMongodFailed({ shardsvr : "" });
-function testGetCmdLineOptsMongodFailed(mongoRunnerConfig) {
+export function testGetCmdLineOptsMongodFailed(mongoRunnerConfig) {
     assert.throws(() => MongoRunner.runMongod(mongoRunnerConfig));
 }

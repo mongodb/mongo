@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 const runTest = function(conn, failPointConn) {
     jsTestLog("Setting up users");
     const db = conn.getDB("admin");
@@ -66,4 +63,3 @@ if (jsTestOptions().storageEngine != "inMemory") {
     runTest(st.s0, st.shard0);
     st.stop();
 }
-})();

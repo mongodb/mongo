@@ -13,8 +13,6 @@
  * @tags: [resource_intensive]
  *
  */
-(function() {
-
 // Add replication-level logging.
 TestData.setParameters = TestData.setParameters || {};
 TestData.setParameters.logComponentVerbosity = TestData.setParameters.logComponentVerbosity || {};
@@ -35,4 +33,3 @@ const replTest = new ReplSetTest({name: 'replsettest_control_12_nodes', nodes: a
 replTest.startSet();
 replTest.initiateWithHighElectionTimeout();
 replTest.stopSet();
-}());

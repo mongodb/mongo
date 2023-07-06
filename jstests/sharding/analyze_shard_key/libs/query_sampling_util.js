@@ -1,11 +1,13 @@
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+
 /**
  * Utilities for testing query sampling.
  */
-var QuerySamplingUtil = (function() {
-    load("jstests/libs/fail_point_util.js");
-    load("jstests/libs/uuid_util.js");
-    load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
-
+export var QuerySamplingUtil = (function() {
     function getCollectionUuid(db, collName) {
         const listCollectionRes =
             assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));

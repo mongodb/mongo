@@ -6,10 +6,7 @@
  * @tags: [requires_majority_read_concern, requires_fcv_53]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 function doCommittedRead(coll) {
     var res = coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": 10000});
@@ -137,4 +134,3 @@ assert.eq(doCommittedRead(oldPrimaryColl), 'new');
 replTest.checkReplicatedDataHashes();
 replTest.checkOplogs();
 replTest.stopSet();
-}());

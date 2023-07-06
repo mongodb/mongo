@@ -8,11 +8,7 @@
  *   directly_against_shardsvrs_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-// For arrayEq and orderedArrayEq.
-load("jstests/aggregation/extras/utils.js");
+import {arrayEq, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
 
 let viewsDB = db.getSiblingDB("views_find");
 assert.commandWorked(viewsDB.dropDatabase());
@@ -120,4 +116,3 @@ assert.eq(viewsDB.identityView.findOne({_id: "San Francisco"}),
 assert.commandFailedWithCode(
     viewsDB.runCommand({find: "identityView", readOnce: true}),
     [ErrorCodes.OperationNotSupportedInTransaction, ErrorCodes.InvalidPipelineOperator]);
-}());

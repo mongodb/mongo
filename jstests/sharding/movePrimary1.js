@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 var s = new ShardingTest({shards: 2});
 
 assert.commandWorked(s.getDB('test1').runCommand({dropDatabase: 1}));
@@ -53,4 +50,3 @@ assert.commandFailedWithCode(s.s0.adminCommand({movePrimary: 'test1', to: 'donte
                              'attempting to use non-existent shard as primary should fail');
 
 s.stop();
-})();

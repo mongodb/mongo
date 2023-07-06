@@ -1,8 +1,5 @@
 // Tests that MongoD fails to start with the correct error message if mongod.lock exists in the
 // dbpath.
-(function() {
-"use strict";
-
 var baseName = "jstests_lock_file_fail_to_open";
 
 var dbPath = MongoRunner.dataPath + baseName + "/";
@@ -21,4 +18,3 @@ assert(logContents.indexOf("Unable to lock the lock file") > 0 ||
        logContents.indexOf("Unable to create/open the lock file") > 0);
 
 MongoRunner.stopMongod(mongo1);
-})();

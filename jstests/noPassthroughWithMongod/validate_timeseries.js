@@ -8,9 +8,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 db.validate_timeseries.drop();
 db.system.buckets.validate_timeseries.drop();
 db.viewSource.drop();
@@ -65,4 +62,3 @@ assert.commandWorked(db.createCollection("system.buckets.view"));
 assert.commandFailedWithCode(view.validate(), ErrorCodes.CommandNotSupportedOnView);
 
 //
-})();

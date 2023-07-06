@@ -3,10 +3,7 @@
  * storer is only updated periodically, commands that use it after an unclean shutdown could return
  * inaccurate results.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/override_methods/override_helpers.js");
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 function runCommandFailUncleanShutdownIncompatibleCommands(
     conn, dbName, commandName, commandObj, func, makeFuncArgs) {
@@ -38,4 +35,3 @@ OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
 
 OverrideHelpers.overrideRunCommand(runCommandFailUncleanShutdownIncompatibleCommands);
-})();

@@ -8,7 +8,6 @@
 // Test argument validation for dataSize command
 //
 
-(function() {
 let coll = db.datasize_validation;
 coll.drop();
 coll.insertOne({_id: 1});
@@ -52,4 +51,3 @@ assert.eq(result.size,
 assert.eq(result.numObjects,
           resultWithKey.numObjects,
           "numObjects should be equal after keyPattern properly inferred from min/max bounds.");
-})();

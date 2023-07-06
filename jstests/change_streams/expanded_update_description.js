@@ -2,11 +2,8 @@
  * Test change stream 'updateDescription' with 'showExpandedEvents'.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 // Drop and recreate the collections to be used in this set of tests.
 assertDropAndRecreateCollection(db, "coll");
@@ -200,4 +197,3 @@ expected = {
 cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expected]});
 
 cst.cleanUp();
-}());

@@ -7,9 +7,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB("sbe_plan_cache_invalidation");
@@ -164,4 +161,3 @@ class TestCollection {
 }());
 
 MongoRunner.stopMongod(conn);
-}());

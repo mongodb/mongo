@@ -9,9 +9,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const timeFieldName = "time";
 const metaFieldName = "tag";
 const dateTime = ISODate("2021-07-12T16:00:00Z");
@@ -183,5 +180,4 @@ const doc7_c_f106 = {
         resultDocList: [doc1_a_nofields, doc4_b_f103, doc5_b_f104, doc7_c_f106],
         nDeleted: 3,
     });
-})();
 })();

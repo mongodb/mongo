@@ -1,4 +1,4 @@
-const numMostCommonValues = 5;
+export const numMostCommonValues = 5;
 
 /**
  * If 'expectEntries' is true , asserts that there are profiler entries for aggregate commands for
@@ -6,7 +6,7 @@ const numMostCommonValues = 5;
  * used index scan and fetch no more 'numMostCommonValues' documents. If 'expectEntries' is false,
  * there are such profiler entries.
  */
-function assertAggregateQueryPlans(mongodConns, dbName, collName, comment, expectEntries) {
+export function assertAggregateQueryPlans(mongodConns, dbName, collName, comment, expectEntries) {
     let numEntries = 0;
 
     mongodConns.forEach(conn => {
@@ -58,7 +58,7 @@ function assertAggregateQueryPlans(mongodConns, dbName, collName, comment, expec
 /**
  * Returns the connections to all data-bearing mongods in the sharded cluster or replica set.
  */
-function getMongodConns({st, rst}) {
+export function getMongodConns({st, rst}) {
     assert(st || rst);
     assert(!st || !rst);
     const conns = [];

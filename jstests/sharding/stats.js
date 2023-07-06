@@ -3,18 +3,16 @@
  *   expects_explicit_underscore_id_index,
  * ]
  */
-(function() {
-
 var s = new ShardingTest({name: "stats", shards: 2, mongos: 1});
 
 s.adminCommand({enablesharding: "test"});
 
-db = s.getDB("test");
+const db = s.getDB("test");
 s.ensurePrimaryShard('test', s.shard1.shardName);
 
 function numKeys(o) {
     var num = 0;
-    for (var x in o)
+    for (let _ in o)
         num++;
     return num;
 }
@@ -137,7 +135,7 @@ let coll_not_scaled = assert.commandWorked(db.foo.stats());
 let coll_scaled_512 = assert.commandWorked(db.foo.stats(512));
 let coll_scaled_1024 = assert.commandWorked(db.foo.stats(1024));
 
-for (var shard in coll_not_scaled.shards) {
+for (let shard in coll_not_scaled.shards) {
     collStatComp(coll_not_scaled.shards[shard], coll_scaled_512.shards[shard], 512, false);
     collStatComp(coll_not_scaled.shards[shard], coll_scaled_1024.shards[shard], 1024, false);
 }
@@ -212,4 +210,3 @@ checkIndexDetails({indexDetails: true, indexDetailsName: indexName}, indexName);
 }());
 
 s.stop();
-})();

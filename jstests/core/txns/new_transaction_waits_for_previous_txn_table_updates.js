@@ -27,11 +27,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/parallel_shell_helpers.js");  // for funWithArgs().
-load("jstests/libs/fail_point_util.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 /**
  * Launches a parallel shell to start a new transaction on the session with the given lsid. It
@@ -163,4 +161,3 @@ try {
         writeConcern: {w: "majority"}
     }));
 }
-}());

@@ -5,10 +5,8 @@
  * @tags: [multiversion_incompatible]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 function runAwaitableHelloBeforeFCVChange(
     topologyVersionField, targetFCV, isPrimary, prevMinWireVersion, serverMaxWireVersion) {
@@ -332,4 +330,3 @@ function runTest(downgradeFCV) {
 
 runTest(lastLTSFCV);
 runTest(lastContinuousFCV);
-})();

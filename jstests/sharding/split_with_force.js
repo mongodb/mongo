@@ -10,7 +10,6 @@ var st = new ShardingTest({shards: 1, mongos: 1, other: options});
 
 var mongos = st.s0;
 var admin = mongos.getDB("admin");
-var config = mongos.getDB("config");
 var shardAdmin = st.shard0.getDB("admin");
 var coll = mongos.getCollection("foo.bar");
 
@@ -29,14 +28,12 @@ assert.commandWorked(bulk.execute());
 jsTest.log("Insert a bunch of data into the rest of the collection...");
 
 bulk = coll.initializeUnorderedBulkOp();
-for (var i = 1; i <= (250 * 1000); i++) {
+for (let i = 1; i <= (250 * 1000); i++) {
     bulk.insert({_id: -i});
 }
 assert.commandWorked(bulk.execute());
 
 jsTest.log("Get split points of the chunk using force : true...");
-
-var maxChunkSizeBytes = 1024 * 1024;
 
 var splitKeys = shardAdmin
                     .runCommand({

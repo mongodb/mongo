@@ -5,11 +5,9 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");
-load("jstests/libs/fail_point_util.js");
+import {anyEq} from "jstests/aggregation/extras/utils.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const dbName = "test";
 const collName = "retryable_write_error_labels";
@@ -311,4 +309,3 @@ testMongosError();
 st.s.adminCommand({"configureFailPoint": "overrideMaxAwaitTimeMS", "mode": "off"});
 
 st.stop();
-}());

@@ -3,9 +3,8 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-load('jstests/aggregation/extras/utils.js');       // For assertErrorCode().
-load('jstests/libs/change_stream_util.js');        // For ChangeStreamTest.
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const st = new ShardingTest({
     shards: 2,

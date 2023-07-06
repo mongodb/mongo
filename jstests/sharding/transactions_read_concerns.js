@@ -5,9 +5,6 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
@@ -81,4 +78,3 @@ for (let readConcernLevel of kAllowedReadConcernLevels) {
 }
 
 st.stop();
-})();

@@ -20,10 +20,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const replTest = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]});
 replTest.startSet();
@@ -118,4 +115,3 @@ jsTestLog("Aborting the second transaction");
 assert.commandWorked(session2.abortTransaction_forTesting());
 
 replTest.stopSet();
-})();

@@ -19,11 +19,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/index_catalog_helpers.js");
-load('jstests/libs/uuid_util.js');
+import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 
 const coll = db.apply_ops_index_collation;
 coll.drop();
@@ -63,4 +59,3 @@ let res = db.adminCommand({
 // It is not possible to test createIndexes in applyOps because that command is not accepted by
 // applyOps in that mode.
 assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
-})();

@@ -6,11 +6,12 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load('jstests/replsets/rslib.js');
-load("jstests/libs/fail_point_util.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {
+    assertVoteCount,
+    isMemberNewlyAdded,
+    waitForNewlyAddedRemovalForNodeToBeCommitted,
+} from "jstests/replsets/rslib.js";
 
 const testName = jsTestName();
 const dbName = "testdb";
@@ -142,4 +143,3 @@ jsTestLog("Making sure the set can accept w:3 writes");
 assert.commandWorked(primaryColl.insert({a: 3}, {writeConcern: {w: 3}}));
 
 rst.stopSet();
-})();

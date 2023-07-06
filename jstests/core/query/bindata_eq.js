@@ -1,9 +1,6 @@
 /**
  * This test ensures that basic eq predicates work with a BinData value.
  */
-(function() {
-'use strict';
-
 const coll = db.jstests_bindata_find_eq;
 
 function testEqOnlyBinData(subtype, blob, expectedCount) {
@@ -76,4 +73,3 @@ testEqOnlyBinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA", 3);
 testEqOnlyBinData(1, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA", 3);
 
 assert(coll.drop());
-})();

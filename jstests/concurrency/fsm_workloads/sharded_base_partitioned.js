@@ -21,9 +21,10 @@
  *  assumes_balancer_off,
  * ]
  */
-
-load('jstests/concurrency/fsm_workload_helpers/chunks.js');  // for chunk helpers
-load("jstests/sharding/libs/find_chunks_util.js");
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
+import {isMongodConfigsvr} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 export const $config = (function() {
     var data = {
@@ -162,7 +163,6 @@ export const $config = (function() {
 
     // Define each thread's data partition, populate it, and encapsulate it in a chunk.
     var setup = function setup(db, collName, cluster) {
-        var dbName = db.getName();
         var ns = db[collName].getFullName();
         var configDB = db.getSiblingDB('config');
 

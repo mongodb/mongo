@@ -11,12 +11,14 @@
  *  requires_fcv_51,
  * ]
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {
     $config as $baseConfig
 } from 'jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js';
-load('jstests/concurrency/fsm_workload_helpers/chunks.js');  // for chunk helpers
 import {getPlanStages} from "jstests/libs/analyze_plan.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.nonShardCollName = "unsharded";

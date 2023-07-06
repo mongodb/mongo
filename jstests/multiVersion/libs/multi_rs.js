@@ -39,7 +39,7 @@ ReplSetTest.prototype.upgradeSet = function(options, user, pwd) {
     }
 };
 
-function mergeNodeOptions(nodeOptions, options) {
+export function mergeNodeOptions(nodeOptions, options) {
     for (let nodeName in nodeOptions) {
         nodeOptions[nodeName] = Object.merge(nodeOptions[nodeName], options);
     }

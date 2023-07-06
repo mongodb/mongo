@@ -1,9 +1,6 @@
 // SERVER-9406: Allow ObjectId type to be treated as a date in date related expressions
 
-(function() {
-"use strict";
-
-load('jstests/libs/dateutil.js');
+import {DateUtil} from "jstests/libs/dateutil.js";
 
 const coll = db.server9406;
 let testOpCount = 0;
@@ -94,4 +91,3 @@ years.forEach(function(year) {
     testOp('$millisecond', newYear);
 });
 assert.eq(testOpCount, 236, 'Expected 236 tests to run');
-})();

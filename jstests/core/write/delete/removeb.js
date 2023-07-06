@@ -7,9 +7,6 @@
 
 // Test removal of Records that have been reused since the remove operation began.  SERVER-5198
 
-(function() {
-"use strict";
-
 const t = db.jstests_removeb;
 t.drop();
 
@@ -61,4 +58,3 @@ assert(!res.hasWriteError(), 'The remove operation failed.');
 p();
 
 t.drop();
-})();

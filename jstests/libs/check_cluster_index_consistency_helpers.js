@@ -4,11 +4,9 @@
  * The hook checks that for every collection, all the shards that own chunks for the
  * collection have the same indexes.
  */
-"use strict";
+import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 
-load("jstests/sharding/libs/sharded_index_util.js");  // for findInconsistentIndexesAcrossShards
-
-var ClusterIndexConsistencyChecker = (function() {
+export var ClusterIndexConsistencyChecker = (function() {
     function run(mongos, keyFile) {
         /**
          * Returns an array of config.collections docs for all collections.

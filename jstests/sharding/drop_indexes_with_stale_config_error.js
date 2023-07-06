@@ -3,12 +3,10 @@
 // successfully complete upon the mongos' command retry.
 //
 
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/shard_versioning_util.js");
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
-load("jstests/libs/fail_point_util.js");
+import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({mongos: 2, shards: 2});
 const dbName = jsTestName();
@@ -34,4 +32,3 @@ ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s1, ns, st.shard1, st.shard0
 assert.commandWorked(mongos0Coll.dropIndexes({y: 1}));
 
 st.stop();
-})();

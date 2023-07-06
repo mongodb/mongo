@@ -1,8 +1,5 @@
 // Tests multi-document transactions metrics are still correct after 'killSessions'.
 // @tags: [uses_transactions]
-(function() {
-"use strict";
-
 // Verifies that the given value of the transaction metrics is incremented in the way we expect.
 function verifyMetricsChange(initialStats, newStats, valueName, expectedIncrement) {
     assert.eq(initialStats[valueName] + expectedIncrement,
@@ -80,4 +77,3 @@ verifyMetricsChange(initialMetrics, newMetrics, "totalStarted", 2);
 session.endSession();
 
 rst.stopSet();
-}());

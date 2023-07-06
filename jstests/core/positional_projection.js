@@ -2,10 +2,7 @@
 // @tags: [
 //   requires_getmore,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
 
 const coll = db.positional_projection;
 coll.drop();
@@ -267,4 +264,3 @@ assert.commandFailedWithCode(err, 5392900);
 err = assert.throws(
     () => coll.find({a: {$not: {$not: {$elemMatch: {$eq: 1}}}}}, {'a.$': 1}).toArray());
 assert.commandFailedWithCode(err, 51246);
-}());

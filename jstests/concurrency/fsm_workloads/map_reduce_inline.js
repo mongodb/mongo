@@ -11,6 +11,8 @@
  *   does_not_support_causal_consistency
  * ]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     function mapper() {
         if (this.hasOwnProperty('key') && this.hasOwnProperty('value')) {

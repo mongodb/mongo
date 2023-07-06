@@ -1,10 +1,7 @@
 /**
  * Test out ElemMatchValueMatchExpression
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.jstests_elemmatch_value;
 coll.drop();
@@ -74,4 +71,3 @@ assert(
         {a: [[{b: [5]}]]},
         {a: [[{b: [3, 7]}]]},
     ]));
-})();

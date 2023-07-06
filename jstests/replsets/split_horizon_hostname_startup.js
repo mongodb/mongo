@@ -4,9 +4,6 @@
  * @tags: [ requires_persistence ]
  */
 
-(function() {
-"use strict";
-
 // Start and configure mongod with invalid split horizons using override setting
 
 let startupConfig = {
@@ -70,4 +67,3 @@ assert.commandFailed(output);
 assert(output.errmsg.includes("Found split horizon configuration using IP"));
 
 MongoRunner.stopMongod(mongod);
-}());

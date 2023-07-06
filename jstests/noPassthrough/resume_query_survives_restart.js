@@ -7,8 +7,6 @@
  * ]
  */
 
-(function() {
-"use strict";
 const testName = TestData.testName;
 let conn = MongoRunner.runMongod();
 let db = conn.getDB(testName);
@@ -45,4 +43,3 @@ assert.eq(2, res.cursor.firstBatch.length);
 queryData = queryData.concat(res.cursor.firstBatch);
 assert.sameMembers(testData, queryData);
 MongoRunner.stopMongod(conn);
-})();

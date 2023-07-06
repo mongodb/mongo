@@ -1,9 +1,7 @@
 /**
  * Test the $size expression.
  */
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.expression_size;
 coll.drop();
@@ -19,4 +17,3 @@ assert.eq(result.toArray(), [{length: 0}, {length: 1}, {length: 2}, {length: 5},
 
 assert.commandWorked(coll.insert({arr: 231}));
 assertErrorCode(coll, {$project: {_id: 0, length: {$size: "$arr"}}}, 17124);
-}());

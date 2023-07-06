@@ -13,11 +13,12 @@
  *
  * This workload was designed to reproduce SERVER-21434.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/findAndModify_remove_queue.js";
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod.
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Use the workload name as the database name, since the workload name is assumed to be

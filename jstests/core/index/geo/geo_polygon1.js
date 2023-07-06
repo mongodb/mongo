@@ -2,9 +2,6 @@
 // Tests for N-dimensional polygon querying
 //
 
-(function() {
-'use strict';
-
 const collNamePrefix = 'geo_polygon1_';
 let collCount = 0;
 let t = db.getCollection(collNamePrefix + collCount++);
@@ -78,4 +75,3 @@ assert.throwsWithCode(() => t.find({loc: {$within: {$polygon: [[1, 2]]}}}).toArr
                       ErrorCodes.BadValue);
 assert.throwsWithCode(() => t.find({loc: {$within: {$polygon: [[1, 2], [2, 3]]}}}).toArray(),
                       ErrorCodes.BadValue);
-})();

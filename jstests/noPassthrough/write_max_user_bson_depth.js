@@ -3,9 +3,6 @@
  * existing documents can be updated to have depth equal to the max user BSON depth. In particular,
  * tests that empty subdocuments do not count toward the depth of a document.
  */
-(function() {
-'use strict';
-
 // Max user BSON depth is 20 less than the max absolute BSON depth.
 const conn = MongoRunner.runMongod({setParameter: {maxBSONDepth: 21}});
 
@@ -25,4 +22,3 @@ assert.commandWorked(coll.update({a: 1}, {$set: {a: {}}}));
 assert.commandFailedWithCode(coll.update({}, {$set: {a: {b: 1}}}), ErrorCodes.Overflow);
 
 MongoRunner.stopMongod(conn);
-})();

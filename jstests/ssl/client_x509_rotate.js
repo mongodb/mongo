@@ -1,10 +1,8 @@
 // Check that rotation works for the cluster certificate in a sharded cluster
 
+import {copyCertificateFile} from "jstests/ssl/libs/ssl_helpers.js";
+
 (function() {
-"use strict";
-
-load('jstests/ssl/libs/ssl_helpers.js');
-
 let mongos;
 function getConnPoolHosts() {
     const ret = mongos.adminCommand({connPoolStats: 1});

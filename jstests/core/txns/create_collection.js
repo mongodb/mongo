@@ -8,12 +8,15 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/create_collection_txn_helpers.js");
-load("jstests/libs/fixture_helpers.js");  // for isMongos
-load("jstests/libs/auto_retry_transaction_in_sharding.js");
+import {
+    retryOnceOnTransientAndRestartTxnOnMongos,
+    withTxnAndAutoRetryOnMongos
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {
+    assertCollCreateFailedWithCode,
+    createCollAndCRUDInTxn
+} from "jstests/libs/create_collection_txn_helpers.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 function runCollectionCreateTest(command, explicitCreate) {
     const session = db.getMongo().startSession();
@@ -120,4 +123,3 @@ runCollectionCreateTest("update", true /*explicitCreate*/);
 runCollectionCreateTest("update", false /*explicitCreate*/);
 runCollectionCreateTest("findAndModify", true /*explicitCreate*/);
 runCollectionCreateTest("findAndModify", false /*explicitCreate*/);
-}());

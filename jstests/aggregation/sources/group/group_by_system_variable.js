@@ -2,17 +2,17 @@
  * Tests that the server doesn't crash when you group by a system variable.
  * Reproduces SERVER-57164.
  */
-(function() {
-"use strict";
-
 function testAggWithSystemVariable(varName, explain) {
     try {
         // This query might or might not throw depending on the engine used
         // and whether the variable is defined.
-        if (explain)
+        if (explain) {
+            // eslint-disable-next-line
             call.explain().aggregate({$group: {_id: varName}});
-        else
+        } else {
+            // eslint-disable-next-line
             call.aggregate({$group: {_id: varName}});
+        }
     } catch (e) {
     } finally {
         // Make sure the server didn't crash.
@@ -26,4 +26,3 @@ testAggWithSystemVariable("$$CLUSTER_TIME", true);
 testAggWithSystemVariable("$$IS_MR");
 testAggWithSystemVariable("$$JS_SCOPE");
 testAggWithSystemVariable("$$CLUSTER_TIME");
-})();

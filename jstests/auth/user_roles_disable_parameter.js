@@ -1,9 +1,6 @@
 // Tests that $$USER_ROLES is not available when the server parameter is set to false.
 // @tags: [requires_fcv_70]
 
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "coll";
 const varNotAvailableErr = 51144;
@@ -64,4 +61,3 @@ const mongodDisabledAtStartup =
     MongoRunner.runMongod({auth: "", setParameter: {enableAccessToUserRoles: false}});
 runTest(mongodDisabledAtStartup, false);
 MongoRunner.stopMongod(mongodDisabledAtStartup);
-}());

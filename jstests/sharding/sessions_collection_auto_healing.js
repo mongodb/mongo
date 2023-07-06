@@ -5,9 +5,7 @@
  *   requires_fcv_70,
  * ]
  */
-load('jstests/libs/sessions_collection.js');
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+import {validateSessionsCollection} from "jstests/libs/sessions_collection.js";
 
 // This test makes assertions about the number of sessions, which are not compatible with
 // implicit sessions.

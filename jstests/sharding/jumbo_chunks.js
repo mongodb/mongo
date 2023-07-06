@@ -1,7 +1,4 @@
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 function bulkInsert(coll, keyValue, sizeMBytes) {
     const big = 'X'.repeat(1024 * 1024);  // 1MB
@@ -166,4 +163,3 @@ assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zon
 }
 
 st.stop();
-})();

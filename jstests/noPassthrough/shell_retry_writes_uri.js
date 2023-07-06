@@ -1,7 +1,4 @@
 // @tags: [requires_replication]
-(function() {
-"use strict";
-
 let rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -127,4 +124,3 @@ runShellScript(mongoUri + "?retryWrites=true", [], false, function sessOptOverri
 });
 
 rst.stopSet();
-}());

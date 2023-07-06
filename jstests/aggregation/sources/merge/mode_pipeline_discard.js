@@ -2,12 +2,9 @@
 //
 // Cannot implicitly shard accessed collections because a collection can be implictly created and
 // exists when none is expected.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
-load("jstests/aggregation/extras/utils.js");          // For assertArrayEq.
-load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isSharded.
+import {dropWithoutImplicitRecreate} from "jstests/aggregation/extras/merge_helpers.js";
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // A helper function to create a pipeline with a $merge stage using a custom 'updatePipeline'
 // for the whenMatched mode. If 'initialStages' array is specified, the $merge stage will be
@@ -271,4 +268,3 @@ target.drop();
     }]));
     assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, c: 1, z: 2}]});
 })();
-}());

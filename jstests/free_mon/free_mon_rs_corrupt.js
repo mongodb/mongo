@@ -1,9 +1,6 @@
 // Validate a user manipulating system.version for free monitoring does
 // not crash mongod
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {FreeMonWebServer, WaitForRegistration} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer();
 
@@ -34,4 +31,3 @@ sleep(20 * 1000);
 rst.stopSet();
 
 mock_web.stop();
-})();

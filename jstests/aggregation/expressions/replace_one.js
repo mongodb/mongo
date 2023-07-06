@@ -1,9 +1,8 @@
 // Test $replaceOne aggregation expressions.
 
-(function() {
-'use strict';
-load("jstests/aggregation/extras/utils.js");        // For assertArrayEq.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
+
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.replace_one;
 coll.drop();
@@ -172,4 +171,3 @@ runAndAssertThrows("$missing_field", "$null_field", "$obj_field", 51744);
 runAndAssertThrows("$null_field", "$missing_field", "$obj_field", 51744);
 runAndAssertThrows("$missing_field", "$missing_field", "$obj_field", 51744);
 runAndAssertThrows("$null_field", "$null_field", "$obj_field", 51744);
-}());

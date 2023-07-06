@@ -7,13 +7,8 @@
  *   requires_fcv_52,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/fail_point_util.js');
-load('jstests/libs/parallel_shell_helpers.js');
-load("jstests/sharding/libs/find_chunks_util.js");
-load("jstests/sharding/libs/shard_versioning_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
 const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 const configDB = st.s.getDB("config");
@@ -150,4 +145,3 @@ testBalancer(false /* setAllowMigrations */, {noBalance: true});
 testSetAllowMigrationsCommand();
 
 st.stop();
-})();

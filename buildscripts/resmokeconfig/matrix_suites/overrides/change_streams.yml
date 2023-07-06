@@ -8,11 +8,11 @@
           # the ones we always want
           eval: >-
             globalThis.testingReplication = true;
-            load('jstests/libs/override_methods/set_read_and_write_concerns.js');
+            await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
 
 - name: causal_consistency
   value:
-    eval: load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+    eval: await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
 
 - name: base_eval
   value:
@@ -23,7 +23,7 @@
           # to get rid of causal consistency
           eval: >-
             globalThis.testingReplication = true;
-            load('jstests/libs/override_methods/set_read_and_write_concerns.js');
+            await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
 
 - name: mongos_passthrough
   value:
@@ -75,7 +75,7 @@
 
 - name: sharded_collections_passthrough_eval
   value:
-    eval: "load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');"
+    eval: "await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');"
 
 - name: secondary_reads
   value:
@@ -117,7 +117,7 @@
 
 - name: secondary_reads_eval
   value:
-    eval: load('jstests/libs/override_methods/set_read_preference_secondary.js');
+    eval: await import('jstests/libs/override_methods/set_read_preference_secondary.js');
 
 - name: disable_write_noops
   value:
@@ -130,8 +130,8 @@
 
 - name: whole_db_eval
   value:
-    eval: "load('jstests/libs/override_methods/implicit_whole_db_changestreams.js');"
+    eval: "await import('jstests/libs/override_methods/implicit_whole_db_changestreams.js');"
 
 - name: whole_cluster_eval
   value:
-    eval: "load('jstests/libs/override_methods/implicit_whole_cluster_changestreams.js');"
+    eval: "await import('jstests/libs/override_methods/implicit_whole_cluster_changestreams.js');"

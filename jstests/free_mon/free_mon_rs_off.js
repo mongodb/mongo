@@ -1,9 +1,6 @@
 // Validate replica set starts up with free monitoring disabled
 //
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {FreeMonWebServer} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer();
 
@@ -35,4 +32,3 @@ assert.commandFailed(rst.getPrimary().adminCommand({setFreeMonitoring: 1, action
 rst.stopSet();
 
 mock_web.stop();
-})();

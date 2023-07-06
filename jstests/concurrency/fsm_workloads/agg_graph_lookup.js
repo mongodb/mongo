@@ -3,6 +3,8 @@
  *
  * Runs a $graphLookup aggregation simultaneously with updates.
  */
+import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     const data = {numDocs: 1000};
 

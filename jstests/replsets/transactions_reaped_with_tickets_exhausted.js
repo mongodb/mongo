@@ -7,10 +7,7 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallelTester.js");  // for Thread
+import {Thread} from "jstests/libs/parallelTester.js";
 
 // We set the number of write tickets to be a small value in order to avoid needing to spawn a
 // large number of threads to exhaust all of the available ones.
@@ -96,4 +93,3 @@ assert(res.errmsg.match(/Transaction .* has been aborted/), res.errmsg);
 
 session.endSession();
 rst.stopSet();
-})();

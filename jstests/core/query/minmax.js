@@ -1,10 +1,7 @@
 // Test min / max query parameters.
 // @tags: [assumes_balancer_off]
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
-load("jstests/aggregation/extras/utils.js");  // For resultsEq.
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.jstests_minmax;
 coll.drop();
@@ -144,4 +141,3 @@ assert(!cursor.hasNext());
 cursor = coll.find().hint({a: -1}).max({a: 4});
 assert.eq(5, cursor.next()["a"]);
 assert(!cursor.hasNext());
-}());

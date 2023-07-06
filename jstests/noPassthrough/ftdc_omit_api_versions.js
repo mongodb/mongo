@@ -2,10 +2,8 @@
  * This test is to make sure that 'apiVersions' section is omitted from serverStatus metrics in
  * FTDC data.
  */
-load('jstests/libs/ftdc.js');
+import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 
-(function() {
-'use strict';
 let conn = MongoRunner.runMongod();
 let adminDb = conn.getDB('admin');
 
@@ -23,4 +21,3 @@ assert(serverStatusMetrics.hasOwnProperty("apiVersions"),
        "does not have 'apiVersions' in '" + tojson(serverStatusMetrics) + "'");
 
 MongoRunner.stopMongod(conn);
-})();

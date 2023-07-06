@@ -6,10 +6,8 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");  // For reconnect()
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {getLastOpTime, reconnect, setLogVerbosity} from "jstests/replsets/rslib.js";
 
 function getTxnTableEntry(db) {
     let txnTableEntries = db.getSiblingDB("config")["transactions"].find().toArray();
@@ -148,4 +146,3 @@ assert.docEq([secondDoc], testDB.getCollection(collName).find().toArray());
 assert.docEq([secondDoc], newTestDB.getCollection(collName).find().toArray());
 
 replTest.stopSet();
-})();

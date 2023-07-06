@@ -1,4 +1,3 @@
-(function() {
 var collectionName = "bulk_api_limits";
 var coll = db.getCollection(collectionName);
 coll.drop();
@@ -132,4 +131,3 @@ var executeTestsOrdered = function() {
 
 executeTestsUnordered();
 executeTestsOrdered();
-}());

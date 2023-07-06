@@ -1,6 +1,7 @@
 // ensure $add asserts on string
-load('jstests/aggregation/extras/utils.js');
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
+
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 let c = db.s6570;
 c.drop();

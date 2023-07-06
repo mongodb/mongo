@@ -5,10 +5,7 @@
  *   multiversion_incompatible,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 const configDB = st.s0.getDB('config');
@@ -178,4 +175,3 @@ testMoveChunk({_id: "hashed", b: 1, c: 1});
 testMoveChunk({_id: 1, "b.c.d": "hashed", c: 1});
 
 st.stop();
-})();

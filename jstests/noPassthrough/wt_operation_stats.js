@@ -6,10 +6,7 @@
 //
 // @tags: [requires_profiling]
 
-(function() {
-'use strict';
-
-load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const readStatRegx = /"storage":{"data":{"bytesRead":([0-9]+)/;
 
@@ -86,4 +83,3 @@ if (jsTest.options().storageEngine && (jsTest.options().storageEngine !== "wired
 
     jsTestLog("Success!");
 }
-})();

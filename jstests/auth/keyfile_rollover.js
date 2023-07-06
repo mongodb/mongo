@@ -10,9 +10,6 @@
 // it has been signed with a dummy key results in an authorization error.
 TestData.skipGossipingClusterTime = true;
 
-(function() {
-'use strict';
-
 let rst = new ReplSetTest({nodes: 3, keyFile: "jstests/libs/key1"});
 rst.startSet();
 rst.initiate();
@@ -89,4 +86,3 @@ runPrimaryTest((curPrimary) => {
 });
 
 rst.stopSet();
-})();

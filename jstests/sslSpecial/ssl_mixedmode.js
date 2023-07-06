@@ -3,7 +3,7 @@
 // and SSL-enabled and disabled shell respectively. For each combination
 // expected behavior is verified.
 
-load("jstests/libs/ssl_test.js");
+import {SSLTest} from "jstests/libs/ssl_test.js";
 
 function testCombination(sslMode, sslShell, shouldSucceed) {
     var serverOptionOverrides = {sslMode: sslMode, setParameter: {enableTestCommands: 1}};

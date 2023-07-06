@@ -13,7 +13,7 @@ executor:
       global_vars:
         TestData:
           checkForInterruptFailpointChance: 0.05
-      eval: load('jstests/libs/jstestfuzz/check_for_interrupt_hook.js')
+      eval: await import('jstests/libs/jstestfuzz/check_for_interrupt_hook.js')
       crashOnInvalidBSONError: ""
       objcheck: ""
   hooks:

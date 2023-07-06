@@ -11,11 +11,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-
 const latest = "latest";
 const SetFCVStatus = Object.freeze({called: 1, transitioning: 2, successful: 3});
 
@@ -217,4 +212,3 @@ function runShardingTest() {
 runStandaloneTest();
 runReplicaSetTest();
 runShardingTest();
-})();

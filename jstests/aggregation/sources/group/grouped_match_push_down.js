@@ -5,9 +5,6 @@
 //   requires_fcv_71,
 // ]
 
-(function() {
-"use strict";
-
 /**
  * Given the root stage of agg explain's JSON representation of a query plan ('root'), returns
  * the pipeline stage names included in the plan in order of execution. The resulting array includes
@@ -80,4 +77,3 @@ assertOptimizeMatchRenameAggregationPipelineWithDottedRename({
     stageSequence: ["$cursor", "$project", "match"],
     expectedResult: [{"_id": {"c": {"d": 2}}, "m": 2}]
 });
-}());

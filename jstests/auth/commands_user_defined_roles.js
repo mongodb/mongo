@@ -15,8 +15,7 @@ import {
     authErrCode,
     commandNotSupportedCode
 } from "jstests/auth/lib/commands_lib.js";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // This test involves killing all sessions, which will not work as expected if the kill command is
 // sent with an implicit session.

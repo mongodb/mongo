@@ -4,9 +4,6 @@
 //   requires_sharding,
 // ]
 
-(function() {
-"use strict";
-
 const dbName = "killop";
 const collName = "test";
 
@@ -79,4 +76,3 @@ runTest(shardConn, shardConn);
 runTest(st.s, shardConn);
 
 st.stop();
-})();

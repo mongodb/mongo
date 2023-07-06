@@ -6,11 +6,7 @@
  *     does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");
-load('jstests/libs/test_background_ops.js');
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const dbName = "test";
 const collName = "create_index_conflicts";
@@ -83,4 +79,3 @@ function runConflictingCollectionCreate(testDB, dbName, collName) {
 }
 
 runConflictingCollectionCreate(testDB, dbName, collName);
-})();

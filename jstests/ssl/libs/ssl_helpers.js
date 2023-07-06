@@ -1,6 +1,7 @@
-load('jstests/multiVersion/libs/multi_rs.js');
-load('jstests/libs/os_helpers.js');
-load('jstests/replsets/libs/basic_replset_test.js');
+import "jstests/multiVersion/libs/multi_rs.js";
+
+import {isDebian, isRHEL8, isUbuntu, isUbuntu2004} from "jstests/libs/os_helpers.js";
+import {basicReplsetTest} from "jstests/replsets/libs/basic_replset_test.js";
 
 // Do not fail if this test leaves unterminated processes because this file expects replset1.js to
 // throw for invalid SSL options.
@@ -8,36 +9,42 @@ TestData.failIfUnterminatedProcesses = false;
 
 //=== Shared SSL testing library functions and constants ===
 
-var KEYFILE = "jstests/libs/key1";
-var SERVER_CERT = "jstests/libs/server.pem";
-var CA_CERT = "jstests/libs/ca.pem";
-var CLIENT_CERT = "jstests/libs/client.pem";
-var DH_PARAM = "jstests/libs/8k-prime.dhparam";
-var CLUSTER_CERT = "jstests/libs/cluster_cert.pem";
+export var KEYFILE = "jstests/libs/key1";
+
+export var SERVER_CERT = "jstests/libs/server.pem";
+export var CA_CERT = "jstests/libs/ca.pem";
+export var CLIENT_CERT = "jstests/libs/client.pem";
+export var DH_PARAM = "jstests/libs/8k-prime.dhparam";
+export var CLUSTER_CERT = "jstests/libs/cluster_cert.pem";
 
 // Note: "sslAllowInvalidCertificates" is enabled to avoid
 // hostname conflicts with our testing certificates
-var disabled = {sslMode: "disabled"};
-var allowSSL = {
+export var disabled = {
+    sslMode: "disabled"
+};
+
+export var allowSSL = {
     sslMode: "allowSSL",
     sslAllowInvalidCertificates: "",
     sslPEMKeyFile: SERVER_CERT,
     sslCAFile: CA_CERT
 };
-var preferSSL = {
+
+export var preferSSL = {
     sslMode: "preferSSL",
     sslAllowInvalidCertificates: "",
     sslPEMKeyFile: SERVER_CERT,
     sslCAFile: CA_CERT
 };
-var requireSSL = {
+
+export var requireSSL = {
     sslMode: "requireSSL",
     sslAllowInvalidCertificates: "",
     sslPEMKeyFile: SERVER_CERT,
     sslCAFile: CA_CERT
 };
 
-var dhparamSSL = {
+export var dhparamSSL = {
     sslMode: "requireSSL",
     sslAllowInvalidCertificates: "",
     sslPEMKeyFile: SERVER_CERT,
@@ -47,13 +54,13 @@ var dhparamSSL = {
 
 // Test if ssl replset  configs work
 
-var replShouldSucceed = function(name, opt1, opt2) {
+export var replShouldSucceed = function(name, opt1, opt2) {
     // try running this file using the given config
     basicReplsetTest(15, opt1, opt2, name);
 };
 
 // Test if ssl replset configs fail
-var replShouldFail = function(name, opt1, opt2) {
+export var replShouldFail = function(name, opt1, opt2) {
     // This will cause an assert.soon() in ReplSetTest to fail. This normally triggers the hang
     // analyzer, but since we do not want to run it on expected timeouts, we temporarily disable it.
     MongoRunner.runHangAnalyzer.disable();
@@ -69,7 +76,7 @@ var replShouldFail = function(name, opt1, opt2) {
  * Test that $lookup works with a sharded source collection. This is tested because of
  * the connections opened between mongos/shards and between the shards themselves.
  */
-function testShardedLookup(shardingTest) {
+export function testShardedLookup(shardingTest) {
     var st = shardingTest;
     assert(st.adminCommand({enableSharding: "lookupTest"}),
            "error enabling sharding for this configuration");
@@ -105,7 +112,7 @@ function testShardedLookup(shardingTest) {
  * Takes in two mongod/mongos configuration options and runs a basic
  * sharding test to see if they can work together...
  */
-function mixedShardTest(options1, options2, shouldSucceed) {
+export function mixedShardTest(options1, options2, shouldSucceed) {
     let authSucceeded = false;
     try {
         // TODO SERVER-14017 is fixed the "enableBalancer" line can be removed.
@@ -207,8 +214,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
     }
 }
 
-function determineSSLProvider() {
-    'use strict';
+export function determineSSLProvider() {
     const info = getBuildInfo();
     const ssl = (info.openssl === undefined) ? '' : info.openssl.running;
     if (/OpenSSL/.test(ssl)) {
@@ -222,9 +228,7 @@ function determineSSLProvider() {
     }
 }
 
-function isMacOS(minVersion) {
-    'use strict';
-
+export function isMacOS(minVersion) {
     function parseVersion(version) {
         // Intentionally leave the end of string unanchored.
         // This allows vesions like: 10.15.7-pl2 or other extra data.
@@ -249,8 +253,7 @@ function isMacOS(minVersion) {
     return parseVersion(minVersion) <= parseVersion(macOS.osProductVersion);
 }
 
-function requireSSLProvider(required, fn) {
-    'use strict';
+export function requireSSLProvider(required, fn) {
     if ((typeof required) === 'string') {
         required = [required];
     }
@@ -265,7 +268,7 @@ function requireSSLProvider(required, fn) {
     fn();
 }
 
-function detectDefaultTLSProtocol() {
+export function detectDefaultTLSProtocol() {
     const conn = MongoRunner.runMongod({
         sslMode: 'allowSSL',
         sslPEMKeyFile: SERVER_CERT,
@@ -305,7 +308,7 @@ function detectDefaultTLSProtocol() {
     }
 }
 
-function sslProviderSupportsTLS1_0() {
+export function sslProviderSupportsTLS1_0() {
     if (isRHEL8()) {
         const cryptoPolicy = cat("/etc/crypto-policies/config");
         return cryptoPolicy.includes("LEGACY");
@@ -318,7 +321,7 @@ function sslProviderSupportsTLS1_0() {
     return !isDebian() && !isUbuntu2004();
 }
 
-function sslProviderSupportsTLS1_1() {
+export function sslProviderSupportsTLS1_1() {
     if (isRHEL8()) {
         const cryptoPolicy = cat("/etc/crypto-policies/config");
         return cryptoPolicy.includes("LEGACY");
@@ -331,7 +334,7 @@ function sslProviderSupportsTLS1_1() {
     return !isDebian() && !isUbuntu2004();
 }
 
-function isOpenSSL3orGreater() {
+export function isOpenSSL3orGreater() {
     // Windows and macOS do not have "openssl.compiled" in buildInfo but they do have "running"
     const opensslCompiledIn = getBuildInfo().openssl.compiled !== undefined;
     if (!opensslCompiledIn) {
@@ -341,7 +344,7 @@ function isOpenSSL3orGreater() {
     return opensslVersionAsInt() >= 0x3000000;
 }
 
-function opensslVersionAsInt() {
+export function opensslVersionAsInt() {
     const opensslInfo = getBuildInfo().openssl;
     if (!opensslInfo) {
         return null;
@@ -355,7 +358,7 @@ function opensslVersionAsInt() {
     return version;
 }
 
-function supportsFIPS() {
+export function supportsFIPS() {
     // OpenSSL supports FIPS
     let expectSupportsFIPS = (determineSSLProvider() == "openssl");
 
@@ -371,7 +374,7 @@ function supportsFIPS() {
     return expectSupportsFIPS;
 }
 
-function copyCertificateFile(a, b) {
+export function copyCertificateFile(a, b) {
     if (_isWindows()) {
         // correctly replace forward slashes for Windows
         a = a.replace(/\//g, "\\");

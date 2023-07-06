@@ -12,11 +12,7 @@
 // Confirm that the most up-to-date node becomes primary.
 // Let the highest priority node catchup and then confirm
 // that it becomes primary.
-
-(function() {
-'use strict';
-
-load('jstests/replsets/rslib.js');
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 var name = 'catchup_takeover_one_high_priority';
 var replSet = new ReplSetTest({name: name, nodes: 3, useBridge: true});
@@ -106,4 +102,3 @@ jsTestLog('node 2 performed priority takeover and is now primary');
 replSet.waitForState(0, ReplSetTest.State.SECONDARY, replSet.kDefaultTimeoutMS);
 
 replSet.stopSet();
-})();

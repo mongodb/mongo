@@ -7,10 +7,7 @@
 //   uses_transactions,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 function expectChunks(st, ns, chunks) {
     for (let i = 0; i < chunks.length; i++) {
@@ -338,4 +335,3 @@ commandTestCases(hashedCollName)
                                  hashedDocs));
 
 st.stop();
-})();

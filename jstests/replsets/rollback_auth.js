@@ -10,9 +10,6 @@
 // run on ephemeral storage engines.
 // @tags: [requires_persistence]
 
-(function() {
-"use strict";
-
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
@@ -236,4 +233,3 @@ authutil.asCluster(replTest.nodes, 'jstests/libs/key1', function() {
 
 // DB hash check is done in stopSet.
 replTest.stopSet();
-}());

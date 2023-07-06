@@ -14,9 +14,6 @@
  *   uses_parallel_shell,
  * ]
  */
-(function() {
-"use strict";
-
 function waitUntilOpCountIs(opFilter, num) {
     assert.soon(() => {
         let ops = db.getSiblingDB('admin')
@@ -48,7 +45,7 @@ var supportsFsync = db.fsyncLock();
 if (!supportsFsync.ok) {
     assert.commandFailedWithCode(supportsFsync, ErrorCodes.CommandNotSupported);
     jsTestLog("Skipping test for " + storageEngine + " as it does not support fsync");
-    return;
+    quit();
 }
 db.fsyncUnlock();
 
@@ -138,4 +135,3 @@ assert(fsyncUnlockRes.lockCount == 0, tojson(fsyncLockRes));
 shellHandle1();
 shellHandle2();
 assert.eq(2, fsyncLockDB.multipleLock.find({}).itcount());
-}());

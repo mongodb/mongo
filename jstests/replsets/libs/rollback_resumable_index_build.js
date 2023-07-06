@@ -1,6 +1,8 @@
-load("jstests/noPassthrough/libs/index_build.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
-const RollbackResumableIndexBuildTest = class {
+export class RollbackResumableIndexBuildTest {
     static checkCompletedAndDrop(
         rollbackTest, originalPrimary, dbName, colls, buildUUIDs, indexNames) {
         for (let i = 0; i < colls.length; i++) {
@@ -105,8 +107,9 @@ const RollbackResumableIndexBuildTest = class {
             assert.commandWorked(colls[i].insert(docs));
 
             awaitCreateIndexes[i] = ResumableIndexBuildTest.createIndexWithSideWrites(
-                rollbackTest, function(collName, indexSpecs, indexNames) {
-                    load("jstests/noPassthrough/libs/index_build.js");
+                rollbackTest, async function(collName, indexSpecs, indexNames) {
+                    const {ResumableIndexBuildTest} =
+                        await import("jstests/noPassthrough/libs/index_build.js");
                     ResumableIndexBuildTest.createIndexesFails(
                         db, collName, indexSpecs, indexNames);
                 }, colls[i], indexSpecs[i], indexNames[i], sideWrites);
@@ -312,4 +315,4 @@ const RollbackResumableIndexBuildTest = class {
                                                               testInfo.buildUUIDs,
                                                               testInfo.indexNames);
     }
-};
+}

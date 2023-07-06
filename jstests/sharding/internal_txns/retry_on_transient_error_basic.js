@@ -5,10 +5,7 @@
  *
  * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const kDbName = "testDb";
 const kCollName = "testColl";
@@ -311,4 +308,3 @@ function testNoPersistenceOfDefaultTxnRetryCounter(
 })();
 
 st.stop();
-})();

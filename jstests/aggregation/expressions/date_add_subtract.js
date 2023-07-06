@@ -4,11 +4,9 @@
  * ]
  */
 
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-load("jstests/libs/aggregation_pipeline_utils.js");  // For executeAggregationTestCase.
-load("jstests/libs/sbe_assert_error_override.js");   // For mapping of error codes in SBE.
+import {executeAggregationTestCase} from "jstests/libs/aggregation_pipeline_utils.js";
 
 const coll = db.date_add_subtract;
 coll.drop();
@@ -234,5 +232,4 @@ function runTest({dateArithmeticsSpec, expectedResult, expectedErrorCode}) {
     // Invalid value of timezone argument.
     runAndAssertErrorCode(
         {$dateAdd: {startDate: "$date", unit: "year", amount: 1, timezone: "Unknown"}}, 40485);
-})();
 })();

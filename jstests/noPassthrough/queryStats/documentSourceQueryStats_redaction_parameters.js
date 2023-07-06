@@ -3,11 +3,8 @@
  * @tags: [featureFlagQueryStatsFindCommand]
  */
 
-load("jstests/aggregation/extras/utils.js");  // For assertAdminDBErrCodeAndErrMsgContains.
-load("jstests/libs/query_stats_utils.js");
-
-(function() {
-"use strict";
+import {assertAdminDBErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
+import {getQueryStats, getQueryStatsFindCmd} from "jstests/libs/query_stats_utils.js";
 
 // Assert the expected queryStats key with no hmac.
 function assertQueryStatsKeyWithoutHmac(queryStatsKey) {
@@ -117,4 +114,3 @@ const st = new ShardingTest({
 });
 runTest(st.s);
 st.stop();
-}());

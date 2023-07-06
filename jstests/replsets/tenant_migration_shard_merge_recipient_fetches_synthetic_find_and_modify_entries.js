@@ -14,12 +14,10 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
-load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
-load("jstests/libs/parallelTester.js");   // For Thread.
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 

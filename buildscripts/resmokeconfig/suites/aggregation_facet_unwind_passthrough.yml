@@ -15,7 +15,7 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      eval: load("jstests/libs/override_methods/implicitly_wrap_pipelines_in_facets.js");
+      eval: await import("jstests/libs/override_methods/implicitly_wrap_pipelines_in_facets.js");
   hooks:
   - class: ValidateCollections
   - class: CleanEveryN

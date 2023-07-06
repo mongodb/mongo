@@ -25,15 +25,10 @@
  * - mapReduce
  * - update
  */
-(function() {
-'use strict';
-
-// For isWiredTiger.
-load("jstests/concurrency/fsm_workload_helpers/server_types.js");
-// For isReplSet
-load("jstests/libs/fixture_helpers.js");
-// For assertDocumentValidationFailure
-load("jstests/libs/doc_validation_utils.js");
+import {
+    assertDocumentValidationFailure,
+    assertDocumentValidationFailureCheckLogs
+} from "jstests/libs/doc_validation_utils.js";
 
 const dbName = 'bypass_document_validation';
 const collName = 'bypass_document_validation';
@@ -202,4 +197,3 @@ runBypassDocumentValidationTest({a: {$exists: true}});
 
 // Run the test again with an equivalent JSON Schema validator.
 runBypassDocumentValidationTest({$jsonSchema: {required: ['a']}});
-})();

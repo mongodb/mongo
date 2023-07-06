@@ -5,10 +5,7 @@
 /**
  * Tests the JSON Schema "additionalItems" keyword.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/assert_schema_match.js");
+import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 
 const coll = db.getCollection("json_schema_additional_items");
 coll.drop();
@@ -90,4 +87,3 @@ assertSchemaMatch(
     coll, {properties: {a: {items: [{not: {}}], additionalItems: false}}}, {a: []}, true);
 assertSchemaMatch(
     coll, {properties: {a: {items: [{not: {}}], additionalItems: {not: {}}}}}, {a: []}, true);
-}());

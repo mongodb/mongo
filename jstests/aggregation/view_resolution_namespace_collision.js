@@ -4,9 +4,6 @@
  *
  * @tags: [assumes_no_implicit_collection_creation_after_drop]
  */
-(function() {
-"use strict";
-
 const testDBName = jsTestName();
 const testDB = db.getSiblingDB(testDBName);
 const siblingDBName = jsTestName() + "_otherDB";
@@ -57,4 +54,3 @@ for (const writeStage of [mergeStage, outStage]) {
 }
 
 siblingDB.dropDatabase();
-})();

@@ -25,7 +25,6 @@ jsTestLog("Migrating via first mongos...");
 var fullShard = st.getShard(coll, {_id: 1});
 var emptyShard = st.getShard(coll, {_id: -1});
 
-var admin = st.s.getDB("admin");
 assert.commandWorked(st.s0.adminCommand(
     {moveChunk: "" + coll, find: {_id: -1}, to: fullShard.shardName, _waitForDelete: true}));
 

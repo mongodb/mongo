@@ -8,9 +8,6 @@
  *   requires_replication
  * ]
  */
-(function() {
-"use strict";
-
 const replSet = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
@@ -96,4 +93,3 @@ assert.eq(numSnapshotTooOld,
           tojson(serverStatusWT));
 
 replSet.stopSet();
-})();

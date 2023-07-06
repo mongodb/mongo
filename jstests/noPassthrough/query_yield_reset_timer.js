@@ -1,6 +1,4 @@
 // Tests the reset logic for the periodic query yield timer.  Regression test for SERVER-21341.
-(function() {
-'use strict';
 var dbpath = MongoRunner.dataPath + jsTest.name();
 resetDbpath(dbpath);
 var mongod = MongoRunner.runMongod({dbpath: dbpath});
@@ -42,4 +40,3 @@ var explainRes = coll.find().explain("executionStats");
 assert.gt(explainRes.executionStats.executionStages.saveState, 4 / 2, tojson(explainRes));
 assert.lt(explainRes.executionStats.executionStages.saveState, 4 * 2, tojson(explainRes));
 MongoRunner.stopMongod(mongod);
-})();

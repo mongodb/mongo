@@ -5,11 +5,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");
-load("jstests/libs/parallelTester.js");  // For Thread.
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const dbName = "test";
 const collName = "no_error_labels_outside_txn";
@@ -271,4 +267,3 @@ assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mod
 session.endSession();
 
 st.stop();
-}());

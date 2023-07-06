@@ -2,10 +2,7 @@
  * Tests that the recipient shard uses the UUID obtained from the donor shard when creating the
  * collection on itself as part of a migration.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/uuid_util.js");
+import {getUUIDFromConfigCollections, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 
 let db = "test";
 let coll = "foo";
@@ -42,4 +39,3 @@ assert.neq(undefined, collEntryUUID);
 assert.eq(donorUUID, collEntryUUID);
 
 st.stop();
-})();

@@ -8,10 +8,6 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  * ]
  */
-(function() {
-
-"use strict";
-
 const testDB = db.getSiblingDB(jsTestName());
 const noCollationColl = testDB.no_collation;
 const caseInsensitiveColl = testDB.case_insensitive;
@@ -145,4 +141,3 @@ assert.docEq(
         {val: "b", caseSensitiveColl: false}
     ],
     results);
-})();

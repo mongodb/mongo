@@ -1,9 +1,6 @@
 /**
  * Test ClusterFindCmd with UUID for collection name fails (but does not crash)
  */
-(function() {
-"use strict";
-
 var cmdRes;
 var cursorId;
 
@@ -18,4 +15,3 @@ cmdRes = db.adminCommand({find: UUID()});
 assert.commandFailed(cmdRes);
 
 st.stop();
-})();

@@ -7,9 +7,6 @@
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
 // ]
-(function() {
-"use strict";
-
 const coll = db.rollback_index_drop;
 coll.drop();
 
@@ -34,4 +31,3 @@ assert.commandWorked(coll.update({a: 3}, {$inc: {a: 1}}));
 assert.commandWorked(coll.insert({a: 5}));
 assert.eq([{a: 1}, {a: 2}, {a: 4}, {a: 5}],
           coll.find().hint({a: 1}).sort({a: 1}).returnKey().toArray());
-}());

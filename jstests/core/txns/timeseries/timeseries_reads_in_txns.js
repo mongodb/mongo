@@ -4,9 +4,6 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
 const tsTestColl = db.timeseries_txn_ts_coll;
 tsTestColl.drop();
 
@@ -63,4 +60,3 @@ session.commitTransaction();
 let doc5 = regularColl.findOne({_id: 1, x: 1});
 assert.neq(null, doc5);
 assert.docEq(doc4, doc5);
-})();

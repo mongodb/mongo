@@ -1,8 +1,7 @@
-'use strict';
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {KilledSessionUtil} from "jstests/libs/killed_session_util.js";
 
-load("jstests/libs/killed_session_util.js");
-
-var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
+export var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
     /**
      * Calls 'func' with the print() function overridden to be a no-op.
      *

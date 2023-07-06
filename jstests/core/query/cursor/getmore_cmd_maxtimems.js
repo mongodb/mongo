@@ -7,9 +7,6 @@
 // ]
 
 // Test attaching maxTimeMS to a getMore command.
-(function() {
-'use strict';
-
 var cmdRes;
 var collName = 'getmore_cmd_maxtimems';
 var coll = db[collName];
@@ -50,4 +47,3 @@ cmdRes = db.runCommand({find: collName, batchSize: 2, tailable: true, awaitData:
 assert.commandWorked(cmdRes);
 cmdRes = db.runCommand({getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: 60000});
 assert.commandWorked(cmdRes);
-})();

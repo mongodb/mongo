@@ -6,9 +6,8 @@
  *   featureFlagShardKeyIndexOptionalHashedSharding
  * ]
  */
-load("jstests/sharding/libs/find_chunks_util.js");
-(function() {
-"use strict";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+
 const st = new ShardingTest({});
 
 const dbName = "testDb";
@@ -69,4 +68,3 @@ assert.soon(() => {
 });
 
 st.stop();
-})();

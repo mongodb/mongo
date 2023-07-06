@@ -4,7 +4,7 @@
  * Verifies that all collections on all databases on the server with admin database adminDB have
  * UUIDs.
  */
-function checkCollectionUUIDs(adminDB) {
+export function checkCollectionUUIDs(adminDB) {
     let res = adminDB.runCommand({"listDatabases": 1});
     assert.commandWorked(res);
     let databaseList = res.databases;

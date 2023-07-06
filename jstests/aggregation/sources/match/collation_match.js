@@ -4,9 +4,6 @@
 // ]
 
 // Test that the $match stage respects the collation.
-(function() {
-"use strict";
-
 var caseInsensitive = {collation: {locale: "en_US", strength: 2}};
 
 var coll = db.collation_match;
@@ -47,4 +44,3 @@ assert.eq(1, coll.aggregate([{$match: {a: "A"}}]).itcount());
 // Test that the $match respects the inherited collation when it cannot be pushed down into the
 // query layer.
 assert.eq(1, coll.aggregate([{$project: {b: "B"}}, {$match: {b: "b"}}]).itcount());
-})();

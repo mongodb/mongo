@@ -2,14 +2,11 @@
  * Tests that executing aggregate with $out with "available" read concern on sharded clusters
  * doesn't fail.
  */
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const st = new ShardingTest({shards: {rs0: {nodes: 1}}});
 const dbName = "test";
-db = st.getDB(dbName);
+const db = st.getDB(dbName);
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 
@@ -40,4 +37,3 @@ const result = assert.commandWorked(db.runCommand({
 assert(resultsEq(result.cursor.firstBatch, inputDocs), result.cursor);
 
 st.stop();
-})();

@@ -2,16 +2,16 @@
  * Test helpers for identifying OS
  */
 
-function isLinux() {
+export function isLinux() {
     return getBuildInfo().buildEnvironment.target_os == "linux";
 }
 
-function isMacOS() {
+export function isMacOS() {
     return getBuildInfo().buildEnvironment.target_os == "macOS";
 }
 
 // See "man 5 os-release" for documentation
-function readOsRelease() {
+export function readOsRelease() {
     try {
         const os_release = cat("/etc/os-release");
 
@@ -40,7 +40,7 @@ function readOsRelease() {
  * @param {string} distro ID of the distro in os-release
  * @returns
  */
-function isDistro(distro) {
+export function isDistro(distro) {
     let tags = readOsRelease();
     return tags.hasOwnProperty("ID") && tags["ID"] === distro;
 }
@@ -52,7 +52,7 @@ function isDistro(distro) {
  * @param {string} distro ID of the distro in os-release
  * @returns
  */
-function isDistroVersion(distro, version) {
+export function isDistroVersion(distro, version) {
     let tags = readOsRelease();
     return tags.hasOwnProperty("ID") && tags["ID"] === distro &&
         tags.hasOwnProperty("VERSION_ID") && tags["VERSION_ID"] === version;
@@ -63,7 +63,7 @@ function isDistroVersion(distro, version) {
  * @param {string} majorVersion
  * @returns True if majorVersion = 8 and version is 8.1, 8.2 etc.
  */
-function isRHELMajorVerison(majorVersion) {
+export function isRHELMajorVerison(majorVersion) {
     let tags = readOsRelease();
     return tags.hasOwnProperty("ID") && tags["ID"] === "rhel" &&
         tags.hasOwnProperty("VERSION_ID") && tags["VERSION_ID"].startsWith(majorVersion);
@@ -89,13 +89,13 @@ REDHAT_BUGZILLA_PRODUCT_VERSION=8.7
 REDHAT_SUPPORT_PRODUCT="Red Hat Enterprise Linux"
 REDHAT_SUPPORT_PRODUCT_VERSION="8.7"
  */
-function isRHEL8() {
+export function isRHEL8() {
     // RHEL 8 disables TLS 1.0 and TLS 1.1 as part their default crypto policy
     // We skip tests on RHEL 8 that require these versions as a result.
     return isRHELMajorVerison("8");
 }
 
-function isSUSE15SP1() {
+export function isSUSE15SP1() {
     if (_isWindows()) {
         return false;
     }
@@ -111,7 +111,7 @@ function isSUSE15SP1() {
     return false;
 }
 
-function isUbuntu() {
+export function isUbuntu() {
     // Ubuntu 18.04 and later compiles openldap against gnutls which does not
     // support SHA1 signed certificates. ldaptest.10gen.cc uses a SHA1 cert.
     return isDistro("ubuntu");
@@ -132,14 +132,14 @@ PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-poli
 VERSION_CODENAME=bionic
 UBUNTU_CODENAME=bionic
  */
-function isUbuntu1804() {
+export function isUbuntu1804() {
     // Ubuntu 18.04's TLS 1.3 implementation has an issue with OCSP stapling. We have disabled
     // stapling on this build variant, so we need to ensure that tests that require stapling
     // do not run on this machine.
     return isDistroVersion("ubuntu", "18.04");
 }
 
-function isUbuntu2004() {
+export function isUbuntu2004() {
     // Ubuntu 20.04 disables TLS 1.0 and TLS 1.1 as part their default crypto policy
     // We skip tests on Ubuntu 20.04 that require these versions as a result.
     return isDistroVersion("ubuntu", "20.04");
@@ -157,7 +157,7 @@ HOME_URL="https://www.debian.org/"
 SUPPORT_URL="https://www.debian.org/support"
 BUG_REPORT_URL="https://bugs.debian.org/"
  */
-function isDebian() {
+export function isDebian() {
     return isDistro("debian");
 }
 
@@ -186,7 +186,7 @@ SUPPORT_END=2024-05-14
 VARIANT="Workstation Edition"
 VARIANT_ID=workstation
  */
-function isFedora() {
+export function isFedora() {
     return isDistro("fedora");
 }
 
@@ -206,6 +206,6 @@ CPE_NAME="cpe:2.3:o:amazon:amazon_linux:2022"
 HOME_URL="https://aws.amazon.com/linux/"
 BUG_REPORT_URL="https://github.com/amazonlinux/amazon-linux-2022"
 */
-function isAmazon2023() {
+export function isAmazon2023() {
     return isDistroVersion("amzn", "2022") || isDistroVersion("amzn", "2023");
 }

@@ -9,13 +9,10 @@
 //   # migration hook.
 //   tenant_migration_incompatible,
 // ]
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Tests for accessing logLevel server parameter using getParameter/setParameter commands
 // and shell helpers.
-
-(function() {
-'use strict';
 
 function scrub(obj) {
     delete obj["operationTime"];
@@ -221,4 +218,3 @@ if (!FixtureHelpers.isMongos(db)) {
     assert.commandWorked(db.adminCommand(
         {setParameter: 1, oplogFetcherInitialSyncMaxFetcherRestarts: origRestarts}));
 }
-})();

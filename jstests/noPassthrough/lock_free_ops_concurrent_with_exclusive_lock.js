@@ -6,11 +6,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 let conn = MongoRunner.runMongod({});
 assert(conn);
@@ -100,4 +96,3 @@ awaitBlockingCollMod();
 
 jsTestLog("Done.");
 MongoRunner.stopMongod(conn);
-})();

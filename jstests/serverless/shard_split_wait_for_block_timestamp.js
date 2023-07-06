@@ -6,15 +6,13 @@
  * @tags: [requires_fcv_63, serverless]
  */
 
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {setParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 import {
     assertMigrationState,
     findSplitOperation,
     ShardSplitTest
 } from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/libs/fail_point_util.js");                         // for "configureFailPoint"
-load("jstests/libs/write_concern_util.js");                      // for "stopServerReplication"
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // for "setParameter"
 
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;

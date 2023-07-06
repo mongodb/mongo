@@ -5,9 +5,6 @@
  * various paths that must all be checked.
  */
 
-(function() {
-"use strict";
-
 function validateDocumentKeyInOplogForRemove(ns, _id, docKey) {
     const deleteEntry = oplog.findOne({ns: ns, op: 'd', 'o._id': _id});
     const o = docKey ? {_id: _id, x: docKey} : {_id: _id};
@@ -158,4 +155,3 @@ validateDocumentKeyInOplogForRemove('test.byIdX', 14, 54);
 validateDocumentKeyInOplogForRemove('test.byIdX', 34, 74);
 
 st.stop();
-})();

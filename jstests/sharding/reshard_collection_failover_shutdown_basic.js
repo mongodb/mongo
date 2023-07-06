@@ -9,11 +9,7 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, enableElections: true});
 reshardingTest.setup();
@@ -44,7 +40,7 @@ reshardingTest.withReshardingInBackground(
             {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
         ],
     },
-    (tempNs) => {
+    () => {
         reshardingTest.stepUpNewPrimaryOnShard(donorShardNames[0]);
 
         reshardingTest.killAndRestartPrimaryOnShard(recipientShardNames[0]);
@@ -53,4 +49,3 @@ reshardingTest.withReshardingInBackground(
     });
 
 reshardingTest.teardown();
-})();

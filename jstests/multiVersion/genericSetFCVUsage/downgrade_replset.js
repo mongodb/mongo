@@ -1,7 +1,6 @@
-// Test the downgrade of a replica set succeeds, while reads and writes continue.
-
-load('jstests/multiVersion/libs/multi_rs.js');
-load('jstests/libs/test_background_ops.js');
+import "jstests/multiVersion/libs/multi_rs.js";
+import {isFinished, startParallelOps} from "jstests/libs/test_background_ops.js";
+import {reconnect} from "jstests/replsets/rslib.js";
 
 let newVersion = "latest";
 

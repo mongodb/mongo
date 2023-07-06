@@ -1,5 +1,5 @@
 // test all operations in parallel
-load('jstests/libs/parallelTester.js');
+import {EventGenerator, ParallelTester} from "jstests/libs/parallelTester.js";
 
 let f = db.jstests_parallel_allops;
 f.drop();

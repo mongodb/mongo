@@ -1,10 +1,7 @@
 // SERVER-28179 Test the startup of in-memory storage engine using --inMemoryEngineConfigString
-(function() {
-'use strict';
-
 if (jsTest.options().storageEngine !== "inMemory") {
     jsTestLog("Skipping test because storageEngine is not inMemory");
-    return;
+    quit();
 }
 
 var mongod = MongoRunner.runMongod({
@@ -14,4 +11,3 @@ var mongod = MongoRunner.runMongod({
 assert.neq(null, mongod, "mongod failed to started up with --inMemoryEngineConfigString");
 
 MongoRunner.stopMongod(mongod);
-}());

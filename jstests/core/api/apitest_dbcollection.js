@@ -10,8 +10,6 @@
  *   does_not_support_causal_consistency,
  * ]
  */
-(function() {
-'use strict';
 const testDb = db.getSiblingDB("test");
 const coll = testDb.getCollection("test_db");
 /*
@@ -269,8 +267,6 @@ t.drop();
  * test testDb.collection.totalSize()
  */
 (function() {
-'use strict';
-
 var t = testDb.apitest_dbcollection;
 
 t.drop();
@@ -296,4 +292,3 @@ assert.neq(undefined,
 
 t.drop();
 }());
-})();

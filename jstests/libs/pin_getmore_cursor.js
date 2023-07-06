@@ -19,10 +19,10 @@
  * 'assertEndCounts': whether to assert zero pinned cursors an the end.
  */
 
-load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
-load('jstests/libs/parallel_shell_helpers.js');
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
-function withPinnedCursor(
+export function withPinnedCursor(
     {conn, sessionId, db, assertFunction, runGetMoreFunc, failPointName, assertEndCounts}) {
     // This test runs manual getMores using different connections, which will not inherit the
     // implicit session of the cursor establishing command.

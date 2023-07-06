@@ -6,9 +6,6 @@
  *   tenant_migration_incompatible,
  * ]
  */
-(function() {
-'use strict';
-
 const validateErrorResponse = function(
     res, db, collectionUUID, expectedCollection, actualCollection) {
     if (res.writeErrors) {
@@ -99,4 +96,3 @@ testCommand("update", {update: "", updates: [{q: {_id: 0}, u: {$set: {updated: t
 testCommand("update",
             {update: "", updates: [{q: {_id: 0}, u: {$set: {updated: true}}, upsert: true}]});
 testCommand("delete", {delete: "", deletes: [{q: {_id: 0}, limit: 1}]});
-})();

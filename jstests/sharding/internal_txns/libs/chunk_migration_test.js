@@ -11,13 +11,16 @@
  * Note that this fixture runs each runTest() against its own collection so it is illegal to make
  * more than one runTest() call.
  */
-'use strict';
+import {runCommandDuringTransferMods} from "jstests/libs/chunk_manipulation_util.js";
+import {runTxnRetryOnTransientError} from "jstests/sharding/internal_txns/libs/fixture_helpers.js";
+import {
+    getTxnEntriesForSession,
+    makeAbortTransactionCmdObj,
+    makeCommitTransactionCmdObj,
+    makePrepareTransactionCmdObj,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
-load('jstests/libs/chunk_manipulation_util.js');
-load('jstests/sharding/internal_txns/libs/fixture_helpers.js');
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
-
-function InternalTransactionChunkMigrationTest() {
+export function InternalTransactionChunkMigrationTest() {
     jsTest.log(`Running chunk migration test`);
 
     let st = new ShardingTest({

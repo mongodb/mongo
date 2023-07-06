@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * An "abstract" base selinux test class, containing common functions that should be
  * assumed to be called by a test executor.
@@ -10,7 +8,7 @@
  * NOTE: Implementations for this exist in both community and enterprise,
  * be cautious about modifying the base class.
  */
-class SelinuxBaseTest {
+export class SelinuxBaseTest {
     /**
      * Returns the "base" configuration per the rpm mongod.conf
      * Inheriting classes should use this base configuration and

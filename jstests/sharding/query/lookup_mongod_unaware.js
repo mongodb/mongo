@@ -11,12 +11,6 @@
  * ]
  *
  */
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
-
 // Restarts the primary shard and ensures that it believes both collections are unsharded.
 function restartPrimaryShard(rs, ...expectedCollections) {
     // Returns true if the shard is aware that the collection is sharded.
@@ -216,4 +210,3 @@ const resultAfter = D.A.aggregate(aggPipeline).toArray();
 assert.eq(resultBefore, resultAfter, "Before and after results do not match");
 
 st.stop();
-})();

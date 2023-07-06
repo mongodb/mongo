@@ -7,10 +7,7 @@
  *   assumes_against_mongod_not_mongos,
  * ]
  */
-load('jstests/libs/collection_drop_recreate.js');  // For 'assertDropAndRecreateCollection' and
-                                                   // 'assertDropCollection'.
-load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
-                                                   // 'assertChangeStreamEventEq'.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {safeToCreateColumnStoreIndex} from "jstests/libs/columnstore_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());

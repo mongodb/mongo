@@ -16,7 +16,7 @@ function setupTest() {
 
 function runTest(m) {
     // these are used by read-only user
-    db = m.getDB("test");
+    const db = m.getDB("test");
     let mro = new Mongo(m.host);
     let dbRO = mro.getDB("test");
     let tRO = dbRO[baseName];

@@ -6,8 +6,9 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
-load("jstests/replsets/rslib.js");
+import {reconnect} from "jstests/replsets/rslib.js";
 
 const dbName = "test";
 const collName = "coll";

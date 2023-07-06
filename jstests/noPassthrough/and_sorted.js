@@ -1,5 +1,5 @@
 // Tests for whether the query solution correctly used an AND_SORTED stage for index intersection.
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();

@@ -10,11 +10,9 @@
 // test restarts a shard, so the cached connection is not usable.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-(function() {
-'use strict';
-load("jstests/replsets/rslib.js");
-load("jstests/sharding/libs/find_chunks_util.js");
-load('jstests/sharding/libs/remove_shard_util.js');
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -179,4 +177,3 @@ assert.eq(originalSeed, seedString(rst1), "Set didn't come back up with the same
 addShard(st, coll, rst1);
 
 st.stop();
-})();

@@ -15,9 +15,9 @@
  * ]
  */
 
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/fixture_helpers.js");  // For numberOfShardsForCollection().
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const documentList = [
     {
@@ -89,42 +89,42 @@ function assertCollScan(explain) {
     assert.eq(collScans.length, FixtureHelpers.numberOfShardsForCollection(coll), explain);
 }
 
-function ensureCorrectResultsWithAndWithoutPlanning(collName, pipeline, useCollScan) {
-    const expected = db[collName].aggregate(pipeline, {hint: {$natural: 1}}).toArray();
-    const actual = db[collName].aggregate(pipeline /* No hint! */).toArray();
+function ensureCorrectResultsWithAndWithoutPlanning(testDb, collName, pipeline, useCollScan) {
+    const expected = testDb[collName].aggregate(pipeline, {hint: {$natural: 1}}).toArray();
+    const actual = testDb[collName].aggregate(pipeline /* No hint! */).toArray();
     if (useCollScan) {
-        assertCollScan(db[collName].explain().aggregate(pipeline /* No hint! */));
+        assertCollScan(testDb[collName].explain().aggregate(pipeline /* No hint! */));
     }
     assertArrayEq({expected, actual});
 }
 
-function testAndMatches(useCollScan) {
-    ensureCorrectResultsWithAndWithoutPlanning("this", testGraphLookup, useCollScan);
-    ensureCorrectResultsWithAndWithoutPlanning("that", testLargerMatch, useCollScan);
-    ensureCorrectResultsWithAndWithoutPlanning("that", testSmallerMatch, useCollScan);
+function testAndMatches(testDb, useCollScan) {
+    ensureCorrectResultsWithAndWithoutPlanning(testDb, "this", testGraphLookup, useCollScan);
+    ensureCorrectResultsWithAndWithoutPlanning(testDb, "that", testLargerMatch, useCollScan);
+    ensureCorrectResultsWithAndWithoutPlanning(testDb, "that", testSmallerMatch, useCollScan);
 }
 
-db = db.getSiblingDB(jsTestName());
+const testDb = db.getSiblingDB(jsTestName());
 
-const coll = db.this;
+const coll = testDb.this;
 coll.drop();
 assert.commandWorked(coll.insert({_id: "whatever"}));
 
-const that = db.that;
+const that = testDb.that;
 that.drop();
 assert.commandWorked(that.insert(documentList));
 
 // Create a single-field wildcard index (always ineligible).
 assert.commandWorked(that.createIndex({"obj.obj.obj.$**": 1}, {}));
-testAndMatches(true /* useCollScan */);
+testAndMatches(testDb, true /* useCollScan */);
 
 // Create a compound wildcard index with obj.date as a prefix (eligible for IXSCAN + FILTER).
 assert.commandWorked(that.dropIndexes());
 assert.commandWorked(that.createIndex({"obj.date": 1, "obj.obj.obj.$**": 1}, {}));
 // This CWI with non-wildcard prefix fields can provide index scan plans.
-testAndMatches(false /* useCollScan */);
+testAndMatches(testDb, false /* useCollScan */);
 
 // Create a compound wildcard index with obj.date as a suffix (always ineligible).
 assert.commandWorked(that.dropIndexes());
 assert.commandWorked(that.createIndex({"obj.obj.obj.$**": 1, "obj.date": 1}, {}));
-testAndMatches(true /* useCollScan */);
+testAndMatches(testDb, true /* useCollScan */);

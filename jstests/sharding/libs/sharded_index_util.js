@@ -1,7 +1,7 @@
 /*
  * Utilities for checking indexes on shards.
  */
-var ShardedIndexUtil = (function() {
+export var ShardedIndexUtil = (function() {
     /*
      * Asserts that the shard has an index for the collection with the given index key.
      */

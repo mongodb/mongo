@@ -1,8 +1,4 @@
 // Test that a pipeline with a $lookup stage on a sharded foreign collection may be run on a mongod.
-(function() {
-
-load("jstests/libs/discover_topology.js");  // For findDataBearingNodes.
-
 const sharded = new ShardingTest({mongos: 1, shards: 2});
 
 assert.commandWorked(sharded.s.adminCommand({enableSharding: "test"}));
@@ -134,4 +130,3 @@ sharded.shardColl(
 runTest();
 
 sharded.stop();
-})();

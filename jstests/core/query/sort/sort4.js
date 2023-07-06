@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 const coll = db.sort4;
 coll.drop();
 
@@ -42,4 +39,3 @@ nice({name: 1, prename: 1}, "A,AB,AC,BB,BD,C", "e2ia");  // SERVER-282
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndex({name: 1}));
 nice({name: 1, prename: 1}, "A,AB,AC,BB,BD,C", "e2ib");  // SERVER-282
-}());

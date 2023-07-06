@@ -7,11 +7,8 @@
  * are there.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {getFirstOplogEntry} from "jstests/replsets/rslib.js";
 
 var name = 'initial_sync_oplog_rollover';
 var replSet = new ReplSetTest({
@@ -64,4 +61,3 @@ assert.eq(0,
           secondary.getDB('local')['temp_oplog_buffer'].find().itcount(),
           "Oplog buffer was not dropped after initial sync");
 replSet.stopSet();
-})();

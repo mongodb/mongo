@@ -6,9 +6,6 @@
  * This test restarts shard replica sets, so it requires a persistent storage engine.
  * @tags: [requires_persistence]
  */
-(function() {
-"use strict";
-
 // This test uses authentication and runs commands without authenticating, which is not
 // compatible with implicit sessions.
 TestData.disableImplicitSessions = true;
@@ -107,4 +104,3 @@ assert.eq(resNoKeys.hasOwnProperty("$clusterTime"), false);
 assert.eq(resNoKeys.hasOwnProperty("operationTime"), false);
 
 st.stop();
-})();

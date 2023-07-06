@@ -6,10 +6,6 @@
  *   not_allowed_with_security_token,uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-
 const dbName = "test";
 const collName = "ensure_active_txn_for_prepare_transaction";
 const testDB = db.getSiblingDB(dbName);
@@ -51,4 +47,3 @@ assert.commandFailedWithCode(
     ErrorCodes.TransactionCommitted);
 
 session.endSession();
-}());

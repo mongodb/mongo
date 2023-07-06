@@ -13,9 +13,6 @@
 // check does a primary only command against the shards using _connections and can fail.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-(function() {
-"use strict";
-
 let st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
 // Verify after startup there is a new key in admin.system.keys.
@@ -89,4 +86,3 @@ assert.soonNoExcept(function() {
 }, "expected the config server primary to create new keys");
 
 st.stop();
-})();

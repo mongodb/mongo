@@ -1,4 +1,4 @@
-load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isMongos.
+import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 /**
@@ -19,7 +19,8 @@ export var EncryptedClient = class {
     constructor(conn, dbName, userName = undefined, adminPwd = undefined) {
         // Detect if jstests/libs/override_methods/implicitly_shard_accessed_collections.js is in
         // use
-        this.useImplicitSharding = !(typeof (ImplicitlyShardAccessCollSettings) === "undefined");
+        this.useImplicitSharding =
+            typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
 
         if (conn.isAutoEncryptionEnabled()) {
             this._keyVault = conn.getKeyVault();

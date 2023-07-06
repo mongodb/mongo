@@ -2,9 +2,6 @@
 //
 // Ensures round-trippability of int ids in DBRef's after a save/restore
 
-(function() {
-"use strict";
-
 const coll = db.dbref4;
 coll.drop();
 
@@ -21,4 +18,3 @@ coll.save(doc);
 
 // after pulling it back and saving it again, still has an int
 assert(coll.findOne({'refInt.$id': {$type: 16}}));
-})();

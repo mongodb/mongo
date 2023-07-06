@@ -10,11 +10,12 @@
 // test causes failovers on a shard, so the cached connection is not usable.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-(function() {
-'use strict';
-
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
-load('jstests/libs/parallel_shell_helpers.js');
+import {
+    getCoordinatorFailpoints,
+    waitForFailpoint,
+    flushRoutersAndRefreshShardMetadata,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -30,16 +31,13 @@ let lsid = {id: UUID()};
 let txnNumber = 0;
 
 const runTest = function(sameNodeStepsUpAfterFailover) {
-    let stepDownSecs;  // The amount of time the node has to wait before becoming primary again.
     let coordinatorReplSetConfig;
 
     if (sameNodeStepsUpAfterFailover) {
-        stepDownSecs = 1;
         coordinatorReplSetConfig = [{}];
     } else {
         // We are making one of the secondaries non-electable to ensure
         // that elections always result in a winner (see SERVER-42234)
-        stepDownSecs = 3;
         coordinatorReplSetConfig = [{}, {}, {rsConfig: {priority: 0}}];
     }
 
@@ -258,4 +256,3 @@ const failpointDataArr = getCoordinatorFailpoints();
 
 runTest(true /* same node always steps up after stepping down */, false);
 runTest(false /* same node always steps up after stepping down */, false);
-})();

@@ -7,10 +7,7 @@
  * @tags: [requires_majority_read_concern]
  */
 
-load("jstests/replsets/rslib.js");  // For reconfig.
-
-(function() {
-"use strict";
+import {reconfig} from "jstests/replsets/rslib.js";
 
 // Set up a set and grab things for later.
 var name = "read_committed_no_snapshots";
@@ -77,4 +74,3 @@ assert.commandFailedWithCode(primary.getSiblingDB(name).foo.runCommand(
                                  'find', {"readConcern": {"level": "majority"}, "maxTimeMS": 1000}),
                              ErrorCodes.MaxTimeMSExpired);
 replTest.stopSet();
-})();

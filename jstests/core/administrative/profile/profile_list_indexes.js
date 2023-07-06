@@ -8,11 +8,7 @@
 
 // Confirms that a listIndexes command and subsequent getMores of its cursor are profiled correctly.
 
-(function() {
-"use strict";
-
-// For 'getLatestProfilerEntry()'.
-load("jstests/libs/profiler.js");
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 var testDB = db.getSiblingDB("profile_list_indexes");
 var testColl = testDB.testColl;
@@ -51,4 +47,3 @@ const getMoreProfileEntry = getLatestProfilerEntry(testDB, {op: "getmore"});
 for (var field in listIndexesCommand) {
     assert.eq(getMoreProfileEntry.originatingCommand[field], listIndexesCommand[field], field);
 }
-})();

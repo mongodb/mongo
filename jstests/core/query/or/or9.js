@@ -10,8 +10,8 @@ t.createIndex({a: 1, b: 1});
 t.save({a: 2, b: 2});
 
 function check(a, q) {
-    count = a;
-    query = q;
+    const count = a;
+    const query = q;
     assert.eq(count, t.count(query));
 }
 

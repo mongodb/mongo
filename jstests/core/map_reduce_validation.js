@@ -6,11 +6,8 @@
 //   does_not_support_stepdowns,
 //   uses_map_reduce_with_temp_collections,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection
-load('jstests/libs/fixture_helpers.js');           // For 'FixtureHelpers'
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const source = db.mr_validation;
 source.drop();
@@ -127,7 +124,3 @@ if (!FixtureHelpers.isMongos(db)) {
         db.runCommand({mapReduce: "sourceView", map: mapFunc, reduce: reduceFunc, out: "foo"}),
         ErrorCodes.CommandNotSupportedOnView);
 }
-
-// Test that mapReduce fails gracefully if the query parameter is the wrong type.
-assert.throws(() => coll.mapReduce(mapFunc, reduceFunc, {out: outputColl.getName(), query: "foo"}));
-}());

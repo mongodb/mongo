@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 function sortByName(a, b) {
     if (a.name < b.name)
         return -1;
@@ -240,4 +237,3 @@ movePrimaryNoFailpoint(true);
 movePrimaryNoFailpoint(false);
 
 st.stop();
-})();

@@ -6,10 +6,7 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For runCommandOnEachPrimary().
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 function executeTest(db, isMongos) {
     let cursor;
@@ -499,5 +496,4 @@ const enableTestCmd = {
     } finally {
         st.stop();
     }
-})();
 })();

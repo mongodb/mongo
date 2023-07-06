@@ -3,9 +3,6 @@
  * replica set shard that was started with --shardsvr.
  */
 
-(function() {
-"use strict";
-
 const checkShardingStateInitialized = function(conn, configConnStr, shardName, clusterId) {
     const res = conn.getDB('admin').runCommand({shardingState: 1});
     assert.commandWorked(res);
@@ -40,4 +37,3 @@ checkShardMarkedAsShardAware(st.s, newShardName);
 replTest.stopSet();
 
 st.stop();
-})();

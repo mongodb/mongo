@@ -4,11 +4,14 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/failpoint_helpers.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {
+    failCommandWithError,
+    failCommandWithWriteConcernError,
+    turnOffFailCommand
+} from "jstests/sharding/libs/failpoint_helpers.js";
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -206,4 +209,3 @@ flushRoutersAndRefreshShardMetadata(st, {ns});
 runCommitTests("coordinateCommitTransaction");
 
 st.stop();
-}());

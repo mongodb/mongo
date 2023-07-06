@@ -2,8 +2,6 @@
  *  @tags: [requires_fcv_53]
  */
 
-(function() {
-'use strict';
 const params = {
     healthMonitoringIntensities: tojson({
         values: [
@@ -44,4 +42,3 @@ const offParams = {
 st = new ShardingTest({mongos: [{setParameter: Object.assign({}, offParams, setFailPoint)}]});
 assert.commandWorked(st.s0.adminCommand({"ping": 1}));
 st.stop();
-})();

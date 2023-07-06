@@ -4,9 +4,6 @@
 //   requires_fastcount,
 // ]
 
-(function() {
-"use strict";
-
 const coll = db.jstests_find_dedup;
 
 function checkDedup(query, idArray) {
@@ -46,4 +43,3 @@ checkDedup({$or: [{a: {$in: [1, 2]}}, {b: {$in: [4, 5]}}]}, [1, 2]);
 
 assert.commandWorked(coll.createIndex({a: 1}));
 checkDedup({$or: [{a: {$in: [1, 2]}}, {b: {$in: [4, 5]}}]}, [1, 2]);
-}());

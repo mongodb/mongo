@@ -15,8 +15,9 @@
  *
  * @tags: [requires_persistence, requires_sharding]
  */
+import "jstests/libs/parallelTester.js";
 
-load('jstests/libs/parallelTester.js');
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     var data = {

@@ -3,10 +3,7 @@
  *
  * @tags: [requires_fsync, requires_wiredtiger, requires_persistence]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const conn = MongoRunner.runMongod();
 
@@ -65,4 +62,3 @@ assert(validateRes.valid);
 checkLog.containsJson(conn, 5980500);
 
 MongoRunner.stopMongod(conn);
-}());

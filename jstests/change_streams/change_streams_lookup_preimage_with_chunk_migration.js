@@ -11,12 +11,14 @@
  *    assumes_read_preference_unchanged,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load("jstests/libs/chunk_manipulation_util.js");   // For pauseMigrateAtStep, waitForMigrateStep and
-                                                   // unpauseMigrateAtStep.
+import {
+    migrateStepNames,
+    moveChunkParallel,
+    pauseMigrateAtStep,
+    unpauseMigrateAtStep,
+    waitForMigrateStep,
+} from "jstests/libs/chunk_manipulation_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const st = new ShardingTest({
     shards: 2,
@@ -230,4 +232,3 @@ function verifyChangeStreamEvents(csCursor, events) {
 })();
 
 st.stop();
-}());

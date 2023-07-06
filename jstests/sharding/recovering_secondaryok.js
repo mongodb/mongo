@@ -7,9 +7,7 @@
 // not see the secondaries. Either the primary connection gets reset, or the primary could change.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-(function() {
-'use strict';
-load("jstests/replsets/rslib.js");
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 var shardTest =
     new ShardingTest({name: "recovering_secondaryok", shards: 2, mongos: 2, other: {rs: true}});
@@ -18,13 +16,9 @@ var mongos = shardTest.s0;
 var mongosSOK = shardTest.s1;
 mongosSOK.setSecondaryOk();
 
-var admin = mongos.getDB("admin");
-var config = mongos.getDB("config");
-
 const dbName = "test";
 var dbase = mongos.getDB(dbName);
 var coll = dbase.getCollection("foo");
-var dbaseSOk = mongosSOK.getDB("" + dbase);
 var collSOk = mongosSOK.getCollection("" + coll);
 
 var rsA = shardTest.rs0;
@@ -55,7 +49,6 @@ print("3: test normal and secondaryOk queries");
 // Make shardA and rsA the same
 var shardA = shardTest.getShard(coll, {_id: -1});
 var shardAColl = shardA.getCollection("" + coll);
-var shardB = shardTest.getShard(coll, {_id: 1});
 
 if (shardA.name == rsB.getURL()) {
     var swap = rsB;
@@ -131,4 +124,3 @@ try {
 assert.eq(collCount, sOKCount);
 
 shardTest.stop();
-})();

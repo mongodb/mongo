@@ -2,8 +2,8 @@
  * Test to ensure that index creation fails on a drop-pending collection.
  */
 
-load("jstests/libs/fail_point_util.js");            // For kDefaultWaitForFailPointTimeout.
-load("jstests/noPassthrough/libs/index_build.js");  // For IndexBuildTest.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Set up a two phase drop test.

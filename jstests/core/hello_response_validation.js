@@ -9,9 +9,6 @@
 //    does_not_support_stepdowns,
 // ]
 
-(function() {
-"use strict";
-
 function checkResponseFields(command, commandType) {
     var res = db.runCommand(command);
     // check that the fields that should be there are there and have proper values
@@ -99,4 +96,3 @@ assert.eq(cmdResponse1, cmdResponse2);
 cmdResponse1 = removeTimestamps(db.runCommand("isMaster"));
 cmdResponse2 = removeTimestamps(db.isMaster());
 assert.eq(cmdResponse1, cmdResponse2);
-})();

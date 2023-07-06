@@ -1,10 +1,7 @@
 /**
  * Basic integration tests for the $let expression.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 let coll = db.agg_expr_let;
 coll.drop();
@@ -129,4 +126,3 @@ assertErrorCode(
     coll,
     [{$project: {output: {$let: {vars: {var1: "$one", var2: "$$var1"}, in : "$$var1"}}}}],
     17276);
-}());

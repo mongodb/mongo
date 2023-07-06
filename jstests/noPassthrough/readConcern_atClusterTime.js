@@ -15,9 +15,6 @@ function _getClusterTime(rst) {
     return pingRes.$clusterTime.clusterTime;
 }
 
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "coll";
 
@@ -28,7 +25,7 @@ const testDB = rst.getPrimary().getDB(dbName);
 
 if (!testDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
     rst.stopSet();
-    return;
+    quit();
 }
 
 let session = testDB.getMongo().startSession({causalConsistency: false});
@@ -146,4 +143,3 @@ rst.stopSet();
     session.endSession();
     rst.stopSet();
 }
-}());

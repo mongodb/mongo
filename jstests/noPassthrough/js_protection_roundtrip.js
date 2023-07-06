@@ -7,9 +7,6 @@
  * 2. A Code object is correctly serialized as BSON type 'Code' or
  *    'CodeWScope'.
  */
-(function() {
-"use strict";
-
 var testServer = MongoRunner.runMongod();
 assert.neq(null, testServer, "failed to start mongod");
 var db = testServer.getDB("test");
@@ -54,4 +51,3 @@ testFunctionUnmarshall(true, withJavaScriptProtection);
 testFunctionUnmarshall(false, withoutJavaScriptProtection);
 
 MongoRunner.stopMongod(testServer);
-})();

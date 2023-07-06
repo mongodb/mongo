@@ -15,9 +15,6 @@
 //   uses_parallel_shell,
 // ]
 
-(function() {
-"use strict";
-
 var coll = db.count10;
 coll.drop();
 
@@ -71,4 +68,3 @@ assert(res.message.match(/count failed/) !== null);
 assert(res.message.match(/\"code\"/) !== null);
 
 s();
-})();

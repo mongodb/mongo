@@ -8,10 +8,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");  // arrayEq
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers
+import {arrayEq, documentEq} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;
@@ -80,7 +78,7 @@ if (FixtureHelpers.isMongos(testDB) && FixtureHelpers.isSharded(collA)) {
 }
 
 // Test that $unionWith fails if $indexStats is not first stage in the sub-pipeline.
-var resObj = testDB.runCommand({
+resObj = testDB.runCommand({
     aggregate: collA.getName(),
     pipeline: [
         {$match: {val: {$exists: false}}},
@@ -158,4 +156,3 @@ resObj = testDB.runCommand({
     cursor: {}
 });
 assert.eq(resObj.code, 40603, resObj);
-})();

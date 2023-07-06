@@ -1,13 +1,4 @@
-/**
- * Verifies that a change stream which is resumed on a downgraded binary does not crash
- * the server, even when reading oplog entries which the downgraded binary may not understand.
- *
- * @tags: [uses_change_streams, requires_replication]
- */
-(function() {
-"use strict";
-
-load("jstests/multiVersion/libs/multi_cluster.js");  // For upgradeCluster.
+import "jstests/multiVersion/libs/multi_cluster.js";
 
 // Checking UUID consistency uses cached connections, which are not valid across restarts or
 // stepdowns.
@@ -367,4 +358,3 @@ assert.commandWorked(
 // Test resuming change streams after downgrading the cluster to 'last-lts'.
 runTests('last-lts');
 st.stop();
-}());

@@ -6,9 +6,6 @@
 //   requires_fcv_62,
 // ]
 
-(function() {
-"use strict";
-
 const coll = db.explain_server_params;
 coll.drop();
 
@@ -38,4 +35,3 @@ assert.hasFields(result.serverParameters, expectedParamList);
 result = coll.find({x: 1, y: 1}).explain('queryPlanner');
 assert(result.hasOwnProperty('serverParameters'), result);
 assert.hasFields(result.serverParameters, expectedParamList);
-})();

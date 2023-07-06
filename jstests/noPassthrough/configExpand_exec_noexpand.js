@@ -1,9 +1,11 @@
 // Test config file expansion using EXEC.
 
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/configExpand/lib.js');
+import {
+    configExpandFailure,
+    configExpandSuccess,
+    jsToYaml,
+    makeReflectionCmd
+} from "jstests/noPassthrough/libs/configExpand/lib.js";
 
 // Unexpected elements.
 configExpandFailure({
@@ -26,4 +28,3 @@ configExpandFailure(sicReflect, /__exec support has not been enabled/, {configEx
 // Expansion enabled, but not recursively.
 configExpandFailure({__exec: makeReflectionCmd(jsToYaml(sicReflect)), type: 'yaml'},
                     /__exec support has not been enabled/);
-})();

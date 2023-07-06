@@ -10,12 +10,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/storage_engine_utils.js");
-load("jstests/libs/write_concern_util.js");
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {storageEngineIsWiredTigerOrInMemory} from "jstests/libs/storage_engine_utils.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 TestData.skipCheckDBHashes = true;  // the set is not consistent when we shutdown the test
 
@@ -127,4 +124,3 @@ assert.eq(0, resyncNode.getDB(dbName)[collName].find(disappearingDoc).itcount())
 // We expect node 1 to have crashed.
 rst.stop(0, undefined, {allowedExitCode: MongoRunner.EXIT_ABORT});
 rst.stopSet();
-})();

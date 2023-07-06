@@ -1,9 +1,6 @@
 // Test an in memory sort memory assertion after a plan has "taken over" in the query optimizer
 // cursor.
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const t = db.jstests_sortj;
 t.drop();
@@ -21,4 +18,3 @@ assert.throwsWithCode(
     () => t.find({a: {$gte: 0}, c: null}).sort({d: 1}).allowDiskUse(false).itcount(),
     ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 t.drop();
-})();

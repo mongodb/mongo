@@ -4,11 +4,6 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");
-
 const coll = db[jsTestName()];
 
 function testWithProject({doc, percentileSpec, letSpec, expectedResult, msg}) {
@@ -165,5 +160,4 @@ testWithProject({
         expectedResult: [null, null, null],
         msg: "Multiple percentiles on large non-numeric input"
     });
-})();
 })();

@@ -7,9 +7,6 @@
  *   requires_wiredtiger,
  * ]
  */
-(function() {
-'use strict';
-
 const conn = MongoRunner.runMongod();
 
 const testDB = conn.getDB('test');
@@ -34,4 +31,3 @@ const indexCreationString = coll.stats({indexDetails: true}).indexDetails.mm_1.c
 assert.neq(-1, indexCreationString.indexOf(',split_pct=88,'), indexCreationString);
 
 MongoRunner.stopMongod(conn);
-})();

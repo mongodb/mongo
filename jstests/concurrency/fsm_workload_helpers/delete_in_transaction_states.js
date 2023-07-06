@@ -5,17 +5,20 @@
  * collection. This includes multi=true deletes and multi=false deletes with exact _id queries.
  */
 
-load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {
+    withTxnAndAutoRetry
+} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 
 // In-memory representation of the documents owned by this thread for all given collections. Used to
 // verify the expected documents are deleted in the collection.
-let expectedDocuments = {};
-let nextGroupId = {};
+export let expectedDocuments = {};
+export let nextGroupId = {};
 
 /**
  * Returns the next groupId for the multiDelete state function to use.
  */
-function getNextGroupIdForDelete(collName, partitionSize) {
+export function getNextGroupIdForDelete(collName, partitionSize) {
     // The number of "groups" each document within those assigned to a thread can belong to for a
     // given collection. Entire groups will be deleted at once by the multiDelete state function, so
     // this is effectively the number of times that stage can be meaningfully run per thread.
@@ -30,7 +33,7 @@ function getNextGroupIdForDelete(collName, partitionSize) {
  * Returns the _id of a random document owned by this thread to be deleted by an exact _id
  * query. Should only be called if this thread hasn't deleted every document assigned to it.
  */
-function getIdForDelete(collName) {
+export function getIdForDelete(collName) {
     assertAlways.neq(0, expectedDocuments[collName].length);
     const randomIndex = Random.randInt(expectedDocuments[collName].length);
     return expectedDocuments[collName][randomIndex]._id;
@@ -40,7 +43,7 @@ function getIdForDelete(collName) {
  * Sends a multi=false delete with an exact match on _id for a random id, which should be sent
  * to all shards.
  */
-function exactIdDelete(db, collName, session) {
+export function exactIdDelete(db, collName, session) {
     // If no documents remain in our partition, there is nothing to do.
     if (!expectedDocuments[collName].length) {
         print('This thread owns no more documents for collection ' + db[collName] +
@@ -65,7 +68,7 @@ function exactIdDelete(db, collName, session) {
  * Sends a multi=true delete without the shard key that targets all documents assigned to this
  * thread, which should be sent to all shards.
  */
-function multiDelete(db, collName, session, tid, partitionSize) {
+export function multiDelete(db, collName, session, tid, partitionSize) {
     // If no documents remain in our partition, there is nothing to do.
     if (!expectedDocuments[collName].length) {
         print('This thread owns no more documents for collection ' + db[collName] +
@@ -91,7 +94,7 @@ function multiDelete(db, collName, session, tid, partitionSize) {
 /**
  * Asserts only the expected documents for this thread are present in the collection.
  */
-function verifyDocuments(db, collName, tid) {
+export function verifyDocuments(db, collName, tid) {
     const docs = db[collName].find({tid: tid}).toArray();
     assertWhenOwnColl.eq(expectedDocuments[collName].length, docs.length, () => {
         return 'unexpected number of documents for ' + db[collName] + ', docs: ' + tojson(docs) +
@@ -119,7 +122,7 @@ function verifyDocuments(db, collName, tid) {
  * Gives each document assigned to this thread a group id for multi=true deletes, and loads each
  * document into memory.
  */
-function initDeleteInTransactionStates(db, collName, tid, partitionSize) {
+export function initDeleteInTransactionStates(db, collName, tid, partitionSize) {
     // The number of "groups" each document within those assigned to a thread can belong to for a
     // given collection. Entire groups will be deleted at once by the multiDelete state function, so
     // this is effectively the number of times that stage can be meaningfully run per thread.

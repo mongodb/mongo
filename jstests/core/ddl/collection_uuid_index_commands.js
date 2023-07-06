@@ -7,9 +7,6 @@
  *   requires_non_retryable_commands,
  * ]
  */
-(function() {
-'use strict';
-
 const validateErrorResponse = function(
     res, db, collectionUUID, expectedCollection, actualCollection) {
     assert.eq(res.db, db);
@@ -104,4 +101,3 @@ const testCommand = function(cmd, cmdObj) {
 
 testCommand("createIndexes", {createIndexes: "", indexes: [{name: "x_1", key: {x: 1}}]});
 testCommand("dropIndexes", {dropIndexes: "", index: {y: 1}});
-})();

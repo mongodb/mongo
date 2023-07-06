@@ -1,10 +1,7 @@
 /**
  * Tests that falling off a capped collection across a yield results in the correct error.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB('test');
@@ -59,4 +56,3 @@ if (joinParallelShell) {
 }
 
 MongoRunner.stopMongod(conn);
-})();

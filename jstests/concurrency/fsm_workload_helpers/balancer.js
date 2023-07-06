@@ -1,12 +1,11 @@
-'use strict';
-
 /**
  * Provides helpers for configuring the balancer.
  *
  * Intended for use by workloads testing sharding (i.e., workloads starting with 'sharded_').
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
-var BalancerHelper = (function() {
+export var BalancerHelper = (function() {
     // Disables balancing for a given collection.
     function disableBalancerForCollection(db, ns) {
         assertAlways.commandWorked(

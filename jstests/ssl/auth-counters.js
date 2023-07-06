@@ -1,8 +1,5 @@
 // Test for auth counters using MONGODB-X509.
 
-(function() {
-'use strict';
-
 const x509 = "MONGODB-X509";
 const mongod = MongoRunner.runMongod({
     auth: '',
@@ -105,4 +102,3 @@ assertFailure({mechanism: x509});
 const finalStats = asAdmin({serverStatus: 1}).security.authentication.mechanisms;
 MongoRunner.stopMongod(mongod);
 printjson(finalStats);
-})();

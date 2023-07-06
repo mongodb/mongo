@@ -2,17 +2,26 @@
  * Starts a mock OCSP Server to test
  * OCSP certificate revocation.
  */
-load("jstests/ocsp/lib/ocsp_helpers.js");
-load("jstests/libs/python.js");
+import {getPython3Binary} from "jstests/libs/python.js";
+import {
+    OCSP_CA_CERT,
+    OCSP_CA_KEY,
+    OCSP_CA_PEM,
+    OCSP_INTERMEDIATE_CA_ONLY_CERT,
+    OCSP_INTERMEDIATE_CA_ONLY_KEY,
+    OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM,
+    OCSP_RESPONDER_CERT,
+    OCSP_RESPONDER_KEY,
+} from "jstests/ocsp/lib/ocsp_helpers.js";
 
 // These are a list of faults to match the list of faults
 // in ocsp_mock.py.
-const FAULT_REVOKED = "revoked";
-const FAULT_UNKNOWN = "unknown";
+export const FAULT_REVOKED = "revoked";
 
-const OCSP_PROGRAM = "jstests/ocsp/lib/ocsp_mock.py";
+export const FAULT_UNKNOWN = "unknown";
+export const OCSP_PROGRAM = "jstests/ocsp/lib/ocsp_mock.py";
 
-class ResponderCertSet {
+export class ResponderCertSet {
     /**
      * Set of certificates for the OCSP responder.'
      * @param {string} cafile
@@ -26,14 +35,16 @@ class ResponderCertSet {
     }
 }
 
-const OCSP_DELEGATE_RESPONDER =
+export const OCSP_DELEGATE_RESPONDER =
     new ResponderCertSet(OCSP_CA_PEM, OCSP_RESPONDER_CERT, OCSP_RESPONDER_KEY);
-const OCSP_CA_RESPONDER = new ResponderCertSet(OCSP_CA_PEM, OCSP_CA_CERT, OCSP_CA_KEY);
-const OCSP_INTERMEDIATE_RESPONDER = new ResponderCertSet(OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM,
-                                                         OCSP_INTERMEDIATE_CA_ONLY_CERT,
-                                                         OCSP_INTERMEDIATE_CA_ONLY_KEY);
 
-class MockOCSPServer {
+export const OCSP_CA_RESPONDER = new ResponderCertSet(OCSP_CA_PEM, OCSP_CA_CERT, OCSP_CA_KEY);
+
+export const OCSP_INTERMEDIATE_RESPONDER = new ResponderCertSet(OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM,
+                                                                OCSP_INTERMEDIATE_CA_ONLY_CERT,
+                                                                OCSP_INTERMEDIATE_CA_ONLY_KEY);
+
+export class MockOCSPServer {
     /**
      * Create a new OCSP Server.
      *

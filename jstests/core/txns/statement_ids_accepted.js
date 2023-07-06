@@ -8,10 +8,7 @@
 //    # Tenant migrations don't support applyOps.
 //    tenant_migration_incompatible
 // ]
-load("jstests/libs/fixture_helpers.js");
-
-(function() {
-"use strict";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const dbName = "test";
 const collName = "statement_ids_accepted";
@@ -232,4 +229,3 @@ assert.commandWorked(sessionDb.adminCommand({
 }));
 
 session.endSession();
-}());

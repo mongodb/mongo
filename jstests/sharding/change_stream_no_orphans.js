@@ -8,10 +8,7 @@
  *   - Test case 3: Transaction from router updating both orphaned and owned documents
  *   - Test case 4: Transaction to shard updating both orphaned and owned documents
  */
-(function() {
-'use strict';
-
-load('jstests/libs/fail_point_util.js');  // For configureFailPoint
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // Asserts that there is no event.
 function assertNoChanges(csCursor) {
@@ -341,4 +338,3 @@ jsTest.log('The collection drop generates a drop event');
 suspendRangeDeletionShard0.off();
 
 st.stop();
-})();

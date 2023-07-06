@@ -24,11 +24,11 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");
-load('jstests/replsets/rslib.js');  // for waitForNewlyAddedRemovalForNodeToBeCommitted
+import {waitForNewlyAddedRemovalForNodeToBeCommitted} from "jstests/replsets/rslib.js";
 
 const testDBName = 'testDB';
 const testCollName = 'testColl';

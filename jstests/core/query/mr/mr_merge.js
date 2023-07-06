@@ -12,8 +12,6 @@
 //   requires_scripting,
 // ]
 (function() {
-"use strict";
-(function() {
 const source = db.mr_merge;
 source.drop();
 
@@ -103,5 +101,4 @@ assert.commandWorked(
 
 assert.eq(2, out.findOne({_id: 1}).value);
 assert.eq(1, out.findOne({_id: 2}).value);
-}());
 }());

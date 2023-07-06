@@ -15,10 +15,7 @@
 // - _id indexes must have the collection default collation.
 // - Non-_id indexes cannot have the name "_id_".
 
-(function() {
-"use strict";
-
-load("jstests/libs/index_catalog_helpers.js");
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 // Must use local db for testing because autoIndexId:false collections are not allowed in
 // replicated databases.
@@ -83,4 +80,3 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 0}));
 assert.commandWorked(coll.createIndex({_id: Number.MAX_VALUE}));
 assert.commandWorked(coll.createIndex({_id: -Number.MAX_VALUE}));
-})();

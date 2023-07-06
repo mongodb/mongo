@@ -6,7 +6,6 @@
  *   requires_libunwind
  * ]
  */
-(function() {
 clearRawMongoProgramOutput();
 const conn = MongoRunner.runMongod();
 // convert the float to a string to make sure it's correctly represented.
@@ -16,4 +15,3 @@ const output = rawMongoProgramOutput();
 assert(output.search(/"processInfo":/) >= 0, output);
 // Will be several of these
 assert(output.search(/"backtrace":/) >= 0, output);
-})();

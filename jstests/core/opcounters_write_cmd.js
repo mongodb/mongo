@@ -11,9 +11,6 @@
 //   does_not_support_repeated_reads,
 // ]
 
-(function() {
-'use strict';
-
 var mongo = new Mongo(db.getMongo().host);
 
 var newdb = mongo.getDB(db.toString());
@@ -217,4 +214,3 @@ assert.eq(opCounters.command + 8,
           newdb.serverStatus().opcounters.command);  // "serverStatus" counted
 assert.eq(null, newdb.serverStatus().metrics.commands.invalid);
 assert.eq(metricsObj['<UNKNOWN>'] + 1, newdb.serverStatus().metrics.commands['<UNKNOWN>']);
-})();

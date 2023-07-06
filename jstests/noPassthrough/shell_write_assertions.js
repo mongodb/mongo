@@ -4,117 +4,110 @@
  * @tags: [requires_replication]
  */
 
-load("jstests/libs/write_concern_util.js");
+const kReallyShortTimeoutMS = 500;
 
-(() => {
-    "use strict";
+const replTest = new ReplSetTest({nodes: 1});
+replTest.startSet();
+replTest.initiate();
 
-    const kReallyShortTimeoutMS = 500;
+const conn = replTest.getPrimary();
+const db = conn.getDB("writeAssertions");
+assert.neq(null, conn, "mongodb was unable to start up");
+const tests = [];
 
-    const replTest = new ReplSetTest({nodes: 1});
-    replTest.startSet();
-    replTest.initiate();
+function setup() {
+    db.coll.drop();
+}
 
-    const conn = replTest.getPrimary();
-    const db = conn.getDB("writeAssertions");
-    assert.neq(null, conn, "mongodb was unable to start up");
-    const tests = [];
+function _doFailedWrite(collection) {
+    const duplicateId = 42;
 
-    function setup() {
-        db.coll.drop();
-    }
+    const res = collection.insert({_id: duplicateId});
+    assert.writeOK(res, "write to collection should have been successful");
+    const failedRes = collection.insert({_id: duplicateId});
+    assert.writeError(failedRes, "duplicate key write should have failed");
+    return failedRes;
+}
 
-    function _doFailedWrite(collection) {
-        const duplicateId = 42;
+/* writeOK tests */
+tests.push(function writeOKSuccessfulWriteDoesNotCallMsgFunction() {
+    var msgFunctionCalled = false;
 
-        const res = collection.insert({_id: duplicateId});
-        assert.writeOK(res, "write to collection should have been successful");
-        const failedRes = collection.insert({_id: duplicateId});
-        assert.writeError(failedRes, "duplicate key write should have failed");
-        return failedRes;
-    }
-
-    /* writeOK tests */
-    tests.push(function writeOKSuccessfulWriteDoesNotCallMsgFunction() {
-        var msgFunctionCalled = false;
-
-        const result = db.coll.insert({data: "hello world"});
-        assert.doesNotThrow(() => {
-            assert.writeOK(result, () => {
-                msgFunctionCalled = true;
-            });
-        });
-
-        assert.eq(false, msgFunctionCalled, "message function should not have been called");
-    });
-
-    tests.push(function writeOKUnsuccessfulWriteDoesCallMsgFunction() {
-        var msgFunctionCalled = false;
-
-        const failedResult = _doFailedWrite(db.coll);
-        assert.throws(() => {
-            assert.writeOK(failedResult, () => {
-                msgFunctionCalled = true;
-            });
-        });
-
-        assert.eq(true, msgFunctionCalled, "message function should have been called");
-    });
-
-    /* writeError tests */
-    tests.push(function writeErrorSuccessfulWriteDoesCallMsgFunction() {
-        var msgFunctionCalled = false;
-
-        const result = db.coll.insert({data: "hello world"});
-        assert.throws(() => {
-            assert.writeError(result, () => {
-                msgFunctionCalled = true;
-            });
-        });
-
-        assert.eq(true, msgFunctionCalled, "message function should have been called");
-    });
-
-    tests.push(function writeErrorUnsuccessfulWriteDoesNotCallMsgFunction() {
-        var msgFunctionCalled = false;
-
-        const failedResult = _doFailedWrite(db.coll);
-        assert.doesNotThrow(() => {
-            assert.writeError(failedResult, () => {
-                msgFunctionCalled = true;
-            });
-        });
-
-        assert.eq(false, msgFunctionCalled, "message function should not have been called");
-    });
-
-    tests.push(function writeConcernErrorIsCaughtFromInsert() {
-        const result = db.coll.insert(
-            {data: "hello world"}, {writeConcern: {w: 'invalid', wtimeout: kReallyShortTimeoutMS}});
-
-        assert.throws(() => {
-            assert.writeOK(result);
+    const result = db.coll.insert({data: "hello world"});
+    assert.doesNotThrow(() => {
+        assert.writeOK(result, () => {
+            msgFunctionCalled = true;
         });
     });
 
-    tests.push(function writeConcernErrorCanBeIgnored() {
-        const result = db.coll.insert(
-            {data: "hello world"}, {writeConcern: {w: 'invalid', wtimeout: kReallyShortTimeoutMS}});
+    assert.eq(false, msgFunctionCalled, "message function should not have been called");
+});
 
-        assert.doesNotThrow(() => {
-            assert.writeOK(
-                result, 'write can ignore writeConcern', {ignoreWriteConcernErrors: true});
+tests.push(function writeOKUnsuccessfulWriteDoesCallMsgFunction() {
+    var msgFunctionCalled = false;
+
+    const failedResult = _doFailedWrite(db.coll);
+    assert.throws(() => {
+        assert.writeOK(failedResult, () => {
+            msgFunctionCalled = true;
         });
     });
 
-    /* main */
+    assert.eq(true, msgFunctionCalled, "message function should have been called");
+});
 
-    tests.forEach((test) => {
-        jsTest.log(`Starting tests '${test.name}'`);
-        setup();
-        test();
+/* writeError tests */
+tests.push(function writeErrorSuccessfulWriteDoesCallMsgFunction() {
+    var msgFunctionCalled = false;
+
+    const result = db.coll.insert({data: "hello world"});
+    assert.throws(() => {
+        assert.writeError(result, () => {
+            msgFunctionCalled = true;
+        });
     });
 
-    /* cleanup */
-    replTest.stopSet();
-})();
+    assert.eq(true, msgFunctionCalled, "message function should have been called");
+});
+
+tests.push(function writeErrorUnsuccessfulWriteDoesNotCallMsgFunction() {
+    var msgFunctionCalled = false;
+
+    const failedResult = _doFailedWrite(db.coll);
+    assert.doesNotThrow(() => {
+        assert.writeError(failedResult, () => {
+            msgFunctionCalled = true;
+        });
+    });
+
+    assert.eq(false, msgFunctionCalled, "message function should not have been called");
+});
+
+tests.push(function writeConcernErrorIsCaughtFromInsert() {
+    const result = db.coll.insert({data: "hello world"},
+                                  {writeConcern: {w: 'invalid', wtimeout: kReallyShortTimeoutMS}});
+
+    assert.throws(() => {
+        assert.writeOK(result);
+    });
+});
+
+tests.push(function writeConcernErrorCanBeIgnored() {
+    const result = db.coll.insert({data: "hello world"},
+                                  {writeConcern: {w: 'invalid', wtimeout: kReallyShortTimeoutMS}});
+
+    assert.doesNotThrow(() => {
+        assert.writeOK(result, 'write can ignore writeConcern', {ignoreWriteConcernErrors: true});
+    });
+});
+
+/* main */
+
+tests.forEach((test) => {
+    jsTest.log(`Starting tests '${test.name}'`);
+    setup();
+    test();
+});
+
+/* cleanup */
+replTest.stopSet();

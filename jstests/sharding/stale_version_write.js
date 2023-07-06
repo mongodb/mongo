@@ -1,7 +1,4 @@
 // Tests whether a reset sharding version triggers errors
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 1, mongos: 2});
 
 var mongosA = st.s0;
@@ -34,4 +31,3 @@ assert.eq(3, collA.find().itcount());
 assert.eq(3, collB.find().itcount());
 
 st.stop();
-})();

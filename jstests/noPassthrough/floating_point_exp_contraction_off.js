@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const conn = MongoRunner.runMongod();
 
 const coll = conn.getDB('test').getCollection('c');
@@ -44,4 +41,3 @@ assert.eq(
         .itcount());
 
 MongoRunner.stopMongod(conn);
-}());

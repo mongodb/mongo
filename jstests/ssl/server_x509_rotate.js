@@ -1,9 +1,6 @@
 // Check that rotation works for the server certificate
 
-(function() {
-"use strict";
-
-load('jstests/ssl/libs/ssl_helpers.js');
+import {copyCertificateFile} from "jstests/ssl/libs/ssl_helpers.js";
 
 const dbPath = MongoRunner.toRealDir("$dataDir/cluster_x509_rotate_test/");
 mkdir(dbPath);
@@ -54,4 +51,3 @@ out = runMongoProgram("mongo",
 assert.eq(out, 0, "Mongo invocation failed");
 
 MongoRunner.stopMongod(mongod);
-}());

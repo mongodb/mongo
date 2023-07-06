@@ -8,10 +8,7 @@
  * @tags: [requires_fsync, requires_wiredtiger, requires_persistence]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const forceCheckpoint = () => {
     assert.commandWorked(db.fsyncLock());
@@ -103,4 +100,3 @@ assert.eq(
     res.keysPerIndex.b_1, numDocs, "Expected " + numDocs + " b_1 index records: " + tojson(res));
 assert.eq(
     res.keysPerIndex.c_1, numDocs, "Expected " + numDocs + " c_1 index records: " + tojson(res));
-})();

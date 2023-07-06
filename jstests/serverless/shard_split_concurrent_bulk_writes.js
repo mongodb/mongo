@@ -15,9 +15,9 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
 
 const kMaxBatchSize = 2;
 const kCollName = "testColl";

@@ -13,9 +13,6 @@
 // test restarts a shard, so the cached connection is not usable.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-(function() {
-'use strict';
-
 var st = new ShardingTest(
     {shards: 2, other: {keyFile: 'jstests/libs/key1', useHostname: true, chunkSize: 1}});
 
@@ -56,4 +53,3 @@ printjson(db.foo.findOne({x: 25}));
 printjson(db.foo.findOne({x: 75}));
 
 st.stop();
-})();

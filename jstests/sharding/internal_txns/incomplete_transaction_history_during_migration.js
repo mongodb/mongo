@@ -4,9 +4,6 @@
  *
  * @tags: [uses_transactions, requires_persistence]
  */
-(function() {
-'use strict';
-
 // This test involves writing directly to the config.transactions collection which is not allowed
 // in a session.
 TestData.disableImplicitSessions = true;
@@ -86,4 +83,3 @@ assert.commandFailedWithCode(testDB.runCommand(Object.assign({}, updateCmdObj, {
                              ErrorCodes.IncompleteTransactionHistory);
 
 st.stop();
-})();

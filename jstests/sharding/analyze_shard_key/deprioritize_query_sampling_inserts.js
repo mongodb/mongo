@@ -13,12 +13,8 @@
  * all-feature-flags variants.
  */
 
-(function() {
-
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 const samplesPerSecond = 1000;
 const queryAnalysisWriterIntervalSecs = 1;
@@ -106,4 +102,3 @@ function runTest(conn, primary, {st, rst}) {
 
     rst.stopSet();
 }
-})();

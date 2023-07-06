@@ -3,14 +3,14 @@
  * the read/write command that produced it.
  * @tags: [requires_majority_read_concern]
  */
-(function() {
-"use strict";
-
 // Skip db hash check because replication is stopped on secondaries.
 TestData.skipCheckDBHashes = true;
 
-load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries,
-                                             // restartReplicationOnSecondaries
+import {
+    stopReplicationOnSecondaries,
+    restartReplicationOnSecondaries
+} from "jstests/libs/write_concern_util.js";
+
 var name = "operation_time_read_and_write_concern";
 
 var replTest = new ReplSetTest(
@@ -123,4 +123,3 @@ assert.eq(failedWriteOperationTime,
               ", should be the cluster time of the last successful write at the time it failed, " +
               tojson(majorityWriteOperationTime));
 replTest.stopSet();
-})();

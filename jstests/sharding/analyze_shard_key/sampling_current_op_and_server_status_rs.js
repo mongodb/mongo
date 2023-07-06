@@ -4,11 +4,14 @@
  * @tags: [requires_fcv_70]
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
-load("jstests/sharding/analyze_shard_key/libs/sampling_current_op_and_server_status_common.js");
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
+import {
+    assertCurrentOpAndServerStatusMongod,
+    getCurrentOpAndServerStatusMongod,
+    makeInitialCurrentOpAndServerStatusMongod,
+    opKindRead,
+    opKindWrite,
+} from "jstests/sharding/analyze_shard_key/libs/sampling_current_op_and_server_status_common.js";
 
 // Make the periodic jobs for refreshing sample rates have a period of 1 second to speed up the
 // test.
@@ -110,4 +113,3 @@ assert.eq(
     0, bsonWoCompare(actualFinalState, expectedFinalState), {actualFinalState, expectedFinalState});
 
 rst.stopSet();
-})();

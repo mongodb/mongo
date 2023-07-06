@@ -4,9 +4,6 @@
  *
  * @tags: [requires_non_retryable_writes]
  */
-(function() {
-'use strict';
-
 const coll = db.command_json_schema_field;
 coll.drop();
 assert.commandWorked(coll.insert({a: 1}));
@@ -49,4 +46,3 @@ assertCommandFailsWithCorrectError(
 // Explain
 assertCommandFailsWithCorrectError({explain: {count: coll.getName()}, jsonSchema: {}},
                                    [ErrorCodes.FailedToParse, 40415, 4662500]);
-}());

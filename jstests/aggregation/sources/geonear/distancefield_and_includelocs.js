@@ -2,10 +2,7 @@
  * Tests the behavior of the $geoNear stage by varying 'distanceField' and 'includeLocs'
  * (specifically, by specifying nested fields, overriding existing fields, and so on).
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For 'customDocumentEq'.
+import {customDocumentEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.getCollection("geonear_distancefield_and_includelocs");
 coll.drop();
@@ -163,4 +160,3 @@ const assertCloseEnough = (left, right) => assert(customDocumentEq({
                            removeDistFieldProj),
         docPlusNewFields({arr: {a: doc.geo}}));
 });
-}());

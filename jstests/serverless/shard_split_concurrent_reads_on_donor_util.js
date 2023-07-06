@@ -3,9 +3,7 @@
  * shard_split_concurrent_reads_on_donor*tests.
  */
 
-'use strict';
-
-function runCommandForConcurrentReadTest(db, cmd, expectedError, isTransaction) {
+export function runCommandForConcurrentReadTest(db, cmd, expectedError, isTransaction) {
     const res = db.runCommand(cmd);
 
     if (expectedError) {
@@ -30,7 +28,7 @@ function runCommandForConcurrentReadTest(db, cmd, expectedError, isTransaction) 
     }
 }
 
-const shardSplitConcurrentReadTestCases = {
+export const shardSplitConcurrentReadTestCases = {
     snapshotReadWithAtClusterTime: {
         isSupportedOnSecondaries: true,
         requiresReadTimestamp: true,

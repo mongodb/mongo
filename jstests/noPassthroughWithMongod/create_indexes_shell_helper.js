@@ -1,5 +1,3 @@
-(function() {
-"use strict";
 var t = db.create_indexes_shell_helper;
 t.drop();
 
@@ -65,4 +63,3 @@ try {
     db._mongo = mongo;
     db._session = new _DummyDriverSession(mongo);
 }
-}());

@@ -12,9 +12,6 @@
  *   requires_fcv_62,
  *  ]
  */
-(function() {
-"use strict";
-
 function getMillis() {
     const d = new Date();
     return d.getTime();
@@ -183,4 +180,3 @@ searchForAndAssertPartialResults(Math.round(0.5 * fullQueryTimeoutMS), function(
 });
 
 st.stop();
-}());

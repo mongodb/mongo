@@ -2,11 +2,7 @@
  * Tests that when run with waitForLock=false, collStats does not conflict with a global MODE_X
  * lock, but rather returns early.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/wait_for_command.js");
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
 const dbName = "test";
 const collName = "collStats_no_wait_for_lock";
@@ -51,4 +47,3 @@ try {
     assert.commandWorked(testDB.getSiblingDB("admin").killOp(sleepCmdOpID));  // kill the sleep cmd
     globalXLockSleepJoin();  // wait for the thread running the sleep cmd to finish
 }
-})();

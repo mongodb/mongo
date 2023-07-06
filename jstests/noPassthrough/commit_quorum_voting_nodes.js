@@ -7,7 +7,6 @@
  * ]
  */
 
-(function() {
 const replSet = new ReplSetTest({
     nodes: [
         {
@@ -79,4 +78,3 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {}, nNodes + 1),
 coll.dropIndexes();
 
 replSet.stopSet();
-})();

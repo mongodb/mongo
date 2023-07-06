@@ -26,10 +26,7 @@
  * batch insert to complete, at which point the state of the indexes will be consistent.
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/secondary_reads_test.js");
+import {SecondaryReadsTest} from "jstests/replsets/libs/secondary_reads_test.js";
 
 const name = "secondaryReadsUniqueIndexes";
 const collName = "testColl";
@@ -109,4 +106,3 @@ for (let iteration = 0; iteration < nIterations; iteration++) {
 
 replSet.awaitReplication();
 secondaryReadsTest.stop();
-})();

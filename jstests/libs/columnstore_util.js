@@ -2,11 +2,13 @@
  * Utilities for column store indexes.
  */
 
-load("jstests/libs/discover_topology.js");  // For findNonConfigNodes.
-// For areAllCollectionsClustered.
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 /**
  * Updates server parameters to disable column scan query planning heuristics so that column scan

@@ -6,8 +6,6 @@
  * path, when the subpath does not exist (this is what happens when a field does not exist and there
  * is no path). Previous it would uassert causing the aggregation to end.
  */
-(function() {
-"use strict";
 db.s6127.drop();
 
 assert.commandWorked(db.s6127.insert({_id: 0, a: 1}));
@@ -24,4 +22,3 @@ const cursor = db.s6127.aggregate(
 // which has a field bar.
 const expected = [{}, {field: 2}, {foo: {bar: 3}, field: {bar: 3}, path: 3}];
 assert.eq(cursor.toArray(), expected);
-}());

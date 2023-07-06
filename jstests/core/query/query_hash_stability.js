@@ -14,7 +14,7 @@
  *   cannot_run_during_upgrade_downgrade,
  * ]
  */
-load('jstests/libs/fixture_helpers.js');  // For and isMongos().
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const collName = "query_hash_stability";

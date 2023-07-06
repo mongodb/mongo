@@ -7,10 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load('jstests/libs/fail_point_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -32,4 +29,3 @@ assert.commandWorked(primaryColl.insert({a: 1}));
 // Index build should fail to start.
 assert.commandFailedWithCode(primaryColl.createIndex({a: 1}), [ErrorCodes.OutOfDiskSpace]);
 rst.stopSet();
-})();

@@ -16,9 +16,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 // Skip metadata consistency checks since the sharded cluster is started with 0 shards
 TestData.skipCheckMetadataConsistency = true;
 TestData.skipCheckRoutingTableConsistency = true;
@@ -28,7 +25,7 @@ var db = testServer.getDB("test");
 if (!db.serverStatus().storageEngine.supportsCommittedReads) {
     print("Skipping read_majority.js since storageEngine doesn't support it.");
     MongoRunner.stopMongod(testServer);
-    return;
+    quit();
 }
 MongoRunner.stopMongod(testServer);
 
@@ -223,4 +220,3 @@ shardingTest.adminCommand({enableSharding: 'throughMongos'});
 
 shardingTest.stop();
 replTest.stopSet();
-})();

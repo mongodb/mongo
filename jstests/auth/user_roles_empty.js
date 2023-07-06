@@ -2,9 +2,6 @@
 // $$USER_ROLES is empty and when mongod was started with auth disabled.
 // @tags: [requires_fcv_70]
 
-(function() {
-"use strict";
-
 const mongod = MongoRunner.runMongod();
 const dbName = "test";
 const db = mongod.getDB(dbName);
@@ -42,4 +39,3 @@ result = db.coll.findOne({}, {myRoles: "$$USER_ROLES"});
 assert.eq([{_id: dbName + ".read", role: "read", db: dbName}], result.myRoles);
 
 MongoRunner.stopMongod(mongod);
-}());

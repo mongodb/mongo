@@ -1,9 +1,6 @@
 /**
  * Tests that sparse indexes are disallowed for $exists:false queries.
  */
-(function() {
-"use strict";
-
 const coll = db.jstests_existsa;
 coll.drop();
 
@@ -108,4 +105,3 @@ coll.drop();
 assert.commandWorked(coll.insert({}));
 coll.createIndex({a: 1});
 assert.eq(1, coll.find({a: {$exists: false}}).itcount());
-})();

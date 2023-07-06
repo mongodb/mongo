@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 var st = new ShardingTest({
     shards: 2,
     other: {chunkSize: 1, useHostname: true, keyFile: 'jstests/libs/key1'},
@@ -21,4 +18,3 @@ for (var i = 0; i < 100; i++) {
 }
 
 st.stop();
-})();

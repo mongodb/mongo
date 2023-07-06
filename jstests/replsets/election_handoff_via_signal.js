@@ -3,9 +3,7 @@
  * non-terminal signal sends a ReplSetStepUp request to an eligible candidate.
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/libs/election_handoff.js");
+import {ElectionHandoffTest} from "jstests/replsets/libs/election_handoff.js";
 
 const testName = "election_handoff_via_signal";
 const numNodes = 3;
@@ -26,4 +24,3 @@ rst.initiateWithHighElectionTimeout();
 ElectionHandoffTest.testElectionHandoff(rst, 0, 1, {stepDownBySignal: true});
 
 rst.stopSet();
-})();

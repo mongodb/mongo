@@ -4,11 +4,8 @@
  *
  * @tags: [requires_persistence]
  */
-(function() {
-
 const dbpath = MongoRunner.dataPath + "validateAuthSchemaOnStartup/";
 resetDbpath(dbpath);
-const dbName = "validateAuthSchemaOnStartup";
 const authSchemaColl = "system.version";
 
 let mongod = MongoRunner.runMongod({dbpath: dbpath, auth: ""});
@@ -48,4 +45,3 @@ adminDB = mongod.getDB('admin');
 assert(adminDB.auth("root", "root"));
 
 MongoRunner.stopMongod(mongod);
-})();

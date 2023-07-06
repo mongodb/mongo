@@ -24,7 +24,7 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      eval: load("jstests/libs/override_methods/enable_sessions.js")
+      eval: await import("jstests/libs/override_methods/enable_sessions.js")
   hooks:
   - class: ValidateCollections
     shell_options:

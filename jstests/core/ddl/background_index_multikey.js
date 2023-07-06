@@ -2,8 +2,6 @@
  * Tests that we can create indexes that are multikey.
  */
 
-(function() {
-"use strict";
 const collNamePrefix = 'background_index_multikey__';
 let collCount = 0;
 
@@ -74,4 +72,3 @@ doc = {
 assert.commandWorked(coll.insert(doc));
 assert.sameMembers([doc], coll.find({f: 1}).toArray());
 assert.sameMembers([doc], coll.find({f: 2}).toArray());
-})();

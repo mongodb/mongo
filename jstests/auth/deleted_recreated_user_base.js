@@ -1,9 +1,7 @@
-'use strict';
-
-const kInvalidationIntervalSecs = 5;
+export const kInvalidationIntervalSecs = 5;
 
 // Test that sessions cannot be resumed by deleted and recreated user.
-function runTest(s0, s1) {
+export function runTest(s0, s1) {
     assert(s0);
     assert(s1);
     const admin = s0.getDB('admin');

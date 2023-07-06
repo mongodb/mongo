@@ -1,8 +1,5 @@
 // Test for startup warning when TLS auth and certificates are added
 
-(function() {
-'use strict';
-
 const SERVER_CERT = 'jstests/libs/server.pem';
 const COMBINED_CA_CERT = 'jstests/ssl/x509/root-and-trusted-ca.pem';
 const CLUSTER_CA_CERT = "jstests/libs/ca.pem";
@@ -41,4 +38,3 @@ runTest({tlsCertificateKeyFile: SERVER_CERT, tlsClusterCAFile: CLUSTER_CA_CERT},
 
 // Warning should show since neither cert is included.
 runTest({tlsCertificateKeyFile: SERVER_CERT}, true);
-})();

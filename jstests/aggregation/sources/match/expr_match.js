@@ -1,7 +1,4 @@
 // Basic testing to confirm that the $match stage handles $expr correctly.
-(function() {
-"use strict";
-
 const coll = db.expr_match;
 coll.drop();
 assert.commandWorked(coll.insert({x: 0}));
@@ -41,4 +38,3 @@ assert.eq(
 assert.eq(2,
           coll.aggregate([{$match: {$and: [{$expr: {$eq: ["$foo", "$bar"]}}, {x: {$lt: 2}}]}}])
               .itcount());
-})();

@@ -1,12 +1,4 @@
-/*
- * Tests startup with a node in downgrading state.
- * Starts a replica set with 2 nodes.
- *
- * @tags: [requires_fcv_70]
- */
-
-load('jstests/multiVersion/libs/verify_versions.js');
-load('jstests/libs/fail_point_util.js');
+import "jstests/multiVersion/libs/verify_versions.js";
 
 function runReplicaSet() {
     let fcvDoc;

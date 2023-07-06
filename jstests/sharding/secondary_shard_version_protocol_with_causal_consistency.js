@@ -4,10 +4,7 @@
  * contradictory things. A secondary request with afterClusterTime specified and no read concern
  * level should default to 'local' read concern level, using the shard version protocol.
  */
-(function() {
-"use strict";
-
-load('jstests/libs/profiler.js');  // for profilerHasSingleMatchingEntryOrThrow()
+import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 // Set the secondaries to priority 0 to prevent the primaries from stepping down.
 let rsOpts = {nodes: [{}, {rsConfig: {priority: 0}}]};
@@ -96,4 +93,3 @@ profilerHasSingleMatchingEntryOrThrow({
 });
 
 st.stop();
-})();

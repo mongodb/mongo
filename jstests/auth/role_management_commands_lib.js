@@ -2,9 +2,7 @@
  * This tests that all the different commands for role manipulation all work properly for all valid
  * forms of input.
  */
-function runAllRoleManagementCommandsTests(conn, writeConcern) {
-    'use strict';
-
+export function runAllRoleManagementCommandsTests(conn, writeConcern) {
     var hasAuthzError = function(result) {
         assert(result instanceof WriteCommandError);
         assert.eq(ErrorCodes.Unauthorized, result.code);

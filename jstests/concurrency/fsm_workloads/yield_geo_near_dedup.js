@@ -2,6 +2,7 @@
  * Intersperses $geoNear aggregations with updates of non-geo fields to test deduplication.
  * @tags: [requires_non_retryable_writes]
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield_geo_near.js";
 

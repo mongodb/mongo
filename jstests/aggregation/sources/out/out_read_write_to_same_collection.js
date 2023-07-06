@@ -7,9 +7,6 @@
 //   # Asserts on the number of indexes.
 //   assumes_no_implicit_index_creation,
 // ]
-(function() {
-"use strict";
-
 const coll = db.out_read_write_to_same_collection;
 coll.drop();
 assert.commandWorked(coll.insert(
@@ -50,4 +47,3 @@ const indexMetadata =
 assert.eq(indexMetadata, [{_id: 1}, {total: 1}]);
 
 coll.drop();
-}());

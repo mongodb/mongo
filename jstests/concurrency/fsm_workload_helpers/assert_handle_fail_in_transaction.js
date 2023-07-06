@@ -2,7 +2,9 @@
  * Helper functions for handling errors that can only occur if commands are run inside multi-
  * statement transactions.
  */
-function assertWorkedHandleTxnErrors(res, errorCodes) {
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
+export function assertWorkedHandleTxnErrors(res, errorCodes) {
     if (TestData.runInsideTransaction) {
         assertAlways.commandWorkedOrFailedWithCode(res, errorCodes);
     } else {
@@ -10,7 +12,7 @@ function assertWorkedHandleTxnErrors(res, errorCodes) {
     }
 }
 
-function assertWorkedOrFailedHandleTxnErrors(res, errorCodesTxn, errorCodes) {
+export function assertWorkedOrFailedHandleTxnErrors(res, errorCodesTxn, errorCodes) {
     if (TestData.runInsideTransaction) {
         assertAlways.commandWorkedOrFailedWithCode(res, errorCodesTxn);
     } else {

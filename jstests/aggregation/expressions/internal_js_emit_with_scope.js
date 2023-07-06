@@ -5,10 +5,7 @@
 // @tags: [
 //   assumes_unsharded_collection,
 // ]
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.js_emit_with_scope;
 coll.drop();
@@ -84,12 +81,15 @@ assert(resultsEq(results,
 //
 // Test that the jsScope is allowed to have any number of fields.
 //
+/* eslint-disable */
 constants.jsScope.multiplier = 5;
 pipeline[0].$project.emits.$_internalJsEmit.eval = function() {
     for (let word of this.text.split(' ')) {
         emit(word, weights[word] * multiplier);
     }
 };
+/* eslint-enable */
+
 results = coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants}).toArray();
 assert(resultsEq(results,
                  [
@@ -125,4 +125,3 @@ assert.commandFailedWithCode(
     db.runCommand(
         {aggregate: coll.getName(), pipeline: pipeline, cursor: {}, runtimeConstants: constants}),
     ErrorCodes.TypeMismatch);
-})();

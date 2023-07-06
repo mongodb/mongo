@@ -11,6 +11,7 @@
  *   uses_curop_agg_stage
  * ]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig

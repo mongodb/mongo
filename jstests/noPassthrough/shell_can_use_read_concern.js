@@ -3,9 +3,6 @@
  * when causal consistency is enabled.
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-
 // This test makes assertions on commands run without logical session ids.
 TestData.disableImplicitSessions = true;
 
@@ -202,4 +199,3 @@ runTests({withSession: false});
 runTests({withSession: true});
 
 rst.stopSet();
-})();

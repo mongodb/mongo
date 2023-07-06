@@ -2,10 +2,14 @@
 // Do not run in whole-cluster passthrough since this test assumes that the change stream will be
 // invalidated by a database drop.
 // @tags: [do_not_run_in_whole_cluster_passthrough]
-load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {
+    assertCreateCollection,
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
 const testDB = db.getSiblingDB("whole_db_metadata_notifs");
 const otherDB = testDB.getSiblingDB("whole_db_metadata_notifs_other");

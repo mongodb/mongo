@@ -5,11 +5,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 assertDropAndRecreateCollection(db, "t1");
 
@@ -72,4 +69,3 @@ expected = {
 testPipelineStyleUpdate(updatePipeline, expected, "update");
 
 cst.cleanUp();
-}());

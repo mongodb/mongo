@@ -3,8 +3,6 @@
 // @tags: [
 //   assumes_unsharded_collection,
 // ]
-(function() {
-'use strict';
 const collNamePrefix = 'jstests_index_check6_';
 let collCount = 0;
 let t = db.getCollection(collNamePrefix + collCount++);
@@ -111,4 +109,3 @@ for (let a = -1; a <= 1; a += 2) {
         }
     }
 }
-})();

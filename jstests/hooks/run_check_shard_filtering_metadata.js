@@ -1,11 +1,10 @@
-'use strict';
-
 /**
  * Checks the filtering metadata on the shards matches the one in the configsvr.
  */
-(function() {
-load('jstests/libs/check_shard_filtering_metadata_helpers.js');
-load('jstests/libs/discover_topology.js');
+import {
+    CheckShardFilteringMetadataHelpers
+} from "jstests/libs/check_shard_filtering_metadata_helpers.js";
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a server?');
 
@@ -35,4 +34,3 @@ for (let shardName of Object.keys(topology.shards)) {
             db.getMongo(), new Mongo(node), shardName, true /* skipCheckShardedCollections */);
     });
 }
-})();

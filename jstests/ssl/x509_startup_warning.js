@@ -1,8 +1,5 @@
 // Test for startuo warning when X509 auth and sslAllowInvalidCertificates are enabled
 
-(function() {
-'use strict';
-
 function runTest(checkMongos, opts, expectWarningCertifcates, expectWarningHostnames) {
     clearRawMongoProgramOutput();
     let mongo;
@@ -59,4 +56,3 @@ runTests(true);
 
 // Run tests on mongod
 runTests(false);
-})();

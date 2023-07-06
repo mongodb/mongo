@@ -1,8 +1,5 @@
 // Verify that $expr can be used in the top-level position, but not in subdocuments.
 
-(function() {
-"use strict";
-
 const coll = db.expr_valid_positions;
 
 // Works at the BSON root level.
@@ -20,4 +17,3 @@ assert.throws(function() {
 assert.throws(function() {
     coll.find({a: {$_internalSchemaObjectMatch: {$expr: {$eq: ["$foo", "$bar"]}}}}).itcount();
 });
-}());

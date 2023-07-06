@@ -8,7 +8,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
 const maxMemUsageMB = 50;
 const replSet = new ReplSetTest({
     nodes: 1,
@@ -47,4 +46,3 @@ assert.between(
     0, section.bytesSpilledUncompressed / numSpills, maxMemUsageMB * 1024 * 1024, tojson(section));
 
 replSet.stopSet();
-})();

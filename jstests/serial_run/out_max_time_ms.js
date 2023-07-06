@@ -5,10 +5,7 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-load("jstests/libs/curop_helpers.js");    // For waitForCurOpByFailPoint().
-load("jstests/libs/fixture_helpers.js");  // For isMongos().
-load("jstests/libs/profiler.js");         // For profilerHasSingleMatchingEntryOrThrow.
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 
 const kDBName = "test";
 const kSourceCollName = "out_max_time_ms_source";
@@ -67,6 +64,7 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
     shellStr += `const sourceColl = testDB['${kSourceCollName}'];`;
     shellStr += `const destColl = testDB['${kDestCollName}'];`;
     shellStr += `const maxTimeMS = ${maxTimeMS};`;
+    /* eslint-disable */
     const runAggregate = function() {
         const pipeline = [{$out: destColl.getName()}];
         const err = assert.throws(
@@ -74,6 +72,7 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
                 pipeline, {maxTimeMS: maxTimeMS, $readPreference: {mode: "secondary"}}));
         assert.eq(err.code, ErrorCodes.MaxTimeMSExpired, "expected aggregation to fail");
     };
+    /* eslint-enable */
     shellStr += `(${runAggregate.toString()})();`;
     const awaitShell = startParallelShell(shellStr, conn.port);
 
@@ -159,5 +158,4 @@ runUnshardedTest(secondary, primary, primary);
 // Run the $out on the secondary and test that the maxTimeMS times out on the secondary.
 runUnshardedTest(secondary, primary, secondary);
 replTest.stopSet();
-})();
 })();

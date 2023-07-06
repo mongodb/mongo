@@ -1,9 +1,7 @@
 /**
  * A class representing a directed graph.
  */
-function Graph() {
-    'use strict';
-
+export function Graph() {
     if (!(this instanceof Graph)) {
         return new Graph();
     }

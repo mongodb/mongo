@@ -5,11 +5,8 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode().
-load("jstests/libs/curop_helpers.js");                // For waitForCurOpByFailPoint().
-load("jstests/libs/fixture_helpers.js");              // For isMongos().
-load("jstests/libs/profiler.js");                     // For profilerHasSingleMatchingEntryOrThrow.
+import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 
 const kDBName = "test";
 const kSourceCollName = "merge_max_time_ms_source";
@@ -62,6 +59,7 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
     shellStr += `const maxTimeMS = ${maxTimeMS};`;
     shellStr += `const whenMatched = ${tojson(whenMatched)};`;
     shellStr += `const whenNotMatched = '${whenNotMatched}';`;
+    /* eslint-disable */
     const runAggregate = function() {
         const pipeline = [{
             $merge:
@@ -72,6 +70,7 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
                 pipeline, {maxTimeMS: maxTimeMS, $readPreference: {mode: "secondary"}}));
         assert.eq(err.code, ErrorCodes.MaxTimeMSExpired, "expected aggregation to fail");
     };
+    /* eslint-enable */
     shellStr += `(${runAggregate.toString()})();`;
     const awaitShell = startParallelShell(shellStr, conn.port);
 
@@ -276,5 +275,4 @@ withEachMergeMode((mode) => runShardedTest(mode.whenMatchedMode,
                                            tojson(mode) + "_shardedDest_" + st.shard1.name));
 
 st.stop();
-})();
 })();

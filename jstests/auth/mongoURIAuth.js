@@ -1,9 +1,6 @@
 // This tests that the shell successfully breaks down the URI and authenticates using
 // the specified auth mechanism.
 
-(function() {
-'use strict';
-
 const runURIAuthTest = function(userMech, uriMech, authMechanism, regexMechanism) {
     const conn = MongoRunner.runMongod({
         auth: "",
@@ -70,4 +67,3 @@ runURIAuthTest(true, false, SCRAM_SHA_1, SCRAM_SHA_1_regex);
 
 jsTestLog("Test that SCRAM-SHA-256 is the default authentication method.");
 runURIAuthTest(false, false, SCRAM_SHA_256, SCRAM_SHA_256_regex);
-})();

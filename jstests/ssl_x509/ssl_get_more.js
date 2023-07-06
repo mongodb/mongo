@@ -1,7 +1,4 @@
-(function() {
-"use strict";
-
-load('jstests/ssl/libs/ssl_helpers.js');
+import {CLUSTER_CERT, requireSSL} from "jstests/ssl/libs/ssl_helpers.js";
 
 const x509_options =
     Object.extend(requireSSL, {sslClusterFile: CLUSTER_CERT, clusterAuthMode: "x509"});
@@ -58,4 +55,3 @@ const x509User = 'CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,
 st.s.getDB('$external').createUser({user: x509User, roles: [{role: '__system', db: 'admin'}]});
 
 st.stop();
-}());

@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const runTest = testDB => {
     // Test command in V2 but not V1.
     assert.commandWorked(testDB.runCommand({testVersion2: 1, apiVersion: "2", apiStrict: true}));
@@ -56,4 +53,3 @@ MongoRunner.stopMongod(conn);
 const st = new ShardingTest({mongosOptions: {setParameter: {acceptApiVersion2: true}}});
 runTest(st.s0.getDB(jsTestName()));
 st.stop();
-})();

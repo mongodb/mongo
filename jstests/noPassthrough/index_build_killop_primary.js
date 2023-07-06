@@ -4,11 +4,8 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/noPassthrough/libs/index_build.js');
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 function killopOnFailpoint(rst, failpointName, collName) {
     const primary = rst.getPrimary();
@@ -100,4 +97,3 @@ jsTestLog("killOp index build on primary after vote for commit readiness");
 killopOnFailpoint(rst, 'hangIndexBuildAfterSignalPrimaryForCommitReadiness', 'afterVoteCommit');
 
 rst.stopSet();
-})();

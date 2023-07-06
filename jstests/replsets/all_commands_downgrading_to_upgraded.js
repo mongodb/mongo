@@ -11,10 +11,9 @@
  */
 
 // This will verify the completeness of our map and run all tests.
-load("jstests/libs/all_commands_test.js");
-load("jstests/libs/fixture_helpers.js");  // For isSharded and isReplSet
+import {AllCommandsTest} from "jstests/libs/all_commands_test.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-load('jstests/replsets/rslib.js');
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const name = jsTestName();
 const dbName = "alltestsdb";
@@ -1653,7 +1652,7 @@ let assertCommandOrWriteFailed = function(res, code, msg) {
 
 let runAllCommands = function(command, test, conn, fixture) {
     let cmdDb = conn.getDB(dbName);
-    const isShardedCluster = isMongos(cmdDb);
+    const isShardedCluster = FixtureHelpers.isMongos(cmdDb);
     const isReplSet = FixtureHelpers.isReplSet(cmdDb);
 
     // Skip command if it does not run on this type of cluster.
@@ -1749,7 +1748,7 @@ let runTest = function(conn, adminDB, fixture) {
     jsTestLog("Running all commands in the downgradingToLastLTS FCV");
     // First check that the map contains all available commands.
     let commandsList = AllCommandsTest.checkCommandCoverage(conn, allCommands);
-    if (isMongos(adminDB)) {
+    if (FixtureHelpers.isMongos(adminDB)) {
         let shardCommandsList =
             AllCommandsTest.checkCommandCoverage(fixture.shard0.rs.getPrimary(), allCommands);
         commandsList = new Set(commandsList.concat(shardCommandsList));
@@ -1775,7 +1774,7 @@ let runTest = function(conn, adminDB, fixture) {
 
     jsTestLog("Running all commands after upgrading back to the latest FCV");
     commandsList = AllCommandsTest.checkCommandCoverage(conn, allCommands);
-    if (isMongos(adminDB)) {
+    if (FixtureHelpers.isMongos(adminDB)) {
         let shardCommandsList =
             AllCommandsTest.checkCommandCoverage(fixture.shard0.rs.getPrimary(), allCommands);
         commandsList = new Set(commandsList.concat(shardCommandsList));

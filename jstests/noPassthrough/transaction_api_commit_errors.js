@@ -1,10 +1,7 @@
 /**
  * Tests that the transaction API handles commit errors correctly.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const kDbName = "testDb";
 const kCollName = "testColl";
@@ -112,4 +109,3 @@ res = assert.commandFailedWithCode(runTxn(st.s, makeSingleInsertTxn({_id: 5})),
 commitFailPoint.off();
 
 st.stop();
-}());

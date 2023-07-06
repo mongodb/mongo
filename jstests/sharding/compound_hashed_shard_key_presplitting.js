@@ -6,10 +6,7 @@
  *   multiversion_incompatible,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({name: jsTestName(), shards: 3});
 const dbname = "test";
@@ -394,4 +391,3 @@ checkValidChunks(db.coll, shardKey, (shardCountsMap) => {
 });
 
 st.stop();
-})();

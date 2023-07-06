@@ -1,7 +1,4 @@
-load('jstests/libs/sessions_collection.js');
-
-(function() {
-"use strict";
+import {validateSessionsCollection} from "jstests/libs/sessions_collection.js";
 
 // This test makes assertions about the number of sessions, which are not compatible with
 // implicit sessions.
@@ -56,4 +53,3 @@ config = conn.getDB("config");
 }
 
 MongoRunner.stopMongod(conn);
-})();

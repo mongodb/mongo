@@ -1,7 +1,4 @@
 // Tests for predicates which can use the trailing field of a text index.
-(function() {
-"use strict";
-
 const coll = db.fts_trailing_fields;
 
 coll.drop();
@@ -19,4 +16,3 @@ assert.commandWorked(coll.createIndex({a: 1, b: "text", "c.d": 1}));
 assert.commandWorked(coll.insert({a: 2, b: "lorem ipsum", c: {d: 3}}));
 assert.eq(0, coll.find({a: [1, 2], $text: {$search: "lorem"}}).itcount());
 assert.eq(0, coll.find({a: 2, $text: {$search: "lorem"}, c: {$elemMatch: {d: 3}}}).itcount());
-}());

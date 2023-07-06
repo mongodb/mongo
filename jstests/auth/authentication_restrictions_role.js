@@ -2,17 +2,13 @@
  * This test checks that authentication restrictions can be set on roles and respected.
  * @tags: [requires_replication, requires_sharding]
  */
-
-(function() {
-'use strict';
+import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
 
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
 function testRestrictionCreationAndEnforcement(
     conn, eventuallyConsistentConn, sleepUntilUserDataPropagated, sleepUntilUserDataRefreshed) {
-    load("jstests/libs/host_ipaddr.js");
-
     // Create a session which observes an eventually consistent view of user data
     const eventualDb = eventuallyConsistentConn.getDB("admin");
 
@@ -431,4 +427,3 @@ testRestrictionCreationAndEnforcement(
     });
 testUsersInfoCommand(st.s0);
 st.stop();
-}());

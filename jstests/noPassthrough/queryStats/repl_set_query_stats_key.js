@@ -4,9 +4,7 @@
  * versioning are included for good measure.
  * @tags: [featureFlagQueryStatsFindCommand]
  */
-load("jstests/libs/query_stats_utils.js");
-(function() {
-"use strict";
+import {getQueryStats} from "jstests/libs/query_stats_utils.js";
 
 const replTest = new ReplSetTest({name: 'reindexTest', nodes: 2});
 
@@ -83,4 +81,3 @@ delete stats[1].key["collectionType"];
 confirmCommandFieldsPresent(stats[1].key, commandObj);
 
 replTest.stopSet();
-})();

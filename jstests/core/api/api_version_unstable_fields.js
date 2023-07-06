@@ -9,9 +9,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_version_unstable_fields";
 assert.commandWorked(testDb[collName].insert({a: 1}));
@@ -87,4 +84,3 @@ assert.commandWorked(
     testDb.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
 let collModCommand = {collMod: "col", apiVersion: "1", apiStrict: true};
 testCommandWithUnstableFields(collModCommand, {index: {name: "a_1", prepareUnique: true}});
-}());

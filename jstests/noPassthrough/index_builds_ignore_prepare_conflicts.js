@@ -8,11 +8,8 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");  // for PrepareHelpers
-load("jstests/noPassthrough/libs/index_build.js");  // for IndexBuildTest
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const replSetTest = new ReplSetTest({
     name: "index_builds_ignore_prepare_conflicts",
@@ -109,4 +106,3 @@ let runTest = function(conn) {
 runTest(replSetTest.getPrimary());
 
 replSetTest.stopSet();
-})();

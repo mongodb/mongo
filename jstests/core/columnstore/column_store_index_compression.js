@@ -18,9 +18,9 @@
  * ]
  */
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
-load("jstests/libs/discover_topology.js");      // For findNonConfigNodes
-load("jstests/libs/fixture_helpers.js");        // For isMongos
-load("jstests/libs/index_catalog_helpers.js");  // For IndexCatalogHelpers
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const columnstoreEnabled =

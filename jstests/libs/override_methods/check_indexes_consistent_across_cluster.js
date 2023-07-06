@@ -4,9 +4,10 @@
  * The hook checks that for every collection, all the shards that own chunks for the
  * collection have the same indexes.
  */
-"use strict";
 
-load("jstests/libs/check_cluster_index_consistency_helpers.js");  // For check implementation.
+import {
+    ClusterIndexConsistencyChecker
+} from "jstests/libs/check_cluster_index_consistency_helpers.js";
 
 ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
     if (jsTest.options().skipCheckingIndexesConsistentAcrossCluster) {

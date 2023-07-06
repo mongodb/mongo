@@ -5,10 +5,10 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {
+    disableStaleVersionAndSnapshotRetriesWithinTransactions,
+    enableStaleVersionAndSnapshotRetriesWithinTransactions,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -81,4 +81,3 @@ for (let readConcernLevel of kAllowedReadConcernLevels) {
 disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 st.stop();
-})();

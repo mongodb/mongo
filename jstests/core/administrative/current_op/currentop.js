@@ -9,8 +9,6 @@
  * ]
  */
 
-(function() {
-"use strict";
 const coll = db.jstests_currentop;
 coll.drop();
 
@@ -48,4 +46,3 @@ assert.soon(
 const fsyncResponse = assert.commandWorked(db.fsyncUnlock());
 assert.eq(fsyncResponse.lockCount, 0);
 awaitInsertShell();
-}());

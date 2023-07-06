@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 /**
  * Test that queries will be properly routed after executing a write that does not
  * perform any shard version checks.
@@ -59,4 +56,3 @@ runTest(function(db) {
 runTest(function(db) {
     db.user.remove({y: 'noMatch'}, false);
 });
-})();

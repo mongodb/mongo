@@ -6,11 +6,10 @@
 // ]
 
 // Tests for the "create" command.
-(function() {
-"use strict";
-
-load("jstests/libs/index_catalog_helpers.js");
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 // "create" command rejects invalid options.
 assert.commandWorked(db.runCommand({drop: "create_collection"}));
@@ -175,7 +174,7 @@ assert.commandFailedWithCode(db.createCollection('size_capped_false', {capped: f
 // because a repeat attempt to create a collection will not have ``clusteredIndex`` set but
 // the existing collection will.
 if (ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo())) {
-    return;
+    quit();
 }
 
 assert.commandWorked(db.runCommand({drop: "create_collection"}));
@@ -193,4 +192,3 @@ assert.commandWorked(db.createCollection("create_collection"), {collation: {loca
 // Creating a collection that already exists with different options reports failure.
 assert.commandFailedWithCode(db.createCollection("create_collection", {collation: {locale: "uk"}}),
                              ErrorCodes.NamespaceExists);
-})();

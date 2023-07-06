@@ -2,9 +2,6 @@
  * Tests that collStats does not return expensive creationString field when numericOnly is true.
  * @tags: [requires_wiredtiger, requires_fcv_52, requires_collstats]
  */
-(function() {
-"use strict";
-
 // Grab the storage engine, default is wiredTiger
 var storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
@@ -12,7 +9,7 @@ var storageEngine = jsTest.options().storageEngine || "wiredTiger";
 // that the parallel suite runs this test only on WT configurations. See SERVER-36181.
 if (storageEngine !== 'wiredTiger') {
     jsTest.log('Skipping test because storageEngine is not "wiredTiger"');
-    return;
+    quit();
 }
 
 const dbName = "test";
@@ -40,4 +37,3 @@ assert.commandWorked(testColl.insert({a: 1}));
     assert(res.wiredTiger.hasOwnProperty("creationString"));
     assert(res.wiredTiger.hasOwnProperty("metadata"));
 }
-})();

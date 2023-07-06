@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 var runTest = function(compressor) {
     var mongo = MongoRunner.runMongod({networkMessageCompressors: compressor});
 
@@ -40,4 +37,3 @@ var runTest = function(compressor) {
 };
 
 runTest("snappy");
-}());

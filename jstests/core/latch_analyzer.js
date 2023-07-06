@@ -4,9 +4,6 @@
  * @tags: [multiversion_incompatible, no_selinux, requires_latch_analyzer]
  */
 
-(function() {
-"use strict";
-
 const failPointName = "enableLatchAnalysis";
 
 function getLatchAnalysis() {
@@ -89,4 +86,3 @@ try {
         mode: "off",
     }));
 }
-})();

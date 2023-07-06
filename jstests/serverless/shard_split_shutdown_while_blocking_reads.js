@@ -13,10 +13,9 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 import {findSplitOperation, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/fail_point_util.js");
 
 const test =
     new ShardSplitTest({recipientTagName: "recipientTag", recipientSetName: "recipientSet"});

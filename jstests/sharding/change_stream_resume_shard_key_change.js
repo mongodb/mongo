@@ -9,9 +9,6 @@
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-"use strict";
-
 const dbName = 'testDB';
 const collName = 'testColl';
 
@@ -87,4 +84,3 @@ changes.forEach((change, i) => {
 });
 
 st.stop();
-})();

@@ -3,10 +3,7 @@
 //
 // Do not run in sharded passthroughs since 'runtimeConstants' is disallowed on mongos.
 // @tags: [assumes_unsharded_collection]
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.js_reduce_with_scope;
 coll.drop();
@@ -48,4 +45,3 @@ const expectedResults = [
 
 const res = assert.commandWorked(db.runCommand(command));
 assert(resultsEq(res.cursor.firstBatch, expectedResults, res.cursor));
-})();

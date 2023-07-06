@@ -5,10 +5,7 @@
  *  2) Inactive transaction is aborted.
  * @tags: [uses_transactions]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
+import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
 
 const testName = "txnsDuringStepDown";
 const dbName = testName;
@@ -131,4 +128,3 @@ runStepDown();
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 rst.stopSet();
-})();

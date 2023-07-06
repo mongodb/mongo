@@ -2,8 +2,6 @@
  * Test that replSetReconfig ignores the term value provided by a user.
  */
 
-(function() {
-
 // Start a 2 node replica set where one of the nodes has priority 0 to
 // prevent unnecessary elections.
 var replTest = new ReplSetTest({nodes: 1});
@@ -44,4 +42,3 @@ config = primary.getDB("local").system.replset.findOne();
 assert(!config.hasOwnProperty("term"));
 
 replTest.stopSet();
-}());

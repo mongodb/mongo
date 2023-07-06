@@ -1,7 +1,5 @@
 // Tests when the granularity rounder needs to approach zero to round correctly. This test was
 // designed to reproduce SERVER-57091.
-(function() {
-"use strict";
 const coll = db.server57091;
 coll.drop();
 coll.insertOne({});
@@ -19,4 +17,3 @@ const res =
         }])
         .toArray();
 assert.eq(res, [{_id: {min: 0, max: 1.02e-321}, count: 1}]);
-})();

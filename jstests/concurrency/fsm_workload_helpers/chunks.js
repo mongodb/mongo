@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Provides wrapper functions that perform exponential backoff and allow for
  * acceptable errors to be returned from mergeChunks, moveChunk, and splitChunk
@@ -10,10 +8,15 @@
  * Intended for use by workloads testing sharding (i.e., workloads starting with 'sharded_').
  */
 
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos & isMongod
-load("jstests/sharding/libs/find_chunks_util.js");
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {
+    isMongod,
+    isMongodConfigsvr,
+    isMongos
+} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-var ChunkHelper = (function() {
+export var ChunkHelper = (function() {
     // exponential backoff
     function getNextBackoffSleep(curSleep) {
         const MAX_BACKOFF_SLEEP = 5000;  // milliseconds

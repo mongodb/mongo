@@ -6,9 +6,6 @@
 // ]
 
 // Test that tailable cursors work correctly with skip and limit.
-(function() {
-"use strict";
-
 // Setup the capped collection.
 var collname = "jstests_tailable_skip_limit";
 var t = db[collname];
@@ -87,4 +84,3 @@ assert.eq(cmdRes.cursor.firstBatch.length, 0);
 assert.eq(t.find().addOption(2).itcount(), 0);
 assert.commandWorked(t.insert({a: 1}));
 assert.eq(t.find().addOption(2).itcount(), 1);
-})();

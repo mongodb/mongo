@@ -3,9 +3,6 @@
 //
 // @tags: [
 // ]
-(function() {
-"use strict";
-
 var st = new ShardingTest({shards: 1});
 var mongos = st.s;
 var config = st.configRS.getPrimary().getDB('config');
@@ -33,4 +30,3 @@ assert.commandFailedWithCode(config.dropDatabase(), ErrorCodes.IllegalOperation)
 assert.commandFailedWithCode(mongos.getDB("admin").dropDatabase(), ErrorCodes.IllegalOperation);
 
 st.stop();
-}());

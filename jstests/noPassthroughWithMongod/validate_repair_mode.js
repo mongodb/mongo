@@ -3,9 +3,6 @@
  * inconsistencies.
  */
 
-(function() {
-"use strict";
-
 const coll = db.getCollection(jsTestName());
 coll.drop();
 
@@ -57,4 +54,3 @@ assert.eq(output.indexDetails._id_.valid,
 output = coll.validate({full: true});
 assert.eq(output.valid, true, "validate returned valid false when expected true");
 assert.eq(output.repaired, false, "validate returned repaired true when expected false");
-}());

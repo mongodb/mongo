@@ -6,11 +6,8 @@
  * @tags: [requires_fcv_51]
  */
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-load("jstests/libs/profiler.js");             // For profilerHas*OrThrow helper functions.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 const testName = "sharded_graph_lookup";
@@ -716,4 +713,3 @@ assertGraphLookupExecution(pipeline, {comment: "multiple_graph_lookups"}, expect
 ]);
 
 st.stop();
-}());

@@ -5,9 +5,6 @@
 //    does_not_support_stepdowns,
 // ]
 
-(function() {
-'use strict';
-
 var t = db.dbadmin;
 t.save({x: 1});
 t.save({x: 1});
@@ -37,4 +34,3 @@ sleep(100);
 var after = db.runCommand("serverStatus");
 print(after.uptimeMillis);
 assert.gte(after.uptimeMillis, before.uptimeMillis, "uptime estimate should be non-decreasing");
-})();

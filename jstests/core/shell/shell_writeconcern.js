@@ -7,7 +7,6 @@
 //   assumes_write_concern_unchanged,
 // ]
 
-"use strict";
 // check that shell writeconcern work correctly
 // 1.) tests that it can be set on each level and is inherited
 // 2.) tests that each operation (update/insert/remove/save) take and ensure a write concern

@@ -6,10 +6,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");  // For Thread.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
@@ -194,4 +192,3 @@ testInsert();
 testUnpreparedTransactionCommit();
 
 replTest.stopSet();
-}());

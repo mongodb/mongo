@@ -1,9 +1,6 @@
 // Tests that an aggregate with an $out cannot output to a sharded collection, even if the
 // collection becomes sharded during the aggregation.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For 'assertErrorCode'.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const st = new ShardingTest({shards: 2});
 
@@ -35,4 +32,3 @@ assert.throwsWithCode(() => new DBCommandCursor(mongosDB, cursorResponse).itcoun
                       ErrorCodes.IllegalOperation);
 
 st.stop();
-}());

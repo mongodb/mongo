@@ -1,6 +1,5 @@
 // Tests for RegExp.escape
 
-(function() {
 var TEST_STRINGS = [
     "[db]",
     "{ab}",
@@ -23,4 +22,3 @@ TEST_STRINGS.forEach(function(str) {
     var regex = new RegExp(escaped);
     assert(regex.test(str), "Wrong escape for " + str);
 });
-})();

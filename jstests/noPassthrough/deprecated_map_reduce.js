@@ -5,9 +5,7 @@
 // the multiple invocations in an effort to not clutter the dev's console.
 // More specifically, we expect to only log 1/127 of mapReduce() events.
 
-(function() {
-"use strict";
-load("jstests/libs/log.js");  // For findMatchingLogLine, findMatchingLogLines
+import {findMatchingLogLines} from "jstests/libs/log.js";
 
 jsTest.log('Test standalone');
 const caseInsensitive = {
@@ -131,4 +129,3 @@ matchingLogLines = [...findMatchingLogLines(globalLogs.log, fieldMatcher)];
 assert.eq(matchingLogLines.length, 0, matchingLogLines);
 
 st.stop();
-})();

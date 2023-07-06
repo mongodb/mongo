@@ -2,9 +2,6 @@
  * Derived from test cases at https://github.com/mongodb/specifications
  */
 
-(function() {
-"use strict";
-
 var testData = [
     {
         "description": "[basx023] conform to rules and exponent will be in permitted range).",
@@ -136,4 +133,3 @@ parseErrors.forEach(function(testCase) {
     }
     assert.throws(test, [], `[Test - ${testCase.description}] should have failed with error.`);
 });
-}());

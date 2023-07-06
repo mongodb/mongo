@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod({setParameter: {featureFlagCommonQueryFramework: true}});
 assert.neq(null, conn, "mongod was unable to start up");
 
@@ -49,4 +46,3 @@ assert.commandWorked(db.runCommand({analyze: coll.getName(), key: "x", sampleRat
 assert.commandWorked(db.runCommand({analyze: coll.getName(), key: "x", sampleSize: 1000}));
 
 MongoRunner.stopMongod(conn);
-}());

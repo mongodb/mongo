@@ -10,8 +10,6 @@
  *   requires_fcv_63,
  * ]
  */
-load('jstests/libs/fixture_helpers.js');  // For 'FixtureHelpers'
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {TTLUtil} from "jstests/libs/ttl_util.js";
 

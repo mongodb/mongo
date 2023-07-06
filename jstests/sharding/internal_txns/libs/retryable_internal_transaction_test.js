@@ -1,12 +1,19 @@
 /*
  * Utilities for testing that internal transactions for retryable writes can be retried.
  */
-'use strict';
 
-load('jstests/sharding/internal_txns/libs/fixture_helpers.js');
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {runTxnRetryOnTransientError} from "jstests/sharding/internal_txns/libs/fixture_helpers.js";
+import {
+    getImageEntriesForTxn,
+    getImageEntriesForTxnOnNode,
+    getOplogEntriesForTxn,
+    getTxnEntriesForSession,
+    makeAbortTransactionCmdObj,
+    makeCommitTransactionCmdObj,
+    makePrepareTransactionCmdObj,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
-function getOplogEntriesForTxnWithRetries(rs, lsid, txnNumber) {
+export function getOplogEntriesForTxnWithRetries(rs, lsid, txnNumber) {
     let oplogEntries;
     assert.soon(
         () => {
@@ -32,7 +39,7 @@ function getOplogEntriesForTxnWithRetries(rs, lsid, txnNumber) {
     return oplogEntries;
 }
 
-function RetryableInternalTransactionTest(collectionOptions = {}) {
+export function RetryableInternalTransactionTest(collectionOptions = {}) {
     // Transactions with more than two operations will have the behavior of large transactions and
     // span multiple oplog entries.
     const maxNumberOfTransactionOperationsInSingleOplogEntry = 2;
@@ -103,13 +110,11 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
                 remember: true,
                 startClean: false,
             });
-            const newPrimary = st.rs0.getPrimary();
         } else if (mode == kTestMode.kFailover) {
             const oldPrimary = st.rs0.getPrimary();
             assert.commandWorked(
                 oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
             assert.commandWorked(oldPrimary.adminCommand({replSetFreeze: 0}));
-            const newPrimary = st.rs0.getPrimary();
         }
     }
 

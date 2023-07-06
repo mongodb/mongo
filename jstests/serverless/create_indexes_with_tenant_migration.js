@@ -5,10 +5,9 @@
  * @tags: [requires_fcv_52, serverless]
  */
 
-import {Thread} from "jstests/libs/parallelTester_module.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardedServerlessTest} from "jstests/serverless/libs/sharded_serverless_test.js";
-
-load("jstests/libs/fail_point_util.js");
 
 // A function, not a constant, to ensure unique UUIDs.
 function donorStartMigrationCmd(tenantID, realConnUrl) {

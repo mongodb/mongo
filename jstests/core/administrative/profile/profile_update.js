@@ -10,11 +10,10 @@
 
 // Confirms that profiled update execution contains all expected metrics with proper values.
 
-(function() {
-"use strict";
-
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {getLatestProfilerEntry, getNLatestProfilerEntries} from "jstests/libs/profiler.js";
 
 // Setup test db and collection.
 var testDB = db.getSiblingDB("profile_update");
@@ -190,4 +189,3 @@ profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.fromMultiPlanner, true, tojson(profileObj));
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
-})();

@@ -11,9 +11,6 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
 var replSetName = "replsets_server-6591";
 var keyfile = "jstests/libs/key1";
 var numShards = 2;
@@ -243,4 +240,3 @@ extraShards.forEach(function(rs) {
     rs.stopSet();
 });
 st.stop();
-})();

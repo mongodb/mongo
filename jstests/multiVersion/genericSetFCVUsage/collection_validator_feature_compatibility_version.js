@@ -6,9 +6,6 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
-"use strict";
-
 const testName = "collection_validator_feature_compatibility_version";
 const dbpath = MongoRunner.dataPath + testName;
 
@@ -259,4 +256,3 @@ testCollectionValidatorFCVBehavior(
 testCollectionValidatorFCVBehavior("last-continuous", testCasesLastContinuous);
 testCollectionValidatorFCVBehavior(
     "last-continuous", testCasesLastContinuousWithFeatureFlags, featureFlagsToEnable);
-}());

@@ -3,10 +3,7 @@
  * "NonResumableChangeStreamError" label.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 // Drop and recreate the collections to be used in this set of tests.
 const coll = assertDropAndRecreateCollection(db, "change_stream_error_label");
@@ -30,4 +27,3 @@ const err = assert.throws(function() {
 assert.commandFailedWithCode(err, ErrorCodes.ChangeStreamFatalError);
 assert("errorLabels" in err, err);
 assert.contains("NonResumableChangeStreamError", err.errorLabels, err);
-}());

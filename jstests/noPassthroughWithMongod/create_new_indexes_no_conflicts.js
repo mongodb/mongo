@@ -1,7 +1,6 @@
-(function() {
-"use strict";
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/wait_for_command.js");
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
+
 const dbName = "test";
 const collName = "create_new_index_no_conflicts";
 const testDB = db.getSiblingDB(dbName);
@@ -45,4 +44,3 @@ res = assert.commandWorked(testColl.createIndex({b: 1}));
 assert.eq(2, res.numIndexesBefore);
 assert.eq(3, res.numIndexesAfter);
 assert(!res.createdCollectionAutomatically);
-})();

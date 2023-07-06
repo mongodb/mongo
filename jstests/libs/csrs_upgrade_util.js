@@ -5,11 +5,9 @@
  * upgrade behavior.
  */
 
-load("jstests/replsets/rslib.js");
+import {waitUntilAllNodesCaughtUp} from "jstests/replsets/rslib.js";
 
-var CSRSUpgradeCoordinator = function() {
-    "use strict";
-
+export var CSRSUpgradeCoordinator = function() {
     var testDBName = jsTestName();
     var dataCollectionName = testDBName + ".data";
     var csrsName = jsTestName() + "-csrs";

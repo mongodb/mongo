@@ -11,11 +11,9 @@
 // @tags: [
 //   requires_sharding,
 // ]
-(function() {
-'use strict';
 // This test will only work on POSIX machines.
 if (_isWindows()) {
-    return;
+    quit();
 }
 
 // Checking index consistency involves reconnecting to the mongos.
@@ -130,4 +128,3 @@ testSockOptions(undefined,
                 {unixSocketPrefix: socketPrefix, port: port},
                 ',',
                 true);
-})();

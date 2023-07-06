@@ -8,8 +8,11 @@
  * @tags: [uses_curop_agg_stage, state_functions_share_cursor]
  */
 
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
-load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {
+    assertWorkedOrFailedHandleTxnErrors
+} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
     let data = {

@@ -3,11 +3,8 @@
  * connection, causing the server to reenter sync source selection.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/write_concern_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const rst = new ReplSetTest({
     name: "new_sync_source_in_quiesce_mode",
@@ -61,4 +58,3 @@ rst.awaitSecondaryNodes();
 
 jsTestLog("Finish test.");
 rst.stopSet();
-})();

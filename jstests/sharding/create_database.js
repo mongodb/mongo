@@ -2,9 +2,6 @@
  * Tests that creating a database causes it to be written to the sharding catalog with a
  * databaseVersion if FCV > 3.6, but not if FCV <= 3.6.
  */
-(function() {
-'use strict';
-
 function createDatabase(mongos, dbName) {
     // A database is implicitly created when a collection inside it is created.
     assert.commandWorked(mongos.getDB(dbName).runCommand({create: collName}));
@@ -67,4 +64,3 @@ let dbEntry2 = assertDbVersionAssigned(st.s, dbName);
 assert.neq(dbEntry1.version.uuid, dbEntry2.version.uuid);
 
 st.stop();
-})();

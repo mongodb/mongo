@@ -1,10 +1,7 @@
 // Tests expression object compilation with different placements of expression objects in the
 // expression tree contained in the projection.
 
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');
+import {documentEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.expression_object;
 coll.drop();
@@ -49,4 +46,3 @@ const testCases = [
 for (let testCase of testCases) {
     assert(documentEq(testCase.resultDoc, coll.findOne(emptyFilterDoc, testCase.projectionDoc)));
 }
-}());

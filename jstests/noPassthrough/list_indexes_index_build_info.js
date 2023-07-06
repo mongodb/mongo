@@ -11,11 +11,8 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/noPassthrough/libs/index_build.js");  // for IndexBuildTest
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 /**
  * Given two listIndexes command results, the first without index build info included and the second
@@ -260,4 +257,3 @@ try {
 }
 
 rst.stopSet();
-})();

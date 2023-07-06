@@ -7,10 +7,8 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const st = new ShardingTest({shards: 2});
 const shard0Primary = st.rs0.getPrimary();
@@ -91,4 +89,3 @@ setFCVThread.join();
 jsTest.log("Done");
 
 st.stop();
-})();

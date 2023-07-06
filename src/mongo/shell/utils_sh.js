@@ -1,4 +1,4 @@
-sh = function() {
+var sh = function() {
     return "try sh.help();";
 };
 
@@ -744,7 +744,7 @@ sh.balancerCollectionStatus = function(coll) {
     return sh._adminCommand({balancerCollectionStatus: coll}, true);
 };
 
-sh.configureCollectionBalancing = function(coll) {
+sh.configureCollectionBalancing = function(coll, opts) {
     let cmd = {configureCollectionBalancing: coll};
     if (opts) {
         cmd = Object.assign(cmd, opts);
@@ -958,12 +958,12 @@ function printShardingStatus(configDB, verbose) {
                     const chunksMatchPredicate =
                         coll.hasOwnProperty("timestamp") ? {uuid: coll.uuid} : {ns: coll._id};
 
-                    res = configDB.chunks
-                              .aggregate({$match: chunksMatchPredicate},
-                                         {$group: {_id: "$shard", cnt: {$sum: 1}}},
-                                         {$project: {_id: 0, shard: "$_id", nChunks: "$cnt"}},
-                                         {$sort: {shard: 1}})
-                              .toArray();
+                    const res = configDB.chunks
+                                    .aggregate({$match: chunksMatchPredicate},
+                                               {$group: {_id: "$shard", cnt: {$sum: 1}}},
+                                               {$project: {_id: 0, shard: "$_id", nChunks: "$cnt"}},
+                                               {$sort: {shard: 1}})
+                                    .toArray();
 
                     var totalChunks = 0;
                     res.forEach(function(z) {

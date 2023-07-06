@@ -1,6 +1,4 @@
-(function() {
-"use strict";
-load('jstests/aggregation/data/articles.js');
+import "jstests/aggregation/data/articles.js";
 
 const article = db.getSiblingDB("aggdb").getCollection("article");
 const cursor = article.aggregate(
@@ -8,4 +6,3 @@ const cursor = article.aggregate(
 const expected = [{Writer: "bob"}, {Writer: "dave"}, {Writer: "jane"}];
 
 assert.eq(cursor.toArray(), expected);
-}());

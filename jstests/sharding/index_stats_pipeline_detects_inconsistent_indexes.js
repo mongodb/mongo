@@ -6,10 +6,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For documentEq.
+import {documentEq} from "jstests/aggregation/extras/utils.js";
 
 // This test deliberately creates indexes in an inconsistent state.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
@@ -342,4 +339,3 @@ function shardCollectionWithChunkOnEachShard(collName) {
 })();
 
 st.stop();
-})();

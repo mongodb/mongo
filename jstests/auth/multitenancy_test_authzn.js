@@ -1,8 +1,5 @@
 // Test creation of local users and roles for multitenancy.
 
-(function() {
-'use strict';
-
 function setup(conn) {
     const admin = conn.getDB('admin');
     assert.commandWorked(
@@ -214,4 +211,3 @@ spanOptions(function(setParams) {
     runTests(standalone, ObjectId(), setParams.multitenancySupport);
     MongoRunner.stopMongod(standalone);
 });
-})();

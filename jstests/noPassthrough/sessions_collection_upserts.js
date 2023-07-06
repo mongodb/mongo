@@ -5,9 +5,6 @@
  *  requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
 const kConfigSessionsNs = "config.system.sessions";
 
 const refreshCmd = {
@@ -96,4 +93,3 @@ let sessionIDs = [];
 })();
 
 rst.stopSet();
-})();

@@ -3,12 +3,9 @@
  * primary to incorrectly acknowledge a w:majority write that's about to be rolled back, even if the
  * stale primary is re-elected primary before waiting for the write concern acknowledgement.
  */
-(function() {
-'use strict';
-
-load("jstests/replsets/rslib.js");
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/write_concern_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 var name = "writeConcernStepDownAndBackUp";
 var dbName = "wMajorityCheck";
@@ -126,4 +123,3 @@ hangBeforeWaitingForWriteConcern.off();
 joinMajorityWriter();
 
 rst.stopSet();
-}());

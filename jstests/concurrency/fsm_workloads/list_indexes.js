@@ -4,6 +4,8 @@
  * Checks that the listIndexes command can tolerate concurrent modifications to the
  * index catalog.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var states = (function() {
         // Picks a random index to drop and recreate.

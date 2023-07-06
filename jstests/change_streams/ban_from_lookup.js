@@ -5,11 +5,8 @@
  *   change_stream_does_not_expect_txns,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");       // For assertErrorCode.
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const coll = assertDropAndRecreateCollection(db, "change_stream_ban_from_lookup");
 const foreignColl = "unsharded";
@@ -35,4 +32,3 @@ assertErrorCode(
            }
         }],
         51047);
-})();

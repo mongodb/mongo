@@ -1,8 +1,6 @@
 // Tests that $merge respects the writeConcern set on the original aggregation command.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
+import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 3}});
 
@@ -127,4 +125,3 @@ testWriteConcernError(shard0);
 testWriteConcernError(shard1);
 
 st.stop();
-}());

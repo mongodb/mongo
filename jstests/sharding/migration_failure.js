@@ -4,9 +4,6 @@
 // Also checks that the collection version on a source shard updates correctly after a migration.
 //
 
-(function() {
-'use strict';
-
 function waitAndGetShardVersion(conn, collNs) {
     var shardVersion = undefined;
     assert.soon(() => {
@@ -95,4 +92,3 @@ assert.commandWorked(st.shard0.getDB("admin").runCommand(
     {configureFailPoint: 'migrationCommitNetworkError', mode: 'off'}));
 
 st.stop();
-})();

@@ -3,9 +3,6 @@
  *
  *  @tags: [multiversion_incompatible]
  */
-(function() {
-'use strict';
-
 const kWaitForCompletedChecksCount = 12;
 const kWaitForPassedChecksCount = 8;
 
@@ -67,4 +64,3 @@ const checkServerStats = function() {
 checkServerStats();
 
 st.stop();
-})();

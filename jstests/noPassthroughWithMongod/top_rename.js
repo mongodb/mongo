@@ -2,9 +2,7 @@
  * Ensures that the data managed by Top is removed for the source namespace when renaming the
  * collection.
  */
-(function() {
-
-load("jstests/libs/stats.js");
+import {getTop} from "jstests/libs/stats.js";
 
 const dbName = "top_rename";
 const sourceCollection = "source";
@@ -47,4 +45,3 @@ const mapReduceTmp = ".tmp.";
 for (const collection in top.totals) {
     assert.eq(false, collection.includes(mapReduceTmp));
 }
-}());

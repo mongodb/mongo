@@ -1,8 +1,5 @@
 // Basic testing for the $unset aggregation stage.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.agg_stage_unset;
 coll.drop();
@@ -35,4 +32,3 @@ assertArrayEq({
     actual: result,
     expected: [{_id: 0, a: 10}, {_id: 1, a: {b: 20, c: 30}}, {_id: 2, a: [{b: 50, c: 60}]}]
 });
-})();

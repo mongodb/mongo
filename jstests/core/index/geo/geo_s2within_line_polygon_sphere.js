@@ -1,6 +1,4 @@
 // Tests for $geowithin $centerSphere operator with LineString and Polygon.
-(function() {
-
 function testGeoWithinCenterSphereLinePolygon(coll) {
     coll.drop();
 
@@ -238,4 +236,3 @@ testGeoWithinCenterSphereLinePolygon(coll);
 // Test $geowithin $centerSphere for LineString and Polygon with 2dsphere index.
 assert.commandWorked(coll.createIndex({geoField: "2dsphere"}));
 testGeoWithinCenterSphereLinePolygon(coll);
-})();

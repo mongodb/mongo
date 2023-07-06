@@ -1,9 +1,6 @@
 /**
  * Test the default behavior of window functions when no documents fall in the window.
  */
-(function() {
-"use strict";
-
 const coll = db[jsTestName()];
 coll.drop();
 
@@ -53,4 +50,3 @@ assert.eq(null, results[0].defaultMin);
 assert.eq(null, results[0].defaultMax);
 // $sum is unique as its default value is 0.
 assert.eq(0, results[0].defaultSum);
-})();

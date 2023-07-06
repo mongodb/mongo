@@ -16,7 +16,9 @@
  *   featureFlagAggOutTimeseries
  * ]
  */
+import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from 'jstests/concurrency/fsm_workloads/agg_out.js';
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {

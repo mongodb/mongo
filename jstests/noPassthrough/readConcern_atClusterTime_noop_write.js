@@ -6,17 +6,14 @@
 //   uses_atclustertime,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
-load("jstests/libs/fail_point_util.js");
+import {getLastOpTime} from "jstests/replsets/rslib.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 if (!assert.commandWorked(conn.getDB("test").serverStatus())
          .storageEngine.supportsSnapshotReadConcern) {
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 MongoRunner.stopMongod(conn);
 
@@ -114,4 +111,3 @@ testNoopWrite(
     "test0", "coll2", st.configRS, "test1", "coll3", PropagationPreferenceOptions.kConfig);
 
 st.stop();
-}());

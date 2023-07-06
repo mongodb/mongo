@@ -6,10 +6,10 @@
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
 
-(function() {
-'use strict';
-
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {
+    getCoordinatorFailpoints,
+    waitForFailpoint
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -200,4 +200,3 @@ failpointDataArr.forEach(function(failpointData) {
 });
 
 st.stop();
-})();

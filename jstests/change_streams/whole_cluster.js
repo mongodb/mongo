@@ -1,18 +1,18 @@
 // Basic tests for $changeStream against all databases in the cluster.
-(function() {
-"use strict";
+import {
+    assertInvalidChangeStreamNss,
+    assertValidChangeStreamNss,
+    ChangeStreamTest
+} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest and
-                                                   // assert[Valid|Invalid]ChangeStreamNss.
-load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
-
-db = db.getSiblingDB(jsTestName());
-const adminDB = db.getSiblingDB("admin");
-const otherDB = db.getSiblingDB(jsTestName() + "_other");
+const testDb = db.getSiblingDB(jsTestName());
+const adminDB = testDb.getSiblingDB("admin");
+const otherDB = testDb.getSiblingDB(jsTestName() + "_other");
 
 // Drop and recreate the collections to be used in this set of tests.
-assertDropAndRecreateCollection(db, "t1");
+assertDropAndRecreateCollection(testDb, "t1");
 assertDropAndRecreateCollection(otherDB, "t2");
 
 // Test that a change stream can be opened on the admin database if {allChangesForCluster:true}
@@ -23,7 +23,7 @@ assertValidChangeStreamNss("admin", 1, {allChangesForCluster: true});
 assertInvalidChangeStreamNss("admin", "testcoll", {allChangesForCluster: true});
 // Test that a change stream cannot be opened on a database other than admin if
 // {allChangesForCluster:true} is specified.
-assertInvalidChangeStreamNss(db.getName(), 1, {allChangesForCluster: true});
+assertInvalidChangeStreamNss(testDb.getName(), 1, {allChangesForCluster: true});
 
 let cst = new ChangeStreamTest(adminDB);
 let cursor = cst.startWatchingAllChangesForCluster();
@@ -32,11 +32,11 @@ let cursor = cst.startWatchingAllChangesForCluster();
 assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 
 // Test that the change stream returns an inserted doc.
-assert.commandWorked(db.t1.insert({_id: 0, a: 1}));
+assert.commandWorked(testDb.t1.insert({_id: 0, a: 1}));
 let expected = {
     documentKey: {_id: 0},
     fullDocument: {_id: 0, a: 1},
-    ns: {db: db.getName(), coll: "t1"},
+    ns: {db: testDb.getName(), coll: "t1"},
     operationType: "insert",
 };
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
@@ -65,7 +65,7 @@ const validUserDBs = [
     "_config_"
 ];
 validUserDBs.forEach(dbName => {
-    assert.commandWorked(db.getSiblingDB(dbName).test.insert({_id: 0, a: 1}));
+    assert.commandWorked(testDb.getSiblingDB(dbName).test.insert({_id: 0, a: 1}));
     expected = [
         {
             documentKey: {_id: 0},
@@ -81,12 +81,12 @@ validUserDBs.forEach(dbName => {
 // includes "system" but is not considered an internal collection.
 const validSystemColls = ["system", "systems.views", "ssystem.views", "test.system"];
 validSystemColls.forEach(collName => {
-    assert.commandWorked(db.getCollection(collName).insert({_id: 0, a: 1}));
+    assert.commandWorked(testDb.getCollection(collName).insert({_id: 0, a: 1}));
     expected = [
         {
             documentKey: {_id: 0},
             fullDocument: {_id: 0, a: 1},
-            ns: {db: db.getName(), coll: collName},
+            ns: {db: testDb.getName(), coll: collName},
             operationType: "insert",
         },
     ];
@@ -98,24 +98,24 @@ validSystemColls.forEach(collName => {
 const filteredDBs = ["admin", "local", "config"];
 filteredDBs.forEach(dbName => {
     // Not allowed to use 'local' db through mongos.
-    if (FixtureHelpers.isMongos(db) && dbName == "local")
+    if (FixtureHelpers.isMongos(testDb) && dbName == "local")
         return;
 
-    assert.commandWorked(db.getSiblingDB(dbName).test.insert({_id: 0, a: 1}));
+    assert.commandWorked(testDb.getSiblingDB(dbName).test.insert({_id: 0, a: 1}));
     // Insert to the test collection to ensure that the change stream has something to
     // return.
-    assert.commandWorked(db.t1.insert({_id: dbName}));
+    assert.commandWorked(testDb.t1.insert({_id: dbName}));
     expected = [
         {
             documentKey: {_id: dbName},
             fullDocument: {_id: dbName},
-            ns: {db: db.getName(), coll: "t1"},
+            ns: {db: testDb.getName(), coll: "t1"},
             operationType: "insert",
         },
     ];
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
     // Clear the test collection to avoid duplicate key errors if this test is run multiple times.
-    assert.commandWorked(db.getSiblingDB(dbName).test.remove({}, false /* justOne */));
+    assert.commandWorked(testDb.getSiblingDB(dbName).test.remove({}, false /* justOne */));
 });
 
 // Dropping a database should generate drop entries for each collection followed by a database
@@ -124,9 +124,8 @@ assert.commandWorked(otherDB.dropDatabase());
 cst.assertDatabaseDrop({cursor: cursor, db: otherDB});
 
 // Drop the remaining databases and clean up the test.
-assert.commandWorked(db.dropDatabase());
+assert.commandWorked(testDb.dropDatabase());
 validUserDBs.forEach(dbName => {
-    db.getSiblingDB(dbName).dropDatabase();
+    testDb.getSiblingDB(dbName).dropDatabase();
 });
 cst.cleanUp();
-}());

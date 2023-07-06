@@ -4,10 +4,7 @@
  *
  * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
  */
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {getOplogEntriesForTxn} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({shards: 1});
 const shard0Primary = st.rs0.getPrimary();
@@ -110,4 +107,3 @@ assert.eq(document, st.s.getCollection(ns).findOne(document));
 assert.eq(documentWithStmtId, st.s.getCollection(ns).findOne(documentWithStmtId));
 
 st.stop();
-})();

@@ -8,11 +8,7 @@
  *   references_foreign_collection,
  * ]
  */
-(function() {
-"use strict";
-
-// For arrayEq.
-load("jstests/aggregation/extras/utils.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const viewsDBName = "views_creation";
 
@@ -157,4 +153,3 @@ assert.commandFailedWithCode(viewsDB.runCommand({create: "collection", viewOn: "
 // Ensure we accept a view with a name of greater than 64 characters (the maximum dbname length).
 assert.commandWorked(viewsDB.createView(
     "longNamedView", "Queries_IdentityView_UnindexedLargeInMatching0_BackingCollection", []));
-}());

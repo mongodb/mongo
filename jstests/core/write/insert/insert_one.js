@@ -2,8 +2,6 @@
  * This test ensures that insertOne only accepts objects and that it doesn't insert any of the
  * object's prototype's methods.
  */
-(function() {
-'use strict';
 var col = db.insert_one_number;
 col.drop();
 
@@ -35,4 +33,3 @@ assert(!('zeroPad' in col.findOne({_id: result.insertedId})),
 assert.docEq({_id: result.insertedId, x: doc.x},
              col.findOne({_id: result.insertedId}),
              "document with prototype not equal to collection find result");
-})();

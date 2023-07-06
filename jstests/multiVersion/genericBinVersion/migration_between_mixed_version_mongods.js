@@ -3,14 +3,10 @@
 // donor is the latest version and the recipient the last-lts, and vice versa.
 // Migrations should be successful.
 //
+import "jstests/multiVersion/libs/verify_versions.js";
 
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
-load("jstests/multiVersion/libs/verify_versions.js");
-
-(function() {
-"use strict";
 
 var options = {
     shards: [
@@ -101,4 +97,3 @@ assert.eq(2,
               "Latest -> last-lts mongod version migration failure.");
 
 st.stop();
-})();

@@ -5,7 +5,7 @@
  *   cqf_experimental_incompatible,
  * ]
  */
-load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();

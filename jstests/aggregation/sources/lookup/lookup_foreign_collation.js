@@ -5,11 +5,7 @@
  *   requires_pipeline_optimization,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For anyEq.
-
-(function() {
-
-"use strict";
+import {anyEq} from "jstests/aggregation/extras/utils.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const localColl = testDB.local_no_collation;
@@ -49,20 +45,6 @@ function setup() {
 (function testCollationPermutations() {
     setup();
 
-    // Pipeline style $lookup with cases insensitive collation.
-    const lookupWithPipeline = (foreignColl) => {
-        return {
-          $lookup: {from: foreignColl.getName(), as: "foreignMatch", _internalCollation: caseInsensitiveCollation, let: {l_id: "$_id"}, pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}]}
-      };
-    };
-
-    // Local-field foreign-field style $lookup with cases insensitive collation.
-    const lookupWithLocalForeignField = (foreignColl) => {
-        return {
-          $lookup: {from: foreignColl.getName(), localField: "_id", foreignField: "_id", as: "foreignMatch", _internalCollation: caseInsensitiveCollation}
-      };
-    };
-
     const resultSetCaseInsensitive = [
         {_id: "a", foreignMatch: [{_id: "a"}]},
         {_id: "b", foreignMatch: [{_id: "B"}]},
@@ -90,14 +72,14 @@ function setup() {
     //
     function assertExpectedResultSet(
         localColl, foreignColl, commandCollation, lookupCollation, expectedResults) {
-        const lookupWithPipeline = {$lookup: {from: foreignColl.getName(), 
+        const lookupWithPipeline = {$lookup: {from: foreignColl.getName(),
                                  as: "foreignMatch",
-                                 let: {l_id: "$_id"}, 
+                                 let: {l_id: "$_id"},
                                  pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}]}};
 
-        const lookupWithLocalForeignField = {$lookup: {from: foreignColl.getName(), 
-         localField: "_id", 
-         foreignField: "_id", 
+        const lookupWithLocalForeignField = {$lookup: {from: foreignColl.getName(),
+         localField: "_id",
+         foreignField: "_id",
          as: "foreignMatch"}};
 
         if (lookupCollation) {
@@ -142,9 +124,9 @@ function setup() {
 (function testNestedLookupStagesWithDifferentCollations() {
     setup();
 
-    const lookupWithPipeline = {$lookup: {from: foreignColl.getName(), 
+    const lookupWithPipeline = {$lookup: {from: foreignColl.getName(),
          as: "foreignMatch",
-         let: {l_id: "$_id"}, 
+         let: {l_id: "$_id"},
          pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}},
                       {$lookup: {from: localColl.getName(),
                          as: "foreignMatch2",
@@ -170,9 +152,9 @@ function setup() {
 
     // A $lookup stage with a collation that differs from the collection and command collation
     // will not absorb a $match on unwound results.
-    let pipeline = [{$lookup: {from: foreignColl.getName(), 
+    let pipeline = [{$lookup: {from: foreignColl.getName(),
          as: "foreignMatch",
-         let: {l_id: "$_id"}, 
+         let: {l_id: "$_id"},
          pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}],
          _internalCollation: caseInsensitiveCollation}},
          {$unwind: "$foreignMatch"},
@@ -190,9 +172,9 @@ function setup() {
 
     // A $lookup stage with a collation that matches the command collation will absorb a $match
     // stage.
-    pipeline = [{$lookup: {from: foreignColl.getName(), 
+    pipeline = [{$lookup: {from: foreignColl.getName(),
          as: "foreignMatch",
-         let: {l_id: "$_id"}, 
+         let: {l_id: "$_id"},
          pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}],
          _internalCollation: caseInsensitiveCollation}},
          {$unwind: "$foreignMatch"},
@@ -209,7 +191,7 @@ function setup() {
 
     // A $lookup stage with a collation that matches the local collection collation will absorb
     // a $match stage.
-    pipeline = [{$lookup: {from: foreignColl.getName(), 
+    pipeline = [{$lookup: {from: foreignColl.getName(),
          as: "foreignMatch",
          let: {l_id: "$_id"},
          pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}],
@@ -225,5 +207,4 @@ function setup() {
     explain = localCaseInsensitiveColl.explain().aggregate(pipeline);
     lastStage = explain.stages[explain.stages.length - 1];
     assert(lastStage.hasOwnProperty("$lookup"), tojson(explain));
-})();
 })();

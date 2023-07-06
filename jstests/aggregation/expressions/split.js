@@ -1,11 +1,9 @@
 // In SERVER-6773, the $split expression was introduced. In this file, we test the functionality and
 // error cases of the expression.
 
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExpression.
-load("jstests/libs/sbe_assert_error_override.js");
+import {assertErrorCode, testExpression} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.split;
 
@@ -78,4 +76,3 @@ pipeline = {
     $project: {split: {$split: ["abc", ""]}}
 };
 assertErrorCode(coll, pipeline, 40087);
-})();

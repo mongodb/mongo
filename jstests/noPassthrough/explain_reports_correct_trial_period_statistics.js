@@ -1,8 +1,5 @@
 // This test checks that .explain() reports the correct trial period statistics for a winning plan
 // in the "allPlansExecution" section.
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = jsTestName();
 
@@ -45,4 +42,3 @@ assert.lte(winningPlanTrialPeriodStats.totalKeysExamined, 10);
 assert.lte(winningPlanTrialPeriodStats.totalDocsExamined, 10);
 
 MongoRunner.stopMongod(conn);
-}());

@@ -8,12 +8,11 @@
 //   requires_wiredtiger,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/libs/fail_point_util.js");  // for 'configureFailPoint()'
-load("jstests/libs/profiler.js");         // for 'getLatestProfilerEntry()'
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -235,4 +234,3 @@ assert.commandWorked(testDB.setProfilingLevel(2));
 }
 
 MongoRunner.stopMongod(conn);
-})();

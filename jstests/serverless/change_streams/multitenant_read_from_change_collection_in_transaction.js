@@ -5,13 +5,10 @@
 //   assumes_against_mongod_not_mongos,
 // ]
 
-(function() {
-"use strict";
-
-// For ChangeStreamMultitenantReplicaSetTest.
-load("jstests/serverless/libs/change_collection_util.js");
-// For assertDropAndRecreateCollection.
-load("jstests/libs/collection_drop_recreate.js");
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    ChangeStreamMultitenantReplicaSetTest
+} from "jstests/serverless/libs/change_collection_util.js";
 
 // Verify that the change stream observes expected events. The method also collects resume tokens
 // for each expected change collection and returns those on successful assertion.
@@ -104,4 +101,3 @@ verifyEventsAndGetResumeTokens(secondTenantCsCursor, [
 ]);
 
 replSetTest.stopSet();
-}());

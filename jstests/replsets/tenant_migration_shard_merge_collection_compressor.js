@@ -11,14 +11,13 @@
  * ]
  */
 
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     isShardMergeEnabled,
     makeTenantDB,
     makeX509OptionsForTest,
 } from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/uuid_util.js");
 
 function runTest(nodeCollectionCompressorOptions) {
     jsTestLog("Testing tenant migration for the following collection compressor options: " +

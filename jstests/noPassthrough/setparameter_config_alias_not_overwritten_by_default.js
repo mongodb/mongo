@@ -1,9 +1,6 @@
 // Verify setParameters paramaters which are an alias to a config parameter do not have the value
 // passed with setParameter as a startup argument overwritten by the config default.
 
-(function() {
-'use strict';
-
 const defaultsConn = MongoRunner.runMongod();
 function getDefaultValue(parameterName) {
     const res =
@@ -31,4 +28,3 @@ function runTestOnConn(conn, setParams) {
 const standaloneConn = MongoRunner.runMongod({setParameter: paramsDict});
 runTestOnConn(standaloneConn, paramsDict);
 MongoRunner.stopMongod(standaloneConn);
-}());

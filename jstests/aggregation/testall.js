@@ -1,9 +1,6 @@
-(function() {
-"use strict";
-
 // Loads data into the namespace 'aggdb.articles'.
-load('jstests/aggregation/data/articles.js');
-load('jstests/aggregation/extras/utils.js');
+import "jstests/aggregation/data/articles.js";
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const testDB = db.getSiblingDB("aggdb");
 
@@ -934,4 +931,3 @@ let g8result = [
 ];
 
 assert.docEq(g8result, g8.cursor.firstBatch, 'g8 failed');
-}());

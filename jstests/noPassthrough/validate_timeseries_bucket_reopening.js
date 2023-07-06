@@ -8,7 +8,7 @@
  * @tags: [requires_replication]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet({setParameter: {timeseriesIdleBucketExpiryMemoryUsageThreshold: 1024}});

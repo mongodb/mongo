@@ -4,9 +4,6 @@
 // index updates.
 //
 
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "coll";
 
@@ -23,7 +20,7 @@ assert.commandWorked(testDB.adminCommand({setParameter: 1, batchedDeletesTargetB
 
 if (!testDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
     rst.stopSet();
-    return;
+    quit();
 }
 
 // Turn off timestamp reaping.
@@ -110,4 +107,3 @@ check(ts, []);
 
 session.endSession();
 rst.stopSet();
-}());

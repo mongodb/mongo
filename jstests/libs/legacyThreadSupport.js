@@ -2,8 +2,7 @@
  * The ParallelTester class is used to test more than one test concurrently
  */
 
-export var Thread, fork, EventGenerator, ParallelTester;
-
+/* eslint-disable */
 if (typeof _threadInject != "undefined") {
     // With --enableJavaScriptProtection functions are presented as Code objects.
     // This function evals all the Code objects then calls the provided start function.
@@ -260,6 +259,11 @@ if (typeof _threadInject != "undefined") {
             // failures in the parallel suite.
             "computed_projections.js",
             "query/project/projection_expr_mod.js",
+
+            // TODO (SERVER-66393): Remove this exclusion once the feature flag is enabled by
+            // default.
+            "timeseries/timeseries_update_multi.js",
+            "timeseries/timeseries_update_one.js",
         ]);
 
         // Get files, including files in subdirectories.
@@ -378,7 +382,7 @@ if (typeof _threadInject != "undefined") {
             const time = await measureAsync(async function() {
                 // Create a new connection to the db for each file. If tests share the same
                 // connection it can create difficult to debug issues.
-                var db = new Mongo(db.getMongo().host).getDB(db.getName());
+                globalThis.db = new Mongo(db.getMongo().host).getDB(db.getName());
                 gc();
                 await import(x);
             });
@@ -442,24 +446,26 @@ if (typeof _threadInject != "undefined") {
     };
 }
 
-globalThis.CountDownLatch = Object.extend(function(count) {
-    if (!(this instanceof CountDownLatch)) {
-        return new CountDownLatch(count);
-    }
-    this._descriptor = CountDownLatch._new.apply(null, arguments);
+if (typeof CountDownLatch !== 'undefined') {
+    CountDownLatch = Object.extend(function(count) {
+        if (!(this instanceof CountDownLatch)) {
+            return new CountDownLatch(count);
+        }
+        this._descriptor = CountDownLatch._new.apply(null, arguments);
 
-    // NOTE: The following methods have to be defined on the instance itself,
-    //       and not on its prototype. This is because properties on the
-    //       prototype are lost during the serialization to BSON that occurs
-    //       when passing data to a child thread.
+        // NOTE: The following methods have to be defined on the instance itself,
+        //       and not on its prototype. This is because properties on the
+        //       prototype are lost during the serialization to BSON that occurs
+        //       when passing data to a child thread.
 
-    this.await = function() {
-        CountDownLatch._await(this._descriptor);
-    };
-    this.countDown = function() {
-        CountDownLatch._countDown(this._descriptor);
-    };
-    this.getCount = function() {
-        return CountDownLatch._getCount(this._descriptor);
-    };
-}, CountDownLatch);
+        this.await = function() {
+            CountDownLatch._await(this._descriptor);
+        };
+        this.countDown = function() {
+            CountDownLatch._countDown(this._descriptor);
+        };
+        this.getCount = function() {
+            return CountDownLatch._getCount(this._descriptor);
+        };
+    }, CountDownLatch);
+}

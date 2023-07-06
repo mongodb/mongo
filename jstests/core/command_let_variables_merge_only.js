@@ -9,9 +9,6 @@
  *   references_foreign_collection,
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.command_let_variables;
 const targetColl = db.command_let_variables_target;
 coll.drop();
@@ -162,4 +159,3 @@ assert.eq(targetColl.aggregate({$match: {$expr: {$eq: ["$var", {$literal: "$notA
               .toArray()
               .length,
           1);
-}());

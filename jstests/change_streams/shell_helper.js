@@ -6,12 +6,12 @@
 // the oplog entry. When operations get bundled into a transaction, their operationTime is instead
 // based on the commit oplog entry, which would cause this test to fail.
 // @tags: [change_stream_does_not_expect_txns]
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
-load("jstests/libs/change_stream_util.js");        // For assertInvalidateOp.
+import {assertChangeStreamEventEq, assertInvalidateOp} from "jstests/libs/change_stream_util.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection
+} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = assertDropAndRecreateCollection(db, "change_stream_shell_helper");
 
@@ -221,4 +221,3 @@ if (invalidateDoc) {
 
     assert.eq(firstChangeAfterDrop.documentKey._id, "After drop", tojson(change));
 }
-}());

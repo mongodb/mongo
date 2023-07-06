@@ -6,11 +6,11 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/write_concern_util.js");
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries
+} from "jstests/libs/write_concern_util.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -76,4 +76,3 @@ const serverStatus = assert.commandWorked(testDB.serverStatus()).bucketCatalog;
 assert.eq(serverStatus.numOpenBuckets, 1, 'Expected one bucket but found: ' + tojson(serverStatus));
 
 replTest.stopSet();
-})();

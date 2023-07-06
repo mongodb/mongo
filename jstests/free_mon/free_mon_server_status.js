@@ -1,9 +1,10 @@
 // Validate serverStatus output.
 //
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {
+    FreeMonWebServer,
+    WaitForFreeMonServerStatusState,
+    WaitForRegistration
+} from "jstests/free_mon/libs/free_mon.js";
 
 const mock_web = new FreeMonWebServer();
 mock_web.start();
@@ -46,4 +47,3 @@ assert.eq(disabled.metricsErrors, 0);
 // Cleanup.
 MongoRunner.stopMongod(mongod);
 mock_web.stop();
-})();

@@ -7,12 +7,10 @@
  * node2. Eventually after catchUpTakeoverDelayMillis has passed, node1 should be able
  * get the vote from node2 which has a lower config, and finish the catchup takeover.
  */
-
-(function() {
-'use strict';
-
-load("jstests/libs/write_concern_util.js");
-load('jstests/replsets/libs/election_metrics.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {
+    verifyServerStatusElectionReasonCounterChange
+} from "jstests/replsets/libs/election_metrics.js";
 
 // Get the current config from the node and compare it with the provided config.
 const getNodeConfigAndCompare = function(node, config, cmp) {
@@ -135,4 +133,3 @@ verifyServerStatusElectionReasonCounterChange(statusBeforeTakeover.electionMetri
 replSet.awaitSecondaryNodes();
 replSet.awaitReplication();
 replSet.stopSet();
-})();

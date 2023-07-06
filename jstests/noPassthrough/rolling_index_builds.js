@@ -9,10 +9,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/index_build.js');
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 // Set up replica set
 const replTest = new ReplSetTest({nodes: 3});
@@ -82,4 +79,3 @@ insertDocs(newColl, numDocs, numDocs);
 assert.eq(numDocs * 2, newColl.count(), 'unexpected number of documents after bulk insert.');
 
 replTest.stopSet();
-}());

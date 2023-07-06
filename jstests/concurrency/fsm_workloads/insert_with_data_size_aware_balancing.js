@@ -9,9 +9,9 @@
  *   antithesis_incompatible,
  *  ]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 const bigString = 'X'.repeat(1024 * 1024 - 30);  // Almost 1MB, to create documents of exactly 1MB
-const minChunkSizeMB = 1;
 const maxChunkSizeMB = 10;
 const dbNames = ['db0', 'db1'];
 const collNames = ['collA', 'collB', 'collC'];

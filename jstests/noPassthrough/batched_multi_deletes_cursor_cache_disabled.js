@@ -8,15 +8,11 @@
  *  requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
 if (!_isAddressSanitizerActive()) {
     jsTestLog("Skipping " + jsTestName() + " because address sanitizer is not active.");
 }
 
-load("jstests/libs/fail_point_util.js");  // For 'configureFailPoint()'
-load("jstests/libs/parallelTester.js");   // For 'startParallelShell()'
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 var st =
     new ShardingTest({shards: 1, rs: {nodes: 1, setParameter: {wiredTigerCursorCacheSize: 0}}});
@@ -55,4 +51,3 @@ throwWriteConflictExceptionInBatchedDeleteStage.off();
 awaitBatchedDelete();
 
 st.stop();
-})();

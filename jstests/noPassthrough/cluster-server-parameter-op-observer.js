@@ -1,9 +1,6 @@
 // Test that ClusterServerParameterOpObserver fires appropriately.
 // @tags: [requires_replication, requires_fcv_71]
 
-(function() {
-'use strict';
-
 function runTest(conn) {
     const config = conn.getDB('config');
     const res =
@@ -17,4 +14,3 @@ rst.startSet();
 rst.initiate();
 runTest(rst.getPrimary());
 rst.stopSet();
-})();

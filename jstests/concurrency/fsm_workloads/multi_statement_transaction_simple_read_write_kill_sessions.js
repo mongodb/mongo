@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Tests periodically killing sessions that are running transactions that may use the single write
  * shard commit optimization.
@@ -8,10 +6,10 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {killSession} from "jstests/concurrency/fsm_workload_helpers/kill_session.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/multi_statement_transaction_simple_read_write.js";
-load('jstests/concurrency/fsm_workload_helpers/kill_session.js');
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.retryOnKilledSession = true;

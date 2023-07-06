@@ -13,10 +13,7 @@
  *   requires_fcv_62,
  *  ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");  // for 'configureFailPoint()'
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 Random.setRandomSeed();
 
@@ -405,4 +402,3 @@ function allowPartialResultsTrueAllFailed(failureController) {
 withEachAllShardFailure(allowPartialResultsTrueAllFailed);
 
 st.stop();
-}());

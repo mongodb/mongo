@@ -2,9 +2,12 @@
  * Encapsulates testing that verifies the behavior of createIndexes with the 'clustered' option. The
  * 'clustered' option may not be used to create a clustered collection impicitly via createIndexes.
  */
-const CreateIndexesClusteredTest = (function() {
-    "use strict";
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
+export const CreateIndexesClusteredTest = (function() {
     /**
      * Tests that createIndex with the 'clustered' option fails when a collection exists and is not
      * clustered.

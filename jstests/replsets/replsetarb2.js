@@ -1,8 +1,5 @@
 // Election when primary fails and remaining nodes are an arbiter and a secondary.
 
-(function() {
-"use strict";
-
 var replTest = new ReplSetTest({name: 'unicomplex', nodes: 3});
 var nodes = replTest.nodeList();
 
@@ -45,4 +42,3 @@ var newPrimaryId = replTest.getNodeId(new_primary);
 assert.neq(newPrimaryId, pId, "Secondary wasn't promoted to new primary");
 
 replTest.stopSet(15);
-}());

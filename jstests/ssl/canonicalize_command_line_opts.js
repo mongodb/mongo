@@ -1,8 +1,5 @@
 // Ensure that all 'ssl' options are canonicalized to their modern 'tls' versions.
 
-(function() {
-'use strict';
-
 function runTest(mongod) {
     assert(mongod);
     const admin = mongod.getDB('admin');
@@ -36,4 +33,3 @@ const options = {
 const mongod = MongoRunner.runMongod(options);
 runTest(mongod);
 MongoRunner.stopMongod(mongod);
-})();

@@ -13,17 +13,14 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 // This test shuts down a shard primary.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-load('jstests/libs/parallel_shell_helpers.js');
-load('jstests/libs/fail_point_util.js');
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 function getNewNs(dbName) {
     if (typeof getNewNs.counter == 'undefined') {
@@ -87,4 +84,3 @@ testShutDownAfterFailPoint("hangInReadyRangeDeletionLocallyInterruptible");
 testShutDownAfterFailPoint("hangInAdvanceTxnNumInterruptible");
 
 st.stop();
-})();

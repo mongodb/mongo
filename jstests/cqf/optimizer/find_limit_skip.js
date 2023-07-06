@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 const coll = db.cqf_find_limit_skip;
 coll.drop();
 
@@ -164,4 +161,3 @@ limitAmount = 40;
 skipAmount = 15;
 numReturned = coll.find().limit(limitAmount).skip(skipAmount).itcount();
 assert.eq(numReturned, docCount - skipAmount);
-}());

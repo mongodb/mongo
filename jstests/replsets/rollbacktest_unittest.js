@@ -1,7 +1,6 @@
 /**
  * Test of the RollbackTest helper library.
  */
-load("jstests/replsets/rslib.js");
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 let checkDataConsistencyCallCount = 0;

@@ -5,10 +5,7 @@
  * @tags: [uses_transactions, uses_prepare_transaction, uses_multi_shard_transaction]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -101,4 +98,3 @@ failPoint.off();
 jsTest.log("Turned off " + applyOpsHangBeforePreparingTransaction + " failpoint.");
 
 st.stop();
-})();

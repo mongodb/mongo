@@ -1,8 +1,5 @@
 // Tests that users can only use transactions that they created.
 // @tags: [uses_transactions]
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 1, keyFile: "jstests/libs/key1"});
 rst.startSet();
 rst.initiate();
@@ -138,4 +135,3 @@ assert.eq(0, testDB[collName].find({_id: "unauthenticated"}).itcount());
 assert.commandWorked(testDB.runCommand({endSessions: [lsid]}));
 testDB.logout();
 rst.stopSet();
-}());

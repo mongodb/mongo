@@ -2,8 +2,6 @@
  * SERVER-28990: Tests that a mongod started with --repair doesn't attempt binding to a port.
  */
 
-(function() {
-"use strict";
 let dbpath = MongoRunner.dataPath + "repair_flag_transport_layer";
 resetDbpath(dbpath);
 
@@ -17,4 +15,3 @@ let conn = MongoRunner.runMongod();
 
 runTest(conn);
 MongoRunner.stopMongod(conn);
-})();

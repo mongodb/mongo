@@ -1,10 +1,7 @@
 /**
  * Perform basic tests for the mergeChunks command against mongos.
  */
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var st = new ShardingTest({mongos: 2, shards: 2, other: {chunkSize: 1}});
 var mongos = st.s0;
@@ -64,4 +61,3 @@ assert.eq(1,
           findChunksUtil.countChunksForNs(mongos.getDB('config'), ns, {min: {a: -1}, max: {a: 1}}));
 
 st.stop();
-})();

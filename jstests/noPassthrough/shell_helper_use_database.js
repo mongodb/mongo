@@ -6,9 +6,6 @@
 // enabled.
 var db;
 
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
 
@@ -36,4 +33,3 @@ assert(session === db.getSession(), "session wasn't inherited as part of switchi
 
 session.endSession();
 MongoRunner.stopMongod(conn);
-})();

@@ -2,10 +2,7 @@
  * Tests that stages which modify or remove the _id field are not permitted to run in a
  * $changeStream pipeline.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 
@@ -144,4 +141,3 @@ for (let transform of idModifyingTransformations) {
                 transform);
     }, transform);
 }
-}());

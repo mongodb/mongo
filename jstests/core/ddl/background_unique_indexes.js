@@ -15,9 +15,6 @@
  *   ]
  */
 
-(function() {
-"use strict";
-
 const dbName = "background_unique_indexes";
 const collName = "test";
 
@@ -67,4 +64,3 @@ for (let iteration = 0; iteration < nIterations; iteration++) {
     assert.commandWorked(testDB.runCommand({dropIndexes: collName, index: "x_1"}));
     print("iteration " + iteration);
 }
-})();

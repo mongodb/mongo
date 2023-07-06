@@ -6,7 +6,7 @@
  * ]
  */
 import {getCachedPlan} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/profiler.js");
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: false}});

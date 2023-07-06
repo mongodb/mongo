@@ -1,8 +1,5 @@
 // Tests tracing where a document was inserted
-load('jstests/libs/trace_missing_docs.js');
-
-(function() {
-'use strict';
+import {traceMissingDoc} from "jstests/libs/trace_missing_docs.js";
 
 var testDocMissing = function(useReplicaSet) {
     var options = {
@@ -43,4 +40,3 @@ var testDocMissing = function(useReplicaSet) {
 };
 
 testDocMissing(true);
-})();

@@ -3,9 +3,6 @@
  *
  * @tags: [uses_transactions, assumes_unsharded_collection, uses_parallel_shell]
  */
-(function() {
-'use strict';
-
 function testAutoComplete() {
     // This method updates a global object with an array of strings on success.
     assert.soon(() => {
@@ -55,4 +52,3 @@ awaitShell();
 db_stuff = testAutoComplete();
 assert.contains('db.adminCommand(', db_stuff);
 assert.contains(`db.${collName}`, db_stuff);
-})();

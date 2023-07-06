@@ -13,10 +13,7 @@
  *     requires_persistence,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/parallel_shell_helpers.js');
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -58,4 +55,3 @@ assert.commandWorked(
 join();
 
 rst.stopSet();
-})();

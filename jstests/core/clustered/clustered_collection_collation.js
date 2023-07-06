@@ -11,11 +11,10 @@
  */
 
 import {getWinningPlan} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
 import {
     validateClusteredCollectionHint
 } from "jstests/libs/clustered_collections/clustered_collection_hint_common.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const collatedName = 'clustered_collection_with_collation';
 const collated = db[collatedName];

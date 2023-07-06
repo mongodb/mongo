@@ -5,8 +5,6 @@
  * containing a different value using $ne. Previously it would return false when comparing a
  * constant and a field regardless of whether they were equal or not.
  */
-(function() {
-"use strict";
 db.s6147.drop();
 
 assert.commandWorked(db.s6147.insert({a: 1}));
@@ -46,4 +44,3 @@ const expected = [
 ];
 
 assert.eq(cursor.toArray(), expected);
-}());

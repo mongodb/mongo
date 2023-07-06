@@ -7,9 +7,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB(jsTestName());
 
 // Drop and recreate the test database and a test collection.
@@ -22,4 +19,3 @@ assert.commandFailedWithCode(testDB.runCommand({explain: {find: "test"}, unknown
 
 // Test that a generic argument will be accepted by command parsing.
 assert.commandWorked(testDB.runCommand({explain: {find: "test"}, comment: true}));
-})();

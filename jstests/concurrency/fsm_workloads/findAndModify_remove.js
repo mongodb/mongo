@@ -4,6 +4,8 @@
  * Each thread repeatedly inserts a document, and subsequently performs
  * the findAndModify command to remove it.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var data = {shardKey: {tid: 1}};
 

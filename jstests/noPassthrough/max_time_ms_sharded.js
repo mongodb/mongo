@@ -4,9 +4,6 @@
 // @tags: [
 //   requires_replication,
 // ]
-(function() {
-'use strict';
-
 var st = new ShardingTest({
     mongos: 1,
     config: 1,
@@ -280,4 +277,3 @@ assert.throws(() => cursor.next(), [], "expected mongos to abort getMore due to 
 // TODO SERVER-30179: Re-introduce tests for moveChunk and maxTimeMS.
 
 st.stop();
-})();

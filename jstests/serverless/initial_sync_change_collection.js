@@ -5,13 +5,11 @@
 //   requires_fcv_62,
 // ]
 //
-(function() {
-"use strict";
-
-// For waitForFailPoint.
-load("jstests/libs/fail_point_util.js");
-// For verifyChangeCollectionEntries and ChangeStreamMultitenantReplicaSetTest.
-load("jstests/serverless/libs/change_collection_util.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {
+    ChangeStreamMultitenantReplicaSetTest,
+    verifyChangeCollectionEntries
+} from "jstests/serverless/libs/change_collection_util.js";
 
 const replSetTest = new ChangeStreamMultitenantReplicaSetTest({nodes: 1});
 const primary = replSetTest.getPrimary();
@@ -105,4 +103,3 @@ verifyChangeCollectionEntries(secondary, startOplogTimestamp, endOplogTimestamp,
 // This is because the change collection's data is never cloned to the secondary, only it's creation
 // is cloned. As such, we will skip the db hash check on the change collection.
 replSetTest.stopSet(undefined /* signal */, undefined /* forRestart */, {skipCheckDBHashes: true});
-})();

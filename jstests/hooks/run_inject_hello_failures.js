@@ -1,5 +1,3 @@
-'use strict';
-
 // Interval between test loops.
 const kTestLoopPeriodMs = 20 * 1000;
 
@@ -147,9 +145,8 @@ function doFailInjectionLoop(db) {
     }
 }
 
-(function() {
-load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
-load('jstests/libs/fixture_helpers.js');
+import {Topology, DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
 var cmdLineOpts = db.adminCommand('getCmdLineOpts');
@@ -162,4 +159,3 @@ if (topology.type === Topology.kShardedCluster) {
     doFailInjectionLoop(db);
 }
 jsTestLog(`Hello fail hook completed`);
-})();

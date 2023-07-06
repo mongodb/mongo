@@ -2,9 +2,6 @@
  * This tests mongo shell functions bsonWoCompare & bsonBinaryEqual.
  */
 
-(function() {
-'use strict';
-
 var t = db.getCollection("bson");
 t.drop();
 function testObjectsAreEqual(obj1, obj2, equalityFunc, func_name) {
@@ -130,4 +127,3 @@ testObjectsAreEqual(NumberInt("1"), NumberDecimal("1.0"), bsonWoCompareWrapper, 
 testObjectsAreNotEqual(NumberInt("1"), NumberDecimal("1.0"), bsonBinaryEqual, "bsonBinaryEqual");
 testObjectsAreEqual(NumberLong("1"), NumberDecimal("1.0"), bsonWoCompareWrapper, "bsonWoCompare");
 testObjectsAreNotEqual(NumberLong("1"), NumberDecimal("1.0"), bsonBinaryEqual, "bsonBinaryEqual");
-})();

@@ -4,7 +4,7 @@
 //   requires_sharding,
 // ]
 
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 // Used by testPipeline to sort result documents. All _ids must be primitives.

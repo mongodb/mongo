@@ -4,9 +4,6 @@
 //   requires_persistence,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
 // Verifies that the server status response has the fields that we expect.
 function verifyServerStatusFields(serverStatusResponse) {
     assert(serverStatusResponse.hasOwnProperty("readConcernCounters"),
@@ -393,4 +390,3 @@ for (let level of ["local", "majority"]) {
 
 session.endSession();
 rst.stopSet();
-}());

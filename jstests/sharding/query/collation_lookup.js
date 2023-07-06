@@ -6,11 +6,7 @@
  * collation either explicitly set on the aggregation operation, or the collation inherited from the
  * collection the "aggregate" command was performed on.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // for arrayEq
-load("jstests/libs/discover_topology.js");    // For findDataBearingNodes.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collation) {
     // Test that the $lookup stage respects the inherited collation.
@@ -626,4 +622,3 @@ assert.commandWorked(mongosDB.adminCommand({
 runTests(withDefaultCollationColl, withoutDefaultCollationColl, caseInsensitive);
 
 st.stop();
-})();

@@ -1,9 +1,10 @@
 // Validate connect message display.
 //
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {
+    FreeMonGetStatus,
+    FreeMonWebServer,
+    WaitForRegistration
+} from "jstests/free_mon/libs/free_mon.js";
 
 const mock_web = new FreeMonWebServer();
 mock_web.start();
@@ -23,4 +24,3 @@ assert(FreeMonGetStatus(mongod).userReminder.includes(reminder), 'userReminder n
 // Cleanup.
 MongoRunner.stopMongod(mongod);
 mock_web.stop();
-})();

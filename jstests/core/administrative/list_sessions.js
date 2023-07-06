@@ -13,9 +13,7 @@
 
 // Basic tests for the $listSessions aggregation stage.
 
-(function() {
-'use strict';
-load('jstests/aggregation/extras/utils.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const admin = db.getSiblingDB('admin');
 const config = db.getSiblingDB('config');
@@ -75,4 +73,3 @@ assert.eq(0, bsonWoCompare(myArray, resultArrayMine));
 
 // Make sure pipelining other collections fail.
 assertErrorCode(admin.system.collections, pipeline, ErrorCodes.InvalidNamespace);
-})();

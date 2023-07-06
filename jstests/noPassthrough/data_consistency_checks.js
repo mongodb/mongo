@@ -36,13 +36,13 @@ function countMatches(pattern, output) {
     return numMatches;
 }
 
-async function runDataConsistencyChecks(testCase) {
+function runDataConsistencyChecks(testCase) {
     clearRawMongoProgramOutput();
 
     // NOTE: once modules are imported they are cached, so we need to run this in a parallel shell.
     const awaitShell = startParallelShell(async function() {
         globalThis.db = db.getSiblingDB("test");
-        load("jstests/hooks/run_check_repl_dbhash.js");
+        await import("jstests/hooks/run_check_repl_dbhash.js");
         await import("jstests/hooks/run_validate_collections.js");
     }, testCase.conn.port);
 
@@ -56,7 +56,7 @@ async function runDataConsistencyChecks(testCase) {
     return output;
 }
 
-await (async function testReplicaSetWithVotingSecondaries() {
+(function testReplicaSetWithVotingSecondaries() {
     const numNodes = 2;
     const rst = new ReplSetTest({
         nodes: numNodes,
@@ -69,8 +69,7 @@ await (async function testReplicaSetWithVotingSecondaries() {
 
     // Insert a document so the "dbhash" and "validate" commands have some actual work to do.
     assert.commandWorked(rst.nodes[0].getDB("test").mycoll.insert({}));
-    const output =
-        await runDataConsistencyChecks({conn: rst.nodes[0], teardown: () => rst.stopSet()});
+    const output = runDataConsistencyChecks({conn: rst.nodes[0], teardown: () => rst.stopSet()});
 
     let pattern = makePatternForDBHash("test");
     assert.eq(numNodes,
@@ -83,7 +82,7 @@ await (async function testReplicaSetWithVotingSecondaries() {
               "expected to find " + tojson(pattern) + " from each node in the log output");
 })();
 
-await (async function testReplicaSetWithNonVotingSecondaries() {
+(function testReplicaSetWithNonVotingSecondaries() {
     const numNodes = 2;
     const rst = new ReplSetTest({
         nodes: numNodes,
@@ -102,8 +101,7 @@ await (async function testReplicaSetWithNonVotingSecondaries() {
 
     // Insert a document so the "dbhash" and "validate" commands have some actual work to do.
     assert.commandWorked(rst.nodes[0].getDB("test").mycoll.insert({}));
-    const output =
-        await runDataConsistencyChecks({conn: rst.nodes[0], teardown: () => rst.stopSet()});
+    const output = runDataConsistencyChecks({conn: rst.nodes[0], teardown: () => rst.stopSet()});
 
     let pattern = makePatternForDBHash("test");
     assert.eq(numNodes,
@@ -116,7 +114,7 @@ await (async function testReplicaSetWithNonVotingSecondaries() {
               "expected to find " + tojson(pattern) + " from each node in the log output");
 })();
 
-await (async function testShardedClusterWithOneNodeCSRS() {
+(function testShardedClusterWithOneNodeCSRS() {
     const st = new ShardingTest({
         mongos: 1,
         config: 1,
@@ -130,7 +128,7 @@ await (async function testShardedClusterWithOneNodeCSRS() {
     // database exists for when we go to run the data consistency checks against the CSRS.
     st.shardColl(st.s.getDB("test").mycoll, {_id: 1}, false);
 
-    const output = await runDataConsistencyChecks({conn: st.s, teardown: () => st.stop()});
+    const output = runDataConsistencyChecks({conn: st.s, teardown: () => st.stop()});
 
     let pattern = makePatternForDBHash("config");
     assert.eq(0,
@@ -146,7 +144,7 @@ await (async function testShardedClusterWithOneNodeCSRS() {
               "expected to find " + tojson(pattern) + " in the log output for 1-node CSRS");
 })();
 
-await (async function testShardedCluster() {
+(function testShardedCluster() {
     const st = new ShardingTest({
         mongos: 1,
         config: 3,
@@ -167,7 +165,7 @@ await (async function testShardedCluster() {
     // Insert a document so the "dbhash" and "validate" commands have some actual work to do on
     // the replica set shard.
     assert.commandWorked(st.s.getDB("test").mycoll.insert({_id: 0}));
-    const output = await runDataConsistencyChecks({conn: st.s, teardown: () => st.stop()});
+    const output = runDataConsistencyChecks({conn: st.s, teardown: () => st.stop()});
 
     // The "config" database exists on both the CSRS and the replica set shards due to the
     // "config.transactions" collection.

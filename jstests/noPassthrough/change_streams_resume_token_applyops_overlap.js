@@ -8,9 +8,6 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
 // Asserts that the expected operation type and documentKey are found on the change stream
 // cursor. Returns the change stream document.
 function assertWriteVisible({cursor, opType, docKey}) {
@@ -99,4 +96,3 @@ for (let i = 0; i < changeList.length; ++i) {
 }
 
 st.stop();
-})();

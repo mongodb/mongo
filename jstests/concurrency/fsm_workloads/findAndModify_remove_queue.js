@@ -9,8 +9,8 @@
  * This workload was designed to reproduce SERVER-18304.
  */
 
-// For isMongod.
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
     var data = {

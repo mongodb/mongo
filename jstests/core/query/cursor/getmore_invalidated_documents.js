@@ -9,9 +9,6 @@
 
 // Tests for invalidation during a getmore. This behavior is storage-engine dependent.
 // See SERVER-16675.
-(function() {
-"use strict";
-
 var t = db.getmore_invalidated_documents;
 
 var count;
@@ -236,4 +233,3 @@ count = cursor.itcount();
 if (cursor.hasNext()) {
     assert.eq(cursor.next().b, 3);
 }
-})();

@@ -8,8 +8,6 @@
  * ]
  */
 
-(function() {
-"use strict";
 let t = db.geo_parse_err;
 t.drop();
 
@@ -121,4 +119,3 @@ err = t.insert({
 });
 assert.includes(err.getWriteError().errmsg,
                 "Element 1 of \"geometries\" must be an object, instead got type double:");
-})();

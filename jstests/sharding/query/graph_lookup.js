@@ -1,7 +1,4 @@
 // Test aggregating a sharded collection while using $graphLookup on an unsharded collection.
-(function() {
-'use strict';
-
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 assert.commandWorked(st.s0.adminCommand({enablesharding: "test"}));
@@ -60,4 +57,3 @@ assert.commandWorked(db.baz.insert({_id: 1, x: 1}));
 }
 
 st.stop();
-})();

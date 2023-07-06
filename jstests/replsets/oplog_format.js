@@ -7,8 +7,6 @@
  * ]
  */
 
-(function() {
-"use strict";
 const replTest = new ReplSetTest({nodes: 1, oplogSize: 2});
 const nodes = replTest.startSet();
 replTest.initiate();
@@ -172,4 +170,3 @@ assert.docEq({_id: 1, a: {b: [{c: 1}, {c: -1}]}}, coll.findOne({}), msg);
 assertLastOplog({"$v": 2, "diff": {"sa": {"u": {"b": [{"c": 1}, {"c": -1}]}}}}, {_id: 1}, msg);
 
 replTest.stopSet();
-})();

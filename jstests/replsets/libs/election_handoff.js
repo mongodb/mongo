@@ -1,12 +1,8 @@
-"use strict";
-
 /**
  * This file is used for testing election handoff.
  */
 
-var ElectionHandoffTest = (function() {
-    load("jstests/replsets/rslib.js");
-
+export var ElectionHandoffTest = (function() {
     const kStepDownPeriodSecs = 30;
     const kSIGTERM = 15;
 

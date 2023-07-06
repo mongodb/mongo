@@ -6,9 +6,6 @@
  * to show that this behavior can be encountered when running a $merge aggregation which writes
  * to the collection being read from.
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("merge_causes_infinite_loop");
 const coll = db.getCollection("merge_causes_infinite_loop");
@@ -101,4 +98,3 @@ assert(foundDocumentUpdatedMultipleTimes,
            " being aggregated over and merged into: " + tojson(sameCollResult));
 
 MongoRunner.stopMongod(conn);
-}());

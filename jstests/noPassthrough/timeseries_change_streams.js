@@ -3,12 +3,6 @@
 //  requires_timeseries,
 //  requires_replication,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");     // For FixtureHelpers.
-load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest and
-                                             // assert[Valid|Invalid]ChangeStreamNss.
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -50,4 +44,3 @@ assert.commandFailedWithCode(
     ErrorCodes.CommandNotSupportedOnView);
 
 rst.stopSet();
-})();

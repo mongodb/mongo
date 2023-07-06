@@ -6,9 +6,6 @@
  * This is a regression test for SERVER-44938.
  */
 
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "coll";
 
@@ -55,4 +52,3 @@ assert.sameMembers(primaryColl.find({_id: 3}).toArray(), [{_id: 3}]);
 assert.sameMembers(secondary.getDB(dbName)[collName].find({_id: 3}).toArray(), [{_id: 3}]);
 
 rst.stopSet();
-})();

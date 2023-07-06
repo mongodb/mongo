@@ -19,14 +19,10 @@
  *   uses_transactions,
  * ]
  */
-load('jstests/noPassthrough/libs/index_build.js');
-load("jstests/replsets/rslib.js");
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
-
-(function() {
-
-"use strict";
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -103,4 +99,3 @@ IndexBuildTest.assertIndexes(newPrimary.getDB(dbName).getCollection(collName), 2
 IndexBuildTest.assertIndexes(primaryColl, 2, ["_id_", "x_1"]);
 
 rst.stopSet();
-})();

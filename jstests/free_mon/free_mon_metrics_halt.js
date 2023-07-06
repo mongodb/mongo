@@ -1,9 +1,10 @@
 // Ensure free monitoring gives up if metrics returns halt
 //
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {
+    FAULT_HALT_METRICS_5,
+    FreeMonWebServer,
+    WaitForUnRegistration
+} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer(FAULT_HALT_METRICS_5);
 
@@ -26,4 +27,3 @@ WaitForUnRegistration(conn);
 MongoRunner.stopMongod(conn);
 
 mock_web.stop();
-})();

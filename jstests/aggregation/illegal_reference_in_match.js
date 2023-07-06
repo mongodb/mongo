@@ -1,9 +1,6 @@
 // This is intended to reproduce SERVER-39109. The test ensures that when a field path which is
 // illegal inside the aggregation system is used in a $match that is not pushed down to the query
 // system, the correct error is raised.
-(function() {
-"use strict";
-
 const coll = db.illegal_reference_in_match;
 assert.commandWorked(coll.insert({a: 1}));
 
@@ -32,4 +29,3 @@ const pipeline = [
 ];
 
 assert.throwsWithCode(() => coll.aggregate(pipeline), 16410);
-})();

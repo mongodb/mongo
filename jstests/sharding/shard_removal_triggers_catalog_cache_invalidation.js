@@ -2,9 +2,7 @@
  * Tests that shard removal triggers an update of the catalog cache so that routers don't continue
  * to target shards that have been removed.
  */
-(function() {
-'use strict';
-load('jstests/sharding/libs/remove_shard_util.js');
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // Checking UUID consistency involves talking to shards, but this test shuts down shards.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
@@ -79,7 +77,7 @@ const dbName = 'TestDB';
     // for the sharded collection which previously resided on a shard that no longer exists.
     assert.soon(() => {
         try {
-            const count = router1ShardedColl.count({_id: 1});
+            router1ShardedColl.count({_id: 1});
             return true;
         } catch (e) {
             print(e);
@@ -107,7 +105,6 @@ const dbName = 'TestDB';
         "Test that entries for a database whose original primary shard gets removed are correctly invalidated in a router's catalog cache.");
 
     const unshardedCollName = 'UnshardedColl';
-    const unshardedCollNs = dbName + '.' + unshardedCollName;
 
     var st = new ShardingTest({shards: 2, mongos: 2, other: {enableBalancer: true}});
 
@@ -145,7 +142,7 @@ const dbName = 'TestDB';
     // the unsharded collection which previously had as primary a shard that no longer exists.
     assert.soon(() => {
         try {
-            const count = router1UnshardedColl.count({_id: 1});
+            router1UnshardedColl.count({_id: 1});
             return true;
         } catch (e) {
             print(e);
@@ -153,5 +150,4 @@ const dbName = 'TestDB';
         }
     });
     st.stop();
-})();
 })();

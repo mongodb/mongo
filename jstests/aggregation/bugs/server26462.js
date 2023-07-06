@@ -1,8 +1,5 @@
 // Tests that adding a field that only contains metadata does not cause a segmentation fault when
 // grouping on the added field.
-(function() {
-"use strict";
-
 // Drop the old test collection, if any.
 db.server26462.drop();
 
@@ -26,4 +23,3 @@ let res = db.server26462
 
 // Assert that the command worked.
 assert.eq(2, res);
-})();

@@ -4,12 +4,9 @@
  * This test assumes that collections are not implicitly sharded, since $out is prohibited if the
  * output collection is sharded.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
-load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
-load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isMongos.
+import {dropWithoutImplicitRecreate} from "jstests/aggregation/extras/merge_helpers.js";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.source;
 const targetCollName = "target";
@@ -87,4 +84,3 @@ assert.commandWorked(targetColl.insert({_id: 1, a: 0}));
 coll.aggregate(pipeline);
 assert.eq(1, targetColl.find().itcount());
 assert.eq(2, targetColl.getIndexes().length);
-}());

@@ -9,8 +9,7 @@
  */
 
 import {authCommandsLib} from "jstests/auth/lib/commands_lib.js";
-
-load("jstests/libs/fail_point_util.js");  // Helper to enable/disable failpoints easily.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const tests = authCommandsLib.tests;
 

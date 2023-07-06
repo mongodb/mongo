@@ -11,9 +11,9 @@
 //   not_allowed_with_security_token,
 // ]
 //
-load("jstests/aggregation/extras/utils.js");  // For 'resultsEq'.
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 function extractAValues(results) {
     return results.map(function(res) {

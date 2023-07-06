@@ -9,13 +9,9 @@
  *  requires_fcv_61
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For 'assertDropCollection()'
-load("jstests/libs/fail_point_util.js");           // For 'configureFailPoint()'
-load("jstests/libs/parallelTester.js");            // For 'startParallelShell()'
-load('jstests/libs/parallel_shell_helpers.js');    // For 'funWithArgs()'
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 Random.setRandomSeed();
 
@@ -170,4 +166,3 @@ runTestSet(false);
 runTestSet(true);
 
 rst.stopSet();
-})();

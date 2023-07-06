@@ -7,10 +7,7 @@
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-(function() {
-"use strict";
-
-load('jstests/replsets/rslib.js');
+import {reconfig} from "jstests/replsets/rslib.js";
 
 var st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
@@ -136,4 +133,3 @@ st.configRS.getSecondaries().forEach(secConn => {
 });
 
 st.stop();
-})();

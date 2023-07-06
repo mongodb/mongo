@@ -10,9 +10,6 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-"use strict";
-
 var st = new ShardingTest({name: 'sync_conn_cmd', shards: TestData.configShard ? 1 : 0, config: 3});
 st.s.setSecondaryOk();
 
@@ -68,4 +65,3 @@ testCountWithQuery();
 testInvalidCount();
 
 st.stop();
-}());

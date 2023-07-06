@@ -6,10 +6,7 @@
  *   no_selinux,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const dbName = jsTestName();
 
@@ -135,4 +132,3 @@ assert.commandWorked(testDB.runCommand({drop: validatorCollName}));
 
 // Clean up all the data for next run.
 assert.commandWorked(testDB.dropDatabase());
-}());

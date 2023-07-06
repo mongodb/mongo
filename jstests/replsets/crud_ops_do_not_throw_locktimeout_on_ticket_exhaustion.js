@@ -8,11 +8,8 @@
  *   uses_prepare_transaction,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 // We set the number of tickets to be a small value in order to avoid needing to spawn a large
 // number of threads to exhaust all of the available ones.
@@ -148,4 +145,3 @@ for (let joinThread of threads) {
 }
 
 rst.stopSet();
-})();

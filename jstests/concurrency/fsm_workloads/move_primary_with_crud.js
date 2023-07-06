@@ -8,6 +8,7 @@
  *  ]
  */
 
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = (function() {

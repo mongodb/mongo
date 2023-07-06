@@ -1,11 +1,6 @@
 // SERVER-9625 Making accumulators $sum, $min, $max, $avg, $stdDevSamp, and $stdDevPop available as
 // expressions.
 
-// For assertErrorCode.
-load('jstests/aggregation/extras/utils.js');
-
-(function() {
-'use strict';
 var coll = db.server9625;
 coll.drop();
 assert.commandWorked(coll.insert({}));
@@ -71,4 +66,3 @@ testOp({$stdDevSamp: ["$a", {$stdDevSamp: [1, 2, 3]}]}, 0);
 testOp({$sum: ["$a", 2, 3, {$sum: [["$a", 4, 5]]}]}, 16);
 testOp({$min: ["$b", 2, 3, {$min: [["$a", 4, 5]]}]}, 1);
 testOp({$max: ["$a", 2, 3, {$max: [["$b", 4, 5]]}]}, 6);
-}());

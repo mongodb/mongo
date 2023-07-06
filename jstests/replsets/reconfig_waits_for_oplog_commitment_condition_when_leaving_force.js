@@ -3,10 +3,8 @@
  * previous config to be committed in the current config even if we are exiting a config that was
  * installed via a 'force' reconfig.
  */
-(function() {
-"use strict";
-load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/rslib.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {isConfigCommitted, reconnect} from "jstests/replsets/rslib.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -78,4 +76,3 @@ assert.soon(() => isConfigCommitted(primary));
 rst.awaitReplication();
 
 rst.stopSet();
-}());

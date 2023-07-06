@@ -6,9 +6,6 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
-"use strict";
-
 var waitForPrimary = function(conn) {
     assert.soon(function() {
         var res = conn.getDB('admin').runCommand({hello: 1});
@@ -172,4 +169,3 @@ var st = new ShardingTest({shards: 1});
 }
 
 st.stop();
-})();

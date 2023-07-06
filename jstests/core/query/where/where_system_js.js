@@ -7,9 +7,6 @@
 //   requires_non_retryable_writes,
 //   requires_scripting,
 // ]
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB("where_system_js");
 const testColl = testDB.where_system_js;
 const systemJsColl = testDB.system.js;
@@ -50,4 +47,3 @@ assert.commandWorked(
 assert.commandFailedWithCode(
     testDB.runCommand({find: testColl.getName(), filter: {$where: "code_with_scope(this.x)"}}),
     4546000);
-}());

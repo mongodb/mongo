@@ -11,11 +11,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load('jstests/libs/fail_point_util.js');
-load('jstests/noPassthrough/libs/index_build.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 function runTest(numDocs) {
     const dbName = 'test';
@@ -86,4 +82,3 @@ function runTest(numDocs) {
 // in the oplog application code.
 runTest(0);
 runTest(1);
-})();

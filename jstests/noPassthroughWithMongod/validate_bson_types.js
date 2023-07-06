@@ -2,7 +2,6 @@
  * Tests that the validate checkBSONConformance option works with various BSON types.
  */
 
-(function() {
 const coll = db.validate_bson_types;
 
 assert.commandWorked(coll.insert({a: 1.0}));        // double
@@ -30,4 +29,3 @@ assert.commandWorked(coll.insert({s: MinKey()}));                               
 assert.commandWorked(coll.insert({t: MaxKey()}));                               // MaxKey
 
 assert.commandWorked(coll.validate({checkBSONConformance: true}));
-})();

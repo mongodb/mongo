@@ -1,9 +1,6 @@
 /**
  * Tests that the queryHash and planCacheKey are logged correctly.
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("jstests_logs_query_hash");
@@ -65,4 +62,3 @@ runAndVerifySlowQueryLog(
 runAndVerifySlowQueryLog([{"$match": {b: 1}}, lookupStage], {"comment": "pipelineWithHint3"}, hint);
 
 MongoRunner.stopMongod(conn);
-})();

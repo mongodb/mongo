@@ -9,9 +9,6 @@
  *    from the chunk that was migrated away
  */
 
-(function() {
-"use strict";
-
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 const dbName = "test";
@@ -36,17 +33,17 @@ let testDB = st.s.getDB(dbName);
 let testColl = testDB.foo;
 
 // Insert 20 docs in first chunk.
-for (var i = -100; i < -80; i++) {
+for (let i = -100; i < -80; i++) {
     testColl.insert({x: i});
 }
 
 // Insert 10 docs in second chunk.
-for (var i = -5; i < 5; i++) {
+for (let i = -5; i < 5; i++) {
     testColl.insert({x: i});
 }
 
 // Insert 10 docs in third chunk.
-for (var i = 15; i < 25; i++) {
+for (let i = 15; i < 25; i++) {
     testColl.insert({x: i});
 }
 
@@ -100,4 +97,3 @@ assert.soon(() => {
 });
 
 st.stop();
-})();

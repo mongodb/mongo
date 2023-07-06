@@ -9,12 +9,8 @@
  *  assumes_no_implicit_index_creation
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
-                                                   // 'assertChangeStreamEventEq'.
-load('jstests/libs/collection_drop_recreate.js');  // For 'assertDropCollection'.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 
@@ -34,7 +30,6 @@ const systemNS = {
     db: testDB.getName(),
     coll: 'system.js'
 };
-const collRenamed = 'collRenamed';
 
 function runWholeDbChangeStreamTestWithoutSystemEvents(test, cursor, nonSystemColl) {
     assertDropCollection(testDB, nonSystemColl.getName());
@@ -202,4 +197,3 @@ runWholeDbChangeStreamTestWithSystemEvents(test, cursor, regularColl);
 pipeline = [{$changeStream: {showExpandedEvents: true, showSystemEvents: false}}];
 cursor = test.startWatchingChanges({pipeline: pipeline, collection: 1});
 runWholeDbChangeStreamTestWithoutSystemEvents(test, cursor, regularColl);
-}());

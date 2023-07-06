@@ -4,9 +4,6 @@
  * set on the aggregation, or the default collation of the collection.
  * @tags: [assumes_no_implicit_collection_creation_after_drop]
  */
-(function() {
-"use strict";
-
 var res;
 const caseInsensitiveUS = {
     collation: {locale: "en_US", strength: 2}
@@ -171,4 +168,3 @@ res = coll.aggregate(
 assert.eq(1, res.length);
 assert.eq("erica", res[0].username);
 assert.eq(2, res[0].friendUsers.length);
-})();

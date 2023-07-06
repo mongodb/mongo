@@ -13,17 +13,16 @@
  * ]
  */
 
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     isShardMergeEnabled,
     makeTenantDB,
     runMigrationAsync
 } from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/replsets/rslib.js");  // 'createRstArgs'
+import {createRstArgs} from "jstests/replsets/rslib.js";
 
 // Index builds should be blocked by the tenant access blocker, not maxNumActiveUserIndexBuilds.
 const tenantMigrationTest = new TenantMigrationTest(

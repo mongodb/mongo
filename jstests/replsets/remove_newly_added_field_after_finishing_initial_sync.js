@@ -8,11 +8,14 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/replsets/rslib.js');
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {checkWriteConcernTimedOut} from "jstests/libs/write_concern_util.js";
+import {
+    assertVoteCount,
+    getConfigWithNewlyAdded,
+    isMemberNewlyAdded,
+    waitForNewlyAddedRemovalForNodeToBeCommitted,
+} from "jstests/replsets/rslib.js";
 
 const testName = jsTestName();
 const dbName = "testdb";
@@ -240,4 +243,3 @@ rst.nodes[2].reconnect(rst.nodes);
 rst.nodes[3].reconnect(rst.nodes);
 
 rst.stopSet();
-})();

@@ -7,7 +7,6 @@
  *   assumes_unsharded_collection,
  * ]
  */
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
 import {
     testClusteredCollectionHint
 } from "jstests/libs/clustered_collections/clustered_collection_hint_common.js";

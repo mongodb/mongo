@@ -22,9 +22,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 // This test completes with a prepared transaction still active, so we cannot enforce an accurate
 // fast count.
@@ -340,4 +338,3 @@ try {
 }
 
 replTest.stopSet();
-}());

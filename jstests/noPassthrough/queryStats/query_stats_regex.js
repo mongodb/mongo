@@ -2,10 +2,7 @@
  * Test that telemetry works properly for a find command that uses regex.
  * @tags: [featureFlagQueryStatsFindCommand]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/query_stats_utils.js");  // For getQueryStats.
+import {getQueryStats} from "jstests/libs/query_stats_utils.js";
 
 // Turn on the collecting of telemetry metrics.
 let options = {
@@ -33,4 +30,3 @@ assert.commandWorked(bulk.execute());
 }
 
 MongoRunner.stopMongod(conn);
-}());

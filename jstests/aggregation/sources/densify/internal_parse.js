@@ -10,10 +10,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/sources/densify/libs/parse_util.js");
+import {parseUtil} from "jstests/aggregation/sources/densify/libs/parse_util.js";
 
 const dbName = jsTestName();
 const testDB = db.getSiblingDB(dbName);
@@ -36,4 +33,3 @@ const internalColl = internalDB[collName];
 parseUtil(internalDB, internalColl, "$_internalDensify", {
     writeConcern: {w: "majority"},
 });
-})();

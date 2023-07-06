@@ -3,14 +3,13 @@
 //   requires_http_client,
 // ]
 
-load("jstests/ocsp/lib/mock_ocsp.js");
-
-(function() {
-"use strict";
+import {FAULT_REVOKED, MockOCSPServer} from "jstests/ocsp/lib/mock_ocsp.js";
+import {OCSP_CA_PEM, OCSP_CLIENT_CERT, OCSP_SERVER_CERT} from "jstests/ocsp/lib/ocsp_helpers.js";
+import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 // We only have custom logging output for openssl.
 if (determineSSLProvider() !== "openssl") {
-    return;
+    quit();
 }
 
 const mongodOptions = (connectionHealthLoggingOn) => {
@@ -123,4 +122,3 @@ let runTest = (options) => {
 runTest({connectionHealthLoggingOn: true});
 runTest({connectionHealthLoggingOn: false});
 runTest({ocspFaultType: FAULT_REVOKED, connectionHealthLoggingOn: true});
-}());

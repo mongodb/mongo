@@ -2,9 +2,6 @@
  * Confirms that mongod will return an error when the result generated for a distinct command
  * exceeds MaxBSONSize.
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 const db = conn.getDB('test');
 const coll = db.test;
@@ -20,4 +17,3 @@ assert.commandWorked(bulk.execute());
 assert.commandFailedWithCode(db.runCommand({distinct: "test", key: "_id", query: {}}), 17217);
 
 MongoRunner.stopMongod(conn);
-})();

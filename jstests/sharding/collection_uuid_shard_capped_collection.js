@@ -1,9 +1,6 @@
 /**
  * Tests the collectionUUID parameter of the shardCollection command against capped collections.
  */
-(function() {
-'use strict';
-
 const st = new ShardingTest({shards: 1});
 const mongos = st.s0;
 
@@ -38,4 +35,3 @@ assert.commandFailedWithCode(
     ErrorCodes.InvalidOptions);
 
 st.stop();
-})();

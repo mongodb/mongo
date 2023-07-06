@@ -7,9 +7,9 @@
  *   requires_non_retryable_writes,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For 'arrayEq'.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanStage, planHasStage} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/fixture_helpers.js");  // For isMongos().
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Make sure that the test collection is empty before starting the test.
 const testColl = db.update_pipeline_shell_helpers_test;

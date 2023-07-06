@@ -1,10 +1,7 @@
 /**
  * Some more tests $and/$or being nested in various ways.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.jstests_and_or_nested;
 coll.drop();
@@ -65,4 +62,3 @@ runWithDifferentIndexes([[], [{a: 1}], [{b: 1}], [{a: 1}, {b: 1}], [{a: 1}, {c: 
             .toArray(),
         [{_id: 1}, {_id: 5}, {_id: 9}, {_id: 10}, {_id: 12}, {_id: 13}]));
 });
-})();

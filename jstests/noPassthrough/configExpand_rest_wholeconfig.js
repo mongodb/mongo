@@ -1,10 +1,11 @@
 // Test config file expansion using REST at top level.
 // @tags: [requires_http_client]
 
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/configExpand/lib.js');
+import {
+    ConfigExpandRestServer,
+    configExpandSuccess,
+    jsToYaml
+} from "jstests/noPassthrough/libs/configExpand/lib.js";
 
 const web = new ConfigExpandRestServer();
 web.start();
@@ -19,4 +20,3 @@ configExpandSuccess(
     });
 
 web.stop();
-})();

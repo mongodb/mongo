@@ -2,10 +2,6 @@
  * Tests that failpoints can be set via --setParameter on the command line for mongos and mongod
  * only when running with enableTestCommands=1.
  */
-(function() {
-
-"use strict";
-
 function assertStartupSucceeds(conn) {
     assert.commandWorked(conn.adminCommand({hello: 1}));
 }
@@ -137,4 +133,3 @@ for (var parameter in res) {  // for-in loop valid only for top-level field chec
 MongoRunner.stopMongod(mongod);
 MongoRunner.stopMongos(mongos);
 configRS.stopSet();
-})();

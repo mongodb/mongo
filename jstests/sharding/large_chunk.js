@@ -7,10 +7,7 @@
  *  resource_intensive,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // Starts a new sharding environment limiting the chunk size to 1GB (highest value allowed).
 // Note that early splitting will start with a 1/4 of max size currently.
@@ -76,4 +73,3 @@ assert.neq(before[0].shard, after[0].shard, "move chunk did not work");
 st.config.changelog.find().forEach(printjson);
 
 st.stop();
-})();

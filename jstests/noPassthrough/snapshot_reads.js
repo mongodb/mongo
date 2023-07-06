@@ -3,9 +3,6 @@
 //   requires_majority_read_concern,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "coll";
 
@@ -129,4 +126,3 @@ for (let establishCursorCmd of [findCmd, aggCmd]) {
 }
 
 rst.stopSet();
-})();

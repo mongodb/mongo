@@ -5,10 +5,7 @@
 /**
  * Tests the JSON Schema "items" keyword.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/assert_schema_match.js");
+import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 
 const coll = db.getCollection("json_schema_items");
 coll.drop();
@@ -66,4 +63,3 @@ assertSchemaMatch(coll, schema, {}, true);
 assertSchemaMatch(coll, schema, {a: "blah"}, true);
 assertSchemaMatch(coll, schema, {a: []}, true);
 assertSchemaMatch(coll, schema, {a: [1, "foo", {}]}, true);
-}());

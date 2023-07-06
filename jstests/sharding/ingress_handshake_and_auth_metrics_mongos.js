@@ -3,10 +3,7 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/ingress_handshake_metrics_helpers.js');
+import {ingressHandshakeMetricsTest} from "jstests/libs/ingress_handshake_metrics_helpers.js";
 
 let runTest = (connectionHealthLoggingOn) => {
     let st = new ShardingTest({shards: TestData.configShard ? 1 : 0, other: {auth: ''}});
@@ -30,4 +27,3 @@ let runTest = (connectionHealthLoggingOn) => {
 // Parameterized on enabling/disabling connection health logging.
 runTest(true);
 runTest(false);
-})();

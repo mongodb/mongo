@@ -3,9 +3,6 @@
  * compound shard key collections.
  */
 
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 1});
 
 var configDB = st.s.getDB('config');
@@ -44,7 +41,7 @@ function testZoneOnShard(ns, testParameters) {
                 {updateZoneKeyRange: ns, min: chunkMinBoundary, max: chunkMaxBoundary, zone: zone}),
             returnCode);
 
-        var tagDoc = configDB.tags.findOne();
+        let tagDoc = configDB.tags.findOne();
         verifyChunkBounds(tagDoc, ns, currentMinBoundary, currentMaxBoundary, currentZone);
     }
 }
@@ -151,4 +148,3 @@ compoundKeyTestCases.forEach(function(test) {
 });
 
 st.stop();
-})();

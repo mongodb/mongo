@@ -1,13 +1,12 @@
 // Check that OCSP verification works
 // @tags: [requires_http_client]
 
-load("jstests/ocsp/lib/mock_ocsp.js");
-
-(function() {
-"use strict";
+import {MockOCSPServer} from "jstests/ocsp/lib/mock_ocsp.js";
+import {clearOCSPCache, OCSP_CA_PEM, OCSP_SERVER_CERT} from "jstests/ocsp/lib/ocsp_helpers.js";
+import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 if (determineSSLProvider() !== "windows") {
-    return;
+    quit();
 }
 
 var ocsp_options = {
@@ -46,4 +45,3 @@ MongoRunner.stopMongod(conn);
 // sleep to make sure that the threads don't interfere with each other.
 sleep(1000);
 mock_ocsp.stop();
-}());

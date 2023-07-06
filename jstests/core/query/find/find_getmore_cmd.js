@@ -3,9 +3,6 @@
 // ]
 
 // Tests that explicitly invoke the find and getMore commands.
-(function() {
-'use strict';
-
 var cmdRes;
 var cursorId;
 var defaultBatchSize = 101;
@@ -85,4 +82,3 @@ assert.eq(cmdRes.cursor.firstBatch.length, 10);
 
 // Error on invalid collection name.
 assert.commandFailedWithCode(db.runCommand({find: ""}), ErrorCodes.InvalidNamespace);
-})();

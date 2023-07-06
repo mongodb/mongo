@@ -3,11 +3,7 @@
  * @tags: [assumes_balancer_off]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/uuid_util.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -116,4 +112,3 @@ let st =
 })();
 
 st.stop();
-})();

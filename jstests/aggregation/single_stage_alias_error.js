@@ -5,11 +5,11 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {
+    assertErrMsgContains,
+    assertErrMsgDoesNotContain
+} from "jstests/aggregation/extras/utils.js";
 
-// For assertErrMessageContains and assertErrMessageDoesNotContain.
-load("jstests/aggregation/extras/utils.js");
 const coll = db.single_stage_alias_error;
 
 coll.drop();
@@ -42,4 +42,3 @@ assertErrMsgDoesNotContain(coll, pipeline, "$unset");
 var doc = {'_id': 0};
 coll.insert(doc);
 pipeline = [{'$replaceWith': "abc"}];
-})();

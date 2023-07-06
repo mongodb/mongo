@@ -3,16 +3,20 @@
  * sample rate configured via the 'configureQueryAnalyzer' command.
  */
 
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
-
-const fieldName = "x";
+export const fieldName = "x";
 
 /**
  * Tries to run randomly generated find commands against the collection 'collName' in the database
  * 'dbName' at rate 'targetNumPerSec' for 'durationSecs'. Returns the actual rate.
  */
-function runFindCmdsOnRepeat(host, dbName, collName, targetNumPerSec, durationSecs) {
-    load("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
+export async function runFindCmdsOnRepeat(host, dbName, collName, targetNumPerSec, durationSecs) {
+    const {QuerySamplingUtil} =
+        await import("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+    const {AnalyzeShardKeyUtil} =
+        await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+    const {fieldName} =
+        await import("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
+
     const conn = new Mongo(host);
     const db = conn.getDB(dbName);
     const makeCmdObjFunc = () => {
@@ -30,8 +34,14 @@ function runFindCmdsOnRepeat(host, dbName, collName, targetNumPerSec, durationSe
  * Tries to run randomly generated delete commands against the collection 'collName' in the database
  * 'dbName' at rate 'targetNumPerSec' for 'durationSecs'. Returns the actual rate.
  */
-function runDeleteCmdsOnRepeat(host, dbName, collName, targetNumPerSec, durationSecs) {
-    load("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
+export async function runDeleteCmdsOnRepeat(host, dbName, collName, targetNumPerSec, durationSecs) {
+    const {QuerySamplingUtil} =
+        await import("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+    const {AnalyzeShardKeyUtil} =
+        await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+    const {fieldName} =
+        await import("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
+
     const conn = new Mongo(host);
     const db = conn.getDB(dbName);
     const makeCmdObjFunc = () => {
@@ -50,9 +60,15 @@ function runDeleteCmdsOnRepeat(host, dbName, collName, targetNumPerSec, duration
  * 'localCollName' and 'foreignCollName' in the database 'dbName' at rate 'targetNumPerSec' for
  * 'durationSecs'. Returns the actual rate.
  */
-function runNestedAggregateCmdsOnRepeat(
+export async function runNestedAggregateCmdsOnRepeat(
     host, dbName, localCollName, foreignCollName, targetNumPerSec, durationSecs) {
-    load("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
+    const {QuerySamplingUtil} =
+        await import("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+    const {AnalyzeShardKeyUtil} =
+        await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+    const {fieldName} =
+        await import("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
+
     const conn = new Mongo(host);
     const db = conn.getDB(dbName);
     const makeCmdObjFunc = () => {
@@ -73,6 +89,6 @@ function runNestedAggregateCmdsOnRepeat(
     return QuerySamplingUtil.runCmdsOnRepeat(db, makeCmdObjFunc, targetNumPerSec, durationSecs);
 }
 
-function assertDiffWindow(actual, expected, maxDiff) {
+export function assertDiffWindow(actual, expected, maxDiff) {
     return assert.lte(Math.abs(actual - expected), maxDiff, {actual, expected});
 }

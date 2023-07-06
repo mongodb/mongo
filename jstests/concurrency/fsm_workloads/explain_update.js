@@ -3,9 +3,10 @@
  *
  * Runs explain() and update() on a collection.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/explain.js";
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states = Object.extend({
@@ -14,6 +15,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 db[collName].explain('executionStats').update({i: this.nInserted}, {$set: {j: 49}});
             assertAlways.commandWorked(res);
             assertWhenOwnColl(function() {
+                // eslint-disable-next-line
                 assertWhenOwnColl.eq(1, explain.executionStats.totalDocsExamined);
 
                 // document should not have been updated.

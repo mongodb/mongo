@@ -7,11 +7,7 @@
 //  requires_replication,
 // ]
 
-load("jstests/noPassthrough/libs/user_write_blocking.js");
-
-(function() {
-'use strict';
-
+import {UserWriteBlockHelpers} from "jstests/noPassthrough/libs/user_write_blocking.js";
 const {ReplicaFixture, ShardingFixture} = UserWriteBlockHelpers;
 
 // Functions run in parallel shells to downgrade FCV and update a cluster parameter.
@@ -185,4 +181,3 @@ function runShardedTest(fixture) {
     runShardedTest(st);
     st.stop();
 }
-}());

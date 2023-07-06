@@ -1,10 +1,8 @@
-"use strict";
-
 // This is a subclass of Mongo, which stores both the default connection
 // and the direct connection to a specific secondary node. For reads with
 // readPreference "secondary", they are sent to the specific secondary node.
 
-function SpecificSecondaryReaderMongo(host, secondary) {
+export function SpecificSecondaryReaderMongo(host, secondary) {
     var defaultMongo = new Mongo(host);
     var secondaryMongo = new Mongo(secondary);
 

@@ -10,7 +10,7 @@
  * Asserts that 'doc' matches 'schema' if and only if 'valid' is true. Drops 'coll' in the process,
  * so do not pass a collection whose contents you wish to preserve.
  */
-function assertSchemaMatch(coll, schema, doc, valid) {
+export function assertSchemaMatch(coll, schema, doc, valid) {
     const errmsg = "Document " + tojson(doc) +
         (valid ? " should have matched the schema " : " unexpectedly matched the schema ") +
         tojson(schema);

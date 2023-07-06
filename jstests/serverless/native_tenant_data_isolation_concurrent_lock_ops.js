@@ -1,11 +1,8 @@
 // Test that two tenants can hold an X/IX db/collection lock without blocking each others even with
 // having same db and collection names.
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const rst = new ReplSetTest({
     nodes: 3,
@@ -262,4 +259,3 @@ function waitForLock(nss, resource, expectedLockMode) {
 }
 
 rst.stopSet();
-})();

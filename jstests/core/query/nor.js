@@ -1,9 +1,6 @@
 // Test $nor match expression.
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.jstests_core_nor;
 coll.drop();
@@ -36,4 +33,3 @@ assert.commandWorked(coll.insert([
 ]));
 
 assertIds({$nor: [{a: 1}, {b: 2}, {c: 3}]}, [8]);
-}());

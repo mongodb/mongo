@@ -1,7 +1,4 @@
 // Tests that save style updates correctly change immutable fields
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 2, mongos: 1});
 
 var mongos = st.s;
@@ -32,4 +29,3 @@ assert.commandWorked(shard0Coll.update({_id: 1}, {a: 1}));
 assert.commandWorked(shard0Coll.update({_id: 1}, {$set: {a: 1}}));
 
 st.stop();
-})();

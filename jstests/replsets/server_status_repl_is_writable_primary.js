@@ -1,8 +1,6 @@
 /**
  * Tests that serverStatus correctly returns repl.isWritablePrimary instead of repl.ismaster.
  */
-(function() {
-"use strict";
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
 replTest.initiate();
@@ -13,4 +11,3 @@ assert.eq(serverStatusMetricsRepl.isWritablePrimary, true, "repl.isWritablePrima
 assert.eq(
     serverStatusMetricsRepl.hasOwnProperty('ismaster'), false, "repl.ismaster should be undefined");
 replTest.stopSet();
-})();

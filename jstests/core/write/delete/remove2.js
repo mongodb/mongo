@@ -2,9 +2,6 @@
 
 // remove2.js
 // a unit test for db remove
-(function() {
-"use strict";
-
 const t = db.removetest2;
 
 function f() {
@@ -44,4 +41,3 @@ f();
 t.drop();
 t.createIndex({x: 1});
 g();
-})();

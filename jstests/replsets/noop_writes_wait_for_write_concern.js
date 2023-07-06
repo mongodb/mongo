@@ -5,10 +5,7 @@
  * be sure it doesn't get rolled back if we acknowledge it.
  */
 
-(function() {
-"use strict";
-load('jstests/libs/write_concern_util.js');
-load('jstests/noPassthrough/libs/index_build.js');
+import {assertWriteConcernError} from "jstests/libs/write_concern_util.js";
 
 var name = 'noop_writes_wait_for_write_concern';
 var replTest = new ReplSetTest({
@@ -300,4 +297,3 @@ commands.forEach(function(cmd) {
 });
 
 replTest.stopSet();
-})();

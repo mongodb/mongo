@@ -1,9 +1,6 @@
 /**
  * Tests that a time-series collection rejects documents with invalid timeField values
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 
 const dbName = jsTestName();
@@ -49,4 +46,3 @@ assert.eq(null, coll.findOne({meta: mixedDocs[0].meta}));
 assert.eq(null, coll.findOne({meta: mixedDocs[2].meta}));
 
 MongoRunner.stopMongod(conn);
-})();

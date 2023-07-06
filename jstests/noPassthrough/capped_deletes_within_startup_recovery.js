@@ -6,10 +6,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/fail_point_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
@@ -32,4 +29,3 @@ replTest.restart(primary);
 // validation to fail if startup recovery did not perform capped deletes on documents that were
 // inserted earlier in startup recovery.
 replTest.stopSet();
-})();

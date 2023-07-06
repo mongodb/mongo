@@ -3,11 +3,8 @@
  * @tags: [requires_fcv_70]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");           // For 'FixtureHelpers'.
-load("jstests/libs/collection_drop_recreate.js");  // For 'assertDropAndRecreateCollection()'.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 // Make sure the collection exists, because some validation might get skipped otherwise.
@@ -287,4 +284,3 @@ for (const postImageMode of ["required", "updateLookup"]) {
         () => testColl.watch([], {resumeAfter: resumeTokens[resumeTokens.length - 2]}),
         ErrorCodes.ChangeStreamFatalError);
 }
-}());

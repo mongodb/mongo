@@ -4,10 +4,6 @@
  * committed across a majority of nodes.
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
-
 const replTest = new ReplSetTest({nodes: 2, useBridge: true});
 const nodes = replTest.startSet();
 // Initiating with a high election timeout prevents unnecessary elections and also prevents
@@ -48,4 +44,3 @@ secondary.reconnect(primary);
 
 replTest.awaitNodesAgreeOnConfigVersion();
 replTest.stopSet();
-}());

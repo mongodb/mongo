@@ -67,8 +67,8 @@ executor:
   config:
     shell_options:
       eval: >-
-        load("jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js");
-        load('jstests/libs/override_methods/enable_hedged_reads.js');
+        await import("jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js");
+        await import('jstests/libs/override_methods/enable_hedged_reads.js');
   hooks:
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground

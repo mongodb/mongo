@@ -9,9 +9,6 @@
 //   requires_scripting,
 // ]
 //
-(function() {
-"use strict";
-
 const coll = db.mr_replace;
 coll.drop();
 
@@ -46,4 +43,3 @@ assert.commandWorked(outColl.insert({_id: 5, value: 1}));
 assert.commandWorked(coll.mapReduce(mapFn, reduceFn, {out: {replace: outCollStr, db: outDbStr}}));
 actual = outColl.find().sort({_id: 1}).toArray();
 assert.eq(expected, actual);
-}());

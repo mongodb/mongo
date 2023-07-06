@@ -1,9 +1,6 @@
 // Test transactions including multi-deletes
 // @tags: [uses_transactions]
-(function() {
-"use strict";
-
-load('jstests/libs/auto_retry_transaction_in_sharding.js');
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = "test";
 const collName = "multi_delete_in_transaction";
@@ -58,4 +55,3 @@ withTxnAndAutoRetryOnMongos(session, () => {
 
 // Collection should be empty.
 assert.eq(0, testColl.countDocuments({}));
-}());

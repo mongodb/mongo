@@ -8,10 +8,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const kDBName = "out_merge_on_secondary_db";
 
@@ -102,4 +99,3 @@ const outPipeline = [{$group: {_id: "$_id", sum: {$sum: "$a"}}}, {$out: outColl.
 testKillOp(outPipeline, "out_on_secondary_killop", outFailpoint);
 
 replTest.stopSet();
-}());

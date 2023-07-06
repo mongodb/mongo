@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 const collectionConfig = {
@@ -18,4 +15,3 @@ const createResult = db.createCollection("coll", collectionConfig);
 assert.commandFailedWithCode(createResult, 6627201);
 
 MongoRunner.stopMongod(conn);
-})();

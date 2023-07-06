@@ -1,10 +1,7 @@
 /**
  * Test a variety of predicates for the find command's filter, projection and sort expressions.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For arrayEq and orderedArrayEq.
+import {arrayEq, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.find_project_sort;
 coll.drop();
@@ -806,4 +803,3 @@ assert.commandWorked(coll.createIndex({z: 1}));
 
 runFindTestsWithHint({a: 1});
 runFindTestsWithHint({z: 1});  // Multi-key
-}());

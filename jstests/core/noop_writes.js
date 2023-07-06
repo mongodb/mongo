@@ -1,7 +1,4 @@
 // Test basic behavior for no-op writes.
-(function() {
-"use strict";
-
 // Use a high enough number of documents so background operations in passthrough tests, e.g.
 // failovers or migrations, can reliably occur.
 const kNumDocs = 20;
@@ -111,4 +108,3 @@ for (let i = 0; i < kNumDocs; i++) {
 
     assert.isnull(coll.findOne({_id: i}), "Unexpected matching document for i = " + i);
 }
-})();

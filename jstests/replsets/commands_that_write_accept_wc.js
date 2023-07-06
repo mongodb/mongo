@@ -6,8 +6,6 @@
  * ensures that they succeed and fail appropriately.
  */
 
-(function() {
-"use strict";
 var replTest = new ReplSetTest({
     name: 'WCSet',
     // Set priority of secondaries to zero to prevent spurious elections.
@@ -198,4 +196,3 @@ commands.forEach(function(cmd) {
 });
 
 replTest.stopSet();
-})();

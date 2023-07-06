@@ -3,10 +3,7 @@
  * of hybrid index builds.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 let conn = MongoRunner.runMongod();
 let testDB = conn.getDB('test');
@@ -127,4 +124,3 @@ assert.eq(totalDocs, testDB.hybrid.count());
 assert.commandWorked(testDB.hybrid.validate({full: true}));
 
 MongoRunner.stopMongod(conn);
-})();

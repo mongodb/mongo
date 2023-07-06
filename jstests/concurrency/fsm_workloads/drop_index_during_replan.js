@@ -6,6 +6,8 @@
  * time, other threads may be dropping {b: 1}. This tests that the replanning process is robust to
  * index drops.
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     let data = {
         collName: 'drop_index_during_replan',

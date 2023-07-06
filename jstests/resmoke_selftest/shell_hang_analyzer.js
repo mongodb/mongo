@@ -1,6 +1,3 @@
-'use strict';
-(function() {
-
 const anyLineMatches = function(lines, rex) {
     for (const line of lines) {
         if (line.match(rex)) {
@@ -97,5 +94,4 @@ try {
 const lines = rawMongoProgramOutput().split('\n');
 // Nothing should be executed, so there's no output.
 assert.eq(lines, ['']);
-})();
 })();

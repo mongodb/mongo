@@ -8,7 +8,7 @@
  */
 import {planHasStage} from "jstests/libs/analyze_plan.js";
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For "setParameter."
+import {setParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     quit();

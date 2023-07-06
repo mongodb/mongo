@@ -18,9 +18,7 @@
  *
  * @tags: [requires_persistence]
  */
-(function() {
-'use strict';
-load("jstests/replsets/rslib.js");
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 var st, replTest;
 if (TestData.configShard) {
@@ -53,4 +51,3 @@ replTest.awaitNodesAgreeOnPrimary();
 assert.commandWorked(st.s0.getDB('test').user.insert({x: 1}));
 
 st.stop();
-})();

@@ -4,11 +4,6 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");
-
 const coll = db[jsTestName()];
 coll.drop();
 // These tests don't validate the computed $percentile but we need a result to be produced in
@@ -229,4 +224,3 @@ assertValidSyntax({
  */
 assertValidSyntax(
     {pSpec: {$median: {input: "$x", method: "approximate"}}, msg: "Simple base case for $median."});
-})();

@@ -11,7 +11,6 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-load("jstests/libs/fixture_helpers.js");
 
 const arbitraryUpdatesEnabled = TimeseriesTest.arbitraryUpdatesEnabled(db);
 

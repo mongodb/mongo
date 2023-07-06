@@ -2,10 +2,7 @@
 // The purpose is to verify the connectivity between mongos, config server, and the shards
 // @tags: [requires_sharding]
 
-load('jstests/ssl/libs/ssl_helpers.js');
-
-(function() {
-'use strict';
+import {KEYFILE, mixedShardTest} from "jstests/ssl/libs/ssl_helpers.js";
 
 // IndexConsistencyCheck requires auth which ttA/ttA fails at.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
@@ -32,4 +29,3 @@ mixedShardTest(transitionToAuthOptions, keyFileOptions, true);
 print('=== Testing no-auth/keyFile cluster fails ===');
 mixedShardTest(noAuthOptions, keyFileOptions, false);
 mixedShardTest(keyFileOptions, noAuthOptions, false);
-}());

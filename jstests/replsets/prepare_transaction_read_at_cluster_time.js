@@ -9,11 +9,8 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/parallelTester.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const runDBHashFn = (host, dbName, clusterTime, useSnapshot) => {
     const conn = new Mongo(host);
@@ -171,4 +168,3 @@ assert.eq(primaryDBHash.collections, secondaryDBHash.collections);
 assert.eq(primaryDBHash.md5, secondaryDBHash.md5);
 
 rst.stopSet();
-}());

@@ -4,12 +4,12 @@
 //   do_not_wrap_aggregations_in_facets,
 //   requires_pipeline_optimization,
 // ]
-load("jstests/aggregation/extras/utils.js");  // For orderedArrayEq.
+import {orderedArrayEq} from "jstests/aggregation/extras/utils.js";
 import {
     getWinningPlan,
-    planHasStage,
     isAggregationPlan,
-    isQueryPlan
+    isQueryPlan,
+    planHasStage
 } from "jstests/libs/analyze_plan.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 

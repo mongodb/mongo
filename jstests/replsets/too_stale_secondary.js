@@ -30,10 +30,7 @@
  *
  */
 
-(function() {
-"use strict";
-
-load('jstests/replsets/rslib.js');
+import {getFirstOplogEntry} from "jstests/replsets/rslib.js";
 
 /**
  * Overflows the oplog of a given node.
@@ -169,4 +166,3 @@ assert.soon(() => myState(replTest.nodes[2]) === ReplSetTest.State.SECONDARY,
 replTest.waitForState(replTest.nodes[2], ReplSetTest.State.SECONDARY);
 
 replTest.stopSet();
-}());

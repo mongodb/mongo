@@ -3,11 +3,7 @@
  *
  * @tags: [requires_persistence]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/index_catalog_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 let conn = MongoRunner.runMongod();
 
@@ -43,4 +39,3 @@ indexSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), "_id_");
 assert.neq(indexSpec, null);
 
 MongoRunner.stopMongod(conn);
-})();

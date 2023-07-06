@@ -9,9 +9,7 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/write_concern_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const oplogApplierBatchSize = 100;
 
@@ -193,4 +191,3 @@ runTest(false);
 // Extends the test to crash the secondary in the middle of rollback right after oplog truncation.
 // We assert that the update made to the 'config.transactions' table persisted on startup.
 runTest(true);
-})();

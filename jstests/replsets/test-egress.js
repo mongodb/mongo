@@ -2,9 +2,6 @@
 // @tags: [
 // ]
 
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({nodes: 3});
 rst.startSet();
 rst.initiate();
@@ -24,4 +21,3 @@ rst.nodeList().forEach(function(host) {
 });
 
 rst.stopSet();
-}());

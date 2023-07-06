@@ -16,10 +16,13 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 import {findSplitOperation, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/serverless/shard_split_concurrent_reads_on_donor_util.js");
+import {
+    runCommandForConcurrentReadTest,
+    shardSplitConcurrentReadTestCases
+} from "jstests/serverless/shard_split_concurrent_reads_on_donor_util.js";
 
 const ktenantId = ObjectId();
 const tenantIds = [ktenantId];
@@ -31,7 +34,6 @@ const kCollName = "testColl";
  */
 async function resumeMigrationAfterBlockingRead(host, tenantId, targetNumBlockedReads) {
     const {ShardSplitTest} = await import("jstests/serverless/libs/shard_split_test.js");
-    load("jstests/libs/fail_point_util.js");
 
     const primary = new Mongo(host);
     assert.soon(() => ShardSplitTest.getNumBlockedReads(primary, eval(tenantId)) ==

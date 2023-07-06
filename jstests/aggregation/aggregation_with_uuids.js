@@ -5,11 +5,6 @@
  *   assumes_read_concern_unchanged,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For 'isMongos'
-
 const dbName = jsTestName();
 const collName = "foo";
 
@@ -121,4 +116,3 @@ assert.commandFailedWithCode(
     testDB.adminCommand(
         {aggregate: 1, collectionUUID: uuid, pipeline: [{$currentOp: {}}], cursor: {}}),
     4928901);
-})();

@@ -2,9 +2,6 @@
  * Validate that exceptions are reported correctly
  *
  */
-(function() {
-'use strict';
-
 let tests = [
     {
         callback: function() {
@@ -36,6 +33,7 @@ let tests = [
     },
     {
         callback: function() {
+            // eslint-disable-next-line
             foo.bar();
         },
         match: "uncaught exception: ReferenceError: foo is not defined :",
@@ -120,4 +118,3 @@ tests.forEach(function(t) {
         }
     });
 });
-})();

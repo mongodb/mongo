@@ -1,10 +1,7 @@
 // SERVER-22599 Test behavior of in-memory storage engine with full cache.
-(function() {
-'use strict';
-
 if (jsTest.options().storageEngine !== "inMemory") {
     jsTestLog("Skipping test because storageEngine is not inMemory");
-    return;
+    quit();
 }
 
 Random.setRandomSeed();
@@ -84,4 +81,3 @@ assert.eq(t.find({}).itcount(), count, "cannot find expected number of documents
 assert.eq(t.aggregate([{$group: {_id: null, count: {$sum: 1}}}]).next().count,
           count,
           "cannot aggregate expected number of documents");
-}());

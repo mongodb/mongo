@@ -1,8 +1,5 @@
 // Tests the behavior of $not when used in agg expressions.
 
-(function() {
-"use strict";
-
 const coll = db.not_expr;
 coll.drop();
 
@@ -148,4 +145,3 @@ assert.eq(results, [
     {_id: 0, x: "y"},
     {_id: 1, x: "x"},
 ]);
-}());

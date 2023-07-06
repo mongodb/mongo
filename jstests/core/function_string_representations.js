@@ -13,9 +13,6 @@
  * the arguments to mapReduce as strings.
  */
 
-(function() {
-"use strict";
-
 const col = db.function_string_representations;
 const out = db.map_reduce_example;
 col.drop();
@@ -49,4 +46,3 @@ assert.eq(1, col.find({$where: whereFunction}).itcount());
 
 // system.js does not need to be tested, as its contents types' are preserved, and
 // strings are not promoted into functions.
-})();

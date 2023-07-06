@@ -2,12 +2,8 @@
  * Test that _getNextSessionMods filters out unrelated oplog entries.
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/chunk_manipulation_util.js');
-load("jstests/sharding/libs/chunk_bounds_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 /*
  * Returns the oplog entry on the shard that matches the query. Asserts
@@ -86,4 +82,3 @@ assert.eq(1, fromShard.getCollection(ns).find(docs[1]).count());
 assert.eq(1, toShard.getCollection(ns).find(docs[0]).count());
 
 st.stop();
-})();

@@ -7,10 +7,7 @@
  *  expects_explicit_underscore_id_index,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/fixture_helpers.js');  // For isReplSet().
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Function to run the test against a test fixture. Accepts an object that contains the following
 // fields:
@@ -152,4 +149,3 @@ runTest({testFixture: st, conn: st.s0, shardLocal: false, shardOutput: true});
 runTest({testFixture: st, conn: st.s0, shardLocal: true, shardOutput: true});
 
 st.stop();
-})();

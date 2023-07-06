@@ -6,11 +6,8 @@
 //  assumes_against_mongod_not_mongos
 //  ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const collName = "delete_in_txn_produces_correct_doc_key";
 
@@ -116,4 +113,3 @@ testDeleteInMultiDocTxn({
         },
     ],
 });
-}());

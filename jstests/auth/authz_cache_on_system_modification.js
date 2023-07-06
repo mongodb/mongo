@@ -2,9 +2,6 @@
  * This tests that the user cache is invalidated after any changes are made to system collections
  */
 
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod({auth: ''});
 let db = conn.getDB('admin');
 const authzErrorCode = 13;
@@ -67,4 +64,3 @@ db.logout();
 })();
 
 MongoRunner.stopMongod(conn);
-})();

@@ -15,9 +15,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const localDB = db.getSiblingDB("local");
 const t = localDB.capped_update;
 t.drop();
@@ -43,4 +40,3 @@ assert(!doc.hasOwnProperty("_id"), "now has _id after godinsert: " + tojson(doc)
 assert.commandWorked(t.update({a: 2}, {$inc: {a: 1}}));
 doc = t.findOne({a: 3});
 assert(!doc.hasOwnProperty("_id"), "now has _id after update: " + tojson(doc));
-})();

@@ -1,6 +1,6 @@
 // Test basic db operations in multitenancy using a securityToken.
 
-load('jstests/aggregation/extras/utils.js');  // For arrayEq()
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 function checkNsSerializedCorrectly(kDbName, kCollectionName, nsField) {

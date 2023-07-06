@@ -1,6 +1,4 @@
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 /**
  * Initial sync runs in several phases - the first 3 are as follows:
@@ -15,7 +13,7 @@ load("jstests/libs/fail_point_util.js");
 // reInitiate the replica set with a secondary node, which will go through initial sync. This
 // function will hang the secondary in initial sync. turnOffHangBeforeCopyingDatabasesFailPoint
 // must be called after reInitiateSetWithSecondary.
-var reInitiateSetWithSecondary = function(replSet, secondaryConfig) {
+export var reInitiateSetWithSecondary = function(replSet, secondaryConfig) {
     const secondary = replSet.add(secondaryConfig);
     secondary.setSecondaryOk();
 
@@ -39,12 +37,12 @@ var reInitiateSetWithSecondary = function(replSet, secondaryConfig) {
 // Must be called after reInitiateSetWithSecondary. Turns off the
 // initialSyncHangBeforeCopyingDatabases fail point so that the secondary will start copying all
 // non-local databases.
-var turnOffHangBeforeCopyingDatabasesFailPoint = function(secondary) {
+export var turnOffHangBeforeCopyingDatabasesFailPoint = function(secondary) {
     assert.commandWorked(secondary.getDB('admin').runCommand(
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
 };
 
-var finishAndValidate = function(replSet, name, numDocuments) {
+export var finishAndValidate = function(replSet, name, numDocuments) {
     replSet.awaitReplication();
     replSet.awaitSecondaryNodes();
     const dbName = 'test';
@@ -64,12 +62,12 @@ secondary collection: ${tojson(secondaryCollection.find().toArray())}`);
               "Oplog buffer was not dropped after initial sync");
 };
 
-var updateRemove = function(sessionColl, query) {
+export var updateRemove = function(sessionColl, query) {
     assert.commandWorked(sessionColl.update(query, {x: 2}, {upsert: false}));
     assert.commandWorked(sessionColl.remove(query, {justOne: true}));
 };
 
-var insertUpdateRemoveLarge = function(sessionColl, query) {
+export var insertUpdateRemoveLarge = function(sessionColl, query) {
     const kSize10MB = 10 * 1024 * 1024;
     const longString = "a".repeat(kSize10MB);
     assert.commandWorked(sessionColl.insert({x: longString}));

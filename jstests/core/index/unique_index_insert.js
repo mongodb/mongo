@@ -6,8 +6,6 @@
  *      does_not_support_transactions
  *  ]
  */
-(function() {
-"use strict";
 const dbName = "unique_index_insert";
 const collName = "test";
 const testDB = db.getSiblingDB("unique_index_insert");
@@ -34,4 +32,3 @@ for (let iter = 0; iter < maxIters; iter++) {
         assert.commandFailed(coll.insert({i, x: xStr}), `Failed with i ${i}, iter ${iter}`);
     }
 }
-}());

@@ -7,10 +7,7 @@
  *   requires_majority_read_concern,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 // Create a new single-node replica set, and ensure that it can support $changeStream.
 const rst = new ReplSetTest({nodes: 1});
@@ -94,4 +91,3 @@ assert.soon(() => {
 });
 
 rst.stopSet();
-}());

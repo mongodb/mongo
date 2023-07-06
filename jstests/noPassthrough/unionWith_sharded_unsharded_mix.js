@@ -9,9 +9,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 function getDocsFromCollection(collObj) {
     return collObj.find().toArray();
@@ -129,4 +127,3 @@ shardNames.forEach(function(shardName) {
     checkResults(resObj, resSet);
 });
 st.stop();
-})();

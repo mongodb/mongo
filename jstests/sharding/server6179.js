@@ -3,9 +3,6 @@
 //   requires_sharding,
 //   requires_spawning_own_processes,
 // ]
-(function() {
-'use strict';
-
 var s = new ShardingTest({shards: 2});
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
@@ -53,4 +50,3 @@ var expected = [
 assert.eq(result, expected);
 
 s.stop();
-})();

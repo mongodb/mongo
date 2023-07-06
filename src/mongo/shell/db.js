@@ -1,5 +1,4 @@
 // db.js
-
 var DB;
 
 (function() {
@@ -263,23 +262,6 @@ DB.prototype._runAggregate = function(cmdObj, aggregateOptions) {
     }
 
     const res = this.runReadCommand(cmdObj);
-
-    if (!res.ok && (res.code == 17020 || res.errmsg == "unrecognized field \"cursor") &&
-        !("cursor" in aggregateOptions)) {
-        // If the command failed because cursors aren't supported and the user didn't explicitly
-        // request a cursor, try again without requesting a cursor.
-        delete cmdObj.cursor;
-
-        res = doAgg(cmdObj);
-
-        if ('result' in res && !("cursor" in res)) {
-            // convert old-style output to cursor-style output
-            res.cursor = {ns: '', id: NumberLong(0)};
-            res.cursor.firstBatch = res.result;
-            delete res.result;
-        }
-    }
-
     assert.commandWorked(res, "aggregate failed");
 
     if ("cursor" in res) {
@@ -633,7 +615,7 @@ DB.prototype.dbEval = DB.prototype.eval;
  */
 DB.prototype.groupeval = function(parmsObj) {
     var groupFunction = function() {
-        var parms = args[0];
+        var parms = args[0];  // eslint-disable-line
         var c = globalThis.db[parms.ns].find(parms.cond || {});
         var map = new Map();
         var pks = parms.key ? Object.keySet(parms.key) : null;
@@ -707,7 +689,7 @@ DB.prototype._getCollectionInfosCommand = function(
 DB.prototype._getCollectionInfosFromPrivileges = function() {
     let ret = this.runCommand({connectionStatus: 1, showPrivileges: 1});
     if (!ret.ok) {
-        throw _getErrorWithCode(res, "Failed to acquire collection information from privileges");
+        throw _getErrorWithCode(ret, "Failed to acquire collection information from privileges");
     }
 
     // Parse apart collection information.
@@ -988,7 +970,7 @@ DB.prototype.printSecondaryReplicationInfo = function() {
     }
 
     function getPrimary(members) {
-        for (i in members) {
+        for (let i in members) {
             var row = members[i];
             if (row.state === 1) {
                 return row;
@@ -1032,14 +1014,14 @@ DB.prototype.printSecondaryReplicationInfo = function() {
         // no primary, find the most recent op among all members
         else {
             startOptimeDate = new Date(0, 0);
-            for (i in status.members) {
+            for (let i in status.members) {
                 if (status.members[i].optimeDate > startOptimeDate) {
                     startOptimeDate = status.members[i].optimeDate;
                 }
             }
         }
 
-        for (i in status.members) {
+        for (let i in status.members) {
             if (status.members[i].self && status.members[i].state === 5) {
                 print("source: " + status.members[i].name);
                 if (!status.initialSyncStatus) {
@@ -1674,8 +1656,7 @@ DB.prototype.watch = function(pipeline, options) {
     pipeline = pipeline || [];
     assert(pipeline instanceof Array, "'pipeline' argument must be an array");
 
-    let changeStreamStage;
-    [changeStreamStage, aggOptions] = this.getMongo()._extractChangeStreamOptions(options);
+    const [changeStreamStage, aggOptions] = this.getMongo()._extractChangeStreamOptions(options);
     pipeline.unshift(changeStreamStage);
     return this._runAggregate({aggregate: 1, pipeline: pipeline}, aggOptions);
 };
@@ -1704,7 +1685,7 @@ DB.prototype.enableFreeMonitoring = function() {
     assert.commandWorked(this.adminCommand({setFreeMonitoring: 1, action: 'enable'}));
 
     const cmd = this.adminCommand({getFreeMonitoringStatus: 1});
-    if (!cmd.ok && (cmd.code == ErrorCode.Unauthorized)) {
+    if (!cmd.ok && (cmd.code == ErrorCodes.Unauthorized)) {
         // Edge case: It's technically possible that a user can change free-mon state,
         // but is not allowed to inspect it.
         print("Successfully initiated free monitoring, but unable to determine status " +

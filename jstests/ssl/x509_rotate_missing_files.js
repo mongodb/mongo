@@ -1,9 +1,6 @@
 // Check that rotation will fail if a certificate file is missing
 
-(function() {
-"use strict";
-
-load('jstests/ssl/libs/ssl_helpers.js');
+import {copyCertificateFile, determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 function deleteFile(file) {
     if (_isWindows()) {
@@ -49,4 +46,3 @@ for (let certType of certTypes) {
 }
 
 MongoRunner.stopMongod(mongod);
-})();

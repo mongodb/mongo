@@ -3,10 +3,8 @@
  *
  * @tags: [requires_fcv_61]
  */
-(function() {
-"use strict";
-load("jstests/libs/uuid_util.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const sourceNs = "reshardingDb.coll";
 
@@ -55,4 +53,3 @@ assert.eq(bsonWoCompare(logEntry.o2.oldShardKey, {oldKey: 1}), 0, logEntry);
 assert.eq(bsonWoCompare(logEntry.o2.shardKey, {newKey: 1}), 0, logEntry);
 
 reshardingTest.teardown();
-})();

@@ -3,9 +3,6 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
 // Set this to opt into the 'samplesPerSecond' check.
 TestData.testingDiagnosticsEnabled = false;
 
@@ -229,4 +226,3 @@ if (!TestData.auth) {
 
     st.stop();
 }
-})();

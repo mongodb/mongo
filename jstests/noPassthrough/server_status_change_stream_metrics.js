@@ -1,9 +1,6 @@
 /**
  * Tests for serverStatus metrics about change streams.
  */
-(function() {
-"use strict";
-
 function getChangeStreamMetrics(db) {
     const metrics = db.serverStatus().metrics;
     return {
@@ -39,4 +36,3 @@ db.coll.explain().aggregate([{$changeStream: {showExpandedEvents: true}}]);
 checkChangeStreamMetrics(db, 4, 2);
 
 rst.stopSet();
-}());

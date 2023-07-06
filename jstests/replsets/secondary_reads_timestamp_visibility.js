@@ -6,10 +6,7 @@
  * PBWM lock, and before advancing the last applied timestamp for readers.
  *
  */
-(function() {
-"use strict";
-
-load('jstests/replsets/libs/secondary_reads_test.js');
+import {SecondaryReadsTest} from "jstests/replsets/libs/secondary_reads_test.js";
 
 const name = "secondaryReadsTimestampVisibility";
 const collName = "testColl";
@@ -21,7 +18,7 @@ let secondaryDB = secondaryReadsTest.getSecondaryDB();
 
 if (!primaryDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
     secondaryReadsTest.stop();
-    return;
+    quit();
 }
 let primaryColl = primaryDB.getCollection(collName);
 
@@ -97,4 +94,3 @@ for (let i in levels) {
               100);
 }
 secondaryReadsTest.stop();
-})();

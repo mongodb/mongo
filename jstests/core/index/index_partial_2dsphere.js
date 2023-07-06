@@ -4,10 +4,6 @@
 //   requires_non_retryable_writes,
 // ]
 
-(function() {
-
-"use strict";
-
 let coll = db.index_partial_2dsphere;
 coll.drop();
 
@@ -66,4 +62,3 @@ assert.eq(
             {isIndexed: 1, geoJson: {$geoNear: {$geometry: {type: "Point", coordinates: [0, 0]}}}})
         .itcount());
 assert.commandWorked(coll.dropIndex(partialIndex));
-})();

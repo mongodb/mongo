@@ -7,9 +7,6 @@
  * Tests that using the $set update modifier to change only the type of a field will actually update
  * the document, including any relevant indices.
  */
-(function() {
-"use strict";
-
 var coll = db.set_type_change;
 coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
@@ -24,4 +21,3 @@ assert.eq(res.nModified, 1);
 // Make sure it actually changed the type.
 var updated = coll.findOne();
 assert(updated.a instanceof NumberLong, "$set did not update type of value: " + updated.a);
-})();

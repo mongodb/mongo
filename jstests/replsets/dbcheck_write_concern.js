@@ -10,9 +10,6 @@
 
 import {checkHealthlog, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 
-(function() {
-"use strict";
-
 const replSet = new ReplSetTest({
     name: "dbCheckWriteConcern",
     nodes: 2,
@@ -141,4 +138,3 @@ const healthlog = db.getSiblingDB('local').system.healthlog;
 })();
 
 replSet.stopSet();
-})();

@@ -8,7 +8,8 @@
  * Make sure both nodes are either primary or secondary
  */
 
-load("jstests/replsets/rslib.js");
+import {reconnect} from "jstests/replsets/rslib.js";
+
 var name = "removeNodes";
 var host = getHostName();
 

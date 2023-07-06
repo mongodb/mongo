@@ -5,9 +5,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 var collName = "jstests_explain_find";
 var t = db[collName];
 t.drop();
@@ -40,4 +37,3 @@ error = assert.throws(function() {
     t.find().explain("foobar");
 });
 assert.commandFailedWithCode(error, ErrorCodes.BadValue);
-}());

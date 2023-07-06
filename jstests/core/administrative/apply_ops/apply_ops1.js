@@ -18,11 +18,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/index_catalog_helpers.js");
-
 var t = db.apply_ops1;
 t.drop();
 
@@ -525,4 +520,3 @@ assert.commandWorked(db.adminCommand({
                      "Nested apply ops was NOT successful");
 assert.eq(t.findOne({_id: 13}), {_id: 13, x: 'nested apply op update1'});
 assert.eq(t.findOne({_id: 14}), {_id: 14, x: 'nested apply op update2'});
-})();

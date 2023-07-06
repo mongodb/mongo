@@ -3,9 +3,6 @@
  * errors for commands run under a session.
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-
 TestData.networkErrorAndTxnOverrideConfig = {
     retryOnNetworkErrors: true
 };
@@ -42,8 +39,7 @@ rst.initiateWithAnyNodeAsPrimary(
 // We require the 'setParameter' command to initialize a replica set, and the command will fail
 // due to the override below. As a result, we must initiate our replica set before we load these
 // files.
-load('jstests/libs/override_methods/network_error_and_txn_override.js');
-load("jstests/replsets/rslib.js");
+await import("jstests/libs/override_methods/network_error_and_txn_override.js");
 
 const dbName = "test";
 const collName = "auto_retry";
@@ -104,4 +100,3 @@ assert.throws(function() {
 });
 
 rst.stopSet();
-})();

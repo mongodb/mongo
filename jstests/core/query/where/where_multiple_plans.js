@@ -6,9 +6,6 @@
  *   requires_scripting,
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.where_multiple_plans;
 coll.drop();
 
@@ -30,4 +27,3 @@ assert.eq(2,
                   }
               })
               .itcount());
-}());

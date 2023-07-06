@@ -6,9 +6,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
@@ -68,4 +65,3 @@ assert.commandWorked(
     secondaryDB.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
 
 rst.stopSet();
-})();

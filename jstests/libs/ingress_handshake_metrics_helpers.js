@@ -1,10 +1,7 @@
-"use strict";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {findMatchingLogLines} from "jstests/libs/log.js";
 
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/log.js');
-load("jstests/libs/parallel_shell_helpers.js");
-
-function ingressHandshakeMetricsTest(conn, options) {
+export function ingressHandshakeMetricsTest(conn, options) {
     // Unpack test options
 
     const {

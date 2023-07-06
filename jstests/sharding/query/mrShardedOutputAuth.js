@@ -2,10 +2,6 @@
  * Test that a mapReduce job can write sharded output to a database
  * from a separate input database while authenticated to both.
  */
-(function() {
-
-"use strict";
-
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 const st = new ShardingTest(
@@ -45,7 +41,7 @@ function doMapReduce(connection, outputDb) {
         },
         reduce: function(k, values) {
             const result = {};
-            values.forEach(function(value) {
+            values.forEach(function() {
                 result.count = 1;
             });
             return result;
@@ -86,4 +82,3 @@ runTest({user: 'inonly', db: 'input'}, ['readWrite'], assertFailure);
 runTest({user: 'outOnly', db: 'output'}, ['readWrite'], assertFailure);
 
 st.stop();
-})();

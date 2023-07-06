@@ -5,9 +5,6 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-"use strict";
-
 const st = new ShardingTest({
     shards: 2,
     enableBalancer: false,
@@ -69,4 +66,3 @@ for (let id = 0; id < nDocs; ++id) {
 }
 
 st.stop();
-})();

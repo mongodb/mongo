@@ -11,11 +11,8 @@
 // ]
 
 // Tests for $expr in the CRUD commands.
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_assert_error_override.js");  // For 'assert.errorCodeEq'.
-load("jstests/libs/fixture_helpers.js");
+import "jstests/libs/sbe_assert_error_override.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.expr;
 
@@ -324,4 +321,3 @@ writeRes = db.runCommand({
 assert.commandWorkedIgnoringWriteErrors(writeRes);
 assert.eq(writeRes.writeErrors[0].code, 17276, tojson(writeRes));
 assert.eq(writeRes.n, 1, tojson(writeRes));
-})();

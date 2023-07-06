@@ -1,9 +1,6 @@
 /*
  * Verify behavior of retryable write commands on a standalone mongod.
  */
-(function() {
-"use strict";
-
 const standalone = MongoRunner.runMongod();
 const testDB = standalone.getDB("test");
 
@@ -15,4 +12,3 @@ assert.commandFailedWithCode(
     "expected command with transaction number to fail on standalone mongod");
 
 MongoRunner.stopMongod(standalone);
-}());

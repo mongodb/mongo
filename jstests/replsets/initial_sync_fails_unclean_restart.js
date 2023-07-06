@@ -6,11 +6,7 @@
  * shutdown. See SERVER-50140 for more details.
  * @tags: [requires_persistence]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -103,4 +99,3 @@ assert.eq(MongoRunner.EXIT_ABRUPT, waitMongoProgram(initialSyncNode.port));
 rst.remove(initialSyncNode);
 
 rst.stopSet();
-})();

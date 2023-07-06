@@ -2,9 +2,6 @@
  * Test that the server returns an error response for operations that attempt to create a non-capped
  * oplog collection.
  */
-(function() {
-'use strict';
-
 var dbpath = MongoRunner.dataPath + 'noncapped_oplog_creation';
 resetDbpath(dbpath);
 
@@ -35,4 +32,3 @@ assert.commandFailed(localDB.runCommand({
 }));
 
 MongoRunner.stopMongod(conn);
-})();

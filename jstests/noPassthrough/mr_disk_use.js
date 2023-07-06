@@ -1,8 +1,5 @@
 // Test mapReduce use with different values of the allowDiskUseByDefault parameter.
 
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 
@@ -40,4 +37,3 @@ const res = assert.commandWorked(db.runCommand(mapReduceCmd));
 assert.eq(res.results[0], {_id: "a", value: 42}, res);
 
 MongoRunner.stopMongod(conn);
-})();

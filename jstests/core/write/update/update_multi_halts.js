@@ -12,9 +12,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 let coll = db.update_multi_halts;
 
 function testUpsert(withIndex) {
@@ -70,5 +67,4 @@ testUpsert(true /* use ixscan for the filter */);
 
     assert.eq(1, coll.count(), "Count of documents in the collection after update");
     assert.eq(1, coll.find().toArray()[0].cUpdates, "Number of updates on the target doc");
-})();
 })();

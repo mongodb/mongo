@@ -5,9 +5,6 @@
  *   uses_api_parameters,
  * ]
  */
-(function() {
-"use strict";
-
 const dbName = jsTestName();
 const collName = "test";
 const collForeignName = collName + "_foreign";
@@ -121,4 +118,3 @@ assert.commandWorked(db.runCommand(
 assert.commandWorked(db.runCommand({find: "view", apiStrict: true, apiVersion: "1"}));
 
 st.stop();
-})();

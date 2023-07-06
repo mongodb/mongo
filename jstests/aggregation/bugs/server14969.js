@@ -1,7 +1,4 @@
 // Test dropping an index that is being used by an agg pipeline.
-(function() {
-"use strict";
-
 var coll = db.server14969;
 var docsPerBatch = 3;
 coll.drop();
@@ -15,7 +12,7 @@ assert.commandWorked(coll.createIndex({a: 1}));
 
 // Create pipeline that uses index "a", with a small initial batch size.
 var cursor = coll.aggregate([{$match: {a: 1}}], {cursor: {batchSize: docsPerBatch}});
-for (var i = 0; i < docsPerBatch; ++i) {
+for (let i = 0; i < docsPerBatch; ++i) {
     assert(cursor.hasNext());
     assert.eq(1, cursor.next().a);
 }
@@ -33,4 +30,3 @@ try {
 
 // Verify that the server hasn't crashed.
 assert.commandWorked(db.adminCommand({ping: 1}));
-}());

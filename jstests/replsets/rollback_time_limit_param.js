@@ -5,10 +5,6 @@
  * entries.
  */
 
-(function() {
-
-"use strict";
-
 const testName = "rollback_time_limit_param";
 
 // Make sure that we reject non-positive values for this parameter set on startup.
@@ -50,4 +46,3 @@ assert.commandFailedWithCode(primary.adminCommand({setParameter: 1, rollbackTime
                              ErrorCodes.BadValue);
 
 rst.stopSet();
-})();

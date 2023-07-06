@@ -2,10 +2,7 @@
  * Tests that using a $graphLookup stage inside of a $facet stage will yield the same results as
  * using the $graphLookup stage outside of the $facet stage.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For documentEq.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 // We will only use one collection, the $graphLookup will look up from the same collection.
 var graphColl = db.facetGraphLookup;
@@ -49,4 +46,3 @@ const facetedResultsUnwound =
         .aggregate([{$facet: {nested: [graphLookupStage, {$unwind: "$connected"}, sortStage]}}])
         .toArray();
 arrayEq(facetedResultsUnwound, [{nested: normalResultsUnwound}]);
-}());

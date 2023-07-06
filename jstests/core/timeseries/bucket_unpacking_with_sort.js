@@ -14,8 +14,7 @@
  *     requires_timeseries,
  * ]
  */
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
-load("jstests/aggregation/extras/utils.js");  // For getExplainedPipelineFromAggregation.
+import {getExplainedPipelineFromAggregation} from "jstests/aggregation/extras/utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 

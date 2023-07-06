@@ -1,7 +1,7 @@
-load('jstests/libs/fail_point_util.js');
-load('jstests/noPassthrough/libs/index_build.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
-const MissingIndexIdent = class {
+export const MissingIndexIdent = class {
     /**
      * Starts a one-node replica set and gets it into a state where the catalog entry for index
      * 'a_1' references an ident which is missing. Returns with the node stopped.

@@ -6,10 +6,7 @@
  *   uses_atclustertime
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 1});
 reshardingTest.setup();
@@ -69,4 +66,3 @@ assert.soon(() => {
 }, "timed out awaiting cloning cursors to be cleaned up", timeout);
 
 reshardingTest.teardown();
-})();

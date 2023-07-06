@@ -4,9 +4,6 @@
  * test's behavior or remove this test entirely if the behavior changes post v4.2.
  * @tags: [uses_transactions, multiversion_incompatible]
  */
-(function() {
-"use strict";
-
 function runTest(downgradeFCV, succeedDowngrade) {
     const rst = new ReplSetTest({nodes: [{binVersion: "latest"}]});
     rst.startSet();
@@ -76,4 +73,3 @@ if (lastLTSFCV !== lastContinuousFCV) {
     runTest(lastContinuousFCV, true /* succeedDowngrade */);
     runTest(lastContinuousFCV, false /* succeedDowngrade */);
 }
-}());

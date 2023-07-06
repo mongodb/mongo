@@ -1,9 +1,6 @@
 // Make sure MongoD starts with TLS 1.0 disabled (except w/ old OpenSSL).
 
-(function() {
-'use strict';
-
-load("jstests/ssl/libs/ssl_helpers.js");
+import {detectDefaultTLSProtocol} from "jstests/ssl/libs/ssl_helpers.js";
 
 // There will be cases where a connect is impossible,
 // let the test runner clean those up.
@@ -108,4 +105,3 @@ test('TLS1_0', 'TLS1_0', supportsTLS1_1);
 test('TLS1_1,TLS1_2', 'TLS1_0', supportsTLS1_3);
 test('TLS1_1,TLS1_2,TLS1_3', 'TLS1_0', false);
 test('TLS1_0,TLS1_1', 'TLS1_0', supportsTLS1_1);
-})();

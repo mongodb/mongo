@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
 // Test index gets created with an empty range deletions collection
@@ -29,4 +26,3 @@ indexes.forEach((index) => {
 });
 
 st.stop();
-})();

@@ -8,13 +8,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.isMongos().
-load(
-    "jstests/libs/auto_retry_transaction_in_sharding.js");  // For
-                                                            // retryOnceOnTransientAndRestartTxnOnMongos().
+import {
+    retryOnceOnTransientAndRestartTxnOnMongos
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = jsTestName();
 const collName = "test";
@@ -105,4 +101,3 @@ for (const txnInitiatingParams of apiParamCombos) {
         }
     }
 }
-})();

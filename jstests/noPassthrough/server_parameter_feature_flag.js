@@ -3,9 +3,6 @@
 // If it is, then we expect the serverParameter to be available and settable.
 // If it is not, then we expect no such serverParameter.
 
-(function() {
-'use strict';
-
 function runTestForSP(conn) {
     const kFF = 'featureFlagToaster';
     const kSP = 'spTestNeedsFeatureFlagToaster';
@@ -81,4 +78,3 @@ function runTestForCWSP(conn) {
     s.stop();
     jsTest.log('END sharding');
 }
-})();

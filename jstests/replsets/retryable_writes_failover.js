@@ -2,9 +2,6 @@
  * Tests that a retryable write started on one primary can be continued on a different node after
  * failover.
  */
-(function() {
-"use strict";
-
 function stepDownPrimary(replTest) {
     assert.commandWorked(replTest.getPrimary().adminCommand({replSetStepDown: 10, force: true}));
 }
@@ -153,4 +150,3 @@ assert.eq(1, testDB.foo.find({y: 1}).itcount());
 assert.eq(deleteOplogEntries, oplog.find({ns: "test.foo", op: "d"}).itcount());
 
 replTest.stopSet();
-})();

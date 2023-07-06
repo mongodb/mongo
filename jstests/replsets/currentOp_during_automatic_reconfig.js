@@ -5,11 +5,11 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/replsets/rslib.js');
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {
+    isMemberNewlyAdded,
+    waitForNewlyAddedRemovalForNodeToBeCommitted
+} from "jstests/replsets/rslib.js";
 
 const testName = jsTestName();
 const dbName = "testdb";
@@ -82,4 +82,3 @@ assert(found, ops);
 hangDuringAutomaticReconfigFP.off();
 waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 1);
 rst.stopSet();
-})();

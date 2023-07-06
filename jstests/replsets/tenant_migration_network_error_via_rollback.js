@@ -16,12 +16,11 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {makeTenantDB, makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
-load("jstests/replsets/rslib.js");  // for 'stopServerReplication'
 
 function runTest({failPointName, failPointData = {}, batchSize = 10 * 1000}) {
     const migrationX509Options = makeX509OptionsForTest();

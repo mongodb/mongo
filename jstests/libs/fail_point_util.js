@@ -2,13 +2,12 @@
  * Utilities for turning on/off and waiting for fail points.
  */
 
-var configureFailPoint;
-var configureFailPointForRS;
-var kDefaultWaitForFailPointTimeout;
+export var configureFailPoint;
+
+export var configureFailPointForRS;
+export var kDefaultWaitForFailPointTimeout;
 
 (function() {
-"use strict";
-
 if (configureFailPoint) {
     return;  // Protect against this file being double-loaded.
 }

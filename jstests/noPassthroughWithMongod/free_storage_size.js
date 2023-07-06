@@ -8,9 +8,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const forceCheckpoint = () => {
     assert.commandWorked(db.fsyncLock());
     assert.commandWorked(db.fsyncUnlock());
@@ -45,4 +42,3 @@ let dbStats = assert.commandWorked(testDB.stats({freeStorage: 1}));
 assert(dbStats.hasOwnProperty("freeStorageSize"), tojson(dbStats));
 assert.gt(dbStats.freeStorageSize, 0);
 assert.eq(dbStats.freeStorageSize, collStats.freeStorageSize);
-})();

@@ -4,8 +4,6 @@ import {
     navigateToPlanPath
 } from "jstests/libs/optimizer_utils.js";
 
-load("jstests/aggregation/extras/utils.js");
-
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
     quit();

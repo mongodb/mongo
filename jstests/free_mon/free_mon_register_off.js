@@ -1,9 +1,6 @@
 // Validate registration does work if free monitoring is disabled.
 //
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {FreeMonWebServer} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer();
 
@@ -37,4 +34,3 @@ assert.commandFailed(conn.adminCommand({setFreeMonitoring: 1, action: "disable"}
 MongoRunner.stopMongod(conn);
 
 mock_web.stop();
-})();

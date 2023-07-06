@@ -9,10 +9,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 // 2 shards single node, 1 mongos, 1 config server 3-node.
 const st = new ShardingTest({});
@@ -133,4 +132,3 @@ testCases.forEach(testCase => {
 });
 
 st.stop();
-})();

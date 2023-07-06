@@ -1,11 +1,8 @@
 // The following are integration tests for $floor and $ceil.
 
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-// For assertErrorCode.
-load("jstests/aggregation/extras/utils.js");
-load('jstests/libs/sbe_assert_error_override.js');  // Override error-code-checking APIs.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.server19548;
 coll.drop();
@@ -39,4 +36,3 @@ testOp({$floor: -1.2}, -2.0);
 // Non-numeric input.
 assertErrorCode(coll, [{$project: {a: {$ceil: "string"}}}], 28765);
 assertErrorCode(coll, [{$project: {a: {$floor: "string"}}}], 28765);
-}());

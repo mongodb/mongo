@@ -10,10 +10,9 @@
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 const st = new ShardingTest({shards: 2});
 const mongos = st.s0;
@@ -200,4 +199,3 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
 }
 
 st.stop();
-})();

@@ -1,9 +1,6 @@
 // Tests that mongos can autodiscover a config server replica set when the only node it knows about
 // is not the primary.
 
-(function() {
-'use strict';
-
 var rst = new ReplSetTest(
     {name: "configRS", nodes: 3, nodeOptions: {configsvr: "", storageEngine: "wiredTiger"}});
 rst.startSet();
@@ -57,4 +54,3 @@ mongos.setSecondaryOk();
 assert.eq(1, admin.foo.findOne().a);
 MongoRunner.stopMongos(mongos);
 rst.stopSet();
-})();

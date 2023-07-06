@@ -2,7 +2,6 @@
 // aggregation pipeline with timezone expressions executes correctly on mongoS.
 // Requires FCV 5.3 since $mergeCursors was added to explain output in 5.3.
 // @tags: [requires_fcv_53]
-(function() {
 const tzGoodInfoFat = "jstests/libs/config_files/good_timezone_info_fat";
 const tzGoodInfoSlim = "jstests/libs/config_files/good_timezone_info_slim";
 const tzBadInfo = "jstests/libs/config_files/bad_timezone_info";
@@ -122,4 +121,3 @@ function testWithGoodTimeZoneDir(tzGoodInfoDir) {
 
 testWithGoodTimeZoneDir(tzGoodInfoFat);
 testWithGoodTimeZoneDir(tzGoodInfoSlim);
-})();

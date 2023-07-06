@@ -1,7 +1,4 @@
 // @tags: [requires_profiling]
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 const uri = "mongodb://" + conn.host + "/test";
 const tests = [];
@@ -74,4 +71,3 @@ tests.forEach((test) => {
 });
 
 MongoRunner.stopMongod(conn);
-})();

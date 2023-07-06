@@ -1,9 +1,9 @@
-(function() {
-"use strict";
-
 // SERVER-20332 make JS NumberLong more robust
 //
 // Make sure swapping floatApprox, top and bottom don't break NumberLong
+
+// NOTE: don't remove the following line, it's required for tests below
+'use strict';
 
 // Picking 2^54 because it's representable as a double (as a power of
 // two), but big enough that the NumberLong code doesn't know it (numbers
@@ -43,4 +43,3 @@ var number = NumberLong("18014398509481984");
 
     assert.eq(number.valueOf(), 18014398509481984);
 }
-})();

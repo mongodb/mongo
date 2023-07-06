@@ -9,7 +9,6 @@
  * This means that secondary should be replicating a newer refresh after that line
  * above and hit the condition described in the ticket to hit the bug.
  */
-(function() {
 let rsOptions = {nodes: 2};
 let st = new ShardingTest({shards: {rs0: rsOptions, rs1: rsOptions}});
 
@@ -52,4 +51,3 @@ assert.eq(2, res.cursor.firstBatch.length, tojson(res));
 joinUpdate();
 
 st.stop();
-})();

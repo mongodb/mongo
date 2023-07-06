@@ -7,10 +7,7 @@
  * few seconds while the other threads get later optimes and commit their inserts.  The hung thread
  * is released after a few seconds and asserts that its write concern can be satisfied.
  */
-(function() {
-'use strict';
-
-load('jstests/libs/parallelTester.js');
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -71,4 +68,3 @@ for (let i = 0; i < numThreads; ++i) {
 }
 
 rst.stopSet();
-}());

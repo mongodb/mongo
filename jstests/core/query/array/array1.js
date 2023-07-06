@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 const coll = db.array1;
 coll.drop();
 
@@ -16,4 +13,3 @@ assert.eq(2, coll.find(x).count());
 
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.eq(2, coll.find(x).count());
-}());

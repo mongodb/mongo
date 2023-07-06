@@ -1,9 +1,10 @@
 // Test config file expansion using EXEC with digests.
 
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/configExpand/lib.js');
+import {
+    configExpandFailure,
+    configExpandSuccess,
+    makeReflectionCmd
+} from "jstests/noPassthrough/libs/configExpand/lib.js";
 
 // hash === SHA256HMAC('12345', 'secret')
 const hash = 'f88c7ebe4740db59c873cecf5e1f18e3726a1ad64068a13d764b79028430ab0e';
@@ -54,4 +55,3 @@ configExpandFailure({
     }
 },
                     /does not match expected digest/);
-})();

@@ -1,8 +1,6 @@
 // This test is to ensure that limit() clauses are pushed down to the shards and evaluated
 // See: http://jira.mongodb.org/browse/SERVER-1896
-(function() {
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var s = new ShardingTest({name: "limit_push", shards: 2, mongos: 1});
 var db = s.getDB("test");
@@ -59,4 +57,3 @@ for (var j in execStages.shards) {
 }
 
 s.stop();
-})();

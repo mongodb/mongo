@@ -4,9 +4,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/doc_validation_utils.js");  // for assertDocumentValidationFailure
+import {assertDocumentValidationFailure} from "jstests/libs/doc_validation_utils.js";
 
 const mongod = MongoRunner.runMongod();
 const db = mongod.getDB(jsTest.name());
@@ -254,4 +252,3 @@ bulkOp.find({$expr: {$lt: ["$x", 1]}}).remove();
 checkCounters(() => assert.commandWorked(bulkOp.execute()), {"$eq": 1, "$lt": 1});
 
 MongoRunner.stopMongod(mongod);
-})();

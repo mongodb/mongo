@@ -5,9 +5,6 @@
  * depth until the key is too large to index. This tests that we support at least the minimum
  * supported BSON nesting depth, as well as maintaining index consistency.
  */
-(function() {
-"use strict";
-
 function makeNestArr(depth) {
     if (depth == 1) {
         return {a: 1};
@@ -43,4 +40,3 @@ assert.gt(level,
 assert.eq(collection.count(),
           collection.find().hint({a: 1}).itcount(),
           "Number of documents in collection does not match number of entries in index");
-}());

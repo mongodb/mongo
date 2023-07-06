@@ -1,7 +1,4 @@
 // Tests renaming the system.buckets collection.
-(function() {
-"use strict";
-
 // Set up the test database.
 const dbName = "test";
 const collName = "mongosync.tmp.UUID123";
@@ -125,4 +122,3 @@ jsTestLog("Sharding: Testing rename timeseries collection");
 
     st.stop();
 }
-})();

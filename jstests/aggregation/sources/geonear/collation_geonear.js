@@ -4,9 +4,6 @@
 // ]
 
 // Test that the $geoNear stage's query predicate respects the collation.
-(function() {
-"use strict";
-
 const caseInsensitive = {
     collation: {locale: "en_US", strength: 2}
 };
@@ -82,4 +79,3 @@ assert.eq(0,
                          }],
                          {collation: {locale: "simple"}})
               .itcount());
-})();

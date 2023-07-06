@@ -6,11 +6,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 Random.setRandomSeed();
 
@@ -70,7 +66,7 @@ reshardingTest.withReshardingInBackground(
             {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
         ],
     },
-    (tempNs) => {
+    () => {
         const mongos = inputCollection.getMongo();
 
         const getShardEstimate = (doc, shardName) => {
@@ -135,4 +131,3 @@ reshardingTest.withReshardingInBackground(
     });
 
 reshardingTest.teardown();
-})();

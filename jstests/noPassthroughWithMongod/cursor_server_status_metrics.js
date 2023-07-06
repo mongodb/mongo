@@ -1,7 +1,6 @@
 /**
  * Tests for serverStatus metrics.cursor stats.
  */
-(function() {
 var coll = db[jsTest.name()];
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1}));
@@ -83,4 +82,3 @@ cursor.next();
 assert(!cursor.hasNext());
 assert.eq(initialTotalOpen, getCurrentCursorsOpen());
 assert.eq(0, getCurrentCursorsPinned());
-}());

@@ -6,7 +6,8 @@
  * moves don't happen and that large changes in document size are handled
  * correctly.
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
     var data = {

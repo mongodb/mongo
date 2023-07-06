@@ -6,10 +6,9 @@
 //   does_not_support_causal_consistency,
 // ]
 
-(function() {
-'use strict';
-
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 
 const t = db.jstests_orf;
 t.drop();
@@ -31,4 +30,3 @@ assert.eq(expectedKeysExamined, explain.executionStats.totalKeysExamined, 'keys 
 assert.eq(200, explain.executionStats.totalDocsExamined, 'docs examined');
 
 assert.eq(200, t.count({$or: a}));
-})();

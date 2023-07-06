@@ -3,10 +3,10 @@
  * single shard work without having to use the two phase protocol.
  */
 
-(function() {
-'use strict';
-
-load('jstests/sharding/libs/without_two_phase_util.js');
+import {
+    assertExplainTargetsCorrectShard,
+    splitAndMoveChunks
+} from "jstests/sharding/libs/without_two_phase_util.js";
 
 const st = new ShardingTest({
     shards: 2,
@@ -59,4 +59,3 @@ assert.commandFailedWithCode(db.runCommand(cmdObj), ErrorCodes.ShardKeyNotFound)
 assert.commandFailedWithCode(db.runCommand({explain: cmdObj}), ErrorCodes.ShardKeyNotFound);
 
 st.stop();
-})();

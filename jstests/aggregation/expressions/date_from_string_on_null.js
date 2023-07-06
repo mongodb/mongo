@@ -1,9 +1,6 @@
 /**
  * Tests for the $dateFromString expression with the optional 'onNull' parameter.
  */
-(function() {
-"use strict";
-
 const onNullValue = ISODate("2017-07-04T11:56:02Z");
 const coll = db.date_from_string_on_null;
 coll.drop();
@@ -63,4 +60,3 @@ assert.eq(
     coll.aggregate(
             {$project: {date: {$dateFromString: {dateString: "$missing", onNull: "$missing"}}}})
         .toArray());
-})();

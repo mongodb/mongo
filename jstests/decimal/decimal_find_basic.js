@@ -1,7 +1,5 @@
 // Tests finding NumberDecimal from the shell.
 
-(function() {
-"use strict";
 var col = db.decimal_find_basic;
 col.drop();
 
@@ -51,4 +49,3 @@ assert.commandWorked(col.insert([
 
 assert.eq(col.find({"max": NumberDecimal("9999999999999999999999999999999999E6111")}).count(), 1);
 assert.eq(col.find({"min": NumberDecimal("1E-6176")}).count(), 1);
-}());

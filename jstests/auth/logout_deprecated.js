@@ -7,9 +7,6 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
 function runTest(conn) {
     const logId = 5626600;
     const logAttr = {};
@@ -47,4 +44,3 @@ function runTest(conn) {
     runTest(st.s0);
     st.stop();
 }
-})();

@@ -1,8 +1,5 @@
 // SERVER-22011: Deadlock in ticket distribution
 // @tags: [requires_replication, requires_capped]
-(function() {
-'use strict';
-
 // Limit concurrent WiredTiger transactions to maximize locking issues, harmless for other SEs.
 var options = {verbose: 1};
 
@@ -42,4 +39,3 @@ shells.forEach((function(f) {
     f();
 }));
 replTest.stopSet();
-}());

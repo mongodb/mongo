@@ -7,9 +7,6 @@
  *   requires_wiredtiger,
  * ]
  */
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({
     nodes: [
         {
@@ -107,4 +104,3 @@ checkLog.containsJson(secondary, 21536, {
 rst.awaitReplication();
 
 rst.stopSet();
-})();

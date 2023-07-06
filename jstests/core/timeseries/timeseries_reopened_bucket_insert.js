@@ -13,7 +13,7 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
     jsTestLog(
@@ -52,7 +52,7 @@ const checkIfBucketReopened = function(
     assert.eq(stats.timeseries['numBucketsReopened'], expectedReopenedBuckets);
 };
 
-const expectNoBucketReopening = function() {
+(function expectNoBucketReopening() {
     jsTestLog("Entering expectNoBucketReopening...");
     resetCollection();
 
@@ -71,9 +71,9 @@ const expectNoBucketReopening = function() {
     checkIfBucketReopened(measurement2, /* willCreateBucket */ false, /* willReopenBucket */ false);
 
     jsTestLog("Exiting expectNoBucketReopening.");
-}();
+})();
 
-const expectToReopenBuckets = function() {
+(function expectToReopenBuckets() {
     jsTestLog("Entering expectToReopenBuckets...");
     resetCollection();
 
@@ -144,9 +144,9 @@ const expectToReopenBuckets = function() {
     checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
 
     jsTestLog("Exiting expectToReopenBuckets.");
-}();
+})();
 
-const expectToReopenBucketsWithComplexMeta = function() {
+(function expectToReopenBucketsWithComplexMeta() {
     jsTestLog("Entering expectToReopenBucketsWithComplexMeta...");
     resetCollection();
 
@@ -186,9 +186,9 @@ const expectToReopenBucketsWithComplexMeta = function() {
     checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     jsTestLog("Exiting expectToReopenBucketsWithComplexMeta.");
-}();
+})();
 
-const expectToReopenArchivedBuckets = function() {
+(function expectToReopenArchivedBuckets() {
     jsTestLog("Entering expectToReopenArchivedBuckets...");
     resetCollection();
 
@@ -212,48 +212,48 @@ const expectToReopenArchivedBuckets = function() {
     checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
 
     jsTestLog("Exiting expectToReopenArchivedBuckets.");
-}();
+})();
 
-// TODO SERVER-77454: Investigate re-enabling this.
-const expectToReopenCompressedBuckets = function() {
-    if (!FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
-        return;
-    }
+// TODO SERVER-77454: Investigate re-enabling this test.
+// (function expectToReopenCompressedBuckets() {
+//     if (!FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
+//         return;
+//     }
 
-    jsTestLog("Entering expectToReopenCompressedBuckets...");
-    resetCollection();
+//     jsTestLog("Entering expectToReopenCompressedBuckets...");
+//     resetCollection();
 
-    let initialMeasurements = [];
-    for (let i = 0; i < 5; ++i) {
-        initialMeasurements.push({
-            [timeField]: ISODate("2022-08-26T19:19:00Z"),
-            [metaField]: "ReopenedBucket1",
-        });
-    }
-    const forward = {
-        [timeField]: ISODate("2022-08-27T19:19:00Z"),
-        [metaField]: "ReopenedBucket1",
-    };
-    const backward = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
-        [metaField]: "ReopenedBucket1",
-    };
+//     let initialMeasurements = [];
+//     for (let i = 0; i < 5; ++i) {
+//         initialMeasurements.push({
+//             [timeField]: ISODate("2022-08-26T19:19:00Z"),
+//             [metaField]: "ReopenedBucket1",
+//         });
+//     }
+//     const forward = {
+//         [timeField]: ISODate("2022-08-27T19:19:00Z"),
+//         [metaField]: "ReopenedBucket1",
+//     };
+//     const backward = {
+//         [timeField]: ISODate("2022-08-26T19:19:00Z"),
+//         [metaField]: "ReopenedBucket1",
+//     };
 
-    for (let i = 0; i < initialMeasurements.length; ++i) {
-        checkIfBucketReopened(
-            initialMeasurements[i], /* willCreateBucket */ i == 0, /* willReopenBucket */ false);
-    }
-    // Time forwards will open a new bucket, and close and compress the old one.
-    checkIfBucketReopened(forward, /* willCreateBucket */ true, /* willReopenBucket */ false);
-    assert.eq(1, bucketsColl.find({"control.version": 2}).toArray().length);
+//     for (let i = 0; i < initialMeasurements.length; ++i) {
+//         checkIfBucketReopened(
+//             initialMeasurements[i], /* willCreateBucket */ i == 0, /* willReopenBucket */ false);
+//     }
+//     // Time forwards will open a new bucket, and close and compress the old one.
+//     checkIfBucketReopened(forward, /* willCreateBucket */ true, /* willReopenBucket */ false);
+//     assert.eq(1, bucketsColl.find({"control.version": 2}).toArray().length);
 
-    // We expect to reopen the compressed bucket with time backwards.
-    checkIfBucketReopened(backward, /* willCreateBucket */ false, /* willReopenBucket */ true);
+//     // We expect to reopen the compressed bucket with time backwards.
+//     checkIfBucketReopened(backward, /* willCreateBucket */ false, /* willReopenBucket */ true);
 
-    jsTestLog("Exiting expectToReopenCompressedBuckets.");
-};
+//     jsTestLog("Exiting expectToReopenCompressedBuckets.");
+// })();
 
-const failToReopenNonSuitableBuckets = function() {
+(function failToReopenNonSuitableBuckets() {
     jsTestLog("Entering failToReopenNonSuitableBuckets...");
     resetCollection();
 
@@ -401,9 +401,9 @@ const failToReopenNonSuitableBuckets = function() {
     checkIfBucketReopened(measurement5, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     jsTestLog("Exiting failToReopenNonSuitableBuckets.");
-}();
+})();
 
-const failToReopenBucketWithNoMetaTimeIndex = function() {
+(function failToReopenBucketWithNoMetaTimeIndex() {
     jsTestLog("Entering failToReopenBucketWithNoMetaTimeIndex...");
     resetCollection();
 
@@ -512,9 +512,9 @@ const failToReopenBucketWithNoMetaTimeIndex = function() {
     checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
 
     jsTestLog("Exiting failToReopenBucketWithNoMetaTimeIndex.");
-}();
+})();
 
-const reopenBucketsWhenSuitableIndexExists = function() {
+(function reopenBucketsWhenSuitableIndexExists() {
     jsTestLog("Entering reopenBucketsWhenSuitableIndexExists...");
     resetCollection();
 
@@ -660,9 +660,9 @@ const reopenBucketsWhenSuitableIndexExists = function() {
     checkIfBucketReopened(measurement4, /* willCreateBucket */ false, /* willReopenBucket */ true);
 
     jsTestLog("Exiting reopenBucketsWhenSuitableIndexExists.");
-}();
+})();
 
-const reopenBucketsWhenSuitableIndexExistsNoMeta = function() {
+(function reopenBucketsWhenSuitableIndexExistsNoMeta() {
     jsTestLog("Entering reopenBucketsWhenSuitableIndexExistsNoMeta...");
     coll.drop();
     assert.commandWorked(
@@ -771,6 +771,6 @@ const reopenBucketsWhenSuitableIndexExistsNoMeta = function() {
     }
 
     jsTestLog("Exiting reopenBucketsWhenSuitableIndexExistsNoMeta.");
-}();
+})();
 
 coll.drop();

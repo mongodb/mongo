@@ -1,8 +1,3 @@
-// Runner for checkOplogs() that compares the oplog on all replica set nodes
-// to ensure all nodes have the same data.
-'use strict';
-
-(function() {
 var startTime = Date.now();
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a mongod?');
 
@@ -35,4 +30,3 @@ if (db.getMongo().isMongos()) {
 
 var totalTime = Date.now() - startTime;
 print('Finished consistency oplog checks of cluster in ' + totalTime + ' ms.');
-})();

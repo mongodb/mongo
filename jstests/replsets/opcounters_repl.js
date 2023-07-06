@@ -5,9 +5,6 @@
  * secondary.
  */
 
-(function() {
-"use strict";
-
 const testName = "opcounters_repl";
 const dbName = testName;
 const rst = new ReplSetTest({name: testName, nodes: 2});
@@ -102,4 +99,3 @@ assert.eq(diff.primary.insert, 1);
 assert.eq(diff.secondary.insert, 1);
 
 rst.stopSet();
-})();

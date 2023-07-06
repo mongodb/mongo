@@ -21,13 +21,10 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallelTester.js');
-load("jstests/sharding/libs/create_sharded_collection_util.js");
-load("jstests/libs/auto_retry_transaction_in_sharding.js");  // For withTxnAndAutoRetryOnMongos.
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const kNumWriteTickets = 10;
 const st = new ShardingTest({
@@ -149,4 +146,3 @@ removeOperationThreads.forEach((thread) => {
 });
 
 st.stop();
-})();

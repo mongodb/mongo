@@ -3,11 +3,7 @@
  *
  * @tags: [requires_replication]
  */
-
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const failpointName = "forceSyncSourceCandidate";
 
@@ -36,4 +32,3 @@ rst.awaitSyncSource(nodes[2], nodes[1]);
 rst.awaitSyncSource(nodes[3], nodes[2]);
 
 rst.stopSet();
-})();

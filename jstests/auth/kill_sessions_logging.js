@@ -2,8 +2,6 @@
 //
 // @tags: [requires_sharding]
 
-"use strict";
-
 function testFixtureSimple(name) {
     this.name = name + " (simple)";
     jsTest.log("Starting test: " + this.name);

@@ -2,7 +2,6 @@
 
 var baseName = "jstests_auth_repl";
 var rsName = baseName + "_rs";
-var rtName = baseName + "_rt";
 var mongoOptions = {auth: null, keyFile: "jstests/libs/key1"};
 var authErrCode = 13;
 
@@ -138,7 +137,7 @@ var AuthReplTest = function(spec) {
             assert.commandWorked(res);
         }
 
-        var res = adminPri.runCommand({
+        res = adminPri.runCommand({
             createUser: testUser,
             pwd: testUser,
             roles: [testRole],
@@ -172,7 +171,7 @@ var AuthReplTest = function(spec) {
 };
 
 jsTest.log("1 test replica sets");
-const rs = new ReplSetTest({name: rsName, nodes: 2});
+let rs = new ReplSetTest({name: rsName, nodes: 2});
 var nodes = rs.startSet(mongoOptions);
 rs.initiate();
 authutil.asCluster(nodes, "jstests/libs/key1", function() {
@@ -197,7 +196,7 @@ authutil.asCluster(nodes, "jstests/libs/key1", function() {
 
 primary = rs.getPrimary();
 
-var authReplTest = AuthReplTest({primaryConn: primary, secondaryConn: null});
+authReplTest = AuthReplTest({primaryConn: primary, secondaryConn: null});
 authReplTest.createUserAndRoles(1);
 
 // Add a secondary and wait for initial sync

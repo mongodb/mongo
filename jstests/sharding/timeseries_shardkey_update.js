@@ -63,9 +63,9 @@ setUpShardedCluster();
     jsTestLog(`Running update multi: ${tojson(updateMultiCmd)}`);
 
     // We don't allow update multi to modify the shard key at all.
-    const res = assert.commandFailedWithCode(testDB.runCommand(updateMultiCmd),
-                                             ErrorCodes.InvalidOptions,
-                                             `cmd = ${tojson(updateMultiCmd)}`);
+    assert.commandFailedWithCode(testDB.runCommand(updateMultiCmd),
+                                 ErrorCodes.InvalidOptions,
+                                 `cmd = ${tojson(updateMultiCmd)}`);
     assert.sameMembers(docs, coll.find().toArray(), "Collection contents did not match");
 })();
 

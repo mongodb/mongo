@@ -14,7 +14,7 @@
  * data in these tests is small and that enables HJ as long as 'allowDiskUse' is 'true').
  */
 
-load("jstests/aggregation/extras/utils.js");
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 

@@ -1,9 +1,6 @@
 /**
  * Verifies cluster time metadata is not gossiped or processed by nodes in an unreadable state.
  */
-(function() {
-"use strict";
-
 function setUpUsers(rst) {
     const primaryAdminDB = rst.getPrimary().getDB("admin");
     assert.commandWorked(
@@ -76,4 +73,3 @@ secondaryAdminDB.logout();
 secondaryTestDB.logout();
 
 rst.stopSet();
-})();

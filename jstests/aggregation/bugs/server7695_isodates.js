@@ -1,11 +1,8 @@
 // SERVER-7695: Add $isoWeek, $isoWeekYear, and $isoDayOfWeek aggregation expressions.
+import {DateUtil} from "jstests/libs/dateutil.js";
 
-(function() {
-"use strict";
 const coll = db.server7695;
 let testOpCount = 0;
-
-load('jstests/libs/dateutil.js');
 
 coll.drop();
 
@@ -19,7 +16,6 @@ function testOp(op, value, expResult) {
     testOpCount++;
     let pipeline = [{$project: {_id: 0, result: {}}}];
     pipeline[0].$project.result[op] = value;
-    let msg = "Exptected {" + op + ": " + value + "} to equal: " + expResult;
     let res = assert.commandWorked(coll.runCommand('aggregate', {pipeline: pipeline, cursor: {}}));
 
     // in the case of $dateToString the date is on property date
@@ -252,4 +248,3 @@ const SUNDAY = 7;
     });
 });
 assert.eq(testOpCount, 486, "unexpected number of calls to 'testOp()'");
-})();

@@ -1,7 +1,4 @@
 // This tests sharding an existing collection that both shards are aware of (SERVER-2828)
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 2, mongos: 2});
 
 assert.commandWorked(st.s0.adminCommand({enablesharding: "test"}));
@@ -55,4 +52,3 @@ assert.commandWorked(
     st.s0.adminCommand({moveChunk: "test.existing3", find: {_id: 1}, to: st.shard0.shardName}));
 
 st.stop();
-})();

@@ -1,10 +1,5 @@
 // Inserts some interesting data into a sharded collection, enables the balancer, and tests that
 // various kinds of aggregations return the expected results.
-(function() {
-'use strict';
-
-load('jstests/aggregation/extras/utils.js');
-
 const shardedAggTest = new ShardingTest({shards: 2, mongos: 1});
 
 assert.commandWorked(shardedAggTest.s0.adminCommand({enablesharding: "aggShard"}));
@@ -83,7 +78,7 @@ shardedAggTest.awaitBalancerRound();
         database.ts1.aggregate([{$group: {_id: "$number", total: {$sum: 1}}}, {$sort: {_id: 1}}])
             .toArray();
 
-    for (var i = 0; i < strings.length; ++i) {
+    for (let i = 0; i < strings.length; ++i) {
         assert.eq(a3[i].total, nItems / strings.length, 'agg sharded test sum numbers failed');
     }
 
@@ -103,7 +98,7 @@ shardedAggTest.awaitBalancerRound();
                  }])
                  .toArray();
     assert.eq(a4.length, 6, tojson(a4));
-    for (var i = 0; i < 6; ++i) {
+    for (let i = 0; i < 6; ++i) {
         var c = a4[i].counter;
         printjson({c: c});
         assert(
@@ -251,4 +246,3 @@ testSample(nItems + 1);
 }());
 
 shardedAggTest.stop();
-}());

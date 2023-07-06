@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 // This test makes assertions about the number of sessions, which are not compatible with
 // implicit sessions.
 TestData.disableImplicitSessions = true;
@@ -77,4 +74,3 @@ admin.logout();
 //
 
 MongoRunner.stopMongod(conn);
-})();

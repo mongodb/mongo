@@ -2,11 +2,9 @@
  * Tests dropping a collection (causing an external index build abort) does not deadlock with an
  * internal self abort for single-phase index builds.
  */
-(function() {
-"use strict";
-
-load('jstests/noPassthrough/libs/index_build.js');
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 // A standalone configuration is key to running the index build single-phase.
 const conn = MongoRunner.runMongod();
@@ -44,4 +42,3 @@ collDrop();
 createIdx();
 
 MongoRunner.stopMongod(conn);
-})();

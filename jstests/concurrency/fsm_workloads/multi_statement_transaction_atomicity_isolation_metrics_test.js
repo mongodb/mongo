@@ -5,12 +5,14 @@
  * @tags: [uses_transactions, uses_prepare_transaction, assumes_snapshot_transactions]
  */
 
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    checkServerStatusInvariants
+} from "jstests/concurrency/fsm_workload_helpers/check_transaction_server_status_invariants.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation.js";
-load('jstests/concurrency/fsm_workload_helpers/check_transaction_server_status_invariants.js');
-load('jstests/core/txns/libs/prepare_helpers.js');
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.setup = function(db, collName, cluster) {

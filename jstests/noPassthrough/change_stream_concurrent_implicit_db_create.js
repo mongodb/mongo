@@ -3,9 +3,6 @@
 // This test was designed to reproduce SERVER-34333.
 // This test uses the WiredTiger storage engine, which does not support running without journaling.
 // @tags: [requires_replication, requires_majority_read_concern]
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -43,4 +40,3 @@ changeStreamShell1();
 changeStreamShell2();
 
 rst.stopSet();
-}());

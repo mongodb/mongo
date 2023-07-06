@@ -3,9 +3,8 @@
  * 'featureFlagAdditionalParticipants' is enabled.
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-load("jstests/libs/fail_point_util.js");
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
 const dbName = "test";
 const collName = "foo";

@@ -1,8 +1,5 @@
 // Tests for the mongos explain command to ensure that the 'executionStats' section of the explain
 // output is populated correctly for each shard.
-(function() {
-'use strict';
-
 // Verifies that the explain output for the given shard contains all expected fields and that
 // field values match the values specified in the 'expected*' arguments. This function also
 // updates the 'totals' object which holds accumulated values for certain fields from each
@@ -136,4 +133,3 @@ st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
 })();
 
 st.stop();
-})();

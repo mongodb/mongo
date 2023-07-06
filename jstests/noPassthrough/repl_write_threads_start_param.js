@@ -4,9 +4,6 @@
 //       3) is actually set to the passed in value
 //       4) cannot be altered at run time
 
-(function() {
-"use strict";
-
 // too low a count
 clearRawMongoProgramOutput();
 assert.throws(() => MongoRunner.runMongod({setParameter: 'replWriterThreadCount=0'}));
@@ -37,4 +34,3 @@ assert.eq(24, result.replWriterThreadCount, "replWriterThreadCount was not set i
 // setParameter to ensure it is not possible
 assert.commandFailed(mongo.getDB("admin").runCommand({setParameter: 1, replWriterThreadCount: 1}));
 MongoRunner.stopMongod(mongo);
-}());

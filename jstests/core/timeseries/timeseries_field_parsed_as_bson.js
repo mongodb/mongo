@@ -8,9 +8,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const collName = "timeseries_field_parsed_as_bson";
 const coll = db.getCollection(collName);
 
@@ -65,4 +62,3 @@ coll.drop();
 assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "\\"}}));
 coll.drop();
 assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "\\\\"}}));
-})();

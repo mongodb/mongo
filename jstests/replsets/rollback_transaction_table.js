@@ -16,14 +16,11 @@
  *  - There is no record for the second session id.
  *  - A record for the third session id was created during oplog replay.
  */
-(function() {
-"use strict";
-
 // This test drops a collection in the config database, which is not allowed under a session. It
 // also manually simulates a session, which is not compatible with implicit sessions.
 TestData.disableImplicitSessions = true;
 
-load("jstests/replsets/rslib.js");
+import {reconnect, waitForState} from "jstests/replsets/rslib.js";
 
 function assertSameRecordOnBothConnections(primary, secondary, lsid) {
     let primaryRecord = primary.getDB("config").transactions.findOne({"_id.id": lsid.id});
@@ -234,4 +231,3 @@ replTest.checkOplogs();
 replTest.checkReplicatedDataHashes(testName);
 
 replTest.stopSet();
-}());

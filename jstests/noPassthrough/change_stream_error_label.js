@@ -6,9 +6,6 @@
  *   uses_change_streams,
  * ]
  */
-(function() {
-"use strict";
-
 // Create a two-node replica set so that we can issue a request to the Secondary.
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
@@ -68,4 +65,3 @@ testFailGetMoreAfterCursorCheckoutFailpoint(
     {errorCode: ErrorCodes.FailedToParse, expectedLabel: false});
 
 rst.stopSet();
-}());

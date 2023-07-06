@@ -6,10 +6,8 @@
  *  featureFlagNewPersistedChunkVersionFormat
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/fail_point_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2, config: 1});
 
@@ -44,4 +42,3 @@ assert(migrationDoc.preMigrationChunkVersion.hasOwnProperty('e'));
 fp.off();
 moveChunkThread.join();
 st.stop();
-})();

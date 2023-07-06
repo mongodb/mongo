@@ -2,7 +2,6 @@
  * Test that .min() and .max() queries properly handle the edge cases with NaN and Infinity.
  * Other edge cases are covered by C++ unit tests.
  */
-(function() {
 const t = db.minmax_edge;
 
 /*
@@ -241,4 +240,3 @@ verifyMax({a: 1, b: 'a', c: Infinity}, indexSpec, [0, 1, 2, 3]);
 
 verifyMin({a: 1, b: 'a', c: -Infinity}, indexSpec, [2, 3, 4, 5, 6, 7]);
 verifyMax({a: 1, b: 'a', c: -Infinity}, indexSpec, [0, 1]);
-})();

@@ -3,9 +3,6 @@
 // @tags: [
 //   uses_full_validation,
 // ]
-(function() {
-"use strict";
-
 const coll = db.update_numeric_field_name;
 coll.drop();
 
@@ -29,4 +26,3 @@ assert.commandWorked(coll.update({_id: 0}, {$set: {'a.1.b.0.0': 1}}));
 
 res = assert.commandWorked(coll.validate({full: true}));
 assert(res.valid, tojson(res));
-})();

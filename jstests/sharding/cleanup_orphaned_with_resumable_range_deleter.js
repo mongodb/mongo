@@ -8,9 +8,7 @@
  *    once all orphans have been deleted.
  */
 
-(function() {
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -75,4 +73,3 @@ assert.eq(0, st.shard0.getDB(dbName).getCollection(collName).count());
 assert.eq(null, res.stoppedAtKey);
 
 st.stop();
-})();

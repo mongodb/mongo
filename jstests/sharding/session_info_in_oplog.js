@@ -3,9 +3,6 @@
  * statement id after executing a write command. Also tests that the session table is properly
  * updated after the write operations.
  */
-(function() {
-"use strict";
-
 const kNodes = 2;
 
 var checkOplog = function(oplog, lsid, uid, txnNum, stmtId, prevTs, prevTerm) {
@@ -176,8 +173,7 @@ var runTests = function(mainConn, priConn, secConn) {
         writeConcern: {w: kNodes},
     };
 
-    var beforeDoc = mainConn.getDB('test').user.findOne({_id: 40});
-    var res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+    assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
 
     firstDoc = oplog.findOne({ns: 'test.user', op: 'u', 'o2._id': 40, ts: {$gt: lastTs}});
     checkOplog(firstDoc, lsid, uid, txnNumber, 0, Timestamp(0, 0), -1);
@@ -201,8 +197,7 @@ var runTests = function(mainConn, priConn, secConn) {
         writeConcern: {w: kNodes},
     };
 
-    beforeDoc = mainConn.getDB('test').user.findOne({_id: 40});
-    res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+    assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
 
     firstDoc = oplog.findOne({ns: 'test.user', op: 'u', 'o2._id': 40, ts: {$gt: lastTs}});
     checkOplog(firstDoc, lsid, uid, txnNumber, 0, Timestamp(0, 0), -1);
@@ -225,8 +220,7 @@ var runTests = function(mainConn, priConn, secConn) {
         writeConcern: {w: kNodes},
     };
 
-    beforeDoc = mainConn.getDB('test').user.findOne({_id: 40});
-    res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+    assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
 
     firstDoc = oplog.findOne({ns: 'test.user', op: 'd', 'o._id': 40, ts: {$gt: lastTs}});
     checkOplog(firstDoc, lsid, uid, txnNumber, 0, Timestamp(0, 0), -1);
@@ -257,4 +251,3 @@ secConn.setSecondaryOk();
 runTests(st.s, st.rs0.getPrimary(), secConn);
 
 st.stop();
-})();

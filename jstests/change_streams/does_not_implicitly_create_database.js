@@ -3,10 +3,7 @@
  * created, and will not implicitly create either.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/change_stream_util.js");  // For 'ChangeStreamTest'.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 
 // Ensure that the test DB does not exist.
 const testDB = db.getSiblingDB(jsTestName());
@@ -74,4 +71,3 @@ const expectedChanges = [
 
 cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: expectedChanges});
 cst.cleanUp();
-})();

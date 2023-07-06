@@ -7,9 +7,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 let viewsDB = db.getSiblingDB("views_coll_stats");
 const matchStage = {
     $match: {}
@@ -90,4 +87,3 @@ assert.commandFailedWithCode(
     viewsDB.runCommand({aggregate: "a", pipeline: [{$collStats: {count: {}}}], cursor: {}}),
     ErrorCodes.CommandNotSupportedOnView);
 clear();
-}());

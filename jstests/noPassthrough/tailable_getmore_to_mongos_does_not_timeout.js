@@ -5,9 +5,6 @@
 //   requires_capped,
 //   requires_sharding,
 // ]
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 2});
 
 const db = st.s.getDB("test");
@@ -28,4 +25,3 @@ assert.commandWorked(db.runCommand({getMore: cursorId, collection: "capped"}));
 assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}));
 
 st.stop();
-}());

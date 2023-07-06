@@ -10,10 +10,7 @@
 //      documents after sampling N times.
 //   2. We should not see any duplicate documents in any one $sample (this is only guaranteed if
 //      there are no ongoing write operations).
-(function() {
-"use strict";
-
-load('jstests/libs/fixture_helpers.js');  // For isReplSet() and awaitReplication().
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 var coll = db.server21632;
 coll.drop();
@@ -41,7 +38,7 @@ if (FixtureHelpers.isReplSet(db)) {
 var storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
 if (storageEngine === "wiredTiger" && coll.stats().wiredTiger.type === 'lsm') {
-    return;
+    quit();
 }
 
 assert.eq([], coll.aggregate([{$sample: {size: 1}}]).toArray());
@@ -92,4 +89,3 @@ assert.gte(Object.keys(cumulativeSeenIds).length, nDocs / 4);
 
 // Make sure we can return all documents in the collection.
 assert.eq(coll.aggregate([{$sample: {size: nDocs}}]).toArray().length, nDocs);
-})();

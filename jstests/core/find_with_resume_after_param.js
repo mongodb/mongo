@@ -7,9 +7,9 @@
  * ]
  */
 
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const clustered = db.clusteredColl;
 const nonClustered = db.normalColl;

@@ -1,12 +1,5 @@
-/**
- * Tests that $out errors when trying to write to time-series collections on older server versions.
- * $out with the 'timeseries' option should only succeed if the FCV >= 7.1.
- */
-
-(function() {
-"use strict";
-
-load('./jstests/multiVersion/libs/multi_cluster.js');  // for upgradeCluster.
+import "jstests/multiVersion/libs/multi_cluster.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 const st = new ShardingTest({
     shards: 2,
@@ -85,4 +78,3 @@ resultColl = mongosConn.getDB(dbName)["timeseries"];
 assert.eq(1, resultColl.find().itcount());
 
 st.stop();
-}());

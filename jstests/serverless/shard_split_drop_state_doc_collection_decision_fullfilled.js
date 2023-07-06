@@ -13,9 +13,8 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {findSplitOperation, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/libs/fail_point_util.js");
 
 TestData.skipCheckDBHashes = true;
 

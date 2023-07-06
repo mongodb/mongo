@@ -488,13 +488,15 @@ assert = (function() {
 
         var start = new Date();
         timeout = timeout || 30000;
+
+        let res;
         if (typeof (f) == "string") {
             res = eval(f);
         } else {
             res = f();
         }
 
-        diff = (new Date()).getTime() - start.getTime();
+        const diff = (new Date()).getTime() - start.getTime();
         if (diff > timeout) {
             const msgPrefix =
                 "assert.time failed timeout " + timeout + "ms took " + diff + "ms : " + f + ", msg";

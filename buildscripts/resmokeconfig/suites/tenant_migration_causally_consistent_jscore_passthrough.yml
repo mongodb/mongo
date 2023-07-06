@@ -79,9 +79,9 @@ executor:
     shell_options:
       eval: >-
         globalThis.testingReplication = true;
-        load('jstests/libs/override_methods/inject_tenant_prefix.js');
-        load('jstests/libs/override_methods/enable_causal_consistency.js');
-        load('jstests/libs/override_methods/enable_sessions.js');
+        await import('jstests/libs/override_methods/inject_tenant_prefix.js');
+        await import('jstests/libs/override_methods/enable_causal_consistency.js');
+        await import('jstests/libs/override_methods/enable_sessions.js');
         jsTest.authenticate(db.getMongo());
       global_vars:
         TestData: &TestData

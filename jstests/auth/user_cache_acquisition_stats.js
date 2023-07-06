@@ -7,11 +7,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/parallel_shell_helpers.js");
-
 function hasCommandLogEntry(conn, id, command, attributes, count) {
     let expectedLog = {command: command};
     if (Object.keys(attributes).length > 0) {
@@ -150,4 +145,3 @@ function runTest(conn, mode) {
     jsTest.log('SUCCESS user_cache_acquisition_stats.js Sharding');
     st.stop();
 }
-})();

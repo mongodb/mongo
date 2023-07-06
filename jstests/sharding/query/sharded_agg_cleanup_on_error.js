@@ -10,12 +10,8 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
-// For assertMergeFailsForAllModesWithCode.
-load("jstests/aggregation/extras/merge_helpers.js");
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+import {assertMergeFailsForAllModesWithCode} from "jstests/aggregation/extras/merge_helpers.js";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const kFailPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
 const kFailpointOptions = {
@@ -164,4 +160,3 @@ try {
 }
 
 st.stop();
-})();

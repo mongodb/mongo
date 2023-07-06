@@ -2,9 +2,6 @@
  * Test that $setWindowFields behaves deterministically if
  * internalQueryAppendIdToSetWindowFieldsSort is enabled.
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 
 const dbName = jsTestName();
@@ -66,4 +63,3 @@ resultB = collB
 assert.eq(resultA["ids"], resultB["ids"]);
 
 MongoRunner.stopMongod(conn);
-})();

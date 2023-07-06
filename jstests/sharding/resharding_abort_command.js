@@ -4,11 +4,10 @@
  *
  * @tags: [uses_atclustertime]
  */
-(function() {
-"use strict";
-load("jstests/libs/discover_topology.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const originalCollectionNs = "reshardingDb.coll";
 const enterAbortFailpointName = "reshardingPauseCoordinatorBeforeStartingErrorFlow";
@@ -39,6 +38,7 @@ let getConnStringsFromNodeType = (nodeType, reshardingTest, topology) => {
             connStrings.push(topology.shards[recipient].primary);
         }
     } else if (nodeType == nodeTypeEnum.NO_EXTRA_FAILPOINTS_SENTINEL) {
+        //
     } else {
         throw 'unsupported node type in resharding abort test';
     }
@@ -350,7 +350,7 @@ runAbortWithFailpoint(
 let recipientFailpoints = [];
 runAbortWithFailpoint(
     null, nodeTypeEnum.NO_EXTRA_FAILPOINTS_SENTINEL, abortLocationEnum.BEFORE_DECISION_PERSISTED, {
-        executeBeforeReshardingStartsFn: (reshardingTest, topology, mongos, ns) => {
+        executeBeforeReshardingStartsFn: (reshardingTest, topology) => {
             recipientFailpoints =
                 generateFailpoints("reshardingPauseRecipientDuringOplogApplication",
                                    nodeTypeEnum.RECIPIENT,
@@ -380,10 +380,9 @@ runAbortWithFailpoint(
                 }
             });
         },
-        executeAfterAbortingFn: (reshardingTest, topology, mongos, ns) => {
+        executeAfterAbortingFn: () => {
             for (let failpoint of recipientFailpoints) {
                 failpoint.off();
             }
         }
     });
-})();

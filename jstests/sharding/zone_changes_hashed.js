@@ -1,8 +1,15 @@
 /**
  * Test that chunks and documents are moved correctly after zone changes.
  */
-load("jstests/sharding/libs/zone_changes_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {
+    assertChunksOnShards,
+    assertDocsOnShards,
+    assertShardTags,
+    moveZoneToShard,
+    runBalancer,
+} from "jstests/sharding/libs/zone_changes_util.js";
 
 /**
  * Adds each shard to the corresponding zone in zoneTags, and makes the zone range equal

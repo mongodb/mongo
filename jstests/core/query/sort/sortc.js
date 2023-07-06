@@ -1,7 +1,4 @@
 // Test sorting with skipping and multiple candidate query plans.
-(function() {
-"use strict";
-
 const coll = db.jstests_sortc;
 coll.drop();
 
@@ -31,4 +28,3 @@ checkSortAndSkip();
 
 assert.commandWorked(coll.createIndex({a: 1}));
 checkSortAndSkip();
-}());

@@ -7,11 +7,11 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/replsets/rslib.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {
+    assertVoteCount,
+    waitForNewlyAddedRemovalForNodeToBeCommitted
+} from "jstests/replsets/rslib.js";
 
 const testName = jsTestName();
 const dbName = "testdb";
@@ -89,4 +89,3 @@ assert.eq(2,
           () => [tojson(configBeforeTermBump), tojson(configAfterTermBump)]);
 
 rst.stopSet();
-})();

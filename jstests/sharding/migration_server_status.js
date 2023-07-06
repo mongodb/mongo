@@ -5,9 +5,15 @@
  * @tags: [requires_fcv_63]
  */
 
-load('jstests/libs/chunk_manipulation_util.js');
+import {
+    moveChunkParallel,
+    moveChunkStepNames,
+    pauseMoveChunkAtStep,
+    unpauseMoveChunkAtStep,
+    waitForMoveChunkStep,
+} from "jstests/libs/chunk_manipulation_util.js";
 
-var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+var staticMongod = MongoRunner.runMongod({});
 
 var st = new ShardingTest({shards: 2, mongos: 1});
 

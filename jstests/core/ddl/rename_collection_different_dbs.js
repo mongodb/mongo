@@ -15,9 +15,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 // Set up namespaces a and b.
 const db_a = db.getSiblingDB("db_a");
 const db_b = db.getSiblingDB("db_b");
@@ -81,4 +78,3 @@ assert.eq(previousMaxSize, stats.maxSize);
 
 a.drop();
 b.drop();
-})();

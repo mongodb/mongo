@@ -7,9 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");  // For 'configureFailPoint()'
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({
     nodes: 2,
@@ -151,4 +149,3 @@ validateTargetBatchTimeMS();
 validateTargetStagedDocsBytes();
 
 rst.stopSet();
-})();

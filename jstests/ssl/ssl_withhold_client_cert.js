@@ -1,8 +1,5 @@
 // Test setParameter tlsWithholdClientCertificate
 
-(function() {
-"use strict";
-
 function testRS(opts, expectWarning) {
     const rsOpts = {
         nodes: {node0: opts, node1: opts},
@@ -50,4 +47,3 @@ const depr_options = Object.extend({
                                    base_options);
 
 testRS(depr_options, true);
-}());

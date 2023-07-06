@@ -1,8 +1,6 @@
-var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
+export var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
 
 (function() {
-"use strict";
-
 StandaloneFixture = function() {};
 
 StandaloneFixture.prototype.runLoadPhase = function runLoadPhase(test) {

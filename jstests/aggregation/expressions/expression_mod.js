@@ -1,10 +1,8 @@
 // Confirm correctness of $mod evaluation in aggregation.
 
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode and testExpression.
-load('jstests/libs/sbe_assert_error_override.js');  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
 
-(function() {
-"use strict";
+import {assertErrorCode, testExpression} from "jstests/aggregation/extras/utils.js";
 
 var testDB = db.getSiblingDB("expression_mod");
 assert.commandWorked(testDB.dropDatabase());
@@ -92,4 +90,3 @@ testExpression(coll, {$mod: [10, -Infinity]}, 10);
 testExpression(coll, {$mod: [Infinity, 10]}, NaN);
 testExpression(coll, {$mod: [-Infinity, 10]}, NaN);
 testExpression(coll, {$mod: [NaN, 10]}, NaN);
-})();

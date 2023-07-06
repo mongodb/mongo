@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 function checkResults(results, checksToDo) {
     for (let i = 0; i < numCollections; i++) {
         const coll = "coll" + i;
@@ -194,4 +191,3 @@ assert.neq(-1, response.errmsg.indexOf("$_internalAllCollectionStats"), response
 assert.neq(-1, response.errmsg.indexOf("admin database"), response.errmsg);
 
 st.stop();
-})();

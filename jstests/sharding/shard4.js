@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 let s = new ShardingTest({shards: 2, mongos: 2});
 let s2 = s.s1;
 
@@ -57,4 +54,3 @@ for (var i = 0; i < 10; i++) {
 }
 
 s.stop();
-})();

@@ -2,9 +2,6 @@
 //   requires_sharding,
 // ]
 
-(function() {
-'use strict';
-
 function runFixture(Fixture) {
     var fixture = new Fixture();
     var conn = fixture.getConn();
@@ -91,4 +88,3 @@ Sharding.prototype.getConn = function() {
 };
 
 [Standalone, Sharding].forEach(runFixture);
-})();

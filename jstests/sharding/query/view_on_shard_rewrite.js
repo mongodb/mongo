@@ -15,9 +15,6 @@
  * @tags: [
  * ]
  */
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
 
 const dbName = "view_on_shard_rewrite";
@@ -62,4 +59,3 @@ assert.throwsWithCode(() => shardDB.getCollection(viewName).findOne({}),
                       ErrorCodes.CommandOnShardedViewNotSupportedOnMongod);
 
 st.stop();
-})();

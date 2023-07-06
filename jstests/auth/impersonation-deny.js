@@ -1,9 +1,6 @@
 // Test that manually inserted impersonation can't escalate privileges.
 // @tags: [requires_replication]
 
-(function() {
-'use strict';
-
 function testMongod(mongod, systemuserpwd = undefined) {
     const admin = mongod.getDB('admin');
     admin.createUser({user: 'admin', pwd: 'admin', roles: ['root']});
@@ -111,4 +108,3 @@ function testMongod(mongod, systemuserpwd = undefined) {
     testMongod(rst.getPrimary(), kKey);
     rst.stopSet();
 }
-})();

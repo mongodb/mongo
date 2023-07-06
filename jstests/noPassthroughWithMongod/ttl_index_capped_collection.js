@@ -2,8 +2,6 @@
  * Tests that attempting to create a TTL index on a capped collection will behave appropriately.
  */
 
-"use strict";
-
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // Ensure that on an uncapped collection, both non-TTL and TTL indexes can be created

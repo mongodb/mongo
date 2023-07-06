@@ -1,7 +1,7 @@
 /**
  * Utilities for testing retryable writes.
  */
-var RetryableWritesUtil = (function() {
+export var RetryableWritesUtil = (function() {
     /**
      * Returns true if the error code is retryable, assuming the command is idempotent.
      *

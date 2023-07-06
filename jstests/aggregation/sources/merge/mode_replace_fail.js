@@ -1,10 +1,6 @@
 // Tests the behaviour of the $merge stage with whenMatched=replace and whenNotMatched=fail.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
-load("jstests/aggregation/extras/utils.js");          // For assertArrayEq.
-load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isMongos.
+import {dropWithoutImplicitRecreate} from "jstests/aggregation/extras/merge_helpers.js";
+import {assertArrayEq, generateCollection} from "jstests/aggregation/extras/utils.js";
 
 const source = db[`${jsTest.name()}_source`];
 source.drop();
@@ -132,4 +128,3 @@ const pipeline = [mergeStage];
     assert.eq(numDocsModified, target.find({padding: {$exists: true}}).itcount());
     assert.eq(numDocsUnmodified, target.find({padding: {$exists: false}}).itcount());
 })();
-}());

@@ -1,10 +1,8 @@
 // SERVER-4589: Add $arrayElemAt aggregation expression.
 
-load('jstests/aggregation/extras/utils.js');        // For assertErrorCode.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
 
-(function() {
-'use strict';
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.agg_array_elem_at_expr;
 coll.drop();
@@ -67,4 +65,3 @@ assertErrorCode(coll, [{$project: {x: {$arrayElemAt: [[1, 2], 1.5]}}}], 28691);
 assertErrorCode(coll, [{$project: {x: {$arrayElemAt: [[1, 2], NumberDecimal('1.5')]}}}], 28691);
 assertErrorCode(coll, [{$project: {x: {$arrayElemAt: [[1, 2], Math.pow(2, 32)]}}}], 28691);
 assertErrorCode(coll, [{$project: {x: {$arrayElemAt: [[1, 2], -Math.pow(2, 31) - 1]}}}], 28691);
-}());

@@ -3,9 +3,6 @@
  *
  * @tags: [does_not_support_stepdowns]
  */
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 1, config: 2});
 
 let coll = st.config.settings;
@@ -47,4 +44,3 @@ assert.commandFailedWithCode(
     ErrorCodes.InvalidOptions);
 
 st.stop();
-})();

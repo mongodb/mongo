@@ -6,9 +6,6 @@
  * opening a connection to the database.
  */
 
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "not_primary_errors_returned_if_client_sends_helloOk";
 const rst = new ReplSetTest({nodes: 2});
@@ -74,4 +71,3 @@ assert(res.errmsg.includes("not primary"), res);
 assert(!res.errmsg.includes("not master"), res);
 
 rst.stopSet();
-})();

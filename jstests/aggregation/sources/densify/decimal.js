@@ -5,10 +5,7 @@
  *   requires_fcv_51,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 function buildErrorString(found, expected) {
     return "Expected:\n" + tojson(expected) + "\nGot:\n" + tojson(found);
@@ -158,4 +155,3 @@ expectedResult = [
     {val: preciseStepTimesThree},
 ];
 assert(arrayEq(result, expectedResult), buildErrorString(result, expectedResult));
-})();

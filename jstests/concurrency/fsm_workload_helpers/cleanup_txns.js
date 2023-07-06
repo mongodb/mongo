@@ -5,7 +5,7 @@
 /**
  * Abort the transaction on the session and return result.
  */
-function abortTransaction(sessionAwareDB, txnNumber) {
+export function abortTransaction(sessionAwareDB, txnNumber) {
     assert(sessionAwareDB.getSession() != null);
 
     // Don't use the given session as it might be in a state we don't want to be and
@@ -33,7 +33,7 @@ function abortTransaction(sessionAwareDB, txnNumber) {
 /**
  * This function operates on the last iteration of each thread to abort any active transactions.
  */
-var {cleanupOnLastIteration} = (function() {
+export var {cleanupOnLastIteration} = (function() {
     function cleanupOnLastIteration(data, func) {
         let lastIteration = ++data.iteration >= data.iterations;
         let activeException = null;
@@ -64,6 +64,7 @@ var {cleanupOnLastIteration} = (function() {
                             print('Original exception stack trace: ' + activeException.stack);
                         }
 
+                        /* eslint-disable-next-line */
                         throw exceptionDuringAbort;
                     }
                 }

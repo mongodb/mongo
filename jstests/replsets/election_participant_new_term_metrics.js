@@ -5,9 +5,6 @@
  * original primary. We check that the metrics are appropriately set or unset after each election.
  */
 
-(function() {
-"use strict";
-
 const testName = jsTestName();
 const rst = ReplSetTest({name: testName, nodes: [{}, {}, {rsConfig: {priority: 0}}]});
 rst.startSet();
@@ -106,4 +103,3 @@ assert(!testNodeElectionParticipantMetrics.newTermAppliedDate,
            tojson(testNodeElectionParticipantMetrics));
 
 rst.stopSet();
-})();

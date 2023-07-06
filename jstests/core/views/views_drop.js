@@ -6,9 +6,6 @@
  *   assumes_unsharded_collection,
  * ]
  */
-(function() {
-"use strict";
-
 let viewsDBName = "views_drop";
 let viewsDB = db.getSiblingDB(viewsDBName);
 viewsDB.dropDatabase();
@@ -32,4 +29,3 @@ let res = viewsDB.runCommand({listCollections: 1});
 assert.commandWorked(res);
 assert.eq(
     res.cursor.firstBatch, [], viewsDBName + " is not empty after deleting views and system.views");
-})();

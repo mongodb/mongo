@@ -7,9 +7,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
@@ -57,4 +54,3 @@ jsTestLog("The added oplog entry is applied as part of replication recovery.");
 assert.eq({_id: 0, a: 1}, conn.getDB("test").coll.findOne());
 
 rst.stopSet();
-}());

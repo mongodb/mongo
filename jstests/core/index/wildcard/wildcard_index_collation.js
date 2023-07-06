@@ -12,12 +12,12 @@
  *   requires_non_retryable_writes,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-import {getWinningPlan, getPlanStages, isIndexOnly} from "jstests/libs/analyze_plan.js";
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {getPlanStages, getWinningPlan, isIndexOnly} from "jstests/libs/analyze_plan.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-load("jstests/libs/index_catalog_helpers.js");     // For IndexCatalogHelpers.
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/fixture_helpers.js");           // For isMongos.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r));
 

@@ -1,7 +1,6 @@
 // SERVER-9841 $map expression to map over arrays
-(function() {
-"use strict";
-load('jstests/aggregation/extras/utils.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+
 var t = db.server9841;
 t.drop();
 t.insert({
@@ -45,4 +44,3 @@ assertErrorCode(t, {$project: {a: {$map: {input: "$simple", as: "var"}}}}, 16882
 
 // 'in' uses undefined variable name.
 assertErrorCode(t, {$project: {a: {$map: {input: "$simple", in : '$$var'}}}}, 17276);
-}());

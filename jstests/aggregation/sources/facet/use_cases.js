@@ -1,13 +1,6 @@
 /**
  * Tests some practical use cases of the $facet stage.
  */
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
-
-const dbName = "test";
 const collName = jsTest.name();
 
 Random.setRandomSeed();
@@ -133,4 +126,3 @@ coll.aggregate([{
         "autoBucketedPrices": [{"$bucketAuto": {"groupBy": "$price", "buckets": 5}}]
     }
 }]);
-}());

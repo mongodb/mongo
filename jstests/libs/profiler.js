@@ -1,7 +1,7 @@
 // Provides convenience methods for confirming system.profile content.
 
 // Given a command, build its expected shape in the system profiler.
-function buildCommandProfile(command, sharded) {
+export function buildCommandProfile(command, sharded) {
     let commandProfile = {};
 
     if (command.mapReduce) {
@@ -36,7 +36,7 @@ function buildCommandProfile(command, sharded) {
 }
 
 // Retrieve N latest system.profile entries.
-function getNLatestProfilerEntries(profileDB, count, filter) {
+export function getNLatestProfilerEntries(profileDB, count, filter) {
     if (filter === null) {
         filter = {};
     }
@@ -48,7 +48,7 @@ function getNLatestProfilerEntries(profileDB, count, filter) {
 }
 
 // Retrieve latest system.profile entry.
-function getLatestProfilerEntry(profileDB, filter) {
+export function getLatestProfilerEntry(profileDB, filter) {
     return getNLatestProfilerEntries(profileDB, 1, filter)[0];
 }
 
@@ -57,7 +57,7 @@ function getLatestProfilerEntry(profileDB, filter) {
  * "filter", or if there are no matches. Optional arguments "errorMsgFilter" and "errorMsgProj"
  * limit profiler output if this asserts.
  */
-function profilerHasAtLeastOneAtMostNumMatchingEntriesOrThrow(
+export function profilerHasAtLeastOneAtMostNumMatchingEntriesOrThrow(
     {profileDB, filter, maxExpectedMatches, errorMsgFilter, errorMsgProj}) {
     assert(typeof maxExpectedMatches === 'number' && maxExpectedMatches > 0,
            "'maxExpectedMatches' must be a number > 0");
@@ -81,7 +81,7 @@ function profilerHasAtLeastOneAtMostNumMatchingEntriesOrThrow(
  * matching "filter". Optional arguments "errorMsgFilter" and "errorMsgProj" limit profiler output
  * if this asserts.
  */
-function profilerHasNumMatchingEntriesOrThrow(
+export function profilerHasNumMatchingEntriesOrThrow(
     {profileDB, filter, numExpectedMatches, errorMsgFilter, errorMsgProj}) {
     assert(typeof numExpectedMatches === 'number' && numExpectedMatches >= 0,
            "'numExpectedMatches' must be a number >= 0");
@@ -97,7 +97,7 @@ function profilerHasNumMatchingEntriesOrThrow(
  * Throws an assertion if the profiler does not contain any entries matching "filter". Optional
  * arguments "errorMsgFilter" and "errorMsgProj" limit profiler output if this asserts.
  */
-function profilerHasAtLeastOneMatchingEntryOrThrow(
+export function profilerHasAtLeastOneMatchingEntryOrThrow(
     {profileDB, filter, errorMsgFilter, errorMsgProj}) {
     assert.gte(profileDB.system.profile.find(filter).itcount(),
                1,
@@ -109,7 +109,8 @@ function profilerHasAtLeastOneMatchingEntryOrThrow(
  * Throws an assertion if the profiler does not contain exactly one entry matching "filter".
  * Optional arguments "errorMsgFilter" and "errorMsgProj" limit profiler output if this asserts.
  */
-function profilerHasSingleMatchingEntryOrThrow({profileDB, filter, errorMsgFilter, errorMsgProj}) {
+export function profilerHasSingleMatchingEntryOrThrow(
+    {profileDB, filter, errorMsgFilter, errorMsgProj}) {
     profilerHasNumMatchingEntriesOrThrow({
         profileDB: profileDB,
         filter: filter,
@@ -123,7 +124,8 @@ function profilerHasSingleMatchingEntryOrThrow({profileDB, filter, errorMsgFilte
  * Throws an assertion if the profiler contains any entries matching "filter". Optional arguments
  * "errorMsgFilter" and "errorMsgProj" limit profiler output if this asserts.
  */
-function profilerHasZeroMatchingEntriesOrThrow({profileDB, filter, errorMsgFilter, errorMsgProj}) {
+export function profilerHasZeroMatchingEntriesOrThrow(
+    {profileDB, filter, errorMsgFilter, errorMsgProj}) {
     profilerHasNumMatchingEntriesOrThrow({
         profileDB: profileDB,
         filter: filter,

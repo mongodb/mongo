@@ -4,9 +4,6 @@
  * Always run on a fully upgraded cluster, so that {$meta: "sortKey"} projections use the newest
  * sort key format.
  */
-(function() {
-"use strict";
-
 var cmdRes;
 var cursorId;
 
@@ -161,4 +158,3 @@ assert.eq(cmdRes.cursor.firstBatch[4], {key: [5]});
 assert.eq(cmdRes.cursor.firstBatch[5], {key: [9]});
 
 st.stop();
-})();

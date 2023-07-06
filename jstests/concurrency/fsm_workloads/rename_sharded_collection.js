@@ -16,8 +16,8 @@
  *   does_not_support_transactions,
  *  ]
  */
-
-load('jstests/concurrency/fsm_workload_helpers/balancer.js');
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
 
 const numChunks = 20;
 const documentsPerChunk = 5;

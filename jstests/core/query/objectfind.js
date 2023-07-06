@@ -1,10 +1,7 @@
 /**
  * Tests some of the find command's semantics with respect to object comparisons.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const t = db.jstests_objectfind;
 t.drop();
@@ -83,4 +80,3 @@ runWithAndWithoutIndex({a: 1}, () => {
     assert.eq(0, t.find({a: {$lt: {}}}).itcount());
     assert.eq(15, t.find({a: {$gt: {}}}).itcount());
 });
-})();

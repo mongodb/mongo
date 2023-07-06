@@ -6,9 +6,6 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.timeseries_id_index;
 coll.drop();
 
@@ -23,4 +20,3 @@ assert.commandWorked(bucketsColl.createIndex({"_id": 1}, {clustered: true, uniqu
 // Passing 'clustered' without unique, regardless of the type of clustered collection, is illegal.
 assert.commandFailedWithCode(bucketsColl.createIndex({"_id": 1}, {clustered: true}),
                              ErrorCodes.CannotCreateIndex);
-})();

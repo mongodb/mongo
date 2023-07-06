@@ -1,7 +1,7 @@
 // Tests whether the noBalance flag disables balancing for collections
 // @tags: [requires_sharding]
 
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1}});
 
@@ -71,7 +71,7 @@ sh.disableBalancing(collB);
 
 // Wait for the balancer to fully finish the last migration and write the changelog
 // MUST set db var here, ugly but necessary
-db = st.s0.getDB("config");
+const db = st.s0.getDB("config");
 st.awaitBalancerRound();
 
 // Make sure auto-migrates on insert don't move data

@@ -1,8 +1,5 @@
 // Tests --networkMessageCompressors options.
 
-(function() {
-'use strict';
-
 var runTest = function(optionValue, expected) {
     jsTest.log("Testing with --networkMessageCompressors=\"" + optionValue +
                "\" expecting: " + expected);
@@ -39,4 +36,3 @@ assert.throws(() => MongoRunner.runMongod({networkMessageCompressors: "snappy,di
 
 runTest("snappy", ["snappy"]);
 runTest("disabled", undefined);
-}());

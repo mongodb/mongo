@@ -1,12 +1,10 @@
-"use strict";
-
 /**
  * Helper functions that help get information or manipulate nodes in the fixture, whether it's a
  * replica set, a sharded cluster, etc.
  */
-var FixtureHelpers = (function() {
-    load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isMongos.
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
+export var FixtureHelpers = (function() {
     function _getHostStringForReplSet(connectionToNodeInSet) {
         const isMaster = assert.commandWorked(connectionToNodeInSet.getDB("test").isMaster());
         assert(

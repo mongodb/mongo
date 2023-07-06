@@ -6,10 +6,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
+import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -74,4 +71,3 @@ assert(!res.hasOwnProperty("writeErrors"));
 assert(!res.hasOwnProperty("writeConcernError"));
 
 replTest.stopSet();
-})();

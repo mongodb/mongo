@@ -7,9 +7,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 function setParameter({rst, value}) {
     return rst.getPrimary().adminCommand({setParameter: 1, mirrorReads: value});
 }
@@ -327,4 +324,3 @@ function verifyMirroringDistribution(rst) {
         rst.stopSet();
     }
 }
-})();

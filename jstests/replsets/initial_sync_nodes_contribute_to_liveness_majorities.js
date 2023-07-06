@@ -8,11 +8,8 @@
  * to run for primary again. Since the other secondary is disconnected, the primary must receive a
  * vote from the initial sync node to get elected again.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {reconfig, waitForState} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();
 const rst = new ReplSetTest({
@@ -96,4 +93,3 @@ assert.commandWorked(initialSyncSecondary.adminCommand(
 waitForState(initialSyncSecondary, ReplSetTest.State.SECONDARY);
 
 rst.stopSet();
-})();

@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 var conn = MongoRunner.runMongod();
 var admin = conn.getDB('admin');
 var db = conn.getDB('test');
@@ -26,4 +23,3 @@ var insertCmd = {
 assert.commandFailedWithCode(db.runCommand(insertCmd), ErrorCodes.MaxTimeMSExpired);
 
 MongoRunner.stopMongod(conn);
-})();

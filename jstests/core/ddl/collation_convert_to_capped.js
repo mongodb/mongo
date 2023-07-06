@@ -10,9 +10,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 let testDb = db.getSiblingDB("collation_convert_to_capped");
 let coll = testDb.coll;
 testDb.dropDatabase();
@@ -34,4 +31,3 @@ const cappedCollectionInfos = testDb.getCollectionInfos({name: coll.getName()});
 assert.eq(cappedCollectionInfos.length, 1, tojson(cappedCollectionInfos));
 assert.eq(originalCollectionInfos[0].options.collation, cappedCollectionInfos[0].options.collation);
 assert.eq([{_id: "FOO"}], coll.find({_id: "foo"}).toArray());
-})();

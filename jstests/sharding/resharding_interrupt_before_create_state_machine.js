@@ -2,11 +2,9 @@
  * Test that reshardCollection does not hang if its opCtx is interrupted between inserting the state
  * document for its state machine and starting that state machine. See SERVER-74647.
  */
-(function() {
-"use strict";
-load("jstests/sharding/libs/resharding_test_fixture.js");
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/discover_topology.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const sourceNs = "reshardingDb.coll";
 
@@ -43,4 +41,3 @@ reshardingTest.withReshardingInBackground({
                                           });
 
 reshardingTest.teardown();
-})();

@@ -2,9 +2,6 @@
  * Tests that shutdown can succeed even if the server is fsync locked.
  */
 
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 assert.neq(conn, null);
 
@@ -26,4 +23,3 @@ assert.commandFailed(testDB.runCommand({insert: {z: 1}, maxTimeMS: 30}));
 jsTestLog("Check that shutdown can succeed with an fsync lock: the fsync lock should be cleared.");
 // Skipping validation because the fsync lock causes the validate command to hang.
 MongoRunner.stopMongod(conn, null, {skipValidation: true});
-}());

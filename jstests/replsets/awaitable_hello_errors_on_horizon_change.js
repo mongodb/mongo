@@ -2,10 +2,8 @@
  * Tests that doing a reconfig that changes the SplitHorizon will cause the server to disconnect
  * from clients with waiting hello/isMaster requests.
  */
-(function() {
-"use strict";
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 // Never retry on network error, because this test needs to detect the network error.
 TestData.skipRetryOnNetworkError = true;
@@ -133,4 +131,3 @@ runTest("hello");
 runTest("isMaster");
 runTest("ismaster");
 replTest.stopSet();
-})();

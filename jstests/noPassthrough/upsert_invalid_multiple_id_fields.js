@@ -2,9 +2,6 @@
  * SERVER-75879: Tests that an invalid document with multiple _id fields cannot be inserted by an
  * update sent with upsert=true.
  */
-(function() {
-"use strict";
-
 // Run tests on a standalone mongod.
 let conn = MongoRunner.runMongod({setParameter: {enableComputeMode: true}});
 let db = conn.getDB(jsTestName());
@@ -32,4 +29,3 @@ assert.writeOK(db.coll.update({}, validBson, {upsert: true}));
 let inserted = db.coll.findOne();
 assert.docEq(inserted, validBson);
 MongoRunner.stopMongod(conn);
-})();

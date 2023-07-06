@@ -1,11 +1,7 @@
 /**
  * Tests that collStats can run concurrently with a RSTL MODE_X lock.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");  // startParallelShell
-load("jstests/libs/wait_for_command.js");        // waitForCommand
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
 const dbName = "test";
 const collName = "collStats_no_wait_for_lock";
@@ -44,4 +40,3 @@ try {
     assert.commandWorked(testDB.getSiblingDB("admin").killOp(sleepCmdOpID));  // kill the sleep cmd
     rstlXLockSleepJoin();  // wait for the thread running the sleep cmd to finish
 }
-})();

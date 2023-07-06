@@ -1,5 +1,3 @@
-load("jstests/libs/parallelTester.js");
-
 /**
  * @tags: [
  *   requires_sharding,
@@ -7,8 +5,7 @@ load("jstests/libs/parallelTester.js");
  * ]
  */
 
-(function() {
-"use strict";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const st = new ShardingTest({mongos: 1, shards: 1, rs: {nodes: 2, protocolVersion: 1}});
 const kDbName = 'test';
@@ -174,4 +171,3 @@ threads.forEach(function(thread) {
 });
 
 st.stop();
-})();

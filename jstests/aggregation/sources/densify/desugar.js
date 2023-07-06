@@ -8,12 +8,7 @@
  *   do_not_wrap_aggregations_in_facets,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");
-load("jstests/aggregation/extras/utils.js");  // For anyEq and
-                                              // desugarSingleStageAggregation.
+import {desugarSingleStageAggregation} from "jstests/aggregation/extras/utils.js";
 
 const coll = db[jsTestName()];
 coll.insert({});
@@ -95,4 +90,3 @@ assert.eq(desugarSingleStageAggregation(db, coll, {
                   }
               },
           ]);
-})();

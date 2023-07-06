@@ -22,11 +22,14 @@
  *   does_not_support_stepdowns,
  *  ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/profiler.js');
-load('jstests/sharding/libs/last_lts_mongos_commands.js');
+import {
+    buildCommandProfile,
+    profilerHasSingleMatchingEntryOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
+import {
+    commandsRemovedFromMongosSinceLastLTS
+} from "jstests/sharding/libs/last_lts_mongos_commands.js";
 
 let db = "test";
 let coll = "foo";
@@ -403,7 +406,6 @@ commandsRemovedFromMongosSinceLastLTS.forEach(function(cmd) {
 
 let scenarios = {
     dropRecreateAsUnshardedOnSameShard: function(staleMongos, freshMongos, test, commandProfile) {
-        let primaryShardPrimary = st.rs0.getPrimary();
         let primaryShardSecondary = st.rs0.getSecondary();
 
         // Drop and recreate the collection.
@@ -455,7 +457,6 @@ let scenarios = {
         }
     },
     dropRecreateAsShardedOnSameShard: function(staleMongos, freshMongos, test, commandProfile) {
-        let primaryShardPrimary = st.rs0.getPrimary();
         let primaryShardSecondary = st.rs0.getSecondary();
 
         // Drop and recreate the collection as sharded.
@@ -512,8 +513,7 @@ let scenarios = {
             });
         }
     },
-    dropRecreateAsUnshardedOnDifferentShard: function(
-        staleMongos, freshMongos, test, commandProfile) {
+    dropRecreateAsUnshardedOnDifferentShard: function() {
         // There is no way to drop and recreate the collection as unsharded on a *different*
         // shard without calling movePrimary, and it is known that a stale mongos will not
         // refresh its notion of the primary shard after it loads it once.
@@ -521,7 +521,6 @@ let scenarios = {
     dropRecreateAsShardedOnDifferentShard: function(
         staleMongos, freshMongos, test, commandProfile) {
         let donorShardSecondary = st.rs0.getSecondary();
-        let recipientShardPrimary = st.rs1.getPrimary();
         let recipientShardSecondary = st.rs1.getSecondary();
 
         // Drop and recreate the collection as sharded, and move the chunk to the other shard.
@@ -660,4 +659,3 @@ for (let command of commands) {
 }
 
 st.stop();
-})();

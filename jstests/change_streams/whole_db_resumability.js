@@ -2,12 +2,12 @@
 // Do not run in whole-cluster passthrough since this test assumes that the change stream will be
 // invalidated by a database drop.
 // @tags: [do_not_run_in_whole_cluster_passthrough]
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
-load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection
+} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Drop and recreate the collections to be used in this set of tests.
 const testDB = db.getSiblingDB(jsTestName());
@@ -198,4 +198,3 @@ cst.consumeDropUpTo({
 });
 
 cst.cleanUp();
-})();

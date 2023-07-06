@@ -1,7 +1,4 @@
 // Tests for the $in/sort/limit optimization combined with inequality bounds.  SERVER-5777
-(function() {
-"use strict";
-
 var t = db.jstests_sorth;
 t.drop();
 
@@ -240,4 +237,3 @@ checkReverseDirection({sort: {b: -1}, index: {a: 1, b: -1, c: 1}});
 checkReverseDirection({sort: {b: -1}, index: {a: 1, b: -1, c: -1}});
 checkReverseDirection({sort: {b: -1, c: 1}, index: {a: 1, b: -1, c: 1}});
 checkReverseDirection({sort: {b: -1, c: -1}, index: {a: 1, b: -1, c: -1}});
-}());

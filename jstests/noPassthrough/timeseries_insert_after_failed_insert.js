@@ -1,10 +1,7 @@
 /**
  * Tests that a failed time-series insert does not leave behind any invalid state.
  */
-(function() {
-'use strict';
-
-load('jstests/libs/fail_point_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const conn = MongoRunner.runMongod();
 
@@ -56,4 +53,3 @@ runTest(true);
 runTest(false);
 
 MongoRunner.stopMongod(conn);
-})();

@@ -8,8 +8,6 @@
  * @tags: [
  *   not_allowed_with_security_token,uses_transactions, assumes_unsharded_collection]
  */
-(function() {
-"use strict";
 var dbName = 'indexing_not_blocked_by_txn';
 var mydb = db.getSiblingDB(dbName);
 const wcMajority = {
@@ -42,4 +40,3 @@ assert.commandWorked(mydb.baz.createIndex({x: 1}));
 
 assert.commandWorked(session.commitTransaction_forTesting());
 session.endSession();
-}());

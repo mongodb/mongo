@@ -17,10 +17,7 @@
  * ]
  */
 
-load("jstests/libs/parallelTester.js");  // For Thread
-
-(function() {
-'use strict';
+import {Thread} from "jstests/libs/parallelTester.js";
 
 function insertWorker(host, collName, tid, nInserts) {
     const conn = new Mongo(host);
@@ -145,4 +142,3 @@ for (let i = 0; i < nWriters; i++) {
 for (let i = 0; i < threads.length; i++) {
     threads[i].join();
 }
-})();

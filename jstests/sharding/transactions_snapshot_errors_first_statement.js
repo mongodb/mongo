@@ -7,11 +7,15 @@
 // sharded collection with one chunk on both shards.
 //
 // @tags: [requires_sharding, uses_transactions, uses_multi_shard_transaction]
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {
+    assertNoSuchTransactionOnAllShards,
+    disableStaleVersionAndSnapshotRetriesWithinTransactions,
+    enableStaleVersionAndSnapshotRetriesWithinTransactions,
+    kSnapshotErrors,
+    setFailCommandOnShards,
+    unsetFailCommandOnEachShard,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -168,4 +172,3 @@ for (let errorCode of kSnapshotErrors) {
 disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 st.stop();
-})();

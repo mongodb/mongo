@@ -5,9 +5,6 @@
 //   references_foreign_collection,
 // ]
 
-(function() {
-"use strict";
-
 let viewsDb = db.getSiblingDB("views_validation");
 const kMaxViewDepth = 20;
 
@@ -190,4 +187,3 @@ assert.commandFailedWithCode(
     [17320, ErrorCodes.InvalidNamespace, ErrorCodes.InvalidViewDefinition]);
 // Delete the invalid view (by dropping the database) so that the validate hook succeeds.
 assert.commandWorked(invalidDb.dropDatabase());
-}());

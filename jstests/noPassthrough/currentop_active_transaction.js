@@ -4,11 +4,9 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-'use strict';
-load("jstests/libs/parallel_shell_helpers.js");
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
-function transactionFn(isPrepared) {
+async function transactionFn(isPrepared) {
     const collName = 'currentop_active_transaction';
     const session = db.getMongo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase('test');
@@ -17,7 +15,7 @@ function transactionFn(isPrepared) {
     sessionDB[collName].update({}, {x: 2});
     if (isPrepared) {
         // Load the prepare helpers to be called in the parallel shell.
-        load('jstests/core/txns/libs/prepare_helpers.js');
+        const {PrepareHelpers} = await import("jstests/core/txns/libs/prepare_helpers.js");
         const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
         PrepareHelpers.commitTransaction(session, prepareTimestamp);
     } else {
@@ -196,4 +194,3 @@ assert.commandWorked(
 joinTransaction();
 
 rst.stopSet();
-})();

@@ -1,4 +1,4 @@
-load("jstests/libs/fts.js");
+import {queryIDS} from "jstests/libs/fts.js";
 
 let t = db.text_parition1;
 t.drop();

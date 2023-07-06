@@ -3,7 +3,7 @@
 // On error inserting documents, traces back and shows where the document was dropped
 //
 
-function traceMissingDoc(coll, doc, mongos) {
+export function traceMissingDoc(coll, doc, mongos) {
     if (mongos)
         coll = mongos.getCollection(coll + "");
     else

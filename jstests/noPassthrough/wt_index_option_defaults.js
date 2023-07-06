@@ -6,9 +6,6 @@
  *   3. system-wide options specified by --wiredTigerIndexConfigString or by
  *     inMemoryIndexConfigString.
  */
-(function() {
-'use strict';
-
 var engine = 'wiredTiger';
 if (jsTest.options().storageEngine) {
     engine = jsTest.options().storageEngine;
@@ -17,7 +14,7 @@ if (jsTest.options().storageEngine) {
 // Skip this test if not running with the right storage engine.
 if (engine !== 'wiredTiger' && engine !== 'inMemory') {
     jsTest.log('Skipping test because storageEngine is not "wiredTiger" or "inMemory"');
-    return;
+    quit();
 }
 
 // Skip this test when 'xxxIndexConfigString' is already set in TestData.
@@ -25,7 +22,7 @@ if (engine !== 'wiredTiger' && engine !== 'inMemory') {
 // commas.
 if (jsTest.options()[engine + 'IndexConfigString']) {
     jsTest.log('Skipping test because system-wide defaults for index options are already set');
-    return;
+    quit();
 }
 
 // Use different values for the same configuration string key to test that index-specific
@@ -154,4 +151,3 @@ function getIndexSpecByName(coll, indexName) {
     assert.eq(1, indexes.length, 'index "' + indexName + '" not found');
     return indexes[0];
 }
-})();

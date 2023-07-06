@@ -2,9 +2,6 @@
  * Test a role with an advanceClusterTime action type.
  */
 
-(function() {
-"use strict";
-
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
@@ -60,4 +57,3 @@ assert.commandWorked(res, "Command request was: " + tojsononeline(cmdObj));
 testDB.logout();
 
 st.stop();
-})();

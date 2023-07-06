@@ -18,10 +18,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
-load("jstests/libs/write_concern_util.js");
+import {checkWriteConcernTimedOut} from "jstests/libs/write_concern_util.js";
+import {assertVoteCount} from "jstests/replsets/rslib.js";
 
 const rst = new ReplSetTest({
     name: jsTestName(),
@@ -131,4 +129,3 @@ assert.eq(rst.nodes[0].getDB("test")[collName].find({a: 3}).itcount(), 1);
 assert.eq(rst.nodes[1].getDB("test")[collName].find({a: 3}).itcount(), 1);
 
 rst.stopSet();
-})();

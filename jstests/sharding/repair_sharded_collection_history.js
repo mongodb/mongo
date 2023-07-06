@@ -1,14 +1,8 @@
-(function() {
-'use strict';
-
 var st = new ShardingTest({
     shards: 1,
 });
 
-let configPrimary = st.configRS.getPrimary();
-let configPrimaryAdminDB = configPrimary.getDB('admin');
 let shardPrimary = st.rs0.getPrimary();
-let shardPrimaryAdminDB = shardPrimary.getDB('admin');
 let shardPrimaryConfigDB = shardPrimary.getDB('config');
 
 let testDB = st.s.getDB('test1');
@@ -56,4 +50,3 @@ chunks.forEach((chunk) => {
 });
 
 st.stop();
-})();

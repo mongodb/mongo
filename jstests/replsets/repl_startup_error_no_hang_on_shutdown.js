@@ -5,11 +5,6 @@
  * @tags: [requires_persistence, requires_fcv_60]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-
 const rst = new ReplSetTest({
     name: jsTestName(),
     nodes: [{
@@ -42,4 +37,3 @@ assert.soon(
     },
     "Node should have fasserted upon encountering a fatal error during startup",
     ReplSetTest.kDefaultTimeoutMS);
-})();

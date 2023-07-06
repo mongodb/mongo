@@ -2,10 +2,8 @@
  * Overrides runCommand so operations that encounter the BackgroundOperationInProgressForNs/Db error
  * codes automatically retry.
  */
-(function() {
-"use strict";
 
-load("jstests/libs/override_methods/override_helpers.js");
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 // These are all commands that can return BackgroundOperationInProgress error codes.
 const commandAllowlist = new Set([
@@ -135,4 +133,3 @@ function runCommandWithRetries(conn, dbName, commandName, commandObj, func, make
 }
 
 OverrideHelpers.overrideRunCommand(runCommandWithRetries);
-})();

@@ -8,9 +8,9 @@
 //  requires_replication,
 //  requires_majority_read_concern,
 // ]
-load('jstests/replsets/rslib.js');                 // For getLatestOp, getFirstOplogEntry.
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 
 const docA = {
     _id: 12345,

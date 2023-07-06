@@ -1,9 +1,7 @@
 // SERVER-11118 Tests for $dateToString
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-load('jstests/aggregation/extras/utils.js');
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.server11118;
 
@@ -151,4 +149,3 @@ testFormatError({format: 1, date: "$date"}, 18533);
 
 // Date
 testFormatError({format: ISODate(), date: "$date"}, 18533);
-})();

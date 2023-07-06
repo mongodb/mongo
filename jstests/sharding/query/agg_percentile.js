@@ -5,7 +5,6 @@
  * ]
  */
 
-(function() {
 const st = new ShardingTest({shards: 2, mongos: 1});
 
 const db = st.s0.getDB(jsTestName());
@@ -110,4 +109,3 @@ function runTest({testName}) {
 })();
 
 st.stop();
-})();

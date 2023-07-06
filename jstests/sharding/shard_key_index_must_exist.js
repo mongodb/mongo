@@ -1,8 +1,5 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-(function() {
-'use strict';
-
 let st = new ShardingTest({shards: 1});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
@@ -139,4 +136,3 @@ let checkIndex = function(collName, expectedIndexNames) {
 })();
 
 st.stop();
-})();

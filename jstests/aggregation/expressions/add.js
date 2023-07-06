@@ -1,7 +1,6 @@
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode and assertErrMsgContains.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
+
+import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
 
 // In SERVER-63012, translation of $add expression into sbe now defaults the translation of $add
 // with no operands to a zero integer constant.
@@ -90,4 +89,3 @@ assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.Overflow, "date overfl
 
 pipeline = [{$project: {res: {$add: [new Date(10), "$veryBigPositiveDecimal"]}}}];
 assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.Overflow, "date overflow");
-}());

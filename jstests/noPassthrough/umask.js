@@ -2,11 +2,9 @@
  * This test makes sure that the log files created by the server correctly honor the server's umask
  * as set in SERVER-22829
  */
-(function() {
-'use strict';
 // We only test this on POSIX since that's the only platform where umasks make sense
 if (_isWindows()) {
-    return;
+    quit();
 }
 
 const oldUmask = new Number(umask(0));
@@ -100,4 +98,3 @@ MongoRunner.stopMongod(conn);
 checkMask(conn.fullOptions.dbpath, worldReadableUmask, false, true);
 
 umask(oldUmask.valueOf());
-})();

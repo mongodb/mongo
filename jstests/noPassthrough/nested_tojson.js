@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 const tooMuchRecursion = (1 << 16);
 
 const nestobj = (depth) => {
@@ -27,4 +24,3 @@ const nestarr = (depth) => {
 
 assert.doesNotThrow(tojson, [nestobj(tooMuchRecursion)], 'failed to print deeply nested object');
 assert.doesNotThrow(tojson, [nestarr(tooMuchRecursion)], 'failed to print deeply nested array');
-})();

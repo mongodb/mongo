@@ -6,11 +6,10 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/noPassthrough/libs/index_build.js');
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({
     nodes: [
@@ -49,10 +48,9 @@ const buildUUID =
         .assertIndexesSoon(primaryColl, 2, ['_id_'], ['a_1'], {includeBuildUUIDs: true})['a_1']
         .buildUUID;
 
-const failAfterVoteForCommitReadiness =
-    configureFailPoint(primaryDB,
-                       "failIndexBuildWithErrorInSecondDrain",
-                       {buildUUID: buildUUID, error: ErrorCodes.OutOfDiskSpace});
+configureFailPoint(primaryDB,
+                   "failIndexBuildWithErrorInSecondDrain",
+                   {buildUUID: buildUUID, error: ErrorCodes.OutOfDiskSpace});
 
 // Continue index build after preparing the artificial failure.
 failpointHangAfterInit.off();
@@ -87,4 +85,3 @@ collDrop();
 createIdx();
 
 rst.stopSet();
-})();

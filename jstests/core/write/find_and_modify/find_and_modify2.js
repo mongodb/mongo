@@ -3,9 +3,6 @@
 // key.
 // @tags: [assumes_unsharded_collection]
 
-(function() {
-"use strict";
-
 const coll = db.find_and_modify2;
 coll.drop();
 
@@ -22,4 +19,3 @@ assert.eq(out, {j: 0});
 
 out = coll.findAndModify({update: {$inc: {i: 1}}, fields: {_id: 0, j: 1}, 'new': true});
 assert.eq(out, {j: 0});
-})();

@@ -13,9 +13,9 @@
  *   not_allowed_with_security_token,
  * ]
  */
-load("jstests/libs/index_catalog_helpers.js");     // For "IndexCatalogHelpers."
-load("jstests/libs/collection_drop_recreate.js");  // For "assertDropCollection."
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     quit();

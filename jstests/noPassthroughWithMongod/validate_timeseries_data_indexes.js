@@ -4,9 +4,6 @@
  * @tags: [requires_fcv_62]
  */
 
-(function() {
-"use strict";
-
 const collPrefix = "validate_timeseries_data_indexes";
 const bucketPrefix = "system.buckets.validate_timeseries_data_indexes";
 let collName = collPrefix;
@@ -114,4 +111,3 @@ res = assert.commandWorked(coll.validate());
 assert(res.valid, tojson(res));
 assert(res.warnings.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
-})();

@@ -2,10 +2,7 @@
 // @tags: [
 //   requires_fcv_71,
 // ]
-(function() {
-'use strict';
-
-load('jstests/libs/fixture_helpers.js');  // For 'FixtureHelpers'
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const localColl = db.lookup_spill_local;
 const foreignColl = db.lookup_spill_foreign;
@@ -71,4 +68,3 @@ try {
 } finally {
     setHashLookupMemoryLimit(oldMemoryLimit);
 }
-})();

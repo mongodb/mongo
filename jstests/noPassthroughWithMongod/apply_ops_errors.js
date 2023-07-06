@@ -12,8 +12,6 @@
  * This is all in accordance with SERVER-10771.
  */
 
-(function() {
-"use strict";
 var coll = db.apply_ops_errors;
 coll.drop();
 
@@ -55,4 +53,3 @@ assert(res.errmsg);
 // applyOps is non-atomic
 assert.eq([true, false], res.results);
 assert.eq(0, res.ok);
-})();

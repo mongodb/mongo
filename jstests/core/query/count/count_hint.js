@@ -7,9 +7,6 @@
  *
  * @tags: [requires_fastcount]
  */
-(function() {
-"use strict";
-
 var coll = db.jstests_count_hint;
 coll.drop();
 
@@ -59,4 +56,3 @@ let cmdRes = db.runCommand({count: coll.getName(), hint: {bad: 1, hint: 1}});
 assert.commandFailedWithCode(cmdRes, ErrorCodes.BadValue, tojson(cmdRes));
 var regex = new RegExp("hint provided does not correspond to an existing index");
 assert(regex.test(cmdRes.errmsg));
-})();

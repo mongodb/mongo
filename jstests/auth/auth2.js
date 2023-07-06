@@ -1,7 +1,7 @@
 // test read/write permissions
 
 let m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
-db = m.getDB("admin");
+const db = m.getDB("admin");
 
 // These statements throw because the localhost exception does not allow
 // these operations: it only allows the creation of the first admin user

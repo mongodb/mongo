@@ -6,7 +6,6 @@
 //   assumes_unsharded_collection,
 // ]
 
-(function() {
 // Exercise Symbol.toPrimitive on DB objects
 assert(`${db}` === 'test');
 assert(isNaN(+db));
@@ -34,4 +33,3 @@ assert(db[Symbol.species] != 1);
 assert(db[Symbol.toPrimitive] != 1);
 
 col1.drop();
-})();

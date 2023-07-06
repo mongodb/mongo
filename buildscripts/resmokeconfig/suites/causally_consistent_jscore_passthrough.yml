@@ -69,7 +69,7 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      eval: load("jstests/libs/override_methods/enable_causal_consistency.js")
+      eval: await import("jstests/libs/override_methods/enable_causal_consistency.js")
   hooks:
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground

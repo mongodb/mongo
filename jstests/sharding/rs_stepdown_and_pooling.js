@@ -1,9 +1,7 @@
 //
 // Tests what happens when a replica set primary goes down with pooled connections.
 //
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 var st = new ShardingTest({shards: {rs0: {nodes: 2}}, mongos: 1});
 
@@ -31,14 +29,14 @@ if (is32Bits && _isWindows()) {
     // Create a bunch of connections to the primary node through mongos.
     // jstest ->(x10)-> mongos ->(x10)-> primary
     var conns = [];
-    for (var i = 0; i < 50; i++) {
+    for (let i = 0; i < 50; i++) {
         conns.push(new Mongo(mongos.host));
         conns[i].getCollection(coll + "").findOne();
     }
 
     jsTest.log("Returning the connections back to the pool.");
 
-    for (var i = 0; i < conns.length; i++) {
+    for (let i = 0; i < conns.length; i++) {
         conns[i] = null;
     }
     // Make sure we return connections back to the pool
@@ -98,4 +96,3 @@ if (is32Bits && _isWindows()) {
 jsTest.log("DONE!");
 
 st.stop();
-}());

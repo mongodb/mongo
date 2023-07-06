@@ -26,10 +26,7 @@
 //  |                   | Commit       |
 //  | WaitForTopOfOplog |              |
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // Returns metrics aggregated by database name.
 const getDBMetrics = (adminDB) => {
@@ -134,4 +131,3 @@ assert.lt(metrics.db1.primaryMetrics.docBytesRead,
           "Writer 1 wait for write concern caused undue consumption metrics increase.");
 
 replSet.stopSet();
-})();

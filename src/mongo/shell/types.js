@@ -73,6 +73,7 @@ Date.prototype.tojson = function() {
         ofs + '")';
 };
 
+// eslint-disable-next-line
 ISODate = function(isoDateStr) {
     if (!isoDateStr)
         return new Date();
@@ -547,6 +548,7 @@ if (typeof (BinData) != "undefined") {
 
 // Map
 if (typeof (Map) == "undefined") {
+    // eslint-disable-next-line
     Map = function() {
         this._data = {};
     };

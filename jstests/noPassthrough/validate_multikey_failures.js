@@ -1,9 +1,6 @@
 /**
  * Test that validate detects and properly reports multikey inconsistencies.
  */
-(function() {
-"use strict";
-
 const baseName = "validate_multikey_failures";
 const dbpath = MongoRunner.dataPath + baseName + "/";
 let conn = MongoRunner.runMongod({dbpath: dbpath});
@@ -75,4 +72,3 @@ assert(checkLog.checkContainsWithAtLeastCountJson(conn, 7556101, {"indexKey": {"
 assert(checkLog.checkContainsWithAtLeastCountJson(conn, 5367500, {"index": "a.b_1"}, 1));
 
 MongoRunner.stopMongod(conn, null, {skipValidation: true});
-})();

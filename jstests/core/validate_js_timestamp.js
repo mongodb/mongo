@@ -10,9 +10,6 @@
  *   requires_scripting
  * ]
  */
-(function() {
-"use strict";
-
 /**
  * Each test case executes a pipeline (created by the `testPipeline' function below) that mutates a
  * Timestamp object according to the 'assignments' field and ensures that execution fails with the
@@ -159,4 +156,3 @@ assert.sameMembers(result, [{computedField: Timestamp(123, 456)}]);
 
 result = db.aggregate(testPipeline(tojson({t: 123.0, i: 456.0}), true)).toArray();
 assert.sameMembers(result, [{computedField: {result: Timestamp(123, 456)}}]);
-}());

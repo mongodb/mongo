@@ -9,8 +9,6 @@
 //   expects_explicit_underscore_id_index,
 // ]
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-(function() {
-'use strict';
 
 var s = new ShardingTest({shards: 2, mongos: 1});
 var dbForTest = s.getDB("test");
@@ -160,4 +158,3 @@ if (!featureFlagClusterFsyncLock) {
 }
 
 s.stop();
-})();

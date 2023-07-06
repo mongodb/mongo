@@ -1,15 +1,16 @@
 /*
  * Test that the index commands abort concurrent outgoing migrations.
  */
+import {
+    moveChunkStepNames,
+    pauseMoveChunkAtStep,
+    unpauseMoveChunkAtStep,
+    waitForMoveChunkStep,
+} from "jstests/libs/chunk_manipulation_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
-(function() {
-"use strict";
-
-load('jstests/libs/chunk_manipulation_util.js');
-load("jstests/libs/parallelTester.js");
-load("jstests/sharding/libs/sharded_index_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {Thread} from "jstests/libs/parallelTester.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 
 // Test deliberately inserts orphans outside of migration.
 TestData.skipCheckOrphans = true;
@@ -195,4 +196,3 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB('admin'),
 }
 
 st.stop();
-})();

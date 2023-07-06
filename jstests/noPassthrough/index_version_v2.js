@@ -5,9 +5,6 @@
  * collation and that index version v=2 is required to index decimal data on storage engines using
  * the KeyString format.
  */
-(function() {
-"use strict";
-
 const storageEnginesUsingKeyString = new Set(["wiredTiger", "inMemory", "rocksdb"]);
 
 function getIndexSpecByName(coll, indexName) {
@@ -118,4 +115,3 @@ testDB.dropDatabase();
 // Test that attempting to create an index with v=3 returns an error.
 assert.commandFailed(testDB.index_version.createIndex({withV3: 1}, {v: 3}));
 MongoRunner.stopMongod(conn);
-})();

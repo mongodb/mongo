@@ -2,9 +2,7 @@
 //
 // This test requires the fsync command to ensure members experience a delay.
 // @tags: [requires_fsync]
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
+import {syncFrom} from "jstests/replsets/rslib.js";
 
 var name = "maxSyncSourceLagSecs";
 var replTest = new ReplSetTest({
@@ -61,4 +59,3 @@ assert.soon(function() {
 
 assert.commandWorked(secondaries[0].getDB("admin").fsyncUnlock());
 replTest.stopSet();
-}());

@@ -5,6 +5,8 @@
  * @tags: [
  * ]
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     const data = {numIds: 10, docValue: "mydoc"};
 

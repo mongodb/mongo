@@ -21,10 +21,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/noPassthrough/libs/index_build.js');
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({
     name: "timestampingIndexBuilds",
@@ -37,7 +34,7 @@ rst.initiateWithHighElectionTimeout();
 if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapshotReadConcern) {
     // Only snapshotting storage engines require correct timestamping of index builds.
     rst.stopSet();
-    return;
+    quit();
 }
 
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
@@ -110,4 +107,3 @@ for (let nodeIdx = 0; nodeIdx < 2; ++nodeIdx) {
 }
 
 rst.stopSet();
-}());

@@ -7,9 +7,6 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
-'use strict';
-
 const baseDir = "jstests_directoryperdb";
 const dbpath = MongoRunner.dataPath + baseDir + "/";
 const dbname = "foo";
@@ -21,7 +18,7 @@ const m = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: '', syncdelay: 
 
 if (!isDirectoryPerDBSupported) {
     assert.isnull(m, 'storage engine without directoryperdb support should fail to start up');
-    return;
+    quit();
 } else {
     assert(m, 'storage engine with directoryperdb support failed to start up');
 }
@@ -76,4 +73,3 @@ MongoRunner.stopMongod(m);
 
 // Subsequent attempt to start server using same dbpath without directoryperdb should fail.
 assert.throws(() => MongoRunner.runMongod({dbpath: dbpath, restart: true}));
-}());

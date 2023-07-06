@@ -6,10 +6,7 @@
  *   not_allowed_with_security_token,uses_transactions, uses_prepare_transaction]
  */
 
-load("jstests/core/txns/libs/prepare_helpers.js");
-
-(function() {
-"use strict";
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const dbName = "test";
 const collName = "commit_prepared_transaction";
@@ -96,4 +93,3 @@ assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp)
 
 // After commit the delete persists.
 assert.eq(null, testColl.findOne(doc2));
-}());

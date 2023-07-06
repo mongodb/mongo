@@ -2,9 +2,6 @@
  * Test the balancerCollectionStatus command and its possible outputs
  */
 
-(function() {
-'use strict';
-
 const chunkSizeMB = 1;
 let st = new ShardingTest({
     shards: 3,
@@ -95,4 +92,3 @@ runBalancer();
 assert.eq(result.chunkSize, chunkSizeMB);
 
 st.stop();
-})();

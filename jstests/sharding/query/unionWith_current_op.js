@@ -6,19 +6,14 @@
  * shard. This behavior affects which operations are logged.
  *  @tags: [ requires_fcv_51 ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
-load("jstests/libs/curop_helpers.js");    // For waitForCurOpByFailPoint.
+import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const st = new ShardingTest({shards: 2});
 const testDB = st.s.getDB(jsTestName());
 const shardedColl1 = testDB.shardedColl1;
 const shardedColl2 = testDB.shardedColl2;
 const unshardedColl = testDB.unsharded;
-const shard0DB = st.shard0.getDB(jsTestName());
-const shard1DB = st.shard1.getDB(jsTestName());
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: testDB.getName()}));
 st.ensurePrimaryShard(testDB.getName(), st.shard0.shardName);
@@ -194,4 +189,3 @@ runTest({
 });
 
 st.stop();
-})();

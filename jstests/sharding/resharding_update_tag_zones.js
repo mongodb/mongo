@@ -2,9 +2,6 @@
  * Testing that config.tags are correctly updated after resharding hashed shard key with zones.
  */
 
-(function() {
-"use strict";
-
 const st = new ShardingTest({shard: 2});
 const dbName = "testDb";
 const collName = "testColl";
@@ -50,4 +47,3 @@ assert.eq({oldKey: NumberLong("7766103514953448108")}, tags[0].max);
 assert.eq(existingZoneName, tags[0].tag);
 
 st.stop();
-})();

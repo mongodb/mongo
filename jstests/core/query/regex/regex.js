@@ -1,10 +1,7 @@
 // @tags: [
 //   assumes_read_concern_local,
 // ]
-load("jstests/libs/fixture_helpers.js");
-
-(function() {
-'use strict';
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const t = db.jstests_regex;
 
@@ -83,4 +80,3 @@ assert.commandWorked(t.save({x: ["abc"]}));
 assert.eq(1, t.count({x: {$regex: /ABC/i}}));
 assert.eq(1, t.count({x: {$regex: /ABC/, $options: 'i'}}));
 assert.eq(1, t.count({x: {$options: 'i', $regex: /ABC/}}));
-})();

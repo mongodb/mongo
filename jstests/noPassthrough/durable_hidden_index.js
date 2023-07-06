@@ -8,10 +8,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/index_catalog_helpers.js");  // For IndexCatalogHelpers.findByName.
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 const dbName = "test";
 
@@ -87,4 +84,3 @@ idxSpec = IndexCatalogHelpers.findByName(db.coll.getIndexes(), "b_1");
 assert.eq(idxSpec.hidden, undefined);
 
 MongoRunner.stopMongod(conn);
-})();

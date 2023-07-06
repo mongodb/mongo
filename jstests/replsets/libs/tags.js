@@ -3,9 +3,9 @@
  *
  * https://docs.mongodb.com/v3.0/tutorial/configure-replica-set-tag-sets/
  */
-var TagsTest = function(options) {
-    'use strict';
+import {reconfig} from "jstests/replsets/rslib.js";
 
+export var TagsTest = function(options) {
     // Skip db hash check since this test leaves replset partitioned.
     TestData.skipCheckDBHashes = true;
 
@@ -23,9 +23,6 @@ var TagsTest = function(options) {
      */
     this.run = function() {
         var options = this.options;
-
-        load('jstests/replsets/rslib.js');
-
         let nodes = options.nodes;
         var host = getHostName();
         var name = 'tags';

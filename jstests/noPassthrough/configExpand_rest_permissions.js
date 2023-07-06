@@ -1,14 +1,15 @@
 // Test config file expansion using REST when permissions are too loose.
 // @tags: [requires_http_client]
 
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/configExpand/lib.js');
+import {
+    configExpandFailure,
+    ConfigExpandRestServer,
+    configExpandSuccess
+} from "jstests/noPassthrough/libs/configExpand/lib.js";
 
 if (_isWindows()) {
     print("Skipping test on windows");
-    return;
+    quit();
 }
 
 const web = new ConfigExpandRestServer();
@@ -32,4 +33,3 @@ configExpandFailure(sicReflect, expect, {configExpand: 'rest', chmod: 0o660});
 configExpandFailure(sicReflect, expect, {configExpand: 'rest', chmod: 0o606});
 
 web.stop();
-})();

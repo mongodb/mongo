@@ -16,8 +16,6 @@
 
 import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
-load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
-
 const test =
     new ShardSplitTest({recipientSetName: "recipientSet", recipientTagName: "recipientTag"});
 test.addRecipientNodes();

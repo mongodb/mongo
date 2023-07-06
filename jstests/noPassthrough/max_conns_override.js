@@ -1,7 +1,4 @@
-(function() {
-'use strict';
-
-load("jstests/libs/host_ipaddr.js");
+import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
 
 const configuredMaxConns = 5;
 const configuredReadyAdminThreads = 3;
@@ -161,4 +158,3 @@ try {
 } finally {
     MongoRunner.stopMongod(conn);
 }
-})();

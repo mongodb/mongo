@@ -7,7 +7,9 @@
  *   requires_persistence,
  * ]
  */
-load("jstests/replsets/libs/rollback_resumable_index_build.js");
+import {
+    RollbackResumableIndexBuildTest
+} from "jstests/replsets/libs/rollback_resumable_index_build.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";

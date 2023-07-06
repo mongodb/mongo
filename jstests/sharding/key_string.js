@@ -1,6 +1,4 @@
-(function() {
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var s = new ShardingTest({name: "keystring", shards: 2});
 
@@ -66,4 +64,3 @@ assert.throws(function() {
 });
 
 s.stop();
-})();

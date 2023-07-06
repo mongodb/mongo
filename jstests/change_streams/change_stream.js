@@ -2,13 +2,16 @@
 // Mark as assumes_read_preference_unchanged since reading from the non-replicated "system.profile"
 // collection results in a failure in the secondary reads suite.
 // @tags: [assumes_read_preference_unchanged]
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest and
-                                                   // assert[Valid|Invalid]ChangeStreamNss.
+import {
+    assertInvalidChangeStreamNss,
+    assertValidChangeStreamNss,
+    ChangeStreamTest
+} from "jstests/libs/change_stream_util.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection
+} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Drop and recreate the collections to be used in this set of tests.
 assertDropAndRecreateCollection(db, "t1");
@@ -253,4 +256,3 @@ resumeCursor = cst.startWatchingChanges({
 assert.docEq(cst.getOneChange(resumeCursor), thirdInsertChangeDoc);
 
 cst.cleanUp();
-}());

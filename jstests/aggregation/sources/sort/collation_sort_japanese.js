@@ -3,9 +3,6 @@
  * merging on a shard. (The sharding scenarios are tested when this test is run in the
  * aggregation_sharded_collections_passthrough.)
  */
-(function() {
-"use strict";
-
 Random.setRandomSeed();
 const coll = db.getCollection("collation_sort_japanese");
 
@@ -148,4 +145,3 @@ runTests(data.map(doc => {
     }
     return copy;
 }));
-}());

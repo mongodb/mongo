@@ -1,8 +1,5 @@
 // Verify that mongorestore can create a collection via applyOps
 
-(function() {
-'use strict';
-
 function makeCreateOp(collName, uuid = undefined) {
     const op = {
         op: 'c',
@@ -58,4 +55,3 @@ function runTest(conn) {
 const standalone = MongoRunner.runMongod({auth: ''});
 runTest(standalone);
 MongoRunner.stopMongod(standalone);
-})();

@@ -13,13 +13,10 @@
 //    during a currently running operation, the logical session cache should vivify the session and
 //    replace it in the config.system.sessions collection.
 
-(function() {
-"use strict";
-
 // This test makes assertions about the number of logical session records.
 TestData.disableImplicitSessions = true;
 
-load("jstests/libs/pin_getmore_cursor.js");  // For "withPinnedCursor".
+import {withPinnedCursor} from "jstests/libs/pin_getmore_cursor.js";
 
 const refresh = {
     refreshLogicalSessionCacheNow: 1
@@ -137,4 +134,3 @@ withPinnedCursor({
 });
 
 replTest.stopSet();
-})();

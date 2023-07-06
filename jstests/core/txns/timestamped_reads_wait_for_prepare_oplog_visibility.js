@@ -15,12 +15,9 @@
  *  cqf_experimental_incompatible,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/core/txns/libs/prepare_helpers.js');
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 TestData.dbName = 'test';
 const baseCollName = 'timestamped_reads_wait_for_prepare_oplog_visibility';
@@ -48,8 +45,8 @@ TestData.otherDocFilter = {
  * field. This function is run in a separate thread and tests that oplog visibility blocks
  * certain reads and that prepare conflicts block other types of reads.
  */
-const readThreadFunc = function(readFunc, _collName, hangTimesEntered, logTimesEntered) {
-    load("jstests/libs/fail_point_util.js");
+const readThreadFunc = async function(readFunc, _collName, hangTimesEntered, logTimesEntered) {
+    const {kDefaultWaitForFailPointTimeout} = await import("jstests/libs/fail_point_util.js");
 
     // Do not start reads until we are blocked in 'prepareTransaction'.
     assert.commandWorked(db.adminCommand({
@@ -141,8 +138,6 @@ function runTest(prefix, readFunc) {
 }
 
 const snapshotRead = function(_collName) {
-    const _db = db.getSiblingDB(TestData.dbName);
-
     const session = db.getMongo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(TestData.dbName);
 
@@ -281,4 +276,3 @@ const normalRead = function(_collName) {
 runTest('normal_reads', normalRead);
 runTest('snapshot_reads', snapshotRead);
 runTest('afterClusterTime', afterClusterTime);
-})();

@@ -4,8 +4,6 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  * ]
  */
-(function() {
-
 // Ensure db exists (needed for explain to work).
 db.filler_collection.drop();
 assert.commandWorked(db.createCollection("filler_collection"));
@@ -52,4 +50,3 @@ assert("executionStats" in explain);
 missingColl.drop();
 explain = missingColl.explain("executionStats").aggregate([{$match: {a: 1}}]);
 assert.commandWorked(explain);
-}());

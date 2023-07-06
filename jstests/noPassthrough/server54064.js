@@ -4,7 +4,6 @@
  *
  * @tags: [requires_replication]
  */
-(function() {
 const name = "server54064";
 const replSet = new ReplSetTest({
     name: name,
@@ -54,4 +53,3 @@ assert.soon(() => {
 });
 
 replSet.stopSet();
-})();

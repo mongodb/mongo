@@ -4,10 +4,8 @@
  *  requires_fcv_63,
  * ]
  */
-// For profilerHasSingleMatchingEntryOrThrow.
-load("jstests/libs/profiler.js");
-// For areAllCollectionsClustered.
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
+
+import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 // Legal values for the verifyExplainResult() 'optimizedAwayPipeline' argument.
 const kOptFalse = 0;
@@ -73,8 +71,6 @@ let mongos = st.s;
 let config = mongos.getDB("config");
 let db = mongos.getDB(jsTestName());
 db.dropDatabase();
-
-const isClustered = ClusteredCollectionUtil.areAllCollectionsClustered(st.rs0.getPrimary());
 
 let coll = db.getCollection("coll");
 

@@ -2,8 +2,12 @@
  * Helper functions that are used in change streams rewrite test cases.
  */
 
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load("jstests/libs/fixture_helpers.js");           // For isMongos.
+import {
+    assertCreateCollection,
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Function which generates a write workload on the specified collection, including all events that
 // a change stream may consume. Assumes that the specified collection does not already exist.

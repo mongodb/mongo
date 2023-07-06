@@ -1,8 +1,5 @@
 // Test that only one user may be authenticated against the database at a time.
 
-(function() {
-'use strict';
-
 const conn = MongoRunner.runMongod({auth: ''});
 const admin = conn.getDB('admin');
 const test = conn.getDB('test');
@@ -22,4 +19,3 @@ test.logout();
 jsTest.log('Shutting down');
 assert(admin.auth('admin', 'pwd'));
 MongoRunner.stopMongod(conn);
-})();

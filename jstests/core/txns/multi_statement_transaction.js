@@ -2,12 +2,8 @@
 // The test runs commands that are not allowed with security token: endSession.
 // @tags: [
 //   not_allowed_with_security_token,uses_transactions]
-(function() {
-"use strict";
-
 // TODO(SERVER-39704): Remove the following load after SERVER-39704 is completed
-// For withTxnAndAutoRetryOnMongos.
-load('jstests/libs/auto_retry_transaction_in_sharding.js');
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = "test";
 const collName = "multi_statement_transaction";
@@ -170,4 +166,3 @@ assert.eq(null, testColl.findOne({_id: "doc-2"}));
 assert.eq(null, testColl.findOne({_id: "doc-3"}));
 
 session.endSession();
-}());

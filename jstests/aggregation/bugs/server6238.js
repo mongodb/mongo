@@ -1,5 +1,5 @@
 // do not allow creation of fields with a $ prefix
-load('jstests/aggregation/extras/utils.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const c = db.c;
 c.drop();

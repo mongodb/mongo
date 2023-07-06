@@ -8,7 +8,6 @@
  *   assumes_unsharded_collection,
  * ]
  */
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
 import {
     testClusteredCollectionBoundedScan
 } from "jstests/libs/clustered_collections/clustered_collection_bounded_scan_common.js";

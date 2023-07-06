@@ -13,12 +13,8 @@ TestData.skipCheckShardFilteringMetadata = true;
 // Do not check metadata consistency as mongos is stopped for testing purposes.
 TestData.skipCheckMetadataConsistency = true;
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallelTester.js');
-load("jstests/libs/retryable_writes_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 const st = new ShardingTest({
     mongos: 1,
     config: 1,
@@ -61,4 +57,3 @@ st.stopMongos(0);
 insertThread.join();
 
 st.stop();
-})();

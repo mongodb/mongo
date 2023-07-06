@@ -6,10 +6,7 @@
  * test suite. This suite must use ssl so it cannot test modes without ssl.
  */
 
-load('jstests/ssl/libs/ssl_helpers.js');
-
-(function() {
-'use strict';
+import {allowSSL, mixedShardTest, preferSSL, requireSSL} from "jstests/ssl/libs/ssl_helpers.js";
 
 // These hooks need to be able to connect to the individual shards.
 TestData.skipCheckOrphans = true;
@@ -34,4 +31,3 @@ mixedShardTest(transitionToX509PreferSSL, transitionToX509PreferSSL, true);
 
 print('=== Testing transitionToAuth/preferSSL - x509/requireSSL cluster ===');
 testCombos(transitionToX509PreferSSL, x509RequireSSL, true);
-}());

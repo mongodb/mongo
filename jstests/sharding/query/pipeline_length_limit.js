@@ -4,10 +4,7 @@
  *   requires_fcv_71,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 function testLimits(testDB, lengthLimit) {
     let maxLength = lengthLimit;
@@ -211,4 +208,3 @@ st.stop();
 runTest(50,
         {setParameter: {internalPipelineLengthLimit: 50}},
         {setParameter: {internalPipelineLengthLimit: 50}});
-})();

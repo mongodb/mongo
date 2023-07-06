@@ -4,8 +4,6 @@
  * @tags: [requires_replication]
  */
 
-(function() {
-
 const rsTest = new ReplSetTest({nodes: 3});
 rsTest.startSet({
     oplogSize: 10,
@@ -69,4 +67,3 @@ const uriShellMech =
 assert.eq(uriShellMech, 0, 'Failed to connect using URI');
 
 rsTest.stopSet();
-})();

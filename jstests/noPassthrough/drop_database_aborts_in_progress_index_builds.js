@@ -2,11 +2,8 @@
  * Tests that the "dropDatabase" command can abort in-progress index builds on all the collections
  * it is dropping.
  */
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/index_build.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const mongodOptions = {};
 const conn = MongoRunner.runMongod(mongodOptions);
@@ -85,4 +82,3 @@ awaitSecondIndexBuild();
 awaitDropDatabase();
 
 MongoRunner.stopMongod(conn);
-}());

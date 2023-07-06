@@ -1,8 +1,5 @@
 // Ensure that multi-update and multi-remove operations yield regularly.
 // @tags: [requires_profiling]
-(function() {
-'use strict';
-
 function countOpYields(coll, op) {
     const profileEntry = coll.getDB()
                              .system.profile.find({ns: coll.getFullName()})
@@ -40,4 +37,3 @@ assert.commandWorked(coll.remove({}, {multi: true}));
 assert.gt(countOpYields(coll, 'remove'), (nDocsToInsert / worksPerYield) - 2);
 
 MongoRunner.stopMongod(mongod);
-})();

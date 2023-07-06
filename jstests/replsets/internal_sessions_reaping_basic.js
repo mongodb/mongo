@@ -6,10 +6,10 @@
  * @tags: [requires_fcv_60, uses_transactions]
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {
+    makeCommitTransactionCmdObj,
+    makeLsidFilter
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 // This test runs the reapLogicalSessionCacheNow command. That can lead to direct writes to the
 // config.transactions collection, which cannot be performed on a session.
@@ -226,4 +226,3 @@ assert.eq(numTransactionsCollEntriesReaped, oplogColl.find({op: 'd', ns: kConfig
 assert.eq(0, oplogColl.find({op: {'$ne': 'd'}, ns: kConfigTxnsNs}).itcount());
 
 rst.stopSet();
-})();

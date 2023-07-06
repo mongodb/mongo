@@ -6,9 +6,6 @@
 // ]
 
 // Test that a memory exception is triggered for in memory sorts, but not for indexed sorts.
-(function() {
-"use strict";
-
 const t = db.jstests_sortg;
 t.drop();
 
@@ -67,4 +64,3 @@ noMemoryException({_id: 1}, {b: null});
 // unindexed plan exhausts its memory limit.
 noMemoryException({_id: 1}, {b: null});
 t.drop();
-})();

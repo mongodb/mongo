@@ -8,9 +8,6 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
 const st = new ShardingTest({name: jsTestName(), mongos: 1, shards: 2, rs: {nodes: 1}});
 
 const db = st.s.getDB(jsTestName());
@@ -313,4 +310,3 @@ for (let result of results) {
 }
 
 st.stop();
-}());

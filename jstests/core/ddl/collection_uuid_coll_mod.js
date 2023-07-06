@@ -6,9 +6,6 @@
  *   tenant_migration_incompatible,
  * ]
  */
-(function() {
-'use strict';
-
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
@@ -76,4 +73,3 @@ assert.eq(res.db, nonexistentDB.getName());
 assert.eq(res.collectionUUID, uuid);
 assert.eq(res.expectedCollection, 'nonexistent');
 assert.eq(res.actualCollection, null);
-})();

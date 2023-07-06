@@ -2,7 +2,7 @@
  * This file implements densification in JavaScript to compare with the output from the $densify
  * stage.
  */
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 /**
  * The code is made a lot shorter by relying on accessing properties on Date objects with
@@ -11,7 +11,7 @@ load("jstests/aggregation/extras/utils.js");  // arrayEq
  * @param {Number} factor
  * @returns functions to immutably add/subtract a specific duration with a date.
  */
-const makeArithmeticHelpers = (unitName, factor) => {
+export const makeArithmeticHelpers = (unitName, factor) => {
     const getter = date => {
         const newDate = new ISODate(date.toISOString());
         // Calling the proper function on the passed in date object. If the unitName was "Seconds"
@@ -50,7 +50,7 @@ const makeArithmeticHelpers = (unitName, factor) => {
  * null/undefined unitName will return functions for numbers rather than dates.
  * @param {String | null} unitName
  */
-const getArithmeticFunctionsForUnit = (unitName) => {
+export const getArithmeticFunctionsForUnit = (unitName) => {
     switch (unitName) {
         case "millisecond":
             return makeArithmeticHelpers("Milliseconds", 1);
@@ -86,7 +86,7 @@ const getArithmeticFunctionsForUnit = (unitName) => {
     }
 };
 
-function densifyInJS(stage, docs) {
+export function densifyInJS(stage, docs) {
     const field = stage.field;
     const {step, bounds, unit} = stage.range;
     const stream = [];
@@ -159,7 +159,7 @@ function densifyInJS(stage, docs) {
     return stream;
 }
 
-const genRange = (min, max) => {
+export const genRange = (min, max) => {
     const result = [];
     for (let i = min; i < max; i++) {
         result.push(i);
@@ -167,26 +167,25 @@ const genRange = (min, max) => {
     return result;
 };
 
-const insertDocumentsFromOffsets = ({base, offsets, addFunc, coll, field}) =>
+export const insertDocumentsFromOffsets = ({base, offsets, addFunc, coll, field}) =>
     offsets.forEach(num => coll.insert({[field || "val"]: addFunc(base, num)}));
 
-const insertDocumentsOnPredicate = ({base, min, max, pred, addFunc, coll, field}) =>
+export const insertDocumentsOnPredicate = ({base, min, max, pred, addFunc, coll, field}) =>
     insertDocumentsFromOffsets(
         {base, offsets: genRange(min, max).filter(pred), addFunc, coll, field});
 
-const insertDocumentsOnStep = ({base, min, max, step, addFunc, coll, field}) =>
+export const insertDocumentsOnStep = ({base, min, max, step, addFunc, coll, field}) =>
     insertDocumentsOnPredicate(
         {base, min, max, pred: i => ((i - min) % step) === 0, addFunc, coll, field});
 
-const densifyUnits = [null, "millisecond", "second", "day", "month", "quarter", "year"];
+export const densifyUnits = [null, "millisecond", "second", "day", "month", "quarter", "year"];
+export const interestingSteps = [1, 2, 3, 4, 5, 7, 11, 13];
 
-const interestingSteps = [1, 2, 3, 4, 5, 7, 11, 13];
-
-function buildErrorString(found, expected) {
+export function buildErrorString(found, expected) {
     return "Expected:\n" + tojson(expected) + "\nGot:\n" + tojson(found);
 }
 
-function testDensifyStage(stage, coll, msg) {
+export function testDensifyStage(stage, coll, msg) {
     if (stage.range.unit === null) {
         delete stage.range.unit;
     }

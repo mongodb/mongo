@@ -1,9 +1,6 @@
 /**
  * Tests user deletes on capped collections.
  */
-(function() {
-"use strict";
-
 let replTest = new ReplSetTest({name: "capped_deletes", nodes: 2});
 replTest.startSet();
 replTest.initiate();
@@ -44,4 +41,3 @@ assert.eq(res.n, 7, res);
 assert.commandWorked(res);
 
 replTest.stopSet();
-}());

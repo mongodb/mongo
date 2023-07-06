@@ -8,9 +8,6 @@
 //   assumes_against_mongod_not_mongos,
 // ]
 
-(function() {
-"use strict";
-
 const coll = db.explain_winning_plan;
 coll.drop();
 
@@ -64,4 +61,3 @@ assert(Array.isArray(explainSinglePlan.executionStats.allPlansExecution), explai
 assert.eq(explainSinglePlan.executionStats.allPlansExecution.length, 0, explainSinglePlan);
 
 assert(coll.drop());
-}());

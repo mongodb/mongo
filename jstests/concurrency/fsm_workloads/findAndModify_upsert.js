@@ -6,6 +6,8 @@
  * created) based on the 'query' specification, and updated using the
  * $push operator.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var data = {sort: false, shardKey: {tid: 1}};
 

@@ -1,11 +1,8 @@
 // Test that initial sync aborts when it encounters auth data from unsupported
 // auth schemas (see: SERVER-17671)
+import {reInitiateWithoutThrowingOnAbortedMember} from "jstests/replsets/rslib.js";
 
 function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
-    'use strict';
-
-    load("jstests/replsets/rslib.js");  // For reInitiateWithoutThrowingOnAbortedMember
-
     // Create a replica set with one data-bearing node and one arbiter to
     // ensure availability when the added node fasserts later in the test
     var rst = new ReplSetTest({nodes: {n0: {}, arbiter: {}}});
@@ -52,8 +49,6 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
 }
 
 function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
-    'use strict';
-
     // Create a replica set with one data-bearing node and one arbiter to
     // ensure availability when the added node fasserts later in the test
     var rst = new ReplSetTest({nodes: {n0: {}, arbiter: {}}});

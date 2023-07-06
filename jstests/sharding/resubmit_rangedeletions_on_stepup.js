@@ -2,10 +2,7 @@
  * Ensure that orphaned documents are submitted for deletion on step up.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/uuid_util.js");
+import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
 
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 // Test deliberately keeps range deletion in pending state.
@@ -152,5 +149,4 @@ function writeRangeDeletionTask(collectionUuid, shardConn, pending, numOrphans) 
     assert.eq(shard0PrimaryColl.find().itcount(), expectedNumDocsShard0 + orphanCount);
 
     st.stop();
-})();
 })();

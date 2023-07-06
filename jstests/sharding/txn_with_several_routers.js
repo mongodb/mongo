@@ -5,10 +5,9 @@
  * @tags: [uses_transactions, uses_prepare_transaction, uses_multi_shard_transaction]
  */
 
-(function() {
-'use strict';
-
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -198,4 +197,3 @@ runTest(() => {
 });
 
 st.stop();
-})();

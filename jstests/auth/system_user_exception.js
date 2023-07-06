@@ -1,8 +1,5 @@
 // Test the special handling of the __system user
 // works when the SCRAM-SHA-1 pw auth mechanisms are disabled.
-(function() {
-"use strict";
-
 // Start mongod with no authentication mechanisms enabled
 var m = MongoRunner.runMongod(
     {keyFile: "jstests/libs/key1", setParameter: "authenticationMechanisms=PLAIN"});
@@ -16,4 +13,3 @@ m.getDB("test").runCommand({createUser: "guest", pwd: "guest", roles: jsTest.rea
 assert.eq(0, m.getDB("test").auth({user: "guest", pwd: "guest", mechanism: "SCRAM-SHA-256"}));
 
 MongoRunner.stopMongod(m);
-})();

@@ -4,9 +4,7 @@
  * entirely if the locking behavior changes post v4.2.
  * @tags: [uses_transactions, uses_prepare_transaction, multiversion_incompatible]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 function runTest(downgradeFCV) {
     const rst = new ReplSetTest({nodes: [{binVersion: "latest"}]});
@@ -73,4 +71,3 @@ runTest(lastLTSFCV);
 if (lastLTSFCV !== lastContinuousFCV) {
     runTest(lastContinuousFCV);
 }
-}());

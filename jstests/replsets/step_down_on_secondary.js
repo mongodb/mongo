@@ -11,13 +11,9 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-
-"use strict";
-load('jstests/libs/parallelTester.js');
-load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -133,4 +129,3 @@ rst.awaitReplication();
 assert.docEq([{_id: 0, b: 1}], primary.getDB(dbName)[collName].find({_id: 0}).toArray());
 
 rst.stopSet();
-})();

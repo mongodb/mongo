@@ -11,14 +11,18 @@
  * Note that this fixture does not support resetting the collection after each runTest() call so it
  * is illegal to do more than one runTest() call.
  */
-'use strict';
 
-load("jstests/libs/discover_topology.js");
-load('jstests/sharding/internal_txns/libs/fixture_helpers.js');
-load("jstests/sharding/libs/resharding_test_fixture.js");
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {runTxnRetryOnTransientError} from "jstests/sharding/internal_txns/libs/fixture_helpers.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
+import {
+    getTxnEntriesForSession,
+    makeAbortTransactionCmdObj,
+    makeCommitTransactionCmdObj,
+    makePrepareTransactionCmdObj,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
-function InternalTransactionReshardingTest({reshardInPlace}) {
+export function InternalTransactionReshardingTest({reshardInPlace}) {
     jsTest.log(`Running resharding test with options ${tojson({reshardInPlace})}`);
 
     const reshardingTest = new ReshardingTest({

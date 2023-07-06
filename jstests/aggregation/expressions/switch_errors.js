@@ -1,10 +1,8 @@
 // SERVER-10689 introduced the $switch expression. In this file, we test the error cases of the
 // expression.
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
 
-(function() {
-"use strict";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.switch;
 coll.drop();
@@ -82,4 +80,3 @@ assert.eq([{"_id": 2, "count": 1}], coll.aggregate(pipeline).toArray());
 assert.commandWorked(coll.remove({x: 1}));
 assert.commandWorked(coll.insert({z: 1}));
 assertErrorCode(coll, pipeline, 40066, "$switch has no default and an input matched no case");
-}());

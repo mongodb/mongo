@@ -13,15 +13,14 @@
  *   requires_timeseries,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
 import {
     createBoringCollections,
-    getMapInterestingValuesToEquivalentsStage,
     createInterestingCollections,
-    expectDistinctScan,
     expectCollScan,
+    expectDistinctScan,
     expectIxscan,
+    getMapInterestingValuesToEquivalentsStage,
     testAllTimeMetaDirections,
 } from "jstests/core/timeseries/libs/timeseries_lastpoint_helpers.js";
 

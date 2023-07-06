@@ -4,7 +4,11 @@
  * @tags: [uses_transactions, assumes_snapshot_transactions]
  */
 
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    withTxnAndAutoRetry
+} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/multi_statement_transaction_simple.js";

@@ -9,11 +9,9 @@
  * multiversion_incompatible]
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
-load("jstests/libs/write_concern_util.js");
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {reconnect} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();
 const dbName = name;
@@ -167,4 +165,3 @@ assert.commandWorked(node.adminCommand({
 assert.sameMembers(getColl2(node).find().toArray(), [{_id: 1, a: 1}]);
 
 rst.stopSet();
-})();

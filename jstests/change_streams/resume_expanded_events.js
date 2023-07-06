@@ -10,13 +10,7 @@
  *   assumes_against_mongod_not_mongos,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/collection_drop_recreate.js');  // For 'assertDropAndRecreateCollection' and
-                                                   // 'assertDropCollection'.
-load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
-                                                   // 'assertChangeStreamEventEq'.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const collName = "coll1";
@@ -127,4 +121,3 @@ function runTest(collNameForChangeStream) {
 
 runTest(1);  // Runs the test using a whole-db change stream
 runTest(collName);
-}());

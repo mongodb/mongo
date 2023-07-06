@@ -15,7 +15,7 @@
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_experimental_incompatible,
 // ]
-load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 

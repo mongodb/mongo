@@ -9,11 +9,14 @@
  *  ]
  */
 
-load('jstests/libs/chunk_manipulation_util.js');
-load("jstests/sharding/libs/find_chunks_util.js");
-
-(function() {
-'use strict';
+import {
+    migrateStepNames,
+    moveChunkParallel,
+    pauseMigrateAtStep,
+    unpauseMigrateAtStep,
+    waitForMigrateStep,
+} from "jstests/libs/chunk_manipulation_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // For startParallelOps to write its state
 var staticMongod = MongoRunner.runMongod({});
@@ -93,4 +96,3 @@ assert.eq(
 
 st.stop();
 MongoRunner.stopMongod(staticMongod);
-})();

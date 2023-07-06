@@ -101,6 +101,7 @@ import {
     isShardMergeEnabled,
     makeMigrationCertificatesForTest
 } from "jstests/replsets/libs/tenant_migration_util.js";
+import {storageEngineIsWiredTigerOrInMemory} from "jstests/libs/storage_engine_utils.js";
 
 // constants
 
@@ -208,9 +209,8 @@ var roles_all = {
     __system: 1
 };
 
-load("jstests/libs/uuid_util.js");
-// For isReplSet
-load("jstests/libs/fixture_helpers.js");
+import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export const authCommandsLib = {
 
@@ -2993,9 +2993,9 @@ export const authCommandsLib = {
         {
           testname: "_shardsvrWriteGlobalIndexKeys",
           command: {_shardsvrWriteGlobalIndexKeys: 1, ops: [
-		  {_shardsvrInsertGlobalIndexKey: UUID(), key: {a: 1}, docKey: {shk: 1, _id: 1}},
-		  {_shardsvrDeleteGlobalIndexKey: UUID(), key: {a: 1}, docKey: {shk: 1, _id: 1}},
-	  ]},
+            {_shardsvrInsertGlobalIndexKey: UUID(), key: {a: 1}, docKey: {shk: 1, _id: 1}},
+            {_shardsvrDeleteGlobalIndexKey: UUID(), key: {a: 1}, docKey: {shk: 1, _id: 1}},
+          ]},
           skipSharded: true,
           testcases: [
               {
@@ -5144,7 +5144,6 @@ export const authCommandsLib = {
           command: {insert: "oplog.rs", documents: [{ts: Timestamp()}]},
           skipSharded: true,
           setup: function(db) {
-              load("jstests/libs/storage_engine_utils.js");
               if (!db.getCollectionNames().includes("oplog.rs")) {
                   assert.commandWorked(
                       db.runCommand({create: "oplog.rs", capped: true, size: 10000}));
@@ -6543,7 +6542,7 @@ export const authCommandsLib = {
               const hello = assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
               const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
               return isStandalone;
-	  },
+          },
           testcases: [
               {
                 runOnDb: adminDbName,

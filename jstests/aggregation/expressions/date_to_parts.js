@@ -1,8 +1,6 @@
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
-load("jstests/libs/sbe_assert_error_override.js");
+import "jstests/libs/sbe_assert_error_override.js";
 
-(function() {
-"use strict";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.dateToParts;
 coll.drop();
@@ -368,4 +366,3 @@ assert.eq({year: 2020, month: 12, day: 15, hour: 7, minute: 0, second: 0, millis
           runDateToPartsExpression(ISODate("2020-12-15T10:00:00.000Z"), "America/Sao_Paulo"));
 assert.eq({year: 2021, month: 1, day: 15, hour: 7, minute: 0, second: 0, millisecond: 0},
           runDateToPartsExpression(ISODate("2021-01-15T10:00:00.000Z"), "America/Sao_Paulo"));
-})();

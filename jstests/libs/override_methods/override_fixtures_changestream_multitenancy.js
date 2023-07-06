@@ -1,7 +1,5 @@
 // Overrides the JS test exiting 'RepliSetTest' fixture to enable reading the change stream in the
 // multitenancy and serverless environment.
-(function() {
-"use strict";
 
 // Make a copy of the original 'ReplSetTest' fixture.
 const originalReplSet = ReplSetTest;
@@ -94,4 +92,3 @@ ShardingTest = function(params) {
 
 // Extend the new 'ShardingTest' fixture with the properties of the original one.
 Object.extend(ShardingTest, originalShardingTest);
-})();

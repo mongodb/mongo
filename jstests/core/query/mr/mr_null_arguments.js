@@ -10,9 +10,6 @@
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
 // ]
-(function() {
-"use strict";
-
 const coll = db.mr_null_test;
 const outColl = db.mr_null_test_out;
 assert.commandWorked(coll.insert({val: 1}));
@@ -59,4 +56,3 @@ assert.commandWorked(db.runCommand({
     scope: null,
     out: {merge: outColl.getName()}
 }));
-})();

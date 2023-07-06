@@ -8,9 +8,10 @@
  * and then inserts 'modulus * countPerNum' documents. [250, 1000]
  * Each thread inserts docs into a unique collection.
  */
+import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/count.js";
-load("jstests/libs/fixture_helpers.js");  // For isMongos.
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.prefix = 'count_fsm_q_l_s';

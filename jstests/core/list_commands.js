@@ -1,9 +1,6 @@
 // Test for listCommands.
 // @tags: [multiversion_incompatible]
 
-(function() {
-"use strict";
-
 var commands = db.runCommand({listCommands: 1});
 assert.commandWorked(commands);
 
@@ -46,4 +43,3 @@ const insert = commands["commands"]["insert"];
 assert(hello["requiresAuth"] === false);
 assert(isMaster["requiresAuth"] === false);
 assert(insert["requiresAuth"] === true);
-})();

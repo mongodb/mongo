@@ -5,9 +5,6 @@
  * @tags: [multiversion_incompatible, featureFlagGlobalIndexesShardingCatalog, requires_fcv_70]
  */
 
-(function() {
-'use strict';
-
 const st = new ShardingTest({shards: 1});
 
 const csrsIndexesCollection = 'csrs.indexes';
@@ -109,4 +106,3 @@ const afterUpgradeShardIndexes = st.rs0.getPrimary()
 assert.eq(3, afterUpgradeShardIndexes.length);
 
 st.stop();
-})();

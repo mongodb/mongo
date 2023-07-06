@@ -1,10 +1,7 @@
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/libs/write_concern_util.js");
-load("jstests/sharding/libs/create_sharded_collection_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 /**
  * Test fixture for resharding a sharded collection once.
@@ -22,7 +19,7 @@ load("jstests/sharding/libs/create_sharded_collection_util.js");
  *      });
  *      reshardingTest.teardown();
  */
-var ReshardingTest = class {
+export var ReshardingTest = class {
     constructor({
         numDonors: numDonors = 1,
         numRecipients: numRecipients = 1,

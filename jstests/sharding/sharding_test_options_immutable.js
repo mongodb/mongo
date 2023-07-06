@@ -2,9 +2,6 @@
  * Ensure options object passed to ShardingTest is not mutated.
  */
 
-(function() {
-'use strict';
-
 const opts = {
     setParameter: {},
 };
@@ -22,4 +19,3 @@ try {
 } finally {
     assert.eq(opts, {setParameter: {}});
 }
-})();

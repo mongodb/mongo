@@ -1,11 +1,8 @@
 /**
  * Tests that findAndModify with upsert=true does not conflict with a collection MODE_IX lock.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/wait_for_command.js");
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
 const collName = "findAndModify_upsert_no_conflicts";
 const testDB = db.getSiblingDB("test");
@@ -47,4 +44,3 @@ assert.eq(testDB[collName].find(updateDoc).toArray().length, 1);
 // Interrupt the sleep command.
 assert.commandWorked(testDB.getSiblingDB("admin").killOp(sleepID));
 sleepCommand();
-})();

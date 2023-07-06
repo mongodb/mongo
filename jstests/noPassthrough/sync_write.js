@@ -4,9 +4,6 @@
  * This test requires persistence to ensure data survives a restart.
  * @tags: [requires_persistence]
  */
-(function() {
-'use strict';
-
 //  The following test verifies that writeConcern: {j: true} ensures that data is durable.
 var dbpath = MongoRunner.dataPath + 'sync_write';
 resetDbpath(dbpath);
@@ -30,4 +27,3 @@ assert.neq(null, conn, 'mongod was unable to restart after receiving a SIGKILL')
 testDB = conn.getDB('test');
 assert.eq(1, testDB.synced.count({synced: true}), 'synced write was not found');
 MongoRunner.stopMongod(conn);
-})();

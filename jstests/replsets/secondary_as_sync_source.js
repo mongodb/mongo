@@ -9,8 +9,8 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-load('jstests/noPassthrough/libs/index_build.js');
-load("jstests/replsets/rslib.js");
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 const dbName = "test";
 const collName = "coll";

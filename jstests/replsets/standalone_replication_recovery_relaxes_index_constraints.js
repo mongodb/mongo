@@ -10,10 +10,7 @@
  * multiversion_incompatible]
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
-load("jstests/libs/write_concern_util.js");
+import {reconnect} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();
 const dbName = name;
@@ -65,4 +62,3 @@ assert.eq(0, node.getCollection("config.system.indexBuilds").count());
 reconnect(node);
 
 rst.stopSet();
-})();

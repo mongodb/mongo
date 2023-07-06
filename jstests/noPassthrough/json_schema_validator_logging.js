@@ -2,9 +2,6 @@
  * Test that createCollection logs for a validator that can't match documents.
  */
 
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB(jsTestName());
 
@@ -52,4 +49,3 @@ log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
 assert.eq(logLine.length, 2, logLine);
 
 MongoRunner.stopMongod(conn);
-})();

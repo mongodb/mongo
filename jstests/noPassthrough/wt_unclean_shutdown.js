@@ -7,15 +7,12 @@
  * @tags: [requires_wiredtiger]
  */
 
-load('jstests/libs/parallelTester.js');  // For Thread
-
-(function() {
-'use strict';
+import {Thread} from "jstests/libs/parallelTester.js";
 
 // Skip this test if not running with the "wiredTiger" storage engine.
 if (jsTest.options().storageEngine && jsTest.options().storageEngine !== 'wiredTiger') {
     jsTest.log('Skipping test because storageEngine is not "wiredTiger"');
-    return;
+    quit();
 }
 
 var dbpath = MongoRunner.dataPath + 'wt_unclean_shutdown';
@@ -128,4 +125,3 @@ for (var i = 0; i < retData.length; i++) {
 }
 
 MongoRunner.stopMongod(conn);
-})();

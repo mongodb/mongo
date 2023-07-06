@@ -1,9 +1,6 @@
 // In SERVER-17258, the $reduce expression was introduced. In this test file, we check the
 // functionality and error cases of the expression.
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExpression.
-
-(function() {
-"use strict";
+import {assertErrorCode, testExpression} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.reduce;
 
@@ -132,4 +129,3 @@ pipeline = {
     $project: {reduced: {$reduce: {input: "$$this", initialValue: [], in : []}}}
 };
 assertErrorCode(coll, pipeline, 17276);
-}());

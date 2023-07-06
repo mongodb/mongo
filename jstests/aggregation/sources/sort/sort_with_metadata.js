@@ -1,7 +1,4 @@
 // Test that the $sort stage properly errors on invalid $meta.
-(function() {
-"use strict";
-
 var coll = db.sort_with_metadata;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, text: "apple", words: 1}));
@@ -44,4 +41,3 @@ assert.sameMembers(results,
                            {$sort: {textScore: {$meta: 'randVal'}}}
                        ])
                        .toArray());
-})();

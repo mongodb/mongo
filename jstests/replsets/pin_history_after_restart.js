@@ -24,9 +24,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 function incTs(ts) {
     return Timestamp(ts.t, ts.i + 1);
 }
@@ -91,4 +88,3 @@ serverStatus = assert.commandWorked(primary.adminCommand("serverStatus"));
 pinnedTs = serverStatus["wiredTiger"]["snapshot-window-settings"]["min pinned timestamp"];
 assert.eq(newPinTs, pinnedTs);
 replTest.stopSet();
-})();

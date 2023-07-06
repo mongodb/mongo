@@ -9,9 +9,6 @@
 //   # inject_tenant_prefix.js override).
 //   tenant_migration_incompatible,
 // ]
-(function() {
-"use strict";
-
 const t = db.bench_test1;
 t.drop();
 
@@ -51,4 +48,3 @@ benchRun(benchArgs);
 assert.soon(function() {
     return t.getIndexes().length == 1;
 });
-}());

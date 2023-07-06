@@ -13,9 +13,7 @@
 //   requires_scripting,
 // ]
 
-load("jstests/aggregation/extras/utils.js");  // For resultsEq
-(function() {
-"use strict";
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.mr_multikey_deduping;
 coll.drop();
@@ -124,5 +122,4 @@ outColl.drop();
     assert(resultsEq(resultsNoIndexNoQuery, resultsIndexedNoQuery));
     assert(resultsEq(resultsNoIndexEqualityOnName, resultsIndexedEqualityOnName));
     assert(resultsEq(resultsNoIndexRangeOnName, resultsIndexedRangeOnName));
-}());
 }());

@@ -14,9 +14,6 @@
 // http://geojson.org/geojson-spec.html#polygon
 //
 
-(function() {
-'use strict';
-
 const coordinates = [
     // One square.
     [[9, 9], [9, 11], [11, 11], [11, 9], [9, 9]],
@@ -82,4 +79,3 @@ assert.commandWorked(t.insert({p: poly}));
 assert.commandWorked(t.insert({p: multiPoly}));
 
 jsTest.log("Success.");
-})();

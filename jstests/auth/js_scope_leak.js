@@ -7,9 +7,6 @@
 //
 //       These transitions are tested for $where and MapReduce.
 
-(function() {
-'use strict';
-
 const conn = MongoRunner.runMongod();
 const test = conn.getDB("test");
 
@@ -103,4 +100,3 @@ testMapReduce();
 testMapReduce();
 
 MongoRunner.stopMongod(conn);
-})();

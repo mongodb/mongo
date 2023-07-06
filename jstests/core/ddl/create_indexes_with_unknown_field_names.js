@@ -2,9 +2,6 @@
  * Tests that we can have unknown field names in the index spec passed to the createIndexes command
  * if 'ignoreUnknownIndexOptions: true' is set on the createIndexes command.
  */
-(function() {
-"use strict";
-
 db.unknown_field_names_create_indexes.drop();
 assert.commandFailedWithCode(db.runCommand({
     createIndexes: "unknown_field_names_create_indexes",
@@ -39,4 +36,3 @@ for (let index in indexes) {
         assert.eq(indexes[index].someField, undefined);
     }
 }
-})();

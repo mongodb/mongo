@@ -1,5 +1,5 @@
 // this tests all points
-load("jstests/libs/geo_near_random.js");
+import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
 
 var test = new GeoNearRandomTest("geo_near_random1");
 

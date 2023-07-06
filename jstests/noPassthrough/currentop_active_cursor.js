@@ -3,9 +3,7 @@
 // @tags: [
 //   requires_sharding,
 // ]
-(function() {
-"use strict";
-load("jstests/libs/pin_getmore_cursor.js");  // for "withPinnedCursor"
+import {withPinnedCursor} from "jstests/libs/pin_getmore_cursor.js";
 
 function runTest(cursorId, coll) {
     const db = coll.getDB();
@@ -64,4 +62,3 @@ withPinnedCursor({
     assertEndCounts: true
 });
 st.stop();
-})();

@@ -1,7 +1,8 @@
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
-function getNewNs(dbName) {
+export function getNewNs(dbName) {
     if (typeof getNewNs.counter == 'undefined') {
         getNewNs.counter = 0;
     }
@@ -10,11 +11,11 @@ function getNewNs(dbName) {
     return [collName, dbName + "." + collName];
 }
 
-function runMoveChunkMakeDonorStepDownAfterFailpoint(st,
-                                                     dbName,
-                                                     failpointName,
-                                                     shouldMakeMigrationFailToCommitOnConfig,
-                                                     expectAbortDecisionWithCode) {
+export function runMoveChunkMakeDonorStepDownAfterFailpoint(st,
+                                                            dbName,
+                                                            failpointName,
+                                                            shouldMakeMigrationFailToCommitOnConfig,
+                                                            expectAbortDecisionWithCode) {
     const [collName, ns] = getNewNs(dbName);
     jsTest.log("Running migration, making donor step down after failpoint " + failpointName +
                "; shouldMakeMigrationFailToCommitOnConfig is " +

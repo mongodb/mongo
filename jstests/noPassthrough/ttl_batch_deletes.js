@@ -8,11 +8,7 @@
  *   uses_ttl,
  * ]
  */
-(function() {
-'use strict';
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load('jstests/replsets/rslib.js');
-load("jstests/libs/fixture_helpers.js");  // For mapOnEachShardNode().
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const docCount = 50;
 
@@ -194,4 +190,3 @@ runTestCase(testTTLDeleteWithCollectionScanBatched);
 runTestCase(testTTLDeleteWithCollectionScanDocByDoc);
 runTestCase(testTTLDeleteWithIndexScanBatchedOnShardedCollection, true);
 runTestCase(testTTLDeleteWithCollectionScanBatchedOnShardedCollection, true);
-})();

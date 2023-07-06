@@ -1,7 +1,4 @@
 // Tests for $array expression.
-(function() {
-"use strict";
-
 let coll = db.array_expr;
 coll.drop();
 
@@ -30,4 +27,3 @@ assert(coll.drop());
 assert.commandWorked(coll.insert({}));
 let result = coll.aggregate([{$project: {out: []}}]).toArray()[0].out;
 assert.eq(result, []);
-}());

@@ -14,9 +14,6 @@
 // Get shell's global scope.
 const self = this;
 
-(function() {
-'use strict';
-
 const testName = jsTest.name();
 const conn = MongoRunner.runMongod({auth: ''});
 const admin = conn.getDB('admin');
@@ -49,4 +46,3 @@ assert(__autocomplete__.includes('db.coachClass'),
 assert(!__autocomplete__.includes('db.businessClass'),
        `Completions should NOT include 'businessClass': ${__autocomplete__}`);
 MongoRunner.stopMongod(conn);
-})();

@@ -10,9 +10,6 @@
  *
  * @tags: [requires_persistence]
  */
-(function() {
-"use strict";
-
 const dbName = "background_validation_with_ddl_ops";
 const dbNameRename = "background_validation_with_ddl_ops_rename";
 const collName = "test";
@@ -188,4 +185,3 @@ try {
 }
 
 awaitPassedValidation();
-}());

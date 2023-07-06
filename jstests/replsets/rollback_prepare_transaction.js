@@ -6,10 +6,10 @@
  *   uses_transactions,
  * ]
  */
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {checkRollbackFiles} from "jstests/replsets/libs/rollback_files.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
-load("jstests/replsets/libs/rollback_files.js");
-load("jstests/libs/uuid_util.js");
 
 const rollbackTest = new RollbackTest();
 const rollbackNode = rollbackTest.getPrimary();

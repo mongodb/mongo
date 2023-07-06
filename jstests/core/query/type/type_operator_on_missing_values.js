@@ -1,8 +1,5 @@
 // Test $type expression with non-existent field in the document.
 
-(function() {
-"use strict";
-
 const coll = db.type_operator_on_missing_values;
 coll.drop();
 
@@ -27,4 +24,3 @@ for (const type of bsonTypes) {
     results = coll.find({a: {$not: {$type: type}}}).sort({_id: 1}).toArray();
     assert.eq(results, documentList);
 }
-}());

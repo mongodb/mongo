@@ -8,9 +8,6 @@
 //   requires_non_retryable_commands,
 //   uses_full_validation,
 // ]
-(function() {
-"use strict";
-
 const collName = "doc_validation_encrypt_keywords";
 const coll = db[collName];
 coll.drop();
@@ -132,4 +129,3 @@ assert.commandFailedWithCode(
         {collMod: collName, validator: encryptMetadataSchema, validationLevel: "moderate"}),
     ErrorCodes.QueryFeatureNotAllowed);
 validateCollectionOptions();
-})();

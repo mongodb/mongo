@@ -1,7 +1,4 @@
 // Tests that planSummary is not duplicated in an active getmore currentOp entry.
-(function() {
-"use strict";
-
 // This test runs a getMore in a parallel shell, which will not inherit the implicit session of
 // the cursor establishing command.
 TestData.disableImplicitSessions = true;
@@ -54,4 +51,3 @@ assert.soon(function() {
     return true;
 });
 awaitShell();
-}());

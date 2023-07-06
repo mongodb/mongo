@@ -8,9 +8,6 @@
  *   requires_getmore,
  * ]
  */
-(function() {
-'use strict';
-
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
@@ -53,4 +50,3 @@ assert.commandWorked(
 assert(testDB.system.views.drop());
 assert.commandWorked(
     testDB.adminCommand({configureFailPoint: "allowSystemViewsDrop", mode: "off"}));
-})();

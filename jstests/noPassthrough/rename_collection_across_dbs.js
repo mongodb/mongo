@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const testName = jsTestName();
 let dbName1 = testName + '1-1';
 let dbName2 = testName + '1-2';
@@ -162,4 +159,3 @@ assert.eq(largeNumberOfDocsToExceedBatchCountLimit / maxInsertsCount,
               " insert oplog entries, in applyOps format.");
 
 rst.stopSet();
-})();

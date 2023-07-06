@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 1, rs: {nodes: 2}});
 
 assert.commandWorked(st.s0.adminCommand({enablesharding: 'TestDB'}));
@@ -29,4 +26,3 @@ assert.eq(2, getMoreCursor.nextBatch[0].x);
 st.rs0.unfreeze(primary);
 
 st.stop();
-})();

@@ -1,9 +1,6 @@
 // Test that shardCollection uses existing zone info to validate
 // shard keys and do initial chunk splits.
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var st = new ShardingTest({shards: 3});
 var kDbName = 'test';
@@ -113,7 +110,7 @@ function testChunkSplits(collectionExists) {
     assert.eq(chunkDocs.length,
               expectedChunks.length,
               "shardCollection failed to create chunk documents correctly");
-    for (var i = 0; i < chunkDocs.length; i++) {
+    for (let i = 0; i < chunkDocs.length; i++) {
         var errMsg = "expect to see chunk " + tojson(expectedChunks[i]) + " but found chunk " +
             tojson(chunkDocs[i]);
         assert.eq(expectedChunks[i].range[0], chunkDocs[i].min, errMsg);
@@ -195,4 +192,3 @@ testChunkSplits(true);
 testNonemptyZonedCollection();
 
 st.stop();
-})();

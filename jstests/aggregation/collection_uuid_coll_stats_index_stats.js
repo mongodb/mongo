@@ -2,9 +2,6 @@
  * Tests the collectionUUID parameter of the aggregate command for $indexStats and $collStats
  * pipelines.
  */
-(function() {
-'use strict';
-
 const validateErrorResponse = function(
     res, db, collectionUUID, expectedCollection, actualCollection) {
     assert.eq(res.db, db);
@@ -113,4 +110,3 @@ const testCommand = function(cmd, cmdObj) {
 
 testCommand("aggregate", {aggregate: "", pipeline: [{$indexStats: {}}], cursor: {}});
 testCommand("aggregate", {aggregate: "", pipeline: [{$collStats: {latencyStats: {}}}], cursor: {}});
-})();

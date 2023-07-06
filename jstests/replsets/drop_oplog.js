@@ -1,8 +1,6 @@
 // Test that dropping the replset oplog, the local database, and the admin database are all
 // prohibited in a replset.
 
-(function() {
-"use strict";
 let rt = new ReplSetTest({name: "drop_oplog", nodes: 1, oplogSize: 30});
 
 let nodes = rt.startSet();
@@ -33,4 +31,3 @@ renameOutput = localDB.foo.renameCollection("oplog.rs");
 assert.eq(renameOutput.ok, 0);
 assert.eq(renameOutput.errmsg, "can't rename to live oplog while replicating");
 rt.stopSet();
-}());

@@ -7,11 +7,8 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/noPassthrough/libs/index_build.js');
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 function killBeforeVoteCommitSucceeds(rst) {
     const primary = rst.getPrimary();
@@ -139,4 +136,3 @@ killBeforeVoteCommitSucceeds(rst);
 killAfterVoteCommitFails(rst);
 
 rst.stopSet();
-})();

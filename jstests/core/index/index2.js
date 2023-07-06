@@ -2,9 +2,6 @@
  * Test indexing where the key is an embedded object.
  */
 
-(function() {
-'use strict';
-
 let t = db.index2_without_index;
 t.drop();
 
@@ -48,4 +45,3 @@ const sortedDocsAscending = t.find().sort({z: 1});
 assert.eq(sortedDocsAscending.length(), 4, tojson(sortedDocsAscending.toArray()));
 const sortedDocsDescending = t.find().sort({z: -1});
 assert.eq(sortedDocsDescending.length(), 4, tojson(sortedDocsDescending.toArray()));
-})();

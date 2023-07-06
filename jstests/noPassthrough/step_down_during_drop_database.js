@@ -7,9 +7,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "coll";
 
@@ -57,4 +54,3 @@ testDB.dropDatabase();
 replSet.awaitReplication();
 
 replSet.stopSet();
-})();

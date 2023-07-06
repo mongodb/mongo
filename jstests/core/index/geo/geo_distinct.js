@@ -6,8 +6,6 @@
 //   requires_fastcount,
 // ]
 
-(function() {
-"use strict";
 const coll = db.geo_distinct;
 let res;
 
@@ -116,4 +114,3 @@ res = coll.runCommand('distinct',
                       {key: 'zone', query: {'loc.coordinates': {$near: [0, 0], $maxDistance: 1}}});
 assert.commandWorked(res);
 assert.eq(res.values.sort(), [3]);
-}());

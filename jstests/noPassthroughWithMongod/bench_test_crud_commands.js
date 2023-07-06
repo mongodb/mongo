@@ -1,8 +1,5 @@
 // Tests the "writeCmd" and "readCmd" options to benchRun().
 
-(function() {
-"use strict";
-
 var coll = db.bench_test_crud_commands;
 coll.drop();
 assert.commandWorked(coll.getDB().createCollection(coll.getName()));
@@ -83,4 +80,3 @@ testWriteConcern();
 
 testFind();
 testFindOne();
-})();

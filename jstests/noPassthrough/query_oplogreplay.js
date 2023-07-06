@@ -3,8 +3,6 @@
 
 import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
-load("jstests/libs/storage_engine_utils.js");
-
 let replSet = new ReplSetTest({nodes: 1});
 replSet.startSet();
 replSet.initiate();

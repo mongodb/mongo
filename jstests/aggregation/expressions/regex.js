@@ -1,10 +1,10 @@
 /**
  * Tests for $regexFind, $regexFindAll and $regexMatch aggregation expressions.
  */
-(function() {
-'use strict';
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode() and anyEq().
-load('jstests/libs/sbe_assert_error_override.js');  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
+
+import {anyEq, assertErrorCode} from "jstests/aggregation/extras/utils.js";
+
 const coll = db.regex_find_expr;
 coll.drop();
 
@@ -567,4 +567,3 @@ function testRegexAggException(inputObj, exceptionCode) {
     assert(anyEq(resultFind, resultMatch));
     assert(anyEq(resultFind, expectedResults));
 })();
-}());

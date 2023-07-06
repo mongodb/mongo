@@ -67,7 +67,7 @@ function testReadLoadBalancing(numReplicas) {
                       tojson(profileCollection.find().toArray()));
     }
 
-    db = primary.getDB("test");
+    const db = primary.getDB("test");
 
     printjson(rs.status());
     let c = rs.conf();

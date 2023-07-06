@@ -3,11 +3,6 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-
 const kDbName = "testDb";
 const kCollName = "testColl";
 const kNs = kDbName + "." + kCollName;
@@ -92,5 +87,4 @@ const kNs = kDbName + "." + kCollName;
     assert.commandFailedWithCode(shard0TestDB.runCommand(insertCmdObj), ErrorCodes.InvalidOptions);
 
     st.stop();
-})();
 })();

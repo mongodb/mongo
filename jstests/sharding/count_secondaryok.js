@@ -10,10 +10,7 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
-load("jstests/replsets/rslib.js");
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 var st = new ShardingTest({shards: 1, mongos: 1, other: {rs: true, rs0: {nodes: 2}}});
 var rst = st.rs0;
@@ -78,4 +75,3 @@ try {
 }
 
 st.stop();
-})();

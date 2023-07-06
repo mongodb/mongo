@@ -2,9 +2,6 @@
  * Tests that a stale mongos does not return a stale shardVersion error to the client for explain
  * of a find command.
  */
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
@@ -41,4 +38,3 @@ jsTest.log("Run explain find on " + ns + " from the stale mongos");
 staleMongos.getDB(dbName).getCollection(collName).explain().find().next();
 
 st.stop();
-})();

@@ -10,10 +10,7 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}],
@@ -65,4 +62,3 @@ assert.eq(rst.getReplSetConfigFromNode(secondaryNodeId).version, newConfigVersio
 // Re-connect the node to let the test complete.
 rst.nodes[1].reconnect([rst.nodes[0]]);
 rst.stopSet();
-}());

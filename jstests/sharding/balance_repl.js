@@ -2,9 +2,6 @@
  * Testing migrations are successful and immediately visible on the secondaries, when
  * secondaryThrottle is used.
  */
-(function() {
-'use strict';
-
 // The mongod secondaries are set to priority 0 to prevent the primaries from stepping down during
 // migrations on slow evergreen builders.
 var s = new ShardingTest({
@@ -62,4 +59,3 @@ assert.eq(2100,
               collPrimary.find().itcount());
 
 s.stop();
-}());

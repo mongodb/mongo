@@ -14,9 +14,6 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.getCollection(jsTestName());
 const bucketColl = db.getCollection("system.buckets." + jsTestName());
 
@@ -74,4 +71,3 @@ for (let i = 0; i < numMeasurements; i++) {
 }
 assert.commandWorked(coll.insertMany(batch), {ordered: false});
 checkAverageBucketSize();
-}());

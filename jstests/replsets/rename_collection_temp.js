@@ -3,9 +3,6 @@
 // correctly propagated.
 // @tags: [requires_replication]
 
-(function() {
-"use strict";
-
 function checkCollectionTemp(db, collName, expectedTempValue) {
     var collectionInformation = db.getCollectionInfos();
 
@@ -80,4 +77,3 @@ replTest.awaitReplication();
 checkCollectionTemp(secondaryFoo, "permanentColl", false);
 
 replTest.stopSet();
-}());

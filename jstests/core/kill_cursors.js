@@ -11,9 +11,6 @@
 // "CursorNotFound."
 //
 // Test the killCursors command.
-(function() {
-'use strict';
-
 var cmdRes;
 var cursor;
 var cursorId;
@@ -86,4 +83,3 @@ assert.eq(cmdRes.cursorsKilled, [cursorId]);
 assert.eq(cmdRes.cursorsNotFound, [NumberLong(123)]);
 assert.eq(cmdRes.cursorsAlive, []);
 assert.eq(cmdRes.cursorsUnknown, []);
-})();

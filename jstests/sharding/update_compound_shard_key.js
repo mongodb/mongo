@@ -6,12 +6,12 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
-load("jstests/sharding/libs/update_shard_key_helpers.js");
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    isUpdateDocumentShardKeyUsingTransactionApiEnabled
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 3});
 
@@ -592,4 +592,3 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
         ErrorCodes.ShardKeyNotFound);
 }
 st.stop();
-})();

@@ -7,8 +7,6 @@
  *   requires_wiredtiger
  * ]
  */
-(function() {
-"use strict";
 const dbName = jsTestName();
 const collName = 'coll';
 
@@ -79,5 +77,4 @@ jsTestLog("Testing replica set");
     const db = rst.getPrimary().getDB(dbName);
     runTest(db);
     rst.stopSet();
-})();
 })();

@@ -1,11 +1,3 @@
-// Tests that the validate command works with partial indexes and a document that does not have
-// an indexed field. For details, see SERVER-23730.
-// @tags: [
-//   uses_full_validation,
-// ]
-'use strict';
-
-(function() {
 var t = db.index_partial_validate;
 t.drop();
 
@@ -21,4 +13,3 @@ assert.commandWorked(res);
 res = t.validate({full: true});
 assert.commandWorked(res);
 assert(res.valid, 'Validate failed with response:\n' + tojson(res));
-})();

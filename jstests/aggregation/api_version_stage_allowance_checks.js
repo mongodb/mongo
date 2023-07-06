@@ -11,9 +11,6 @@
  *   uses_api_parameters,
  * ]
  */
-(function() {
-"use strict";
-
 const dbName = jsTestName();
 const testDB = db.getSiblingDB(dbName);
 testDB.dropDatabase();
@@ -163,5 +160,4 @@ assert.commandWorked(result);
     const plans = [coll.find().explain(), coll.explain().aggregate([{$match: {}}])];
     assert(plans.every(
         plan => plan.stages.map(x => Object.keys(x)[0]).includes("$_internalUnpackBucket")));
-})();
 })();

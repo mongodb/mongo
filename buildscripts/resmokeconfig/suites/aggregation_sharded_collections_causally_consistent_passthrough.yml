@@ -59,9 +59,9 @@ executor:
     shell_options:
       eval: >-
         globalThis.testingReplication = true;
-        load('jstests/libs/override_methods/enable_causal_consistency.js');
-        load('jstests/libs/override_methods/detect_spawning_own_mongod.js');
-        load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js")
+        await import('jstests/libs/override_methods/enable_causal_consistency.js');
+        await import('jstests/libs/override_methods/detect_spawning_own_mongod.js');
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js")
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're

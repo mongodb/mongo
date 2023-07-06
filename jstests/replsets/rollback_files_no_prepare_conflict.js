@@ -7,7 +7,7 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const name = "rollback_files_no_prepare_conflicts";

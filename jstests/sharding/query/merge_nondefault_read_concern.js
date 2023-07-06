@@ -3,16 +3,9 @@
  * set on the session.
  * @tags: [requires_fcv_71]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");
-
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 const mongosDB = st.s0.getDB("merge_nondefault_read_concern");
-const source = mongosDB["source"];
-const target = mongosDB["target"];
 
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
 
@@ -36,4 +29,3 @@ assert.commandWorked(
 assert.commandWorked(mongosDB.runCommand(baseMergeCommand));
 
 st.stop();
-}());

@@ -2,10 +2,9 @@
 // error.
 //
 // @tags: [requires_sharding, uses_transactions, uses_multi_shard_transaction]
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {
+    assertNoSuchTransactionOnAllShards
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -60,4 +59,3 @@ assertNoSuchTransactionOnAllShards(st, session.getSessionId(), session.getTxnNum
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 st.stop();
-})();

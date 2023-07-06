@@ -5,9 +5,6 @@
  *
  * @tags: [requires_sharding]
  */
-(function() {
-'use strict';
-
 function setup(conn) {
     const adminDB = conn.getDB('admin');
 
@@ -49,4 +46,3 @@ runTests(st.s);
 runTests(st.configRS.getPrimary());
 
 st.stop();
-})();

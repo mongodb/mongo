@@ -1,12 +1,4 @@
-//
-// Tests launching multi-version ShardingTest clusters.
-//
-//
-
-load('jstests/multiVersion/libs/verify_versions.js');
-
-(function() {
-"use strict";
+import "jstests/multiVersion/libs/verify_versions.js";
 
 function checkEquivalent(testConfig, st) {
     var expectedVersions = [testConfig.other.mongosOptions.binVersion];
@@ -25,7 +17,7 @@ function checkEquivalent(testConfig, st) {
 
 if (MongoRunner.areBinVersionsTheSame("last-continuous", "last-lts")) {
     jsTest.log("Skipping test because 'last-continuous' == 'last-lts'");
-    return;
+    quit();
 }
 
 const invalidMixedVersionsToCheck = [
@@ -65,4 +57,3 @@ for (let config of validMixedVersionsToCheck) {
 
     st.stop();
 }
-})();

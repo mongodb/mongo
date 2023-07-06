@@ -1,7 +1,4 @@
 // Tests $alwaysTrue and $alwaysFalse behavior for match expressions.
-(function() {
-"use strict";
-
 const coll = db.always_true_false;
 coll.drop();
 
@@ -50,4 +47,3 @@ assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {$alwa
                              ErrorCodes.FailedToParse);
 assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {a: {$alwaysFalse: 1}}}),
                              ErrorCodes.BadValue);
-}());

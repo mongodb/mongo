@@ -5,9 +5,6 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
 const kOplogDocs = 47500;
 // kNumOplogSamples is derived from the number of oplog entries above.
 // Formula is kRandomSamplesPerMarker * numRecords / estimatedRecordsPerMarker, where
@@ -75,4 +72,3 @@ assert(checkLog.checkContainsOnce(replSet.getPrimary(),
                                   RegExp("(Collection|Oplog) sampling complete")));
 
 replSet.stopSet();
-})();

@@ -6,10 +6,15 @@
  * ]
  */
 
-load("jstests/aggregation/sources/densify/libs/densify_in_js.js");
+import {
+    densifyUnits,
+    getArithmeticFunctionsForUnit,
+    insertDocumentsOnPredicate,
+    insertDocumentsOnStep,
+    interestingSteps,
+    testDensifyStage,
+} from "jstests/aggregation/sources/densify/libs/densify_in_js.js";
 
-(function() {
-"use strict";
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
@@ -72,4 +77,3 @@ for (let i = 0; i < densifyUnits.length; i++) {
         runDensifyFullTest();
     }
 }
-})();

@@ -1,10 +1,7 @@
 /**
  * Test that write errors resulting as part of refreshing logical session do not kill open cursors.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: 1});
 
@@ -30,4 +27,3 @@ assert.commandWorked(
 fp.off();
 
 rst.stopSet();
-})();

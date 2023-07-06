@@ -6,9 +6,6 @@
 //   requires_scripting,
 // ]
 
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB('system_js_access');
 const coll = testDB.system_js_access;
 coll.drop();
@@ -127,4 +124,3 @@ assert.commandWorked(testDB.runCommand({
     ],
     cursor: {}
 }));
-}());

@@ -4,10 +4,7 @@
  *
  */
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For resultsEq.
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 let st = new ShardingTest({shards: 2});
 const db = st.s.getDB(jsTestName());
@@ -157,4 +154,3 @@ assert.throwsWithCode(() => {
 }, ErrorCodes.InvalidNamespace);
 
 st.stop();
-})();

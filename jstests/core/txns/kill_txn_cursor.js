@@ -2,9 +2,6 @@
 // The test runs commands that are not allowed with security token: endSession, killCursors.
 // @tags: [
 //   not_allowed_with_security_token,uses_transactions]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "kill_txn_cursor";
 const testDB = db.getSiblingDB(dbName);
@@ -63,4 +60,3 @@ assert.sameMembers([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}],
                    sessionColl.find().toArray());
 
 session.endSession();
-}());

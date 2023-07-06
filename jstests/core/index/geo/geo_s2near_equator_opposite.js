@@ -1,7 +1,6 @@
 // Tests geo near with 2 points diametrically opposite to each other
 // on the equator
 // First reported in SERVER-11830 as a regression in 2.5
-(function() {
 var t = db.geos2nearequatoropposite;
 
 t.drop();
@@ -49,4 +48,3 @@ assert.eq(
 assert.gt(dist,
           geoNearStats.maxDistance,
           `unexpected maximum distance in $geoNear results: ${tojson(geoNearStats)}`);
-}());

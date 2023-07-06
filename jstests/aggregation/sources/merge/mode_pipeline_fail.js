@@ -2,11 +2,7 @@
 //
 // Cannot implicitly shard accessed collections because a collection can be implictly created and
 // exists when none is expected.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.isMongos.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const source = db[`${jsTest.name()}_source`];
 source.drop();
@@ -110,4 +106,3 @@ const pipeline = [mergeStage];
     assertArrayEq(
         {actual: target.find().toArray(), expected: [{_id: 1, c: 1, z: 2}, {_id: 2, c: 2, z: 4}]});
 })();
-}());

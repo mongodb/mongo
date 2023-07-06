@@ -7,9 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/api_version_helpers.js");  // For 'APIVersionHelpers'.
+import {APIVersionHelpers} from "jstests/libs/api_version_helpers.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_version_new_50_language_features";
@@ -71,4 +69,3 @@ assert.commandWorked(testDb.runCommand({
 }));
 
 assert.commandWorked(testDb.runCommand({drop: 'new_50_features_validator'}));
-})();

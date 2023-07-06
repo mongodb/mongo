@@ -1,11 +1,9 @@
 /*
  * Tests general $range functionality.
  */
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-load("jstests/aggregation/extras/utils.js");
-load("jstests/libs/sbe_assert_error_override.js");
+import {arrayEq, assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.range;
 coll.drop();
@@ -304,4 +302,3 @@ assertErrorCode(
     coll, [{$project: {result: {$range: [0, 1073741924]}}}], ErrorCodes.ExceededMemoryLimit);
 assert(arrayEq([{_id: 1, result: []}],
                coll.aggregate([{$project: {result: {$range: [0, 1073741924, -1]}}}]).toArray()));
-}());

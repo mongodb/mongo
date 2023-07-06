@@ -3,13 +3,11 @@
 // @tags: [
 //   requires_fcv_62,
 // ]
-(function() {
-"use strict";
-
-// For verifyChangeCollectionEntries and ChangeStreamMultitenantReplicaSetTest.
-load("jstests/serverless/libs/change_collection_util.js");
-// For funWithArgs.
-load('jstests/libs/parallel_shell_helpers.js');
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {
+    ChangeStreamMultitenantReplicaSetTest,
+    verifyChangeCollectionEntries
+} from "jstests/serverless/libs/change_collection_util.js";
 
 const replSetTest = new ChangeStreamMultitenantReplicaSetTest({nodes: 2});
 
@@ -52,8 +50,9 @@ function getLatestTimestamp() {
     jsTestLog("Testing writes on change collections with multiple tenants.");
 
     // A helper shell function to perform write for the specified 'tenantId'.
-    function shellFn(hostAddr, collName, tenantId, performWrites) {
-        load("jstests/serverless/libs/change_collection_util.js");
+    async function shellFn(hostAddr, collName, tenantId, performWrites) {
+        const {ChangeStreamMultitenantReplicaSetTest} =
+            await import("jstests/serverless/libs/change_collection_util.js");
 
         const tenantConn =
             ChangeStreamMultitenantReplicaSetTest.getTenantConnection(hostAddr, tenantId);
@@ -113,8 +112,9 @@ function getLatestTimestamp() {
     jsTestLog("Testing transactional writes on change collections with multiple tenants.");
 
     // A helper shell function to perform transactional write for the specified 'tenantId'.
-    function shellFn(hostAddr, collName, tenantId, performWrites) {
-        load("jstests/serverless/libs/change_collection_util.js");
+    async function shellFn(hostAddr, collName, tenantId, performWrites) {
+        const {ChangeStreamMultitenantReplicaSetTest} =
+            await import("jstests/serverless/libs/change_collection_util.js");
 
         const tenantConn =
             ChangeStreamMultitenantReplicaSetTest.getTenantConnection(hostAddr, tenantId);
@@ -173,4 +173,3 @@ function getLatestTimestamp() {
 })();
 
 replSetTest.stopSet();
-}());

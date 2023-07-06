@@ -4,11 +4,6 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
-
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 const dbName = "testDb";
@@ -70,4 +65,3 @@ const res1 = assert.commandWorked(st.s.adminCommand({
 assert.eq(res1.keyCharacteristics.monotonicity.type, expectedType, res1);
 
 st.stop();
-})();

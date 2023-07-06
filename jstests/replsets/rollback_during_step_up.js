@@ -5,11 +5,8 @@
  * @tags: [uses_transactions]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/write_concern_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const rst = new ReplSetTest({
     name: jsTestName(),
@@ -68,4 +65,3 @@ assert.commandWorked(node2.getDB('test')[collName].insert({_id: "write 4"}));
 rst.awaitReplication();
 
 rst.stopSet();
-})();

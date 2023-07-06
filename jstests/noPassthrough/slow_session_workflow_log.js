@@ -5,11 +5,8 @@
  *   multiversion_incompatible
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/log.js");  // For findMatchingLogLine
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {findMatchingLogLines} from "jstests/libs/log.js";
 
 const expectedLogId = 6983000;
 const sleepMillisInSendResponse = 200;
@@ -100,4 +97,3 @@ if (testEnabled) {
     runTest(st.s0);
     st.stop();
 }
-})();

@@ -1,6 +1,7 @@
-load('jstests/concurrency/fsm_libs/fsm.js');
+import {AssertLevel} from "jstests/concurrency/fsm_libs/assert.js";
+import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 
-var composer = (function() {
+export var composer = (function() {
     function runCombinedFSM(workloads, configs, mixProb) {
         // TODO: what if a workload depends on iterations?
         var iterations = 100;

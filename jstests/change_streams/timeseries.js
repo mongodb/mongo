@@ -7,7 +7,7 @@
  *     requires_fcv_61,
  * ]
  */
-load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 let testDB = db.getSiblingDB(jsTestName());

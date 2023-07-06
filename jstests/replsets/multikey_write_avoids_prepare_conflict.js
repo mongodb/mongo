@@ -6,9 +6,7 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const replTest = new ReplSetTest({name: 'multikey_write_avoids_prepare_conflict', nodes: 2});
 replTest.startSet();
@@ -55,4 +53,3 @@ assert.commandWorked(newPrimary.adminCommand({
 }));
 
 replTest.stopSet();
-}());

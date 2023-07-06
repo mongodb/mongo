@@ -4,11 +4,7 @@
 // ]
 
 // Test that expressions which make can make string comparisons respect the collation.
-(function() {
-"use strict";
-
-// For testExpression() and testExpressionWithCollation().
-load("jstests/aggregation/extras/utils.js");
+import {testExpression, testExpressionWithCollation} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.collation_expressions;
 coll.drop();
@@ -262,4 +258,3 @@ results = coll.aggregate([{
               .toArray();
 assert.eq(1, results.length);
 assert.eq([[0, 1], [2, 3], [4, 5]], results[0].out);
-})();

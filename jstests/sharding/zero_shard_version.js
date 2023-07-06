@@ -2,9 +2,6 @@
  * Tests the setShardVersion logic on the this shard side, specifically when comparing
  * against a major version of zero or incompatible epochs.
  */
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 2, mongos: 2});
 
 var testDB_s0 = st.s.getDB('test');
@@ -167,4 +164,3 @@ checkShardMajorVersion(st.rs0.getPrimary(), 2);
 checkShardMajorVersion(st.rs1.getPrimary(), 0);
 
 st.stop();
-})();

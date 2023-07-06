@@ -2,10 +2,7 @@
  * Use prototype overrides to massage command objects and make them suitable to run for multi
  * statement transaction suites.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/override_methods/override_helpers.js");
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 function runCommandInMultiStmtTxnPassthrough(
     conn, dbName, commandName, commandObj, func, makeFuncArgs) {
@@ -58,4 +55,3 @@ OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/txn_passthrough_cmd_massage.js");
 
 OverrideHelpers.overrideRunCommand(runCommandInMultiStmtTxnPassthrough);
-})();

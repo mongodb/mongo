@@ -2,10 +2,7 @@
  * Tests that reading from an existing sync source continues uninterrupted when the sync source
  * enters quiesce mode.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // Set the oplog fetcher batch size to 1, in order to test fetching multiple batches while the sync
 // source is in quiesce mode.
@@ -49,4 +46,3 @@ syncingNode.reconnect(primary);
 quiesceModeFailPoint.off();
 rst.restart(syncSource);
 rst.stopSet();
-})();

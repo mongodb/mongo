@@ -9,11 +9,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load('jstests/libs/parallel_shell_helpers.js');
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 // Configure 'internalQueryExecYieldIterations' on both shards such that operations will yield on
 // each 10th PlanExecuter iteration.
@@ -66,9 +63,8 @@ function runMigration() {
     return awaitResult;
 }
 
-function updateOperationFn(shardColl, numInitialDocsOnShard0) {
-    load('jstests/sharding/libs/shard_versioning_util.js');  // For kIgnoredShardVersion
-
+async function updateOperationFn(shardColl, numInitialDocsOnShard0) {
+    const {ShardVersioningUtil} = await import("jstests/sharding/libs/shard_versioning_util.js");
     jsTest.log("Begin multi-update.");
 
     // Send a multi-update with 'shardVersion: IGNORED' directly to the shard, as if we were a
@@ -87,9 +83,8 @@ function updateOperationFn(shardColl, numInitialDocsOnShard0) {
     assert.eq(numInitialDocsOnShard0, shardColl.find({c: 1}).itcount());
 }
 
-function deleteOperationFn(shardColl, numInitialDocsOnShard0) {
-    load('jstests/sharding/libs/shard_versioning_util.js');  // For kIgnoredShardVersion
-
+async function deleteOperationFn(shardColl, numInitialDocsOnShard0) {
+    const {ShardVersioningUtil} = await import("jstests/sharding/libs/shard_versioning_util.js");
     jsTest.log("Begin multi-delete");
 
     // Send a multi-delete with 'shardVersion: IGNORED' directly to the shard, as if we were a
@@ -151,4 +146,3 @@ runTest(updateOperationFn);
 runTest(deleteOperationFn);
 
 st.stop();
-})();

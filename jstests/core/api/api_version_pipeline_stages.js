@@ -10,9 +10,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_version_pipeline_stages";
 const coll = testDb[collName];
@@ -98,4 +95,3 @@ const cmdResult = assert.commandWorked(testDb.runCommand({
 assert.eq(cmdResult.cursor.id, 0, cmdResult);
 assert.eq(cmdResult.cursor.firstBatch.length, 1, cmdResult);
 assert.eq(cmdResult.cursor.firstBatch[0].count, 1, cmdResult);
-})();

@@ -2,9 +2,6 @@
 // @tags: [assumes_no_implicit_collection_creation_after_drop]
 
 // Test that the $group stage and all accumulators respect the collation.
-(function() {
-"use strict";
-
 var coll = db.collation_group;
 coll.drop();
 
@@ -79,4 +76,3 @@ assert.eq("2", results[0].min);
 results = coll.aggregate([{$group: {_id: null, max: {$max: "$num"}}}]).toArray();
 assert.eq(1, results.length);
 assert.eq("100", results[0].max);
-})();

@@ -5,10 +5,7 @@
  * containing the database name. If the new primary creates the same database name with a different
  * casing, the secondary would fatally assert.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: 3});
 rst.startSet();
@@ -36,4 +33,3 @@ awaitDrop();
 assert.commandFailedWithCode(rst.getPrimary().getDB("TEST").createCollection("a"),
                              ErrorCodes.DatabaseDifferCase);
 rst.stopSet();
-})();

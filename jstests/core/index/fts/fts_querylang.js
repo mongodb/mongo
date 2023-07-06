@@ -3,9 +3,6 @@
 //   requires_multi_updates,
 //   requires_non_retryable_writes,
 // ]
-(function() {
-"use strict";
-
 const coll = db.getCollection("fts_querylang");
 coll.drop();
 
@@ -102,4 +99,3 @@ assert.commandFailedWithCode(
                           })
                           .itcount()),
                  ErrorCodes.BadValue);
-}());

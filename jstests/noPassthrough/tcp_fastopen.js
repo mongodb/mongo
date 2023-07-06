@@ -1,10 +1,7 @@
 // Attempt to verify that connections can make use of TCP_FASTOPEN
 // @tags: [multiversion_incompatible, does_not_support_stepdowns]
 
-(function() {
-'use strict';
-
-load("jstests/libs/netstat.js");
+import {getNetStatObj} from "jstests/libs/netstat.js";
 
 function dbHost(x) {
     return x.getMongo().host;
@@ -81,11 +78,10 @@ function testTcpFastOpenServer() {
 
 if (!hostSupportsTfo()) {
     print("==Skipping test, this host doesn't support TFO");
-    return;
+    quit();
 }
 if (isActiveBlackhole()) {
     print("==Skipping test, as this host has an active TCPFastOpenBlackhole");
-    return;
+    quit();
 }
 testTcpFastOpenServer();
-})();

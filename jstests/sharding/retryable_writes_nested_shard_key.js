@@ -3,10 +3,7 @@
  * key to ensure that each operation is not re-executed when run after chunk migration.
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/create_sharded_collection_util.js");
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const st = new ShardingTest({mongos: 1, config: 1, shards: 2, rs: {nodes: 1}});
 
@@ -80,4 +77,3 @@ assert.eq(secondResInsert.n, firstResInsert.n);
 assert.eq(collection.findOne({_id: 2}), {_id: 2, x: {y: 25}});
 
 st.stop();
-})();

@@ -10,9 +10,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 function assertCollectionDropped(ns) {
     const coll = db[ns];
     // No more coll entry
@@ -59,4 +56,3 @@ jsTest.log("Drop collection with multiple indexes.");
     assert.commandWorked(db.runCommand({drop: coll.getName()}));
     assertCollectionDropped(coll.getFullName());
 }
-})();

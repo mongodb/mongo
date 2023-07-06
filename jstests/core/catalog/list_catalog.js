@@ -11,10 +11,7 @@
  *     requires_getmore,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/fixture_helpers.js');
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
@@ -105,4 +102,3 @@ checkEntries(viewSimpleName, result, 'view', {viewOn: collSimple.getName()});
 checkEntries(collTimeseries.getName(), result, 'timeseries', {
     viewOn: 'system.buckets.' + collTimeseries.getName()
 });
-})();

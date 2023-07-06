@@ -1,8 +1,10 @@
 // Validate that if the endpoint returns halt = true that free monitoring halts
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {
+    FAULT_HALT_METRICS_5,
+    FreeMonWebServer,
+    WaitForFreeMonServerStatusState,
+    WaitForRegistration,
+} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer(FAULT_HALT_METRICS_5, true);
 
@@ -59,4 +61,3 @@ WaitForFreeMonServerStatusState(rst.getSecondary(), 'enabled');
 rst.stopSet();
 
 mock_web.stop();
-})();

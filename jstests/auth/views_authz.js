@@ -3,9 +3,6 @@
  * operations on views even if the user has an explicit privilege on that view.
  * @tags: [requires_sharding]
  */
-(function() {
-"use strict";
-
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
@@ -140,4 +137,3 @@ const cluster = new ShardingTest(
     {shards: 1, mongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: {auth: ""}}});
 runTest(cluster);
 cluster.stop();
-}());

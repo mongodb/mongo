@@ -1,10 +1,8 @@
 // SERVER-8568: Adding $sqrt expression
+import "jstests/libs/sbe_assert_error_override.js";
 
-load('jstests/aggregation/extras/utils.js');        // For assertErrorCode.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-(function() {
-'use strict';
 var coll = db.sqrt;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0}));
@@ -40,4 +38,3 @@ testOp({$sqrt: [NaN]}, NaN);
 testError({$sqrt: ["string"]}, 28765);
 // Args cannot be negative.
 testError({$sqrt: [-1]}, 28714);
-}());

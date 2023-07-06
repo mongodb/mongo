@@ -8,6 +8,8 @@
  *   requires_fcv_51,
  * ]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
 const dbPrefix = 'fsm_db_for_sharded_timeseries_collection_';
 const dbCount = 2;
 const collPrefix = 'sharded_timeseries_collection_';

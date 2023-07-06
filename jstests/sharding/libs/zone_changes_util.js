@@ -1,5 +1,5 @@
-load("jstests/sharding/libs/chunk_bounds_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 /**
  * Asserts that the given shards have the given chunks.
@@ -8,7 +8,7 @@ load("jstests/sharding/libs/find_chunks_util.js");
  *                                  the chunks on the shard. Each pair of chunk bounds is an array
  *                                  of the form [minKey, maxKey].
  */
-function assertChunksOnShards(configDB, ns, shardChunkBounds) {
+export function assertChunksOnShards(configDB, ns, shardChunkBounds) {
     for (let [shardName, chunkBounds] of Object.entries(shardChunkBounds)) {
         for (let bounds of chunkBounds) {
             assert.eq(
@@ -31,7 +31,7 @@ function assertChunksOnShards(configDB, ns, shardChunkBounds) {
  *                                  hashed sharding. (i.e. equivalent to the value passed for the
  *                                  "key" field for the shardCollection command).
  */
-function assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey) {
+export function assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey) {
     for (let doc of docs) {
         let docShardKey = {};
         for (const [k, v] of Object.entries(shardKey)) {
@@ -50,7 +50,7 @@ function assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey) {
  * @param shardTags {Object} a map from each shard name to an array of strings representing the zone
  *                           names that the shard owns.
  */
-function assertShardTags(configDB, shardTags) {
+export function assertShardTags(configDB, shardTags) {
     for (let [shardName, tags] of Object.entries(shardTags)) {
         assert.eq(tags.sort(),
                   configDB.shards.findOne({_id: shardName}).tags.sort(),
@@ -61,7 +61,7 @@ function assertShardTags(configDB, shardTags) {
 /**
  * Adds toShard to zone and removes fromShard from zone.
  */
-function moveZoneToShard(st, zoneName, fromShard, toShard) {
+export function moveZoneToShard(st, zoneName, fromShard, toShard) {
     assert.commandWorked(st.s.adminCommand({addShardToZone: toShard.shardName, zone: zoneName}));
     assert.commandWorked(
         st.s.adminCommand({removeShardFromZone: fromShard.shardName, zone: zoneName}));
@@ -71,7 +71,7 @@ function moveZoneToShard(st, zoneName, fromShard, toShard) {
  * Starts the balancer, lets it run for at least the given number of rounds,
  * then stops the balancer.
  */
-function runBalancer(st, minNumRounds) {
+export function runBalancer(st, minNumRounds) {
     st.startBalancer();
 
     // We add 1 to the number of rounds to avoid a race condition
@@ -85,7 +85,7 @@ function runBalancer(st, minNumRounds) {
 /**
  * Updates the zone key range for the given namespace.
  */
-function updateZoneKeyRange(st, ns, zoneName, fromRange, toRange) {
+export function updateZoneKeyRange(st, ns, zoneName, fromRange, toRange) {
     assert.commandWorked(st.s.adminCommand(
         {updateZoneKeyRange: ns, min: fromRange[0], max: fromRange[1], zone: null}));
     assert.commandWorked(st.s.adminCommand(

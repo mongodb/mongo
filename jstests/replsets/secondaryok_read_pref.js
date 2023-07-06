@@ -1,8 +1,5 @@
 // Test that secondaryOk is implicitly allowed for queries on a secondary with a read preference
 // other than 'primary', and that queries which do have 'primary' read preference fail.
-(function() {
-"use strict";
-
 const readPrefs =
     [undefined, "primary", "secondary", "primaryPreferred", "secondaryPreferred", "nearest"];
 
@@ -62,9 +59,10 @@ assertNotPrimaryNoSecondaryOk(
         secondaryColl
             .aggregate([{$merge: {into: "target", whenMatched: "fail", whenNotMatched: "insert"}}])
             .itcount());
+/* eslint-disable */
 assertNotPrimaryNoSecondaryOk(() => secondaryColl.mapReduce(() => emit(this.a),
                                                             (k, v) => Array.sum(b),
                                                             {out: {replace: "target"}}));
+/* eslint-enable */
 
 rst.stopSet();
-})();

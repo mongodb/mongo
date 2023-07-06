@@ -2,9 +2,6 @@
 // The test runs commands that are not allowed with security token: endSession, killSessions.
 // @tags: [
 //   not_allowed_with_security_token,uses_transactions, uses_parallel_shell]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "kill_sessions_kills_transaction";
 const testDB = db.getSiblingDB(dbName);
@@ -83,4 +80,3 @@ awaitDrop();
 assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.endSession();
-}());

@@ -1,15 +1,9 @@
 // Basic $lookup regression tests.
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and arrayEq.
-load("jstests/libs/discover_topology.js");    // For findDataBearingNodes.
+import {arrayEq, assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 const testName = "lookup_sharded";
-
-const nodeList = DiscoverTopology.findNonConfigNodes(st.s);
 
 const mongosDB = st.s0.getDB(testName);
 assert.commandWorked(mongosDB.dropDatabase());
@@ -32,8 +26,6 @@ function testPipeline(pipeline, expectedResult, collection) {
 }
 
 function runTest(coll, from, thirdColl, fourthColl) {
-    let db = null;  // Using the db variable is banned in this function.
-
     assert.commandWorked(coll.remove({}));
     assert.commandWorked(from.remove({}));
     assert.commandWorked(thirdColl.remove({}));
@@ -589,4 +581,3 @@ sourceColl.aggregate([
 assert.eq([{a: 0, same: [{_id: 0, b: 0}]}], outColl.find({}, {_id: 0}).toArray());
 
 st.stop();
-}());

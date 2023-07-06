@@ -6,9 +6,6 @@
 // @tags: [
 //   not_allowed_with_security_token,uses_transactions]
 
-(function() {
-"use strict";
-
 const testDBName = "testDB";
 const testCollName = "abort_expired_transaction";
 const ns = testDBName + "." + testCollName;
@@ -99,4 +96,3 @@ try {
         transactionLifetimeLimitSeconds: originalTransactionLifetimeLimitSeconds
     }));
 }
-}());

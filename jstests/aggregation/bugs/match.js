@@ -1,10 +1,7 @@
 // Check $match pipeline stage.
 // - Filtering behavior equivalent to a mongo query.
 // - $where and geo operators are not allowed
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.jstests_aggregation_match;
 coll.drop();
@@ -169,4 +166,3 @@ checkMatchResults(true);
 coll.createIndex({'a.b': 1});
 coll.createIndex({'a.c': 1});
 checkMatchResults(true);
-})();

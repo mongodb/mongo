@@ -1,8 +1,5 @@
 // This test checks that an infinite recursion correctly produces an 'InternalError: too much
 // recursion' error and does not crash the shell.
-(function() {
-"use strict";
-
 const makeBinData = () => BinData(4, "gf1UcxdHTJ2HQ/EGQrO7mQ==");
 const makeUUID = () => UUID("81fd5473-1747-4c9d-8743-f10642b3bb99");
 const makeHexData = () => new HexData(4, "81fd547317474c9d8743f10642b3bb99");
@@ -35,4 +32,3 @@ function assertThrowsInfiniteRecursion(fn) {
 assertThrowsInfiniteRecursion(infiniteRecursionGen(makeBinData));
 assertThrowsInfiniteRecursion(infiniteRecursionGen(makeUUID));
 assertThrowsInfiniteRecursion(infiniteRecursionGen(makeHexData));
-})();

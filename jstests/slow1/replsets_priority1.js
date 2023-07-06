@@ -1,14 +1,10 @@
 // come up with random priorities and make sure that the right member gets
 // elected. then kill that member and make sure the next one gets elected.
 
-(function() {
-
-"use strict";
-
-load("jstests/replsets/rslib.js");
+import {isConfigCommitted, occasionally, reconnect} from "jstests/replsets/rslib.js";
 
 const rs = new ReplSetTest({name: 'testSet', nodes: 3, nodeOptions: {verbose: 2}});
-var nodes = rs.startSet();
+rs.startSet();
 rs.initiate();
 
 var primary = rs.getPrimary();
@@ -97,8 +93,6 @@ for (var i = 0; i < n; i++) {
     var second = null;
     primary = rs.getPrimary();
     var config = primary.getDB("local").system.replset.findOne();
-
-    var version = config.version;
     config.version++;
 
     for (var j = 0; j < config.members.length; j++) {
@@ -111,7 +105,7 @@ for (var i = 0; i < n; i++) {
         }
     }
 
-    for (var j = 0; j < config.members.length; j++) {
+    for (let j = 0; j < config.members.length; j++) {
         if (config.members[j] == max) {
             continue;
         }
@@ -188,4 +182,3 @@ for (var i = 0; i < n; i++) {
 }
 
 rs.stopSet();
-})();

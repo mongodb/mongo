@@ -2,8 +2,6 @@
 // each role is a member of the next, creating a large chain.
 // @tags: [requires_sharding]
 
-(function() {
-"use strict";
 function runTest(conn) {
     var testdb = conn.getDB("rolechain");
     testdb.runCommand({dropAllRolesFromDatabase: 1});
@@ -29,7 +27,6 @@ function runTest(conn) {
             jsTestLog("Creating role " + i);
             var prevRole = roleNameBase + (i - 1);
             testdb.runCommand({createRole: name, privileges: [], roles: [prevRole]});
-            var roleInfo = testdb.getRole(name);
         }
     }
 }
@@ -43,4 +40,3 @@ MongoRunner.stopMongod(conn);
 conn = new ShardingTest({shards: 2, mongos: 1, config: 3});
 runTest(conn);
 conn.stop();
-})();

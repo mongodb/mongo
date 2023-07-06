@@ -1,9 +1,6 @@
 /**
  * Projection tests for FTS queries.
  */
-(function() {
-"use strict";
-
 const kUnavailableMetadataErrCode = 40218;
 
 const coll = db.text_proj;
@@ -28,4 +25,3 @@ let error = assert.throws(() => coll.find({}, {score: {$meta: "textScore"}}).itc
 assert.commandFailedWithCode(error, kUnavailableMetadataErrCode);
 error = assert.throws(() => coll.aggregate([{$project: {score: {$meta: "textScore"}}}]).itcount());
 assert.commandFailedWithCode(error, kUnavailableMetadataErrCode);
-}());

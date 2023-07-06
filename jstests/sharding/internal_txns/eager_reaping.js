@@ -4,9 +4,6 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 1, config: 1});
 
 const kDbName = "testDb";
@@ -212,4 +209,3 @@ runTest(st.s, st.rs0.getPrimary());
 runParameterTest(st.s, st.rs0.getPrimary());
 
 st.stop();
-})();

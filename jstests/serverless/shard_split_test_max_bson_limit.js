@@ -11,11 +11,9 @@
  *   requires_fcv_63
  * ]
  */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
 
 const kCollName = "testColl";
 const kTenantDefinedDbName = "0";

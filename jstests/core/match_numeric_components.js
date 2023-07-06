@@ -1,7 +1,6 @@
 /**
  * Tests behavior of the match language when using numeric path components.
  */
-(function() {
 const coll = db.match_numeric_components;
 coll.drop();
 
@@ -446,4 +445,3 @@ assert.commandWorked(coll.insert({_id: 3, f0: 'zz', f1: [[[0], [3, 5]], [[0], [5
     const res2 = coll.find({'0.1': {$elemMatch: {$eq: 5}}}).toArray();
     assert.sameMembers([{'0': {'0': [42], '1': [5]}, _id: 2}], res2);
 }
-})();

@@ -4,6 +4,8 @@
  * Designed to execute queries and make them yield as much as possible while also updating and
  * removing documents that they operate on.
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     // The explain used to build the assertion message in advanceCursor() is the only command not
     // allowed in a transaction used in the query state function. With shard stepdowns, getMores

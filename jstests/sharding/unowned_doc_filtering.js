@@ -13,11 +13,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 // Test deliberately inserts orphans.
 TestData.skipCheckOrphans = true;
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/chunk_bounds_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 /*
  * Asserts that find and count command filter out unowned documents.
@@ -97,4 +94,3 @@ unownedDocs = [{x: -5}, {x: 10}];
 runTest(st, hashedShardedColl, ownedDocs, unownedDocs, true);
 
 st.stop();
-}());

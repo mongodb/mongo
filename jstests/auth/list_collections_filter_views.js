@@ -6,11 +6,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-const dbName = "list_collections_filter_views";
-
 function runTestOnConnection(conn) {
     const admin = conn.getDB("admin");
     const db = conn.getDB("test");
@@ -61,4 +56,3 @@ const st = new ShardingTest({
 });
 runTestOnConnection(st.s0);
 st.stop();
-}());

@@ -24,8 +24,9 @@
  *    catchUpTimeoutMS: number (default 0 seconds)
  *        The amount of time allowed for newly-elected primaries to catch up.
  */
-load("jstests/libs/parallelTester.js");  // Thread and CountDownLatch
-load("jstests/replsets/rslib.js");       // reconfig
+
+import {Thread} from "jstests/libs/parallelTester.js";
+import {reconfig} from "jstests/replsets/rslib.js";
 
 export class ContinuousStepdown {
     /**

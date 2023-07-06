@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 const options = {
     setParameter: "jsHeapLimitMB=1000"
 };
@@ -21,4 +18,3 @@ assert.commandWorked(res);
 assert.eq(1000, res.jsHeapLimitMB);
 
 MongoRunner.stopMongod(conn);
-})();

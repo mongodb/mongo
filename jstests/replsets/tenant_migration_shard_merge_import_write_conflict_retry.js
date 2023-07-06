@@ -15,11 +15,10 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/uuid_util.js");
-load("jstests/libs/fail_point_util.js");
 
 const migrationId = UUID();
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
@@ -35,7 +34,6 @@ if (!isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
 const tenantId = ObjectId();
 const dbName = `${tenantId.str}_myDatabase`;
 
-(function() {
 jsTestLog("Generate test data");
 
 const db = donorPrimary.getDB(dbName);
@@ -51,7 +49,6 @@ assert.commandWorked(db.runCommand({
     indexes: [{key: {a: 1}, name: "a_1"}],
     writeConcern: {w: "majority"}
 }));
-})();
 
 // Enable Failpoints to simulate WriteConflict exception while importing donor files.
 configureFailPoint(

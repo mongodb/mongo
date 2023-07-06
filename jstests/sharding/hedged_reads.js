@@ -2,11 +2,8 @@
  * Tests hedging metrics in the serverStatus output.
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 function setCommandDelay(nodeConn, command, delay, ns) {
     assert.commandWorked(nodeConn.adminCommand({
@@ -235,4 +232,3 @@ try {
 }
 
 st.stop();
-}());

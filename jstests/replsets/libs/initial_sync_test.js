@@ -12,10 +12,6 @@
  *
  */
 
-"use strict";
-
-load('jstests/replsets/rslib.js');
-
 /**
  * This fixture allows the user to optionally pass in a custom ReplSetTest to be used for the test.
  * The underlying replica set must have exactly two nodes: a primary, and a secondary.
@@ -27,7 +23,7 @@ load('jstests/replsets/rslib.js');
  * @param {Object} [replSet] the ReplSetTest instance to adopt
  * @param {int} [timeout] how long to wait for initial sync to start
  */
-function InitialSyncTest(
+export function InitialSyncTest(
     name = "InitialSyncTest", replSet, timeout, replBatchLimitBytes = 100 * 1024 * 1024) {
     this.replBatchLimitBytes = replBatchLimitBytes;
     const State = {

@@ -17,10 +17,9 @@
  * @tags: [resource_intensive]
  */
 
-(function() {
-'use strict';
-
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 // Create a new sharded collection with numDocs documents, with two docs sharing each shard key
 // (used for testing *multi* removes to a *specific* shard key).
@@ -292,4 +291,3 @@ checkAllUpdateQueries(makeStaleMongosTargetMultipleShardsWhenAllChunksAreOnOneSh
 checkAllUpdateQueries(makeStaleMongosTargetOneShardWhenChunksAreOnMultipleShards);
 
 st.stop();
-})();

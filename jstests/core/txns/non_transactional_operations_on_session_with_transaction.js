@@ -6,12 +6,8 @@
  * @tags: [uses_transactions, uses_snapshot_read_concern]
  */
 
-(function() {
-"use strict";
-
 // TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
-// For retryOnceOnTransientOnMongos.
-load('jstests/libs/auto_retry_transaction_in_sharding.js');
+import {retryOnceOnTransientOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = "test";
 const collName = "non_transactional_operations_on_session_with_transactions";
@@ -112,4 +108,3 @@ assert.docEq(doc1, testColl.findOne(doc1));
 assert.docEq(doc1, sessionColl.findOne(doc1));
 assert.docEq(doc2, testColl.findOne(doc2));
 assert.docEq(doc2, sessionColl.findOne(doc2));
-}());

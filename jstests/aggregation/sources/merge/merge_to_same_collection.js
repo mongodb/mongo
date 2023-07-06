@@ -3,10 +3,7 @@
  *
  * @tags: [assumes_unsharded_collection]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // for assertArrayEq()
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.name;
 coll.drop();
@@ -30,4 +27,3 @@ assert.doesNotThrow(() => coll.aggregate(pipeline));
 
 assertArrayEq(
     {actual: coll.find().toArray(), expected: [{_id: 0, a: 3}, {_id: 1, a: 1}, {_id: 2, a: 2}]});
-}());

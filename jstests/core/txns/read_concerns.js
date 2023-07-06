@@ -7,10 +7,7 @@
 //   uses_snapshot_read_concern,
 //   requires_majority_read_concern,
 // ]
-(function() {
-"use strict";
-
-load('jstests/libs/auto_retry_transaction_in_sharding.js');
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = "test";
 const collName = "supported_read_concern_levels";
@@ -65,4 +62,3 @@ for (let level of kUnsupportedLevels) {
     runTest(level, {causalConsistency: false}, false /*supported*/);
     runTest(level, {causalConsistency: true}, false /*supported*/);
 }
-}());

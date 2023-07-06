@@ -9,9 +9,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -24,7 +21,7 @@ const collModIndexUniqueEnabled =
 if (!collModIndexUniqueEnabled) {
     jsTestLog('Skipping test because the collMod unique index feature flag is disabled');
     rst.stopSet();
-    return;
+    quit();
 }
 
 const collName = 'collmod_disallow_duplicates_step_up';
@@ -57,4 +54,3 @@ const uniqueIndexes = coll_primary.getIndexes().filter(function(doc) {
 assert.eq(1, uniqueIndexes.length);
 
 rst.stopSet();
-})();

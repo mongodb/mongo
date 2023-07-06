@@ -1,8 +1,5 @@
 // Test behavior of {logMessage: ... } test-only command.
 
-(function() {
-'use strict';
-
 const mongo = MongoRunner.runMongod({useLogFiles: true});
 const admin = mongo.getDB('admin');
 
@@ -105,4 +102,3 @@ extras.forEach(function(extra) {
 admin.setLogLevel(0);
 
 MongoRunner.stopMongod(mongo);
-})();

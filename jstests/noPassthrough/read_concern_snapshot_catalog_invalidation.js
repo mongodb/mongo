@@ -1,7 +1,7 @@
 // Tests that snapshot reads return an error when accessing a collection whose metadata is invalid
 // for the snapshot's point in time.
 // @tags: [uses_transactions]
-load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 
 const kDbName = "test";
 const kCollName = "coll";

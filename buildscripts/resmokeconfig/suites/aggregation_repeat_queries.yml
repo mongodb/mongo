@@ -24,8 +24,8 @@ executor:
   config:
     shell_options:
       eval: >-
-        load("jstests/libs/override_methods/detect_spawning_own_mongod.js");
-        load("jstests/libs/override_methods/rerun_queries.js");
+        await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+        await import("jstests/libs/override_methods/rerun_queries.js");
   hooks:
   - class: ValidateCollections
   - class: CleanEveryN

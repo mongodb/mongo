@@ -1,8 +1,6 @@
 // Tests the waitInHello failpoint.
 // @tags: [requires_replication]
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 function runTest(conn) {
     function runHelloCommand() {
@@ -42,4 +40,3 @@ rst.stopSet();
 const st = new ShardingTest({mongos: 1, shards: [{nodes: 1}], config: 1});
 runTest(st.s);
 st.stop();
-}());

@@ -4,9 +4,6 @@
  * @tags: [requires_persistence, requires_replication]
  */
 
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({
     nodes: 3,
     waitForKeys: false,
@@ -34,4 +31,3 @@ assert.commandWorked(primary.getDB("admin").runCommand({hello: 1}));
 assert.commandWorked(primary.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'}));
 
 rst.stopSet();
-})();

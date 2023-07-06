@@ -6,9 +6,9 @@
  * ]
  */
 
-load("jstests/aggregation/extras/utils.js");  // arrayEq, documentEq
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
+import {anyEq, arrayEq, documentEq} from "jstests/aggregation/extras/utils.js";
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;

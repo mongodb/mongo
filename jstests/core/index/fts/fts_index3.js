@@ -6,8 +6,6 @@
 // ]
 
 // Test that updates to fields in a text-indexed document are correctly reflected in the text index.
-(function() {
-'use strict';
 const collNamePrefix = 'fts_index3_';
 let collCount = 0;
 
@@ -154,4 +152,3 @@ assert.eq(0, coll.find({$text: {$search: "testing", $language: "en"}}).itcount()
 assert.commandWorked(coll.update({}, {$set: {idioma: "en"}}));
 assert.eq(0, coll.find({$text: {$search: "testing", $language: "es"}}).itcount());
 assert.eq(1, coll.find({$text: {$search: "testing", $language: "en"}}).itcount());
-})();

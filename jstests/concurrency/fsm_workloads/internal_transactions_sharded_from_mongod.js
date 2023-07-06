@@ -11,10 +11,11 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/internal_transactions_sharded.js";
-load('jstests/libs/fixture_helpers.js');
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.expectDirtyDocs = {

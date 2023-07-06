@@ -4,11 +4,9 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");  // For reconnect()
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {reconnect} from "jstests/replsets/rslib.js";
 
 const rst = new ReplSetTest({nodes: 2, name: jsTestName()});
 rst.startSet();
@@ -67,4 +65,3 @@ assert.commandWorked(PrepareHelpers.commitTransaction(newSession, prepareTimesta
 assert.eq(doc, primaryColl.findOne({}), primaryColl.find({}).toArray());
 
 rst.stopSet();
-})();

@@ -3,6 +3,8 @@
  *
  * Each thread does a $rename to cause documents to jump between indexes.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var fieldNames = ['update_rename_x', 'update_rename_y', 'update_rename_z'];
 

@@ -24,14 +24,16 @@ for (let i = 0; i < 100; ++i) {
 assert.commandWorked(bulk.execute());
 
 // Attempt to remove the last match for the {a:1} index scan while distinct is yielding.
-let p = startParallelShell('for( i = 0; i < 100; ++i ) {                              ' +
-                           '    var bulk = db.jstests_distinct3.initializeUnorderedBulkOp();' +
-                           '    bulk.find( { a:49 } ).remove();                       ' +
-                           '    for( j = 0; j < 20; ++j ) {                           ' +
-                           '        bulk.insert( { a:49, c:49, d:j } );               ' +
-                           '    }                                                     ' +
-                           '    assert.commandWorked(bulk.execute());                       ' +
-                           '}                                                         ');
+let p = startParallelShell(function() {
+    for (let i = 0; i < 100; ++i) {
+        var bulk = db.jstests_distinct3.initializeUnorderedBulkOp();
+        bulk.find({a: 49}).remove();
+        for (let j = 0; j < 20; ++j) {
+            bulk.insert({a: 49, c: 49, d: j});
+        }
+        assert.commandWorked(bulk.execute());
+    }
+});
 
 for (let i = 0; i < 100; ++i) {
     let count = t.distinct('c', {$or: [{a: {$gte: 0}, d: 0}, {b: {$gte: 0}}]}).length;

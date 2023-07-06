@@ -4,9 +4,6 @@
 //
 // @tags: [sets_replica_set_matching_strategy]
 
-(function() {
-"use strict";
-
 // Helper function to check the matching policy of a node, given the output of the connPoolStats
 // command run against the node and the expected policy.
 function checkSTEPReplicaSetMatchingPolicy(connPoolStats, expectedPolicy) {
@@ -54,4 +51,3 @@ checkSTEPReplicaSetMatchingPolicy(mongosStats, "matchPrimaryNode");
 checkSTEPReplicaSetMatchingPolicy(mongodStats, "disabled");
 checkSTEPReplicaSetMatchingPolicy(otherMongodStats, "disabled");
 st.stop();
-})();

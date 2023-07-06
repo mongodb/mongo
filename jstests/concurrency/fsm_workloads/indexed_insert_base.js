@@ -5,6 +5,8 @@
  * documents appear in both a collection scan and an index scan. The indexed
  * value is the thread's id.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     function makeSortSpecFromIndexSpec(ixSpec) {
         var sort = {};

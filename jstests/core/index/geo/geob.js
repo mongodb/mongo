@@ -1,5 +1,3 @@
-(function() {
-"use strict";
 var t = db.geob;
 t.drop();
 
@@ -35,4 +33,3 @@ assert.close(0, res[0].dis, "G");
 assert.close(2, res[1].dis, "H");
 assert.close(10, res[2].dis, "I");
 assert.close(12, res[3].dis, "J");
-}());

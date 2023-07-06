@@ -3,10 +3,7 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/ingress_handshake_metrics_helpers.js');
+import {ingressHandshakeMetricsTest} from "jstests/libs/ingress_handshake_metrics_helpers.js";
 
 let runTest = (connectionHealthLoggingOn) => {
     let rootCreds = {user: 'root', pwd: 'root'};
@@ -31,4 +28,3 @@ let runTest = (connectionHealthLoggingOn) => {
 // Parameterized on enabling/disabling connection health logging.
 runTest(true);
 runTest(false);
-})();

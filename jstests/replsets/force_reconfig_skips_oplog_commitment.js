@@ -4,10 +4,7 @@
  * the current config.
  */
 
-(function() {
-"use strict";
-load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/rslib.js");  // For reconnect.
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -69,4 +66,3 @@ restartServerReplication(secondary);
 rst.awaitNodesAgreeOnConfigVersion();
 
 rst.stopSet();
-}());

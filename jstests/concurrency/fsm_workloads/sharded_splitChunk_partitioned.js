@@ -9,8 +9,9 @@
  *  assumes_balancer_off,
  * ]
  */
-
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/sharded_base_partitioned.js";
@@ -25,7 +26,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // in the cluster affected by the splitChunk operation sees the appropriate
     // after-state regardless of whether the operation succeeded or failed.
     $config.states.splitChunk = function splitChunk(db, collName, connCache) {
-        var dbName = db.getName();
         var ns = db[collName].getFullName();
         var config = ChunkHelper.getPrimary(connCache.config);
 
@@ -127,7 +127,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // If the splitChunk operation succeeded, verify that the mongos sees two chunks between
             // the old chunk's lower and upper bounds. If the operation failed, verify that the
             // mongos still only sees one chunk between the old chunk's lower and upper bounds.
-            var numChunksBetweenOldChunksBounds =
+            let numChunksBetweenOldChunksBounds =
                 ChunkHelper.getNumChunks(mongos, ns, chunk.min._id, chunk.max._id);
             if (splitChunkRes.ok) {
                 msg = 'splitChunk succeeded but the mongos does not see exactly 2 chunks ' +
@@ -141,7 +141,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
             // If the splitChunk operation succeeded, verify that the total number of chunks in our
             // partition has increased by 1. If it failed, verify that it has stayed the same.
-            var numChunksAfter = ChunkHelper.getNumChunks(
+            let numChunksAfter = ChunkHelper.getNumChunks(
                 mongos, ns, this.partition.chunkLower, this.partition.chunkUpper);
             if (splitChunkRes.ok) {
                 msg = 'splitChunk succeeded but the mongos does nnot see exactly 1 more ' +

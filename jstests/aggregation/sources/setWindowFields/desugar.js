@@ -10,9 +10,6 @@
  *   do_not_wrap_aggregations_in_facets,
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db[jsTestName()];
 coll.insert({});
 
@@ -88,4 +85,3 @@ assert.eq(stages, [
     {$_internalSetWindowFields: {partitionBy: '$' + tmp, sortBy: {ts: -1, _id: 1}, output: {}}},
     {$project: {[tmp]: false, _id: true}},
 ]);
-})();

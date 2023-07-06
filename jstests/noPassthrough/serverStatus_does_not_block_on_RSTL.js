@@ -9,11 +9,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");  // startParallelShell
-load("jstests/libs/wait_for_command.js");        // waitForCommand
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
 // Use a sharding environment in order to exercise the sharding specific serverStatus sections.
 const st = new ShardingTest(
@@ -56,4 +52,3 @@ try {
 }
 
 st.stop();
-})();

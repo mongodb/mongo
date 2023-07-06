@@ -6,9 +6,6 @@
  * - When something is not allowed, what error message do we expect?
  */
 
-(function() {
-"use strict";
-
 const coll = db.setWindowFields_parse;
 coll.drop();
 
@@ -258,4 +255,3 @@ assert.commandWorked(run({$setWindowFields: {output: {v: {$max: {mergeObjects: {
 err = assert.commandFailedWithCode(
     run({$setWindowFields: {output: {a: {$sum: 1}, 'a.b': {$sum: 1}}}}), 6307900);
 assert.includes(err.errmsg, 'specification contains two conflicting paths');
-})();

@@ -1,10 +1,8 @@
-'use strict';
-
 /*
  * This file tests the FSM test framework.
  */
 
-load('jstests/concurrency/fsm_libs/fsm.js');
+import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 
 (function() {
 var getWeightedRandomChoice = fsm._getWeightedRandomChoice;

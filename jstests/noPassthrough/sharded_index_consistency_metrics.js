@@ -4,10 +4,9 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/sharded_index_consistency_metrics_helpers.js");
+import {
+    checkServerStatusNumCollsWithInconsistentIndexes
+} from "jstests/noPassthrough/libs/sharded_index_consistency_metrics_helpers.js";
 
 // This test creates inconsistent indexes.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
@@ -176,4 +175,3 @@ rst.startSet();
 rst.initiate();
 assertServerStatusNotContainIndexMetrics(rst.getPrimary());
 rst.stopSet();
-}());

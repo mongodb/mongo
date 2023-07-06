@@ -1,15 +1,4 @@
-/**
- * Tests that an updateLookup change stream doesn't throw ChangeStreamFatalError or
- * TooManyMatchingDocuments after fixing SERVER-44598.
- *
- * @tags: [
- *   uses_change_streams,
- * ]
- */
-(function() {
-"use strict";
-
-load("jstests/multiVersion/libs/multi_cluster.js");  // For ShardingTest.waitUntilStable.
+import "jstests/multiVersion/libs/multi_cluster.js";
 
 // The UUID consistency check can hit NotPrimaryNoSecondaryOk when it attempts to obtain a list of
 // collections from the shard Primaries through mongoS at the end of this test.
@@ -75,4 +64,3 @@ assert.soon(() => csCursor.hasNext());
 assert.docEq({_id: 0, a: -100, updated: true}, csCursor.next().fullDocument);
 
 st.stop();
-})();

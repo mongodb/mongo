@@ -2,9 +2,6 @@
 // standalone mongod and a sharded cluster).
 // @tags: [requires_fcv_70]
 
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "accounts";
 
@@ -110,4 +107,3 @@ const st = new ShardingTest({
 
 runTest(st.s, st);
 st.stop();
-}());

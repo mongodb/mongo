@@ -116,12 +116,16 @@ var ShardingTest = function ShardingTest(params) {
     // Publicly exposed variables
 
     /**
-     * Tries to load the 'jstests/libs/parallelTester.js' dependency. Returns true if the file is
-     * loaded successfully, and false otherwise.
+     * Tries to load the 'jstests/libs/legacyThreadSupport.js' dependency. Returns true if the file
+     * is loaded successfully, and false otherwise.
      */
     function tryLoadParallelTester() {
+        if (typeof globalThis.Thread !== 'undefined') {
+            return true;
+        }
+
         try {
-            load("jstests/libs/parallelTester.js");  // For Thread.
+            load("jstests/libs/legacyThreadSupport.js");  // For Thread.
             return true;
         } catch (e) {
             return false;
@@ -269,7 +273,7 @@ var ShardingTest = function ShardingTest(params) {
         var primaryShard = this.config.shards.findOne({_id: dbPrimaryShardId});
 
         if (primaryShard) {
-            shardConnectionString = primaryShard.host;
+            const shardConnectionString = primaryShard.host;
             var rsName = shardConnectionString.substring(0, shardConnectionString.indexOf("/"));
 
             for (var i = 0; i < this._connections.length; i++) {

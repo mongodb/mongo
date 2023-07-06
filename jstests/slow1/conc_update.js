@@ -1,9 +1,8 @@
-(function() {
-"use strict";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
-db = conn.getDB("concurrency");
+const db = conn.getDB("concurrency");
 db.dropDatabase();
 
 const NRECORDS = 3 * 1024 * 1024;
@@ -21,14 +20,14 @@ db.conc.createIndex({x: 1});
 var c1 = db.conc.count({x: {$lt: NRECORDS}});
 
 const updater = startParallelShell(
-    "db = db.getSiblingDB('concurrency');\
-                                  db.concflag.insert({ inprog: true });\
-                                  sleep(20);\
-                                  assert.commandWorked(db.conc.update({}, \
-                                                 { $inc: { x: " +
-    NRECORDS +
-    "}}, false, true)); \
-                                  assert.commandWorked(db.concflag.update({}, { inprog: false }));");
+    funWithArgs(function(numRecords) {
+        const testDb = db.getSiblingDB('concurrency');
+        testDb.concflag.insert({inprog: true});
+        sleep(20);
+
+        assert.commandWorked(testDb.conc.update({}, {$inc: {x: numRecords}}, false, true));
+        assert.commandWorked(testDb.concflag.update({}, {inprog: false}));
+    }, NRECORDS), conn.port);
 
 assert.soon(function() {
     var x = db.concflag.findOne();
@@ -58,4 +57,3 @@ assert.eq(NRECORDS, db.conc.count(), "AT END 1");
 updater();  // wait()
 
 MongoRunner.stopMongod(conn);
-})();

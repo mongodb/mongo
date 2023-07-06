@@ -11,9 +11,6 @@
  *     does_not_support_repeated_reads,
  * ]
  */
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB("union_with_query_stats");
 testDB.dropDatabase();
 
@@ -53,5 +50,4 @@ for (let idx = 0; idx < collData.length; idx++) {
     assert.eq(output, expectedOutput);
     assert.eq(expectedOutput.length,
               testDB.serverStatus().metrics.queryExecutor.scannedObjects - prevScannedObjects);
-})();
 })();

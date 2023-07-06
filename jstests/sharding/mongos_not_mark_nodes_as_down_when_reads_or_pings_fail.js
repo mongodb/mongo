@@ -1,11 +1,8 @@
 /*
  * Tests that mongos does not mark nodes as down when reads or pings fail.
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 /*
  * Configures failCommand to force the given command to fail with the given error code when run
@@ -110,4 +107,3 @@ jsTest.log("Test that mongos does not mark the secondary node as down when pings
 })();
 
 st.stop();
-})();

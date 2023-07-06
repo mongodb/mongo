@@ -3,9 +3,6 @@
  * to be done during a collection rename. This test is to verify the TTL behavior after a collection
  * rename.
  */
-(function() {
-'use strict';
-
 let conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
 let db = conn.getDB('test');
 let coll = db.ttl_coll;
@@ -42,4 +39,3 @@ assert.soon(function() {
 }, 'TTL index on x didn\'t delete');
 
 MongoRunner.stopMongod(conn);
-})();

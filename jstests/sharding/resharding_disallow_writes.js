@@ -5,10 +5,7 @@
  *   multiversion_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest();
 reshardingTest.setup();
@@ -38,9 +35,9 @@ reshardingTest.withReshardingInBackground(
         newShardKeyPattern: {newKey: 1},
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
     },
-    (tempNs) => {},
+    () => {},
     {
-        postCheckConsistencyFn: (tempNs) => {
+        postCheckConsistencyFn: () => {
             jsTestLog("Attempting insert");
             let res = sourceCollection.runCommand({
                 insert: collName,
@@ -115,4 +112,3 @@ assert.commandWorked(
 assert.commandWorked(sourceCollection.runCommand({drop: collName}));
 
 reshardingTest.teardown();
-})();

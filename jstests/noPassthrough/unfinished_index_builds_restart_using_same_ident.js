@@ -8,11 +8,8 @@
  *     requires_wiredtiger,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/noPassthrough/libs/index_build.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const replSet = new ReplSetTest({nodes: 1});
 replSet.startSet();
@@ -77,4 +74,3 @@ assert.commandWorked(primaryColl.insert({x: 5}));
 assert.eq(5, primaryColl.find().hint("x_1").count());
 
 replSet.stopSet();
-}());

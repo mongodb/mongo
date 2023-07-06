@@ -219,7 +219,7 @@ void CountDownLatchInfo::postInstall(JSContext* cx,
     }
 
     val.setObjectOrNull(obj);
-    ObjectWrapper(cx, global).setValue("CountDownLatch", val);
+    ObjectWrapper(cx, global).setValue(CountDownLatchInfo::className, val);
 }
 
 }  // namespace mozjs

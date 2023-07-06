@@ -3,9 +3,6 @@
  * primary. Mongos does this as an optimization.
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({name: "invalidate_sessions_on_stepdown", nodes: 2});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
@@ -64,4 +61,3 @@ assert.eq(0, node0SessionDB.coll.find({b: 1}).itcount());
 assert.eq(1, node0SessionDB.coll.find({c: 1}).itcount());
 
 rst.stopSet();
-})();

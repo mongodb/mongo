@@ -1,8 +1,5 @@
 // @tags: [requires_non_retryable_writes]
 
-(function() {
-"use strict";
-
 let coll = db.update_modifier_pop;
 coll.drop();
 
@@ -95,4 +92,3 @@ assert.commandWorked(coll.insert({_id: 0, a: [{b: 0}, {b: 1}]}));
 writeRes = assert.commandWorked(coll.update({_id: 0}, {$pop: {"a.2.b": 1}}));
 assert.eq(writeRes.nMatched, 1);
 assert.eq(writeRes.nModified, 0);
-}());

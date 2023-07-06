@@ -19,10 +19,7 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallelTester.js");
+import {Thread} from "jstests/libs/parallelTester.js";
 
 // Use a single node replica set for simplicity. Note that an oplog hole on a single node replica
 // will block new writes from becoming majority committed.
@@ -133,4 +130,3 @@ assert.commandWorked(db.adminCommand({
 triggerPrepareConflictThread.join();
 
 rst.stopSet();
-})();

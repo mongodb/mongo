@@ -4,9 +4,6 @@
  *
  */
 
-(function() {
-"use strict";
-
 let st = new ShardingTest({shards: 3});
 
 function listDatabases(options) {
@@ -45,4 +42,3 @@ result = db.aggregate([
 assert(result.toArray().length == 1);
 
 st.stop();
-})();

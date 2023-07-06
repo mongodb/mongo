@@ -6,11 +6,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/discover_topology.js");                       // For findNonConfigNodes.
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const paramName = "internalQueryMaxAllowedDensifyDocs";
 const origParamValue = assert.commandWorked(
@@ -62,4 +59,3 @@ runAggregate({$densify: {field: "val", range: {step: 1, bounds: "full"}}});
 
 // Reset parameter.
 setMaxDocs(origParamValue);
-})();

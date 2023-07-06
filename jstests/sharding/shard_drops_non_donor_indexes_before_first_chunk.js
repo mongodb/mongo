@@ -5,8 +5,6 @@
  *   expects_explicit_underscore_id_index,
  * ]
  */
-(function() {
-"use strict";
 const st = new ShardingTest({shards: 2});
 const dbName = 'test';
 const testDB = st.s.getDB('test');
@@ -102,4 +100,3 @@ shard1Index = shard1Coll.aggregate(commonIndexPipeline).toArray();
 assert.eq(shard0Index, shard1Index);
 
 st.stop();
-})();

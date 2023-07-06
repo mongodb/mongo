@@ -2,12 +2,8 @@
  * Verifies creating the logical sessions collection TTL index retries on stale version errors.
  */
 
-(function() {
-"use strict";
-
-load('jstests/libs/sessions_collection.js');
-load("jstests/sharding/libs/shard_versioning_util.js");
-load("jstests/libs/fail_point_util.js");
+import {validateSessionsCollection} from "jstests/libs/sessions_collection.js";
+import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
 let st = new ShardingTest({shards: 2});
 
@@ -38,4 +34,3 @@ validateSessionsCollection(st.shard0, true, false);
 validateSessionsCollection(st.shard1, true, true);
 
 st.stop();
-})();

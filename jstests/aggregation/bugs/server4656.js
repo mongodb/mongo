@@ -43,7 +43,7 @@ function test(limit, direction) {
                 assert.eq(res_rnd[i], rnd_sorted[i]);
             }
         } else {
-            for (var i = 0; i < expectedLength; i++) {
+            for (let i = 0; i < expectedLength; i++) {
                 assert.eq(res_inc[i], inc_sorted[NUM_OBJS - 1 - i]);
                 assert.eq(res_dec[i], dec_sorted[NUM_OBJS - 1 - i]);
                 assert.eq(res_rnd[i], rnd_sorted[NUM_OBJS - 1 - i]);

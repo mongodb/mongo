@@ -2,9 +2,6 @@
  * Test that the server rejects extremely large values for write concern wtimeout.
  */
 
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({name: jsTestName(), nodes: 2});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
@@ -29,4 +26,3 @@ assert.commandFailedWithCode(
     ErrorCodes.FailedToParse);
 
 rst.stopSet();
-})();

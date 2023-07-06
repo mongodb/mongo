@@ -4,13 +4,9 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 // This test runs the reapLogicalSessionCacheNow command. That can lead to direct writes to the
 // config.transactions collection, which cannot be performed on a session.
@@ -129,4 +125,3 @@ assertNumEntries({
 });
 
 st.stop();
-})();

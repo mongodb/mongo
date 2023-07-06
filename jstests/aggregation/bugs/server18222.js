@@ -1,6 +1,4 @@
 // SERVER-18222: Add $isArray aggregation expression.
-(function() {
-'use strict';
 var coll = db.is_array_expr;
 coll.drop();
 
@@ -40,4 +38,3 @@ var expectedResults = [
 ];
 
 assert.eq(results, expectedResults);
-}());

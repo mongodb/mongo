@@ -1,9 +1,6 @@
 /**
  * Test runner responsible for parsing and executing a MQL MongoD model test json file.
  */
-(function() {
-"use strict";
-
 const jsonFilename = jsTestOptions().mqlTestFile;
 const mqlRootPath = jsTestOptions().mqlRootPath;
 
@@ -54,4 +51,3 @@ testList.forEach(function(singleTest) {
         throw new Error("Unknown test type: " + tojson(singleTest));
     }
 });
-}());

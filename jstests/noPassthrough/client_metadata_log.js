@@ -5,9 +5,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 let checkLogForMetadata = function(conn) {
     let coll = conn.getCollection("test.foo");
     assert.commandWorked(coll.insert({_id: 1}));
@@ -67,4 +64,3 @@ let testMongoS = function() {
 
 testMongoD();
 testMongoS();
-})();

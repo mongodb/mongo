@@ -1,8 +1,8 @@
 /**
  * Tests for the $$NOW and $$CLUSTER_TIME system variable.
  */
+import "jstests/libs/sbe_assert_error_override.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 const coll = db[jsTest.name()];
 const otherColl = db[coll.getName() + "_other"];

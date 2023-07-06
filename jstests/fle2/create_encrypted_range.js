@@ -6,9 +6,6 @@
  * assumes_unsharded_collection
  * ]
  */
-(function() {
-'use strict';
-
 let dbTest = db.getSiblingDB('create_range_encrypted_collection_db');
 
 dbTest.basic.drop();
@@ -26,4 +23,3 @@ const sampleEncryptedFields = {
 };
 
 assert.commandWorked(dbTest.createCollection("basic", {encryptedFields: sampleEncryptedFields}));
-}());

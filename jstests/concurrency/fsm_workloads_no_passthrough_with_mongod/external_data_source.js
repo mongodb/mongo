@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * external_data_source.js
  *

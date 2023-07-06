@@ -6,10 +6,8 @@
 //      no_selinux,
 // ]
 
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");  // for documentEq
-load("jstests/libs/fixture_helpers.js");      // for getPrimaryForNodeHostingDatabase
+import {documentEq} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 function assertFailsValidation(res) {
     assert.writeError(res);
@@ -86,4 +84,3 @@ assert.commandWorked(
 t.insert({a: 2});
 t.insert({a: 1});
 assert.eq(2, t.count());
-})();

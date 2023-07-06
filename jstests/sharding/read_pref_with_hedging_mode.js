@@ -2,8 +2,6 @@
  * Integration test for read preference with hedging mode. The more comprehensive unit test can be
  * found in dbtests/read_preference_test.cpp and s/hedge_options_util_test.cpp.
  */
-(function() {
-
 const st = new ShardingTest({shards: 2});
 const dbName = "foo";
 const collName = "bar";
@@ -46,4 +44,3 @@ assert.commandWorked(st.s.getDB(dbName).runCommand(
     {distinct: collName, key: "x", $readPreference: {mode: "primaryPreferred", hedge: {}}}));
 
 st.stop();
-})();

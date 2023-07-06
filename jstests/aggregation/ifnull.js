@@ -1,7 +1,4 @@
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const t = db.jstests_aggregation_ifnull;
 t.drop();
@@ -96,4 +93,3 @@ assertResult('foo', ['$a', {$ifNull: ['$b', {$ifNull: ['$c', '$d']}]}]);
 assert.commandWorked(t.updateMany({}, {$set: {b: 'bar'}}));
 assertResult('bar', ['$a', {$ifNull: ['$b', {$ifNull: ['$c', '$d']}]}]);
 assertResult('bar', ['$a', {$ifNull: ['$b', {$ifNull: ['$c', '$d']}]}, '$e']);
-}());

@@ -1,7 +1,3 @@
-// Test that the dbhash command checks system collections that are replicated.
-'use strict';
-
-(function() {
 var rst = new ReplSetTest({name: 'dbhash_system_collections', nodes: 2});
 rst.startSet();
 rst.initiate();
@@ -51,4 +47,3 @@ var primaryMd5 = checkDbHash(primary);
 var secondaryMd5 = checkDbHash(secondary);
 assert.eq(primaryMd5, secondaryMd5, 'dbhash is different on the primary and the secondary');
 rst.stopSet();
-})();

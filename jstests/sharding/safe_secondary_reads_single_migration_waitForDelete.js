@@ -16,12 +16,15 @@
  * - behavior: Must be one of "unshardedOnly", "targetsPrimaryUsesConnectionVersioning" or
  * "versioned". Determines what system profiler checks are performed.
  */
-(function() {
-"use strict";
-
-load('jstests/libs/profiler.js');
-load('jstests/sharding/libs/last_lts_mongos_commands.js');
-load('jstests/sharding/libs/shard_versioning_util.js');
+import {
+    buildCommandProfile,
+    profilerHasSingleMatchingEntryOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
+import {
+    commandsRemovedFromMongosSinceLastLTS
+} from "jstests/sharding/libs/last_lts_mongos_commands.js";
+import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
 let db = "test";
 let coll = "foo";
@@ -605,4 +608,3 @@ for (let command of commands) {
 }
 
 st.stop();
-})();

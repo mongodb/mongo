@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 let s = new ShardingTest({shards: 2});
 let db = s.getDB("test");
 
@@ -160,4 +157,3 @@ assert.commandFailedWithCode(db.runCommand({count: 'foo', random: true}), 40415)
 assert.commandFailedWithCode(db.runCommand({explain: {count: 'foo', random: true}}), 40415);
 
 s.stop();
-})();

@@ -4,10 +4,8 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/index_build.js');  // For IndexBuildTest
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 var rst = new ReplSetTest({
     nodes: 2,
@@ -385,4 +383,3 @@ assert.commandWorked(primaryDB[collName].dropIndex({a: 1}));
     IndexBuildTest.assertIndexes(secondaryDB[collName], 2, ['_id_', 'a_1']);
 })();
 rst.stopSet();
-}());

@@ -1,8 +1,3 @@
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/index_build.js');
-
 const debug = 0;
 
 let rst = new ReplSetTest({name: "applyOpsIdempotency", nodes: 1});
@@ -253,4 +248,3 @@ for (let f in tests)
     testIdempotency(rst.getPrimary(), tests[f], f);
 
 rst.stopSet();
-})();

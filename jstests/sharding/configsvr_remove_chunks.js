@@ -4,11 +4,8 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/retryable_writes_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 function runConfigsvrRemoveChunksWithRetries(conn, uuid, lsid, txnNumber) {
     var res;
@@ -89,4 +86,3 @@ assert.eq(1, configDB.getCollection("chunks").find({uuid: otherCollectionUUID}).
 configDB.getCollection("chunks").remove({uuid: otherCollectionUUID});
 
 st.stop();
-})();

@@ -14,12 +14,6 @@
  *   tenant_migration_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-// For arrayEq.
-load("jstests/aggregation/extras/utils.js");
-
 const viewsDBName = jsTestName();
 
 let viewsDB = db.getSiblingDB(viewsDBName);
@@ -46,4 +40,3 @@ assert.commandFailedWithCode(
 assert.commandWorked(viewsDB.adminCommand({
     applyOps: [{op: "d", ns: viewsDBName + ".system.views", o: {_id: viewsDBName + ".invalidView"}}]
 }));
-}());

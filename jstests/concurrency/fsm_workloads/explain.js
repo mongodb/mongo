@@ -4,7 +4,8 @@
  * Runs explain() on a collection.
  *
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 export const $config = (function() {
@@ -23,10 +24,6 @@ export const $config = (function() {
             return probs;
         }
     };
-
-    function setup(db, collName, cluster) {
-        assertAlways.commandWorked(db[collName].createIndex({j: 1}));
-    }
 
     var states = (function() {
         function insert(db, collName) {

@@ -4,10 +4,6 @@
  * requires_fcv_62,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/replsets/libs/apply_ops_concurrent.js');
+import {ApplyOpsConcurrentTest} from "jstests/replsets/libs/apply_ops_concurrent.js";
 
 new ApplyOpsConcurrentTest({ns1: 'test.coll1', ns2: 'test.coll2'}).run();
-}());

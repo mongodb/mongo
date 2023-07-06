@@ -1,8 +1,5 @@
 // Verify error is produced when specifying an invalid set parameter.
 
-(function() {
-'use strict';
-
 TestData.enableTestCommands = false;
 
 function tryRun(arg) {
@@ -34,4 +31,3 @@ assert.gte(
         /--setParameter 'roleGraphInvalidationIsFatal' only available when used with 'enableTestCommands'/),
     0,
     fooOutput);
-}());

@@ -1,8 +1,5 @@
 // Note: This test cannot be run in parallel because all output from child processes of the same
 // shell is multiplexed to the same buffer.
-(function() {
-"use strict";
-
 // Note: the windows command line length limit is 8191 characters, so keep this string length
 // under that.
 const numLines = 300;
@@ -28,4 +25,3 @@ var echoTest = function() {
 for (var i = 0; i < 16; i++) {
     echoTest();
 }
-})();

@@ -17,8 +17,6 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-load("jstests/libs/fixture_helpers.js");  // For 'isMongos'
-
 if (!FeatureFlagUtil.isEnabled(db, "CollModIndexUnique")) {
     jsTestLog('Skipping test because the collMod unique index feature flag is disabled.');
     quit();

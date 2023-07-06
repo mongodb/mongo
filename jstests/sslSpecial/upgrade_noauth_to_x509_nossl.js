@@ -9,10 +9,8 @@
  * @tags: [requires_persistence]
  */
 
-load('jstests/ssl/libs/ssl_helpers.js');
+import {allowSSL} from "jstests/ssl/libs/ssl_helpers.js";
 
-(function() {
-'use strict';
 var dbName = 'upgradeToX509';
 
 // Disable auth explicitly
@@ -39,4 +37,3 @@ assert.commandWorked(testDB.a.insert({a: 1, str: 'TESTTESTTEST'}));
 assert.eq(2, testDB.a.find().itcount(), 'Error interacting with replSet');
 
 rst.stopSet();
-}());

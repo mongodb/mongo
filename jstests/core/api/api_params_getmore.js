@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB(jsTestName());
 const testColl = testDB.getCollection("test");
 testColl.drop();
@@ -60,4 +57,3 @@ for (const initParams of apiParamCombos) {
         }
     }
 }
-})();

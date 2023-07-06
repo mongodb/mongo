@@ -8,12 +8,17 @@
  * original value of the document's shard key. This file tests that behavior.
  * @tags: [uses_transactions, uses_multi_shard_transaction,]
  */
-(function() {
-
-"use strict";
-
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
-load('jstests/libs/chunk_manipulation_util.js');
+import {
+    moveChunkParallel,
+    moveChunkStepNames,
+    pauseMoveChunkAtStep,
+    unpauseMoveChunkAtStep,
+    waitForMoveChunkStep,
+} from "jstests/libs/chunk_manipulation_util.js";
+import {
+    flushRoutersAndRefreshShardMetadata,
+    isUpdateDocumentShardKeyUsingTransactionApiEnabled,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 // For startParallelOps to write its state
 let staticMongod = MongoRunner.runMongod({});
@@ -477,4 +482,3 @@ test(
 
 st.stop();
 MongoRunner.stopMongod(staticMongod);
-})();

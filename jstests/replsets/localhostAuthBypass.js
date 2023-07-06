@@ -8,7 +8,7 @@ var keyfile = "jstests/libs/key1";
 var username = "foo";
 var password = "bar";
 
-load("jstests/libs/host_ipaddr.js");
+import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
 
 var createUser = function(mongo) {
     print("============ adding a user.");

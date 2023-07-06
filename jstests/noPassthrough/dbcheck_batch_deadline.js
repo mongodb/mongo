@@ -7,9 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const replTest = new ReplSetTest({name: "dbcheck_batch_deadline", nodes: 2});
 replTest.startSet();
@@ -68,4 +66,3 @@ if (debugBuild) {
 assert.eq(0, healthlog.find({"severity": {$ne: "info"}}).itcount());
 
 replTest.stopSet();
-})();

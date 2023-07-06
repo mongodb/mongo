@@ -4,10 +4,7 @@
  * @tags: [requires_replication]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet({journalCommitInterval: 500});
@@ -51,4 +48,3 @@ checkLog.containsJson(primary, 5574501);
 
 rst.stopSet();
 // MongoRunner.stopMongod(conn);
-})();

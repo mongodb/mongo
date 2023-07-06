@@ -25,7 +25,7 @@ executor:
       # This override method helps some tests remain applicable in the passthrough by hiding the
       # column store indexes from 'listIndexes' output, so tests can still see only a list of
       # indexes that the test itself created.
-      eval: load("jstests/libs/override_methods/hide_column_store_indexes_from_get_indexes.js")
+      eval: await import("jstests/libs/override_methods/hide_column_store_indexes_from_get_indexes.js")
   hooks:
   - class: ValidateCollections
   - class: CleanEveryN

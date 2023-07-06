@@ -2,8 +2,6 @@
  *  @tags: [multiversion_incompatible]
  */
 const PROGRESS_TIMEOUT_SECONDS = 5;
-(function() {
-'use strict';
 
 const params = {
     setParameter: {
@@ -77,4 +75,3 @@ assert(pingNetworkError, "expected " + st.s1.host + "to be killed");
 
 // Don't validate exit codes, since a mongos will exit on its own with a non-zero exit code.
 st.stop({skipValidatingExitCode: true});
-})();

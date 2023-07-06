@@ -4,8 +4,7 @@
  *
  * @tags: [requires_fsync, requires_wiredtiger, requires_persistence]
  */
-(function() {
-load('jstests/libs/fail_point_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const dbName = "test";
 const collName = "currentOpValidation";
@@ -70,4 +69,3 @@ assert.commandWorked(db.adminCommand({setParameter: 1, maxValidateMBperSec: 0}))
 awaitValidation();
 
 MongoRunner.stopMongod(conn);
-}());

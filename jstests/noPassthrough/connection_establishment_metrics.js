@@ -3,12 +3,9 @@
  *
  * @tags: [requires_fcv_63]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/log.js");
-load("jstests/libs/parallel_shell_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {findMatchingLogLines} from "jstests/libs/log.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 function hasNonNegativeAttr(entry, attrName) {
     return entry.attr.hasOwnProperty(attrName) && entry.attr[attrName] >= 0;
@@ -147,4 +144,3 @@ let runTest = (connectionHealthLoggingOn) => {
 // Parameter is connectionHealthLoggingOn == true/false
 runTest(true);
 runTest(false);
-})();

@@ -8,7 +8,7 @@
  *     assumes_balancer_off,
  * ]
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
+import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     const states = {
@@ -35,7 +35,7 @@ export const $config = (function() {
                                .batchSize(2)
                                .maxTimeMS(10);
 
-                const c = curs.itcount();
+                const c = curs.itcount();  // eslint-disable-line
             } catch (e) {
                 assert.commandFailedWithCode(
                     e, [ErrorCodes.MaxTimeMSExpired, ErrorCodes.NetworkInterfaceExceededTimeLimit]);

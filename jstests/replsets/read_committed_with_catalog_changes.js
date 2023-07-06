@@ -26,8 +26,8 @@
  * ]
  */
 
-load("jstests/libs/parallelTester.js");  // For Thread.
-load("jstests/libs/write_concern_util.js");
+import {Thread} from "jstests/libs/parallelTester.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 // Each test case includes a 'prepare' method that sets up the initial state starting with a
 // database that has been dropped, a 'performOp' method that does some operation, and two

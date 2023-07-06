@@ -1,8 +1,5 @@
 // Test runtime setting of various setParameters on a mongod.
 
-(function() {
-'use strict';
-
 const dbConn = MongoRunner.runMongod();
 
 function setAndCheckParameter(dbConn, parameterName, newValue, expectedResult) {
@@ -70,4 +67,3 @@ ensureSetParameterFailure(
 MongoRunner.stopMongod(dbConn);
 
 jsTest.log("noPassthrough_parameters_test succeeded!");
-})();

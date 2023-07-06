@@ -5,10 +5,7 @@
 // hello fails on the arbiter once it's removed, which blocks all checks.
 TestData.skipCheckDBHashes = true;
 
-(function() {
-'use strict';
-
-load('jstests/replsets/rslib.js');
+import {reconnect} from "jstests/replsets/rslib.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -57,4 +54,3 @@ assert.soonNoExcept(
     1000 /* intervalMS */);
 
 replTest.stopSet();
-})();

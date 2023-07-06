@@ -1,14 +1,11 @@
 // Test that the server supports ECDHE and DHE tls cipher suites.
 
-load('jstests/ssl/libs/ssl_helpers.js');
-load("jstests/libs/python.js");
-
-(function() {
-"use strict";
+import {getPython3Binary} from "jstests/libs/python.js";
+import {CA_CERT, CLIENT_CERT, determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Need to use toolchain python, which is unsupported on Windows
 if (_isWindows()) {
-    return;
+    quit();
 }
 
 // Amazon linux does not currently support ECDHE
@@ -96,4 +93,3 @@ if (determineSSLProvider() !== 'apple') {
 }
 
 MongoRunner.stopMongod(mongod);
-}());

@@ -7,9 +7,6 @@
  *   requires_getmore,
  * ]
  */
-(function() {
-'use strict';
-
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
@@ -33,4 +30,3 @@ const collections = assert.commandWorked(testDB.runCommand({listCollections: 1})
 jsTestLog('Checking listCollections result: ' + tojson(collections));
 assert.eq(collections.length, 1);
 assert(collections.find(entry => entry.name === 'system.buckets.' + coll.getName()));
-})();

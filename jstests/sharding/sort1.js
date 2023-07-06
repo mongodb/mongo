@@ -1,7 +1,4 @@
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var s = new ShardingTest({name: "sort1", shards: 2, mongos: 2});
 
@@ -109,4 +106,3 @@ assert.eq(backward, getSorted("sub.x", 1, {'_id': 0, 'sub.num': 1}), "D11");
 assert.eq(forward, getSorted("sub.x", -1, {'_id': 0, 'sub.num': 1}), "D12");
 
 s.stop();
-})();

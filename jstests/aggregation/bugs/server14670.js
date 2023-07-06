@@ -3,11 +3,9 @@
  * test their expected behaviour.
  * */
 
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.substr;
 assert(coll.drop());
@@ -46,4 +44,3 @@ assert.eq({"strLenBytes": 2, "strLenCP": 1},
                   }
               })
               .toArray()[0]);
-}());

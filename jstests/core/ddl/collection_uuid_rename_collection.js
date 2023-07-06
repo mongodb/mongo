@@ -8,9 +8,6 @@
  *   tenant_migration_incompatible,
  * ]
  */
-(function() {
-'use strict';
-
 const testDB = db.getSiblingDB("coll_uuid_rename_coll");
 assert.commandWorked(testDB.dropDatabase());
 
@@ -208,4 +205,3 @@ assert.commandFailedWithCode(testDB.adminCommand({
     dropTarget: uuid(coll),
 }),
                              [ErrorCodes.InvalidOptions, ErrorCodes.CommandFailed]);
-})();

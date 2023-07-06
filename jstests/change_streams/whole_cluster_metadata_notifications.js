@@ -3,10 +3,13 @@
 // collections will live on different shards. Majority read concern cannot be off with multi-shard
 // transactions, which is why this test needs the tag below.
 // @tags: [requires_majority_read_concern]
-load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection
+} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
 // Define two databases. We will conduct our tests by creating one collection in each.
 const testDB1 = db.getSiblingDB("whole_cluster_metadata"),

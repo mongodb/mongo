@@ -1,12 +1,8 @@
 /*
  * This test ensures an index build can yield during bulk load phase.
  */
-(function() {
-
-"use strict";
-
-load("jstests/noPassthrough/libs/index_build.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const mongodOptions = {};
 const conn = MongoRunner.runMongod(mongodOptions);
@@ -58,4 +54,3 @@ awaitIndex();
 awaitDrop();
 
 MongoRunner.stopMongod(conn);
-})();

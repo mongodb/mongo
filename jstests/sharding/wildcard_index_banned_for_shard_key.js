@@ -2,9 +2,6 @@
 // Confirms that a wildcard index cannot be used to support a shard key.
 //
 
-(function() {
-'use strict';
-
 const st = new ShardingTest({mongos: 1, shards: 2});
 const kDbName = 'wildcard_index_banned_for_shard_key';
 const mongos = st.s0;
@@ -37,4 +34,3 @@ assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 1}));
 assertCannotShardCollectionOnWildcardIndex({a: 1});
 
 st.stop();
-})();

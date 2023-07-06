@@ -17,12 +17,8 @@
  * ]
  */
 
-load("jstests/noPassthrough/libs/backup_restore.js");
-
-(function() {
-"use strict";
+import {BackupRestoreTest} from "jstests/noPassthrough/libs/backup_restore.js";
 
 // Run the fsyncLock test. Will return before testing for any engine that doesn't
 // support fsyncLock
 new BackupRestoreTest({backup: 'fsyncLock'}).run();
-}());

@@ -6,13 +6,10 @@
  * uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.isMongos.
-load("jstests/libs/transactions_util.js");         // For TransactionsUtil.runInTransaction.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const cst = new ChangeStreamTest(testDB);
@@ -145,4 +142,3 @@ if (!FixtureHelpers.isMongos(testDB)) {
         {_id: 6, operationType: "delete", preImage: {_id: 6, a: 1}},
     ]);
 }
-})();

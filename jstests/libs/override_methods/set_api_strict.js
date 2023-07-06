@@ -1,10 +1,7 @@
 /**
  * Uses prototype overrides to set the api to strict for each command when running tests.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 const apiVersion = "1";
 
@@ -94,4 +91,3 @@ function isOperationPartOfStableAPI(commandName, commandObj) {
 OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/set_api_strict.js");
 
 OverrideHelpers.overrideRunCommand(runCommandWithApiStrict);
-})();

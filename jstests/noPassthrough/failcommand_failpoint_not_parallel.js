@@ -1,7 +1,4 @@
-(function() {
-"use strict";
-
-load("jstests/libs/parallelTester.js");
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn);
@@ -163,4 +160,3 @@ jsTest.log("Test command changes");
 }
 
 MongoRunner.stopMongod(conn);
-}());

@@ -8,10 +8,7 @@
 //   tenant_migration_incompatible,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const session = db.getMongo().startSession();
 const sessionDb = session.getDatabase("admin");
@@ -63,4 +60,3 @@ if (!FixtureHelpers.isMongos(db)) {
 }
 
 session.endSession();
-}());

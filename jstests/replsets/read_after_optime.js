@@ -1,8 +1,5 @@
 // Test read after opTime functionality with maxTimeMS.
 
-(function() {
-"use strict";
-
 var replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
 replTest.initiate();
@@ -83,4 +80,3 @@ jsTest.log("test2");
 runTest(replTest.getSecondary().getDB('test2'), primary);
 
 replTest.stopSet();
-})();

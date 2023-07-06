@@ -4,11 +4,7 @@
 /**
  * Confirms that $lookup with a non-correlated prefix returns expected results.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");      // For isSharded.
-load("jstests/aggregation/extras/utils.js");  // for arrayEq
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const testColl = db.lookup_non_correlated_prefix;
 testColl.drop();
@@ -130,4 +126,3 @@ assert.doesNotThrow(() => testColl.aggregate([
         },
     },
 ]));
-})();

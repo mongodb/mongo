@@ -3,9 +3,6 @@
  * @tags: [
  * ]
  */
-(function() {
-"use strict";
-
 const mongod = MongoRunner.runMongod();
 const dbName = "dots_and_dollars_fields";
 const db = mongod.getDB(dbName);
@@ -121,4 +118,3 @@ runCommandAndCheckUpdateCount(() => db.runCommand({
                               1);
 
 MongoRunner.stopMongod(mongod);
-})();

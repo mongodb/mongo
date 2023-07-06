@@ -6,7 +6,7 @@
  * ]
  */
 
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {TTLUtil} from "jstests/libs/ttl_util.js";
 
 // Run TTL monitor constantly to speed up this test.

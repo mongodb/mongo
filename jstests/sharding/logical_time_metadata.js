@@ -3,9 +3,6 @@
  * This does not test cluster time propagation via the shell as there are many back channels
  * where the cluster time metadata can propagated, making it inherently racy.
  */
-(function() {
-"use strict";
-
 function assertHasClusterTimeAndOperationTime(res) {
     assert.hasFields(res, ['$clusterTime']);
     assert.hasFields(res.$clusterTime, ['clusterTime', 'signature']);
@@ -57,4 +54,3 @@ assert.commandFailed(res);
 assertHasClusterTimeAndOperationTime(res);
 
 st.stop();
-})();

@@ -7,13 +7,11 @@
  * @tags: [requires_majority_read_concern, requires_fcv_60]
  */
 
-(function() {
-'use strict';
-
-load('jstests/libs/profiler.js');             // For various profiler helpers.
-load('jstests/aggregation/extras/utils.js');  // For arrayEq()
-load("jstests/libs/fail_point_util.js");      // for configureFailPoint.
-load("jstests/libs/log.js");                  // For findMatchingLogLines.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {findMatchingLogLines} from "jstests/libs/log.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({
     name: jsTestName(),
@@ -565,31 +563,20 @@ expectedRes = [
     {_id: 2, a: 3, bs: [{_id: 2, b: 3, cs: [{_id: 2, c: 3}]}]}
 ];
 
-const parallelScript = (pipeline, expectedRes, comment) =>
-    `{
-    load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-    const pipeline = ` +
-    tojson(pipeline) +
-    `;
-    const options = {comment: "` +
-    comment +
-    `"};
-
-    db = db.getSiblingDB(jsTestName() + '_db');
-    const res = db.local.aggregate(pipeline, options).toArray();
-
-    const expectedRes = ` +
-    tojson(expectedRes) +
-    `;
+const assertDocumentsAsync = async function(pipeline, expectedRes, comment) {
+    const {arrayEq} = await import("jstests/aggregation/extras/utils.js");
+    const options = {comment};
+    const testDb = db.getSiblingDB(jsTestName() + '_db');
+    const res = testDb.local.aggregate(pipeline, options).toArray();
 
     // Assert we haven't lost any documents
     assert(arrayEq(expectedRes, res));
-}`;
+};
 
 // Start a parallel shell to run the nested $lookup.
 clearLogs();
-let awaitShell =
-    startParallelShell(parallelScript(pipeline, expectedRes, parallelTestComment), st.s.port);
+let awaitShell = startParallelShell(
+    funWithArgs(assertDocumentsAsync, pipeline, expectedRes, parallelTestComment), st.s.port);
 
 // When we hit this failpoint, the nested $lookup will have just completed its first subpipeline.
 // Shard 'foreign' to verify that $lookup execution changes correctly mid-query.
@@ -628,8 +615,8 @@ failPoint = configureFailPoint(st.shard0, "waitAfterCommandFinishesExecution", d
 
 // Start a parallel shell to run the nested $lookup.
 clearLogs();
-awaitShell =
-    startParallelShell(parallelScript(pipeline, expectedRes, parallelTestComment), st.s.port);
+awaitShell = startParallelShell(
+    funWithArgs(assertDocumentsAsync, pipeline, expectedRes, parallelTestComment), st.s.port);
 
 // When we hit this failpoint, the nested $lookup will have just completed its first subpipeline.
 // Move the primary to the other shard to verify that $lookup execution changes correctly mid-query.
@@ -685,8 +672,8 @@ data.comment = parallelTestComment;
 failPoint = configureFailPoint(st.shard1, "waitAfterCommandFinishesExecution", data);
 
 // Start a parallel shell to run the $graphLookup.
-awaitShell =
-    startParallelShell(parallelScript(pipeline, expectedRes, parallelTestComment), st.s.port);
+awaitShell = startParallelShell(
+    funWithArgs(assertDocumentsAsync, pipeline, expectedRes, parallelTestComment), st.s.port);
 
 // When we hit this failpoint, the nested $lookup will have just completed its first subpipeline.
 // Move the primary to the shard executing $graphLookup to verify that we still get correct results.
@@ -698,4 +685,3 @@ failPoint.off();
 awaitShell();
 
 st.stop();
-}());

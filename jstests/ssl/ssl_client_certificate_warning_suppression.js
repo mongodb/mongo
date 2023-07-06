@@ -7,10 +7,7 @@
  * and is not output when the setParameter is set to false.
  */
 
-load('jstests/ssl/libs/ssl_helpers.js');
-
-(function() {
-'use strict';
+import {CA_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 function test(suppress) {
     const opts = {
@@ -62,4 +59,3 @@ function test(suppress) {
 
 test(true);
 test(false);
-})();

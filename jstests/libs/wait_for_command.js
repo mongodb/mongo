@@ -1,4 +1,4 @@
-const waitForCommand = function(waitingFor, opFilter, myDB) {
+export const waitForCommand = function(waitingFor, opFilter, myDB) {
     let opId = -1;
     assert.soon(function() {
         print(`Checking for ${waitingFor}`);

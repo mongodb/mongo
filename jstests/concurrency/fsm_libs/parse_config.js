@@ -1,9 +1,7 @@
-'use strict';
-
 // Validate the config object and return a normalized copy of it.
 // Normalized means all optional parameters are set to their default values,
 // and any parameters that need to be coerced have been coerced.
-function parseConfig(config) {
+export function parseConfig(config) {
     config = Object.extend({}, config, true);  // defensive deep copy
 
     var allowedKeys = [

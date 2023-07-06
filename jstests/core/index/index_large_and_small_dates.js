@@ -3,8 +3,6 @@
 //   tenant_migration_incompatible,
 // ]
 
-(function() {
-"use strict";
 const coll = db.index_dates;
 coll.drop();
 
@@ -32,4 +30,3 @@ assert.commandWorked(coll.dropIndex({d: 1}));
 // Testing index version 2.
 assert.commandWorked(coll.createIndex({d: 1}));
 test();
-})();

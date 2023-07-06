@@ -1,9 +1,6 @@
 //
 // Tests that only a correct major-version is needed to connect to a shard via mongos
 //
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 1, mongos: 2});
 
 var mongos = st.s0;
@@ -48,4 +45,3 @@ assert.eq(Timestamp(1, 0),
           staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}).version);
 
 st.stop();
-})();

@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 function testShardedDataAggregationStage() {
     // Get all expected results in obj format
     const fooResults = fooColl.aggregate([{$collStats: {storageStats: {}}}]).toArray();
@@ -185,4 +182,3 @@ assert.neq(
     -1, response2.errmsg.indexOf("The $shardedDataDistribution stage can only be run on mongoS"));
 
 rsTest.stopSet();
-})();

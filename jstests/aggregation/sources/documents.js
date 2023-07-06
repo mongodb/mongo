@@ -5,10 +5,7 @@
 // @tags: [
 //   do_not_wrap_aggregations_in_facets
 // ]
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For resultsEq.
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const dbName = jsTestName();
 
@@ -170,4 +167,3 @@ assert.throwsWithCode(() => {
 
 // Test that $documents succeeds when given a singleton object.
 assert.eq(currDB.aggregate([{$documents: [{a: [1, 2, 3]}]}]).toArray(), [{a: [1, 2, 3]}]);
-})();

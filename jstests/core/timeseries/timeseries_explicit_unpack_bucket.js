@@ -9,9 +9,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 const tsCollWithMeta = testDB.getCollection("tsCollWithMeta");
@@ -155,4 +152,3 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     assert.throws(() => sysCollWithMeta.aggregate([{$_unpackBucket: {timeField: "start"}}])),
                  5369601);
-})();

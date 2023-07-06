@@ -2,9 +2,6 @@
 // to each other during intra-cluster communication.
 // @tags: [requires_replication]
 
-(function() {
-'use strict';
-
 const kAuthenticationSuccessfulLogId = 5286306;
 const kAuthenticationFailedLogId = 5286307;
 
@@ -145,4 +142,3 @@ Object.keys(initialMechStats).forEach(function(mech) {
 
 admin.logout();
 rst.stopSet();
-}());

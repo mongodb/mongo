@@ -6,6 +6,8 @@
  * @tags: [
  * ]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var states = {
         init: function init(db, collName) {

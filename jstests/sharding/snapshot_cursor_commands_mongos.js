@@ -1,15 +1,14 @@
 // Tests snapshot isolation on readConcern level snapshot reads through mongos.
 // @tags: [requires_sharding, uses_transactions, uses_multi_shard_transaction]
-(function() {
-"use strict";
-
 // This test intentionally runs commands without a logical session id, which is not compatible
 // with implicit sessions.
 TestData.disableImplicitSessions = true;
 
-load("jstests/libs/global_snapshot_reads_util.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {verifyInvalidGetMoreAttempts} from "jstests/libs/global_snapshot_reads_util.js";
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const dbName = "test";
 const shardedCollName = "shardedColl";
@@ -276,4 +275,3 @@ runScenario(shardingScenarios.multiShardAllShardReads, {useCausalConsistency: fa
 
 runScenario(shardingScenarios.multiShardSomeShardReads,
             {useCausalConsistency: false, collName: shardedCollName});
-})();

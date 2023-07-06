@@ -2,11 +2,8 @@
  * Tests that only allowlisted stages are permitted to run in a $changeStream pipeline.
  */
 
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');       // For assertErrorCode.
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const coll = assertDropAndRecreateCollection(db, "change_stream_allowlist");
 
@@ -62,4 +59,3 @@ assert.commandWorked(db.runCommand(
 for (let bannedStage of denylist) {
     assertErrorCode(coll, changeStream.concat(bannedStage), ErrorCodes.IllegalOperation);
 }
-}());

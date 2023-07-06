@@ -7,14 +7,12 @@
  *  ]
  */
 
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 let st = new ShardingTest({shards: {rs0: {nodes: 1}}});
 const dbName = "test";
-db = st.getDB(dbName);
+const db = st.getDB(dbName);
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 

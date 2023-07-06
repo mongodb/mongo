@@ -7,11 +7,7 @@
  *     requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
-load('jstests/libs/uuid_util.js');
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 function verifyCollectionExists(node, globalIndexUUID, namespace) {
     const systemDB = node.getDB("system");
@@ -211,4 +207,3 @@ testCreateGlobalIndex(rst);
 testDropGlobalIndex(rst);
 
 rst.stopSet();
-})();

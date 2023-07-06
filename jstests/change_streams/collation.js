@@ -2,12 +2,17 @@
  * Tests that a change stream can take a user-specified collation, does not inherit the collection's
  * default collation, and uses the simple collation if none is provided.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/change_stream_util.js");        // For 'ChangeStreamTest' and
-                                                   // 'runCommandChangeStreamPassthroughAware'.
+import {
+    assertChangeStreamEventEq,
+    ChangeStreamTest,
+    isChangeStreamPassthrough,
+    runCommandChangeStreamPassthroughAware,
+} from "jstests/libs/change_stream_util.js";
+import {
+    assertCreateCollection,
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 
 let cst = new ChangeStreamTest(db);
 
@@ -331,4 +336,3 @@ changeStream = new DBCommandCursor(db, cmdRes);
 assert.soon(() => changeStream.hasNext());
 assert.docEq({_id: "dropped_coll"}, changeStream.next().documentKey);
 }());
-})();

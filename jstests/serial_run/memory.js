@@ -1,7 +1,4 @@
 // @tags: [requires_fast_memory]
-(function() {
-"use strict";
-
 var col = db.memoryTest;
 
 var buildInfo = assert.commandWorked(db.adminCommand("buildInfo"));
@@ -28,7 +25,6 @@ for (var i = 0; i < loopNum; ++i) {
 
 // do mix of calls to make sure OOM is handled with no permanent damage
 function doWhereTest(count) {
-    'use strict';
     print('doWhereTest(' + count + ')');
     const coll = db.whereCol;
     coll.drop();
@@ -70,4 +66,3 @@ doWhereTest(10);
 doWhereTest(loopNum);
 doWhereTest(loopNum);
 doWhereTest(loopNum);
-})();

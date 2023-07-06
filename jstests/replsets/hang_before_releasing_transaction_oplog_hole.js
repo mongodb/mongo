@@ -6,10 +6,7 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -29,8 +26,8 @@ assert.commandWorked(coll.insert({a: 1}));
 // Rather than setting a timeout on commit and forfeiting our ability to check commit for
 // success, we use a separate thread to disable the failpoint and allow the server to finish
 // committing successfully.
-function transactionFn() {
-    load('jstests/core/txns/libs/prepare_helpers.js');
+async function transactionFn() {
+    const {PrepareHelpers} = await import("jstests/core/txns/libs/prepare_helpers.js");
 
     const name = 'hang_before_releasing_transaction_oplog_hole';
     const dbName = 'test';
@@ -71,4 +68,3 @@ jsTestLog("Dropping another collection.");
 testDB["otherColl"].drop({writeConcern: {w: "majority"}});
 
 rst.stopSet();
-})();

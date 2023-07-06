@@ -1,8 +1,5 @@
 // SERVER-7906
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var coll = 'points';
 
@@ -33,7 +30,7 @@ function test(st, db, sharded, indexType) {
 
     var bulk = db[coll].initializeUnorderedBulkOp();
     var numPts = 10 * 1000;
-    for (var i = 0; i < numPts; i++) {
+    for (let i = 0; i < numPts; i++) {
         var lat = 90 - Random.rand() * 180;
         var lng = 180 - Random.rand() * 360;
         bulk.insert({rand: Math.random(), loc: [lng, lat]});
@@ -65,4 +62,3 @@ st.ensurePrimaryShard('test', st.shard1.shardName);
 
 test(st, st.getDB('test'), true, '2dsphere');
 st.stop();
-})();

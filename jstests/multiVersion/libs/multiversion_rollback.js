@@ -5,10 +5,9 @@
  * exercise rollback via refetch in the case that refetch is necessary.
  */
 
+import {restartServerReplication} from "jstests/libs/write_concern_util.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
-load("jstests/libs/collection_drop_recreate.js");
-load('jstests/libs/parallel_shell_helpers.js');
-load("jstests/libs/fail_point_util.js");
+import {reconfig, waitForState} from "jstests/replsets/rslib.js";
 
 export function printFCVDoc(nodeAdminDB, logMessage) {
     const fcvDoc = nodeAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});

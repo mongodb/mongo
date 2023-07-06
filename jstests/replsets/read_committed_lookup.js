@@ -5,10 +5,7 @@
  * @tags: [requires_majority_read_concern]
  */
 
-load("jstests/libs/read_committed_lib.js");  // For testReadCommittedLookup
-
-(function() {
-"use strict";
+import {testReadCommittedLookup} from "jstests/libs/read_committed_lib.js";
 
 // Confirm majority readConcern works on a replica set.
 const replSetName = "lookup_read_majority";
@@ -52,4 +49,3 @@ testReadCommittedLookup(rst.getPrimary().getDB("test"), shardSecondary, rst);
 
 st.stop();
 rst.stopSet();
-})();

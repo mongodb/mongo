@@ -1,9 +1,6 @@
 /**
  * Tests the exception handling behavior of the load() function across nested calls.
  */
-(function() {
-"use strict";
-
 let isMain = true;
 
 if (TestData.hasOwnProperty("loadDepth")) {
@@ -39,4 +36,3 @@ for (let i = 0; i < TestData.loadErrors.length; ++i) {
         () => "JavaScript stacktrace from load() didn't include file paths (AKA stack frames): " +
             error.stack);
 }
-})();

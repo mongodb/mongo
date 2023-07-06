@@ -6,10 +6,7 @@
 // the cursor establishing command.
 TestData.disableImplicitSessions = true;
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.testCollection;
 coll.drop();
@@ -289,5 +286,4 @@ assert.eq(0, numDocs % numConsumers);
     } finally {
         assert.commandWorked(db.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
     }
-})();
 })();

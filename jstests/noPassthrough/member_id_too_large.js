@@ -3,9 +3,6 @@
 // @tags: [
 //   requires_replication,
 // ]
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 
@@ -38,4 +35,3 @@ assert.commandWorked(testColl.insert(doc, {writeConcern: {w: 3}}));
 
 MongoRunner.stopMongod(secondary2);
 rst.stopSet();
-})();

@@ -3,8 +3,6 @@
  */
 const PROGRESS_TIMEOUT_SECONDS = 5;
 const monitoringIntervalMs = 500;
-(function() {
-'use strict';
 
 const params = {
     setParameter: {
@@ -62,4 +60,3 @@ assert.soon(() => {
 // Don't validate exit codes, since a mongos will exit on its own with a non-zero exit code.
 
 st.stop({skipValidatingExitCode: true});
-})();

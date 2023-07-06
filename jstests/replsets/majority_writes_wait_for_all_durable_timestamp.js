@@ -3,10 +3,7 @@
  * timestamp to reach the timestamp of the write. This guarantees that once a write is majority
  * committed, reading at the all durable timestamp will read that write.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 function assertWriteConcernTimeout(result) {
     assert.writeErrorWithCode(result, ErrorCodes.WriteConcernFailed);
@@ -54,4 +51,3 @@ try {
 
 joinHungWrite();
 rst.stopSet();
-})();

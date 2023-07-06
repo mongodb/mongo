@@ -1,12 +1,8 @@
 /*
  * Test that $merge sends results to the right shards.
  */
-(function() {
-'use strict';
-
-load("jstests/aggregation/extras/merge_helpers.js");
-load("jstests/sharding/libs/chunk_bounds_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 let st = new ShardingTest({shards: 3});
 let dbName = "test";
@@ -50,4 +46,3 @@ for (let i = 0; i < docs.length; i++) {
 }
 
 st.stop();
-})();

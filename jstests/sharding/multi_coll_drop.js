@@ -1,6 +1,4 @@
 // Tests the dropping and re-adding of a collection
-(function() {
-
 var st = new ShardingTest({name: "multidrop", shards: 1, mongos: 2});
 
 var mA = st.s0;
@@ -30,7 +28,7 @@ assert(coll.drop());
 jsTestLog("Recreating collection...");
 
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
-for (var i = -10; i < 10; i++) {
+for (let i = -10; i < 10; i++) {
     assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: i}}));
 }
 
@@ -40,4 +38,3 @@ assert.eq(0, coll.find().itcount());
 assert.eq(0, collB.find().itcount());
 
 st.stop();
-})();

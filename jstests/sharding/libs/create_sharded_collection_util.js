@@ -1,6 +1,4 @@
-"use strict";
-
-var CreateShardedCollectionUtil = (function() {
+export var CreateShardedCollectionUtil = (function() {
     /**
      * Shards a non-existing collection (or an unsharded empty collection) using
      * the specified shard key and chunk ranges.

@@ -2,10 +2,7 @@
  * Tests some of the find command's semantics with respect to how 64-bit integers and doubles are
  * compared with each other.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {arrayEq, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.jstests_compare_long_double;
 coll.drop();
@@ -88,4 +85,3 @@ runWithAndWithoutIndex({a: 1}, () => {
                "Comparison of sort results failed:\n" + tojson(result) + " != " + tojson(expected));
     }
 });
-})();

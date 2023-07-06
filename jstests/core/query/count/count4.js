@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 const t = db.count4;
 t.drop();
 
@@ -23,4 +20,3 @@ assert.commandWorked(t.createIndex({x: 1}));
 assert.eq(50, t.find(q).count(), 'index scan fast count: ' + tojson(q));
 assert.eq(50, t.find(q).itcount(), 'index scan find iterator count: ' + tojson(q));
 assert.eq(50, t.countDocuments(q), 'index scan aggregation count: ' + tojson(q));
-})();

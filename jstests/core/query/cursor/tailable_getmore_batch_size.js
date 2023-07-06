@@ -9,10 +9,7 @@
 
 // Tests for the behavior of combining the tailable and awaitData options to the getMore command
 // with the batchSize option.
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.isMongos().
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const collName = "tailable_getmore_batch_size";
 const coll = db[collName];
@@ -122,4 +119,3 @@ checkNoIntermediateEmptyBatchesWhenBatchSizeSmall(false);
 if (!FixtureHelpers.isMongos(db)) {
     checkNoIntermediateEmptyBatchesWhenBatchSizeSmall(true);
 }
-}());

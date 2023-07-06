@@ -39,15 +39,6 @@ function assertHasBlockingQuerySort(pipeline, expectRejectedPlans) {
     assert.eq(expectRejectedPlans, hasRejectedPlans(explainOutput), explainOutput);
 }
 
-function assertDoesNotHaveQuerySort(pipeline, expectRejectedPlans) {
-    const explainOutput = coll.explain().aggregate(pipeline);
-    assert(isAggregationPlan(explainOutput), explainOutput);
-    assert(aggPlanHasStage(explainOutput, "$sort"), explainOutput);
-    assert(!aggPlanHasStage(explainOutput, "SORT"), explainOutput);
-    assert.eq(expectRejectedPlans, hasRejectedPlans(explainOutput), explainOutput);
-    return explainOutput;
-}
-
 // Test that a sort on _id can use the query system to provide the sort. Since the sort and match
 // are both on the _id field, we don't expect there to be any rejected plans.
 assertHasNonBlockingQuerySort([{$sort: {_id: -1}}], false);

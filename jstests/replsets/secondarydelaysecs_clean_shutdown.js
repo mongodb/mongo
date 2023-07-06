@@ -3,9 +3,7 @@
 // @tags: [
 //   requires_persistence,
 // ]
-load('jstests/replsets/rslib.js');
-(function() {
-"use strict";
+import {getLatestOp, reconfig} from "jstests/replsets/rslib.js";
 
 // Skip db hash check since secondary has slave delay.
 TestData.skipCheckDBHashes = true;
@@ -67,4 +65,3 @@ sleep(2000);  // Prevent the test from passing by chance.
 assert.eq(getLatestOp(secondary), lastOp);
 
 rst.stopSet();
-})();

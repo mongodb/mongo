@@ -1,8 +1,5 @@
 // Tests that reads on views are supported in transactions.
 // @tags: [uses_transactions, uses_snapshot_read_concern]
-(function() {
-"use strict";
-
 const session = db.getMongo().startSession({causalConsistency: false});
 const testDB = session.getDatabase("test");
 const coll = testDB.getCollection("view_reads_in_transaction_data_coll");
@@ -55,4 +52,3 @@ assert.eq(view.distinct("_id"), ["kyle"]);
 
 assert.commandWorked(session.commitTransaction_forTesting());
 jsTestLog("Transaction committed.");
-}());

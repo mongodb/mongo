@@ -1,10 +1,9 @@
 /**
  * Test the set expressions.
  */
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode.
-load('jstests/libs/sbe_assert_error_override.js');  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
+
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.expression_set;
 coll.drop();
@@ -148,4 +147,3 @@ for (const [operator, errorCodes] of operators) {
         assertErrorCode(coll, [{$project: {output: {[operator]: ["$arr1", "$arr2"]}}}], errorCodes);
     }
 }
-}());

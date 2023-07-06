@@ -10,8 +10,6 @@
 // ]
 
 // Test key uniqueness
-(function() {
-
 let t = db.jstests_index8;
 t.drop();
 
@@ -77,4 +75,3 @@ assert.eq(1, t.find().sort({a: -1}).hint({a: 1}).toArray().length);
 
 assert.eq(t._indexSpec({x: 1}, true), t._indexSpec({x: 1}, [true]), "spec 1");
 assert.eq(t._indexSpec({x: 1}, "eliot"), t._indexSpec({x: 1}, ["eliot"]), "spec 2");
-})();

@@ -1,9 +1,6 @@
 // Ensure that created/updated users have the correct credentials.
 // @tags: [requires_persistence]
 
-(function() {
-'use strict';
-
 let mongod = MongoRunner.runMongod(
     {auth: "", setParameter: "authenticationMechanisms=SCRAM-SHA-1,SCRAM-SHA-256,PLAIN"});
 const admin = mongod.getDB('admin');
@@ -237,4 +234,3 @@ function restartWithOneMech(mech) {
 
 restartWithOneMech('SCRAM-SHA-1');
 restartWithOneMech('SCRAM-SHA-256');
-})();

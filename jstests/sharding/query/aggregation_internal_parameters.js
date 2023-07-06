@@ -2,10 +2,9 @@
  * Tests that mongoS rejects 'aggregate' commands which explicitly set any of the
  * parameters that mongoS uses internally when communicating with the shards.
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1, enableMajorityReadConcern: ''}});
 
@@ -128,4 +127,3 @@ assert.commandFailedWithCode(mongosDB.runCommand({
                              51089);
 
 st.stop();
-})();

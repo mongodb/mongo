@@ -6,10 +6,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/noPassthrough/libs/index_build.js');
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({
     nodes: [
@@ -90,4 +87,3 @@ const ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.abortIndexBuild': col
 assert.eq(1, ops.length, 'primary did not write abortIndexBuild oplog entry: ' + tojson(ops));
 
 rst.stopSet();
-})();

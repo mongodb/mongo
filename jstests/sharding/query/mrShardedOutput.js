@@ -2,14 +2,10 @@
 // flag.
 // This test stresses behavior that is only true of the mapReduce implementation using aggregation,
 // so it cannot be run in mixed-version suites.
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 
-const config = st.getDB("config");
 const testDB = st.getDB("test");
 const inputColl = testDB.foo;
 const outputColl = testDB.mr_sharded_out;
@@ -78,4 +74,3 @@ assert.throwsWithCode(
     ErrorCodes.IllegalOperation);
 
 st.stop();
-}());

@@ -4,11 +4,8 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 // Make the periodic job for writing sampled queries have a period of 1 second to speed up the test.
 const queryAnalysisWriterIntervalSecs = 1;
@@ -138,4 +135,3 @@ testRetryExecutedWrite(st.rs0);
 testRetryUnExecutedWrite(st.rs0);
 
 st.stop();
-})();

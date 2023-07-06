@@ -1,11 +1,5 @@
-// SERVER-29425 added a new expression, $sortArray, which consumes an array or a nullish value
-// and produces either the sorted version of that array, or null. In this test file, we check the
-// behavior and error cases.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode.
-
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 let coll = db.sortArray;
 coll.drop();
@@ -218,4 +212,3 @@ assertDBOutputEquals(
     coll.aggregate(
         [{$project: {sorted: {$sortArray: {input: "$collatorObjectTestField", sortBy: {a: 1}}}}}],
         {collation: {locale: "en", numericOrdering: true}}));
-}());

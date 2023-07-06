@@ -1,6 +1,6 @@
 // Providing the wrong number of fields in a pipeline stage specification triggers a parsing error.
 // SERVER-6861
-load('jstests/aggregation/extras/utils.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 let t = db.jstests_server6861;
 t.drop();

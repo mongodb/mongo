@@ -1,4 +1,4 @@
-GeoNearRandomTest = function(name, dbToUse) {
+export var GeoNearRandomTest = function(name, dbToUse) {
     this.name = name;
     this.db = (dbToUse || globalThis.db);
     this.t = this.db[name];

@@ -14,9 +14,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const backingColl = db.apply_ops_system_dot_views_backing;
 backingColl.drop();
 const view = db.apply_ops_view;
@@ -44,4 +41,3 @@ const ops = [{
 
 assert.commandWorked(db.adminCommand({applyOps: ops}));
 assert.eq(view.find({}, {_id: 0, a: 1}).toArray(), [{a: 0}]);
-}());

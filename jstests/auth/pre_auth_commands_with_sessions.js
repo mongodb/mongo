@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 var conn = MongoRunner.runMongod({auth: ""});
 var admin = conn.getDB("admin");
 var db = conn.getDB("otherdb");
@@ -20,7 +17,6 @@ var testCommand = function(cmd) {
     db.auth("lily", "pwd");
     var res = admin.runCommand({startSession: 1});
     assert.commandWorked(res);
-    var id = res.id;
 
     var commandWithSession = {[cmd]: 1, lsid: res.id};
 
@@ -48,4 +44,3 @@ for (var i = 0; i < commands.length; i++) {
     testCommand(commands[i]);
 }
 MongoRunner.stopMongod(conn, null, {user: "admin", pwd: "pwd"});
-})();

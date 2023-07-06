@@ -5,10 +5,8 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-'use strict';
-load("jstests/sharding/libs/find_chunks_util.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 /* Create new sharded collection on testDB */
 let _collCounter = 0;
@@ -439,4 +437,3 @@ executeTestCase(balancerTriggersAutomergerWhenIsEnabledTest);
 executeTestCase(testConfigurableAutoMergerIntervalSecs);
 
 st.stop();
-})();

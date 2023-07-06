@@ -1,5 +1,5 @@
 // perform inserts in parallel from several clients
-load('jstests/libs/parallelTester.js');
+import {EventGenerator, ParallelTester} from "jstests/libs/parallelTester.js";
 
 let f = db.jstests_parallel_insert;
 f.drop();

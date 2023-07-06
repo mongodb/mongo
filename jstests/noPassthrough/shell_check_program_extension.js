@@ -2,9 +2,6 @@
  * Tests that the shell correctly checks for program extensions in Windows environments.
  */
 
-(function() {
-'use strict';
-
 if (_isWindows()) {
     const filename = 'jstests/noPassthrough/libs/testWindowsExtension.bat';
 
@@ -14,4 +11,3 @@ if (_isWindows()) {
 } else {
     jsTestLog("This test is only relevant for Windows environments.");
 }
-})();

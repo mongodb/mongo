@@ -3,10 +3,7 @@
  * admin database, but a user exists in a tenant's user collection.
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");  // For reInitiateWithoutThrowingOnAbortedMember
+import {reInitiateWithoutThrowingOnAbortedMember} from "jstests/replsets/rslib.js";
 
 const rst = new ReplSetTest({
     nodes: 1,
@@ -66,4 +63,3 @@ assert.soon(
 
 rst.stop(secondary, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
 rst.stopSet();
-})();

@@ -1,6 +1,4 @@
-var fc = (function() {
-    'use strict';
-
+export var fc = (function() {
     var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis
         : typeof window !== 'undefined'                    ? window
         : typeof global !== 'undefined'                    ? global

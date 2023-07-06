@@ -1,8 +1,5 @@
 // Tests the behavior of $size for match expressions.
 
-(function() {
-"use strict";
-
 const coll = db.jstests_find_size;
 coll.drop();
 
@@ -84,4 +81,3 @@ badInputs.forEach(function(input) {
     assert.commandFailed(db.runCommand({find: coll.getName(), filter: {"a": {$size: input}}}),
                          "$size argument " + input + " should have failed");
 });
-}());

@@ -3,9 +3,11 @@
  * @tags: [requires_fcv_63, serverless]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {
+    ChangeStreamMultitenantReplicaSetTest
+} from "jstests/serverless/libs/change_collection_util.js";
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
-load("jstests/libs/fail_point_util.js");
-load("jstests/serverless/libs/change_collection_util.js");
 
 const tenantIds = [ObjectId(), ObjectId()];
 const donorRst = new ChangeStreamMultitenantReplicaSetTest({

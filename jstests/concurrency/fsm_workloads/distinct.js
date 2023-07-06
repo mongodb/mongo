@@ -5,6 +5,7 @@
  * The indexed field contains unique values.
  * Each thread operates on a separate collection.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     var data = {numDocs: 1000, prefix: 'distinct_fsm', shardKey: {i: 1}};

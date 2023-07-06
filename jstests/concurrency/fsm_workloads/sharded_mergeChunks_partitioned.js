@@ -9,12 +9,13 @@
  *  assumes_balancer_off,
  * ]
  */
-
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/sharded_base_partitioned.js";
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.iterations = 8;
@@ -86,7 +87,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     // Merge a random chunk in this thread's partition with its upper neighbor.
     $config.states.mergeChunks = function mergeChunks(db, collName, connCache) {
-        var dbName = db.getName();
         var ns = db[collName].getFullName();
         var config = ChunkHelper.getPrimary(connCache.config);
 
@@ -152,10 +152,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // Regardless of whether the mergeChunks operation succeeded or failed,
         // verify that the shard chunk1 was on returns all data for the chunk.
-        var shardPrimary = ChunkHelper.getPrimary(connCache.shards[chunk1.shard]);
-        var shardNumDocsAfter =
+        shardPrimary = ChunkHelper.getPrimary(connCache.shards[chunk1.shard]);
+        shardNumDocsAfter =
             ChunkHelper.getNumDocs(shardPrimary, ns, chunk1.min._id, chunk2.max._id);
-        var msg = "Chunk1's shard should contain all documents after mergeChunks.\n" + msgBase;
+        msg = "Chunk1's shard should contain all documents after mergeChunks.\n" + msgBase;
         assertWhenOwnColl.eq(shardNumDocsAfter, numDocsBefore, msg);
 
         // Verify that all config servers have the correct after-state.
@@ -225,7 +225,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // If the mergeChunks operation succeeded, verify that the mongos sees one chunk between
             // the original chunks' lower and upper bounds. If the operation failed, verify that the
             // mongos still sees two chunks between the original chunks' lower and upper bounds.
-            var numChunksBetweenOldChunksBounds =
+            let numChunksBetweenOldChunksBounds =
                 ChunkHelper.getNumChunks(mongos, ns, chunk1.min._id, chunk2.max._id);
             if (mergeChunksRes.ok) {
                 msg = 'mergeChunks succeeded but mongos does not see exactly 1 chunk between ' +
@@ -240,7 +240,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // If the mergeChunks operation succeeded, verify that the mongos sees that the total
             // number of chunks in our partition has decreased by 1. If it failed, verify that it
             // has stayed the same.
-            var numChunksAfter = ChunkHelper.getNumChunks(
+            let numChunksAfter = ChunkHelper.getNumChunks(
                 mongos, ns, this.partition.chunkLower, this.partition.chunkUpper);
             if (mergeChunksRes.ok) {
                 msg = 'mergeChunks succeeded but mongos does not see exactly 1 fewer chunks ' +

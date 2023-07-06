@@ -1,11 +1,7 @@
 // Tests that sub-queries across shards as part of $unionWith will obey the read preference
 // specified by the user.
 // @tags: [requires_majority_read_concern]
-(function() {
-"use strict";
-
-load('jstests/libs/profiler.js');             // For various profiler helpers.
-load("jstests/aggregation/extras/utils.js");  // For arrayEq()
+import {profilerHasAtLeastOneMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({name: "union_with_read_pref", mongos: 1, shards: 2, rs: {nodes: 2}});
 
@@ -153,4 +149,3 @@ for (let rs of [st.rs0, st.rs1]) {
 }
 
 st.stop();
-}());

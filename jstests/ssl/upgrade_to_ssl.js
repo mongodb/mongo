@@ -7,7 +7,7 @@
  * and therefore cannot test modes that do not allow ssl.
  */
 
-load("jstests/ssl/libs/ssl_helpers.js");
+import {SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 // "sslAllowInvalidCertificates" is enabled to avoid hostname conflicts with our testing certs
 var opts = {

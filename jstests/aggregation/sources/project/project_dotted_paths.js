@@ -1,6 +1,5 @@
 // Test that projection of dotted paths which happens in the "agg" layer works correctly. See
 // SERVER-26066 for details.
-(function() {
 const coll = db.project_dotted_paths;
 coll.drop();
 
@@ -23,4 +22,3 @@ checkResultsConsistent({"a.b": {$literal: "newValue"}, _id: 0},
 checkResultsConsistent({"a.b.c": {$literal: "newValue"}, _id: 0}, [
     {a: [{b: {c: "newValue"}}, {b: {c: "newValue"}}, {b: {c: "newValue"}}, {b: {c: "newValue"}}]}
 ]);
-})();

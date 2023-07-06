@@ -1,8 +1,5 @@
 // Test SCRAM iterationCount defaults.
 
-(function() {
-'use strict';
-
 function runOpt(params, sha1Value, sha256Value) {
     const conn = MongoRunner.runMongod({auth: '', setParameter: params});
     const adminDB = conn.getDB('admin');
@@ -25,4 +22,3 @@ runOpt({scramSHA256IterationCount: 9999}, 10000, 9999);
 runOpt({scramSHA256IterationCount: 10001}, 10000, 10001);
 runOpt({scramIterationCount: 7000, scramSHA256IterationCount: 8000}, 7000, 8000);
 runOpt({scramIterationCount: 8000, scramSHA256IterationCount: 7000}, 8000, 7000);
-})();

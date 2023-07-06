@@ -3,6 +3,8 @@
  *
  * Ensures reIndex successfully handles WriteConflictExceptions.
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var states = {
         reIndex: function reIndex(db, collName) {

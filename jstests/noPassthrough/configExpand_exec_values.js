@@ -1,9 +1,9 @@
 // Test config file expansion using EXEC.
 
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/configExpand/lib.js');
+import {
+    configExpandSuccess,
+    makeReflectionCmd
+} from "jstests/noPassthrough/libs/configExpand/lib.js";
 
 // Basic success case
 configExpandSuccess(
@@ -24,4 +24,3 @@ configExpandSuccess(
                   23456,
                   "Incorrect derived config value scramSHA256IterationCount");
     });
-})();

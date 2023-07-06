@@ -1,9 +1,6 @@
 // Verify that the update system correctly rejects invalid entries during post-image validation.
 // @tags: [
 // ]
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 
@@ -23,4 +20,3 @@ assert.commandWorked(testDB.coll.update({_id: 1}, {$set: {"a.00": {$ref: "coll",
 assert.docEq({_id: 1, a: [{$ref: "coll", $db: "test"}]}, testDB.coll.findOne({_id: 1}));
 
 MongoRunner.stopMongod(conn);
-}());

@@ -3,9 +3,6 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 1, config: 1});
 const shard0Primary = st.rs0.getPrimary();
 
@@ -92,4 +89,3 @@ function runTest(conn) {
 runTest(st.s);
 
 st.stop();
-})();

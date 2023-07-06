@@ -16,8 +16,6 @@
  * document larger than 16MB as a result of the reduce() or finalize() functions and using the
  * "replace" action for the out collection.
  */
-(function() {
-"use strict";
 function mapper() {
     // Emit multiple values to ensure that the reducer gets called.
     emit(this._id, 1);
@@ -87,4 +85,3 @@ runTest({
     },
     finalize: createBigDocument
 });
-})();

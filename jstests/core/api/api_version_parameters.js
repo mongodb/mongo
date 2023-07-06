@@ -9,9 +9,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const testDb = db.getSiblingDB(jsTestName());
 
 // Test parsing logic on command included in API V1.
@@ -152,4 +149,3 @@ assert.commandFailedWithCode(
 // Test reading from system.js succeeds.
 assert.commandWorked(testDb.runCommand(
     {find: "system.js", filter: {_id: "shouldExist"}, apiVersion: "1", apiStrict: true}));
-})();

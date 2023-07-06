@@ -37,5 +37,5 @@ executor:
     shell_options:
       eval: >-
         globalThis.testingReplication = false;
-        load('jstests/libs/override_methods/set_api_strict.js');
+        await import('jstests/libs/override_methods/set_api_strict.js');
       nodb: ''

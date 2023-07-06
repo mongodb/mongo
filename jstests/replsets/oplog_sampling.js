@@ -3,9 +3,6 @@
  * support OplogTruncateMarkers.
  * @tags: [ requires_persistence ]
  */
-(function() {
-"use strict";
-
 // Force oplog sampling to occur on start up for small numbers of oplog inserts.
 const replSet = new ReplSetTest({
     nodes: 1,
@@ -69,4 +66,3 @@ assert.gt(res.oplogTruncation.totalTimeProcessingMicros, 0);
 assert.eq(res.oplogTruncation.processingMethod, "sampling");
 
 replSet.stopSet();
-})();

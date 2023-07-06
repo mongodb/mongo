@@ -6,13 +6,11 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
-const kDBName = "unsharded_lookup_in_txn";
 
 let session = st.s.startSession();
 let sessionDB = session.getDatabase("unsharded_lookup_in_txn");
@@ -97,4 +95,3 @@ flushRoutersAndRefreshShardMetadata(st, {ns: shardedColl.getFullName()});
 testLookupDoesNotSeeDocumentsOutsideSnapshot();
 
 st.stop();
-})();

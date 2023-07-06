@@ -5,11 +5,6 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");
-
 const coll = db[jsTestName()];
 
 /**
@@ -76,4 +71,3 @@ testWithMultipleGroups({
     expectedResult: [/* k:0 */ 1, /* k:1 */ 0, /* k:2 */ null],
     msg: "Median of multiple groups"
 });
-})();

@@ -3,9 +3,6 @@
  *
  *  @tags: [multiversion_incompatible]
  */
-(function() {
-'use strict';
-
 const kWaitForCompletedChecksCount = 20;
 const kWaitForPassedChecksCount = 10;
 
@@ -45,4 +42,3 @@ assert.soon(() => {
 }, 'Config server health check did not reach necessary count of passed checks', 60000, 1000);
 
 st.stop();
-})();

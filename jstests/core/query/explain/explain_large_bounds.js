@@ -10,7 +10,6 @@
  * assumes_balancer_off,
  * ]
  */
-(function() {
 const coll = db.jstests_explain_large_bounds;
 coll.drop();
 
@@ -22,4 +21,3 @@ for (let i = 0; i < 1000000; i++) {
 }
 
 assert.commandWorked(coll.find({a: {$in: inClause}}).explain());
-}());

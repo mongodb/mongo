@@ -3,10 +3,11 @@
  * @tags: [featureFlagQueryStatsFindCommand]
  */
 
-load('jstests/libs/query_stats_utils.js');
-
-(function() {
-"use strict";
+import {
+    assertExpectedResults,
+    getQueryStats,
+    getQueryStatsFindCmd
+} from "jstests/libs/query_stats_utils.js";
 
 const setup = () => {
     const st = new ShardingTest({
@@ -128,4 +129,3 @@ const setup = () => {
                           /* getMores */ false);
     st.stop();
 }
-}());

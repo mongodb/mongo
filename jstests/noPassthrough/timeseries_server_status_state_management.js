@@ -8,9 +8,6 @@
  *   requires_fcv_63,
  * ]
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 
 const dbName = jsTestName();
@@ -100,4 +97,3 @@ expected.trackedClearOperations--;
 checkServerStatus();
 
 MongoRunner.stopMongod(conn);
-}());

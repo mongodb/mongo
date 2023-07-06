@@ -24,11 +24,9 @@
 // ]
 //
 
-(function() {
-"use strict";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {assertHistogramDiffEq, getHistogramStats} from "jstests/libs/stats.js";
 
-load("jstests/libs/fixture_helpers.js");
-load("jstests/libs/stats.js");
 var name = "operationalLatencyHistogramTest";
 
 var testDB = db.getSiblingDB(name);
@@ -195,4 +193,3 @@ lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 0);
 // Test non-command.
 assert.commandFailed(testColl.runCommand("IHopeNobodyEverMakesThisACommand"));
 lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 0);
-}());

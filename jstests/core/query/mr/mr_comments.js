@@ -8,9 +8,6 @@
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
 // ]
-(function() {
-"use strict";
-
 const coll = db.mr_comments;
 coll.drop();
 const outColl = db.mr_comments_out;
@@ -57,4 +54,3 @@ assert.commandWorked(db.runCommand({
     out: {merge: outColl.getName()}
 }));
 assert.eq(2, outColl.find().toArray().length);
-}());

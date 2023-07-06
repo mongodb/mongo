@@ -4,7 +4,7 @@
  * Add/revoke roles to/from other roles checking for cycles.
  * @tags: [incompatible_with_concurrency_simultaneous]
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropRoles
+import {dropRoles} from "jstests/concurrency/fsm_workload_helpers/drop_utils.js";
 
 export const $config = (function() {
     const kRoleNamePrefix = 'auth_role_consistency';

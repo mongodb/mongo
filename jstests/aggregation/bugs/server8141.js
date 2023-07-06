@@ -1,6 +1,4 @@
 // SERVER-8141 Avoid treating arrays as literals in aggregation pipeline.
-(function() {
-'use strict';
 var coll = db.exprs_in_arrays;
 coll.drop();
 
@@ -47,4 +45,3 @@ assert.commandWorked(coll.insert({_id: 1, x: 1, z: 2}));
 
 pipeline = [{$project: {_id: 0, coordinate: ['$x', '$y', '$z']}}];
 assert.eq(coll.aggregate(pipeline).toArray(), [{coordinate: [1, null, 2]}]);
-}());

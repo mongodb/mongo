@@ -3,11 +3,9 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
 
@@ -289,4 +287,3 @@ assert.commandWorked(testDB[kCollName].insert({x: 1}));  // Set up the collectio
 })();
 
 st.stop();
-})();

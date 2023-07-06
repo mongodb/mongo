@@ -7,8 +7,6 @@
 //   requires_getmore
 // ]
 
-(function() {
-'use strict';
 let collName = 'system_indexes_invalidations';
 let collNameRenamed = 'renamed_collection';
 let coll = db[collName];
@@ -42,4 +40,3 @@ function testIndexInvalidation(isRename) {
 // Test that we invalidate indexes for both collection drops and renames.
 testIndexInvalidation(false);
 testIndexInvalidation(true);
-}());

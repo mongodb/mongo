@@ -17,12 +17,12 @@
  *
  * @tags: [requires_replication, uses_write_concern]
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {supportsCommittedReads} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
     // Use the workload name as the collection name.
     var uniqueCollectionName = 'secondary_reads';
-
-    load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
     function isWriterThread() {
         return this.tid === 0;

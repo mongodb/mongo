@@ -5,9 +5,8 @@
 
 // Test subtleties of batchSize and limit.
 
-(function() {
-"use strict";
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
 var t = db.jstests_batch_size;
 t.drop();
 
@@ -121,4 +120,3 @@ assert.eq(nDocs - 1, cursor.next().z);
 assert.eq(nDocs - 2, cursor.next().z);
 assert.eq(nDocs - 3, cursor.next().z);
 assert(!cursor.hasNext());
-}());

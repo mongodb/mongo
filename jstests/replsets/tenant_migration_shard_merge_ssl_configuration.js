@@ -13,6 +13,7 @@
  * ]
  */
 
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     getCertificateAndPrivateKey,
@@ -21,8 +22,6 @@ import {
     makeMigrationCertificatesForTest,
     makeX509OptionsForTest,
 } from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/uuid_util.js");
 
 const standalone = MongoRunner.runMongod({});
 const shardMergeFeatureFlagEnabled = isShardMergeEnabled(standalone.getDB("admin"));

@@ -1,7 +1,4 @@
 // Confirms that there's no attempt to drop a temp collection after $out is performed.
-(function() {
-"use strict";
-
 // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
 // of data logged for each op.
 TestData.skipGossipingClusterTime = true;
@@ -25,4 +22,3 @@ for (let i = 0; i < log.length; ++i) {
 }
 
 MongoRunner.stopMongod(conn);
-})();

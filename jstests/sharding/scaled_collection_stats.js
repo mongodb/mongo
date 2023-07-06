@@ -4,9 +4,6 @@
  *   expects_explicit_underscore_id_index,
  * ]
  */
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "scaled_collection_stats";
 const ns = dbName + "." + collName;
@@ -53,4 +50,3 @@ res = assert.commandWorked(coll.stats(totalIndexSize));
 assert.eq(1, res.totalIndexSize);
 
 st.stop();
-}());

@@ -1,8 +1,5 @@
 // @tags: [requires_fastcount]
 
-(function() {
-"use strict";
-
 const coll = db.find5;
 coll.drop();
 
@@ -53,4 +50,3 @@ assert(!coll.findOne({}, {"b.c": 1}).b.d, "F");
 assert(coll.drop());
 assert.commandWorked(coll.insert({a: {b: {c: 1}}}));
 assert.eq(1, coll.findOne({}, {"a.b.c": 1}).a.b.c, "G");
-}());

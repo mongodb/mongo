@@ -1,5 +1,3 @@
-load("jstests/libs/parallelTester.js");
-
 /**
  * @tags: [requires_replication, requires_sharding]
  *
@@ -8,9 +6,6 @@ load("jstests/libs/parallelTester.js");
  *
  * Heavily modified from jstest/noPassthrough/set_step_params.js
  */
-
-(function() {
-"use strict";
 
 const poolSizeLogId = 6265600;
 
@@ -116,4 +111,3 @@ for (const [min, max] of [[4, 6], [10, 20], [2, 4], [-1, -1]]) {
 }
 
 st.stop();
-})();

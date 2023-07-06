@@ -10,13 +10,9 @@
  * ]
  */
 
-load('jstests/libs/ftdc.js');
-
-(function() {
-"use strict";
+import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 
 // Verify we require admin database
 assert.commandFailed(db.diagdata.runCommand("getDiagnosticData"));
 
 verifyGetDiagnosticData(db.getSiblingDB('admin'));
-})();

@@ -8,9 +8,6 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "change_stream_empty_apply_ops";
 const namespace = dbName + "." + collName;
@@ -72,4 +69,3 @@ assert.commandWorked(sesion.commitTransaction_forTesting());
 });
 
 st.stop();
-})();

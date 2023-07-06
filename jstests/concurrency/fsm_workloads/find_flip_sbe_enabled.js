@@ -8,6 +8,7 @@
  *     does_not_support_stepdowns,
  * ]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     let data = {originalParamValues: {}};

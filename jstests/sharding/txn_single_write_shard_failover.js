@@ -16,18 +16,11 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-
 const db1Name = "db1";
 const coll1Name = "foo";
-const ns1 = db1Name + "." + coll1Name;
 
 const db2Name = "db2";
 const coll2Name = "bar";
-const ns2 = db2Name + "." + coll2Name;
 
 const st = new ShardingTest({
     shards: {rs0: {nodes: 2}, rs1: {nodes: 1}},
@@ -70,4 +63,3 @@ jsTest.log("Make second attempt to commit, should still return that the transact
 assert.commandWorked(session.commitTransaction_forTesting());
 
 st.stop();
-})();

@@ -16,10 +16,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/replsets/rslib.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 /**
  * Restarts a secondary node so that it goes through initial sync and forces it to sync from
@@ -114,4 +112,3 @@ jsTestLog("secondary2 successfully replicated prepared transaction after initial
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
 replSet.stopSet();
-})();

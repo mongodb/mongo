@@ -11,10 +11,7 @@
 
 // Tests that running a getMore on a cursor that has been invalidated by something like a collection
 // drop will return an appropriate error message.
-(function() {
-'use strict';
-
-load('jstests/libs/fixture_helpers.js');  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB("getmore_invalidated_cursors");
 const coll = testDB.test;
@@ -121,4 +118,3 @@ if (!isShardedCollection) {
     assert.eq(error.code, ErrorCodes.QueryPlanKilled, tojson(error));
     assert.neq(-1, error.message.indexOf('collection renamed'), error.message);
 }
-}());

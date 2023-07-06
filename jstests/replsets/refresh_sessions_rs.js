@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 // This test makes assertions about the number of logical session records.
 TestData.disableImplicitSessions = true;
 
@@ -76,4 +73,3 @@ assert.eq(db1.system.sessions.count(), 3, "should have three local session recor
 
 // Stop the test.
 replTest.stopSet();
-})();

@@ -3,8 +3,6 @@
 //   requires_replication,
 // ]
 
-(function() {
-"use strict";
 const name = "operationalLatencyHistogramTest";
 
 // Get the current opLatencies histograms from testDB.
@@ -231,4 +229,3 @@ testColl.drop();
 runLatencyComparisonTest(st, testDB);
 runTests(testDB, true);
 st.stop();
-}());

@@ -8,12 +8,8 @@
 //   tenant_migration_incompatible,
 // ]
 
-(function() {
-"use strict";
-
 // TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
-// For retryOnceOnTransientOnMongos.
-load('jstests/libs/auto_retry_transaction_in_sharding.js');
+import {retryOnceOnTransientOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = "test";
 const collName = "commands_not_allowed_in_txn";
@@ -176,4 +172,3 @@ if (!runningOnMongos) {
 }
 
 session.endSession();
-}());

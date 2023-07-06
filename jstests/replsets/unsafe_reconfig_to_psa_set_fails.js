@@ -12,9 +12,10 @@
  * The second reconfig should then increase its priority to the desired level.
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
+import {
+    assertVoteCount,
+    waitForNewlyAddedRemovalForNodeToBeCommitted
+} from "jstests/replsets/rslib.js";
 
 {
     jsTestLog("Testing reconfig from PA set to PSA set fails");
@@ -164,4 +165,3 @@ load("jstests/replsets/rslib.js");
 
     rst.stopSet();
 }
-})();

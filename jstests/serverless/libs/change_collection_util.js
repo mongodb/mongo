@@ -2,7 +2,7 @@
 
 // Verifies that the oplog and change collection entries are the same for the provided tenant
 // 'tenantId' for the specified timestamp window:- (startOplogTimestamp, endOplogTimestamp].
-function verifyChangeCollectionEntries(
+export function verifyChangeCollectionEntries(
     connection, startOplogTimestamp, endOplogTimestamp, tenantId) {
     // Fetch the oplog documents for the provided tenant for the specified timestamp window. Note
     // that the startOplogTimestamp is expected to be just before the first write, while the
@@ -66,7 +66,7 @@ function verifyChangeCollectionEntries(
 
 // A class that sets up the multitenant environment to enable change collections on the replica set.
 // This class also provides helpers that are commonly used when working with change collections.
-class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
+export class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
     constructor(config = {}) {
         jsTestLog(`Config is ${tojson(config)}`);
         // Instantiate the 'ReplSetTest' with 'serverless' as an option.

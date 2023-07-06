@@ -1,10 +1,8 @@
 // Tests the behavior of $ceil, $floor, $exp, $log10, $ln and $sqrt when used in agg expressions.
 
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.unary_numeric;
 coll.drop();
@@ -315,4 +313,3 @@ assertErrorCode(coll, [{$project: {a: {$exp: "$x"}}}], 28765);
 assertErrorCode(coll, [{$project: {a: {$log10: "$x"}}}], 28765);
 assertErrorCode(coll, [{$project: {a: {$ln: "$x"}}}], 28765);
 assertErrorCode(coll, [{$project: {a: {$sqrt: "$x"}}}], 28765);
-}());

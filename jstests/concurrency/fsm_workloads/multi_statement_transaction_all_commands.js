@@ -3,7 +3,8 @@
  *
  * @tags: [uses_transactions, state_functions_share_transaction]
  */
-load('jstests/concurrency/fsm_workload_helpers/cleanup_txns.js');
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {cleanupOnLastIteration} from "jstests/concurrency/fsm_workload_helpers/cleanup_txns.js";
 
 export const $config = (function() {
     function quietly(func) {
@@ -98,7 +99,7 @@ export const $config = (function() {
         runFindAndGetMore: function runFindAndGetMore(db, collName) {
             autoRetryTxn(this, () => {
                 const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-                const documents = collection.find().batchSize(2).toArray();
+                collection.find().batchSize(2).toArray();
             });
         },
 

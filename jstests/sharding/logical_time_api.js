@@ -7,9 +7,6 @@
  *
  * Expects logicalTime to come in the command body from both a mongos and a mongod.
  */
-(function() {
-"use strict";
-
 // Returns true if the given object contains a logicalTime BSON object in the following format:
 // $clusterTime: {
 //     clusterTime: <Timestamp>
@@ -96,4 +93,3 @@ assert(!containsValidLogicalTimeBson(res),
            "received: " + tojson(res));
 
 MongoRunner.stopMongod(standalone);
-})();

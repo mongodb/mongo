@@ -1,9 +1,6 @@
 /**
  * Test sorting with dotted field paths and numeric path components.
  */
-(function() {
-"use strict";
-
 const coll = db.sort_dotted_paths_positional;
 coll.drop();
 
@@ -63,4 +60,3 @@ testSortAndSortWithLimit(
 testSortAndSortWithLimit(
     {"a.0.b": -1, _id: -1},
     [{_id: 9}, {_id: 3}, {_id: 6}, {_id: 4}, {_id: 1}, {_id: 8}, {_id: 5}, {_id: 2}, {_id: 7}]);
-})();

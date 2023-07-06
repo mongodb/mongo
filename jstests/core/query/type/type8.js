@@ -2,9 +2,6 @@
 //   no_selinux,
 // ]
 
-(function() {
-"use strict";
-
 // SERVER-8246 Min/MaxKey should be comparable
 //
 // make sure that the MinKey MaxKey JS types are comparable
@@ -19,4 +16,3 @@ function testType(t1, t2) {
 }
 testType(MinKey, MaxKey);
 testType(MaxKey, MinKey);
-})();

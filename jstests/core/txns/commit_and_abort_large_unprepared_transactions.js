@@ -4,9 +4,6 @@
  * @tags: [uses_transactions]
  */
 
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "large_unprepared_transactions";
 const testDB = db.getSiblingDB(dbName);
@@ -56,4 +53,3 @@ assert.commandWorked(sessionColl.insert(doc4));
 
 assert.commandWorked(session.abortTransaction_forTesting());
 assert.sameMembers(sessionColl.find({_id: {$gt: 2}}).toArray(), []);
-}());

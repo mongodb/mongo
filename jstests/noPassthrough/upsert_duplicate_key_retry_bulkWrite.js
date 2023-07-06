@@ -7,10 +7,7 @@
  * @tags: [requires_replication]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 
 const rst = new ReplSetTest({
     nodes: {
@@ -107,4 +104,3 @@ res = testDB.adminCommand({
 assert(res.cursor.firstBatch[0].code == ErrorCodes.DuplicateKey);
 
 rst.stopSet();
-})();

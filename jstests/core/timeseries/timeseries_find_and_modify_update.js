@@ -17,7 +17,7 @@ import {
     testFindOneAndUpdate,
     timeFieldName
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 /**
  * Tests op-style updates.

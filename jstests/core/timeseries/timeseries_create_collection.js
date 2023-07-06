@@ -10,9 +10,6 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-'use strict';
-
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
@@ -79,4 +76,3 @@ collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).curs
 jsTestLog('Checking listCollections result: ' + tojson(collections));
 assert.isnull(collections.find(entry => entry.name === 'system.buckets.' + coll.getName()));
 assert(collections.find(entry => entry.name === coll.getName()));
-})();

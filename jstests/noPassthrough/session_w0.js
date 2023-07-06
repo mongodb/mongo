@@ -1,9 +1,6 @@
 /**
  * Explicit shell session should prohibit w: 0 writes.
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 const session = conn.startSession();
 const sessionColl = session.getDatabase("test").getCollection("foo");
@@ -16,4 +13,3 @@ assert.includes(
 
 session.endSession();
 MongoRunner.stopMongod(conn);
-})();

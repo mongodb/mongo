@@ -2,10 +2,7 @@
  * Tests hedging metrics in the serverStatus output.
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 /*
  * Verifies that the server status response has the hegingMetrics fields that we expect.
@@ -152,4 +149,3 @@ expectedHedgingMetrics.numTotalHedgedOperations += 1;
 checkServerStatusHedgingMetrics(testDB, expectedHedgingMetrics);
 
 st.stop();
-}());

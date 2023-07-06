@@ -1,11 +1,8 @@
 /**
  * Test that initial sync works without error when the sync source has an oplog hole.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 // Set up replica set. Disallow chaining so nodes always sync from primary.
 const testName = "initial_sync_oplog_hole";
@@ -94,4 +91,3 @@ replTest.awaitReplication();
 assert.docEq([{"_id": "a"}, {"_id": "b"}, {"_id": "c"}], secondaryColl.find().toArray());
 
 replTest.stopSet();
-})();

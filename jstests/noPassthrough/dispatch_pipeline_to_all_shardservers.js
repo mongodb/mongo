@@ -1,7 +1,5 @@
 // Various tests of the ability to establish a cursor on each mongod in a sharded cluster.
 
-(function() {
-"use strict";
 function listMongodStats(db) {
     return db.getSiblingDB("admin").aggregate([{$_internalShardServerInfo: {}}]).toArray();
 }
@@ -9,9 +7,7 @@ function listMongodStats(db) {
 /**
  * Test that mongos can establish cursors on all nodes within a sharded cluster.
  */
-
 (function() {
-"use strict";
 function runTest({shards, nodes}) {
     const st = new ShardingTest({
         mongos: 1,
@@ -40,7 +36,6 @@ runTest({shards: 3, nodes: 2});
  * Test that remote cursors are closed on all nodes when there is an error on one or more nodes.
  */
 (function() {
-"use strict";
 const st = new ShardingTest({
     mongos: 1,
     shards: 1,
@@ -139,5 +134,4 @@ results = listMongodStats(st.s.getDB(jsTestName()));
 assert.eq(5, results.length, results);
 
 st.stop();
-}());
 }());

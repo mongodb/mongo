@@ -6,11 +6,12 @@
 
 // Confirms that profiled aggregation execution contains expected values for usedDisk.
 
-(function() {
-"use strict";
+import {
+    getLatestProfilerEntry,
+    profilerHasSingleMatchingEntryOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
 
-// For 'getLatestProfilerEntry()'.
-load("jstests/libs/profiler.js");
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("profile_agg");
 const coll = testDB.getCollection("test");
@@ -296,4 +297,3 @@ assert.commandWorked(shard0DB.adminCommand(
     {setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 100 * 1024 * 1024}));
 
 st.stop();
-})();

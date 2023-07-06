@@ -1,10 +1,7 @@
 /**
  * Tests that stepdown terminates writes, but does not disconnect connections.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 
 const rst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}],
@@ -107,4 +104,3 @@ runStepDownTest({
     operation: "db['" + collname + "'].remove({removeme: true})"
 });
 rst.stopSet();
-})();

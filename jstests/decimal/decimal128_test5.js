@@ -2,9 +2,6 @@
  * Derived from test cases at https://github.com/mongodb/specifications
  */
 
-(function() {
-"use strict";
-
 var testData = [
     {
         "description": "[decq035] fold-downs (more below) (Clamped)",
@@ -320,4 +317,3 @@ testData.forEach(function(testCase) {
         assert.eq(output, `NumberDecimal("${testCase.input}")`);
     }
 });
-}());

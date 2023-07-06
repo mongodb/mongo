@@ -19,16 +19,12 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    isShardMergeEnabled,
-    runMigrationAsync
-} from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/replsets/rslib.js");  // 'createRstArgs'
+import {runMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
+import {createRstArgs, getLastOpTime} from "jstests/replsets/rslib.js";
 
 const kCollName = "testColl";
 const kTenantDefinedDbName = "0";

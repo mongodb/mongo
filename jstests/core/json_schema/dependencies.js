@@ -5,10 +5,7 @@
 /**
  * Tests for the JSON Schema 'dependencies' keyword.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/assert_schema_match.js");
+import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 
 const coll = db.jstests_schema_dependencies;
 
@@ -109,4 +106,3 @@ assertSchemaMatch(coll,
 // Empty dependencies matches everything.
 assertSchemaMatch(coll, {dependencies: {}}, {}, true);
 assertSchemaMatch(coll, {properties: {obj: {dependencies: {}}}}, {obj: {}}, true);
-}());

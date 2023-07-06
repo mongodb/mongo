@@ -5,9 +5,6 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 2});
 st.stopBalancer();
 
@@ -88,4 +85,3 @@ assert.eq(getNumberOfCursorsOpened() - initialNumCursorsOpened, 3, cmdRes);
 assert.eq(getNumberOfCursorsMoreThanOneBatch() - initialNumCursorsMoreThanOneBatch, 2, cmdRes);
 
 st.stop();
-})();

@@ -13,11 +13,8 @@
 //   uses_parallel_shell,
 // ]
 
-(function() {
-'use strict';
-
-load("jstests/libs/fixture_helpers.js");
-load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 let collName = 'await_data_non_capped';
 let coll = db[collName];
@@ -213,7 +210,7 @@ try {
         const readConcern =
             assert.commandWorked(db.adminCommand({getDefaultRWConcern: 1})).defaultReadConcern;
         if (readConcern.level == "majority" || TestData.defaultReadConcernLevel === "majority") {
-            return;
+            quit();
         }
     }
 
@@ -274,4 +271,3 @@ try {
     db.setLogLevel(originalCmdLogLevel, 'command');
     db.setLogLevel(originalQueryLogLevel, 'query');
 }
-})();

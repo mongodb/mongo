@@ -4,9 +4,6 @@
  * and local reads and writes return the last applied optime's timestamp.
  * @tags: [requires_majority_read_concern]
  */
-(function() {
-"use strict";
-
 function assertCorrectOperationTime(operationTime, expectedTimestamp, opTimeType) {
     assert.eq(0,
               timestampCmp(operationTime, expectedTimestamp),
@@ -52,4 +49,3 @@ statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
 assertCorrectOperationTime(res.operationTime, statusRes.optimes.appliedOpTime.ts, "applied");
 
 replTest.stopSet();
-})();

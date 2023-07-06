@@ -5,12 +5,9 @@
  *   requires_fcv_61
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest();
 reshardingTest.setup();
@@ -32,8 +29,7 @@ const kReadsDuringCriticalSection = 'countReadsDuringCriticalSection';
 
 function attemptFromParallelShell(fn) {
     const join = startParallelShell(funWithArgs((fn) => {
-                                        db = db.getSiblingDB('reshardingDb');
-                                        fn(db.coll);
+                                        fn(db.getSiblingDB('reshardingDb').coll);
                                     }, fn), mongos.port);
     return join;
 }
@@ -75,7 +71,7 @@ reshardingTest.withReshardingInBackground({
     newShardKeyPattern: {newKey: 1},
     newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientName}],
 },
-                                          (tempNs) => {},
+                                          () => {},
                                           {
                                               postDecisionPersistedFn: () => {
                                                   hangWhileBlockingReads.wait();
@@ -94,4 +90,3 @@ waitForWrite();
 waitForRead();
 
 reshardingTest.teardown();
-})();

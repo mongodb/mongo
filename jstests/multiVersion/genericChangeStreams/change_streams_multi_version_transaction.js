@@ -1,17 +1,4 @@
-// Test that resume tokens from a replica set running a downgraded mongod can be used to resume
-// a change stream after upgrading the replica set to the "latest" mongod, even when the change
-// stream includes multi-statement transactions.
-//
-// @tags: [
-//     uses_change_streams,
-//     uses_transactions,
-//     requires_replication,
-//     requires_majority_read_concern
-// ]
-(function() {
-"use strict";
-
-load('jstests/multiVersion/libs/multi_rs.js');  // For upgradeSet.
+import "jstests/multiVersion/libs/multi_rs.js";
 
 const dbName = jsTestName();
 const watchedCollName = "change_stream_watched";
@@ -137,4 +124,3 @@ function runTest(downgradeVersion) {
 
 runTest("last-continuous");
 runTest("last-lts");
-}());

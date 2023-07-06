@@ -2,9 +2,6 @@
 //   requires_non_retryable_writes,
 // ]
 
-(function() {
-"use strict";
-
 const coll = db.jstests_not2;
 coll.drop();
 
@@ -88,4 +85,3 @@ doTest();
 // Run the test with an index present.
 assert.commandWorked(coll.createIndex({i: 1}));
 doTest();
-}());

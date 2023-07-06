@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Helpers for controlling under which situations an assert is actually executed.
  * This allows us to define workloads that will have only valid assertions,
@@ -11,7 +9,7 @@
  *   OWN_DB   = these assertions are executed when workloads are run on separate databases
  */
 
-var AssertLevel = (function() {
+export var AssertLevel = (function() {
     function AssertLevel(level) {
         this.level = level;
 
@@ -35,11 +33,17 @@ var AssertLevel = (function() {
     };
 })();
 
-if (typeof globalAssertLevel === 'undefined') {
-    var globalAssertLevel = AssertLevel.OWN_DB;
+let globalAssertLevel = AssertLevel.OWN_DB;
+
+export function getGlobalAssertLevel() {
+    return globalAssertLevel;
 }
 
-var assertWithLevel = function(level) {
+export function setGlobalAssertLevel(level) {
+    globalAssertLevel = level;
+}
+
+export var assertWithLevel = function(level) {
     assert(AssertLevel.isAssertLevel(level), 'expected AssertLevel as first argument');
 
     function quietlyDoAssert(msg, obj) {
@@ -108,6 +112,6 @@ var assertWithLevel = function(level) {
     return assertWithLevel;
 };
 
-var assertAlways = assertWithLevel(AssertLevel.ALWAYS);
-var assertWhenOwnColl = assertWithLevel(AssertLevel.OWN_COLL);
-var assertWhenOwnDB = assertWithLevel(AssertLevel.OWN_DB);
+export var assertAlways = assertWithLevel(AssertLevel.ALWAYS);
+export var assertWhenOwnColl = assertWithLevel(AssertLevel.OWN_COLL);
+export var assertWhenOwnDB = assertWithLevel(AssertLevel.OWN_DB);

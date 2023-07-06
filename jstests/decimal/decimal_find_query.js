@@ -1,7 +1,5 @@
 // Find the decimal using query operators
 
-(function() {
-'use strict';
 var col = db.decimal_find_query;
 col.drop();
 
@@ -46,4 +44,3 @@ assert.commandWorked(col.insert([
 ]),
                      '2 insertion failed');
 assert.eq(col.find({'decimal': {$mod: [2, 0]}}).count(), 4, "$mod count incorrect");
-}());

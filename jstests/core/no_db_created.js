@@ -4,8 +4,6 @@
 
 // checks that operations do not create a database
 
-(function() {
-"use strict";
 var adminDB = db.getSiblingDB("admin");
 var noDB = function(db) {
     var dbName = db.getName();
@@ -36,4 +34,3 @@ assert.commandFailed(coll.runCommand("collMod", {expireAfterSeconds: 1}));
 noDB(mydb);
 assert.commandWorked(coll.insert({}));
 mydb.dropDatabase();
-}());

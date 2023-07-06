@@ -9,9 +9,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 let coll = db.rename_operator_change_target_type;
 coll.drop();
 
@@ -21,4 +18,3 @@ assert.commandWorked(coll.update({}, {$rename: {from: "to"}}));
 let aggResult = coll.aggregate([{$project: {toType: {$type: "$to"}}}]).toArray();
 assert.eq(aggResult.length, 1);
 assert.eq(aggResult[0].toType, "double", "Incorrect type resulting from $rename");
-})();

@@ -9,10 +9,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const databaseName = "my-database";
 const collectionName = "my-collection";
@@ -43,4 +40,3 @@ assert.commandFailedWithCode(database.runCommand(generateInsertCommand(30000)),
 failpoint.off();
 
 st.stop();
-}());

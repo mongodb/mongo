@@ -2,10 +2,10 @@
 // @tags: [
 //   requires_majority_read_concern,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries.
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries
+} from "jstests/libs/write_concern_util.js";
 
 const rst = new ReplSetTest({nodes: 2, nodeOptions: {enableMajorityReadConcern: ""}});
 
@@ -63,4 +63,3 @@ rst.awaitLastOpCommitted();
 awaitShell();
 
 rst.stopSet();
-}());

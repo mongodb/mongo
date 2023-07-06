@@ -4,9 +4,6 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
 delete TestData.setParameters.featureFlagTransitionToCatalogShard;
 delete TestData.setParametersMongos.featureFlagTransitionToCatalogShard;
 
@@ -33,4 +30,3 @@ assert.commandFailedWithCode(
     configPrimary.adminCommand({_configsvrTransitionToDedicatedConfigServer: 1}), 7368402);
 
 st.stop();
-}());

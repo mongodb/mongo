@@ -1,22 +1,12 @@
 // Test that a client can authenicate against the server with roles.
 // Also validates RFC2253
-load('jstests/ssl/libs/ssl_helpers.js');
-
-(function() {
-"use strict";
-
 const SERVER_CERT = "jstests/libs/server.pem";
 const CA_CERT = "jstests/libs/ca.pem";
 const CLIENT_CERT = "jstests/libs/client_roles.pem";
 const CLIENT_ESCAPE_CERT = "jstests/libs/client_escape.pem";
 const CLIENT_UTF8_CERT = "jstests/libs/client_utf8.pem";
 const CLIENT_EMAIL_CERT = "jstests/libs/client_email.pem";
-const CLIENT_TITLE_CERT = "jstests/libs/client_title.pem";
 const CLIENT_CERT_NO_ROLES = "jstests/libs/client.pem";
-
-const CLIENT_USER =
-    "C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel Users,CN=Kernel Client Peer Role";
-
 const CLIENT_USER_NO_ROLES = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
 const smokeScript = 'assert(db.getSiblingDB(\'$external\').auth({ mechanism: \'MONGODB-X509\' }));';
 
@@ -153,4 +143,3 @@ print("4. Testing x.509 auth to mongos with x509 roles disabled");
     authAndTest(st.s0.port, false);
     st.stop();
 }
-}());

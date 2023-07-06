@@ -1,6 +1,4 @@
 // This tests that we can successfully profile queries on secondaries.
-(function() {
-'use strict';
 var rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
@@ -21,4 +19,3 @@ jsTestLog('Check the query is in the profile and turn profiling off.');
 assert.eq(numProfileEntries(secondaryDB.doesntexist), 1, 'expected a single profile entry');
 assert.commandWorked(secondaryDB.runCommand({profile: 0}));
 rst.stopSet();
-})();

@@ -4,15 +4,13 @@
  * @tags: [requires_fcv_63, serverless]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 import {
     assertMigrationState,
     findSplitOperation,
     ShardSplitTest
 } from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load('jstests/libs/parallel_shell_helpers.js');
 
 jsTestLog("Starting runBlocking");
 

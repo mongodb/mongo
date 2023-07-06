@@ -3,11 +3,9 @@
  * targeted.
  */
 
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/shard_versioning_util.js");
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 let st = new ShardingTest({
     mongos: 1,
@@ -108,4 +106,3 @@ testMerge();
 testMoveChunk();
 
 st.stop();
-})();

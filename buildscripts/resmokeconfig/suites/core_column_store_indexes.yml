@@ -30,7 +30,7 @@ executor:
     shell_options:
       eval: >-
         globalThis.testingReplication = true;
-        load("jstests/libs/override_methods/hide_column_store_indexes_from_get_indexes.js");
+        await import("jstests/libs/override_methods/hide_column_store_indexes_from_get_indexes.js");
   hooks:
   - class: ValidateCollections
   - class: CleanEveryN

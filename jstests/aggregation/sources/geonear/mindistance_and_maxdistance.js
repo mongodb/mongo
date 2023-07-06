@@ -1,9 +1,6 @@
 /**
  * Tests the behavior of the $geoNear stage with varying values of 'minDistance' and 'maxDistance'.
  */
-(function() {
-"use strict";
-
 const coll = db.getCollection("geonear_mindistance_maxdistance");
 
 const kMaxDistance = Math.PI * 2.0;
@@ -101,4 +98,3 @@ const far = {
     // An impossible range is legal but returns no results.
     assertGeoNearResults({minDistance: 3.0, maxDistance: 1.0}, []);
 });
-}());

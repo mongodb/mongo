@@ -3,9 +3,6 @@
  * jstests/fle/fle_command_line_encryption.js.
  */
 
-(function() {
-"use strict";
-
 const shell = Mongo();
 const keyVault = shell.getKeyVault();
 
@@ -74,4 +71,3 @@ for (const encryptionAlgorithm of encryptionAlgorithms) {
 }
 
 print("Test completed with no errors.");
-}());

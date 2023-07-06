@@ -1,9 +1,6 @@
 /**
  * Tests the explain command with the maxTimeMS option.
  */
-(function() {
-"use strict";
-
 const standalone = MongoRunner.runMongod();
 assert.neq(null, standalone, "mongod was unable to start up");
 
@@ -79,4 +76,3 @@ for (const verbosity of ["executionStats", "allPlansExecution"]) {
 assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}));
 
 MongoRunner.stopMongod(standalone);
-})();

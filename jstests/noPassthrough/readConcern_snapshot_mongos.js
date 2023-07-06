@@ -7,10 +7,9 @@
 //   uses_atclustertime,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 // Runs the command as the first in a multi statement txn that is aborted right after, expecting
 // success.
@@ -149,4 +148,3 @@ assert.commandFailedWithCode(testDB.runCommand({
                              ErrorCodes.InvalidOptions);
 
 st.stop();
-}());

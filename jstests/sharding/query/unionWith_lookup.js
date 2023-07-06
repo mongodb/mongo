@@ -1,8 +1,5 @@
 // Tests various combinations of $lookup and $unionWith to ensure that referencing a sharded
 // collection within $lookup is not allowed.
-(function() {
-"use strict";
-
 const testName = "unionWith_lookup";
 const st = new ShardingTest({
     shards: 2,
@@ -100,4 +97,3 @@ expectedResults = [
 ];
 assert.eq(baseColl.aggregate(deepLookupPipeline).toArray(), expectedResults);
 st.stop();
-}());

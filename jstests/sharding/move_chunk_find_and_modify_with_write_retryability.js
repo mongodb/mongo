@@ -1,7 +1,4 @@
-load("jstests/sharding/move_chunk_with_session_helper.js");
-
-(function() {
-"use strict";
+import {testMoveChunkWithSession} from "jstests/sharding/move_chunk_with_session_helper.js";
 
 var checkFindAndModifyResult = function(expected, toCheck) {
     assert.eq(expected.ok, toCheck.ok);
@@ -115,4 +112,3 @@ tests.forEach(function(test) {
 });
 
 st.stop();
-})();

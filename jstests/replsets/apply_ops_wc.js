@@ -9,10 +9,11 @@
  * It finally stops replication at another secondary and confirms that applyOps commands fail.
  */
 
-load("jstests/libs/write_concern_util.js");
+import {
+    restartReplicationOnSecondaries,
+    stopServerReplication
+} from "jstests/libs/write_concern_util.js";
 
-(function() {
-"use strict";
 var nodeCount = 3;
 var replTest = new ReplSetTest({name: 'applyOpsWCSet', nodes: nodeCount});
 replTest.startSet();
@@ -139,4 +140,3 @@ majorityWriteConcerns.forEach(testMajorityWriteConcerns);
 restartReplicationOnSecondaries(replTest);
 
 replTest.stopSet();
-})();

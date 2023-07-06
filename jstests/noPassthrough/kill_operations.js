@@ -4,10 +4,7 @@
 //   requires_sharding,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/parallelTester.js");  // For Thread.
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const kDbName = "kill_operations";
 const kCollName = "test";
@@ -188,4 +185,3 @@ runTest(shardConn);
 runTest(st.s);
 
 st.stop();
-})();

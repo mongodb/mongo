@@ -2,10 +2,7 @@
  * Tests that hybrid index builds on timeseries buckets collections behave correctly when they
  * receive concurrent writes.
  */
-load("jstests/noPassthrough/libs/index_build.js");
-
-(function() {
-"use strict";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const conn = MongoRunner.runMongod();
 
@@ -135,4 +132,3 @@ runTest({
 });
 
 MongoRunner.stopMongod(conn);
-})();

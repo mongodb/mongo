@@ -1,7 +1,6 @@
 // The $isoDate operator is not available.  SERVER-6290
 
-// load the test utilities
-load('jstests/aggregation/extras/utils.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var t = db.jstests_aggregation_server6290;
 t.drop();

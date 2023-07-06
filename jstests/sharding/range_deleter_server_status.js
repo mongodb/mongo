@@ -2,9 +2,6 @@
  * Basic test to demonstrate that the range deleter section in shardingStatistics is displayed
  * correctly.
  */
-(function() {
-"use strict";
-
 let st = new ShardingTest({shards: 2});
 
 assert.commandWorked(
@@ -59,4 +56,3 @@ fooPositiveCursor.close();
 barCursor.close();
 
 st.stop();
-})();

@@ -1,10 +1,7 @@
 // Check that if a hello command for intracluster auth contains both the saslSupportedMechs field
 // for the __system user and a speculativeAuthenticate field for X509, we do not see a log marking
 // the changing of the username from __system to that specified in the x509 certificate.
-(function() {
-'use strict';
-
-load("jstests/libs/log.js");  // For findMatchingLogLine.
+import {findMatchingLogLine} from "jstests/libs/log.js";
 
 var x509_options = {
     sslMode: "requireSSL",
@@ -37,4 +34,3 @@ assert.eq(
     findMatchingLogLine(globalLog.log, fieldMatcher),
     "Found log line concerning \"Different user name was supplied to saslSupportedMechs\" when we did not expect to.");
 MongoRunner.stopMongod(mongo);
-})();

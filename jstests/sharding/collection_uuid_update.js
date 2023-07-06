@@ -6,9 +6,6 @@
  *   requires_fcv_60,
  * ]
  */
-(function() {
-'use strict';
-
 const st = new ShardingTest({shards: 2});
 const mongos = st.s;
 
@@ -118,4 +115,3 @@ for (let writeError of res) {
 }
 
 st.stop();
-})();

@@ -7,10 +7,7 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-load('jstests/libs/fail_point_util.js');
-load('jstests/libs/parallel_shell_helpers.js');
-load('jstests/libs/discover_topology.js');
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 
 const st = new ShardingTest({shards: 3, chunkSize: 1});
 const configDB = st.s.getDB('config');
@@ -201,4 +198,3 @@ testAddShard();
 testMovePrimary();
 
 st.stop();
-}());

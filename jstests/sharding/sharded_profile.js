@@ -1,13 +1,10 @@
 // Tests whether profiling can trigger stale config errors and interfere with write batches
 // SERVER-13413
 
-(function() {
-
 var st = new ShardingTest({shards: 1, mongos: 2});
 st.stopBalancer();
 
 var admin = st.s0.getDB('admin');
-var shards = st.s0.getCollection('config.shards').find().toArray();
 var coll = st.s0.getCollection('foo.bar');
 
 assert(admin.runCommand({enableSharding: coll.getDB() + ''}).ok);
@@ -31,4 +28,3 @@ printjson(profileEntry);
 assert.eq(profileEntry.command.documents, inserts);
 
 st.stop();
-})();

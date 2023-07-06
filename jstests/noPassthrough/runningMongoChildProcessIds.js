@@ -1,8 +1,5 @@
 // Tests the _runningMongoChildProcessIds shell built-in.
 
-(function() {
-'use strict';
-
 /**
  * @param {NumberLong[]} expected pids
  */
@@ -47,4 +44,3 @@ try {
 
 // empty at the end
 assertRunningMongoChildProcessIds([]);
-})();

@@ -25,13 +25,15 @@ for (let i = 0; i < 1100; i += 11) {
 }
 
 // Remove and then reinsert random documents in the background.
-let s = startParallelShell('t = db.jstests_removec;' +
-                           'Random.setRandomSeed();' +
-                           'for( j = 0; j < 1000; ++j ) {' +
-                           '    o = t.findOne( { a:Random.randInt( 1100 ) } );' +
-                           '    t.remove( { _id:o._id } );' +
-                           '    t.insert( o );' +
-                           '}');
+let s = startParallelShell(function() {
+    const t = db.jstests_removec;
+    Random.setRandomSeed();
+    for (let j = 0; j < 1000; ++j) {
+        const o = t.findOne({a: Random.randInt(1100)});
+        t.remove({_id: o._id});
+        t.insert(o);
+    }
+});
 
 // Find operations are error free. Note that the cursor throws if it detects the $err
 // field in the returned document.

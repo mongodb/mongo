@@ -1,8 +1,4 @@
-// Basic tests for using date expressions with time zone arguments.
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
 
 const coll = db.date_expressions_with_time_zones;
 coll.drop();
@@ -170,4 +166,3 @@ testDateTimeExpression("$isoDayOfWeek",
                        {idBasedTzExpected: 7, offsetBasedTzExpected: 6, noTzExpected: 1});
 testDateTimeExpression("$isoWeek",
                        {idBasedTzExpected: 2, offsetBasedTzExpected: 52, noTzExpected: 3});
-})();

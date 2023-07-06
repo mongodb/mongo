@@ -1,11 +1,8 @@
-"use strict";
-
-(function() {
-'use strict';
-
-load("jstests/libs/discover_topology.js");  // For Topology and DiscoverTopology.
-load("jstests/libs/fixture_helpers.js");    // For 'FixtureHelpers'.
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 assert.neq(typeof db, "undefined", "No `db` object, is the shell connected to a server?");
 
@@ -312,4 +309,3 @@ if (latestSampledQueryDoc) {
     const collName = latestSampledQueryDoc.ns.substring(dbName.length + 1);
     analyzeRandomShardKeys(dbName, collName);
 }
-})();

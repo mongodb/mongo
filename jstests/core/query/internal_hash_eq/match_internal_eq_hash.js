@@ -6,9 +6,8 @@
  *   requires_fcv_70,
  * ]
  */
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
-
-load("jstests/aggregation/extras/utils.js");  // For 'resultsEq().'
 
 const coll = db.match_internal_eq_hash;
 

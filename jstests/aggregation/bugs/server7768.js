@@ -4,9 +4,6 @@
 //   # This test sets a read preference itself and does not expect it to be overridden.
 //   assumes_read_preference_unchanged,
 // ]
-(function() {
-'use strict';
-
 let collection = db.server7768;
 collection.drop();
 assert.commandWorked(collection.insert({foo: 1}));
@@ -20,4 +17,3 @@ let res = db.runCommand({
 
 assert.commandWorked(res);
 assert.eq(res.cursor.firstBatch, [{foo: 1}]);
-}());

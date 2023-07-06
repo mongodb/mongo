@@ -1,9 +1,6 @@
 // Test that when running the shell for the first time creates the ~/.dbshell file, and it has
 // appropriate permissions (where relevant).
 
-(function() {
-"use strict";
-
 // Use dataPath because it includes the trailing "/" or "\".
 var tmpHome = MongoRunner.dataPath;
 // Ensure it exists and is a dir (eg. if running without resmoke.py and /data/db doesn't exist).
@@ -43,6 +40,7 @@ if (_isWindows()) {
 
     // Use the mongo shell from the $PATH, Resmoke sets $PATH to
     // include all the mongo binaries first.
+    /* eslint-disable-next-line */
     cmdline = cmdline;
 
     // Set umask to 0 prior to running the shell.
@@ -101,4 +99,3 @@ if (!_isWindows()) {
     // First field is the prefix, second field is the `ls -l` permissions.
     assert.eq(fields[1].substr(0, 10), "-rw-------", targetFile + " has bad permissions");
 }
-})();

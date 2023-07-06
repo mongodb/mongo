@@ -9,10 +9,11 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
 // This workload does not make use of random moveChunks, but other workloads that extend this base
 // workload may.
-load('jstests/concurrency/fsm_workload_helpers/balancer.js');
+import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 10;

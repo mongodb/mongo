@@ -1,8 +1,6 @@
 // Tests that dropping and re-adding a shard with the same name to a cluster doesn't mess up
 // migrations
-(function() {
-'use strict';
-load('jstests/sharding/libs/remove_shard_util.js');
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -60,4 +58,3 @@ assert.eq('world', shard2Conn.getCollection(coll + '').findOne().hello);
 
 st.stop();
 shard2.stopSet();
-})();

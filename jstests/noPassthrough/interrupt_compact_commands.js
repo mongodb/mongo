@@ -9,11 +9,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 /**
  * Loads 30000 * 20 documents into collection <dbName>.<collName> via 20 threads.
@@ -131,4 +128,3 @@ try {
 
 jsTestLog("Done");
 MongoRunner.stopMongod(conn);
-})();

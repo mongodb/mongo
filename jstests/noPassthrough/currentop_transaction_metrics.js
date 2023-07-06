@@ -4,9 +4,7 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-'use strict';
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -69,4 +67,3 @@ PrepareHelpers.commitTransaction(session, prepareTimestamp);
 session.endSession();
 
 rst.stopSet();
-})();

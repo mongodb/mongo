@@ -2,9 +2,6 @@
  * Derived from test cases at https://github.com/mongodb/specifications
  */
 
-(function() {
-"use strict";
-
 var testData = [
     {"description": "Special - Canonical NaN", "input": "NaN"},
     {"description": "Special - Negative NaN", "input": "NaN", "lossy": true},
@@ -160,4 +157,3 @@ testData.forEach(function(testCase) {
         assert.eq(output, `NumberDecimal("${testCase.input}")`);
     }
 });
-}());

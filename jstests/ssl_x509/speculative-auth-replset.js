@@ -2,9 +2,6 @@
 // to each other during intra-cluster communication.
 // @tags: [requires_replication]
 
-(function() {
-'use strict';
-
 const x509_options = {
     tlsMode: 'requireTLS',
     tlsCertificateKeyFile: 'jstests/libs/server.pem',
@@ -96,4 +93,3 @@ Object.keys(initialMechStats).forEach(function(mech) {
 
 admin.logout();
 rst.stopSet();
-}());

@@ -1,9 +1,6 @@
 /**
  * Tests behavior of $first and $last aggregation operators.
  */
-(function() {
-"use strict";
-
 const coll = db.expression_first_last;
 
 coll.drop();
@@ -34,4 +31,3 @@ assert.eq(result, [
     {_id: 5, f: null, l: null},
     {_id: 6, f: null, l: null},
 ]);
-}());

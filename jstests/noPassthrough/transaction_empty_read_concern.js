@@ -4,9 +4,6 @@
  * @tags: [requires_replication, requires_sharding]
  */
 
-(function() {
-"use strict";
-
 const lsid = {
     id: UUID()
 };
@@ -54,4 +51,3 @@ const lsid = {
 
     st.stop();
 }
-})();

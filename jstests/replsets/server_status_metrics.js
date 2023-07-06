@@ -6,11 +6,12 @@
  * to block oplog fetching getMores while trying to do oplog writes.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {
+    checkWriteConcernTimedOut,
+    restartServerReplication,
+    stopServerReplication
+} from "jstests/libs/write_concern_util.js";
 
 /**
  * Test replication metrics
@@ -280,4 +281,3 @@ assert.gt(ssNew.numSelections, ssOld.numSelections, "num selections not incremen
 assert.gt(ssNew.numTimesCouldNotFind, ssOld.numTimesCouldNotFind, "found new sync source");
 
 rt.stopSet();
-})();

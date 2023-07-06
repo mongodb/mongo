@@ -6,10 +6,7 @@
 // 5. Restart replication on the SECONDARY.
 // 6. Wait for PRIMARY to StepDown.
 
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 var name = "stepDownWithLongWait";
 var replSet = new ReplSetTest({name: name, nodes: 3});
@@ -76,4 +73,3 @@ var exitCode = stepDowner();
 jsTestLog("Wait for SECONDARY " + secondary.host + " to become PRIMARY");
 replSet.waitForState(secondary, ReplSetTest.State.PRIMARY);
 replSet.stopSet();
-})();

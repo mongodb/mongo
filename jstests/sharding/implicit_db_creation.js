@@ -1,9 +1,6 @@
 /**
  * This tests the basic cases for implicit database creation in a sharded cluster.
  */
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 2});
 const configDB = st.s.getDB('config');
 
@@ -42,4 +39,3 @@ assert.neq(null, configDB.databases.findOne({_id: 'unshardedDB'}));
 
 newShard.stopSet();
 st.stop();
-})();

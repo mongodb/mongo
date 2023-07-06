@@ -1,8 +1,7 @@
 /**
  * Tests the deleteOne command on time-series collections in multi-document transactions.
  */
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();

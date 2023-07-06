@@ -4,9 +4,6 @@
  * ]
  * Tests the countDocuments and estimatedDocumentCount commands.
  */
-(function() {
-"use strict";
-
 const standalone = MongoRunner.runMongod();
 const dbName = "test";
 const db = standalone.getDB(dbName);
@@ -60,4 +57,3 @@ assert.commandFailedWithCode(assert.throws(function() {
 assert.commandWorked(db.adminCommand({configureFailPoint: 'maxTimeAlwaysTimeOut', mode: 'off'}));
 
 MongoRunner.stopMongod(standalone);
-})();

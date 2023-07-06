@@ -4,9 +4,6 @@
 // The test runs commands that are not allowed with security token: endSession.
 // @tags: [
 //   not_allowed_with_security_token,uses_transactions, requires_majority_read_concern]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "read_concern";
 const testDB = db.getSiblingDB(dbName);
@@ -113,4 +110,3 @@ assert.commandFailedWithCode(
 assert.commandWorked(session.commitTransaction_forTesting());
 
 session.endSession();
-}());

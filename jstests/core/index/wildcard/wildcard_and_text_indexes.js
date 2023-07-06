@@ -6,15 +6,15 @@
  *   does_not_support_stepdowns,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {
-    getWinningPlan,
     getPlanStages,
     getRejectedPlans,
+    getWinningPlan,
     planHasStage
 } from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-load("jstests/libs/fixture_helpers.js");  // For isMongos.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 

@@ -3,10 +3,7 @@
  * lastApplied, the node can update its own lastOpCommitted to its lastApplied.
  * @tags: [requires_majority_read_concern]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");  // for [stop|restart]ServerReplication.
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -90,4 +87,3 @@ assert.eq(
 assert.commandWorked(
     nodeE.adminCommand({configureFailPoint: "stopReplProducerOnDocument", mode: "off"}));
 rst.stopSet();
-}());

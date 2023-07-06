@@ -1,11 +1,5 @@
 
-load('jstests/ssl/libs/ssl_helpers.js');
-
-(function() {
-"use strict";
-
-const randomAlgorithm = "AEAD_AES_256_CBC_HMAC_SHA_512-Random";
-const deterministicAlgorithm = "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic";
+import {CA_CERT, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 const x509_options = {
     sslMode: "requireSSL",
@@ -15,9 +9,6 @@ const x509_options = {
 };
 
 const conn = MongoRunner.runMongod(x509_options);
-const unencryptedDatabase = conn.getDB("test");
-const collection = unencryptedDatabase.keystore;
-
 const localKMS = {
     key: BinData(
         0,
@@ -58,4 +49,3 @@ clientSideFLEOptionsPass.forEach(element => {
 });
 
 MongoRunner.stopMongod(conn);
-}());

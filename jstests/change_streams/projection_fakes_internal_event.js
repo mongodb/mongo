@@ -7,9 +7,6 @@
  * to test with a config shard.
  * @tags: [assumes_read_preference_unchanged, config_shard_incompatible]
  */
-(function() {
-"use strict";
-
 const numShards = 2;
 
 const st = new ShardingTest({
@@ -215,4 +212,3 @@ testProjection = {
 assertChangeStreamBehaviour(testProjection, null, ErrorCodes.TypeMismatch);
 
 st.stop();
-})();

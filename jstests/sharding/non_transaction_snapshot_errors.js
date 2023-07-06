@@ -14,11 +14,12 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {
+    kSnapshotErrors,
+    setFailCommandOnShards,
+    unsetFailCommandOnEachShard
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -150,4 +151,3 @@ for (let errorCode of kSnapshotErrors) {
 }
 
 st.stop();
-})();

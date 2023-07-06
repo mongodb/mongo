@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 db.bson_compare_bug.drop();
 
 // We want some BSON objects for this test. One convenient way to get that is to insert them
@@ -40,4 +37,3 @@ assert(!bsonBinaryEqual(res[0], res[1]));
 // This check ensures that "_id" is still getting moved to the front. The value of res[0] should
 // now have changed so that both it and res[2] have their _id field first.
 assert(bsonBinaryEqual(res[0], res[2]));
-}());

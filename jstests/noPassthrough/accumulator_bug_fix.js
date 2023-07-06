@@ -5,9 +5,6 @@
  *  requires_sharding,
  * ]
  */
-(function() {
-'use strict';
-
 (function testAccumulatorWhenSpillingOnClassicEngine() {
     const verifyAccumulatorSpillingResult = (testDesc, accSpec) => {
         const conn = MongoRunner.runMongod();
@@ -583,5 +580,4 @@
     });
 
     st.stop();
-}());
 }());

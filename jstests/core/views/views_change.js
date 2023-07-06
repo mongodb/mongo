@@ -6,11 +6,7 @@
  *   requires_non_retryable_commands,
  * ]
  */
-(function() {
-"use strict";
-
-// For arrayEq.
-load("jstests/aggregation/extras/utils.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 let viewDB = db.getSiblingDB("views_change");
 let collection = viewDB.collection;
@@ -99,4 +95,3 @@ assert.commandWorked(collection.insert(doc));
 assertFindResultEq("viewOnView", [doc]);
 assert.commandWorked(viewDB.runCommand({drop: "view"}));
 assertFindResultEq("viewOnView", []);
-}());

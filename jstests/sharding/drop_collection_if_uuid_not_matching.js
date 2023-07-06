@@ -10,13 +10,11 @@
  * ]
  */
 
-"use strict";
-
 const dbName = "test";
 
 const st = new ShardingTest({shards: 1});
 const mongos = st.s;
-db = st.rs0.getPrimary().getDB(dbName);
+const db = st.rs0.getPrimary().getDB(dbName);
 
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 

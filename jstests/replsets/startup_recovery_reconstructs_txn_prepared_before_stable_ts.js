@@ -5,9 +5,7 @@
  * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
@@ -111,4 +109,3 @@ assert.sameMembers(testColl.find().toArray(), [{_id: 0, a: largeArray}, {_id: 1}
 assert.eq(testColl.count(), 3);
 
 replTest.stopSet();
-}());

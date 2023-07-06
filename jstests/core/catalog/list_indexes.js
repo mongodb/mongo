@@ -9,10 +9,7 @@
 
 // Basic functional tests for the listIndexes command.
 
-load("jstests/libs/fixture_helpers.js");
-
-(function() {
-"use strict";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 var coll = db.list_indexes1;
 var cursor;
@@ -183,4 +180,3 @@ cursor = new DBCommandCursor(coll.getDB(), res, 2);
 assert.throws(function() {
     cursor.hasNext();
 });
-}());

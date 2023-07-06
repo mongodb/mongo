@@ -8,9 +8,6 @@
  *   uses_change_streams,
  * ]
  */
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "c";
 
@@ -110,4 +107,3 @@ rst.initiate();
 runTest(rst.getPrimary());
 
 rst.stopSet();
-})();

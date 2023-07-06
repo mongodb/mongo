@@ -2,9 +2,6 @@
  * Ensure that transaction rollback succeeds after an interrupted index ttl update or upgrade
  * collMod command.
  */
-(function() {
-'use strict';
-
 let dbpath = MongoRunner.dataPath + "setFCV_collmod_transaction_rollback";
 resetDbpath(dbpath);
 
@@ -37,4 +34,3 @@ var ttlAfterRollback = index[1].expireAfterSeconds;
 assert.eq(ttlAfterRollback, ttlBeforeRollback);
 
 MongoRunner.stopMongod(conn);
-})();

@@ -10,8 +10,8 @@
  * ]
  */
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/write_concern_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const dbName = "foo";
 const collName = "bar";

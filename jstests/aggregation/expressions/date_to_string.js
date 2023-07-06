@@ -1,8 +1,6 @@
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
 
-(function() {
-"use strict";
+import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.date_to_string;
 coll.drop();
@@ -334,4 +332,3 @@ pipeline = [{
 }];
 assertErrCodeAndErrMsgContains(
     coll, pipeline, 18536, "Invalid format character '%n' in format string");
-})();

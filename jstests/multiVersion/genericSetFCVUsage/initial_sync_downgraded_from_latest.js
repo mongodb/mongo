@@ -3,9 +3,7 @@
  * secondary syncs from a 'latest' version replica set.
  */
 
-'use strict';
-
-load("jstests/multiVersion/libs/initial_sync.js");
+import {multversionInitialSyncTest} from "jstests/multiVersion/libs/initial_sync.js";
 
 let replSetVersion = "latest";
 

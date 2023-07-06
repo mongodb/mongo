@@ -7,9 +7,7 @@
  * requires_fcv_70
  * ]
  */
-(function() {
-'use strict';
-load("jstests/libs/doc_validation_utils.js");  // for assertDocumentValidationFailure
+import {assertDocumentValidationFailure} from "jstests/libs/doc_validation_utils.js";
 
 const dbTest = db.getSiblingDB('implicit_schema_validation_db');
 
@@ -476,4 +474,3 @@ dbTest.test.drop();
 assert.commandWorked(dbTest.createCollection("test", {encryptedFields: sampleEncryptedFields}));
 negativeUpdateTests(dbTest.test);
 positiveUpdateTests(dbTest.test);
-}());

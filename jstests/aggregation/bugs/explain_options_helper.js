@@ -1,9 +1,6 @@
 // Test that the explain helper does not modify the options document passed to it.
 // This test was designed to reproduce SERVER-32300".
 
-(function() {
-"use strict";
-
 const coll = db.explain_options;
 coll.drop();
 
@@ -23,4 +20,3 @@ assert.commandWorked(coll.explain().aggregate([], collation));
 const secondResults = coll.aggregate([{$sort: {_id: 1}}], collation).toArray();
 // Assert that the result didn't change after an explain helper is issued.
 assert.eq(firstResults, secondResults);
-}());

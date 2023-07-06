@@ -1,8 +1,5 @@
 // Aggregation $substrBytes tests.
 
-(function() {
-"use strict";
-
 let t = db.jstests_aggregation_substr;
 t.drop();
 
@@ -137,4 +134,3 @@ assert.eq(
      })
         .toArray()[0]
         .a);
-}());

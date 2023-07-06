@@ -1,7 +1,6 @@
 /**
  * Test the behavior of $addFields in the presence of a dotted field path.
  */
-(function() {
 const coll = db.add_fields_dotted_paths;
 coll.drop();
 
@@ -95,4 +94,3 @@ initObj["arrayField"] = [
 ];
 assertAddFieldsResult({"arrayField.subField.b": valueWithNestedObject}, initObj);
 assertAddFieldsResult({"arrayField.subField.b": {$literal: valueWithNestedObject}}, initObj);
-})();

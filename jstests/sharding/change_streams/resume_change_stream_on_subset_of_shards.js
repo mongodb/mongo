@@ -4,9 +4,6 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-"use strict";
-
 // Create a 3-shard cluster. Enable 'writePeriodicNoops' and set 'periodicNoopIntervalSecs' to 1
 // second so that each shard is continually advancing its optime, allowing the
 // AsyncResultsMerger to return sorted results even if some shards have not yet produced any
@@ -66,4 +63,3 @@ assert.eq(next.fullDocument, {_id: -1});
 assert.eq(next.operationType, "insert");
 
 st.stop();
-}());

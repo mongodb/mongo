@@ -1,12 +1,16 @@
-load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Common routines for override functions that need to shard collections
 
-var testMayRunDropInParallel = false;
+let testMayRunDropInParallel = false;
+
+export function setTestMayRunDropInParallel(val) {
+    testMayRunDropInParallel = !!val;
+}
 
 const kZoneName = 'moveToHereForMigrationPassthrough';
 
-var denylistedNamespaces = [
+export const denylistedNamespaces = [
     /\$cmd/,
     /^admin\./,
     /^config\./,
@@ -19,7 +23,7 @@ var denylistedNamespaces = [
 /**
  * Settings for the converting implictily accessed collections to sharded collections.
  */
-const ImplicitlyShardAccessCollSettings = (function() {
+export const ImplicitlyShardAccessCollSettings = (function() {
     let mode = 0;  // Default to hashed shard key.
 
     return {
@@ -40,9 +44,7 @@ const ImplicitlyShardAccessCollSettings = (function() {
     };
 })();
 
-var ShardingOverrideCommon = (function() {
-    "use strict";
-
+export var ShardingOverrideCommon = (function() {
     /**
      * Shard a collection
      * @param {*} collection is a shell object

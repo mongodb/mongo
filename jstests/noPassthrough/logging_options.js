@@ -1,6 +1,6 @@
 var baseName = "jstests_core_logging_options";
 
-load('jstests/libs/command_line/test_parsed_options.js');
+import {testGetCmdLineOptsMongod} from "jstests/libs/command_line/test_parsed_options.js";
 
 // Verbosity testing
 jsTest.log("Testing \"verbose\" command line option with no args");

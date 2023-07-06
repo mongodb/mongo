@@ -5,9 +5,6 @@
 //   resource_intensive,
 // ]
 
-(function() {
-'use strict';
-
 const numLocations = 300;
 let locObj = [];
 // Add locations everywhere
@@ -64,4 +61,3 @@ test(primary, /*index=*/ true);
 test(primary, /*index=*/ false);
 
 rst.stopSet();
-})();

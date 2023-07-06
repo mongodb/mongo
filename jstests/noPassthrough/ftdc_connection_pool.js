@@ -4,10 +4,8 @@
  *
  * @tags: [requires_sharding, requires_fcv_53]
  */
-load('jstests/libs/ftdc.js');
+import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 
-(function() {
-'use strict';
 const testPath = MongoRunner.toRealPath('ftdc_dir');
 const st = new ShardingTest({
     shards: 2,
@@ -40,4 +38,3 @@ assert(stats.pools.hasOwnProperty('NetworkInterfaceTL-ShardRegistry'));
 assert(stats.replicaSetPingTimesMillis.hasOwnProperty(st.configRS.name));
 
 st.stop();
-})();

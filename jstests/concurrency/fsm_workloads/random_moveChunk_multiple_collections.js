@@ -7,7 +7,9 @@
  *  does_not_support_add_remove_shards,
  * ]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
 
 const dbNames = ['db0', 'db1', 'db2'];
@@ -20,8 +22,6 @@ const withSkipRetryOnNetworkError = (fn) => {
     let res = undefined;
     try {
         res = fn();
-    } catch (e) {
-        throw e;
     } finally {
         TestData.skipRetryOnNetworkError = previousSkipRetryOnNetworkError;
     }

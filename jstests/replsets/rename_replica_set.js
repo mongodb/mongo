@@ -8,9 +8,6 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
-"use strict";
-
 const replTest = new ReplSetTest({name: 'testSet', nodes: 2});
 let nodes = replTest.startSet();
 replTest.initiate();
@@ -60,4 +57,3 @@ assert.eq(secondaryReplSetName, newReplSetName);
 assert.commandWorked(coll.insert({b: 2}, {"writeConcern": {"w": 2}}));
 
 replTest.stopSet();
-}());

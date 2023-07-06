@@ -30,4 +30,4 @@ executor:
   config:
     shell_options:
       nodb: ''
-      eval: load("jstests/libs/set_try_bonsai_experimental.js");
+      eval: await import("jstests/libs/set_try_bonsai_experimental.js");

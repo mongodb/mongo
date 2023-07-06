@@ -1,5 +1,4 @@
 // Try to create two identical indexes, via background. Shouldn't be allowed by the server.
-(function() {
 var t = db.duplIndexTest;
 t.drop();
 let docs = [];
@@ -16,4 +15,3 @@ assert.commandWorked(t.dropIndex({i: 1}));
 assert.eq(1, t.find({i: 1}).count(), "Should find only one doc");
 join1();
 join2();
-})();

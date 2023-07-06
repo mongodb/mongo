@@ -10,10 +10,7 @@
  *
  * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
  */
-(function() {
-'use strict';
-
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {makeCommitTransactionCmdObj} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const kDbName = "testDb";
 const kCollName = "testColl";
@@ -348,4 +345,3 @@ function runTestForInternalSessionForNonRetryableWrite(makeSessionOptsFunc) {
 }
 
 st.stop();
-})();

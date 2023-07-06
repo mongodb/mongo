@@ -9,12 +9,13 @@
  *  uses_transactions,
  * ]
  */
+import "jstests/libs/override_methods/retry_on_killed_session.js";
+
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {killSession} from "jstests/concurrency/fsm_workload_helpers/kill_session.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/random_moveChunk_update_shard_key.js";
-load('jstests/concurrency/fsm_workload_helpers/kill_session.js');  // for killSession
-load('jstests/libs/override_methods/retry_on_killed_session.js');
 
 // By default retry_on_killed_session.js will only retry known retryable operations like reads and
 // retryable writes, but the moveChunks in this test may be interrupted and are safe to retry so opt

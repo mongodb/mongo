@@ -7,10 +7,7 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");  // For reconnect()
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const replTest = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}],
@@ -95,4 +92,3 @@ assert.eq(4, initialSyncNode.getDB(dbName)[collName].find().itcount());
 printjson(initialSyncNode.getDB("local").oplog.rs.find().toArray());
 
 replTest.stopSet();
-})();

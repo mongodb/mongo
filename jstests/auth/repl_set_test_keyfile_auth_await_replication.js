@@ -3,9 +3,6 @@
  *
  * @tags: [requires_persistence, requires_replication]
  */
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({
     nodes: 3,
     waitForKeys: false,
@@ -42,4 +39,3 @@ for (const secondary of rst.getSecondaries()) {
 }
 
 rst.stopSet();
-})();

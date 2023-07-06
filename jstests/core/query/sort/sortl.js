@@ -1,8 +1,6 @@
 // Tests equality query on _id with a sort, intended to be tested on both mongos and mongod. For
 // SERVER-20641.
 
-(function() {
-'use strict';
 var coll = db.sortl;
 coll.drop();
 
@@ -37,4 +35,3 @@ res = db.runCommand({
 assert.commandFailedWithCode(res, ErrorCodes.BadValue, "$meta sortKey delete");
 
 coll.drop();
-})();

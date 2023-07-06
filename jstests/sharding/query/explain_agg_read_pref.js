@@ -1,10 +1,7 @@
 /**
  * Tests that readPref applies on an explain for an aggregation command.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/profiler.js");  // For profilerHasAtLeastOneMatchingEntryOrThrow.
+import {profilerHasAtLeastOneMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({
     name: "agg_explain_readPref",
@@ -150,4 +147,3 @@ assert.commandWorked(mongosDB.adminCommand(
 confirmReadPreference(rs1Primary.getDB(mongosDB.getName()), rs1Secondary.getDB(mongosDB.getName()));
 
 st.stop();
-})();

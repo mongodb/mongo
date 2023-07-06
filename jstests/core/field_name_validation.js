@@ -11,9 +11,6 @@
  *   assumes_unsharded_collection,
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.field_name_validation;
 coll.drop();
 
@@ -266,4 +263,3 @@ assert.commandFailed(db.runCommand({
     aggregate: coll.getName(),
     pipeline: [{$group: {_id: "$_id.a", "$invalid": {$sum: "$_id.b"}}}]
 }));
-})();

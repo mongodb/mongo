@@ -2,8 +2,6 @@
  * Test mirrored reads in a multi-tenant environment.
  */
 
-load('jstests/aggregation/extras/utils.js');  // For arrayEq()
-
 const rst = new ReplSetTest({
     nodes: 2,
     nodeOptions: {

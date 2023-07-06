@@ -22,9 +22,6 @@
 // Skip db hash check because replset cannot reach consistent state.
 TestData.skipCheckDBHashes = true;
 
-(function() {
-"use strict";
-
 let replTest = new ReplSetTest({name: "invalidate_images_when_minvalid", nodes: 1});
 
 let nodes = replTest.startSet({setParameter: {replBatchLimitOperations: 1}});
@@ -153,4 +150,3 @@ for (let idx = 0; idx < validWrites.length; ++idx) {
 }
 
 replTest.stopSet();
-})();

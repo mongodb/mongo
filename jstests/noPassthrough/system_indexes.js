@@ -5,7 +5,6 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
 let conn = MongoRunner.runMongod();
 let config = conn.getDB("config");
 let db = conn.getDB("admin");
@@ -80,4 +79,3 @@ conn = MongoRunner.runMongod({restart: conn, cleanData: false});
 db = conn.getDB("admin");
 assert.eq(2, db.system.roles.getIndexes().length);
 MongoRunner.stopMongod(conn);
-})();

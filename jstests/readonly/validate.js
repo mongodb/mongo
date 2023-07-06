@@ -1,14 +1,13 @@
 // Tests that running validate in read-only mode doesn't try to fix metadata
 // @tags: [assumes_against_mongod_not_mongos]
 
-load("jstests/readonly/lib/read_only_test.js");
+import {runReadOnlyTest} from "jstests/readonly/lib/read_only_test.js";
 
 // We skip doing the data consistency checks while terminating the cluster because we leave data in
 // an inconsitent state on purpose.
 TestData.skipCollectionAndIndexValidation = true;
 
 runReadOnlyTest(function() {
-    'use strict';
     return {
         name: 'validate',
         load: function(writableCollection) {

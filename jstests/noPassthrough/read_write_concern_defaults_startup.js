@@ -7,9 +7,7 @@
 //   requires_replication,
 //   requires_sharding,
 // ]
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");  // For reconnect.
+import {reconnect} from "jstests/replsets/rslib.js";
 
 function runTest(conn, failPointConn, restartFn) {
     // Set a default rwc.
@@ -68,4 +66,3 @@ jsTestLog("Testing plain replica set node...");
 
     rst.stopSet();
 }
-})();

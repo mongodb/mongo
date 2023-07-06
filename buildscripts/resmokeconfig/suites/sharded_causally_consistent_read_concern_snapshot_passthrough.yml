@@ -95,9 +95,9 @@ executor:
           disallowSnapshotDistinct: true
       eval: >-
         globalThis.testingReplication = true;
-        load('jstests/libs/override_methods/set_read_and_write_concerns.js');
-        load("jstests/libs/override_methods/enable_causal_consistency.js");
-        load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
+        await import("jstests/libs/override_methods/enable_causal_consistency.js");
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
   hooks:
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground

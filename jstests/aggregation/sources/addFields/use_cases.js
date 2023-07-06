@@ -4,11 +4,7 @@
  * the same result.
  */
 
-(function() {
-"use strict";
-
-// For arrayEq.
-load("jstests/aggregation/extras/utils.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const collName = jsTest.name();
 const coll = db.getCollection(collName);
@@ -50,4 +46,3 @@ let addFieldsEmptySpecPipe = [{$addFields: {}}];
 
 assert(arrayEq(coll.aggregate(addFieldsEmptySpecPipe).toArray(), coll.aggregate().toArray()),
        "$addFields with empty spec did not result in no-op");
-})();

@@ -6,9 +6,6 @@
 //   assumes_balancer_off,
 //   operations_longer_than_stepdown_interval_in_txns,
 // ]
-(function() {
-"use strict";
-
 const coll = db.geo_s2ordering;
 coll.drop();
 
@@ -59,4 +56,3 @@ assert.eq(slow.totalDocsExamined, 1);
 // The ordering actually matters for lookup speed.
 // totalKeysExamined is a direct measure of its speed.
 assert.lt(fast.totalKeysExamined, slow.totalKeysExamined);
-}());

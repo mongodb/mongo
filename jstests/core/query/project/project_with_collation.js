@@ -4,9 +4,6 @@
 //   assumes_no_implicit_collection_creation_after_drop,
 // ]
 
-(function() {
-'use strict';
-
 const collation = {
     locale: "en_US",
     strength: 2
@@ -179,5 +176,4 @@ queryWithSimpleCollation(collWithCollation);
         {_id: 1, sortedArray: null},
         {_id: 2, sortedArray: null}
     ]);
-})();
 })();

@@ -15,7 +15,7 @@
  * (preferSSL), sslPEMKeyFile ("jstests/libs/server.pem"), and sslCAFile
  * "jstests/libs/ca.pem").
  */
-function SSLTest(serverOpts, clientOpts) {
+export function SSLTest(serverOpts, clientOpts) {
     var canonicalServerOpts = function(userProvidedOpts) {
         var canonical = Object.extend({}, userProvidedOpts || {});
 

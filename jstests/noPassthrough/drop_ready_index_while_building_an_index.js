@@ -4,10 +4,7 @@
  *
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/index_build.js");
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = ReplSetTest({nodes: 3});
 rst.startSet();
@@ -71,4 +68,3 @@ IndexBuildTest.assertIndexes(
     secondaryColl, /*numIndexes=*/ 2, /*readyIndexes=*/["_id_", "y_1"], /*notReadyIndexes=*/[]);
 
 rst.stopSet();
-}());

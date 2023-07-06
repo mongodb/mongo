@@ -1,10 +1,7 @@
 // Tests for $arrayToObject aggregation expression.
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-// For assertErrorCode().
-load("jstests/aggregation/extras/utils.js");
-load("jstests/libs/sbe_assert_error_override.js");
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 let coll = db.array_to_object_expr;
 coll.drop();
@@ -105,4 +102,3 @@ assertErrorCode(
     coll,
     [{$replaceWith: {$arrayToObject: {$literal: [{k: "a\0b", v: "blah"}]}}}, {$out: "output"}],
     4940401);
-}());

@@ -1,9 +1,10 @@
 // Ensure free monitoring gives up if metrics returns permanently delete
 //
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {
+    FAULT_PERMANENTLY_DELETE_AFTER_3,
+    FreeMonGetRegistration,
+    FreeMonWebServer
+} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer(FAULT_PERMANENTLY_DELETE_AFTER_3);
 
@@ -32,4 +33,3 @@ assert.soon(
 MongoRunner.stopMongod(conn);
 
 mock_web.stop();
-})();

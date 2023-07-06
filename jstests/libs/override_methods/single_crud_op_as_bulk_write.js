@@ -3,12 +3,8 @@
  * Converts the bulkWrite responses into the original CRUD response.
  * This override takes single CRUD ops and sends a bulkWrite and does not batch multiple CRUD ops.
  */
-(function() {
-'use strict';
-
-// load util functions
-load("jstests/libs/crud_ops_to_bulk_write_lib.js");
-load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
+import {BulkWriteUtils} from "jstests/libs/crud_ops_to_bulk_write_lib.js";
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 function getAdditionalParameters(cmdObj) {
     // Deep copy of original command to modify.
@@ -63,4 +59,3 @@ function runCommandSingleOpBulkWriteOverride(
 OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/single_crud_op_as_bulk_write.js");
 OverrideHelpers.overrideRunCommand(runCommandSingleOpBulkWriteOverride);
-})();

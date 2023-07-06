@@ -10,8 +10,13 @@
  * ];
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    exactIdUpdate,
+    initUpdateInTransactionStates,
+    multiUpdate,
+    verifyDocuments
+} from "jstests/concurrency/fsm_workload_helpers/update_in_transaction_states.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
-load('jstests/concurrency/fsm_workload_helpers/update_in_transaction_states.js');
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 5;

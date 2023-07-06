@@ -9,25 +9,13 @@
  * This test requires users to persist across a restart.
  * @tags: [requires_persistence]
  */
+import {CA_CERT, KEYFILE, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 function authAllNodes() {
     for (var n = 0; n < rst.nodes.length; n++) {
         var status = rst.nodes[n].getDB("admin").auth("root", "pwd");
         assert.eq(status, 1);
     }
-}
-
-load("jstests/ssl/libs/ssl_helpers.js");
-
-// The mongo shell cannot authenticate as the internal __system user in tests that use x509 for
-// cluster authentication. Choosing the default value for wcMajorityJournalDefault in
-// ReplSetTest cannot be done automatically without the shell performing such authentication, so
-// in this test we must make the choice explicitly, based on the global test options.
-var wcMajorityJournalDefault;
-if (jsTestOptions().storageEngine == "inMemory") {
-    wcMajorityJournalDefault = false;
-} else {
-    wcMajorityJournalDefault = true;
 }
 
 let opts = {

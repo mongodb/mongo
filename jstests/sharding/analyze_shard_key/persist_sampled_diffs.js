@@ -6,8 +6,7 @@
  * @tags: [requires_fcv_70]
  */
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
-
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 const testCases = [];
 

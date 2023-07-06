@@ -8,11 +8,8 @@
  * @tags: [requires_fcv_53]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 var collName = "test.coll";
 var counter = 0;
@@ -142,4 +139,3 @@ rst.awaitSecondaryNodes();
 rst.checkReplicatedDataHashes();
 rst.checkOplogs();
 rst.stopSet();
-}());

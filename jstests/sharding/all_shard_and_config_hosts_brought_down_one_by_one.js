@@ -13,9 +13,6 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
 var st = new ShardingTest({
     shards: {
         rs0: {nodes: 2},
@@ -114,4 +111,3 @@ for (var i = 0; i < 2; i++) {
 // Restart two config server nodes to ensure that teardown checks may be executed
 st.restartAllConfigServers();
 st.stop();
-}());

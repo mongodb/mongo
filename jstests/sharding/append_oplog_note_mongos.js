@@ -7,10 +7,7 @@
  * @tags: [config_shard_incompatible]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 function checkOplogEntry(actualOplogEntry) {
     const {op, o} = actualOplogEntry;
@@ -77,4 +74,3 @@ assert.eq(shardOneAfter.members[0].optime.ts, lastEntryShardOne.ts);
 assert.eq(shardTwoAfter.members[0].optime.ts, lastEntryShardTwo.ts);
 
 st.stop();
-}());

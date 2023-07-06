@@ -3,10 +3,6 @@
  * 'enableOverrideClusterChainingSetting' will allow the node to chain anyway.
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
-
 let rst = new ReplSetTest({
     nodes: {
         n0: {},
@@ -37,4 +33,3 @@ var options = {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}};
 assert.commandWorked(primary.getDB("admin").foo.insert({x: 1}, options));
 
 rst.stopSet();
-}());

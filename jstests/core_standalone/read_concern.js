@@ -1,10 +1,7 @@
 // This test verifies readConcern behavior on a standalone mongod or embedded
 // @tags: [requires_majority_read_concern]
-(function() {
-'use strict';
-
 // For isWiredTiger.
-load("jstests/concurrency/fsm_workload_helpers/server_types.js");
+import {isEphemeral, isWiredTiger} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 var t = db.read_concern;
 t.drop();
@@ -43,4 +40,3 @@ assert.commandFailedWithCode(
         {find: "read_concern", readConcern: {level: "local", afterClusterTime: Timestamp(0, 1)}}),
     [ErrorCodes.IllegalOperation, ErrorCodes.NotImplemented],
     "expected afterClusterTime read to fail on standalone mongod");
-})();

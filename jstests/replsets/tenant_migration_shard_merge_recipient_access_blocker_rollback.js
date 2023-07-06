@@ -12,6 +12,10 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     getCertificateAndPrivateKey,
@@ -20,11 +24,6 @@ import {
     makeTenantDB,
     makeX509OptionsForTest
 } from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/uuid_util.js");           // For extractUUIDFromObject().
-load("jstests/libs/fail_point_util.js");     // For configureFailPoint().
-load("jstests/libs/write_concern_util.js");  // for 'stopReplicationOnSecondaries'
-load("jstests/libs/parallelTester.js");      // For Thread()
 
 const migrationX509Options = makeX509OptionsForTest();
 

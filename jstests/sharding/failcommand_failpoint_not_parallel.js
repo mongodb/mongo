@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 3, mongos: 1});
 const db = st.s.getDB("test_failcommand_noparallel");
 
@@ -18,4 +15,3 @@ assert.commandWorked(db.runCommand({find: "c"}));
 assert.commandWorked(st.s.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 st.stop();
-}());

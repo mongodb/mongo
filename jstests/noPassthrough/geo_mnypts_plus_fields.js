@@ -1,7 +1,5 @@
 // Test sanity of geo queries with a lot of points
 
-(function() {
-"use strict";
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
 const db = conn.getDB("test");
@@ -100,4 +98,3 @@ for (var fields = 1; fields < maxFields; fields++) {
 }
 
 MongoRunner.stopMongod(conn);
-})();

@@ -5,9 +5,6 @@
  * commands for the SBE query engine.
  */
 
-(function() {
-"use strict";
-
 // Create a capped collection with max of 20 documents.
 const mydb = db.getSiblingDB(jsTestName() + "_db");
 const mycoll = mydb.getCollection(jsTestName() + "_coll");
@@ -73,4 +70,3 @@ try {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: setParamResWas}));
 }
-})();

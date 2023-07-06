@@ -4,9 +4,6 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
-'use strict';
-
 function waitFailedToStart(pid, exitCode) {
     assert.soon(function() {
         return !checkProgram(pid).alive;
@@ -78,4 +75,3 @@ if (_isWindows()) {
 let log = parseLogFile(backtraceLogFileFullPath);
 assert.eq(log["id"], 31380);
 assert.eq(log["msg"], "BACKTRACE");
-})();

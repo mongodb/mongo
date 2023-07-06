@@ -3,11 +3,11 @@
  * @tags: [featureFlagShardMerge]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {
     isShardMergeEnabled,
     makeMigrationCertificatesForTest
 } from "jstests/replsets/libs/tenant_migration_util.js";
-load("jstests/libs/fail_point_util.js");
 
 function runTest(downgradeFCV) {
     const rst = new ReplSetTest({nodes: 1, serverless: true});

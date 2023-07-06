@@ -4,10 +4,7 @@
  *   assumes_unsharded_collection,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.expression_set_field;
 coll.drop();
@@ -355,4 +352,3 @@ assertPipelineResultsEq(
         }
     }],
     [{_id: 0, "x": 1, "a$b": "foo", "$x..$y": {"$a": "forget-me-not", "$b..$c": 2}}]);
-})();

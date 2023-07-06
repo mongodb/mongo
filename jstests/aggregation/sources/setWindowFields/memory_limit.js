@@ -3,12 +3,8 @@
  * data. Memory checks are per node, so only test when the data is all in one place.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");                         // For FixtureHelpers.isMongos.
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/discover_topology.js");                       // For findNonConfigNodes.
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -82,4 +78,3 @@ assert.commandFailedWithCode(coll.runCommand({
 // Reset limit for other tests.
 setParameterOnAllHosts(
     nonConfigNodes, "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 100 * 1024 * 1024);
-})();

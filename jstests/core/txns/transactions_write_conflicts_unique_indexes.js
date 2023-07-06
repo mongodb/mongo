@@ -4,10 +4,7 @@
  *  @tags: [cannot_create_unique_index_when_using_hashed_shard_key, uses_transactions]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/write_conflicts.js");  // for 'WriteConflictHelpers'.
+import {WriteConflictHelpers} from "jstests/core/txns/libs/write_conflicts.js";
 
 const dbName = "test";
 const collName = "transactions_write_conflicts_unique_indexes";
@@ -141,4 +138,3 @@ expectedDocs2 = [
 ];
 WriteConflictHelpers.writeConflictTest(
     coll, t1Op, t2Op, expectedDocs2, WriteConflictHelpers.T2StartsSecondAndWins, initOp);
-}());

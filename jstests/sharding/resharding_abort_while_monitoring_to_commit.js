@@ -2,12 +2,9 @@
  * Test that the resharding operation is aborted if any of the recipient shards encounters
  * an error during the Applying phase
  */
-
-(function() {
-"use strict";
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 1});
 reshardingTest.setup();
@@ -64,4 +61,3 @@ reshardingTest.withReshardingInBackground(
 shardsvrReshardingOperationTimeFailpoint.off();
 
 reshardingTest.teardown();
-})();

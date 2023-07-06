@@ -1,7 +1,5 @@
 // this tests all points using $near
-(function() {
-"use strict";
-load("jstests/libs/geo_near_random.js");
+import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
@@ -17,4 +15,3 @@ test.testPt(test.mkPt());
 test.testPt(test.mkPt());
 
 MongoRunner.stopMongod(conn);
-})();

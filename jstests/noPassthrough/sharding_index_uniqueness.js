@@ -9,9 +9,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 1, mongos: 1});
 const dbName = "db";
 const db = st.getDB(dbName);
@@ -61,4 +58,3 @@ assert.commandWorked(
     db.runCommand({collMod: coll.getName(), index: {keyPattern: {b: 1, d: 1}, unique: true}}));
 
 st.stop();
-})();

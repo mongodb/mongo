@@ -11,10 +11,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -202,4 +199,3 @@ assert.commandWorked(sessionDB3.adminCommand(
 assert.eq(testColl.find({_id: 3}).toArray(), [{_id: 3}]);
 
 replTest.stopSet();
-})();

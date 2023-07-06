@@ -10,7 +10,7 @@
  *   does_not_support_stepdowns,
  * ]
  */
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const latest = "latest";
 // The FCV downgrade should be < 1 second but we added a buffer for slow machines.

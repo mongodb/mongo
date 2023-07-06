@@ -4,7 +4,6 @@
  *   requires_fcv_51,
  * ]
  */
-(function() {
 const coll = db.regex_error;
 coll.drop();
 
@@ -25,4 +24,3 @@ assert.commandFailedWithCode(coll.runCommand("find", {
     }
 }),
                              51091);
-})();

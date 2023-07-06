@@ -4,9 +4,6 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-"use strict";
-
 const st = new ShardingTest({
     shards: 2,
     rs: {
@@ -109,4 +106,3 @@ assert.commandWorked(mongosDB.adminCommand({
 });
 
 st.stop();
-})();

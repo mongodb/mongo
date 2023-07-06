@@ -1,4 +1,4 @@
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 /**
  * Utilities for feature flags.

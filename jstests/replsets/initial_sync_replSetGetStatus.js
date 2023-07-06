@@ -3,10 +3,7 @@
  * progress.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 var name = 'initial_sync_replSetGetStatus';
 var replSet = new ReplSetTest({
@@ -173,4 +170,3 @@ assert.eq(0,
           "Oplog buffer was not dropped after initial sync");
 
 replSet.stopSet();
-})();

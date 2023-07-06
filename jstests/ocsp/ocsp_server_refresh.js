@@ -1,13 +1,18 @@
 // Check that OCSP verification works
 // @tags: [requires_http_client, requires_ocsp_stapling]
 
-load("jstests/ocsp/lib/mock_ocsp.js");
-
-(function() {
-"use strict";
+import {FAULT_REVOKED, MockOCSPServer} from "jstests/ocsp/lib/mock_ocsp.js";
+import {
+    assertClientConnectFails,
+    assertClientConnectSucceeds,
+    OCSP_CA_PEM,
+    OCSP_REVOKED,
+    OCSP_SERVER_CERT,
+    supportsStapling,
+} from "jstests/ocsp/lib/ocsp_helpers.js";
 
 if (!supportsStapling()) {
-    return;
+    quit();
 }
 
 let mock_ocsp = new MockOCSPServer("", 20);
@@ -131,4 +136,3 @@ MongoRunner.stopMongod(conn);
 // sleep to make sure that the threads don't interfere with each other.
 sleep(1000);
 mock_ocsp.stop();
-}());

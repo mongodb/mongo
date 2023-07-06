@@ -5,7 +5,7 @@
  * third attempt.
  */
 
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const testName = "rollback_remote_cursor_retry";

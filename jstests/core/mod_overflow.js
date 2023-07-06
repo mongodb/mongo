@@ -2,9 +2,6 @@
  * Tests that modding the smallest representable integer values by -1 does not result in integer
  * overflow. Exercises the fix for SERVER-43699.
  */
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB(jsTestName());
 const testColl = testDB.test;
 testColl.drop();
@@ -42,4 +39,3 @@ for (let divisor of [-1.0, NumberInt("-1"), NumberLong("-1"), NumberDecimal("-1"
             .aggregate([{$project: {val: 1, modVal: {$mod: ["$val", divisor]}}}, {$sort: {_id: 1}}])
             .toArray());
 }
-})();

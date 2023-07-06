@@ -8,10 +8,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
+import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
 
 // This test manually simulates a session, which is not compatible with implicit sessions.
 TestData.disableImplicitSessions = true;
@@ -54,6 +51,7 @@ function makeParallelShellFunctionString(cursorId, getMoreErrCodes, useSession, 
     }
 
     const runGetMore = function() {
+        // eslint-disable-next-line
         let getMoreCmd = {getMore: cursorId, collection: collName, batchSize: 4};
 
         if (useSession) {
@@ -267,4 +265,3 @@ testShardedKillPinned({
 });
 
 st.stop();
-})();

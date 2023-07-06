@@ -1,10 +1,7 @@
 // See SERVER-9448
 // Test argument and receiver (aka 'this') objects and their children can be mutated
 // in Map, Reduce and Finalize functions
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const map = function() {
     // set property on receiver
@@ -97,4 +94,3 @@ assert.neq(null, st.s, "mongod was unable to start up");
 st.s.adminCommand({shardCollection: "test.mrMutableReceiver"});
 runTest(st.s.getDB("test").mrMutableReceiver);
 st.stop();
-}());

@@ -1,7 +1,6 @@
 // Regression test for SERVER-71270.
-(function() {
-"use strict";
-load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+
 const doc = {
     _id: 0,
     time: new Date('2019-01-18T13:24:15.443Z'),
@@ -27,4 +26,3 @@ assertArrayEq({
     actual: ts,
     expected: vanilla,
 });
-}());

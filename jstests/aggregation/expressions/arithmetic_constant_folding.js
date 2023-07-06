@@ -6,13 +6,12 @@
  *  requires_pipeline_optimization,
  * ]
  */
+import {
+    assertArrayEq,
+    getExplainedPipelineFromAggregation
+} from "jstests/aggregation/extras/utils.js";
 
 (function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode() and assertArrayEq().
-
 const collName = jsTest.name();
 const coll = db[collName];
 coll.drop();
@@ -108,10 +107,6 @@ assertConstantFoldingResults(
 
 // Mixing $add and $multiply
 (function() {
-"use strict";
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode() and assertArrayEq().
-
 const collName = jsTest.name();
 const coll = db[collName];
 coll.drop();
@@ -169,11 +164,6 @@ assertFoldedResult(
 
 // Regression tests for BFs related to SERVER-63099.
 (function() {
-"use strict";
-// TODO: comparing NumberDecimals as equal doesn't work in the shell.
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode() and assertArrayEq().
-
 const coll = db[jsTest.name()];
 coll.drop();
 

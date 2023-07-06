@@ -4,9 +4,6 @@
 // @tags: [
 //   requires_sharding,
 // ]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + '.' + collName;
@@ -59,4 +56,3 @@ assert.commandWorked(recipientPrimary.adminCommand(
     {configureFailPoint: "skipShardFilteringMetadataRefresh", mode: "off"}));
 
 st.stop();
-})();

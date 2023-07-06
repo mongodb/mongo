@@ -8,13 +8,10 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/auto_retry_transaction_in_sharding.js");  // For withTxnAndAutoRetryOnMongos.
-load("jstests/libs/change_stream_util.js");                  // For ChangeStreamTest.
-load("jstests/libs/collection_drop_recreate.js");            // For assert[Drop|Create]Collection.
-load("jstests/libs/fixture_helpers.js");                     // For FixtureHelpers.isMongos.
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const otherCollName = "change_stream_apply_ops_2";
 const coll = assertDropAndRecreateCollection(db, "change_stream_apply_ops");
@@ -157,7 +154,7 @@ function assertNextChangesEqual({cursor, expectedChanges, expectInvalidate}) {
 //
 
 // Verify that the stream returns the expected sequence of changes.
-const changes = assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges});
+assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges});
 
 // Single collection change stream should also be invalidated by the drop.
 assertNextChangesEqual({
@@ -220,4 +217,3 @@ changeStream = cst.startWatchingChanges({
 assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges});
 
 cst.cleanUp();
-}());

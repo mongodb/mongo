@@ -4,9 +4,6 @@
  *
  * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
  */
-(function() {
-'use strict';
-
 // For the test case where we abort a prepared internal transaction for retryable findAndModify with
 // a pre/post image, the image collection on the primary is expected to be inconsistent with the
 // image collection on secondaries. The reason is that for prepared transactions, the pre/post image
@@ -16,8 +13,11 @@
 // the write to image collection only gets rolled back on secondaries.
 TestData.skipCheckDBHashes = true;
 
-load("jstests/replsets/rslib.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {
+    makeAbortTransactionCmdObj,
+    makeCommitTransactionCmdObj,
+    makePrepareTransactionCmdObj,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 function runTest(st, stepDownShard0PrimaryFunc, testOpts) {
     jsTest.log("Testing with options " + tojson(testOpts));
@@ -190,4 +190,3 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts) {
 
     st.stop();
 }
-})();

@@ -1,8 +1,5 @@
 // In MongoDB 3.4, $graphLookup was introduced. In this file, we test some complex graphs.
 
-(function() {
-"use strict";
-
 var local = db.local;
 var foreign = db.foreign;
 
@@ -86,4 +83,3 @@ res = db.local
 
 // ATL should now connect to itself, MIA, and SFO.
 assert.eq(res.connections.length, 3);
-}());

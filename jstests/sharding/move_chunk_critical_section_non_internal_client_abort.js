@@ -6,11 +6,8 @@
  *   does_not_support_stepdowns
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const dbName = "test";
 const collName = "move_chunk_critical_section_non_internal_client_abort";
@@ -43,4 +40,3 @@ fp.off();
 awaitResult();
 
 st.stop();
-})();

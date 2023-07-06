@@ -2,13 +2,10 @@
  * Tests that FTDC collects information about the change collection, including its purging job.
  * @tags: [ requires_fcv_62 ]
  */
-(function() {
-'use strict';
-
-// For verifyGetDiagnosticData.
-load('jstests/libs/ftdc.js');
-// For ChangeStreamMultitenantReplicaSetTest.
-load("jstests/serverless/libs/change_collection_util.js");
+import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
+import {
+    ChangeStreamMultitenantReplicaSetTest
+} from "jstests/serverless/libs/change_collection_util.js";
 
 const kExpiredChangeRemovalJobSleepSeconds = 1;
 const kExpireAfterSeconds = 1;
@@ -92,4 +89,3 @@ assert.soon(() => {
 });
 
 replicaSet.stopSet();
-}());

@@ -1,13 +1,10 @@
 /**
  * Tests that the resharding coordinator recovers its abort decision after a primary failover.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/discover_topology.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest(
     {enableElections: true, logComponentVerbosity: tojson({sharding: 2, network: 4})});
@@ -124,4 +121,3 @@ reshardingTest.withReshardingInBackground(
 awaitAbort();
 
 reshardingTest.teardown();
-})();

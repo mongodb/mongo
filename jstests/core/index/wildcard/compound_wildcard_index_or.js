@@ -10,7 +10,7 @@
  *   requires_fcv_70,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For arrayEq().
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const documentList = [

@@ -9,8 +9,11 @@
  *   requires_replication,
  * ]
  */
-
-load('jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js');
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {
+    doSnapshotFindAtClusterTime,
+    doSnapshotGetMoreAtClusterTime
+} from "jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js";
 
 export const $config = (function() {
     const data = {numIds: 100, numDocsToInsertPerThread: 5, batchSize: 10};

@@ -7,10 +7,10 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {killSession} from "jstests/concurrency/fsm_workload_helpers/kill_session.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/multi_statement_transaction_simple.js";
-load('jstests/concurrency/fsm_workload_helpers/kill_session.js');  // for killSession
 
 export const $config = extendWorkload($baseConfig, ($config, $super) => {
     $config.data.retryOnKilledSession = true;

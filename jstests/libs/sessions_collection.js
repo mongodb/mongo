@@ -4,7 +4,7 @@
  * Validates that the sessions collection exists if we expect it to,
  * and has a TTL index on the lastUse field, if we expect it to.
  */
-function validateSessionsCollection(conn, collectionExists, indexExists, timeout) {
+export function validateSessionsCollection(conn, collectionExists, indexExists, timeout) {
     var config = conn.getDB("config");
 
     var info = config.getCollectionInfos({name: "system.sessions"});

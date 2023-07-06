@@ -1,7 +1,7 @@
 /**
  * Tests that the query planning time is captured in the profiler.
  */
-load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB('test');

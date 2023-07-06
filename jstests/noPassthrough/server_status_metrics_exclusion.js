@@ -1,8 +1,6 @@
 /**
  * Tests that serverStatus metrics are filtered when requested.
  */
-(function() {
-"use strict";
 const mongod = MongoRunner.runMongod();
 const dbName = jsTestName();
 const db = mongod.getDB(dbName);
@@ -63,4 +61,3 @@ serverStatusMetrics = db.serverStatus({metrics: {document: false}}).metrics;
 assert(!serverStatusMetrics.hasOwnProperty("document"));
 
 MongoRunner.stopMongod(mongod);
-})();

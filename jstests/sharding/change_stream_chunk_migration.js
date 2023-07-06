@@ -4,13 +4,10 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-'use strict';
-
 // TODO WT-3864: Re-enable test for LSM once transaction visibility bug in LSM is resolved.
 if (jsTest.options().wiredTigerCollectionConfigString === "type=lsm") {
     jsTestLog("Skipping test because we're running with WiredTiger's LSM tree.");
-    return;
+    quit();
 }
 
 const rsNodeOptions = {
@@ -156,4 +153,3 @@ assert(!changeStream.hasNext());
 
 st.stop();
 newShard.stopSet();
-})();

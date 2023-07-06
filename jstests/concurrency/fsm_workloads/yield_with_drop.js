@@ -1,8 +1,7 @@
-"use strict";
-
 /**
  * Executes query operations that can yield while the source collection is dropped and recreated.
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     const data = {
@@ -94,7 +93,7 @@ export const $config = (function() {
         },
 
         recreateColl: function recreateColl(db, collName) {
-            const cmdRes = db[collName].drop();
+            db[collName].drop();
             this.create(db, collName);
         },
     };

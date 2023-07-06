@@ -17,7 +17,6 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
 // Helper function that runs listIndexes against shards to check for the existence of an index.
 function checkShardIndexes(indexKey, shardsWithIndex, shardsWithoutIndex) {
     function shardHasIndex(indexKey, shard) {
@@ -216,4 +215,3 @@ assert.eq(res.raw[st.shard1.host].ok, 1, tojson(res));  // gets created on shard
 assert.eq(undefined, res.raw[st.shard2.host], tojson(res));  // shard does not own chunks
 
 st.stop();
-})();

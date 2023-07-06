@@ -4,10 +4,10 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-"use strict";
-
-load('jstests/libs/profiler.js');  // For various profiler helpers.
+import {
+    profilerHasAtLeastOneMatchingEntryOrThrow,
+    profilerHasSingleMatchingEntryOrThrow,
+} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({
     name: "change_stream_read_pref",
@@ -123,4 +123,3 @@ for (let rs of [st.rs0, st.rs1]) {
 
 secondaryStream.close();
 st.stop();
-}());

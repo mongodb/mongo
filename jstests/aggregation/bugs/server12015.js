@@ -6,10 +6,8 @@
  * non-blocking sort.
  */
 
-load("jstests/aggregation/extras/utils.js");  // For orderedArrayEq.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
-(function() {
-"use strict";
 const coll = db.server12015;
 coll.drop();
 const indexSpec = {
@@ -84,4 +82,3 @@ assertResultsMatch(
 assertResultsMatch([{$sort: {b: 1, a: -1}}, {$project: {_id: 0, a: 1, b: 1}}]);
 assertResultsMatch([{$sort: {b: 1, a: -1}}, {$group: {_id: "$b", arr: {$push: "$a"}}}],
                    ignoreSortOrder);
-}());

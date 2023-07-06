@@ -6,7 +6,6 @@
  * @tags: [
  * ]
  */
-(function() {
 let coll = db.geo_validate;
 coll.drop();
 
@@ -118,4 +117,3 @@ assert.writeError(coll.insert({geo: {type: 'Polygon', coordinates: [[]]}}));
 assert.writeError(coll.insert({geo: {type: 'Polygon', coordinates: [[[0, 0]]]}}));
 assert.writeError(
     coll.insert({geo: {type: 'Polygon', coordinates: [[[0, 0], [0, 0], [0, 0], [0, 0]]]}}));
-})();

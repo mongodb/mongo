@@ -2,9 +2,6 @@
 // @tags: [assumes_no_implicit_collection_creation_after_drop]
 
 // Test that the $bucket stage defines and sorts buckets according to the collation.
-(function() {
-"use strict";
-
 var results;
 const numericOrdering = {
     collation: {locale: "en_US", numericOrdering: true}
@@ -99,4 +96,3 @@ results =
 assert.eq(2, results.length);
 assert.eq({_id: "1", count: 3}, results[0]);  // "1", "10", and "100".
 assert.eq({_id: "2", count: 6}, results[1]);
-})();

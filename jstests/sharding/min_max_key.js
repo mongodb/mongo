@@ -2,9 +2,6 @@
  * Test writing and targeting of Max/Min key values
  */
 
-(function() {
-'use strict';
-
 const st = new ShardingTest({});
 const coll = st.s.getDB(jsTestName())['coll'];
 
@@ -25,4 +22,3 @@ assert.eq(0, coll.countDocuments({}));
 assert.eq(0, coll.countDocuments({x: MinKey}));
 
 st.stop();
-})();

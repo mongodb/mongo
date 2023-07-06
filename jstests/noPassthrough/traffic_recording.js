@@ -1,5 +1,4 @@
 // tests for the traffic_recording commands.
-(function() {
 function getDB(client) {
     let db = client.getDB("admin");
     db.auth("admin", "pass");
@@ -124,4 +123,3 @@ function runTest(client, restartCommand) {
 
     shardTest.stop();
 }
-})();

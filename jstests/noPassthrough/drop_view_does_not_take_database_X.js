@@ -4,10 +4,7 @@
  * @tags: [requires_db_locking]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB("test");
@@ -29,4 +26,3 @@ failPoint.off();
 
 awaitDrop();
 MongoRunner.stopMongod(conn);
-})();

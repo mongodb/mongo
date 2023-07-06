@@ -7,9 +7,6 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-'use strict';
-
 const getExtendedRangeCount = (db) => {
     return assert.commandWorked(db.adminCommand({serverStatus: 1}))
         .catalogStats.timeseriesExtendedRange;
@@ -57,4 +54,3 @@ assert.eq(1, primaryDB.extended.count());
 assert.eq(1, getExtendedRangeCount(primary));
 
 rst.stopSet();
-})();

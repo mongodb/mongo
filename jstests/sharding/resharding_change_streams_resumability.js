@@ -5,12 +5,8 @@
 //   requires_majority_read_concern,
 //   uses_atclustertime
 // ]
-(function() {
-"use strict";
-
-load('jstests/libs/change_stream_util.js');
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 // Use a higher frequency for periodic noops to speed up the test.
 const reshardingTest = new ReshardingTest({
@@ -167,4 +163,3 @@ cst.assertNextChangesEqual(
     {cursor: resumedCursorFromMidOperation, expectedChanges: postReshardCollectionChanges});
 
 reshardingTest.teardown();
-})();

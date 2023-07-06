@@ -7,11 +7,23 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
-load("jstests/sharding/libs/update_shard_key_helpers.js");
+import {
+    enableCoordinateCommitReturnImmediatelyAfterPersistingDecision
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {
+    assertCanDoReplacementUpdateWhereShardKeyMissingFields,
+    assertCannotUpdate_id,
+    assertCannotUpdate_idDottedPath,
+    assertCannotUpdateSKToArray,
+    assertCannotUpdateWithMultiTrue,
+    assertCanUnsetSKField,
+    assertCanUpdateDottedPath,
+    assertCanUpdateInBulkOpWhenDocsRemainOnSameShard,
+    assertCanUpdatePartialShardKey,
+    assertCanUpdatePrimitiveShardKey,
+    assertCanUpdatePrimitiveShardKeyHashedSameShards,
+    shardCollectionMoveChunks,
+} from "jstests/sharding/libs/update_shard_key_helpers.js";
 
 const st = new ShardingTest({
     mongos: 1,
@@ -23,7 +35,6 @@ const kDbName = 'db';
 const ns = kDbName + '.foo';
 const mongos = st.s0;
 const shard0 = st.shard0.shardName;
-const shard1 = st.shard1.shardName;
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
@@ -842,4 +853,3 @@ assert.eq(id, sessionDB.foo.find({"x": 1}).toArray()[0]._id);
 mongos.getDB(kDbName).foo.drop();
 
 st.stop();
-})();

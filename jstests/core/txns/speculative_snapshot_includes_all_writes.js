@@ -11,10 +11,7 @@
  *  command_not_supported_in_serverless,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const dbName = "test";
 const collName = "speculative_snapshot_includes_all_writes_1";
@@ -121,4 +118,3 @@ try {
         writeConcern: {w: "majority"}
     }));
 }
-}());

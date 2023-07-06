@@ -8,9 +8,6 @@
  *   requires_fcv_60,
  * ]
  */
-(function() {
-'use strict';
-
 const st = new ShardingTest({shards: 2});
 
 const db = st.s.getDB(jsTestName());
@@ -55,4 +52,3 @@ assert.eq(res[0].shard, st.shard1.shardName);
 checkResult(res);
 
 st.stop();
-})();

@@ -16,9 +16,11 @@
  * ]
  */
 
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {createRst, createRstArgs} from "jstests/replsets/rslib.js";
 import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/libs/clustered_collections/clustered_collection_util.js");  // ClusteredCollectionUtil
 
 const test = new ShardSplitTest({
     recipientSetName: "recipientSet",

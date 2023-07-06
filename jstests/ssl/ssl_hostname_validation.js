@@ -134,7 +134,7 @@ ssl_options = {
     sslAllowInvalidCertificates: ""
 };
 
-var replTest = new ReplSetTest({nodes: {node0: ssl_options, node1: ssl_options}});
+replTest = new ReplSetTest({nodes: {node0: ssl_options, node1: ssl_options}});
 replTest.startSet();
 replTest.initiate();
 replTest.stopSet();

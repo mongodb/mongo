@@ -1,8 +1,5 @@
 // This test is meant to reproduce SERVER-38840, where the ICU library crashes on Windows when
 // attempting to parse an invalid ID-prefixed locale.
-(function() {
-"use strict";
-
 const coll = db.invalid_collation_locale;
 coll.drop();
 
@@ -22,4 +19,3 @@ assert.commandFailedWithCode(
 
 assert.commandFailedWithCode(
     db.createCollection(coll.getName(), {collation: {locale: "xx_invalid"}}), ErrorCodes.BadValue);
-})();

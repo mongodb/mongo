@@ -10,9 +10,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "coll";
 
@@ -46,4 +43,3 @@ assert.commandWorked(db.stats());
 awaitCreateCollections();
 
 rst.stopSet();
-}());

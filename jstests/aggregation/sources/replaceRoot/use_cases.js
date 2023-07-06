@@ -1,7 +1,4 @@
 // Basic integration tests for $replaceRoot and its alias $replaceWith.
-(function() {
-"use strict";
-
 const coll = db.replaceWith_use_cases;
 coll.drop();
 
@@ -19,4 +16,3 @@ assert.eq(coll.aggregate(pipeline).toArray(), expectedResults);
 // Test the same thing but using the $replaceWith alias.
 pipeline = [{$unwind: "$comments"}, {$replaceWith: "$comments"}, {$sortByCount: "$user_id"}];
 assert.eq(coll.aggregate(pipeline).toArray(), expectedResults);
-}());

@@ -5,8 +5,6 @@ if (!checkCascadesOptimizerEnabled(db)) {
     quit();
 }
 
-load("jstests/aggregation/extras/utils.js");
-
 const collA = db.collA;
 collA.drop();
 

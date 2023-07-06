@@ -1,9 +1,6 @@
 // In SERVER-24714, the 'restrictSearchWithMatch' option was added to $graphLookup. In this file,
 // we test the functionality and correctness of the option.
 
-(function() {
-"use strict";
-
 var local = db.local;
 var foreign = db.foreign;
 
@@ -124,4 +121,3 @@ assert.throwsWithCode(() => local
                             restrictSearchWithMatch: {neighbors: {$near: [10, 20]}}
                             }
                         }]), 5626500);
-})();

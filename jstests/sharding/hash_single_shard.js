@@ -1,6 +1,6 @@
 // Test hashed presplit with 1 shard.
 
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var st = new ShardingTest({shards: 1});
 var testDB = st.getDB('test');

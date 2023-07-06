@@ -1,10 +1,7 @@
 /**
  * Ensures that the 'collStats' command lists indexes that are ready and in-progress.
  */
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/index_build.js');
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const collName = "collstats_show_ready_and_in_progress_indexes";
 const testDB = db.getSiblingDB("test");
@@ -65,4 +62,3 @@ try {
         db.adminCommand({configureFailPoint: "hangAfterStartingIndexBuildUnlocked", mode: "off"}));
     awaitParallelShell();
 }
-})();

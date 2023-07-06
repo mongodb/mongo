@@ -3,20 +3,17 @@
 //   not_allowed_with_security_token,does_not_support_stepdowns, requires_profiling]
 
 // Test that reading the profiling level doesn't create databases, but setting it does.
-(function(db) {
-'use strict';
-
-function dbExists() {
+function dbExists(db) {
     return Array.contains(db.getMongo().getDBNames(), db.getName());
 }
 
-db = db.getSiblingDB('profile_no_such_db');  // Note: changes db argument not global var.
-assert.commandWorked(db.dropDatabase());
-assert(!dbExists());
+const testDb = db.getSiblingDB('profile_no_such_db');  // Note: changes db argument not global var.
+assert.commandWorked(testDb.dropDatabase());
+assert(!dbExists(testDb));
 
 // Reading the profiling level shouldn't create the database.
-var defaultProfilingLevel = db.getProfilingLevel();
-assert(!dbExists());
+var defaultProfilingLevel = testDb.getProfilingLevel();
+assert(!dbExists(testDb));
 
 // This test assumes that the default profiling level hasn't been changed.
 assert.eq(defaultProfilingLevel, 0);
@@ -28,14 +25,13 @@ assert.eq(defaultProfilingLevel, 0);
     // Note: setting the profiling level to 0 puts the database in a weird state where it
     // exists internally, but doesn't show up in listDatabases, and won't exist if you
     // restart the server.
-    var res = db.setProfilingLevel(level);
+    var res = testDb.setProfilingLevel(level);
     assert.eq(res.was, defaultProfilingLevel);
-    assert(dbExists() || level == 0);
-    assert.eq(db.getProfilingLevel(), level);
+    assert(dbExists(testDb) || level == 0);
+    assert.eq(testDb.getProfilingLevel(), level);
 
     // Dropping the db reverts the profiling level to the default.
-    assert.commandWorked(db.dropDatabase());
-    assert.eq(db.getProfilingLevel(), defaultProfilingLevel);
-    assert(!dbExists());
+    assert.commandWorked(testDb.dropDatabase());
+    assert.eq(testDb.getProfilingLevel(), defaultProfilingLevel);
+    assert(!dbExists(testDb));
 });
-}(db));

@@ -14,8 +14,6 @@
  * ]
  */
 
-(function() {
-"use strict";
 const timeFieldName = "time";
 
 /*
@@ -181,4 +179,3 @@ runTest(
         {[timeFieldName]: new Date("1995-01-01")},
         {[timeFieldName]: new Date("2030-01-01")},
     ]);
-})();

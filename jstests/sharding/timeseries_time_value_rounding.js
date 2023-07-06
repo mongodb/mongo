@@ -6,8 +6,6 @@
  * ]
  */
 
-load("jstests/aggregation/extras/utils.js");
-
 Random.setRandomSeed();
 
 const dbName = 'testDB';

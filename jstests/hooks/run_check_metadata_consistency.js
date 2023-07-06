@@ -1,5 +1,5 @@
 import {MetadataConsistencyChecker} from "jstests/libs/check_metadata_consistency_helpers.js";
-load('jstests/libs/fixture_helpers.js');  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a server?');
 

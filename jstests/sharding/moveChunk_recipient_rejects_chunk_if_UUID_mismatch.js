@@ -2,9 +2,6 @@
  * Test that moving a chunk into a shard that already has the collection with a different UUID
  * causes the recipient to fail the migration.
  */
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "inputColl";
 const ns = dbName + "." + collName;
@@ -47,4 +44,3 @@ assert.commandWorked(st.s.getDB(dbName).runCommand({drop: collName}));
 assert.eq(0, recipient.getDB(dbName).getCollectionInfos({name: collName}).length);
 
 st.stop();
-})();

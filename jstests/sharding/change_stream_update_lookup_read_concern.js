@@ -10,14 +10,13 @@
  *   uses_change_streams,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/profiler.js");   // For profilerHas*OrThrow() helpers.
-load("jstests/replsets/rslib.js");  // For reconfig().
-
-// For stopServerReplication() and restartServerReplication().
-load("jstests/libs/write_concern_util.js");
+import {
+    profilerHasAtLeastOneMatchingEntryOrThrow,
+    profilerHasSingleMatchingEntryOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
+import {stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {awaitRSClientHosts, reconfig} from "jstests/replsets/rslib.js";
 
 // Configure a replica set to have nodes with specific tags - we will eventually add this as
 // part of a sharded cluster.
@@ -178,7 +177,8 @@ assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updatedCount: 2}}));
 // getting the next change from the stream.
 const noConnect = true;  // This shell creates its own connection to the host.
 const joinResumeReplicationShell =
-        startParallelShell(`load('jstests/libs/write_concern_util.js');
+        startParallelShell(`
+            import {restartServerReplication} from "jstests/libs/write_concern_util.js";
 
             const pausedSecondary = new Mongo("${newClosestSecondary.host}");
 
@@ -228,4 +228,3 @@ profilerHasSingleMatchingEntryOrThrow({profileDB: newClosestSecondaryDB, filter:
 changeStream.close();
 st.stop();
 rst.stopSet();
-}());

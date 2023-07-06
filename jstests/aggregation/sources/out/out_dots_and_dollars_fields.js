@@ -5,9 +5,6 @@
 // @tags: [
 //   assumes_unsharded_collection,
 // ]
-(function() {
-"use strict";
-
 const coll = db.out_dots_and_dollars_fields_coll;
 coll.drop();
 coll.insertOne({_id: 0});
@@ -35,4 +32,3 @@ const test = {
                             coll.aggregate([{$replaceWith: {$const: test}}, {$out: c.getName()}]));
     assert.eq(c.find().toArray(), [test]);
 });
-}());

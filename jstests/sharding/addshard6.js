@@ -1,8 +1,6 @@
 /**
  * Test that adding a config server replica set as a shard fails.
  */
-(function() {
-
 var addShardRes;
 
 // Note: this method expects that the failure is *not* that the specified shardName is already
@@ -45,4 +43,3 @@ assertAddShardFailed(addShardRes, "nonConfig");
 configRS.stopSet();
 
 st.stop();
-})();

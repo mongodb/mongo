@@ -5,9 +5,6 @@
 /**
  * Tests for the array-related behavior of the $type query operator.
  */
-(function() {
-"use strict";
-
 let coll = db.jstest_type_array;
 coll.drop();
 
@@ -71,4 +68,3 @@ function runTests() {
 runTests();
 assert.commandWorked(coll.createIndex({a: 1}));
 runTests();
-}());

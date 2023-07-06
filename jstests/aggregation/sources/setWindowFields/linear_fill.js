@@ -4,8 +4,6 @@
  *   requires_fcv_52,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-
 const coll = db.linear_fill;
 coll.drop();
 

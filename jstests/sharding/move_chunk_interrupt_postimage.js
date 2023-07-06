@@ -3,12 +3,8 @@
  * to consistent config.transactions data across primary and secondaries (SERVER-67492)
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/create_sharded_collection_util.js");
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 2}});
 const interruptBeforeProcessingPrePostImageOriginatingOpFP =
@@ -39,4 +35,3 @@ interruptBeforeProcessingPrePostImageOriginatingOpFP.wait();
 
 interruptBeforeProcessingPrePostImageOriginatingOpFP.off();
 st.stop();
-})();

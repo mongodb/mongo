@@ -11,14 +11,9 @@
 //   tenant_migration_incompatible,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 var crudAPISpecTests = function crudAPISpecTests() {
-    "use strict";
-
     // Get the colllection
     var coll = db.crud_tests;
 
@@ -727,4 +722,3 @@ var crudAPISpecTests = function crudAPISpecTests() {
 };
 
 crudAPISpecTests();
-})();

@@ -11,12 +11,13 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {parseConfig} from "jstests/concurrency/fsm_libs/parse_config.js";
+import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {
     extendWithInternalTransactionsUnsharded
 } from "jstests/concurrency/fsm_workloads/internal_transactions_unsharded.js";
 import {$config as $baseConfig} from 'jstests/concurrency/fsm_workloads/random_moveChunk_base.js';
-load('jstests/concurrency/fsm_workload_helpers/balancer.js');
-load('jstests/libs/fail_point_util.js');
 
 const parsedBaseConfig = parseConfig($baseConfig);
 const $extendedBaseConfig = extendWithInternalTransactionsUnsharded(

@@ -1,8 +1,5 @@
 // Tests various cases of dropping and recreating collections in the same namespace with multiple
 // mongoses
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 3, mongos: 3, causallyConsistent: true});
 
 var config = st.s0.getDB("config");
@@ -76,4 +73,3 @@ assert.eq(100, staleMongos.getCollection(coll + "").find({test: "c"}).itcount())
 assert.eq(0, staleMongos.getCollection(coll + "").find({test: {$in: ["a", "b"]}}).itcount());
 
 st.stop();
-})();

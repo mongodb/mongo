@@ -1,9 +1,7 @@
-"use strict";
-
 /**
  * Helper functions that help test things to do with the index catalog.
  */
-var IndexCatalogHelpers = (function() {
+export var IndexCatalogHelpers = (function() {
     /**
      * Returns the index specification with the name 'indexName' if it is present in the
      * 'indexSpecs' array, and returns null otherwise.

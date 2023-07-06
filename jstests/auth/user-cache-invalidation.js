@@ -1,12 +1,8 @@
 // Test for invalidation of records across invalidation boundaries.
 // @tags: [requires_replication]
 
-(function() {
-'use strict';
-
-// Pull in Thread.
-load('jstests/libs/parallelTester.js');
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const testUser = "user1";
 const testDB = "user_cache_invalidation";
@@ -257,4 +253,3 @@ function runTest(writeNode, readNode, awaitReplication, lock, unlock) {
     runTest(primary, secondary, () => rst.awaitReplication(), lockCompletion, unlockCompletion);
     rst.stopSet();
 }
-})();

@@ -1,5 +1,5 @@
 // Check $redact pipeline stage.
-load('jstests/aggregation/extras/utils.js');
+import {anyEq} from "jstests/aggregation/extras/utils.js";
 
 let t = db.jstests_aggregation_redact;
 t.drop();

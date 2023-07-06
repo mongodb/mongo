@@ -3,10 +3,7 @@
 // @tags: [
 //   assumes_no_implicit_index_creation,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/fts.js");
+import {queryIDS} from "jstests/libs/fts.js";
 
 const coll = db.text1;
 coll.drop();
@@ -26,4 +23,3 @@ assert.eq([4], queryIDS(coll, "d"), "A2");
 const index = coll.getIndexes().find(index => index.name === "x_text");
 assert.neq(index, undefined);
 assert.gte(index.textIndexVersion, 1, tojson(index));
-}());

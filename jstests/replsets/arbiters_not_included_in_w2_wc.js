@@ -11,9 +11,6 @@
  * @tags: [requires_fcv_53]
  */
 
-(function() {
-"use strict";
-
 const name = "arbiters_not_included_in_w2_wc";
 const rst = new ReplSetTest({name: name, nodes: 5});
 const nodes = rst.nodeList();
@@ -51,4 +48,3 @@ assert.commandFailedWithCode(testColl.insert({"b": 2}, {writeConcern: {w: 2, wti
                              ErrorCodes.WriteConcernFailed);
 
 rst.stopSet();
-})();

@@ -5,10 +5,7 @@
 /**
  * Tests the JSON Schema "uniqueItems" keyword.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/assert_schema_match.js");
+import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 
 const coll = db.getCollection("json_schema_unique_items");
 coll.drop();
@@ -70,4 +67,3 @@ assertSchemaMatch(coll, schema, {a: [[1, 2], [1, 2]]}, true);
 assertSchemaMatch(coll, schema, {a: [null, null]}, true);
 assertSchemaMatch(coll, schema, {a: [{x: 1, y: 1}, {y: 1, x: 1}]}, true);
 assertSchemaMatch(coll, schema, {a: [{x: [1, 2], y: "a"}, {y: "a", x: [1, 2]}]}, true);
-}());

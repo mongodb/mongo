@@ -50,7 +50,7 @@ function authAndTest(mongo) {
     const log =
         assert.commandWorked(external.getSiblingDB("admin").runCommand({getLog: "global"})).log;
 
-    function checkAuthSuccess(element, index, array) {
+    function checkAuthSuccess(element /*, index, array*/) {
         const logJson = JSON.parse(element);
 
         return logJson.id === 5286306 && logJson.attr.user === CLIENT_USER &&

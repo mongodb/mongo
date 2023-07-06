@@ -5,9 +5,6 @@
  *     requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -59,4 +56,3 @@ assert.soon(() => {
 }, 'full validation reported warnings');
 
 rst.stopSet();
-})();

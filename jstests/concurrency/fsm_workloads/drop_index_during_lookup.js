@@ -4,6 +4,8 @@
  * Sets up a situation where index join strategy will be chosen for $lookup while while running
  * concurrent dropIndexes against the index chosen for the foreign side.
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     let data = {
         collName: 'localColl',

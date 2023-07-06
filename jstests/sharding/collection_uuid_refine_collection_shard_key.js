@@ -9,9 +9,6 @@
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
 const st = new ShardingTest({shards: 1});
 const mongos = st.s0;
 const db = mongos.getDB(jsTestName());
@@ -108,4 +105,3 @@ assert.eq(res.expectedCollection, coll2.getName());
 assert.eq(res.actualCollection, coll.getName());
 
 st.stop();
-})();

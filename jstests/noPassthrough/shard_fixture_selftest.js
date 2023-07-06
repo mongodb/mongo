@@ -3,10 +3,7 @@
 //   requires_sharding,
 // ]
 
-(function() {
-'use strict';
-
-load('jstests/concurrency/fsm_libs/shard_fixture.js');
+import {FSMShardingTest} from "jstests/concurrency/fsm_libs/shard_fixture.js";
 
 const rsTestOriginal = new ShardingTest({shards: 2, mongos: 2, config: 2});
 
@@ -32,4 +29,3 @@ assert.eq(rsTestWrapper.c(1).host, rsTestOriginal.c1.host);
 assert.eq(rsTestWrapper.c(2), rsTestOriginal.c2);  // Both should be undefined.
 
 rsTestOriginal.stop();
-})();

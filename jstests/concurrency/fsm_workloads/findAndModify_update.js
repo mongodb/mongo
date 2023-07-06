@@ -6,6 +6,8 @@
  * selected based on 'query' and 'sort' specifications, and updated
  * using either the $min or $max operator.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var data = {
         numDocsPerThread: 3,  // >1 for 'sort' to be meaningful

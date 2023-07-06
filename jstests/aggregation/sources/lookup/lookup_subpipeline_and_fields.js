@@ -1,9 +1,6 @@
 /**
  * Tests for the $lookup stage with sub-pipeline syntax and localField/foreignField syntax.
  */
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB(jsTestName());
 assert(testDB.dropDatabase());
 
@@ -321,4 +318,3 @@ expected = [{
     }
 }];
 assert.sameMembers(result, expected);
-}());

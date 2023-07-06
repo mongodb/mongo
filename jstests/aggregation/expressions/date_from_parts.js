@@ -1,8 +1,10 @@
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode and assertErrMsgContains.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
 
-(function() {
-"use strict";
+import {
+    anyEq,
+    assertErrCodeAndErrMsgContains,
+    assertErrorCode
+} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.dateFromParts;
 
@@ -888,4 +890,3 @@ tests.forEach(function(test) {
             .toArray(),
         tojson(test));
 });
-})();

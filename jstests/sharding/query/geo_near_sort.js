@@ -1,7 +1,4 @@
 // Tests that the sort specification is obeyed when the query contains $near/$nearSphere.
-(function() {
-'use strict';
-
 const st = new ShardingTest({shards: 2});
 const db = st.getDB("test");
 const coll = db.geo_near_sort;
@@ -108,4 +105,3 @@ testSortOrders({geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 
                {geo: "2dsphere"});
 
 st.stop();
-})();

@@ -7,7 +7,10 @@
  *
  * This workload was designed to reproduce SERVER-24761.
  */
-load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {
+    assertWorkedOrFailedHandleTxnErrors
+} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
 
 export const $config = (function() {
     // Use the workload name as the collection name, since the workload name is assumed to be

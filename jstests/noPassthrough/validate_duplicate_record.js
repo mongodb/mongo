@@ -1,9 +1,6 @@
 /**
  * Tests that duplicate records for _id index keys are detected by validate.
  */
-(function() {
-"use strict";
-
 // Disable testing diagnostics (TestingProctor) so we do not hit test only fasserts.
 TestData.testingDiagnosticsEnabled = false;
 
@@ -30,4 +27,3 @@ function testValidateWithFailpoint(fpName) {
 testValidateWithFailpoint("WTIndexUassertDuplicateRecordForIdIndex");
 
 rst.stopSet();
-})();

@@ -3,11 +3,8 @@
  * which spreads the collection across all available shards.
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/uuid_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 let st = new ShardingTest({shards: 2});
 let mongos = st.s0;
@@ -68,4 +65,3 @@ assert.eq(chunksOnConfigCount, chunksOnShard0.length);
 assert.eq(chunksOnConfigCount, chunksOnShard1.length);
 
 st.stop();
-})();

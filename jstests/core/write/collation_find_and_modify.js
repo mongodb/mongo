@@ -3,8 +3,6 @@
 // @tags: [assumes_no_implicit_collection_creation_after_drop]
 
 // Integration tests for collation-aware findAndModify.
-(function() {
-'use strict';
 var coll = db.getCollection("find_and_modify_update_test");
 
 const caseInsensitive = {
@@ -86,4 +84,3 @@ doc = coll.findAndModify({
     new: true
 });
 assert.eq(doc.newField, 3, doc);
-})();

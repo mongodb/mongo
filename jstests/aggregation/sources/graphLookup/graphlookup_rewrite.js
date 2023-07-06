@@ -6,9 +6,9 @@
 //  do_not_wrap_aggregations_in_facets,
 //  requires_pipeline_optimization,
 // ]
-load('jstests/aggregation/extras/utils.js');
+import {arrayEq, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
+
 import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/fixture_helpers.js");
 
 const coll = db.graphlookup_rewrite;
 coll.drop();

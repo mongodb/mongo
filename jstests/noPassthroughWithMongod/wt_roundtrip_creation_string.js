@@ -2,13 +2,10 @@
  * Tests that the creation string returned by the collStats command can be used to create a
  * collection or index with the same WiredTiger options.
  */
-(function() {
-'use strict';
-
 // Skip this test if not running with the "wiredTiger" storage engine.
 if (db.serverStatus().storageEngine.name !== 'wiredTiger') {
     jsTest.log('Skipping test because storageEngine is not "wiredTiger"');
-    return;
+    quit();
 }
 
 var collNamePrefix = 'wt_roundtrip_creation_string';
@@ -39,4 +36,3 @@ assert.commandWorked(db.runCommand({
     }]
 }),
                      'unable to create index using the creation string of another index');
-})();

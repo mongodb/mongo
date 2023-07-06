@@ -6,9 +6,7 @@
  * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 const nodes = replTest.startSet();
@@ -124,4 +122,3 @@ replTest.awaitReplication();
 assert.eq(secondaryTestColl.findOne({_id: 1}), {_id: 1, a: 3});
 
 replTest.stopSet();
-}());

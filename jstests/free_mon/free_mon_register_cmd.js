@@ -1,9 +1,11 @@
 // Validate registration works via a command. Validate it can be registered and unregistered
 //
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {
+    FreeMonGetRegistration,
+    FreeMonGetStatus,
+    FreeMonWebServer,
+    WaitForFreeMonServerStatusState,
+} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer();
 
@@ -67,4 +69,3 @@ assert.eq(retStatus2.state, "disabled", tojson(retStatus1));
 MongoRunner.stopMongod(conn);
 
 mock_web.stop();
-})();

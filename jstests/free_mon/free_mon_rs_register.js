@@ -1,9 +1,12 @@
 // Validate registration works in a replica set
 //
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {
+    FreeMonWebServer,
+    ValidateFreeMonReplicaSet,
+    WaitForFreeMonServerStatusState,
+    WaitForRegistration,
+    WaitForUnRegistration,
+} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer();
 
@@ -100,4 +103,3 @@ WaitForFreeMonServerStatusState(rst.getSecondary(), 'disabled');
 rst.stopSet();
 
 mock_web.stop();
-})();

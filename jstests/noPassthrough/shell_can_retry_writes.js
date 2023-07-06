@@ -3,9 +3,6 @@
  * transaction number so that they can be retried.
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -153,4 +150,3 @@ testCommandCanBeRetried(function() {
 
 db.getSession().endSession();
 rst.stopSet();
-})();

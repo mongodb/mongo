@@ -6,10 +6,9 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/auto_retry_transaction_in_sharding.js");
+import {
+    retryOnceOnTransientAndRestartTxnOnMongos
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbNameShard0 = "test";
 const dbNameShard2 = "testOther";
@@ -73,4 +72,3 @@ if (!versionSupportsSingleWriteShardCommitOptimization) {
 }
 
 st.stop();
-})();

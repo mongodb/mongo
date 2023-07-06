@@ -6,10 +6,7 @@
 //   requires_majority_read_concern,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");  // For stopServerReplication.
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -99,4 +96,3 @@ assert.commandFailedWithCode(primarySession.abortTransaction_forTesting(),
                              ErrorCodes.NoSuchTransaction);
 
 rst.stopSet();
-}());

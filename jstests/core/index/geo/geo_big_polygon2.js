@@ -10,8 +10,6 @@
 //    $geoWithin & $geoIntersects
 //  - Big polygon objects cannot be stored
 //    Try all different shapes queries against various stored geo points, line & polygons
-(function() {
-
 const crs84CRS = {
     type: "name",
     properties: {name: "urn:ogc:def:crs:OGC:1.3:CRS84"}
@@ -645,4 +643,3 @@ indexes.forEach(function(index) {
             p.nI, coll.count({geo: {$geoIntersects: {$geometry: p}}}), "intersection " + p.name);
     });
 });
-})();

@@ -3,10 +3,10 @@
  * work without having to use the two phase protocol.
  */
 
-(function() {
-'use strict';
-
-load('jstests/sharding/libs/without_two_phase_util.js');
+import {
+    assertExplainTargetsCorrectShard,
+    splitAndMoveChunks
+} from "jstests/sharding/libs/without_two_phase_util.js";
 
 const st = new ShardingTest({
     shards: 2,
@@ -69,4 +69,3 @@ assert.eq(db.sharded_coll.count({a: {$gt: 0}}), 2);  // Check that other documen
 assertExplainTargetsCorrectShard(db, cmdObj, st.shard0.shardName);
 
 st.stop();
-})();

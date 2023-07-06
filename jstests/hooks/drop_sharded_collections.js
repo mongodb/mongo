@@ -2,10 +2,7 @@
  * Drops all sharded collections (except for collections used internally,
  * like config.system.sessions).
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For isMongos.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a mongod?');
 assert(FixtureHelpers.isMongos(db), "not connected to mongos");
@@ -30,4 +27,3 @@ db.getSiblingDB('config').collections.find().forEach(collEntry => {
 if (balSettingResult.mode !== 'off') {
     assert.commandWorked(db.adminCommand({balancerStart: 1}));
 }
-})();

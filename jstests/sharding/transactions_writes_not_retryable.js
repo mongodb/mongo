@@ -3,9 +3,6 @@
  *
  * @tags: [requires_sharding, uses_transactions]
  */
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + '.' + collName;
@@ -117,4 +114,3 @@ kCmdTestCases.forEach(cmdTestCase => {
 });
 
 st.stop();
-})();

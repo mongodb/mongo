@@ -2,25 +2,23 @@
  * Wrapper around ReplSetTest for testing tenant migration behavior.
  */
 
-"use strict";
-
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {
-    makeX509OptionsForTest,
-    makeMigrationCertificatesForTest,
-    createTenantMigrationRecipientRoleIfNotExist,
-    createTenantMigrationDonorRoleIfNotExist,
-    runTenantMigrationCommand,
-    runDonorStartMigrationCommand,
-    isMigrationCompleted,
     checkTenantDBHashes,
+    createTenantMigrationDonorRoleIfNotExist,
+    createTenantMigrationRecipientRoleIfNotExist,
     getExternalKeys,
-    isShardMergeEnabled,
-    isNamespaceForTenant,
     getTenantMigrationAccessBlocker,
-    kProtocolShardMerge,
+    isMigrationCompleted,
+    isNamespaceForTenant,
+    isShardMergeEnabled,
     kProtocolMultitenantMigrations,
+    kProtocolShardMerge,
+    makeMigrationCertificatesForTest,
+    makeX509OptionsForTest,
+    runDonorStartMigrationCommand,
+    runTenantMigrationCommand,
 } from "jstests/replsets/libs/tenant_migration_util.js";
-load("jstests/aggregation/extras/utils.js");
 
 function loadDummyData() {
     const numDocs = 20;

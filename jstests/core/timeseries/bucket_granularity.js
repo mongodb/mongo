@@ -10,8 +10,6 @@
  * ]
  */
 
-(function() {
-
 function verifyViewPipeline(coll) {
     const cProps =
         db.runCommand({listCollections: 1, filter: {name: coll.getName()}}).cursor.firstBatch[0];
@@ -234,5 +232,4 @@ function verifyViewPipeline(coll) {
     // Decreasing hours -> seconds shouldn't work either.
     assert.commandFailed(
         db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'seconds'}}));
-})();
 })();

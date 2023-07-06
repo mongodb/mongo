@@ -2,9 +2,6 @@
 // Tests for polygon querying with varying levels of accuracy
 //
 
-(function() {
-"use strict";
-
 const collNamePrefix = 'geo_polygon3_';
 
 // See https://docs.mongodb.com/manual/tutorial/build-a-2d-index/
@@ -71,4 +68,3 @@ bits.forEach((precision) => {
 
     assert.eq(1, t.countDocuments({loc: {$within: {$polygon: pacman}}}), "Pacman double point");
 });
-})();

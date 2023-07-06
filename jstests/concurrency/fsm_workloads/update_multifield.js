@@ -5,8 +5,8 @@
  * The collection has an index for each field, and a compound index for all fields.
  */
 
-// For isMongod.
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
     function makeQuery(options) {

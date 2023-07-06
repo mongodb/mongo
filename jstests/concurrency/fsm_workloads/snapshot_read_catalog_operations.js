@@ -8,7 +8,11 @@
  * @tags: [creates_background_indexes, uses_transactions]
  */
 
-load('jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js');
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {
+    doSnapshotFind,
+    doSnapshotGetMore
+} from "jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js";
 
 export const $config = (function() {
     const data = {numIds: 100, numDocsToInsertPerThread: 5, valueToBeInserted: 1, batchSize: 50};

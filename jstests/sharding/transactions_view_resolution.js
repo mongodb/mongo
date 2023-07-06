@@ -7,11 +7,10 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const shardedDbName = "shardedDB";
 const shardedCollName = "sharded";
@@ -305,4 +304,3 @@ assertAggResultEqInTransaction(lookupColl,
                                    [{_id: 1, matchedX: "unsharded"}]);
 
 st.stop();
-})();

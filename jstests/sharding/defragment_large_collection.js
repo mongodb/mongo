@@ -1,8 +1,5 @@
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
-load("jstests/sharding/libs/defragmentation_util.js");
+import {defragmentationUtil} from "jstests/sharding/libs/defragmentation_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 Random.setRandomSeed();
 
@@ -85,4 +82,3 @@ runTest(1, "singleCollection");
 runTest(3, "threeCollections");
 
 st.stop();
-})();

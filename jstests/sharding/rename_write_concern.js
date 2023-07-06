@@ -1,13 +1,10 @@
-(function() {
-'use strict';
-
 // The following checks involve talking to a shard node, which in this test is shutdown.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 TestData.skipCheckRoutingTableConsistency = true;
 TestData.skipCheckMetadataConsistency = true;
 
-load("jstests/replsets/rslib.js");
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 jsTest.log("Testing write concern (2)");
 
@@ -31,4 +28,3 @@ assert.commandWorked(db.foo.insert({_id: 4}));
 assert.commandWorked(db.foo.renameCollection('bar', true));
 
 st.stop();
-})();

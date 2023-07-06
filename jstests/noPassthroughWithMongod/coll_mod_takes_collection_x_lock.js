@@ -1,10 +1,7 @@
 /**
  * Ensures that the 'collMod' command takes a Collection MODE_X lock during a no-op.
  */
-(function() {
-'use strict';
-
-load('jstests/libs/parallel_shell_helpers.js');
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 // Note: failpoint name may not be changed due to backwards compatibility problem in
 // multiversion suites running JS tests using the failpoint.
@@ -42,4 +39,3 @@ assert.soon(() => {
 
 assert.commandWorked(db.adminCommand({configureFailPoint: failpoint, mode: "off"}));
 awaitParallelShell();
-})();

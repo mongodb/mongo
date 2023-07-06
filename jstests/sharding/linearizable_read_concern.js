@@ -21,11 +21,8 @@
  * exercise possible (invalid) user behavior.
  */
 
-load("jstests/replsets/rslib.js");
-load("jstests/libs/write_concern_util.js");
-
-(function() {
-"use strict";
+import {shardCollectionWithChunks} from "jstests/libs/write_concern_util.js";
+import {reconfig} from "jstests/replsets/rslib.js";
 
 // Skip the following checks since this test leaves a replica set shard partitioned.
 TestData.skipCheckDBHashes = true;
@@ -130,4 +127,3 @@ if (TestData.configShard) {
 }
 
 st.stop();
-})();

@@ -1,9 +1,5 @@
 // Test for auth counters in serverStatus.
 
-(function() {
-'use strict';
-load('jstests/libs/parallel_shell_helpers.js');
-
 const kFailedToAuthMsgId = 5286307;
 
 const mongod = MongoRunner.runMongod();
@@ -28,4 +24,3 @@ try {
 } finally {
     MongoRunner.stopMongod(mongod);
 }
-})();

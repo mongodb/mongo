@@ -20,9 +20,6 @@ import {
     runDbCheck
 } from "jstests/replsets/libs/dbcheck_utils.js";
 
-(function() {
-"use strict";
-
 // This test injects inconsistencies between replica set members; do not fail because of expected
 // dbHash differences.
 TestData.skipCheckDBHashes = true;
@@ -462,4 +459,3 @@ function simpleTestCatchesExtra() {
 simpleTestCatchesExtra();
 
 replSet.stopSet();
-})();

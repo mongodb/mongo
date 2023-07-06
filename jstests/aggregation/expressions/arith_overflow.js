@@ -1,8 +1,5 @@
 // Tests for $add, $subtract and $multiply aggregation expression type promotion on overflow
 // @tags: [require_fcv_71]
-(function() {
-"use strict";
-
 const coll = db.arith_overflow;
 
 function runTest(operator, expectedResults) {
@@ -28,4 +25,3 @@ assert.commandWorked(coll.insert({_id: 1, lhs: NumberLong(9e+18), rhs: NumberLon
 runTest("$subtract", [NumberLong(4e+9), 1.8e+19]);
 // $multiply uses same arguments
 runTest("$multiply", [NumberLong(-4e+18), -8.1e+37]);
-}());

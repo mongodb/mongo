@@ -18,10 +18,7 @@
  *   featureFlagBulkWriteCommand,
  * ]
  */
-load("jstests/libs/bulk_write_utils.js");  // For cursorEntryValidator.
-
-(function() {
-"use strict";
+import {cursorEntryValidator} from "jstests/libs/bulk_write_utils.js";
 
 var coll = db.getCollection("coll");
 var coll1 = db.getCollection("coll1");
@@ -59,4 +56,3 @@ assert.eq(coll.find().itcount(), 1);
 assert.eq(coll1.find().itcount(), 1);
 coll.drop();
 coll1.drop();
-})();

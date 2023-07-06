@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 // Randomly resets the cluster wide write concern to either w:1 or w:majority.
 const defaultWriteConcern =
     (Math.random() < 0.5) ? {w: 1, wtimeout: 0} : {w: 'majority', wtimeout: 0};
@@ -17,4 +14,3 @@ assert.commandWorkedOrFailedWithCode(result, [51300, 51301, 40415]);
 if (result.ok) {
     jsTestLog("Resetting the global cluster wide write concern to " + tojson(defaultWriteConcern));
 }
-})();

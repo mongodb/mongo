@@ -2,7 +2,7 @@
  * Helpers for testing lastpoint queries on time-series collections.
  */
 
-load("jstests/aggregation/extras/utils.js");
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 

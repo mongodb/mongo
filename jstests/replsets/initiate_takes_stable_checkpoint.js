@@ -7,11 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/rslib.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const rst = ReplSetTest({
     name: jsTestName(),
@@ -115,4 +111,3 @@ rst.waitForState(rst.nodes[0], ReplSetTest.State.SECONDARY);
 
 jsTestLog("Done with test");
 rst.stopSet();
-})();

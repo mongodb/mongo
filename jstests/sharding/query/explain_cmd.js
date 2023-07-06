@@ -1,8 +1,7 @@
 // Tests for the mongos explain command.
-(function() {
-'use strict';
-
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 // Create a cluster with 3 shards.
 var st = new ShardingTest({shards: 2});
@@ -70,7 +69,7 @@ collUnsharded.drop();
 collUnsharded.createIndex({a: 1});
 collUnsharded.createIndex({b: 1});
 
-for (var i = 0; i < 3; i++) {
+for (let i = 0; i < 3; i++) {
     collUnsharded.insert({_id: i, a: i, b: 1});
 }
 assert.eq(3, collUnsharded.count({b: 1}));
@@ -177,4 +176,3 @@ assert.commandFailedWithCode(
     explain, ErrorCodes.OperationNotSupportedInTransaction, tojson(explain));
 
 st.stop();
-})();

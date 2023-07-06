@@ -8,8 +8,7 @@
  *  cqf_experimental_incompatible,
  * ]
  */
-// For getLatestProfilerEntry().
-load("jstests/libs/profiler.js");
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
 // of data logged for each op. For some of the testcases below, including the cluster time would

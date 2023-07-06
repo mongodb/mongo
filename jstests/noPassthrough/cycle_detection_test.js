@@ -1,10 +1,7 @@
 /**
  * Tests for the Graph#findCycle() method.
  */
-(function() {
-'use strict';
-
-load('jstests/libs/cycle_detection.js');  // for Graph
+import {Graph} from "jstests/libs/cycle_detection.js";
 
 (function testLinearChainHasNoCycle() {
     const graph = new Graph();
@@ -86,5 +83,4 @@ load('jstests/libs/cycle_detection.js');  // for Graph
     graph.addEdge({a: 5}, {a: 3});
 
     assert.eq([{a: 3}, {a: 4}, {a: 5}, {a: 3}], graph.findCycle());
-})();
 })();

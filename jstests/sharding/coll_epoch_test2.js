@@ -4,7 +4,6 @@
 // operation on a mongos may be active when it happens.  All operations should handle gracefully.
 //
 
-(function() {
 var st = new ShardingTest({shards: 2, mongos: 5, verbose: 1});
 // Balancer is by default stopped, thus it will not interfere
 
@@ -125,4 +124,3 @@ coll.drop();
 jsTest.log("Done!");
 
 st.stop();
-})();

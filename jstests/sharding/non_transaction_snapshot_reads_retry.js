@@ -17,12 +17,8 @@
  * - The read will fail with SnapshotTooOld, mongos should retry and succeed.
  * - Assert the read succeeded and returned the updated (post-updateTS) document.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const historyWindowSecs = 10;
 const st = new ShardingTest({
@@ -104,4 +100,3 @@ waitForShell();
 waitForShellCausal();
 
 st.stop();
-})();

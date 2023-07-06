@@ -1,8 +1,8 @@
 /**
  * Test projections with $and in cases where optimizations could be performed.
  */
-load("jstests/aggregation/extras/utils.js");
-import {getWinningPlan, isIndexOnly, isCollscan} from "jstests/libs/analyze_plan.js";
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {getWinningPlan, isCollscan, isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 const coll = db.projection_and;
 coll.drop();

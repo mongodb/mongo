@@ -12,9 +12,6 @@ TestData.skipCheckOrphans = true;
 TestData.skipCheckRoutingTableConsistency = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
 var st = new ShardingTest({
     shards: 2,
     mongos: 1,
@@ -50,4 +47,3 @@ assert.writeError(
         .TestColl.insert({_id: 0, value: 'This value will never be inserted'}, {maxTimeMS: 15000}));
 
 st.stop();
-}());

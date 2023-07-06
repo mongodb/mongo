@@ -2,10 +2,9 @@
 // shard key feature is not enabled.
 //
 // @tags: [uses_transactions]
-(function() {
-"use strict";
-
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -30,7 +29,7 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(sessionDB)
     assert.commandWorked(session.abortTransaction_forTesting());
 
     st.stop();
-    return;
+    quit();
 }
 
 // Failed update.
@@ -55,4 +54,3 @@ assert(res.hasOwnProperty("writeErrors"), "expected write errors, res: " + tojso
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 st.stop();
-}());

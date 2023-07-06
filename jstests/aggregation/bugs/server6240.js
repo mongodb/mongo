@@ -13,9 +13,9 @@
  * 3) Assert that we get the correct error
  */
 
-// Load test utilities
-load('jstests/aggregation/extras/utils.js');
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
+
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 // Clear db
 db.s6240.drop();

@@ -3,9 +3,7 @@
  * then back to the first one.
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/libs/election_handoff.js");
+import {ElectionHandoffTest} from "jstests/replsets/libs/election_handoff.js";
 
 const testName = "election_handoff_flip";
 const numNodes = 2;
@@ -22,4 +20,3 @@ sleep(ElectionHandoffTest.stepDownPeriodSecs * 1000);
 ElectionHandoffTest.testElectionHandoff(rst, 1, 0);
 
 rst.stopSet();
-})();

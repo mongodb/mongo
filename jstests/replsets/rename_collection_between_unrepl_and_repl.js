@@ -5,9 +5,6 @@
  * 'local' database for unreplicated namespaces.
  */
 
-(function() {
-"use strict";
-
 const name = "rename_collection_between_unrepl_and_repl";
 const rst = new ReplSetTest({"name": name, "nodes": 1});
 rst.startSet();
@@ -39,4 +36,3 @@ assert.commandFailedWithCode(primary.adminCommand({"renameCollection": sourceNs,
                              ErrorCodes.IllegalOperation);
 
 rst.stopSet();
-})();

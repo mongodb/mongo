@@ -7,15 +7,16 @@
  * do_not_wrap_aggregations_in_facets,
  * ]
  */
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/discover_topology.js");                       // For findNonConfigNodes.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {
     seedWithTickerData,
     testAccumAgainstGroup
 } from "jstests/aggregation/extras/window_function_helpers.js";
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
-load("jstests/aggregation/extras/utils.js");  // arrayEq.
-load("jstests/libs/profiler.js");             // getLatestProfileEntry.
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
+import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 // Doc size was found through logging the size in the SpillableCache. Partition sizes were chosen
 // arbitrarily.

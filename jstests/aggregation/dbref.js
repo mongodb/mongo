@@ -9,9 +9,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");  // For anyEq.
+import {anyEq} from "jstests/aggregation/extras/utils.js";
+
 const coll = db.dbref_in_expression;
 const otherColl = db.dbref_in_expression_2;
 
@@ -201,4 +200,3 @@ thirdColl
     ])
     .itcount();
 assert.eq(coll.find().toArray()[0], {_id: 0, link: new DBRef("otherRef", "otherId", "otherDB")});
-})();

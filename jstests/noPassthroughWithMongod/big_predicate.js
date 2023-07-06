@@ -2,8 +2,6 @@
  * Test that queries containing an AND or an OR with a lot of clauses can be answered.
  */
 (function() {
-"use strict";
-
 const coll = db.big_predicate;
 coll.drop();
 
@@ -28,8 +26,6 @@ assert.commandWorked(coll.explain().find({$and: [filter]}).finish());
  * limit, triggers the appropriate error.
  */
 (function() {
-"use strict";
-
 const coll = db.big_predicate;
 coll.drop();
 
@@ -62,8 +58,6 @@ assert.throwsWithCode(() => coll.explain().find(filter).finish(), 17279);
  * the appropriate error.
  */
 (function() {
-"use strict";
-
 const coll = db.big_predicate;
 coll.drop();
 

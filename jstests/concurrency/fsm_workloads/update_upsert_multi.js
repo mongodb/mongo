@@ -9,6 +9,8 @@
  *
  * @tags: [requires_non_retryable_writes]
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var states = {
         insert: function insert(db, collName) {

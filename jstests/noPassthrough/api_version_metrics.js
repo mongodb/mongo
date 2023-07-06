@@ -5,9 +5,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const apiVersionsFieldName = "apiVersions";
 const appName = "apiVersionMetricsTest";
 const defaultAppName = "MongoDB Shell";
@@ -51,4 +48,3 @@ assert(serverStatus[apiVersionsFieldName].hasOwnProperty(defaultAppName),
        () => `serverStatus should store metrics for '${defaultAppName}': ${serverStatus}`);
 
 MongoRunner.stopMongod(conn);
-})();

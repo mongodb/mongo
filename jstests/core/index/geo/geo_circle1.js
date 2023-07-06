@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const t = db.geo_circle1;
 t.drop();
 
@@ -60,4 +57,3 @@ for (let i = 0; i < searches.length; i++) {
                   tojson(searches[i] + "; query : " + tojson(q, '', true) +
                          "; explain : " + tojson(explain)));
 }
-})();

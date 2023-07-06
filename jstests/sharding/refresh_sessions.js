@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 // This test makes assumptions about the number of logical sessions.
 TestData.disableImplicitSessions = true;
 
@@ -35,9 +32,9 @@ var cluster = new ShardingTest({shards: 2});
 
 // Test that refreshing on mongod flushes local records to the collection.
 {
-    var mongos = cluster.s.getDB(sessionsDb);
-    var shard = cluster.shard0.getDB(sessionsDb);
-    var sessionCount = mongos.system.sessions.count();
+    let mongos = cluster.s.getDB(sessionsDb);
+    let shard = cluster.shard0.getDB(sessionsDb);
+    let sessionCount = mongos.system.sessions.count();
 
     assert.commandWorked(shard.runCommand(startSession));
     assert.commandWorked(shard.runCommand(refresh));
@@ -50,11 +47,11 @@ var cluster = new ShardingTest({shards: 2});
 
 // Test that refreshing on all servers flushes all records.
 {
-    var mongos = cluster.s.getDB(sessionsDb);
-    var shard0 = cluster.shard0.getDB(sessionsDb);
-    var shard1 = cluster.shard1.getDB(sessionsDb);
+    let mongos = cluster.s.getDB(sessionsDb);
+    let shard0 = cluster.shard0.getDB(sessionsDb);
+    let shard1 = cluster.shard1.getDB(sessionsDb);
 
-    var sessionCount = mongos.system.sessions.count();
+    let sessionCount = mongos.system.sessions.count();
 
     assert.commandWorked(mongos.runCommand(startSession));
     assert.commandWorked(shard0.runCommand(startSession));
@@ -83,4 +80,3 @@ var cluster = new ShardingTest({shards: 2});
 }
 
 cluster.stop();
-})();

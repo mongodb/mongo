@@ -3,7 +3,7 @@
  * serverStatus.
  */
 
-load("jstests/libs/profiler.js");  // For 'getLatestProfilerEntry()'.
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 let conn = MongoRunner.runMongod({});

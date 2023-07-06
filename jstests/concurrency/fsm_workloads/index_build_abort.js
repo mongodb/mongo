@@ -17,8 +17,8 @@
  * ]
  */
 
-load("jstests/libs/fail_point_util.js");
-load("jstests/noPassthrough/libs/index_build.js");
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 export const $config = (function() {
     const data = {

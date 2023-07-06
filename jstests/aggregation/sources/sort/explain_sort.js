@@ -16,8 +16,6 @@ const kNumDocs = 10;
 // requested verbosity.
 function checkResults(results, verbosity, expectedNumResults = kNumDocs) {
     let cursorSubdocs = getAggPlanStages(results, "$cursor");
-    let nReturned = 0;
-    let nExamined = 0;
     for (let stageResult of cursorSubdocs) {
         const result = stageResult.$cursor;
         if (verbosity === "queryPlanner") {

@@ -8,8 +8,6 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-"use strict";
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
@@ -124,4 +122,3 @@ assert.commandFailedWithCode(coll.runCommand({
                              [ErrorCodes.FailedToParse, 40415]);
 
 st.stop();
-}());

@@ -10,12 +10,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
-load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
-                                                   // 'assertChangeStreamEventEq'.
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 var st = new ShardingTest({
     shards: 2,
@@ -150,4 +146,3 @@ validateExpectedEventAndConfirmResumability(1, {
 });
 
 st.stop();
-}());

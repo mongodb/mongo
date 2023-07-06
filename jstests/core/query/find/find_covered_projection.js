@@ -8,10 +8,7 @@
  *   assumes_unsharded_collection,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.jstests_find_covered_projection;
 coll.drop();
@@ -57,4 +54,3 @@ assert.commandWorked(coll.dropIndex({_id: 1, ln: 1}));
 assert.commandWorked(coll.createIndex({obj: 1}));
 
 assertResultsMatch({obj: {a: 1, b: "blah"}}, {obj: 1, _id: 0}, [{obj: {a: 1, b: "blah"}}]);
-}());

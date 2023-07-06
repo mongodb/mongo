@@ -1,8 +1,8 @@
-load('jstests/concurrency/fsm_libs/assert.js');
+import {AssertLevel, setGlobalAssertLevel} from "jstests/concurrency/fsm_libs/assert.js";
 import {Cluster} from "jstests/concurrency/fsm_libs/cluster.js";
-load('jstests/concurrency/fsm_libs/parse_config.js');
+import {parseConfig} from "jstests/concurrency/fsm_libs/parse_config.js";
 import {ThreadManager} from "jstests/concurrency/fsm_libs/thread_mgr.js";
-load('jstests/concurrency/fsm_utils/name_utils.js');  // for uniqueCollName and uniqueDBName
+import {uniqueCollName, uniqueDBName} from "jstests/concurrency/fsm_utils/name_utils.js";
 
 export const runner = (function() {
     function validateExecutionMode(mode) {
@@ -593,7 +593,7 @@ export const runner = (function() {
             // that always apply.
             assertLevel = AssertLevel.ALWAYS;
         }
-        globalAssertLevel = assertLevel;
+        setGlobalAssertLevel(assertLevel);
 
         var context = {};
         await loadWorkloadContext(

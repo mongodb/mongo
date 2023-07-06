@@ -8,9 +8,6 @@
  *   requires_fcv_71,
  * ]
  */
-(function() {
-"use strict";
-
 let st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 let dbName = "test";
 let shardedCollNameSingleShard = "shardedCollSingleShard";
@@ -384,4 +381,3 @@ function testCommandShardedCollectionOnMultipleShards(testCase) {
 })();
 
 st.stop();
-})();

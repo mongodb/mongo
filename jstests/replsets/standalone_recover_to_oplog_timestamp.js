@@ -9,9 +9,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = jsTestName();
 
@@ -52,4 +49,3 @@ const primaryStandalone = MongoRunner.runMongod({
 assert.eq(primaryStandalone.getDB(dbName)[collName].find().toArray(), docs);
 
 MongoRunner.stopMongod(primaryStandalone);
-}());

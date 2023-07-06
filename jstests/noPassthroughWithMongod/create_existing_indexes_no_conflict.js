@@ -1,7 +1,6 @@
-(function() {
-"use strict";
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/wait_for_command.js");
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
+
 const dbName = "test";
 const collName = "ensure_index_no_conflicts";
 const testDB = db.getSiblingDB(dbName);
@@ -39,4 +38,3 @@ assert.commandFailedWithCode(testColl.createIndex({a: -1}, {name: "a_1"}),
 assert.commandWorked(testDB.getSiblingDB("admin").killOp(sleepID));
 
 sleepCommand();
-})();

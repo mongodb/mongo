@@ -2,8 +2,6 @@
 // @tags: [
 //   requires_replication,
 // ]
-(function() {
-'use strict';
 var st = new ShardingTest({mongos: 1, shards: 1, rs: {nodes: 2}});
 var kDbName = 'test';
 var ns = 'test.foo';
@@ -70,4 +68,3 @@ assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
 retryOnFailureUpToFiveTimes("sharded collection", runTest);
 
 st.stop();
-})();

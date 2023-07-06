@@ -8,10 +8,7 @@
  *   do_not_wrap_aggregations_in_facets,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');  // For resultsEq.
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -88,4 +85,3 @@ assert(resultsEq(res.toArray(), [
     {int_field: 0, count: 1},
     {other_field: 0, count: 1}
 ]));
-})();

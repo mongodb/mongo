@@ -4,10 +4,7 @@
  *
  * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {makeCommitTransactionCmdObj} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
 
@@ -239,4 +236,3 @@ let currentParentTxnNumber = NumberLong(35);
 }
 
 st.stop();
-})();

@@ -1,18 +1,12 @@
 // This test validates that map/reduce runs intermediate reduce steps in order to keep the
 // in-memory state small. See SERVER-12949 for more details.
 
-load("jstests/aggregation/extras/utils.js");  // For resultsEq
-(function() {
-"use strict";
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
-function assertGLEOK(status) {
-    assert(status.ok && status.err === null, "Expected OK status object; found " + tojson(status));
-}
+const testDb = db.getSiblingDB("MapReduceTestDB");
+testDb.dropDatabase();
 
-db = db.getSiblingDB("MapReduceTestDB");
-db.dropDatabase();
-
-var coll = db.getCollection("mrInput");
+var coll = testDb.getCollection("mrInput");
 
 // Insert 10 x 49 elements (10 i-s, 49 j-s)
 var expectedOutColl = [];
@@ -36,6 +30,5 @@ function reduceFn(key, values) {
 var out = coll.mapReduce(mapFn, reduceFn, {out: {replace: "mrOutput"}});
 
 // Check the output is as expected
-var outColl = db.getCollection("mrOutput").find().toArray();
+var outColl = testDb.getCollection("mrOutput").find().toArray();
 assert(resultsEq(outColl, expectedOutColl));
-})();

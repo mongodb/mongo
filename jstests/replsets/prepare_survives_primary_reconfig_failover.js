@@ -4,11 +4,10 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-load("jstests/replsets/libs/prepare_failover_due_to_reconfig.js");
+import {
+    testPrepareFailoverDueToReconfig
+} from "jstests/replsets/libs/prepare_failover_due_to_reconfig.js";
 
 let testName = "prepare_survives_primary_reconfig_failover";
 
 testPrepareFailoverDueToReconfig(testName, /* reconfigOnPrimary */ true);
-})();

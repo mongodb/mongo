@@ -1,7 +1,4 @@
 // Tests that a mongos will correctly retry a stale shard version when read preference is used
-(function() {
-'use strict';
-
 var st = new ShardingTest({
     shards: {rs0: {quiet: ''}, rs1: {quiet: ''}},
     mongos: 2,
@@ -37,4 +34,3 @@ assert(cursor.hasNext());
 assert.eq(130, cursor.next().x);
 
 st.stop();
-})();

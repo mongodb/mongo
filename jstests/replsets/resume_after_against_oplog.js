@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {setParameter: {logComponentVerbosity: tojson({command: 2, query: 5})}}
@@ -301,4 +298,3 @@ jsTestLog("Running query on the oplog with an empty batch");
 }
 
 rst.stopSet();
-})();

@@ -3,12 +3,9 @@
 //
 // Cannot implicitly shard accessed collections because a collection can be implictly created and
 // exists when none is expected.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
-load("jstests/aggregation/extras/utils.js");          // For assertArrayEq.
-load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isSharded.
+import {dropWithoutImplicitRecreate} from "jstests/aggregation/extras/merge_helpers.js";
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const source = db[`${jsTest.name()}_source`];
 source.drop();
@@ -194,4 +191,3 @@ const pipeline = [mergeStage];
     assert.commandWorked(source.dropIndex({_id: 1, a: -1}));
     assert.commandWorked(target.dropIndex({_id: 1, a: -1}));
 })();
-}());

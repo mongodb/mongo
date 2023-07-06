@@ -1,9 +1,6 @@
 // Tests the ttlMonitorSleepSecs parameter
 
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/server_parameter_helpers.js');
+import {testNumericServerParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 testNumericServerParameter(
     'ttlMonitorSleepSecs',
@@ -16,4 +13,3 @@ testNumericServerParameter(
     false,    // has upper bound
     'unused'  // out of bounds value (above upper bound)
 );
-})();

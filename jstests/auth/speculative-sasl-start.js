@@ -1,8 +1,5 @@
 // Test for speculativeSaslStart during isMaster.
 
-(function() {
-'use strict';
-
 const keyFile = 'jstests/libs/key1';
 const mongod = MongoRunner.runMongod({auth: '', keyFile: keyFile});
 const admin = mongod.getDB('admin');
@@ -200,4 +197,3 @@ assertSpecLog("I", clusterAuthFailedAttrs, 1);
 admin.setLogLevel(0);
 
 MongoRunner.stopMongod(mongod);
-})();

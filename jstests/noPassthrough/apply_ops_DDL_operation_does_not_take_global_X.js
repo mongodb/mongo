@@ -7,9 +7,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const testDBName = 'test';
 const readDBName = 'read';
 const readCollName = 'readColl';
@@ -76,4 +73,3 @@ assert.commandWorked(secondary.getDB("admin").runCommand(
 findWait();
 
 rst.stopSet();
-})();

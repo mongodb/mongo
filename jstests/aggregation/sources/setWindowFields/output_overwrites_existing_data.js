@@ -6,9 +6,6 @@
  *   do_not_wrap_aggregations_in_facets,
  * ]
  */
-(function() {
-"use strict";
-
 assert.commandWorked(db[jsTestName()].insert({dummy: 1}));
 
 let windowResults = db.aggregate([
@@ -27,4 +24,3 @@ windowResults = db.aggregate([
 ]);
 
 assert.eq(windowResults.toArray(), [{_id: 0, obj: {k1: "v1", k2: "v2", subPath: 1}}]);
-})();

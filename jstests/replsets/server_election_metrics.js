@@ -1,9 +1,6 @@
 /**
  * Tests the format of 'electionMetrics' serverStatus section.
  */
-(function() {
-"use strict";
-
 // Verifies that the 'electionMetrics' serverStatus section has the given field.
 function verifyElectionMetricsField(serverStatusResponse, fieldName) {
     assert(serverStatusResponse.electionMetrics.hasOwnProperty(fieldName),
@@ -57,4 +54,3 @@ verifyElectionMetricsSSS(serverStatusResponse);
 
 // Stop the replica set.
 rst.stopSet();
-}());

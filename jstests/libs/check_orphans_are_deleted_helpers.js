@@ -1,6 +1,4 @@
-'use strict';
-
-var CheckOrphansAreDeletedHelpers = (function() {
+export var CheckOrphansAreDeletedHelpers = (function() {
     function runCheck(mongosConn, shardConn, shardId) {
         const configDB = shardConn.getDB('config');
 

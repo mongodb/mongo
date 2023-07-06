@@ -2,10 +2,9 @@
 // @tags: [
 //  requires_replication,
 // ]
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/change_stream_pre_image_time_based_expiration_utils.js");
+import {
+    testTimeBasedPreImageRetentionPolicy
+} from "jstests/noPassthrough/libs/change_stream_pre_image_time_based_expiration_utils.js";
 
 // Tests pre-image time based expiration on a replica-set.
 (function testChangeStreamPreImagesforTimeBasedExpirationOnReplicaSet() {
@@ -24,4 +23,3 @@ load("jstests/noPassthrough/libs/change_stream_pre_image_time_based_expiration_u
     testTimeBasedPreImageRetentionPolicy(conn, primary);
     replSetTest.stopSet();
 })();
-}());

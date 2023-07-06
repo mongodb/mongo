@@ -1,8 +1,5 @@
 // Ensure that benchRun tests are able to use either SCRAM-SHA-1 or SCRAM-SHA-256 via mech
 // negotiation from server
-(function() {
-"use strict";
-
 function benchRunnerAuthWithProvidedMech(mechanism) {
     var m = MongoRunner.runMongod({setParameter: 'authenticationMechanisms=' + mechanism});
 
@@ -37,4 +34,3 @@ function benchRunnerAuthWithProvidedMech(mechanism) {
 
 benchRunnerAuthWithProvidedMech("SCRAM-SHA-1");
 benchRunnerAuthWithProvidedMech("SCRAM-SHA-256");
-})();

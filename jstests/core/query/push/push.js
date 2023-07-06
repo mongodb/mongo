@@ -9,9 +9,6 @@
  * - jstests/core/push_sort.js
  * - src/mongod/db/update/push_node_test.cpp
  */
-(function() {
-'use strict';
-
 const t = db.push;
 t.drop();
 
@@ -46,4 +43,3 @@ assert.sameMembers(
     [],
     t.findOne().a,
     "Popping (last element of) non-existent field should not affect array in field 'a'.");
-})();

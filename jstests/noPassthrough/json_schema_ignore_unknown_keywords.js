@@ -2,10 +2,7 @@
  * Test that setting the query knob 'internalQueryIgnoreUnknownJSONSchemaKeywords' correctly
  * ignores unknown keywords within $jsonSchema.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/assert_schema_match.js");
+import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 
 const options = {
     setParameter: "internalQueryIgnoreUnknownJSONSchemaKeywords=1"
@@ -57,4 +54,3 @@ assertSchemaMatch(
 }
 
 MongoRunner.stopMongod(conn);
-}());

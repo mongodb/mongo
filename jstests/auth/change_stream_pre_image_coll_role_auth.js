@@ -9,9 +9,6 @@
  *  requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
 const password = "password";
 const keyFile = "jstests/libs/key1";
 
@@ -199,4 +196,3 @@ assertActionAuthorized(removePreImage.bind(null, rootPrimary), true);
 rootPrimary.logout();
 
 replSetTest.stopSet();
-})();

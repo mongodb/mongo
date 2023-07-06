@@ -2,10 +2,9 @@
 // @tags: [
 //  requires_sharding,
 // ]
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/change_stream_pre_image_time_based_expiration_utils.js");
+import {
+    testTimeBasedPreImageRetentionPolicy
+} from "jstests/noPassthrough/libs/change_stream_pre_image_time_based_expiration_utils.js";
 
 // Tests pre-image time-based expiration on a sharded cluster.
 (function testChangeStreamPreImagesforTimeBasedExpirationOnShardedCluster() {
@@ -24,4 +23,3 @@ load("jstests/noPassthrough/libs/change_stream_pre_image_time_based_expiration_u
     testTimeBasedPreImageRetentionPolicy(st.s0, st.rs0.getPrimary());
     st.stop();
 })();
-}());

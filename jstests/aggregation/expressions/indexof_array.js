@@ -1,9 +1,6 @@
 // In SERVER-8951, $indexOfArray was introduced. In this file, we test the correctness and error
 // cases of the expression.
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExpression.
-
-(function() {
-"use strict";
+import {assertErrorCode, testExpression} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.indexofarray;
 coll.drop();
@@ -65,4 +62,3 @@ pipeline = {
     $project: {output: {$indexOfArray: [[1, 2, 3], 2, 1, -1]}}
 };
 assertErrorCode(coll, pipeline, 40097);
-}());

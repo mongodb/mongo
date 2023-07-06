@@ -7,12 +7,9 @@
  *   uses_atclustertime,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/discover_topology.js');
-load("jstests/sharding/libs/resharding_test_fixture.js");
-load('jstests/sharding/libs/shard_versioning_util.js');
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
+import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
 // The test purposely emplaces documents on a shard that doesn't own them.
 TestData.skipCheckOrphans = true;
@@ -78,4 +75,3 @@ assert.soon(() => {
 });
 
 reshardingTest.teardown();
-})();

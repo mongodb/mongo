@@ -4,11 +4,9 @@
 //  requires_replication,
 //  requires_sharding,
 // ]
-(function() {
-"use strict";
-
-// For ChangeStreamMultitenantReplicaSetTest.
-load("jstests/serverless/libs/change_collection_util.js");
+import {
+    ChangeStreamMultitenantReplicaSetTest
+} from "jstests/serverless/libs/change_collection_util.js";
 
 const testDBName = jsTestName();
 
@@ -197,4 +195,3 @@ function testChangeStreamOptionsWithAdminDB(conn) {
 
     replSetTest.stopSet();
 })();
-}());

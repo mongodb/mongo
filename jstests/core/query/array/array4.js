@@ -1,9 +1,6 @@
 /**
  * Basic test for querying on documents containing arrays.
  */
-(function() {
-'use strict';
-
 const collNamePrefix = 'array4_';
 let collCount = 0;
 
@@ -44,4 +41,3 @@ query = {
 docs = t.find(query).toArray();
 assert.eq(docs.length, 1, tojson(docs));
 assert.eq(docs[0].a[0], 0, tojson(docs));
-}());

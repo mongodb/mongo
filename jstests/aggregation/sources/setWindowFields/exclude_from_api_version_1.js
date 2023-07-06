@@ -1,9 +1,6 @@
 /**
  * Test that $setWindowFields is excluded from API version 1.
  */
-(function() {
-"use strict";
-
 const coll = db[jsTestName()];
 coll.drop();
 coll.insert({a: 1});
@@ -17,4 +14,3 @@ assert.commandWorked(db.runCommand({
     apiVersion: "1",
     apiStrict: true
 }));
-})();

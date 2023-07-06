@@ -1,8 +1,5 @@
 // Validate that *.system.buckets.system.buckets.* is an invalid namespace
 
-(function() {
-"use strict";
-
 function runTest(conn) {
     const admin = conn.getDB('admin');
     assert.commandWorked(admin.runCommand({createUser: 'admin', pwd: 'admin', roles: ['root']}));
@@ -18,4 +15,3 @@ function runTest(conn) {
 const mongod = MongoRunner.runMongod({auth: ''});
 runTest(mongod);
 MongoRunner.stopMongod(mongod);
-}());

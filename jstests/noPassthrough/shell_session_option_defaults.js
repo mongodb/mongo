@@ -1,9 +1,6 @@
 /**
  * Tests the default values for causal consistency and retryable writes as part of SessionOptions.
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 
 let session = conn.startSession();
@@ -78,4 +75,3 @@ runMongoShellWithRetryWritesEnabled(function() {
 });
 
 MongoRunner.stopMongod(conn);
-})();

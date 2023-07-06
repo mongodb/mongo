@@ -5,7 +5,6 @@
  *  backport_required_multiversion,
  * ]
  */
-(function() {
 const st = new ShardingTest({
     shards: 2,
     mongos: 1,
@@ -52,4 +51,3 @@ res = assert.commandWorked(mongosDB.runCommand(
 assert.eq(res.results[0], {_id: 0, value: {val: "reduced value"}});
 
 st.stop();
-}());

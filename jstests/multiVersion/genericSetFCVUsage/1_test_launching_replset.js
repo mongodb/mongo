@@ -1,12 +1,4 @@
-//
-// Tests launching multi-version ReplSetTest replica sets
-//
-//
-
-load('jstests/multiVersion/libs/verify_versions.js');
-
-(function() {
-"use strict";
+import "jstests/multiVersion/libs/verify_versions.js";
 
 for (let version of ["last-lts", "last-continuous", "latest"]) {
     jsTestLog("Testing single version: " + version);
@@ -47,7 +39,7 @@ for (let versions of [["last-lts", "latest"], ["last-continuous", "latest"]]) {
 
 if (MongoRunner.areBinVersionsTheSame("last-continuous", "last-lts")) {
     jsTest.log("Skipping test because 'last-continuous' == 'last-lts'");
-    return;
+    quit();
 }
 
 for (let versions of [["last-lts", "last-continuous"], ["last-continuous", "last-lts"]]) {
@@ -85,8 +77,3 @@ for (let versions of [["last-lts", "last-continuous"], ["last-continuous", "last
 }
 
 jsTestLog("Done!");
-})();
-
-//
-// End
-//

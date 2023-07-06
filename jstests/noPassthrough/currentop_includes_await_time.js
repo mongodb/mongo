@@ -3,8 +3,6 @@
  * include time spent blocking for the await time.
  * @tags: [requires_capped]
  */
-(function() {
-"use test";
 
 // This test runs a getMore in a parallel shell, which will not inherit the implicit session of
 // the cursor establishing command.
@@ -50,4 +48,3 @@ assert.commandWorked(coll.insert({_id: 2}));
 
 cleanupShell();
 MongoRunner.stopMongod(conn);
-}());

@@ -12,10 +12,7 @@
  *   requires_capped,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 
 // This test runs a getMore in a parallel shell, which will not inherit the implicit session of
 // the cursor establishing command.
@@ -384,4 +381,3 @@ assert.commandFailedWithCode(
 setup();
 res = assert.commandWorked(testDB.runCommand(defaultAggregateCmdSmallBatch));
 assert.eq(0, MongoRunner.stopMongod(conn), 'expected mongod to shutdown cleanly');
-})();

@@ -6,9 +6,6 @@
  *     requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
 replTest.initiate();
@@ -53,4 +50,3 @@ res = assert.commandWorked(db.runCommand({
 assert(res.collections.hasOwnProperty("renamed"));
 
 replTest.stopSet();
-})();

@@ -9,9 +9,6 @@
  *   requires_fcv_53
  * ]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
@@ -43,4 +40,3 @@ assert.commandWorked(
 assert.eq(rst.getPrimary().getDBNames().indexOf(dbName), -1);
 
 rst.stopSet();
-})();

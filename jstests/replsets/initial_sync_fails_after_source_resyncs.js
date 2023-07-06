@@ -2,10 +2,7 @@
  * Tests that initial sync will abort an attempt if the sync source enters and completes initial
  * sync during cloning (i.e. the source is resynced during an outage).
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const testName = "initial_sync_fails_after_source_resyncs";
 const rst = new ReplSetTest(
@@ -99,4 +96,3 @@ assert.soon(() => {
 TestData.skipCheckDBHashes = true;
 rst.stop(initialSyncNode, null, {skipValidation: true, allowedExitCode: MongoRunner.EXIT_ABRUPT});
 rst.stopSet(null, null, {skipValidation: true});
-})();

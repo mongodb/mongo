@@ -1,9 +1,6 @@
 /**
  * Tests for the $dateToString expression with the optional 'onNull' parameter.
  */
-(function() {
-"use strict";
-
 const onNullValue = ISODate("2017-07-04T11:56:02Z");
 const coll = db.date_to_string_on_null;
 coll.drop();
@@ -69,4 +66,3 @@ assert.eq([{_id: 0}],
                   }
               })
               .toArray());
-})();

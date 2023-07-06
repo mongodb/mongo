@@ -1,10 +1,8 @@
 // Confirm correctness of $mod evaluation in find projection.
 
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load("jstests/libs/sbe_assert_error_override.js");
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.projection_expr_mod;
 coll.drop();
@@ -76,4 +74,3 @@ assert.eq(coll.findOne({}, {f: {$mod: ["$a", -Infinity]}, _id: 0}), {f: 10});
 assert.eq(coll.findOne({}, {f: {$mod: [Infinity, "$a"]}, _id: 0}), {f: NaN});
 assert.eq(coll.findOne({}, {f: {$mod: [-Infinity, "$a"]}, _id: 0}), {f: NaN});
 assert.eq(coll.findOne({}, {f: {$mod: [NaN, "$a"]}, _id: 0}), {f: NaN});
-})();

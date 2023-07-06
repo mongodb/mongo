@@ -2,8 +2,6 @@
  * Runs initial sync on a node with many databases.
  */
 
-(function() {
-
 var name = 'initial_sync_many_dbs';
 var num_dbs = 32;
 var max_colls = 32;
@@ -37,11 +35,11 @@ replSet.reInitiate();
 replSet.awaitSecondaryNodes(30 * 60 * 1000);
 var secondary = replSet.getSecondary();
 jsTestLog('New node has transitioned to secondary. Checking collection sizes');
-for (var i = 0; i < num_dbs; i++) {
-    var dbname = name + '_db' + i;
-    for (var j = 0; j < (i % max_colls + 1); j++) {
-        var collname = name + '_coll' + j;
-        var coll = secondary.getDB(dbname)[collname];
+for (let i = 0; i < num_dbs; i++) {
+    let dbname = name + '_db' + i;
+    for (let j = 0; j < (i % max_colls + 1); j++) {
+        let collname = name + '_coll' + j;
+        let coll = secondary.getDB(dbname)[collname];
         assert.eq(
             num_docs,
             coll.find().itcount(),
@@ -50,4 +48,3 @@ for (var i = 0; i < num_dbs; i++) {
 }
 
 replSet.stopSet();
-})();

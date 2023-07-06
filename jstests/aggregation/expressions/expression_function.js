@@ -1,8 +1,5 @@
 // Tests basic functionality of the $function expression.
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.expression_function;
 coll.drop();
@@ -139,4 +136,3 @@ pipeline = [{
 }];
 assert.commandFailedWithCode(
     db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}), 31266);
-})();

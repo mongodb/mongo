@@ -3,7 +3,6 @@
  * operated as it should which didn't work in rename7.js per SERVER-36717.
  */
 // @tags: [requires_profiling]
-(function() {
 // Set up namespaces a and b.
 var admin = db.getMongo().getDB("admin");
 var db_a = db.getMongo().getDB("db_a");
@@ -52,4 +51,3 @@ assert.gte(db_a.system.profile.findOne().writeConflicts, 1);  // Make sure that 
 assert.commandWorked(db_a.setProfilingLevel(0));
 a.drop();
 b.drop();
-})();

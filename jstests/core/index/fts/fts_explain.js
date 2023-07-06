@@ -6,9 +6,6 @@
 
 // Test $text explain.  SERVER-12037.
 
-(function() {
-"use strict";
-
 const coll = db.fts_explain;
 let res;
 
@@ -37,4 +34,3 @@ assert.eq(textStage.parsedTextQuery.terms, ["a"]);
 assert.eq(textStage.parsedTextQuery.negatedTerms, ["b"]);
 assert.eq(textStage.parsedTextQuery.phrases, ["a"]);
 assert.eq(textStage.parsedTextQuery.negatedPhrases, ["c"]);
-})();

@@ -14,11 +14,15 @@
  * not affect the default read concern of commands in any way.
  *
  */
-(function() {
-"use strict";
 
-load("jstests/libs/override_methods/override_helpers.js");
-load("jstests/libs/override_methods/read_and_write_concern_helpers.js");
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
+import {
+    kCommandsSupportingReadConcern,
+    kCommandsSupportingSnapshot,
+    kCommandsSupportingWriteConcern,
+    kCommandsSupportingWriteConcernInTransaction,
+    kWriteCommandsSupportingSnapshotInTransaction
+} from "jstests/libs/override_methods/read_and_write_concern_helpers.js";
 
 if (typeof TestData === "undefined" || !TestData.hasOwnProperty("defaultReadConcernLevel")) {
     throw new Error("The readConcern level to use must be set as the 'defaultReadConcernLevel'" +
@@ -160,4 +164,3 @@ OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/set_read_and_write_concerns.js");
 
 OverrideHelpers.overrideRunCommand(runCommandWithReadAndWriteConcerns);
-})();

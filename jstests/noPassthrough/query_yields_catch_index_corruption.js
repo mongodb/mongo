@@ -3,9 +3,6 @@
 //   # TODO: SERVER-70446 Enable yielding for index plans in CQF.
 //   cqf_experimental_incompatible,
 // ]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "query_yields_catch_index_corruption";
 
@@ -114,4 +111,3 @@ coll = db.getCollection(collName);
 
 // Runs validate before shutting down.
 MongoRunner.stopMongod(mongod);
-})();

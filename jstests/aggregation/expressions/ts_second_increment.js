@@ -1,10 +1,4 @@
-// Validates the correctness of the '$tsSecond' and the '$tsIncrement' expression in the aggregation
-// pipeline.
-
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
-
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
 var testDB = db.getSiblingDB("expression_ts_second_increment");
 
@@ -68,5 +62,4 @@ assert.commandWorked(
                 }])
                 .toArray());
     assert.commandFailedWithCode(nonTimestampError, 5687302);
-})();
 })();

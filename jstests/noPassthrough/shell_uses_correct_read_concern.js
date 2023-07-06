@@ -2,8 +2,6 @@
  * Tests that reads through the shell uses the correct read concern.
  * @tags: [requires_replication, uses_transactions, requires_majority_read_concern]
  */
-(function() {
-"use strict";
 const rst = new ReplSetTest({nodes: 2, nodeOptions: {enableMajorityReadConcern: ""}});
 rst.startSet();
 rst.initiate();
@@ -54,4 +52,3 @@ assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(getSnapshotRCCount(), 4);
 
 rst.stopSet();
-})();

@@ -5,9 +5,6 @@
  *   uses_api_parameters,
  * ]
  */
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB("createAPIVersion");
 testDB.dropDatabase();
 
@@ -36,4 +33,3 @@ assert.commandFailedWithCode(testDB.runCommand({
     apiStrict: true,
 }),
                              ErrorCodes.InvalidOptions);
-})();

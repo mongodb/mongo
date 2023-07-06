@@ -1,7 +1,5 @@
 // Tests constructing NumberDecimal with various types
 
-(function() {
-'use strict';
 var col = db.d_constructors;
 col.drop();
 
@@ -100,4 +98,3 @@ assert(!numberDecimalsAlmostEqual(NumberDecimal("Infinity"), NumberDecimal("-Inf
 assert(!numberDecimalsAlmostEqual(NumberDecimal("Infinity"), NumberDecimal("NaN"), 10));
 assert(numberDecimalsAlmostEqual(NumberDecimal("NaN"), NumberDecimal("NaN"), 10));
 assert(!numberDecimalsAlmostEqual(NumberDecimal("0"), NumberDecimal("0.000001"), 10));
-}());

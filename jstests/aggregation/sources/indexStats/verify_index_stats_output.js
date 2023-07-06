@@ -11,12 +11,9 @@
  *   uses_parallel_shell,
  * ]
  */
-(function() {
-"use strict";
-load('jstests/noPassthrough/libs/index_build.js');  // for waitForIndexBuildToStart().
-load('jstests/libs/fixture_helpers.js');            // for runCommandOnEachPrimary.
-load("jstests/aggregation/extras/utils.js");        // for resultsEq.
-load("jstests/libs/fail_point_util.js");            // for configureFailPoint.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const coll = db.index_stats_output;
 coll.drop();
@@ -110,4 +107,3 @@ let finishedOutput = coll.aggregate([{$indexStats: {}}, {$match: {name: indexNam
 for (const indexStats of finishedOutput) {
     assert(!indexStats.hasOwnProperty("building"), tojson(indexStats));
 }
-})();

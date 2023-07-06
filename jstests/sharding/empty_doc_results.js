@@ -1,7 +1,4 @@
 // Verifies that mongos correctly handles empty documents when all fields are projected out
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 2});
 
 var mongos = st.s0;
@@ -56,4 +53,3 @@ assertLast50Positive(coll.find({}).sort({positiveId: 1}).toArray());
 assertLast50Positive(coll.find({}, {_id: 0}).sort({positiveId: 1}).toArray());
 
 st.stop();
-})();

@@ -3,10 +3,7 @@
  * config.rangeDeletions collection.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/uuid_util.js");
+import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -155,4 +152,3 @@ let testColl = testDB.foo;
 })();
 
 st.stop();
-})();

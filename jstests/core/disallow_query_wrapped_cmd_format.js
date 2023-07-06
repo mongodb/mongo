@@ -7,8 +7,6 @@
  *    not_allowed_with_security_token,
  * ]
  */
-(function() {
-"use strict";
 // The OP_QUERY protocol used to permit commands to be wrapped inside a key named "$query" or
 // "query". Even if the client was using OP_MSG, the client code used to have logic to upconvert
 // this OP_QUERY format to a correct OP_MSG.
@@ -18,4 +16,3 @@
 // produce an "unknown command" error.
 assert.commandFailedWithCode(db.runCommand({$query: {ping: 1}}), ErrorCodes.CommandNotFound);
 assert.commandFailedWithCode(db.runCommand({query: {ping: 1}}), ErrorCodes.CommandNotFound);
-}());

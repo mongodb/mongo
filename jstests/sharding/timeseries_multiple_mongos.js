@@ -8,7 +8,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-load('jstests/sharding/libs/shard_versioning_util.js');
+import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
 Random.setRandomSeed();
 
@@ -32,14 +32,6 @@ assert.commandWorked(mongos0.adminCommand({enableSharding: dbName}));
 let currentId = 0;
 function generateId() {
     return currentId++;
-}
-
-function generateBatch(size) {
-    return TimeseriesTest.generateHosts(size).map((host, index) => Object.assign(host, {
-        _id: generateId(),
-        [metaField]: index,
-        [timeField]: ISODate(`20${index}0-01-01`),
-    }));
 }
 
 /**

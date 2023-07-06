@@ -3,9 +3,6 @@
  * In order to perform such a reconfig, users must set a cluster-wide write concern.
  */
 
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
@@ -46,4 +43,3 @@ assert(cwwc.hasOwnProperty("defaultWriteConcern"));
 assert.eq({w: 1, wtimeout: 0}, cwwc.defaultWriteConcern, tojson(cwwc));
 
 rst.stopSet();
-})();

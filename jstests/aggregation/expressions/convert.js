@@ -1,9 +1,6 @@
 /**
  * Tests behavior of $convert aggregation operator.
  */
-(function() {
-"use strict";
-
 const coll = db.expression_convert;
 function populateCollection(documentList) {
     coll.drop();
@@ -260,7 +257,7 @@ pipeline = [
     {$project: {output: {$convert: {to: "$target", input: "$input", onError: "ERROR"}}}},
     {$sort: {_id: 1}}
 ];
-var aggResult = coll.aggregate(pipeline).toArray();
+aggResult = coll.aggregate(pipeline).toArray();
 assert.eq(aggResult.length, illegalConversionTestDocs.length);
 
 aggResult.forEach(doc => {
@@ -275,7 +272,7 @@ pipeline = [
     },
     {$sort: {_id: 1}}
 ];
-var aggResult = coll.aggregate(pipeline).toArray();
+aggResult = coll.aggregate(pipeline).toArray();
 assert.eq(aggResult.length, illegalConversionTestDocs.length);
 
 aggResult.forEach(doc => {
@@ -294,7 +291,7 @@ pipeline = [
     {$project: {output: {$convert: {to: "int", input: "$input", onNull: "NULL"}}}},
     {$sort: {_id: 1}}
 ];
-var aggResult = coll.aggregate(pipeline).toArray();
+aggResult = coll.aggregate(pipeline).toArray();
 assert.eq(aggResult.length, nullTestDocs.length);
 
 aggResult.forEach(doc => {
@@ -306,10 +303,9 @@ pipeline = [
     {$project: {output: {$convert: {to: null, input: "$input", onNull: "NULL"}}}},
     {$sort: {_id: 1}}
 ];
-var aggResult = coll.aggregate(pipeline).toArray();
+aggResult = coll.aggregate(pipeline).toArray();
 assert.eq(aggResult.length, nullTestDocs.length);
 
 aggResult.forEach(doc => {
     assert.eq(doc.output, "NULL", "Unexpected result: _id = " + doc._id);
 });
-}());

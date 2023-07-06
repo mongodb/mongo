@@ -1,9 +1,6 @@
 // Ensure that attempting to use SCRAM-SHA-1 auth on a
 // user with invalid SCRAM-SHA-1 credentials fails gracefully.
 
-(function() {
-'use strict';
-
 const mongod = MongoRunner.runMongod({auth: "", useLogFiles: true});
 const admin = mongod.getDB('admin');
 const test = mongod.getDB('test');
@@ -34,4 +31,3 @@ const error = assert.throws(function() {
 assert.eq(error, "Error: Authentication failed.");
 
 MongoRunner.stopMongod(mongod);
-})();

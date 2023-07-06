@@ -7,10 +7,12 @@
 // Bad namespace at runtime
 // Missing collection
 
-load('jstests/libs/ftdc.js');
-
-(function() {
-'use strict';
+import {
+    getParameter,
+    setParameter,
+    verifyGetDiagnosticData,
+    waitFailedToStart
+} from "jstests/libs/ftdc.js";
 
 // Validate we fail at startup on bad input
 let startFailed = MongoRunner.runMongod(
@@ -61,4 +63,3 @@ assert.soon(() => {
 });
 
 MongoRunner.stopMongod(m);
-})();

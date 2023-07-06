@@ -8,9 +8,6 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-"use strict";
-
 var st = new ShardingTest({
     shards: 1,
     config: 3,
@@ -70,4 +67,3 @@ testOps(st.s);
 
 st.stop();
 MongoRunner.stopMongos(mongos2);
-}());

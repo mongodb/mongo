@@ -5,9 +5,6 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 2, keyFile: "jstests/libs/key1"});
 rst.startSet();
 rst.initiate();
@@ -202,4 +199,3 @@ assert.commandWorked(testDB.runCommand({endSessions: [lsid]}));
 adminDB.logout();
 
 rst.stopSet();
-}());

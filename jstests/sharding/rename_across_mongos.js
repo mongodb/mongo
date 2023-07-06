@@ -1,7 +1,3 @@
-(function() {
-
-'use strict';
-
 var st = new ShardingTest({name: 'rename_across_mongos', shards: 1, mongos: 2});
 var dbName = 'RenameDB';
 
@@ -25,4 +21,3 @@ assert.eq([{Key: 1, Value: 1}],
           st.s1.getDB(dbName).CollNameAfterRename.find({}, {_id: false}).toArray());
 
 st.stop();
-})();

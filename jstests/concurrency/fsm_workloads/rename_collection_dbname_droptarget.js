@@ -9,6 +9,7 @@
  *     assumes_unsharded_collection,
  * ]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     var data = {

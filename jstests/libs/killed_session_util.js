@@ -1,7 +1,7 @@
 /**
  * Utilities for testing when sessions are killed.
  */
-var KilledSessionUtil = (function() {
+export var KilledSessionUtil = (function() {
     // Returns if the code is one that could come from a session being killed.
     function isKilledSessionCode(code) {
         return code === ErrorCodes.Interrupted || code === ErrorCodes.CursorKilled ||

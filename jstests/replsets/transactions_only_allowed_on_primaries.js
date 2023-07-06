@@ -3,9 +3,6 @@
  *
  * @tags: [uses_transactions]
  */
-(function() {
-"use strict";
-
 // In 4.0, we allow read-only transactions on secondaries when test commands are enabled, so we
 // disable them in this test, to test that transactions on secondaries will be disallowed
 // for production users.
@@ -124,4 +121,3 @@ assert.commandWorked(primarySession.commitTransaction_forTesting());
 primarySession.endSession();
 
 replTest.stopSet();
-}());

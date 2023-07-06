@@ -9,9 +9,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const collNamePrefix = 'jstests_count_';
 let collCount = 0;
 
@@ -46,4 +43,3 @@ assert.eq(assert.throws(() => coll.count({}, {random: true})).code, 40415);
 // Test that a string passed into count will be converted into a $where clause.
 assert.eq(1, coll.count("this.a"));
 assert.eq(0, coll.count("this.b"));
-})();

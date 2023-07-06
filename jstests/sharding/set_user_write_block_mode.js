@@ -8,12 +8,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
-load('jstests/sharding/libs/remove_shard_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
+import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 
 const st = new ShardingTest({shards: 2});
 
@@ -278,4 +275,3 @@ newShard.initiate();
 
 st.stop();
 newShard.stopSet();
-})();

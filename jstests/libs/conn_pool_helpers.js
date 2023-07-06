@@ -1,6 +1,6 @@
-load("jstests/libs/parallelTester.js");
+import {Thread} from "jstests/libs/parallelTester.js";
 
-function configureReplSetFailpoint(st, kDbName, failpoint, modeValue) {
+export function configureReplSetFailpoint(st, kDbName, failpoint, modeValue) {
     st.rs0.nodes.forEach(function(node) {
         assert.commandWorked(node.getDB("admin").runCommand({
             configureFailPoint: failpoint,
@@ -13,7 +13,7 @@ function configureReplSetFailpoint(st, kDbName, failpoint, modeValue) {
     });
 }
 
-function launchFinds(mongos, threads, {times, readPref, shouldFail}) {
+export function launchFinds(mongos, threads, {times, readPref, shouldFail}) {
     jsTestLog("Starting " + times + " connections");
     for (var i = 0; i < times; i++) {
         var thread = new Thread(function(connStr, readPref, dbName, shouldFail) {
@@ -32,7 +32,8 @@ function launchFinds(mongos, threads, {times, readPref, shouldFail}) {
     }
 }
 
-function assertHasConnPoolStats(mongos, allHosts, args, checkNum, connPoolStatsCmd = undefined) {
+export function assertHasConnPoolStats(
+    mongos, allHosts, args, checkNum, connPoolStatsCmd = undefined) {
     checkNum++;
     jsTestLog("Check #" + checkNum + ": " + tojson(args));
     let {ready = 0, pending = 0, active = 0, hosts = allHosts, isAbsent, checkStatsFunc} = args;

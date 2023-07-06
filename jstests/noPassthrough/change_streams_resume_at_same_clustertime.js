@@ -7,9 +7,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 2, rs: {nodes: 1, setParameter: {writePeriodicNoops: false}}});
 
 const mongosDB = st.s.startSession({causalConsistency: true}).getDatabase(jsTestName());
@@ -68,4 +65,3 @@ for (let x = 0; x < 2; ++x) {
 assert.soon(() => csCursor.hasNext());
 
 st.stop();
-})();

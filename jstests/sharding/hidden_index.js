@@ -5,9 +5,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-load("jstests/libs/index_catalog_helpers.js");  // For IndexCatalogHelpers.findByName.
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 // Test to validate the correct behaviour of hiding an index in a sharded cluster with a shard key.
 function validateHiddenIndexBehaviour() {
@@ -83,4 +81,3 @@ validateOneShardKeyHiddenIndexBehaviour();
 validateDifferentHiddenIndexesBehaviour();
 
 st.stop();
-})();

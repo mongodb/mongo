@@ -4,6 +4,8 @@
  * Ensures that concurrent multi updates cannot produce duplicate index entries. Regression test
  * for SERVER-17132.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var states = (function() {
         function multiUpdate(db, collName) {

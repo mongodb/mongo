@@ -7,9 +7,6 @@
  *   requires_scripting,
  * ]
  */
-(function() {
-"use strict";
-
 const collection = db.where_tolerates_js_exception;
 collection.drop();
 
@@ -18,6 +15,7 @@ assert.commandWorked(collection.save({a: 1}));
 const res = collection.runCommand("find", {
     filter: {
         $where: function myFunction() {
+            // eslint-disable-next-line
             return a();
         }
     }
@@ -32,4 +30,3 @@ assert(!res.hasOwnProperty("stack"),
        () => "$where shouldn't return JavaScript stacktrace separately: " + tojson(res));
 assert(!res.hasOwnProperty("originalError"),
        () => "$where shouldn't return wrapped version of the error: " + tojson(res));
-})();

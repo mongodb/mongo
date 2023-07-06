@@ -1,9 +1,6 @@
 // Tests that $merge's enforcement of a unique index on mongos includes a shard and/or database
 // version.
-(function() {
-"use strict";
-
-load("jstests/libs/profiler.js");
+import {profilerHasAtLeastOneMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 function prepareProfilerOnShards(st, dbName) {
     st._rs.forEach(rs => {
@@ -297,4 +294,3 @@ const targetCollName = "targetFoo";
 })();
 
 st.stop();
-})();

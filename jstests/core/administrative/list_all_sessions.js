@@ -11,9 +11,7 @@
 
 // Basic tests for the $listSessions {allUsers:true} aggregation stage.
 
-(function() {
-'use strict';
-load('jstests/aggregation/extras/utils.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const admin = db.getSiblingDB("admin");
 const config = db.getSiblingDB("config");
@@ -59,4 +57,3 @@ try {
 } finally {
     admin.setLogLevel(originalLogLevel);
 }
-})();

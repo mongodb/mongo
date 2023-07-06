@@ -1,7 +1,7 @@
 /**
  * Helper function shared by createCollection inside txns tests.
  */
-const createCollAndCRUDInTxn = function(sessionDB, collName, command, explicitCreate) {
+export const createCollAndCRUDInTxn = function(sessionDB, collName, command, explicitCreate) {
     if (undefined === explicitCreate) {
         doassert('createCollAndCRUDInTxn called with undefined explicitCreate');
     }
@@ -31,7 +31,7 @@ const createCollAndCRUDInTxn = function(sessionDB, collName, command, explicitCr
     assert.eq(sessionColl.find({}).itcount(), 1);
 };
 
-const assertCollCreateFailedWithCode = function(
+export const assertCollCreateFailedWithCode = function(
     sessionDB, collName, command, explicitCreate, code) {
     if (undefined === explicitCreate) {
         doassert('assertWriteConflictForCollCreate called with undefined explicitCreate');

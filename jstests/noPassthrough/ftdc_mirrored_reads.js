@@ -6,10 +6,7 @@
  *   requires_fcv_62
  * ]
  */
-load('jstests/libs/ftdc.js');
-
-(function() {
-'use strict';
+import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 
 const kDbName = "mirrored_reads_ftdc_test";
 const kCollName = "test";
@@ -149,4 +146,3 @@ assert.commandWorked(primary.adminCommand({setParameter: 1, mirrorReads: {sampli
     }, "Failed to wait for secondary mirrored reads stats to converge", 10000);
 }
 rst.stopSet();
-})();

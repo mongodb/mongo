@@ -2,9 +2,6 @@
  * Tests that we can create both simple and compound geo indexes.
  * Also tests that a geo index can support non-geo searches on the indexed field.
  */
-(function() {
-'use strict';
-
 const docs = [
     {_id: 1, y: [1, 1]},
     {_id: 2, y: [1, 1], z: 3},
@@ -30,4 +27,3 @@ assert.eq(1, t.find({y: [1, 1], z: 3}).itcount(), "A2");
 
 assert.commandWorked(t.insert({_id: 5, y: 5}));
 assert.eq(5, t.findOne({y: 5})._id, "B1");
-})();

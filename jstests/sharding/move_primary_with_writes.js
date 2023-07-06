@@ -1,10 +1,7 @@
 /**
  * @tags: [does_not_support_stepdowns]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/fail_point_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 let st = new ShardingTest({
     mongos: 2,
@@ -311,4 +308,3 @@ testMovePrimaryDDL(cloningDataFPName, fromShard, toShard, st.s.getDB("admin"), f
 overrideDDLLockTimeoutFPs.forEach(fp => fp.off());
 
 st.stop();
-})();

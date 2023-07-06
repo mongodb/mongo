@@ -2,11 +2,7 @@
  * Confirms that the log output for find and getMore are in the expected format.
  * @tags: [requires_profiling]
  */
-(function() {
-"use strict";
-
-// For checkLog and getLatestProfilerEntry.
-load("jstests/libs/profiler.js");
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 function assertLogLineContains(conn, parts) {
     if (typeof (parts) == 'string') {
@@ -100,4 +96,3 @@ logLine = [
 assertLogLineContains(conn, logLine);
 
 MongoRunner.stopMongod(conn);
-})();

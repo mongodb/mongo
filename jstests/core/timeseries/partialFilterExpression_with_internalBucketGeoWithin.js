@@ -12,8 +12,8 @@
  */
 
 import {getWinningPlan, isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
-load('jstests/noPassthrough/libs/index_build.js');
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const timeFieldName = "timestamp";
 

@@ -2,8 +2,6 @@
  * SERVER-32001: Test that indexing paths for non-unique, partial, unique, partial&unique
  * crud operations correctly handle WriteConflictExceptions.
  */
-(function() {
-"strict";
 
 let conn = MongoRunner.runMongod();
 let testDB = conn.getDB("test");
@@ -59,4 +57,3 @@ assert.commandWorked(
 res = t.validate();
 assert(res.valid, tojson(res));
 MongoRunner.stopMongod(conn);
-})();

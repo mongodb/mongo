@@ -6,11 +6,8 @@
  *   requires_non_retryable_writes,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");       // For arrayEq.
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 // Drop and recreate the collections to be used in this set of tests.
 assertDropAndRecreateCollection(db, "t1");
@@ -156,4 +153,3 @@ documents2[0] = {
     obj: {x: {b: 2, c: [kMediumStr], str: kMediumStr}},
 };
 testUpdate(documents2, db.t2, {_id: 100}, oplogUpdate);
-}());

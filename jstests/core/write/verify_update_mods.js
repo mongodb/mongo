@@ -8,9 +8,6 @@
  *   requires_non_retryable_writes,
  * ]
  */
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 const coll = testDB.update_modifiers;
@@ -304,4 +301,3 @@ for (const command of [updateCommand, findAndModifyCommand]) {
         executeUpdateTestCase(Object.assign({command: command}, testCase));
     }
 }
-})();

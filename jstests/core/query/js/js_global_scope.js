@@ -11,11 +11,6 @@
 //   # Uses $where operator
 //   requires_scripting,
 // ]
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For 'resultsEq'.
-
 // Note: It's important to use our own database here to avoid sharing a javascript execution context
 // (Scope) with other tests which could pollute the global scope. This context is cached and shared
 // per database in a pool for every operation using JS in the same database.
@@ -207,4 +202,3 @@ assert.eq(
                 "return true;"
         })
         .itcount());
-}());

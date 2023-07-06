@@ -1,4 +1,4 @@
-var testCRUDAndAgg = function(db) {
+export var testCRUDAndAgg = function(db) {
     assert.commandWorked(db.foo.insert({x: 1}));
     assert.commandWorked(db.foo.insert({x: -1}));
     assert.commandWorked(db.foo.update({x: 1}, {$set: {y: 1}}));
@@ -13,7 +13,7 @@ var testCRUDAndAgg = function(db) {
     assert.eq(null, db.foo.findOne());
 };
 
-var testDDLOps = function(st) {
+export var testDDLOps = function(st) {
     var shard0Name = st.shard0.shardName;
     var shard1Name = st.shard1.shardName;
     var db = st.s.getDB("sharded");

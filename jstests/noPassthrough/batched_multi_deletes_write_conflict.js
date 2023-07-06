@@ -6,12 +6,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For 'assertDropCollection()'
-load("jstests/libs/profiler.js");                  // For 'getLatestProfilerEntry()'
-load("jstests/libs/fail_point_util.js");           // For 'configureFailPoint()'
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const conn = MongoRunner.runMongod();
 
@@ -56,4 +53,3 @@ assert.eq(collCount, profileObj.ndeleted);
 assert.eq(0, coll.find().itcount());
 
 MongoRunner.stopMongod(conn);
-})();

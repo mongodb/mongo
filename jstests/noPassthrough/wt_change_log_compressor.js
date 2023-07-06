@@ -4,9 +4,6 @@
  * @tags: [requires_wiredtiger, requires_replication, requires_persistence]
  */
 
-(function() {
-'use strict';
-
 const initOpt = {
     wiredTigerEngineConfigString: 'log=(compressor=snappy)'
 };
@@ -39,4 +36,3 @@ for (const node of replSetTest.getSecondaries()) {
 restartNodeWithOpts(replSetTest.getPrimary(), optChangeJournal);
 
 replSetTest.stopSet();
-})();

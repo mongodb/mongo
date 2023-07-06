@@ -3,11 +3,9 @@
  * featureCompatibilityVersionMinor, featureCompatibilityVersionTransitioning' metrics are in the
  * serverStatus metrics in FTDC data.
  */
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/ftdc.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 
-(function() {
-'use strict';
 let conn = MongoRunner.runMongod();
 let adminDb = conn.getDB('admin');
 
@@ -96,4 +94,3 @@ assert.soon(function() {
 });
 
 MongoRunner.stopMongod(conn);
-})();

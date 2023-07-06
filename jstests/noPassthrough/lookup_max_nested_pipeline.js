@@ -2,12 +2,8 @@
 // greater.
 // @tags: [requires_sharding]
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");       // For assertErrorCode.
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
-load("jstests/libs/discover_topology.js");         // For findNonConfigNodes.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 function generateNestedPipeline(foreignCollName, numLevels) {
     let pipeline = [{"$lookup": {pipeline: [], from: foreignCollName, as: "same"}}];
@@ -73,4 +69,3 @@ assert(sharded.adminCommand({shardCollection: "test.lookup", key: {_id: 'hashed'
 runTest(sharded.getDB('test').lookup);
 
 sharded.stop();
-}());

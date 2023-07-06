@@ -9,7 +9,6 @@
  *     assumes_unsharded_collection,
  * ]
  */
-(function() {
 const coll = db.capped_large_docs;
 coll.drop();
 
@@ -28,4 +27,3 @@ for (let i = 0; i < 5; i++) {
 const stats = assert.commandWorked(coll.stats());
 assert.eq(2, stats.count);
 assert(stats.size <= maxSize);
-}());

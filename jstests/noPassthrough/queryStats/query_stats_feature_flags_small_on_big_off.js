@@ -4,8 +4,8 @@
  * aggregate commmands should not be collected.
  * TODO SERVER-79494 remove this test once featureFlagQueryStatsFindCommand is removed.
  */
-load("jstests/libs/query_stats_utils.js");
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {getQueryStats, verifyMetrics} from "jstests/libs/query_stats_utils.js";
 
 function runTest(conn) {
     const testDB = conn.getDB('test');

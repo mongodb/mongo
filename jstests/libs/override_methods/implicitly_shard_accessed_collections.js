@@ -9,12 +9,17 @@
  * dropped in a sharded cluster.
  */
 
-(function() {
-'use strict';
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
+import {
+    setTestMayRunDropInParallel,
+    ShardingOverrideCommon
+} from "jstests/libs/override_methods/shard_collection_util.js";
+import {
+    ImplicitlyShardAccessCollSettings
+} from "jstests/libs/override_methods/shard_collection_util.js";
 
-load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
-load("jstests/libs/fixture_helpers.js");                    // For 'FixtureHelpers'.
-load("jstests/libs/override_methods/shard_collection_util.js");
+// Expose settings for this override on `globalThis`
+globalThis.ImplicitlyShardAccessCollSettings = ImplicitlyShardAccessCollSettings;
 
 // Save a reference to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
@@ -145,11 +150,10 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
 // Tests may use a parallel shell to run the "drop" command concurrently with other
 // operations. This can cause the "shardCollection" command to return a
 // ConflictingOperationInProgress error response.
-startParallelShell = function() {
-    testMayRunDropInParallel = true;
+globalThis.startParallelShell = function() {
+    setTestMayRunDropInParallel(true);
     return originalStartParallelShell.apply(this, arguments);
 };
 
 OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
-}());

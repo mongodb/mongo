@@ -5,9 +5,6 @@
  * @tags: [requires_fcv_60, uses_transactions]
  */
 
-(function() {
-"use strict";
-
 // This test makes assertions about the number of sessions, which are not compatible with
 // implicit sessions.
 TestData.disableImplicitSessions = true;
@@ -119,4 +116,3 @@ assert.eq(0,
 assert.eq(0, imageCollOnPrimary.find().itcount());
 
 st.stop();
-})();

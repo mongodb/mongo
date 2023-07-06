@@ -7,8 +7,6 @@
  *   no_selinux,
  * ]
  */
-(function() {
-
 const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
@@ -54,4 +52,3 @@ for (let i = 0; i < 32; i++) {
     let query = {['f' + i]: 1};
     assert.eq(2, coll.find().hint(spec).itcount(), "failed on query: " + tojson(query));
 }
-})();

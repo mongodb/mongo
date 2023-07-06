@@ -1,8 +1,5 @@
 // Tests the behavior of $mod for match expressions.
 
-(function() {
-"use strict";
-
 const coll = db.mod;
 coll.drop();
 
@@ -175,4 +172,3 @@ assert.commandWorked(coll.insert([
 ]));
 assert.eq(0, coll.find({c: {$mod: [11, 10.0]}}).itcount());
 assert.eq(0, coll.find({c: {$mod: [-12, 0]}}).itcount());
-}());

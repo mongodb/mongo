@@ -7,10 +7,7 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");  // For PrepareHelpers.
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const dbName = "test";
 const collName = "change_stream_transaction";
@@ -272,4 +269,3 @@ rst.initiate();
 runTest(rst.getPrimary());
 
 rst.stopSet();
-})();

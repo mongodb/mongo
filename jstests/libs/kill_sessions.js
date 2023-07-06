@@ -1,11 +1,9 @@
-load("jstests/libs/parallelTester.js");
+import {Thread} from "jstests/libs/parallelTester.js";
 
 /**
  * Implements a kill session test helper
  */
-var _kill_sessions_api_module = (function() {
-    "use strict";
-
+export var _kill_sessions_api_module = (function() {
     var KillSessionsTestHelper = {};
 
     function isdbgrid(client) {
@@ -789,4 +787,4 @@ var _kill_sessions_api_module = (function() {
 })();
 
 // Globals
-var KillSessionsTestHelper = _kill_sessions_api_module.KillSessionsTestHelper;
+export var KillSessionsTestHelper = _kill_sessions_api_module.KillSessionsTestHelper;

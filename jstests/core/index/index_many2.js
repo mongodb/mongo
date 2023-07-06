@@ -2,10 +2,9 @@
 // collection.
 // @tags: [assumes_no_implicit_index_creation]
 
-(function() {
-'use strict';
-
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 
 const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
 
@@ -82,4 +81,3 @@ t.dropIndexes("*");
 assert.eq(1, t.getIndexKeys().length, "Expected only one index after dropping indexes via '*'");
 
 jsTestLog("Test index_many2.js complete.");
-})();

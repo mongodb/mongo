@@ -11,7 +11,8 @@
  * ]
  */
 
-load('jstests/concurrency/fsm_workload_helpers/balancer.js');
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
 
 export const $config = (function() {
     const initData = {

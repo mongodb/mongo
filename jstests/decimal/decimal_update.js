@@ -1,7 +1,5 @@
 // Test decimal updates
 
-(function() {
-"use strict";
 var col = db.decimal_updates;
 col.drop();
 
@@ -37,4 +35,3 @@ assert.commandWorked(col.update({}, {$mul: {'a': NumberDecimal("0")}}, {multi: t
 assert.eq(col.find({a: 0}).count(), 5, "count after $mul 0 incorrect");
 
 assert.writeError(col.update({}, {$bit: {'a': {and: 1}}}, {multi: true}), "$bit should fail");
-}());

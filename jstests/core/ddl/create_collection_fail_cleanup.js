@@ -3,10 +3,7 @@
 // The test runs commands that are not allowed with security token: top.
 // @tags: [
 //   not_allowed_with_security_token,requires_capped]
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For 'isMongos()'.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 var dbTest = db.getSiblingDB("DB_create_collection_fail_cleanup");
 dbTest.dropDatabase();
@@ -38,4 +35,3 @@ if (!FixtureHelpers.isMongos(dbTest)) {
     assert(topOutput.totals.hasOwnProperty(dbTest.legal_collation_collection.getFullName()),
            topOutput);
 }
-}());

@@ -6,11 +6,6 @@
  *
  * @tags: [requires_fcv_51]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/discover_topology.js");  // For findDataBearingNodes.
-
 const testName = "lookup_stale_mongos";
 const st = new ShardingTest({
     shards: 2,
@@ -130,4 +125,3 @@ assert.commandWorked(mongos0LocalColl.insert({_id: 2}));
 assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), expectedResults);
 
 st.stop();
-})();

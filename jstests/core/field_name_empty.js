@@ -4,10 +4,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.field_name_empty;
 coll.drop();
@@ -72,4 +69,3 @@ runTest({
     filter: {"x.": {$elemMatch: {"": 3}}},
     expected: [{_id: 9, x: [{"": 3}]}, {_id: 10, x: [{"": [3]}]}, {_id: 11, x: {"": [{"": 3}]}}]
 });
-})();

@@ -1,8 +1,6 @@
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-load("jstests/aggregation/extras/utils.js");  // For arrayEq and orderedArrayEq.
-load("jstests/libs/sbe_assert_error_override.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.computed_projection;
 coll.drop();
@@ -1118,4 +1116,3 @@ testCases.forEach(function(test) {
             result, test.expectedErrorCode, Object.assign({result: result}, test));
     }
 });
-}());

@@ -2,12 +2,9 @@
  * Test that oplog (on both primary and secondary) rolls over when its size exceeds the configured
  * maximum, with parameters for setting the initial sync method and the storage engine.
  */
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-
-function oplogRolloverTest(storageEngine, initialSyncMethod, serverless = false) {
+export function oplogRolloverTest(storageEngine, initialSyncMethod, serverless = false) {
     jsTestLog("Testing with storageEngine: " + storageEngine);
     if (initialSyncMethod) {
         jsTestLog("  and initial sync method: " + initialSyncMethod);

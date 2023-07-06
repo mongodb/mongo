@@ -1,7 +1,5 @@
 // Test skipShellCursorFinalize shell option.
 
-(function() {
-"use strict";
 const coll = db.skip_shell_cursor_finalize;
 coll.drop();
 
@@ -46,4 +44,3 @@ awaitShell = startParallelShell(checkShellCursorFinalize,
                                 "--setShellParameter",
                                 "skipShellCursorFinalize=true");
 awaitShell();
-})();

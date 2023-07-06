@@ -4,11 +4,6 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");
-
 const coll = db.expression_percentile;
 coll.drop();
 
@@ -230,4 +225,3 @@ assertValidSyntax({
     pSpec: {$median: {input: ["$k1", "$k2"], method: "approximate"}},
     msg: "Simple base case for $median with array input field"
 });
-})();

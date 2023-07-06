@@ -5,11 +5,8 @@
  * directly on that mongod. This will test the machinery of per-shard cursors via mongos.
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
-load("jstests/libs/discover_topology.js");                  // For 'DiscoverTopology'.
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 // To be eligible, a command must be a changeStream request sent to a mongos.
 const isEligibleForPerShardCursor = function(conn, cmdObj) {
@@ -44,4 +41,3 @@ OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/implicit_passthrough_to_shard_changestreams.js");
 
 OverrideHelpers.overrideRunCommand(runCommandWithPassthroughToShard);
-}());

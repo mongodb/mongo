@@ -14,9 +14,8 @@
  * unless explicitly requested by the user with a write concern.
  */
 
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
-load("jstests/replsets/rslib.js");
-load("jstests/libs/write_concern_util.js");
 
 // Returns a list of all collections in a given database. Use 'args' as the
 // 'listCollections' command arguments.

@@ -1,8 +1,5 @@
 // Test that the ssl=true/false option is honored in shell URIs.
 
-(function() {
-"use strict";
-
 var shouldSucceed = function(uri) {
     var conn = new Mongo(uri);
     var res = conn.getDB('admin').runCommand({"hello": 1});
@@ -11,7 +8,7 @@ var shouldSucceed = function(uri) {
 
 var shouldFail = function(uri) {
     assert.throws(function(uri) {
-        var conn = new Mongo(uri);
+        new Mongo(uri);
     }, [uri], "network error while attempting to run command");
 };
 
@@ -61,4 +58,3 @@ assert.eq(res, 1, "should not have been able to connect without --ssl");
 
 // Clean up
 MongoRunner.stopMongod(sslMongo);
-}());

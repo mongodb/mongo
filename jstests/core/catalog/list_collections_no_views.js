@@ -12,8 +12,6 @@
  *   tenant_migration_incompatible,
  * ]
  */
-(function() {
-'use strict';
 let mydb = db.getSiblingDB('list_collections_no_views');
 
 assert.commandWorked(mydb.createCollection('foo'));
@@ -146,4 +144,3 @@ assert.commandFailed(mydb.runCommand({listCollections: 1, filter: {type: 'view'}
 
 // Fix database state for end of test validation and burn-in tests
 mydb.dropDatabase();
-})();

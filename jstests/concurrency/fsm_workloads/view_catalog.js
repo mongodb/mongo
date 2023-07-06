@@ -4,6 +4,7 @@
  * Creates, modifies and drops view namespaces concurrently. Each worker operates on their own view,
  * built on a shared underlying collection.
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     var data = {

@@ -8,9 +8,6 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-"use strict";
-
 var numDocs = 2000;
 var baseName = "shard_insert_getlasterror_w2";
 var testDBName = baseName;
@@ -34,7 +31,7 @@ var replSet1 = shardingTest.rs0;
 // Add data to it
 var testDBReplSet1 = replSet1.getPrimary().getDB(testDBName);
 var bulk = testDBReplSet1.foo.initializeUnorderedBulkOp();
-for (var i = 0; i < numDocs; i++) {
+for (let i = 0; i < numDocs; i++) {
     bulk.insert({x: i, text: textString});
 }
 assert.commandWorked(bulk.execute());
@@ -62,7 +59,7 @@ assert.writeError(testDB.foo.insert({_id: 'a', x: 1}, {writeConcern: {w: 2, wtim
 
 // Add more data
 bulk = testDB.foo.initializeUnorderedBulkOp();
-for (var i = numDocs; i < 2 * numDocs; i++) {
+for (let i = numDocs; i < 2 * numDocs; i++) {
     bulk.insert({x: i, text: textString});
 }
 assert.commandWorked(bulk.execute({w: replNodes, wtimeout: 30000}));
@@ -91,4 +88,3 @@ assert.soon(function() {
 shardingTest.stop();
 
 print('shard_insert_getlasterror_w2.js SUCCESS');
-})();

@@ -1,9 +1,9 @@
 /**
  * Utilities for testing transactions.
  */
-var TransactionsUtil = (function() {
-    load("jstests/libs/override_methods/override_helpers.js");
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
+export var TransactionsUtil = (function() {
     // Although createCollection and createIndexes are supported inside multi-document
     // transactions, we intentionally exclude them from this list since they are non-
     // idempotent and, for createIndexes, are not supported inside multi-document

@@ -8,9 +8,13 @@
  *  uses_transactions,
  * ]
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
+import {
+    withTxnAndAutoRetry
+} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
-load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 5;

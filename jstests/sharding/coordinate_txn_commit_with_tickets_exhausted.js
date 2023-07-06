@@ -10,12 +10,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallelTester.js');
-load("jstests/sharding/libs/create_sharded_collection_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const kNumWriteTickets = 10;
 const st = new ShardingTest({
@@ -108,4 +105,3 @@ for (let thread of prepareConflictThreads) {
 }
 
 st.stop();
-})();

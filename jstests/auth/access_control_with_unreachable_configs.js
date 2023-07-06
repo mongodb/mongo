@@ -28,7 +28,7 @@ db.createUser({user: 'user', pwd: 'pwd', roles: ['clusterAdmin']});
 db.auth('user', 'pwd');
 
 // open a new connection to mongos (unauthorized)
-var conn = new Mongo(mongos.host);
+conn = new Mongo(mongos.host);
 db = conn.getDB('admin');
 
 // first serverStatus should fail since user is not authorized

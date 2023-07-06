@@ -8,8 +8,8 @@
  * ]
  */
 
-load("jstests/libs/fixture_helpers.js");  // For isMongos.
-import {getWinningPlan, getRejectedPlan} from "jstests/libs/analyze_plan.js";
+import {getRejectedPlan, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const collName = jsTestName();
 const coll = db[collName];

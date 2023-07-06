@@ -1,9 +1,8 @@
 /**
  * Utility test functions for FTDC
  */
-'use strict';
 
-function getParameter(adminDb, field) {
+export function getParameter(adminDb, field) {
     var q = {getParameter: 1};
     q[field] = 1;
 
@@ -11,7 +10,7 @@ function getParameter(adminDb, field) {
     return ret[field];
 }
 
-function setParameter(adminDb, obj) {
+export function setParameter(adminDb, obj) {
     let o = Object.extend({setParameter: 1}, obj, true);
     return adminDb.runCommand(Object.extend({setParameter: 1}, obj));
 }
@@ -19,7 +18,7 @@ function setParameter(adminDb, obj) {
 /**
  * Verify that getDiagnosticData is working correctly.
  */
-function verifyGetDiagnosticData(adminDb, logData = true) {
+export function verifyGetDiagnosticData(adminDb, logData = true) {
     // We need to retry a few times if run this test immediately after mongod is started as FTDC may
     // not have run yet.
     var foundGoodDocument = false;
@@ -57,7 +56,7 @@ function verifyGetDiagnosticData(adminDb, logData = true) {
 /**
  * Validate all the common FTDC parameters are set correctly and can be manipulated.
  */
-function verifyCommonFTDCParameters(adminDb, isEnabled) {
+export function verifyCommonFTDCParameters(adminDb, isEnabled) {
     // Are we running against MongoS?
     var isMongos = ("isdbgrid" == adminDb.runCommand("ismaster").msg);
 
@@ -113,7 +112,7 @@ function verifyCommonFTDCParameters(adminDb, isEnabled) {
     assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerInterimUpdate": 10}));
 }
 
-function waitFailedToStart(pid, exitCode) {
+export function waitFailedToStart(pid, exitCode) {
     assert.soon(function() {
         return !checkProgram(pid).alive;
     }, `Failed to wait for ${pid} to die`, 30 * 1000);

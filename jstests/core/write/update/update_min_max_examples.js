@@ -1,7 +1,4 @@
 // Basic examples for $min/$max
-(function() {
-"use strict";
-
 let res;
 const coll = db.update_min_max;
 coll.drop();
@@ -71,4 +68,3 @@ res = coll.update({_id: 8, "y.a": 6}, {$min: {"y.$.a": 5}});
 assert.commandWorked(res);
 insertdoc.y[1].a = 5;
 assert.docEq(insertdoc, coll.findOne({_id: 8}));
-}());

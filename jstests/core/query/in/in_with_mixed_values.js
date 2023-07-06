@@ -1,7 +1,4 @@
 // Test $in regular expressions with a mix of types.
-(function() {
-'use strict';
-
 const coll = db.jstests_in_with_mixed_values;
 
 // Exercise mixed regex and scalar integer cases.
@@ -114,4 +111,3 @@ assert.eq(2, coll.find({x: {$in: [BinData(0, "ZAA="), BinData(1, "AAA=")]}}).itc
 assert.eq(0, coll.find({x: {$in: [BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")]}}).itcount());
 
 assert(coll.drop());
-})();

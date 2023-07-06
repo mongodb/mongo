@@ -5,8 +5,8 @@
  * @tags: [requires_capped]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {makeCapped} from "jstests/concurrency/fsm_workload_modifiers/make_capped.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_base.js";
-load('jstests/concurrency/fsm_workload_modifiers/make_capped.js');  // for makeCapped
 
 export const $config = extendWorkload($baseConfig, makeCapped);
 

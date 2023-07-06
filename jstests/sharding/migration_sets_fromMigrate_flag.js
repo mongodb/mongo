@@ -14,12 +14,15 @@
 //         delete op is done during chunk migration within the chunk range.
 //
 
-load('jstests/libs/chunk_manipulation_util.js');
+import {
+    migrateStepNames,
+    moveChunkParallel,
+    pauseMigrateAtStep,
+    unpauseMigrateAtStep,
+    waitForMigrateStep,
+} from "jstests/libs/chunk_manipulation_util.js";
 
-(function() {
-"use strict";
-
-var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+var staticMongod = MongoRunner.runMongod({});
 
 var st = new ShardingTest({shards: 2, mongos: 1, rs: {nodes: 1}});
 
@@ -198,4 +201,3 @@ assertEqAndDumpOpLog(1,
 
 st.stop();
 MongoRunner.stopMongod(staticMongod);
-})();

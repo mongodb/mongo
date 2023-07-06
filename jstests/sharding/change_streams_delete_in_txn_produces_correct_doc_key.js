@@ -5,11 +5,8 @@
 //   uses_transactions,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 // Create a new sharded cluster. For this test, in addition to testing 'delete' events within a
 // multi-document transaction, we only test the 'documentKey' field contains the shard key in a
@@ -127,4 +124,3 @@ testDeleteInMultiDocTxn({
 });
 
 s.stop();
-}());

@@ -6,11 +6,7 @@
  * This tests behavior centered around both upgrading and downgrading FCV.
  * @tags: [multiversion_incompatible]
  */
-
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
@@ -100,4 +96,3 @@ runInitialSync({
                /*initialFCV*/ latestFCV);
 
 rst.stopSet();
-})();

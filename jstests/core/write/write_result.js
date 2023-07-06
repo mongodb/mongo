@@ -10,8 +10,6 @@
 //   requires_fastcount,
 // ]
 
-(function() {
-"use strict";
 //
 // Tests the behavior of single writes using write commands
 //
@@ -182,4 +180,3 @@ if (!replSet)
     assert.eq(coll.count(), 0, "not replset");
 else
     assert.eq(coll.count(), 1, "replset");
-}());

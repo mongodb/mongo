@@ -3,9 +3,6 @@
  * collections.
  */
 
-(function() {
-"use strict";
-
 function runTest(st, badViewDefinition) {
     const mongos = st.s;
     const config = mongos.getDB("config");
@@ -135,4 +132,3 @@ runTest(st, {_id: "invalidNotFullyQualifiedNs", viewOn: "coll", pipeline: []});
 runTest(st, {_id: "invalid_system_views.missingViewOnField", pipeline: []});
 
 st.stop();
-}());

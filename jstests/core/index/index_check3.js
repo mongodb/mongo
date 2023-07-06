@@ -2,9 +2,6 @@
 //   assumes_balancer_off,
 //   assumes_read_concern_local,
 // ]
-(function() {
-"use strict";
-
 const t = db.index_check3;
 t.drop();
 
@@ -65,4 +62,3 @@ assert.eq(2, t.find({i: {$gte: 'a'}}).itcount(), "gte b2");
 assert.eq(2, t.find({i: {$gte: 'a', $lt: MaxKey}}).itcount(), "gte c2");
 assert.eq(2, t.find({i: {$gte: 'a', $lt: MaxKey}}).sort({i: -1}).itcount(), "gte d2");
 assert.eq(2, t.find({i: {$gte: 'a', $lt: MaxKey}}).sort({i: 1}).itcount(), "gte e2");
-})();

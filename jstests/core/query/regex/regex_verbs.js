@@ -1,9 +1,6 @@
 /**
  * Tests regular expressions and the use of various UCP verbs.
  */
-(function() {
-"use strict";
-
 const coll = db.getCollection("regex_backtracking_verbs");
 coll.drop();
 
@@ -52,4 +49,3 @@ assertFindResultsEq("b(*ACCEPT)", [docB]);
     assertFindResultsEq(`(*${verb})a`, [docA]);
     assertFindResultsEq(`(*${verb})[Bb]`, [docB]);
 });
-}());

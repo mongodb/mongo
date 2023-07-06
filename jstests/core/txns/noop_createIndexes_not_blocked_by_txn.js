@@ -1,12 +1,8 @@
 // Tests that no-op createIndex commands do not block behind transactions.
 // @tags: [uses_transactions]
-(function() {
-"use strict";
-
 // TODO(SERVER-39704): Remove the following load after SERVER-39704 is completed
-// For withTxnAndAutoRetryOnMongos.
-load('jstests/libs/auto_retry_transaction_in_sharding.js');
-load("jstests/libs/fixture_helpers.js");
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const dbName = 'noop_createIndexes_not_blocked';
 const collName = 'test';
@@ -68,4 +64,3 @@ withTxnAndAutoRetryOnMongos(session, () => {
     });
     assert(ErrorCodes.isExceededTimeLimitError(res.code));
 });
-}());

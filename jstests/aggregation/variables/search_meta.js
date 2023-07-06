@@ -8,9 +8,6 @@
  *   assumes_read_concern_unchanged
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.searchCollector;
 coll.drop();
 assert.commandWorked(coll.insert({"_id": 1, "title": "cakes"}));
@@ -44,4 +41,3 @@ if (!response.ok) {
 } else {
     assert.eq(response.cursor.firstBatch, []);
 }
-})();

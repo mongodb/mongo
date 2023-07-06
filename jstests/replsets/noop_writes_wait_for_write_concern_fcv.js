@@ -4,11 +4,8 @@
  * This tests behavior on both latest and last-lts FCVs.
  * @tags: [multiversion_incompatible]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");  // assertWriteConcernError
-load("jstests/replsets/rslib.js");           // reconfig
+import {assertWriteConcernError} from "jstests/libs/write_concern_util.js";
+import {reconfig} from "jstests/replsets/rslib.js";
 
 // Start a two node replica set and set its FCV to the given version, then take down one
 // node so majority write concern can no longer be satisfied and verify that a noop setFCV
@@ -77,4 +74,3 @@ function testFCVNoop(targetVersion) {
 
 testFCVNoop(lastLTSFCV);
 testFCVNoop(latestFCV);
-})();

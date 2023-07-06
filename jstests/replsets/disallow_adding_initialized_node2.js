@@ -9,9 +9,6 @@
 // This test requires users to persist across a restart.
 // @tags: [requires_persistence]
 
-(function() {
-'use strict';
-
 var name = 'disallow_adding_initialized_node2';
 var replSetA = new ReplSetTest({
     name: name,
@@ -95,4 +92,3 @@ assert.eq(ReplSetTest.State.PRIMARY, statusB.members[0].state);
 
 replSetB.stopSet();
 replSetA.stopSet();
-})();

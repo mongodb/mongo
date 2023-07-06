@@ -5,13 +5,6 @@
  * write -- linearizable does a read then no-op write
  */
 
-load('jstests/replsets/rslib.js');
-load('jstests/libs/parallelTester.js');
-load('jstests/libs/write_concern_util.js');
-
-(function() {
-'use strict';
-
 var sendLinearizableReadOnFailpoint = function() {
     // Linearizable read concern is not allowed on secondaries. But set this flag so we can start
     // the operation during the transition from secondary to primary. The read sent at this state
@@ -90,4 +83,3 @@ assert.commandWorked(newPrimary.adminCommand({"replSetStepUp": 1}));
 parallelShell();
 
 replTest.stopSet();
-}());

@@ -1,10 +1,7 @@
 /**
  * Check the functionality of encrypt and decrypt functions in KeyStore.js
  */
-load('jstests/ssl/libs/ssl_helpers.js');
-
-(function() {
-"use strict";
+import {CA_CERT, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 const x509_options = {
     sslMode: "requireSSL",
@@ -113,4 +110,3 @@ for (const kmsType of kmsTypes) {
 }
 
 MongoRunner.stopMongod(conn);
-}());

@@ -12,7 +12,7 @@
 
 TestData.skipCheckDBHashes = true;
 
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";

@@ -1,4 +1,3 @@
-(function() {
 let t = db.push2;
 t.drop();
 
@@ -19,4 +18,3 @@ for (let x = 0; x < 100; x++) {
 assert(gotError, "should have gotten error");
 
 t.drop();
-})();

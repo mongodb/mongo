@@ -3,11 +3,8 @@
 // data (member3), then puts 50 more ops in member3's buffer and makes sure that member3 doesn't try
 // to sync from member2.
 
-(function() {
-"use strict";
-
-load('jstests/libs/write_concern_util.js');
-load("jstests/replsets/rslib.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {syncFrom} from "jstests/replsets/rslib.js";
 
 // helper to ensure two nodes are at the same place in the oplog
 var waitForSameOplogPosition = function(db1, db2, errmsg) {
@@ -145,4 +142,3 @@ while ((new Date()).getTime() < end) {
 assert.commandWorked(member2.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}));
 
 replSet.stopSet();
-}());

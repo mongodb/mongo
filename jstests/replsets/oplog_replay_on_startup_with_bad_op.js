@@ -5,9 +5,6 @@
 // @tags: [
 //   requires_persistence,
 // ]
-(function() {
-"use strict";
-
 var rst = new ReplSetTest({
     nodes: 1,
 });
@@ -68,4 +65,3 @@ assert.throws(() => rst.restart(0));  // Restart in replSet mode again.
 
 rst.stop(0, undefined, {allowedExitCode: MongoRunner.EXIT_ABORT});
 rst.stopSet();
-})();

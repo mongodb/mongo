@@ -2,9 +2,9 @@
  * Tests that dropDatabase respects maxTimeMS.
  * @tags: [requires_replication, uses_transactions]
  */
-(function() {
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/wait_for_command.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
+
 const rst = ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -66,4 +66,3 @@ const dropDB = rst.getPrimary().getDB("drop");
 })();
 
 rst.stopSet();
-})();

@@ -10,8 +10,12 @@
  * update operation.
  */
 
-(function() {
-load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
+import {
+    finishAndValidate,
+    reInitiateSetWithSecondary,
+    turnOffHangBeforeCopyingDatabasesFailPoint,
+    updateRemove,
+} from "jstests/replsets/libs/initial_sync_update_missing_doc.js";
 
 const replSet = new ReplSetTest({nodes: 1});
 
@@ -36,4 +40,3 @@ turnOffHangBeforeCopyingDatabasesFailPoint(secondary);
 finishAndValidate(replSet, collectionName, 0 /* numDocuments */);
 
 replSet.stopSet();
-})();

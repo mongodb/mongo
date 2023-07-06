@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 TestData.disableImplicitSessions = true;
 
 var conn = MongoRunner.runMongod({setParameter: {maxSessions: 2}});
@@ -25,4 +22,3 @@ assert.commandFailed(db.runCommand({find: "foo", batchSize: 1}),
                      "able to run find when the cache is full");
 
 MongoRunner.stopMongod(conn);
-})();

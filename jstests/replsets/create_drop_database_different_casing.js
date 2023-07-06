@@ -14,10 +14,7 @@
  * @tags: [requires_replication]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
@@ -52,4 +49,3 @@ assert.commandWorked(lowerDB.createCollection("test"));
 awaitDropUpper();
 
 rst.stopSet();
-})();

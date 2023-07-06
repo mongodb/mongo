@@ -3,11 +3,8 @@
 // @tags: [
 //   requires_fcv_62,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");         // For configureFailPoint.
-load('jstests/libs/parallel_shell_helpers.js');  // For funWithArgs.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 // Disable implicit sessions since dropping "config" database for a tenant must be done not in a
 // session.
@@ -313,4 +310,3 @@ const secondOrgTenantId = ObjectId();
 
 replSetTest.stopSet();
 TestData.disableImplicitSessions = false;
-}());

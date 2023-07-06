@@ -16,11 +16,11 @@
  */
 
 import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
-load("jstests/libs/index_catalog_helpers.js");     // For IndexCatalogHelpers.findByName.
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const columnstoreEnabled =
     checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"], true /* checkAllNodes */) &&

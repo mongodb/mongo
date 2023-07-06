@@ -3,7 +3,7 @@
 // before/afterServerInfo hooks run before and after the fuzzer preamble reaches out to the server
 // for information. Use these hooks to prevent server commands in preamble.js from failing.
 
-function defineFuzzerHooks({
+export function defineFuzzerHooks({
     beforeServerInfo: beforeServerInfo = Function.prototype,
     afterServerInfo: afterServerInfo = Function.prototype,
 } = {}) {

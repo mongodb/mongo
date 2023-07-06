@@ -1,9 +1,9 @@
 /**
  * Tests that direct removal in a timeseries bucket collection synchronizes with bucket reopening.
  */
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-load("jstests/libs/parallel_shell_helpers.js");
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const conn = MongoRunner.runMongod();
 

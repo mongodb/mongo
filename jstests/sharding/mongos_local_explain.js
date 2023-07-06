@@ -2,9 +2,6 @@
  * Test that a mongos-only aggregation pipeline is explainable, and that the resulting explain plan
  * confirms that the pipeline ran entirely on mongoS.
  */
-(function() {
-"use strict";
-
 const st = new ShardingTest({name: "mongos_comment_test", mongos: 1, shards: 1});
 const mongosConn = st.s;
 
@@ -29,4 +26,3 @@ assert.eq(explainPlan.mongos.host, mongosConn.name);
 assert.isnull(explainPlan.splitPipeline);
 
 st.stop();
-})();

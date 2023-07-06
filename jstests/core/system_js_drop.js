@@ -10,9 +10,6 @@
  *   requires_scripting,
  * ]
  */
-(function() {
-'use strict';
-
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
@@ -36,4 +33,3 @@ assert(systemJs.drop());
 assert.commandFailedWithCode(
     testDB.runCommand({find: coll.getName(), filter: {$where: "isTeenager(this.age)"}}),
     ErrorCodes.JSInterpreterFailure);
-})();

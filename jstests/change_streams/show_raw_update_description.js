@@ -7,12 +7,9 @@
  *   requires_fcv_60,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");       // For arrayEq.
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 // Drop and recreate the collections to be used in this set of tests.
 assertDropAndRecreateCollection(db, "t1");
@@ -397,4 +394,3 @@ cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 assertCanApplyRawUpdate(db.t2, db.t2Copy, expected);
 
 cst.cleanUp();
-}());

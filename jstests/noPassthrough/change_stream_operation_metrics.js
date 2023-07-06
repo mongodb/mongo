@@ -5,9 +5,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({
     nodes: 2,
     nodeOptions: {setParameter: {"aggregateOperationResourceConsumptionMetrics": true}}
@@ -292,4 +289,3 @@ let nextId = nDocs;
     });
 })();
 rst.stopSet();
-}());

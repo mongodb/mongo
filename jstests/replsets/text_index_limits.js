@@ -5,9 +5,6 @@
  * killed by a stepdown before any attempt can finish on slower variants.
  * @tags: [does_not_support_stepdowns]
  */
-(function() {
-"use strict";
-
 const replTest = new ReplSetTest({nodes: 3});
 replTest.startSet();
 replTest.initiate();
@@ -53,4 +50,3 @@ assert.commandWorked(db.runCommand(
     {insert: t.getName(), documents: [{_id: 2, comments: commentsWithWordsOfLargeSize}]}));
 
 replTest.stopSet();
-})();

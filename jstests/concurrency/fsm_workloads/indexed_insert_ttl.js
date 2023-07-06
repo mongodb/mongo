@@ -8,7 +8,8 @@
  * @tags: [uses_ttl]
  */
 
-load('jstests/concurrency/fsm_workload_helpers/balancer.js');
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
 
 export const $config = (function() {
     var states = {

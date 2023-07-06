@@ -11,16 +11,15 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     getTenantMigrationAccessBlocker,
     makeX509OptionsForTest
 } from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/libs/write_concern_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
 
 // During "shard merge" tenant migrations, writes to internal DBs are still allowed.
 const kUnrelatedDbName = "admin";

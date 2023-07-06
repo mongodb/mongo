@@ -6,10 +6,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/index_build.js");
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const dbName = jsTest.name();
 const collName = "test";
@@ -94,5 +91,4 @@ indexes = coll.getIndexes();
 assert.eq(2, indexes.length);
 
 rst.stopSet();
-return;
-}());
+quit();

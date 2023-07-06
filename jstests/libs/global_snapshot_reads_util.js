@@ -2,7 +2,7 @@
  * Tests invalid getMore attempts against an established global snapshot cursor on mongos. The
  * cursor should still be valid and usable after each failed attempt.
  */
-function verifyInvalidGetMoreAttempts(mainDb, collName, cursorId, lsid, txnNumber) {
+export function verifyInvalidGetMoreAttempts(mainDb, collName, cursorId, lsid, txnNumber) {
     // Reject getMores without a session.
     assert.commandFailedWithCode(
         mainDb.runCommand({getMore: cursorId, collection: collName, batchSize: 1}), 50800);
@@ -48,7 +48,7 @@ function verifyInvalidGetMoreAttempts(mainDb, collName, cursorId, lsid, txnNumbe
  * @param {collName} String
  * @param {awaitCommittedFn} A function with no arguments or return value
  */
-function SnapshotReadsTest({primaryDB, secondaryDB, awaitCommittedFn}) {
+export function SnapshotReadsTest({primaryDB, secondaryDB, awaitCommittedFn}) {
     function _makeSnapshotReadConcern(atClusterTime) {
         if (atClusterTime === undefined) {
             return {level: "snapshot"};

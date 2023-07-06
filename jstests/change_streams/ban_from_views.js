@@ -1,10 +1,10 @@
 /**
  * Test that the $changeStream stage cannot be used in a view definition pipeline.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection
+} from "jstests/libs/collection_drop_recreate.js";
 
 const coll = assertDropAndRecreateCollection(db, "change_stream_ban_from_views");
 assert.commandWorked(coll.insert({_id: 1}));
@@ -35,4 +35,3 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     db.runCommand({aggregate: normalViewName, pipeline: [{$changeStream: {}}], cursor: {}}),
     ErrorCodes.CommandNotSupportedOnView);
-})();

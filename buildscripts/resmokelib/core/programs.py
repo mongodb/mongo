@@ -291,35 +291,37 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
 
     # Load a callback to check UUID consistency before shutting down a ShardingTest.
     eval_sb.append(
-        "load('jstests/libs/override_methods/check_uuids_consistent_across_cluster.js');")
+        'await import("jstests/libs/override_methods/check_uuids_consistent_across_cluster.js")')
 
     # Load a callback to check index consistency before shutting down a ShardingTest.
     eval_sb.append(
-        "load('jstests/libs/override_methods/check_indexes_consistent_across_cluster.js');")
+        'await import("jstests/libs/override_methods/check_indexes_consistent_across_cluster.js")')
 
     # Load a callback to check that all orphans are deleted before shutting down a ShardingTest.
-    eval_sb.append("load('jstests/libs/override_methods/check_orphans_are_deleted.js');")
+    eval_sb.append('await import("jstests/libs/override_methods/check_orphans_are_deleted.js")')
 
     # Load a callback to check that the info stored in config.collections and config.chunks is
     # semantically correct before shutting down a ShardingTest.
     eval_sb.append(
-        "await import('jstests/libs/override_methods/check_routing_table_consistency.js');")
+        'await import("jstests/libs/override_methods/check_routing_table_consistency.js")')
 
     # Load a callback to check that all shards have correct filtering information before shutting
     # down a ShardingTest.
-    eval_sb.append("load('jstests/libs/override_methods/check_shard_filtering_metadata.js');")
+    eval_sb.append(
+        'await import("jstests/libs/override_methods/check_shard_filtering_metadata.js")')
 
     if config.FUZZ_MONGOD_CONFIGS is not None and config.FUZZ_MONGOD_CONFIGS is not False:
         # Prevent commands from running with the config fuzzer.
         eval_sb.append(
-            "load('jstests/libs/override_methods/config_fuzzer_incompatible_commands.js');")
+            'await import("jstests/libs/override_methods/config_fuzzer_incompatible_commands.js")')
 
     # Load this file to retry operations that fail due to in-progress background operations.
     eval_sb.append(
-        "load('jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js');")
+        'await import("jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js")'
+    )
 
     eval_sb.append(
-        "(function() { Timestamp.prototype.toString = function() { throw new Error(\"Cannot toString timestamps. Consider using timestampCmp() for comparison or tojson(<variable>) for output.\"); } })();"
+        "(function() { Timestamp.prototype.toString = function() { throw new Error(\"Cannot toString timestamps. Consider using timestampCmp() for comparison or tojson(<variable>) for output.\"); } })()"
     )
 
     eval_str = "; ".join(eval_sb)

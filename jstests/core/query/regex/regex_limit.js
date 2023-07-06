@@ -1,9 +1,6 @@
 /**
  * Test the behavior of very, very long regex patterns.
  */
-(function() {
-"use strict";
-
 const coll = db.regex_limit;
 coll.drop();
 
@@ -60,4 +57,3 @@ assert.commandFailedWithCode(coll.runCommand("find", {filter: {z: {$regex: patte
                              51091);
 assert.commandFailedWithCode(
     coll.runCommand("find", {filter: {z: {$in: [new RegExp(patternTooLong)]}}}), 51091);
-}());

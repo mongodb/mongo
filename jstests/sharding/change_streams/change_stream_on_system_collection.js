@@ -9,11 +9,8 @@
  *   uses_change_streams,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/change_stream_util.js");        // For assertChangeStreamEventEq.
+import {assertChangeStreamEventEq} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 // Asserts that the next event in a change stream connected to via cursor 'changeStreamCursor' is
 // equal to 'eventDocument'.
@@ -135,4 +132,3 @@ assertNextChangeStreamEventEquals(wholeClusterCursor, {
     operationType: "insert",
 });
 st.stop();
-}());

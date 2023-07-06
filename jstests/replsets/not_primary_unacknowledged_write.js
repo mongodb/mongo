@@ -2,9 +2,6 @@
  * Test that a secondary hangs up on an unacknowledged write.
  */
 
-(function() {
-"use strict";
-
 function getNotPrimaryUnackWritesCounter() {
     return assert.commandWorked(primaryDB.adminCommand({serverStatus: 1}))
         .metrics.repl.network.notPrimaryUnacknowledgedWrites;
@@ -91,4 +88,3 @@ let failedUnackWritesAfter = getNotPrimaryUnackWritesCounter();
 assert.eq(failedUnackWritesAfter, failedUnackWritesBefore + 1);
 
 rst.stopSet();
-})();

@@ -16,12 +16,8 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -41,8 +37,8 @@ const sessionID = session.getSessionId();
 
 let failPoint = configureFailPoint(primary, "hangBeforeSessionCheckOut");
 
-const txnFunc = function(sessionID) {
-    load("jstests/core/txns/libs/prepare_helpers.js");
+const txnFunc = async function(sessionID) {
+    const {PrepareHelpers} = await import("jstests/core/txns/libs/prepare_helpers.js");
     const session = PrepareHelpers.createSessionWithGivenId(db.getMongo(), sessionID);
     const sessionDB = session.getDatabase("test");
     session.startTransaction({writeConcern: {w: "majority"}});
@@ -56,8 +52,7 @@ failPoint.wait();
 replTest.stepUp(newPrimary);
 assert.eq(replTest.getPrimary(), newPrimary, "Primary didn't change.");
 
-const prepareTxnFunc = function(sessionID) {
-    load("jstests/core/txns/libs/prepare_helpers.js");
+const prepareTxnFunc = async function(sessionID) {
     const newPrimaryDB = db.getMongo().getDB("test");
 
     // Start a transaction on the same session as before, but with a higher transaction number.
@@ -113,4 +108,3 @@ assert.commandWorked(newPrimaryDB.adminCommand({
 }));
 
 replTest.stopSet();
-})();

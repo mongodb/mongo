@@ -3,10 +3,7 @@
  * after upgrade, downgrade, and addShard.
  */
 
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/remove_shard_util.js");
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 const st = new ShardingTest({shards: 1, useHostname: false});
 
@@ -39,4 +36,3 @@ checkClusterParameter(st.shard0, true);
 
 additionalShard.stopSet();
 st.stop();
-})();

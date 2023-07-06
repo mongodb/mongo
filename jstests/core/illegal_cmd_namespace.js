@@ -6,9 +6,6 @@
  *   assumes_unsharded_collection,
  * ]
  */
-(function() {
-"use strict";
-
 function testBadNamespace(collName) {
     const coll = db[collName];
     assert.commandFailedWithCode(db.runCommand({find: collName}), ErrorCodes.InvalidNamespace);
@@ -33,4 +30,3 @@ testBadNamespace("$cmd.aggregate");
 testBadNamespace("a$cmdb");
 testBadNamespace("$");
 testBadNamespace("a$b");
-}());

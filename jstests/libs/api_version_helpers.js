@@ -1,9 +1,7 @@
-"use strict";
-
 /**
  * Helper functions that help make assertions on API Version parameters.
  */
-var APIVersionHelpers = (function() {
+export var APIVersionHelpers = (function() {
     /**
      * Asserts that the pipeline fails with the given code when apiStrict is set to true and
      * apiVersion is "1".

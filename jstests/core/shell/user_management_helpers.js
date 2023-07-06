@@ -12,9 +12,6 @@
 //   tenant_migration_incompatible,
 // ]
 
-(function() {
-'use strict';
-
 // This test is a basic sanity check of the shell helpers for manipulating user objects
 // It is not a comprehensive test of the functionality of the user manipulation commands
 function assertHasRole(rolesArray, roleName, roleDB) {
@@ -149,4 +146,3 @@ try {
     db.getSiblingDB('admin').system.users.find().forEach(printjson);
     throw x;
 }
-})();

@@ -10,10 +10,6 @@
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
 // ]
-(function() {
-"use strict";
-load("jstests/libs/fixture_helpers.js");  // For "FixtureHelpers".
-
 const coll = db.mr_correctness;
 coll.drop();
 
@@ -184,4 +180,3 @@ function reduceNumbers(key, values) {
 
 coll.drop();
 outColl.drop();
-}());

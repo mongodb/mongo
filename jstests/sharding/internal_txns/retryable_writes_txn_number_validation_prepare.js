@@ -4,13 +4,13 @@
  *
  * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {
+    makeCommitTransactionCmdObj,
+    makePrepareTransactionCmdObj
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
@@ -101,8 +101,9 @@ function testTxnNumberValidationStartNewTxnNumberWhilePreviousIsInPrepare(
     setUpTestMode(testMode);
     rst.awaitLastOpCommitted();
 
-    let runNewTxnNumber = function(primaryHost, parentSessionUUIDString, dbName, collName) {
-        load('jstests/sharding/libs/sharded_transactions_helpers.js');
+    let runNewTxnNumber = async function(primaryHost, parentSessionUUIDString, dbName, collName) {
+        const {makeCommitTransactionCmdObj} =
+            await import("jstests/sharding/libs/sharded_transactions_helpers.js");
 
         const primary = new Mongo(primaryHost);
         const testDB = primary.getDB(dbName);
@@ -146,4 +147,3 @@ for (let testModeName in kTestMode) {
 }
 
 rst.stopSet();
-})();

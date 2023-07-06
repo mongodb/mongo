@@ -4,8 +4,9 @@
  * @tags: [requires_fcv_51]
  */
 
-load("jstests/libs/fail_point_util.js");
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+
 Random.setRandomSeed();
 
 const dbName = "test";

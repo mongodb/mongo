@@ -7,13 +7,9 @@
  * ]
  *
  */
-load('jstests/noPassthrough/libs/index_build.js');
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
-
-(function() {
-
-"use strict";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -68,4 +64,3 @@ IndexBuildTest.waitForIndexBuildToStop(primaryDB, primaryColl.getFullName(), "x_
 IndexBuildTest.assertIndexes(primaryColl, 2, ["_id_", "x_1"], []);
 
 rst.stopSet();
-})();

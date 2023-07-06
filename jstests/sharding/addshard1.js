@@ -1,7 +1,4 @@
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var s = new ShardingTest({name: "add_shard1", shards: 1, useHostname: false});
 
@@ -86,4 +83,3 @@ rs1.stopSet();
 rs2.stopSet();
 
 s.stop();
-})();

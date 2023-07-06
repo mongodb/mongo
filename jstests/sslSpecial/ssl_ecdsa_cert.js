@@ -1,8 +1,6 @@
-load('jstests/ssl/libs/ssl_helpers.js');
+import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 const test = () => {
-    "use strict";
-
     const ECDSA_CA_CERT = 'jstests/libs/ecdsa-ca.pem';
     const ECDSA_CLIENT_CERT = 'jstests/libs/ecdsa-client.pem';
     const ECDSA_SERVER_CERT = 'jstests/libs/ecdsa-server.pem';

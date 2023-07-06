@@ -2,9 +2,6 @@
 
 // SERVER-23129 Write commands should reject unknown fields. This is run in passthrough tests to
 // ensure that both mongos and mongod reject these commands.
-(function() {
-'use strict';
-
 var coll = db.write_commands_reject_unknown_fields;
 
 // All commands must reject fields at the top-level.
@@ -18,4 +15,3 @@ assert.commandFailed(coll.runCommand('delete', {deletes: [{q: {}, limit: 0}], as
 assert.commandFailed(
     coll.runCommand('update', {updates: [{q: {}, u: {$inc: {a: 1}}, asdf: true}]}));
 assert.commandFailed(coll.runCommand('delete', {deletes: [{q: {}, limit: 0, asdf: true}]}));
-}());

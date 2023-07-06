@@ -1,9 +1,5 @@
 // SERVER-7781 $geoNear pipeline stage
-(function() {
-'use strict';
-
-load('jstests/libs/geo_near_random.js');
-load('jstests/aggregation/extras/utils.js');
+import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
 
 var coll = 'server7781';
 
@@ -92,4 +88,3 @@ function test(db, indexType) {
 
 test(db, '2d');
 test(db, '2dsphere');
-})();

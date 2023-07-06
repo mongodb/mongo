@@ -1,10 +1,7 @@
 /**
  * Uses prototype overrides to set the apiVersion field to "1" for each command when running tests.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 const apiVersion = "1";
 
@@ -26,4 +23,3 @@ function runCommandWithApiVersion(conn, dbName, commandName, commandObj, func, m
 OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/set_api_version.js");
 
 OverrideHelpers.overrideRunCommand(runCommandWithApiVersion);
-})();

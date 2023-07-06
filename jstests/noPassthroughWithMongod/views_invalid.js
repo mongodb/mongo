@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 const dbname = 'views_invalid';
 let invalidDB = db.getSiblingDB(dbname);
 
@@ -70,4 +67,3 @@ assert.commandWorked(
 assert.eq(invalidDB.view.findOne({}, {_id: 0}),
           {x: 1},
           'find on view should work again after removing invalid view from catalog');
-})();

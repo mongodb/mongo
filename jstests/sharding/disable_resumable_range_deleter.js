@@ -4,11 +4,7 @@
  * requires_persistence - This test restarts shards and expects them to remember their data.
  * @tags: [requires_persistence]
  */
-(function() {
-
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // This test intentionally disables the resumable range deleter.
 TestData.skipCheckOrphans = true;
@@ -133,4 +129,3 @@ assert.commandFailedWithCode(
     ErrorCodes.OperationFailed);
 
 st.stop();
-})();

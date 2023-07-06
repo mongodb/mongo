@@ -4,11 +4,8 @@
 //   requires_fcv_62,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");                    // For configureFailPoint.
-load("jstests/serverless/libs/change_collection_util.js");  // For verifyChangeCollectionEntries.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {verifyChangeCollectionEntries} from "jstests/serverless/libs/change_collection_util.js";
 
 const replSetTest =
     new ReplSetTest({nodes: 1, name: "ChangeStreamMultitenantReplicaSetTest", serverless: true});
@@ -147,4 +144,3 @@ assert(endTimestamp !== undefined);
 verifyChangeCollectionEntries(primary, startTimestamp, endTimestamp, tenantId);
 
 replSetTest.stopSet();
-})();

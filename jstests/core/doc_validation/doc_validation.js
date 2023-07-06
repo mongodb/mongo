@@ -9,9 +9,7 @@
 // ]
 
 // Test basic inserts and updates with document validation.
-(function() {
-"use strict";
-load("jstests/libs/doc_validation_utils.js");  // for assertDocumentValidationFailure
+import {assertDocumentValidationFailure} from "jstests/libs/doc_validation_utils.js";
 
 const collName = "doc_validation";
 const coll = db[collName];
@@ -355,4 +353,3 @@ for (const command of [updateCommand, findAndModifyCommand]) {
     };
     assert.docEq(expectedError, errorInfo, tojson(res));
 }
-})();

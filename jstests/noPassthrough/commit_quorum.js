@@ -5,9 +5,8 @@
  *   requires_replication,
  * ]
  */
-(function() {
-load("jstests/noPassthrough/libs/index_build.js");
-load('jstests/libs/fail_point_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const replSet = new ReplSetTest({
     nodes: [
@@ -103,4 +102,3 @@ awaitShell();
 IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
 
 replSet.stopSet();
-})();

@@ -2,12 +2,8 @@
  * Tests that heartbeats containing writes from a different branch of history can't cause a stale
  * primary to incorrectly acknowledge a w:majority write that's about to be rolled back.
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 var name = "writeConcernStepDownAndBackUp";
 var dbName = "wMajorityCheck";
@@ -117,4 +113,3 @@ jsTestLog("Waiting for node 0 to roll back the failed write.");
 rst.awaitReplication();
 
 rst.stopSet();
-}());

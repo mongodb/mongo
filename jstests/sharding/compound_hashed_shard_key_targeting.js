@@ -7,11 +7,17 @@
  *   requires_majority_read_concern,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For arrayEq().
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/profiler.js");  // For profilerHas*OrThrow helper functions.
-load("jstests/sharding/libs/find_chunks_util.js");
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    profilerHasAtLeastOneMatchingEntryOrThrow,
+    profilerHasSingleMatchingEntryOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 const st = new ShardingTest({shards: 2});
 const kDbName = jsTestName();

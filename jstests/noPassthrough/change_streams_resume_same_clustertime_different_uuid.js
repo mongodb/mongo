@@ -7,10 +7,7 @@
  *   uses_change_streams,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For runCommandOnEachPrimary.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Asserts that the expected operation type and documentKey are found on the change stream
 // cursor. Returns the change stream document.
@@ -98,4 +95,3 @@ for (let i = 0; i < changeList.length; ++i) {
 }
 
 st.stop();
-})();

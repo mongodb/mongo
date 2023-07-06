@@ -5,9 +5,6 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 let testDB = conn.getDB(jsTestName());
 let testColl = testDB.test;
@@ -56,4 +53,3 @@ assert.eq(testColl
           ]);
 
 st.stop();
-})();

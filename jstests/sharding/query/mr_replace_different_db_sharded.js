@@ -1,5 +1,4 @@
 // Test MapReduce output option replace into different db in a sharded environment.
-(function() {
 const st = new ShardingTest({shards: 2, mongos: 1});
 
 const sourceDB = st.s.getDB("mr_source_db");
@@ -64,4 +63,3 @@ const finalIndexes = assert.commandWorked(destDB.runCommand({"listIndexes": dest
 const finalIndexesArray = new DBCommandCursor(destDB, finalIndexes).toArray();
 assert.eq(2, finalIndexesArray.length);
 st.stop();
-})();

@@ -1,8 +1,5 @@
 // Confirm correctness of $cond expression evaluation.
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');
+import {assertArrayEq, assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.expressionCond;
 
@@ -116,4 +113,3 @@ runAndAssert(
         {_id: 1, year: 2021, century: "new"},
         {_id: 2, year: 2000, century: "2000 was in XX century"}
     ]);
-})();

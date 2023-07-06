@@ -1,8 +1,5 @@
 // Verify that the clusterMonitor role can access config.system.sessions
 
-(function() {
-'use strict';
-
 function runTestAs(conn, role) {
     const admin = conn.getDB('admin');
     const config = conn.getDB('config');
@@ -24,7 +21,6 @@ function runTestAs(conn, role) {
 
 function runTest(conn) {
     const admin = conn.getDB('admin');
-    const config = conn.getDB('config');
     assert.commandWorked(
         admin.runCommand({createUser: 'admin', pwd: 'admin', roles: ['__system']}));
 
@@ -34,4 +30,3 @@ function runTest(conn) {
 const standalone = MongoRunner.runMongod({auth: ''});
 runTest(standalone);
 MongoRunner.stopMongod(standalone);
-})();

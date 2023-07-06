@@ -4,10 +4,7 @@
 // @tags: [
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -296,4 +293,3 @@ testCommand(function() {
 }, {"command.findAndModify": "coll"}, true);
 
 rst.stopSet();
-}());

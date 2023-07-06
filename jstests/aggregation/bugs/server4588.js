@@ -1,7 +1,4 @@
 // SERVER-4588 Add option to $unwind to emit array index.
-(function() {
-"use strict";
-
 const coll = db.server4588;
 coll.drop();
 
@@ -52,4 +49,3 @@ expectedResults = [
 assert.eq(expectedResults,
           actualResults,
           "Incorrect results $unwind with includeArrayIndex and preserveNullAndEmptyArrays");
-}());

@@ -5,10 +5,7 @@
 /**
  * Tests for the non-standard 'bsonType' keyword in JSON Schema, as well as some tests for 'type'.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/assert_schema_match.js");
+import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 
 const coll = db.jstests_schema_bsontype;
 
@@ -287,4 +284,3 @@ assertSchemaMatch(coll, {type: ["object", "string"]}, {foo: 1, bar: 1}, true);
 // Test that the 'bsonType' keyword with an array of types is valid at the top-level.
 assertSchemaMatch(coll, {bsonType: ["object", "double"]}, {}, true);
 assertSchemaMatch(coll, {bsonType: ["object", "double"]}, {foo: 1, bar: 1}, true);
-}());

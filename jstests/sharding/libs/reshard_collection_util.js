@@ -2,11 +2,10 @@
  * Util class for testing reshardCollection cmd.
  */
 
-"use strict";
+import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 
-load("jstests/libs/uuid_util.js");
-
-class ReshardCollectionCmdTest {
+export class ReshardCollectionCmdTest {
     constructor(testConfig) {
         assert(testConfig.st && testConfig.dbName && testConfig.collName &&
                testConfig.numInitialDocs);

@@ -1,8 +1,5 @@
 // check the insertMulti path works, including the error handling
 
-(function() {
-"use strict";
-
 function makeDocument(docSize) {
     var doc = {"fieldName": ""};
     var longString = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
@@ -50,4 +47,3 @@ assert.commandWorked(t.insert(docs));
 assert.eq(t.count(), docs.length);
 
 assert(t.drop());
-})();

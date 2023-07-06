@@ -4,10 +4,7 @@
 //   requires_getmore,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/geo_math.js");
+import {deg2rad, metersToRadians} from "jstests/libs/geo_math.js";
 
 var t = db.geo_mindistance;
 t.drop();
@@ -248,4 +245,3 @@ cmdResult = t.aggregate({
              }).toArray();
 assert.eq(1, cmdResult.length);
 assertApproxEqual(deg2rad(42), cmdResult[0].dis, 1e-3);
-}());

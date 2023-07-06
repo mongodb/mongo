@@ -1,9 +1,6 @@
 // Tests for $merge with a non-existing target collection.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
-load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
+import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 const sourceDB = st.s0.getDB("source_db");
@@ -104,4 +101,3 @@ testMerge(sourceColl, outputCollDiffDb, false);
 // Like the last test, but with a sharded source collection.
 testMerge(sourceColl, outputCollDiffDb, true);
 st.stop();
-}());

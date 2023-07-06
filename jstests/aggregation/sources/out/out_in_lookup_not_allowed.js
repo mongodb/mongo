@@ -3,13 +3,8 @@
  *
  * @tags: [requires_fcv_51]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");       // For assertErrorCode.
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
-load("jstests/libs/discover_topology.js");         // For findNonConfigNodes.
-load("jstests/libs/fixture_helpers.js");           // For isSharded.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const ERROR_CODE_OUT_BANNED_IN_LOOKUP = 51047;
 const coll = db.out_in_lookup_not_allowed;
@@ -70,4 +65,3 @@ pipeline = [
 const cmdRes =
     coll.getDB().runCommand({create: "view1", viewOn: coll.getName(), pipeline: pipeline});
 assert.commandFailedWithCode(cmdRes, ERROR_CODE_OUT_BANNED_IN_LOOKUP);
-}());

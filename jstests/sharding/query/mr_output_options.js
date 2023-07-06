@@ -1,8 +1,5 @@
 // Tests that the mapReduce command works correctly under all combinations of the input and output
 // collections being sharded or unsharded.
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 
 const testDB = st.getDB("mrShard");
@@ -105,4 +102,3 @@ assert.commandWorked(output);
 assert.eq(output.results, [{_id: 0, value: 1}]);
 
 st.stop();
-})();

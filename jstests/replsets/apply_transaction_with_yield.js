@@ -6,9 +6,6 @@
  *
  * @tags: [uses_transactions, requires_majority_read_concern]
  */
-(function() {
-"use strict";
-
 const name = "change_stream_speculative_majority";
 const replTest = new ReplSetTest({name: name, nodes: [{}, {rsConfig: {priority: 0}}]});
 replTest.startSet();
@@ -41,4 +38,3 @@ session.commitTransaction();
 replTest.awaitReplication();
 
 replTest.stopSet();
-})();

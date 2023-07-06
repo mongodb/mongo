@@ -2,11 +2,7 @@
  * Test that initial sync does not fail if an identical index spec is created, dropped and
  * recreated.
  */
-
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");  // for kDefaultWaitForFailPointTimeout
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
 const testName = "initial_sync_same_index_spec";
 const dbName = testName;
@@ -24,10 +20,7 @@ let primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 
 let primaryDB = primary.getDB(dbName);
-let secondaryDB = secondary.getDB(dbName);
-
 let primaryColl = primaryDB[collName];
-let secondaryColl = secondaryDB[collName];
 
 // Insert data into the collection for initial sync to copy.
 assert.commandWorked(primaryColl.insert([{_id: 1, a: 1}, {_id: 2, a: 2}]));
@@ -61,8 +54,6 @@ jsTestLog(
     "Restarting the the secondary with no data in order to provoke an initial sync from the " +
     "primary. Using startup options: " + tojson(startupOptions));
 secondary = replTest.restart(secondary, startupOptions);
-secondaryDB = secondary.getDB(dbName);
-secondaryColl = secondaryDB[collName];
 
 jsTestLog("Waiting for secondary to reach failPoint '" + fp + "'");
 assert.commandWorked(secondary.adminCommand(
@@ -95,4 +86,3 @@ jsTestLog("Waiting for initial sync to complete successfully.");
 replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
 
 replTest.stopSet();
-})();

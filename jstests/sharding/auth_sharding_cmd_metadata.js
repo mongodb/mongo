@@ -6,10 +6,6 @@
 // authentication is needed for contacting shard0 of this cluster
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
-(function() {
-
-"use strict";
-
 function getConfigOpTime() {
     var srvStatus = assert.commandWorked(shardTestDB.serverStatus());
     assert.hasFields(srvStatus, ['sharding']);
@@ -51,4 +47,3 @@ assert(timestampCmp(getConfigOpTime(), newTimestamp) < 0, "Unexpected ConfigOpTi
 mongosAdminDB.logout();
 shardAdminDB.logout();
 st.stop();
-})();

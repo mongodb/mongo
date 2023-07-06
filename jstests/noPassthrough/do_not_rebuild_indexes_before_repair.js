@@ -9,9 +9,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const dbName = "indexRebuild";
 const collName = "coll";
 
@@ -27,7 +24,7 @@ if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapsho
     // Only snapshotting storage engines can pause advancing the stable timestamp allowing us
     // to get into a state where indexes exist, but the underlying tables were dropped.
     rst.stopSet();
-    return;
+    quit();
 }
 
 let primary = rst.getPrimary();
@@ -83,4 +80,3 @@ let mongod = MongoRunner.runMongod({dbpath: primaryDbpath, noCleanData: true});
 assert.eq(3, mongod.getDB(dbName)[collName].getIndexes().length);
 
 MongoRunner.stopMongod(mongod);
-})();

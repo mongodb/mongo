@@ -5,8 +5,6 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
-"use strict";
 var collName = 'leaves';
 var coll = db[collName];
 
@@ -179,4 +177,3 @@ commands.forEach(function(cmd) {
         testInvalidWriteConcern(wc, cmd);
     });
 });
-})();

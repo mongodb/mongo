@@ -4,9 +4,6 @@
  *
  * @tags: [uses_transactions]
  */
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "transactions_on_secondaries_not_allowed";
 
@@ -87,4 +84,3 @@ assert.commandFailedWithCode(sessionDb.runCommand({find: 'foo', txnNumber: Numbe
 
 session.endSession();
 rst.stopSet(undefined, false, {skipValidation: true});
-}());

@@ -3,8 +3,6 @@
  * @tags: [requires_wiredtiger]
  */
 
-(function() {
-"use strict";
 var conn = MongoRunner.runMongod();
 var db = conn.getDB('test');
 
@@ -25,4 +23,3 @@ for (let i = 0; i < 100; i++) {
 }
 
 MongoRunner.stopMongod(conn);
-})();

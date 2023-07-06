@@ -2,7 +2,7 @@
 // @tags: [
 //   requires_majority_read_concern,
 // ]
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const st = new ShardingTest({
     shards: 2,

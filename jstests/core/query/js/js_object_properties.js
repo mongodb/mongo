@@ -8,10 +8,7 @@
 //   # Uses mapReduce command.
 //   requires_scripting,
 // ]
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For 'resultsEq'.
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const testDB = db.getSiblingDB("js_object_properties");
 const coll = testDB.test;
@@ -133,4 +130,3 @@ assert.eq([{field: "_id"}, {field: "a"}, {field: "b"}],
                   {$sort: {field: 1}},
               ])
               .toArray());
-}());

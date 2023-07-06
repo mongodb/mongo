@@ -1,7 +1,4 @@
 // Validates the expected behaviour of direct writes against the `config.transactions` collection
-(function() {
-'use strict';
-
 // Direct writes to config.transactions cannot be part of a session.
 TestData.disableImplicitSessions = true;
 
@@ -83,4 +80,3 @@ assert.eq(0, res.nModified);
 assert.eq(1, db.user.find({_id: 1}).toArray()[0].x);
 
 replTest.stopSet();
-})();

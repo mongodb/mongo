@@ -15,7 +15,8 @@
  * This test assumes a 'newlyAdded' removal.
  */
 
-load("jstests/replsets/rslib.js");
+import {reconnect} from "jstests/replsets/rslib.js";
+
 var basename = "jstests_initsync1";
 
 print("1. Bring up set");

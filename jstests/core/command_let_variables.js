@@ -4,8 +4,7 @@
 // ]
 //
 import {getPlanStage} from "jstests/libs/analyze_plan.js";
-
-load("jstests/libs/fixture_helpers.js");  // For 'isMongos' and 'isSharded'.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB("command_let_variables");
 const coll = testDB.command_let_variables;

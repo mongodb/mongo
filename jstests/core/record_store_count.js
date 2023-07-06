@@ -7,7 +7,7 @@
  */
 
 import {planHasStage} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/fixture_helpers.js");  // For isMongos and isSharded.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 var coll = db.record_store_count;
 coll.drop();
@@ -25,13 +25,13 @@ assert.commandWorked(coll.createIndex({x: 1}));
 //
 var explain = coll.explain().count({});
 assert(!planHasStage(db, explain.queryPlanner.winningPlan, "COLLSCAN"));
-if (!isMongos(db) || !FixtureHelpers.isSharded(coll)) {
+if (!FixtureHelpers.isMongos(db) || !FixtureHelpers.isSharded(coll)) {
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "RECORD_STORE_FAST_COUNT"));
 }
 
 explain = coll.explain().count({$comment: "hi"});
 assert(!planHasStage(db, explain.queryPlanner.winningPlan, "COLLSCAN"));
-if (!isMongos(db) || !FixtureHelpers.isSharded(coll)) {
+if (!FixtureHelpers.isMongos(db) || !FixtureHelpers.isSharded(coll)) {
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "RECORD_STORE_FAST_COUNT"));
 }
 
@@ -56,7 +56,7 @@ function testExplainAndExpectStage({expectedStages, unexpectedStages, hintIndex}
     checkPlan(explain.queryPlanner.winningPlan, expectedStages, unexpectedStages);
 }
 
-if (!isMongos(db) || !FixtureHelpers.isSharded(coll)) {
+if (!FixtureHelpers.isMongos(db) || !FixtureHelpers.isSharded(coll)) {
     // In an unsharded collection we can use the COUNT_SCAN stage.
     testExplainAndExpectStage(
         {expectedStages: ["COUNT_SCAN"], unexpectedStages: [], hintIndex: {x: 1}});

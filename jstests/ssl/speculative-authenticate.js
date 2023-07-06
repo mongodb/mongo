@@ -1,8 +1,5 @@
 // Test for speculativeAuthenticate during isMaster.
 
-(function() {
-'use strict';
-
 const mongod = MongoRunner.runMongod({
     auth: '',
     tlsMode: 'requireTLS',
@@ -97,4 +94,3 @@ assertStats(function(mechStats) {
 });
 
 MongoRunner.stopMongod(mongod);
-})();

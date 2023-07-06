@@ -2,9 +2,6 @@
  * Tests the defaultStartupFCV startup parameter.
  */
 
-(function() {
-"use strict";
-
 TestData.setParameters = TestData.setParameters || {};
 TestData.setParameters.disableTransitionFromLatestToLastContinuous = true;
 
@@ -241,4 +238,3 @@ function runShardingTest() {
 runStandaloneTest();
 runReplicaSetTest();
 runShardingTest();
-})();

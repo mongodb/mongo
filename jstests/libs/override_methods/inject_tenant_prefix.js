@@ -3,11 +3,9 @@
  * "local" excluded) with a tenant prefix, so that the accessed data will be migrated by the
  * background operations run by the ContinuousTenantMigration and ContinuousShardSplit hooks.
  */
-(function() {
-'use strict';
 
-load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
-load("jstests/libs/transactions_util.js");
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
+import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 
 // Save references to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
@@ -853,4 +851,3 @@ Mongo.prototype.getDbNameWithTenantPrefix = function(dbName) {
 
 OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/inject_tenant_prefix.js");
-}());

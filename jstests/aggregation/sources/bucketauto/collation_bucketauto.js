@@ -2,9 +2,6 @@
 // @tags: [assumes_no_implicit_collection_creation_after_drop]
 
 // Test that the $bucketAuto stage defines and sorts buckets according to the collation.
-(function() {
-"use strict";
-
 var results;
 const numericOrdering = {
     collation: {locale: "en_US", numericOrdering: true}
@@ -55,4 +52,3 @@ assert.eq(3, results.length);
 assert.eq({_id: {min: "1", max: "2"}, count: 3}, results[0]);
 assert.eq({_id: {min: "2", max: "5"}, count: 3}, results[1]);
 assert.eq({_id: {min: "5", max: "500"}, count: 3}, results[2]);
-})();

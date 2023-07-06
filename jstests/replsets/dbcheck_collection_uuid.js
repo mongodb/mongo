@@ -8,9 +8,6 @@
 
 import {checkHealthlog, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 
-(function() {
-"use strict";
-
 const replSet = new ReplSetTest({
     name: jsTestName(),
     nodes: 2,
@@ -50,4 +47,3 @@ function healthLogCollectionUUID() {
 healthLogCollectionUUID();
 
 replSet.stopSet();
-})();

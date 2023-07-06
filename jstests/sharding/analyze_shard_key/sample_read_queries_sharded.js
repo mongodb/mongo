@@ -3,10 +3,7 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
 // period of 1 second to speed up the test.
@@ -268,4 +265,3 @@ QuerySamplingUtil.assertSoonSampledQueryDocumentsAcrossShards(
 assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
 
 st.stop();
-})();

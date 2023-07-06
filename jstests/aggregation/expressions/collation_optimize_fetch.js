@@ -12,10 +12,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-var results;
 const caseInsensitiveUS = {
     locale: "en",
     strength: 2
@@ -92,4 +88,3 @@ runTest(10);
 
 // Cleanup.
 db.collation_optimize_fetch.drop();
-})();

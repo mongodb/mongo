@@ -27,11 +27,8 @@
  *   uses_full_validation,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");  // for waitForState
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 /**
  * Overflow a capped collection 'coll' by continuously inserting a given document,
@@ -122,4 +119,3 @@ var failMsg =
     "Index validation of '" + secondaryCappedColl.name + "' failed: " + tojson(validate_result);
 assert(validate_result.valid, failMsg);
 replTest.stopSet();
-})();

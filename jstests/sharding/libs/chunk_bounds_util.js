@@ -1,7 +1,7 @@
 /*
  * Utilities for dealing with chunk bounds.
  */
-var chunkBoundsUtil = (function() {
+export var chunkBoundsUtil = (function() {
     let eq = function(shardKeyA, shardKeyB) {
         return bsonWoCompare(shardKeyA, shardKeyB) == 0;
     };

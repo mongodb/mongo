@@ -2,9 +2,6 @@
  * Tests the 'confirm: true' parameter in setFeatureCompatibilityVersion.
  */
 
-(function() {
-"use strict";
-
 let dbpath = MongoRunner.dataPath + "feature_compatibility_version_confirm";
 resetDbpath(dbpath);
 
@@ -87,4 +84,3 @@ if (lastLTSFCV != lastContinuousFCV) {
     runReplicaSetTest('last-continuous');
     runShardingTest('last-continuous');
 }
-})();

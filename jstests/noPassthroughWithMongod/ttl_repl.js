@@ -7,7 +7,7 @@
  *  @tags: [requires_replication]
  */
 
-load("jstests/replsets/rslib.js");
+import {reconfig} from "jstests/replsets/rslib.js";
 
 var rt = new ReplSetTest({name: "ttl_repl", nodes: 2});
 

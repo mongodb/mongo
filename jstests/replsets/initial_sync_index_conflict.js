@@ -5,11 +5,8 @@
  * subsequently dropped and recreated after the collection has documents.
  */
 
-(function() {
-'use strict';
-
-load('jstests/libs/fail_point_util.js');
-load('jstests/noPassthrough/libs/index_build.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const dbName = 'test';
 const collectionName = 'coll';
@@ -64,4 +61,3 @@ try {
 IndexBuildTest.assertIndexes(primaryColl, 2, ['_id_', 'a_1']);
 
 rst.stopSet();
-})();

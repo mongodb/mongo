@@ -1,4 +1,4 @@
-function removeShard(st, shardName, timeout) {
+export function removeShard(st, shardName, timeout) {
     if (timeout == undefined) {
         timeout = 10 * 60 * 1000;  // 10 minutes
     }

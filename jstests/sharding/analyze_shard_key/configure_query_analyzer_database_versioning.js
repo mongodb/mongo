@@ -4,11 +4,6 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
-
 const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 2}});
 
 const dbName = "testDb";
@@ -44,4 +39,3 @@ assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard1.name}
 assert.commandWorked(st.s.adminCommand(configureCmdObj));
 
 st.stop();
-})();

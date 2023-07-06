@@ -8,8 +8,6 @@
  * ]
  */
 
-(function() {
-"use strict";
 let testCount = 0;
 const collNamePrefix = "validate_timeseries_id_timestamp";
 const bucketNamePrefix = "system.buckets.validate_timeseries_id_timestamp";
@@ -64,4 +62,3 @@ res = coll.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
 assert.eq(res.warnings.length, 1);
-})();

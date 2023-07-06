@@ -2,7 +2,7 @@
  * Defines helpers for testing currentOp and serverStatus for query sampling.
  */
 
-function getCurrentOpAndServerStatusMongos(conn) {
+export function getCurrentOpAndServerStatusMongos(conn) {
     const currentOp = conn.getDB("admin")
                           .aggregate([
                               {$currentOp: {allUsers: true, localOps: true}},
@@ -13,14 +13,14 @@ function getCurrentOpAndServerStatusMongos(conn) {
     return {currentOp, serverStatus};
 }
 
-function getCurrentOpAndServerStatusMongod(conn) {
+export function getCurrentOpAndServerStatusMongod(conn) {
     const currentOp =
         assert.commandWorked(conn.adminCommand({currentOp: true, desc: "query analyzer"})).inprog;
     const serverStatus = assert.commandWorked(conn.adminCommand({serverStatus: 1})).queryAnalyzers;
     return {currentOp, serverStatus};
 }
 
-function validateCurrentOpMongos(currentOp) {
+export function validateCurrentOpMongos(currentOp) {
     assert(currentOp.hasOwnProperty("desc"), currentOp);
     assert(currentOp.hasOwnProperty("ns"), currentOp);
     assert(currentOp.hasOwnProperty("collUuid"), currentOp);
@@ -32,7 +32,7 @@ function validateCurrentOpMongos(currentOp) {
     assert(!currentOp.hasOwnProperty("sampledWritesBytes"), currentOp);
 }
 
-function validateCurrentOpMongod(currentOp, isShardSvr) {
+export function validateCurrentOpMongod(currentOp, isShardSvr) {
     assert(currentOp.hasOwnProperty("desc"), currentOp);
     assert(currentOp.hasOwnProperty("ns"), currentOp);
     assert(currentOp.hasOwnProperty("collUuid"), currentOp);
@@ -44,7 +44,7 @@ function validateCurrentOpMongod(currentOp, isShardSvr) {
     assert(currentOp.hasOwnProperty("sampledWritesBytes"), currentOp);
 }
 
-function validateServerStatusMongos(serverStatus) {
+export function validateServerStatusMongos(serverStatus) {
     assert(serverStatus.hasOwnProperty("activeCollections"), serverStatus);
     assert(serverStatus.hasOwnProperty("totalCollections"), serverStatus);
     assert(serverStatus.hasOwnProperty("totalSampledReadsCount"), serverStatus);
@@ -53,7 +53,7 @@ function validateServerStatusMongos(serverStatus) {
     assert(!serverStatus.hasOwnProperty("totalSampledWritesBytes"), serverStatus);
 }
 
-function validateServerStatusMongod(serverStatus) {
+export function validateServerStatusMongod(serverStatus) {
     assert(serverStatus.hasOwnProperty("activeCollections"), serverStatus);
     assert(serverStatus.hasOwnProperty("totalCollections"), serverStatus);
     assert(serverStatus.hasOwnProperty("totalSampledReadsCount"), serverStatus);
@@ -62,7 +62,7 @@ function validateServerStatusMongod(serverStatus) {
     assert(serverStatus.hasOwnProperty("totalSampledWritesBytes"), serverStatus);
 }
 
-function makeInitialCurrentOpAndServerStatusMongos(numColls) {
+export function makeInitialCurrentOpAndServerStatusMongos(numColls) {
     return {
         currentOp: Array(numColls).fill({sampledReadsCount: 0, sampledWritesCount: 0}),
         serverStatus: {
@@ -74,7 +74,7 @@ function makeInitialCurrentOpAndServerStatusMongos(numColls) {
     };
 }
 
-function makeInitialCurrentOpAndServerStatusMongod(numColls) {
+export function makeInitialCurrentOpAndServerStatusMongod(numColls) {
     return {
         currentOp: Array(numColls).fill({
             sampledReadsCount: 0,
@@ -93,16 +93,16 @@ function makeInitialCurrentOpAndServerStatusMongod(numColls) {
     };
 }
 
-const opKindRead = 0;
-const opKindWrite = 1;
-const opKindNoop = 2;
+export const opKindRead = 0;
+export const opKindWrite = 1;
+export const opKindNoop = 2;
 
 /**
  * Validates the mongos currentOp and serverStatus attached in 'newState' given that the mongos has
  * just executed the operation 'opKind' and its currentOp and serverStatus prior to that are as
  * attached in 'oldState'.
  */
-function assertCurrentOpAndServerStatusMongos(
+export function assertCurrentOpAndServerStatusMongos(
     ns, opKind, oldState, newState, {expectedSamplesPerSecond} = {}) {
     const errMsg = {opKind, oldState, newState};
 
@@ -177,7 +177,7 @@ function assertCurrentOpAndServerStatusMongos(
  * just executed the operation 'opKind' and its currentOp and serverStatus prior to that are as
  * attached in 'oldState'.
  */
-function assertCurrentOpAndServerStatusMongod(ns, opKind, oldState, newState, isShardSvr) {
+export function assertCurrentOpAndServerStatusMongod(ns, opKind, oldState, newState, isShardSvr) {
     const errMsg = {opKind, oldState, newState};
 
     validateCurrentOpMongod(newState.currentOp[0], isShardSvr);

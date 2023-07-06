@@ -4,9 +4,6 @@
  *  is renamed.
  */
 
-(function() {
-"use strict";
-
 // Bring up a 2 node replset.
 var name = "bg_index_rename";
 var rst = new ReplSetTest({name: name, nodes: 3});
@@ -49,4 +46,3 @@ var indexes = barDB.runCommand({listIndexes: "test"});
 assert.eq(indexes.cursor.firstBatch.length, 2);
 
 rst.stopSet();
-}());

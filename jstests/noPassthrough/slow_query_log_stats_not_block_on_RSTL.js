@@ -5,11 +5,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");  // startParallelShell
-load("jstests/libs/wait_for_command.js");        // waitForCommand
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -58,4 +54,3 @@ try {
 }
 
 rst.stopSet();
-})();

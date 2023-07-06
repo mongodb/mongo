@@ -5,9 +5,6 @@
  *   - mongod from a non-sharded replica set
  *   - standalone mongod
  */
-(function() {
-"use strict";
-
 function responseContainsTimestampOperationTime(res) {
     return res.operationTime !== undefined && isTimestamp(res.operationTime);
 }
@@ -68,4 +65,3 @@ assert(!responseContainsTimestampOperationTime(res),
            "received: " + tojson(res));
 
 MongoRunner.stopMongod(standalone);
-})();

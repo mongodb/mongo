@@ -1,9 +1,7 @@
 // Auth tests for the $listSessions {allUsers:true} aggregation stage.
 // @tags: [requires_sharding, requires_auth]
 
-(function() {
-'use strict';
-load('jstests/aggregation/extras/utils.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 // This test makes assertions about the number of sessions, which are not compatible with
 // implicit sessions.
@@ -67,4 +65,3 @@ st.rs0.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}
 
 runListAllSessionsTest(st.s0);
 st.stop();
-})();

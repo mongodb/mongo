@@ -6,11 +6,7 @@
  *  - failure in subsequent batches
  *  - multiple resumable failures during the same clone
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");  // For setLogVerbosity()
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
 // Verify the 'find' command received by the primary includes a resume token request.
 function checkHasRequestResumeToken() {
@@ -199,4 +195,3 @@ jsTestLog("Waiting for initial sync to complete.");
 rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
 
 rst.stopSet();
-})();

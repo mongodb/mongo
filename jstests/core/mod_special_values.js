@@ -1,12 +1,4 @@
-/**
- * Tests $mod match expression with NaN, Infinity and large value inputs.
- *
- * This test exercises a changed behavior, thus prevent it running in multi-version variants.
- * @tags: [requires_fcv_51]
- */
-(function() {
-"use strict";
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
 const testDB = db.getSiblingDB(jsTestName());
 
 function executeTestCase(collection, testCase) {
@@ -96,4 +88,3 @@ testCases.push({
 
 testCases.forEach((testCase, testCaseIdx) =>
                       executeTestCase(testDB.getCollection("coll" + testCaseIdx), testCase));
-})();

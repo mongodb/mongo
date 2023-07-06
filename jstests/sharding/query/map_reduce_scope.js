@@ -2,9 +2,6 @@
  * Test to verify 'scope' parameter of mapReduce command. This test verfies that 'map', 'reduce' and
  * 'finalize' functions can use 'scope' variable passed in the input.
  */
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 2});
 const dbName = jsTest.name();
 const coll = st.s.getDB(dbName).coll;
@@ -12,6 +9,7 @@ st.s.adminCommand({enableSharding: dbName});
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
 function runTest(coll) {
+    /* eslint-disable */
     const map = function() {
         emit(xx.val, this.a);
     };
@@ -22,6 +20,7 @@ function runTest(coll) {
         values.finalize = xx.val + 2;
         return values;
     };
+    /* eslint-enable */
     const res = assert.commandWorked(
         coll.mapReduce(map, reduce, {finalize: finalize, out: {inline: 1}, scope: {xx: {val: 9}}}));
     assert.eq(res.results.length, 1, res);
@@ -38,4 +37,3 @@ st.shardColl("coll", {a: 1}, {a: 0});
 runTest(coll);
 
 st.stop();
-})();

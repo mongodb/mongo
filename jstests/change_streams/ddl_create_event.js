@@ -4,10 +4,9 @@
  *
  * @tags: [ requires_fcv_60, ]
  */
-load('jstests/libs/collection_drop_recreate.js');  // For 'assertDropAndRecreateCollection' and
-                                                   // 'assertDropCollection'.
-load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
-                                                   // 'assertChangeStreamEventEq'.
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 

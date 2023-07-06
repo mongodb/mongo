@@ -2,9 +2,6 @@
  * Test that $group cleans up temporary files under dbpath + '/_tmp'.
  */
 
-(function() {
-"use strict";
-
 const memoryLimitMb = 16;
 const memoryLimitBytes = memoryLimitMb * 1024 * 1024;
 
@@ -44,4 +41,3 @@ testDb.largeColl.aggregate(pipeline).itcount();
 assert.eq(listFiles(conn.dbpath + "/_tmp").length, 0);
 
 MongoRunner.stopMongod(conn);
-})();

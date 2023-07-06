@@ -1,10 +1,7 @@
 /**
  * Enables sessions on the db object
  */
-(function() {
-"use strict";
-
-load("jstests/libs/override_methods/override_helpers.js");
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 const getDBOriginal = Mongo.prototype.getDB;
 
@@ -47,8 +44,7 @@ Mongo.prototype.getDB = function(dbName) {
 };
 
 // Override the global `db` object to be part of a session.
-db = db.getMongo().getDB(db.getName());
+globalThis.db = db.getMongo().getDB(db.getName());
 
 OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/enable_sessions.js");
 OverrideHelpers.overrideRunCommand(runCommandWithLsidCheck);
-})();

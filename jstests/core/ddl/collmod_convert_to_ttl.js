@@ -11,7 +11,6 @@
  * ]
  */
 
-'use strict';
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const collName = "collmod_convert_to_ttl";

@@ -5,9 +5,6 @@
  * - Throw InvalidOptions if a client specifies readConcern in all other cases.
  * @tags: [requires_fcv_51, uses_transactions, uses_multi_shard_transaction]
  */
-(function() {
-'use strict';
-
 const st = new ShardingTest({
     mongos: 1,
     shards: 1,
@@ -177,4 +174,3 @@ const kCollName1 = "testColl1";
 runTests(st.s, st.s, kCollName1);
 
 st.stop();
-})();

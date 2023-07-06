@@ -6,9 +6,6 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
 const kDbName = "cluster_explain_commands";
 const kCollName = "bar";
 
@@ -84,4 +81,3 @@ function runTestCaseExpectFail(conn, testCase, code) {
 
     st.stop();
 }
-}());

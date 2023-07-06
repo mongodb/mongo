@@ -2,9 +2,6 @@
 // with the original error code. This is important for retryable errors like
 // 'InterruptedDueToReplStateChange',
 // and also to ensure that the error is not swallowed and the diagnostic info is not lost.
-(function() {
-"use strict";
-
 const kPlanExecAlwaysFailsCode = 4382101;
 
 const mongod = MongoRunner.runMongod({});
@@ -52,4 +49,3 @@ assertCmdFailsWithExpectedError(
 
 assert.commandWorked(db.adminCommand({configureFailPoint: "planExecutorAlwaysFails", mode: "off"}));
 MongoRunner.stopMongod(mongod);
-}());

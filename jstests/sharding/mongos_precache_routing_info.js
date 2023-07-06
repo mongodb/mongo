@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 // create
 var s = new ShardingTest({
     shards: 2,
@@ -52,4 +49,3 @@ ss = db.serverStatus();
 assert.eq(0, ss.shardingStatistics.catalogCache.countFullRefreshesStarted);
 
 s.stop();
-})();

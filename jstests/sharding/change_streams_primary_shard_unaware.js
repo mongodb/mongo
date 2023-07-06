@@ -10,10 +10,7 @@
 //   requires_persistence,
 //   uses_change_streams,
 // ]
-(function() {
-"use strict";
-
-load('jstests/libs/change_stream_util.js');  // For ChangeStreamTest.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 
 // Returns true if the shard is aware that the collection is sharded.
 function isShardAware(shard, coll) {
@@ -182,4 +179,3 @@ cstMongos2.assertNextChangesEqual({
 });
 
 st.stop();
-})();

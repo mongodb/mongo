@@ -9,9 +9,7 @@
  *   uses_parallel_shell
  * ]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const dbName = "test";
 const collName = "currentop_blocked_operations";
@@ -85,4 +83,3 @@ waitForBlockedOp({ns: testColl.getFullName(), op: "update"}, function(op) {
 assert.commandWorked(session.abortTransaction_forTesting());
 awaitUpdate();
 assert.eq(1, testColl.find({_id: 2222, x: 999}).itcount());
-})();

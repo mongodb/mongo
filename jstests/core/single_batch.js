@@ -1,7 +1,4 @@
 // Test the "single batch" semantics of negative limit.
-(function() {
-'use strict';
-
 var coll = db.jstests_single_batch;
 coll.drop();
 
@@ -18,4 +15,3 @@ for (var i = 0; i < 20; i++) {
 var numResults = coll.find().limit(-18).itcount();
 assert.lt(numResults, 18);
 assert.gt(numResults, 0);
-})();

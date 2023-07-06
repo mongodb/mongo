@@ -1,9 +1,6 @@
 /**
  * Test initial sync cloning of a collection that contains a multikey index.
  */
-(function() {
-"use strict";
-
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
 replTest.initiate();
@@ -32,4 +29,3 @@ jsTestLog("Waiting until initial sync completes.");
 replTest.awaitSecondaryNodes();
 replTest.awaitReplication();
 replTest.stopSet();
-})();

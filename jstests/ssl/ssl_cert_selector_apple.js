@@ -9,11 +9,9 @@
  * and fail when we do not.
  */
 
-load('jstests/ssl/libs/ssl_helpers.js');
+import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 requireSSLProvider('apple', function() {
-    'use strict';
-
     const CLIENT =
         'CN=Trusted Kernel Test Client,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US';
     const SERVER =

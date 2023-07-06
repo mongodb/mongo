@@ -1,8 +1,5 @@
 // Test X509 auth with custom OIDs.
 
-(function() {
-'use strict';
-
 function testClient(conn, name) {
     let auth = {mechanism: 'MONGODB-X509'};
     if (name !== null) {
@@ -51,4 +48,3 @@ const mongod = MongoRunner.runMongod({
 });
 runTest(mongod);
 MongoRunner.stopMongod(mongod);
-})();

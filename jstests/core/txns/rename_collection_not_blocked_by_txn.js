@@ -4,9 +4,6 @@
  * @tags: [uses_transactions, requires_db_locking, assumes_unsharded_collection]
  */
 
-(function() {
-"use strict";
-
 let dbName = 'rename_collection_not_blocked_by_txn';
 let mydb = db.getSiblingDB(dbName);
 
@@ -32,4 +29,3 @@ assert.commandWorked(
 assert.commandWorked(mydb.adminCommand({renameCollection: dbName + ".b", to: dbName + ".c"}));
 
 assert.commandWorked(session.commitTransaction_forTesting());
-})();

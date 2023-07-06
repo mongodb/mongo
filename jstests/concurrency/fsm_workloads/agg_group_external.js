@@ -6,6 +6,7 @@
  * The data passed to the $group is greater than 100MB, which should force
  * disk to be used.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/agg_base.js";
 

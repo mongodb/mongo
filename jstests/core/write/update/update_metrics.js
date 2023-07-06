@@ -15,9 +15,6 @@
  *   tenant_migration_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 const coll = testDB.update_metrics;
@@ -79,4 +76,3 @@ serverStatusAfterTest = testDB.serverStatus();
 assert.eq(serverStatusBeforeTest.metrics.commands.update.arrayFilters + 2,
           serverStatusAfterTest.metrics.commands.update.arrayFilters,
           `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
-})();

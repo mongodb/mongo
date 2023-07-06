@@ -3,9 +3,6 @@
  *
  * @tags: [uses_transactions]
  */
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "empty_commit_abort";
 const testDB = db.getSiblingDB(dbName);
@@ -62,4 +59,3 @@ assert.eq(res.nMatched, 1, tojson(res));
 assert.eq(res.nModified, 0, tojson(res));
 assert.eq(res.nUpserted, 0, tojson(res));
 assert.commandWorked(session.abortTransaction_forTesting());
-}());

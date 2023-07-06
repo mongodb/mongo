@@ -2,7 +2,7 @@
 // plan. For instance, there are helpers for checking whether a plan is a collection
 // scan or whether the plan is covered (index only).
 
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 /**
  * Returns a sub-element of the 'queryPlanner' explain output which represents a winning plan.

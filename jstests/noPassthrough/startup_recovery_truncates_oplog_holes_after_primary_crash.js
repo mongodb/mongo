@@ -12,10 +12,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({name: jsTest.name(), nodes: 2});
 rst.startSet();
@@ -95,4 +92,3 @@ const find = primary.getDB(dbName).getCollection(collName).findOne({_id: "writeA
 assert.eq(find, null);
 
 rst.stopSet();
-})();

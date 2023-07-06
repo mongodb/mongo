@@ -1,5 +1,6 @@
-load('jstests/libs/parallelTester.js');  // for Thread and CountDownLatch
+import {getGlobalAssertLevel} from "jstests/concurrency/fsm_libs/assert.js";
 import {workerThread} from "jstests/concurrency/fsm_libs/worker_thread.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 /**
  * Helper for spawning and joining worker threads.
@@ -21,7 +22,7 @@ export const ThreadManager = function(clusterOptions, executionMode = {
                 return threadFn(workloads, args, options);
             } finally {
                 if (typeof db !== 'undefined') {
-                    db = null;
+                    globalThis.db = undefined;
                     gc();
                 }
             }
@@ -118,7 +119,7 @@ export const ThreadManager = function(clusterOptions, executionMode = {
                     cluster: cluster.getSerializedCluster(),
                     clusterOptions: clusterOptions,
                     seed: Random.randInt(1e13),  // contains range of Date.getTime()
-                    globalAssertLevel: globalAssertLevel,
+                    globalAssertLevel: getGlobalAssertLevel(),
                     errorLatch: errorLatch,
                     sessionOptions: options.sessionOptions
                 };
@@ -198,7 +199,7 @@ export const ThreadManager = function(clusterOptions, executionMode = {
 
 workerThread.fsm = async function(workloads, args, options) {
     const {workerThread} = await import("jstests/concurrency/fsm_libs/worker_thread.js");
-    load('jstests/concurrency/fsm_libs/fsm.js');  // for fsm.run
+    const {fsm} = await import("jstests/concurrency/fsm_libs/fsm.js");
 
     return workerThread.main(workloads, args, function(configs) {
         var workloads = Object.keys(configs);
@@ -209,7 +210,7 @@ workerThread.fsm = async function(workloads, args, options) {
 
 workerThread.composed = async function(workloads, args, options) {
     const {workerThread} = await import("jstests/concurrency/fsm_libs/worker_thread.js");
-    load('jstests/concurrency/fsm_libs/composer.js');  // for composer.run
+    const {composer} = await import("jstests/concurrency/fsm_libs/composer.js");
 
     return workerThread.main(workloads, args, function(configs) {
         composer.run(workloads, configs, options);

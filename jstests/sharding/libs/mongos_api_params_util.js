@@ -3,12 +3,20 @@
  * servers and shards.
  */
 
-load('jstests/replsets/rslib.js');
-load('jstests/sharding/libs/last_lts_mongos_commands.js');
-load('jstests/sharding/libs/remove_shard_util.js');
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
-load('jstests/libs/auto_retry_transaction_in_sharding.js');
+import {
+    retryOnceOnTransientAndRestartTxnOnMongos
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {setLogVerbosity} from "jstests/replsets/rslib.js";
+import {
+    commandsAddedToMongosSinceLastLTS,
+    commandsRemovedFromMongosSinceLastLTS
+} from "jstests/sharding/libs/last_lts_mongos_commands.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",

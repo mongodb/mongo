@@ -3,10 +3,7 @@
  * replSetGetStatus 'electionCandidateMetrics' section are present only when they should be.
  */
 
-(function() {
-"use strict";
-load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/rslib.js");
+import {restartReplSetReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const name = jsTestName();
 const rst = new ReplSetTest({name: name, nodes: 3});
@@ -65,4 +62,3 @@ assert(
         tojson(res.electionCandidateMetrics));
 
 rst.stopSet();
-})();

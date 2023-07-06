@@ -1,9 +1,6 @@
 // Tests that a primary with upgrade featureCompatibilityVersion cannot connect with a secondary
 // with a lower binary version.
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const latest = "latest";
 
@@ -61,4 +58,3 @@ function runTest(downgradeVersion) {
 
 runTest('last-continuous');
 runTest('last-lts');
-})();

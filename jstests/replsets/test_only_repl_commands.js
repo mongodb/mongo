@@ -5,9 +5,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const cmdList = [
     {'replSetGetConfig': 1, '$_internalIncludeNewlyAdded': true},
     {'replSetGetConfig': 1, '$_internalIncludeNewlyAdded': false}
@@ -38,4 +35,3 @@ for (let cmd of cmdList) {
 
 rst.awaitReplication();
 rst.stopSet();
-})();

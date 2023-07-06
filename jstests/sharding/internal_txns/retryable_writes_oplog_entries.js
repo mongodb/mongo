@@ -8,10 +8,11 @@
  *
  * @tags: [requires_fcv_60, uses_transactions, exclude_from_large_txns]
  */
-(function() {
-'use strict';
-
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {
+    getOplogEntriesForTxn,
+    makeCommitTransactionCmdObj,
+    makePrepareTransactionCmdObj,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const kDbName = "testDb";
 const kCollName = "testColl";
@@ -37,10 +38,11 @@ function makeCustomStmtIdsForTest(numStmtIds, option) {
     switch (option) {
         case kStmtIdsOption.isComplete:
             return [...Array(numStmtIds).keys()].map(i => NumberInt(i * 10));
-        case kStmtIdsOption.isIncomplete:
+        case kStmtIdsOption.isIncomplete: {
             let stmtIds = [...Array(numStmtIds).keys()];
             stmtIds[0] = -1;
             return stmtIds.map(i => NumberInt(i));
+        }
         case kStmtIdsOption.isRepeated:
             return Array(numStmtIds).fill(1).map(i => NumberInt(i));
     }
@@ -219,4 +221,3 @@ function testDeletes(lsid, txnNumber, testOptions) {
 }
 
 st.stop();
-})();

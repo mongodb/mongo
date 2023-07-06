@@ -3,9 +3,6 @@
  * commands since a timeseries collection is a view (of a bucket collection) and the analyzeShardKey
  * and configureQueryAnalyzer commands cannot be run against a view.
  */
-(function() {
-"use strict";
-
 const numNodesPerRS = 2;
 
 function runTest(conn, {isShardedColl, st}) {
@@ -54,4 +51,3 @@ function runTest(conn, {isShardedColl, st}) {
     runTest(rst.getPrimary(), {isShardedColl: false});
     rst.stopSet();
 }
-})();

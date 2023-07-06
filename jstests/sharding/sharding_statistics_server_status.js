@@ -6,12 +6,14 @@
 //     uses_transactions,
 // ]
 
-(function() {
-'use strict';
-
-load("jstests/libs/chunk_manipulation_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/wait_for_command.js");
+import {
+    moveChunkStepNames,
+    pauseMoveChunkAtStep,
+    unpauseMoveChunkAtStep,
+    waitForMoveChunkStep,
+} from "jstests/libs/chunk_manipulation_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
 // Documents inserted in this test are in the shape {_id: int} so the size is 18 bytes
 const docSizeInBytes = 18;
@@ -306,4 +308,3 @@ assert.commandFailedWithCode(moveChunkThread.returnData(), ErrorCodes.Interrupte
 checkServerStatusAbortedMigrationCount(donorConn, 2);
 
 st.stop();
-})();

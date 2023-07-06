@@ -16,15 +16,12 @@
  * ]
  */
 
-load("jstests/noPassthrough/libs/backup_restore.js");
-
-(function() {
-"use strict";
+import {BackupRestoreTest} from "jstests/noPassthrough/libs/backup_restore.js";
 
 // Windows doesn't guarantee synchronous file operations.
 if (_isWindows()) {
     print("Skipping test on windows");
-    return;
+    quit();
 }
 
 // Grab the storage engine, default is wiredTiger
@@ -36,4 +33,3 @@ if (!runProgram('bash', '-c', 'which rsync')) {
 } else {
     jsTestLog("Skipping test for " + storageEngine + ' rolling');
 }
-}());

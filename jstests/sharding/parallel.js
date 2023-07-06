@@ -1,7 +1,4 @@
 // This test fails when run with authentication because benchRun with auth is broken: SERVER-6388
-(function() {
-"use strict";
-
 var numShards = 3;
 var s = new ShardingTest({name: "parallel", shards: numShards, mongos: 2});
 
@@ -52,4 +49,3 @@ assert(x.ok, tojson(x));
 printjson(x);
 
 s.stop();
-}());

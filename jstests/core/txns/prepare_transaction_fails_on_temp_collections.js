@@ -16,9 +16,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const dbName = "test";
 const tempCollName = "prepare_transaction_fails_on_temp_collections";
 const testDB = db.getSiblingDB(dbName);
@@ -43,4 +40,3 @@ jsTest.log("Calling prepareTransaction for a transaction with operations against
            "temporary collection should now fail.");
 assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1}),
                              ErrorCodes.OperationNotSupportedInTransaction);
-})();

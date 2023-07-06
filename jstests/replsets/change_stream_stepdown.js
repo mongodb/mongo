@@ -1,11 +1,7 @@
 /**
  * Test that a change stream on the primary node survives stepdown.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");  // for [stop|restart]ServerReplication.
-load("jstests/libs/parallel_shell_helpers.js");
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const name = "change_stream_stepdown";
 const replTest = new ReplSetTest({name: name, nodes: [{}, {}]});
@@ -130,4 +126,3 @@ assert.eq(changes[0]["operationType"], "insert");
 waitForShell();
 
 replTest.stopSet();
-})();

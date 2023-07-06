@@ -2,9 +2,7 @@
  * Tests that ReplSetTest consistency checks, namely checkDBHashesForReplSet, wait for secondaries
  * to have fully transitioned to SECONDARY state before attempting data reads.
  */
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
 const testName = jsTestName();
 const dbName = "testdb";
@@ -41,4 +39,3 @@ assert.commandWorked(secondary.adminCommand(
 
 // stopSet() will call checkReplicatedDBHashes
 rst.stopSet();
-})();

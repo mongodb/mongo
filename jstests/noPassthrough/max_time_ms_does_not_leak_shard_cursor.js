@@ -3,10 +3,7 @@
 //
 // @tags: []
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");  // for 'configureFailPoint()'
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 function getIdleCursors(conn, collName) {
     return conn.getDB('admin')
@@ -91,4 +88,3 @@ assertNoIdleCursors(st.shard0, collName);
 }
 
 st.stop();
-})();

@@ -1,7 +1,5 @@
 // SERVER-11675 Text search integration with aggregation
-(function() {
-load('jstests/aggregation/extras/utils.js');  // For 'assertErrorCode'.
-load('jstests/libs/fixture_helpers.js');      // For 'FixtureHelpers'
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.server11675;
 coll.drop();
@@ -219,4 +217,3 @@ assertErrorCode(coll, [{$sort: {text: 1}}, {$match: {$text: {$search: 'apple ban
 // wrong $stage, but correct position
 assertErrorCode(coll, [{$project: {searchValue: {$text: {$search: 'apple banana'}}}}], 31325);
 assertErrorCode(coll, [{$sort: {$text: {$search: 'apple banana'}}}], 17312);
-})();

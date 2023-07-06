@@ -10,9 +10,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const coll = db.compound_wildcard_index_validation;
 coll.drop();
 
@@ -85,4 +82,3 @@ for (let i = 0; i < 10; i++) {
 }
 
 assert.commandWorked(coll.validate({full: true}));
-})();

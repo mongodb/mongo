@@ -2,8 +2,6 @@
  * Tests counters for $group and $setWindowFields accumulator expressions.
  */
 
-(function() {
-"use strict";
 const mongod = MongoRunner.runMongod();
 const db = mongod.getDB(jsTest.name());
 const collName = jsTest.name();
@@ -123,4 +121,3 @@ for (const wAccInfo of windowAccumulators) {
 }
 
 MongoRunner.stopMongod(mongod);
-})();

@@ -8,11 +8,11 @@
  * lsids. Variables named with 0 correlates to the former and 1 with the latter.
  * @tags: [requires_fcv_60]
  */
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {
+    makeAbortTransactionCmdObj,
+    makePrepareTransactionCmdObj
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const kDbName = "testDb";
 const kCollName = "testColl";
@@ -116,5 +116,4 @@ function makeInsertCmdObj(childLsid, txnNumber, startTransaction) {
         shard0Primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     st.stop();
-})();
 })();

@@ -7,11 +7,7 @@
  *     requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/noPassthrough/libs/index_build.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {votes: 0, priority: 0}}]});
 rst.startSet();
@@ -56,4 +52,3 @@ checkLog.containsJson(secondary, 6852200, {
 });
 
 rst.stopSet();
-})();

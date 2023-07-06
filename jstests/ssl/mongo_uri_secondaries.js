@@ -6,9 +6,6 @@
 //   security add-trusted-cert -d jstests/libs/trusted-ca.pem
 // TODO BUILD-17503 Remove this tag
 // @tags: [incompatible_with_macos]
-(function() {
-'use strict';
-
 const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
 if (HOST_TYPE == "windows") {
     // OpenSSL backed imports Root CA and intermediate CA
@@ -34,12 +31,12 @@ rst.initiate();
 
 const subShellCommand = function(hosts) {
     var Ms = [];
-    for (var i = 0; i < 10; i++) {
+    for (let i = 0; i < 10; i++) {
         Ms.push(
             new Mongo("mongodb://" + hosts[0] + "," + hosts[1] + "/?ssl=true&replicaSet=sslSet"));
     }
 
-    for (var i = 0; i < 10; i++) {
+    for (let i = 0; i < 10; i++) {
         var db = Ms[i].getDB("test");
         db.setSecondaryOk();
         db.col.find().readPref("secondary").toArray();
@@ -54,7 +51,6 @@ const subShellCommandFormatter = function(replSet) {
 
     let command = `
             (function () {
-                'use strict';
                 let command = ${subShellCommand.toString()};
                 let hosts = ${tojson(hosts)};
                 command(hosts);
@@ -74,4 +70,3 @@ const retVal = runWithEnv(subShellArgs, {"SSL_CERT_FILE": "jstests/libs/trusted-
 assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
 
 rst.stopSet();
-}());

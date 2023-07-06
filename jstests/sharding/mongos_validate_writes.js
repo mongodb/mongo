@@ -3,10 +3,9 @@
 //
 // Note that this is *unsafe* with broadcast removes and updates
 //
-(function() {
-'use strict';
-
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 var st = new ShardingTest({shards: 2, mongos: 3, other: {shardOptions: {verbose: 2}}});
 
@@ -95,4 +94,3 @@ if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(coll.getD
 }
 
 st.stop();
-})();

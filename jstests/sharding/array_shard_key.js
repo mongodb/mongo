@@ -3,9 +3,6 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 3});
 
 var mongos = st.s0;
@@ -143,4 +140,3 @@ st.shardColl(coll, {_id: 1, i: 1}, {_id: ObjectId(), i: 1});
 st.printShardingStatus();
 
 st.stop();
-})();

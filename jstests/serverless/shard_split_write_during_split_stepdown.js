@@ -6,6 +6,9 @@
  * @tags: [requires_fcv_63, serverless]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {createRstArgs} from "jstests/replsets/rslib.js";
 import {doWriteOperations, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 const test = new ShardSplitTest({

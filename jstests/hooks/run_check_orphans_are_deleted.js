@@ -1,13 +1,10 @@
-'use strict';
-
 /**
  * Asserts that no shard in the cluster contains any orphan documents.
  *
  * Note: This hook won't find documents which don't have the full shard key.
  */
-(function() {
-load('jstests/libs/check_orphans_are_deleted_helpers.js');  // For CheckOrphansAreDeletedHelpers.
-load('jstests/libs/discover_topology.js');                  // For Topology and DiscoverTopology.
+import {CheckOrphansAreDeletedHelpers} from "jstests/libs/check_orphans_are_deleted_helpers.js";
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a server?');
 
@@ -33,4 +30,3 @@ for (let shardName of Object.keys(topology.shards)) {
 
     CheckOrphansAreDeletedHelpers.runCheck(db.getMongo(), new Mongo(shardPrimary), shardName);
 }
-})();

@@ -4,9 +4,6 @@
  *
  * Originally designed to reproduce SERVER-70597.
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 
@@ -36,4 +33,3 @@ const results = coll.aggregate([
 assert.eq(results, [{a: 2, b: 3}]);
 
 MongoRunner.stopMongod(conn);
-})();

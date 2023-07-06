@@ -11,9 +11,6 @@
 //   does_not_support_causal_consistency,
 // ]
 
-(function() {
-"use strict";
-
 db.recursion.drop();
 
 // Make sure the shell doesn't blow up.
@@ -36,4 +33,3 @@ function mapReduceRecursion() {
 
 assert.commandWorked(db.recursion.insert({}));
 assert.commandFailedWithCode(assert.throws(mapReduceRecursion), ErrorCodes.JSInterpreterFailure);
-}());

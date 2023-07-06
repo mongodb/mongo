@@ -1,11 +1,9 @@
 /**
  * Test runner responsible for parsing and executing a JSON-Schema-Test-Suite json file.
  */
+import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
+
 (function() {
-"use strict";
-
-load("jstests/libs/assert_schema_match.js");
-
 const coll = db.json_schema_test_corpus;
 coll.drop();
 

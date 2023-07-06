@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 var CA_CERT = "jstests/libs/ca.pem";
 var SERVER_CERT = "jstests/libs/server.pem";
 var CLIENT_CERT = "jstests/libs/client.pem";
@@ -32,4 +29,3 @@ assert.eq(
     mongo,
     "Connection attempt failed when an irrelevant sslClusterFile was provided to the server!");
 MongoRunner.stopMongod(mongod);
-}());

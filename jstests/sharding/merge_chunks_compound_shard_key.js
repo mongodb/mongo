@@ -3,9 +3,6 @@
 // with a compound shard key.
 //
 
-(function() {
-'use strict';
-
 var getShardVersion = function() {
     var res = st.shard0.adminCommand({getShardVersion: coll + ""});
     assert.commandWorked(res);
@@ -89,4 +86,3 @@ jsTest.log("Merge chunks whos bounds are MinKey/MaxKey, but which have a compoun
 checkMergeWorked({x: MinKey, y: MinKey}, {x: MaxKey, y: MaxKey});
 
 st.stop();
-})();

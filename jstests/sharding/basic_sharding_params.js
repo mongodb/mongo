@@ -2,9 +2,6 @@
  * Test of complex sharding initialization
  */
 
-(function() {
-'use strict';
-
 function shardingTestUsingObjects() {
     var st = new ShardingTest({
         mongos: {s0: {verbose: 6}, s1: {verbose: 5}},
@@ -100,4 +97,3 @@ function shardingTestUsingArrays() {
 
 shardingTestUsingObjects();
 shardingTestUsingArrays();
-})();

@@ -18,10 +18,7 @@
 // test fails, and hard-wiring that as the test number.
 //
 
-(function() {
-"use strict";
-
-load("jstests/libs/geo_math.js");
+import {deg2rad, rad2deg} from "jstests/libs/geo_math.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
@@ -538,4 +535,3 @@ for (var test = 0; test < numTests; test++) {
 }
 
 MongoRunner.stopMongod(conn);
-})();

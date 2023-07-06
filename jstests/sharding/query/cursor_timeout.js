@@ -17,9 +17,6 @@
 // @tags: [
 //   requires_sharding, requires_fcv_51
 // ]
-(function() {
-'use strict';
-
 // This test manually simulates a session, which is not compatible with implicit sessions.
 TestData.disableImplicitSessions = true;
 
@@ -222,4 +219,3 @@ assert.commandWorked(
 })();
 
 st.stop();
-})();

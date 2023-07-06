@@ -2,10 +2,7 @@
 // The test runs commands that are not allowed with security token: endSession.
 // @tags: [
 //   not_allowed_with_security_token,uses_rename, uses_transactions]
-(function() {
-"use strict";
-
-load("jstests/libs/parallelTester.js");  // for Thread.
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const dbName = "transactions_block_ddl";
 const collName = "transactions_block_ddl";
@@ -143,4 +140,3 @@ const dropIndexesCmd = {
 testTimeout(dbName, dropIndexesCmd);
 testSuccessOnTxnCommit(dbName, dropIndexesCmd, {"command.dropIndexes": collName});
 session.endSession();
-}());

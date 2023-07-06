@@ -1,8 +1,5 @@
 // Hash sharding with initial chunk count set.
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var s = new ShardingTest({shards: 3});
 
@@ -33,4 +30,3 @@ s.config.shards.find().forEach(
 assert.commandWorked(db.runCommand({"drop": coll}), "couldn't drop empty, pre-split collection");
 
 s.stop();
-})();

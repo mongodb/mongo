@@ -3,9 +3,6 @@
  * both mongos and the shard.
  */
 
-(function() {
-"use strict";
-
 var st = new ShardingTest({shards: 1});
 
 var testDB = st.s.getDB('test');
@@ -41,4 +38,3 @@ var mongodServerStatus = st.rs0.getPrimary().getDB('admin').runCommand({serverSt
 checkShardingServerStatus(mongodServerStatus);
 
 st.stop();
-})();

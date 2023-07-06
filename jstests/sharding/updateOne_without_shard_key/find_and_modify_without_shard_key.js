@@ -10,11 +10,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
-
 // 2 shards single node, 1 mongos, 1 config server 3-node.
 const st = new ShardingTest({});
 const dbName = "testDb";
@@ -304,4 +299,3 @@ testCases.forEach(testCase => {
 });
 
 st.stop();
-})();

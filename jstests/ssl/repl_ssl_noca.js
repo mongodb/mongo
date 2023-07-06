@@ -1,8 +1,6 @@
 // TODO BUILD-17503 Remove this tag
 // @tags: [incompatible_with_macos]
 
-(function() {
-'use strict';
 if (_isWindows()) {
     // OpenSSL backed imports Root CA and intermediate CA
     runProgram("certutil.exe", "-addstore", "-user", "-f", "CA", "jstests\\libs\\trusted-ca.pem");
@@ -56,4 +54,3 @@ var disableSSLURL = `mongodb://${nodeList}/admin?replicaSet=${replTest.name}&ssl
 jsTestLog(`Replica set url (doesnt use SSL): ${disableSSLURL}`);
 assert.neq(checkShellOkay(disableSSLURL), 0, "shell correctly failed to connect without SSL");
 replTest.stopSet();
-})();

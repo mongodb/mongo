@@ -84,8 +84,8 @@ executor:
   config:
     shell_options:
       eval: |
-         load("jstests/libs/override_methods/enable_causal_consistency.js");
-         load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+         await import("jstests/libs/override_methods/enable_causal_consistency.js");
+         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
   hooks:
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash

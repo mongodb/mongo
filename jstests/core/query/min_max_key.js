@@ -1,9 +1,6 @@
 // Tests the behavior of queries using MinKey and MaxKey
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For 'resultsEq'.
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.test_min_max;
 coll.drop();
@@ -100,4 +97,3 @@ assert.eq(coll.find({outer: {$lt: {a: {c: 1}}}}).itcount(), 1);
 assert(coll.drop());
 assert.commandWorked(coll.insert({outer: {a: {b: MaxKey}}}));
 assert.eq(coll.find({outer: {$gte: {a: {c: 1}}}}).itcount(), 1);
-}());

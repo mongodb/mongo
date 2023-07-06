@@ -4,9 +4,6 @@
  *
  * @tags: [requires_fcv_71]
  */
-(function() {
-"use strict";
-
 let st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 let dbName = "test";
 let collName = "foo";
@@ -456,4 +453,3 @@ function runAndVerifyCommand(testCase) {
 })();
 
 st.stop();
-})();

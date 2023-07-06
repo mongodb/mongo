@@ -1,9 +1,7 @@
 // SERVER-5124
 // The puporse of this test is to test authentication when adding/removing a shard. The test sets
 // up a sharded system, then adds/removes a shard.
-(function() {
-'use strict';
-load('jstests/sharding/libs/remove_shard_util.js');
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -112,4 +110,3 @@ assert.eq(1, st.config.shards.count(), "removed server still appears in count");
 rst.stopSet();
 
 st.stop();
-})();

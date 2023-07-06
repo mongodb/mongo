@@ -3,12 +3,12 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest.
-load("jstests/libs/namespace_utils.js");     // For getCollectionNameFromFullNamespace.
-load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries
+} from "jstests/libs/write_concern_util.js";
 
 const rst = new ReplSetTest({nodes: 2, nodeOptions: {enableMajorityReadConcern: ""}});
 
@@ -82,4 +82,3 @@ let doc = cst.getOneChange(cursor);
 assert.docEq("insert", doc.operationType);
 assert.docEq({_id: 2}, doc.fullDocument);
 rst.stopSet();
-}());

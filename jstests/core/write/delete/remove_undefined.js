@@ -1,8 +1,5 @@
 // @tags: [requires_non_retryable_writes, requires_fastcount]
 
-(function() {
-"use strict";
-
 const coll = db.remove_undefined;
 coll.drop();
 
@@ -32,4 +29,3 @@ assert.eq(3, coll.count());
 
 assert.writeErrorWithCode(coll.remove({_id: undefined}), ErrorCodes.BadValue);
 assert.eq(3, coll.count());
-})();

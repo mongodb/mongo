@@ -2,10 +2,7 @@
  * Tests that the exact _id index spec is replicated when v>=2, and a v=1 index is implicitly
  * created on the secondary when the index spec is not included in the oplog.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/index_catalog_helpers.js");
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 var rst = new ReplSetTest({nodes: 2});
 rst.startSet();
@@ -75,4 +72,3 @@ assert.neq(null, spec, "_id index not found: " + tojson(allIndexes));
 assert.eq(1, spec.v, "Expected secondary to implicitly build a v=1 _id index: " + tojson(spec));
 
 rst.stopSet();
-})();

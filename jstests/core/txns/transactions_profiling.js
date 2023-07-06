@@ -5,9 +5,7 @@
 //   uses_transactions,
 //   requires_profiling,
 // ]
-(function() {
-"use strict";
-load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const dbName = "test";
 const collName = "transactions_profiling";
@@ -235,4 +233,3 @@ assert.eq(profileObj.errCode, ErrorCodes.WriteConflict, tojson(profileObj));
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.endSession();
-}());

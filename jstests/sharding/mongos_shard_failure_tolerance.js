@@ -15,9 +15,6 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 3, mongos: 1});
 
 var admin = st.s0.getDB("admin");
@@ -138,4 +135,3 @@ mongosConnNew = new Mongo(st.s0.host);
 assert.commandWorked(mongosConnNew.getCollection(collUnsharded.toString()).insert({_id: 7}));
 
 st.stop();
-})();

@@ -7,9 +7,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({
     name: "rebuildMultipleIndexesAtStartup",
     nodes: 2,
@@ -22,7 +19,7 @@ if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapsho
     // Only snapshotting storage engines can pause advancing the stable timestamp allowing us
     // to get into a state where indexes exist, but the underlying tables were dropped.
     rst.stopSet();
-    return;
+    quit();
 }
 
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
@@ -68,4 +65,3 @@ rst.startSet(undefined, true);
 coll = rst.getPrimary().getDB("indexRebuild")["coll"];
 assert.eq(1, coll.getIndexes().length);
 rst.stopSet();
-})();

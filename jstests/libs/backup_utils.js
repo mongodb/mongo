@@ -1,6 +1,6 @@
-load("jstests/libs/parallelTester.js");  // for Thread.
+import {Thread} from "jstests/libs/parallelTester.js";
 
-function backupData(mongo, destinationDirectory) {
+export function backupData(mongo, destinationDirectory) {
     let backupCursor = openBackupCursor(mongo);
     let metadata = getBackupCursorMetadata(backupCursor);
     copyBackupCursorFiles(
@@ -9,7 +9,7 @@ function backupData(mongo, destinationDirectory) {
     return metadata;
 }
 
-function openBackupCursor(mongo) {
+export function openBackupCursor(mongo) {
     // Opening a backup cursor can race with taking a checkpoint, resulting in a transient
     // error. Retry until it succeeds.
     while (true) {
@@ -21,13 +21,13 @@ function openBackupCursor(mongo) {
     }
 }
 
-function extendBackupCursor(mongo, backupId, extendTo) {
+export function extendBackupCursor(mongo, backupId, extendTo) {
     return mongo.getDB("admin").aggregate(
         [{$backupCursorExtend: {backupId: backupId, timestamp: extendTo}}],
         {maxTimeMS: 180 * 1000});
 }
 
-function startHeartbeatThread(host, backupCursor, session, stopCounter) {
+export function startHeartbeatThread(host, backupCursor, session, stopCounter) {
     let cursorId = tojson(backupCursor._cursorid);
     let lsid = tojson(session.getSessionId());
 
@@ -44,12 +44,12 @@ function startHeartbeatThread(host, backupCursor, session, stopCounter) {
         }
     };
 
-    heartbeater = new Thread(heartbeatBackupCursor, host, cursorId, lsid, stopCounter);
+    const heartbeater = new Thread(heartbeatBackupCursor, host, cursorId, lsid, stopCounter);
     heartbeater.start();
     return heartbeater;
 }
 
-function getBackupCursorMetadata(backupCursor) {
+export function getBackupCursorMetadata(backupCursor) {
     assert(backupCursor.hasNext());
     let doc = backupCursor.next();
     assert(doc.hasOwnProperty("metadata"));
@@ -61,7 +61,7 @@ function getBackupCursorMetadata(backupCursor) {
  * is true, this function will spawn a Thread doing the copy work and return the thread along
  * with the backup cursor metadata. The caller should `join` the thread when appropriate.
  */
-function copyBackupCursorFiles(
+export function copyBackupCursorFiles(
     backupCursor, namespacesToSkip, dbpath, destinationDirectory, async, fileCopiedCallback) {
     resetDbpath(destinationDirectory);
     mkdir(destinationDirectory + "/journal");
@@ -71,7 +71,7 @@ function copyBackupCursorFiles(
     return copyThread;
 }
 
-function copyBackupCursorExtendFiles(
+export function copyBackupCursorExtendFiles(
     cursor, namespacesToSkip, dbpath, destinationDirectory, async, fileCopiedCallback) {
     let files = _cursorToFiles(cursor, namespacesToSkip, fileCopiedCallback);
     let copyThread;
@@ -92,7 +92,7 @@ function copyBackupCursorExtendFiles(
     return copyThread;
 }
 
-function _cursorToFiles(cursor, namespacesToSkip, fileCopiedCallback) {
+export function _cursorToFiles(cursor, namespacesToSkip, fileCopiedCallback) {
     let files = [];
     while (cursor.hasNext()) {
         let doc = cursor.next();
@@ -112,7 +112,7 @@ function _cursorToFiles(cursor, namespacesToSkip, fileCopiedCallback) {
     return files;
 }
 
-function _copyFiles(files, dbpath, destinationDirectory, copyFileHelper) {
+export function _copyFiles(files, dbpath, destinationDirectory, copyFileHelper) {
     files.forEach((file) => {
         let dbgDoc = copyFileHelper(file, dbpath, destinationDirectory);
         dbgDoc["msg"] = "File copy";
@@ -120,7 +120,7 @@ function _copyFiles(files, dbpath, destinationDirectory, copyFileHelper) {
     });
 }
 
-function _copyFileHelper(absoluteFilePath, sourceDbPath, destinationDirectory) {
+export function _copyFileHelper(absoluteFilePath, sourceDbPath, destinationDirectory) {
     // Ensure the dbpath ends with an OS appropriate slash.
     let separator = '/';
     if (_isWindows()) {

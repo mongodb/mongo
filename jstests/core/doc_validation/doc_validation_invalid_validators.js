@@ -9,9 +9,6 @@
 
 // Verify invalid validator statements won't work and that we
 // can't create validated collections on restricted databases.
-(function() {
-"use strict";
-
 var collName = "doc_validation_invalid_validators";
 var coll = db[collName];
 coll.drop();
@@ -81,4 +78,3 @@ assert.commandFailed(
     db.runCommand({"collMod": collName, "validator": {$where: "this.a == this.b"}}));
 assert.commandWorked(db.runCommand({"collMod": collName, "validator": {a: {$exists: true}}}));
 coll.drop();
-})();

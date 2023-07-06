@@ -1,4 +1,4 @@
-function runTxnRetryOnTransientError(txnFunc) {
+export function runTxnRetryOnTransientError(txnFunc) {
     assert.soon(() => {
         try {
             txnFunc();

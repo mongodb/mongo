@@ -3,8 +3,6 @@
  * @tags: [requires_fcv_50]
  */
 
-(function() {
-"use strict";
 const mongod = MongoRunner.runMongod();
 const db = mongod.getDB(jsTest.name());
 const collName = jsTest.name();
@@ -286,4 +284,3 @@ checkCounters(
     "$geoIntersects");
 
 MongoRunner.stopMongod(mongod);
-})();

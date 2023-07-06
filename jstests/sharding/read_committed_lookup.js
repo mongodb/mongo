@@ -5,9 +5,7 @@
  * @tags: [requires_majority_read_concern]
  */
 
-load("jstests/libs/read_committed_lib.js");  // For testReadCommittedLookup
-
-(function() {
+import {testReadCommittedLookup} from "jstests/libs/read_committed_lib.js";
 
 // Manually create a shard.
 const replSetName = "lookup_read_majority";
@@ -67,4 +65,3 @@ testReadCommittedLookup(st.s.getDB("test"), shardSecondary, rst);
 
 st.stop();
 rst.stopSet();
-})();

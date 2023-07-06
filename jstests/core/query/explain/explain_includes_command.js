@@ -5,8 +5,6 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-"use strict";
 const collName = "explain_includes_command";
 
 db[collName].drop();
@@ -52,4 +50,3 @@ testExplainContainsCommand({count: collName, query: {_id: 1}});
 
 // Test 'distinct'.
 testExplainContainsCommand({distinct: collName, key: "a"});
-})();

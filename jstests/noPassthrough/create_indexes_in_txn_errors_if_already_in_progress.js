@@ -6,12 +6,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");
-load('jstests/libs/fail_point_util.js');
-load('jstests/libs/test_background_ops.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -87,4 +83,3 @@ joinFirstIndexBuild();
 // We should have the _id index and the 'the_b_1_index' index just built.
 assert.eq(testColl.getIndexes().length, 2);
 rst.stopSet();
-})();

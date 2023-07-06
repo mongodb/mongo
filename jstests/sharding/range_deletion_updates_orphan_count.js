@@ -7,10 +7,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rangeDeleterBatchSize = 128;
 
@@ -75,4 +72,3 @@ for (let i = 0; i < numBatches; i++) {
 beforeDeletionFailpoint.off();
 
 st.stop();
-})();

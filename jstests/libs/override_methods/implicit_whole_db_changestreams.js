@@ -7,12 +7,13 @@
  * 'noPassthrough' flag, are passed through as-is.
  */
 
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {ChangeStreamWatchMode} from "jstests/libs/change_stream_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Helper function which tests can call to explicitly request that the command not be modified by
 // the passthrough code. When defined, ChangeStreamTest will adopt this as its default runCommand
 // implementation to allow individual tests to exempt themselves from modification.
-const changeStreamPassthroughAwareRunCommand = (db, cmdObj, noPassthrough) =>
+globalThis.changeStreamPassthroughAwareRunCommand = (db, cmdObj, noPassthrough) =>
     db.runCommand(cmdObj, undefined, undefined, noPassthrough);
 
 // Defines a set of functions to validate incoming $changeStream requests and transform
@@ -20,7 +21,7 @@ const changeStreamPassthroughAwareRunCommand = (db, cmdObj, noPassthrough) =>
 // runCommand override to generically upconvert $changeStream requests, and the
 // ChangeStreamPassthroughHelpers may themselves be overridden by other passthroughs in order to
 // alter the behaviour of runCommand.
-const ChangeStreamPassthroughHelpers = {
+globalThis.ChangeStreamPassthroughHelpers = {
     isValidChangeStreamRequest: function(db, cmdObj) {
         // Determine whether this command is a valid $changeStream aggregation on a single
         // collection or database.
@@ -106,25 +107,21 @@ const ChangeStreamPassthroughHelpers = {
     }
 };
 
-(function() {
-'use strict';
-
 const originalRunCommandImpl = DB.prototype._runCommandImpl;
 const originalRunCommand = DB.prototype.runCommand;
 
 const upconvertedCursors = new Set();
-
-const db = null;
 
 const passthroughRunCommandImpl = function(dbName, cmdObj, options) {
     // Check whether this command is an upconvertable $changeStream request. If the command is an
     // explain, we check the wrapped command object.
     let csCmdObj = (cmdObj.explain ? cmdObj.explain : cmdObj);
     const upconvertCursor =
-        ChangeStreamPassthroughHelpers.isUpconvertableChangeStreamRequest(this, csCmdObj);
+        globalThis.ChangeStreamPassthroughHelpers.isUpconvertableChangeStreamRequest(this,
+                                                                                     csCmdObj);
     if (upconvertCursor) {
         [dbName, csCmdObj] =
-            ChangeStreamPassthroughHelpers.upconvertChangeStreamRequest(this, csCmdObj);
+            globalThis.ChangeStreamPassthroughHelpers.upconvertChangeStreamRequest(this, csCmdObj);
     }
 
     // If this is an explain, put the upconverted agg back into the explain command.
@@ -138,7 +135,8 @@ const passthroughRunCommandImpl = function(dbName, cmdObj, options) {
     // whole-db. Ensure that we update the 'collection' field to be the collectionless
     // namespace.
     if (cmdObj && cmdObj.getMore && upconvertedCursors.has(cmdObj.getMore.toString())) {
-        [dbName, cmdObj] = ChangeStreamPassthroughHelpers.upconvertGetMoreRequest(this, cmdObj);
+        [dbName, cmdObj] =
+            globalThis.ChangeStreamPassthroughHelpers.upconvertGetMoreRequest(this, cmdObj);
     }
 
     // Pass the modified command to the original runCommand implementation.
@@ -158,7 +156,8 @@ const passthroughRunCommandImpl = function(dbName, cmdObj, options) {
 // passthrough wherever Collection.watch is called.
 DBCollection.prototype.watch = function(pipeline, options) {
     pipeline = Object.assign([], pipeline);
-    pipeline.unshift(ChangeStreamPassthroughHelpers.nsMatchFilter(this.getDB(), this.getName()));
+    pipeline.unshift(
+        globalThis.ChangeStreamPassthroughHelpers.nsMatchFilter(this.getDB(), this.getName()));
     return this.getDB().watch(pipeline, options);
 };
 
@@ -167,4 +166,3 @@ DB.prototype.runCommand = function(cmdObj, extra, queryOptions, noPassthrough) {
     this._runCommandImpl = (noPassthrough ? originalRunCommandImpl : passthroughRunCommandImpl);
     return originalRunCommand.apply(this, [cmdObj, extra, queryOptions]);
 };
-}());

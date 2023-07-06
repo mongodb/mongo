@@ -1,7 +1,4 @@
 // Tests that certain aggregation operators have configurable memory limits.
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("test");
@@ -83,4 +80,3 @@ assert.commandWorked(bulk.execute());
 }());
 
 MongoRunner.stopMongod(conn);
-}());

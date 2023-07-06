@@ -1,9 +1,6 @@
 /**
  * Tests for $jsonSchema queries in a sharded cluster.
  */
-(function() {
-"use strict";
-
 const dbName = "json_schema_sharding";
 
 var st = new ShardingTest({shards: 2, mongos: 1});
@@ -62,4 +59,3 @@ res = coll.findAndModify({query: {_id: 150, $jsonSchema: schema}, update: {$set:
 assert.eq(1, res.b);
 
 st.stop();
-})();

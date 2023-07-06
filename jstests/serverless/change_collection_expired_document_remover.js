@@ -4,13 +4,12 @@
  * @tags: [requires_fcv_62]
  */
 
-// For configureFailPoint.
-load("jstests/libs/fail_point_util.js");
-// For assertDropAndRecreateCollection.
-load("jstests/libs/collection_drop_recreate.js");
-// For ChangeStreamMultitenantReplicaSetTest.
-load("jstests/serverless/libs/change_collection_util.js");
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {
+    ChangeStreamMultitenantReplicaSetTest
+} from "jstests/serverless/libs/change_collection_util.js";
 
 const getTenantConnection = ChangeStreamMultitenantReplicaSetTest.getTenantConnection;
 

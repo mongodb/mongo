@@ -14,9 +14,6 @@
 //   # $lookup containing $facet is not allowed in $facet (because $facet is not allowed in $facet).
 //   do_not_wrap_aggregations_in_facets,
 // ]
-(function() {
-"use strict";
-
 const joinColl = db.lookup_non_correlated_prefix_join;
 const testColl = db.lookup_non_correlated_prefix;
 joinColl.drop();
@@ -41,4 +38,3 @@ assert.doesNotThrow(() => testColl.aggregate([{
     ]
   }
 }]));
-}());

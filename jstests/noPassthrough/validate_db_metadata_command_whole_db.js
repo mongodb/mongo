@@ -4,7 +4,7 @@
  *   requires_sharding,
  * ]
  */
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const dbName = jsTestName();
 const collName = "coll1";

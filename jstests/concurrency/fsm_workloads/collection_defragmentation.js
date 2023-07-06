@@ -5,6 +5,7 @@
  *
  * @tags: [requires_sharding, assumes_balancer_on, antithesis_incompatible]
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 
 const dbPrefix = jsTestName() + '_DB_';
 const dbCount = 2;
@@ -12,9 +13,9 @@ const collPrefix = 'sharded_coll_';
 const collCount = 2;
 const maxChunkSizeMB = 10;
 
-load('jstests/sharding/libs/defragmentation_util.js');
-load('jstests/sharding/libs/find_chunks_util.js');
-load('jstests/concurrency/fsm_workload_helpers/chunks.js');
+import {defragmentationUtil} from "jstests/sharding/libs/defragmentation_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 
 function getRandomDb(db) {
     return db.getSiblingDB(dbPrefix + Random.randInt(dbCount));

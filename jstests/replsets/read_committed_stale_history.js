@@ -4,12 +4,9 @@
  *
  * @tags: [requires_majority_read_concern]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/rslib.js");  // for reconnect.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {reconnect} from "jstests/replsets/rslib.js";
 
 var name = "readCommittedStaleHistory";
 var dbName = "wMajorityCheck";
@@ -142,4 +139,3 @@ assert.neq(
     nodes[0].getDB(dbName).getCollection(collName).find({a: 3}).readConcern('majority').next());
 
 rst.stopSet();
-}());

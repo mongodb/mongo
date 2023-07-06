@@ -58,8 +58,8 @@ executor:
     shell_options:
       eval: >-
         globalThis.testingReplication = true;
-        load('jstests/libs/override_methods/set_read_preference_secondary.js');
-        load('jstests/libs/override_methods/enable_causal_consistency.js');
+        await import('jstests/libs/override_methods/set_read_preference_secondary.js');
+        await import('jstests/libs/override_methods/enable_causal_consistency.js');
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're

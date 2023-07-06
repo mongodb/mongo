@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 const coll = db.find4;
 coll.drop();
 
@@ -39,4 +36,3 @@ assert.eq("1-undefined,2-undefined",
                   return z.a + "-" + z.b;
               })
               .toString());
-}());

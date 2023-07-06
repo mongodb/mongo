@@ -5,10 +5,7 @@
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2, other: {chunkSize: 1}});
 const primaryShard = st.shard0.shardName;
@@ -18,7 +15,6 @@ const kCollName = 'foo';
 const kNestedCollName = 'nested_foo';
 const kNsName = kDbName + '.' + kCollName;
 const kNestedNsName = kDbName + '.' + kNestedCollName;
-const kConfigChunks = 'config.chunks';
 const kZoneName = 'testZone';
 
 function generateJumboChunk(ns, isForNestedCase) {
@@ -228,4 +224,3 @@ assert.commandWorked(
 validateMoveChunkAfterRefine(kNestedNsName, "y.z");
 
 st.stop();
-})();

@@ -3,9 +3,6 @@
 // ensures that an older version mongod/mongos will fail to connect to the node when it is upgraded,
 // upgrading, or downgrading.
 //
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 const adminDB = conn.getDB("admin");
 
@@ -94,4 +91,3 @@ runTest(lastLTSFCV, res.maxWireVersion - numVersionsSinceLastLTS, res.maxWireVer
 runTest(lastLTSFCV, res.maxWireVersion - numVersionsSinceLastLTS, res.maxWireVersion, "ismaster");
 
 MongoRunner.stopMongod(conn);
-})();

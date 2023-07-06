@@ -12,14 +12,12 @@
  * ]
  */
 
-(function() {
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
-load("jstests/libs/storage_engine_utils.js");
+import {storageEngineIsWiredTiger} from "jstests/libs/storage_engine_utils.js";
 
 // TODO (SERVER-39362): remove once parallel suite respects tags properly.
 if (!storageEngineIsWiredTiger()) {
     jsTestLog("Skipping test because storage engine is not WiredTiger.");
-    return;
+    quit();
 }
 
 const doc = {
@@ -55,4 +53,3 @@ assert.soon(() => {
         return false;
     }
 }, "Expected operation to eventually fail with TransactionTooLargeForCache error.");
-}());

@@ -1,9 +1,6 @@
 /**
  * Tests that a null embedded malformed string is rejected gracefully.
  */
-(function() {
-'use strict';
-
 var engine = 'wiredTiger';
 if (jsTest.options().storageEngine) {
     engine = jsTest.options().storageEngine;
@@ -12,7 +9,7 @@ if (jsTest.options().storageEngine) {
 // Skip this test if not running with the right storage engine.
 if (engine !== 'wiredTiger' && engine !== 'inMemory') {
     jsTest.log('Skipping test because storageEngine is not "wiredTiger" or "inMemory"');
-    return;
+    quit();
 }
 
 // Build an array of malformed strings to test
@@ -57,4 +54,3 @@ function runTest() {
 
     MongoRunner.stopMongod(conn);
 }
-})();

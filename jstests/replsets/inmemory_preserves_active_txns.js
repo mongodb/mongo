@@ -10,17 +10,15 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/storage_helpers.js");  // getOldestRequiredTimestampForCrashRecovery()
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {getOldestRequiredTimestampForCrashRecovery} from "jstests/libs/storage_helpers.js";
 
 // If the test runner passed --storageEngine=inMemory then we know inMemory is compiled into the
 // server. We'll actually use both inMemory and wiredTiger storage engines.
 const storageEngine = jsTest.options().storageEngine;
 if (storageEngine !== 'inMemory') {
     jsTestLog(`Skip test: storageEngine == "${storageEngine}", not "inMemory"`);
-    return;
+    quit();
 }
 
 // A new replica set for both the commit and abort tests to ensure the same clean state.
@@ -112,4 +110,3 @@ function doTest(commitOrAbort) {
 
 doTest("commit");
 doTest("abort");
-})();

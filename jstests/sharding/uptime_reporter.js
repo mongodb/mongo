@@ -4,9 +4,6 @@
  * @tags: [requires_fcv_52]
  */
 
-(function() {
-'use strict';
-
 const st = new ShardingTest({shards: 1});
 
 const configDB = st.s.getDB('config');
@@ -32,4 +29,3 @@ assert.soon(function() {
         docNext.ping.toString() != docInitial.ping.toString();
 }, "uptime reporter test timed out on update", undefined, 1000);
 st.stop();
-})();

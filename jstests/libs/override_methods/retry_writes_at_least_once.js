@@ -2,11 +2,9 @@
  * Overrides Mongo.prototype.runCommand to retry all retryable writes at least once, randomly more
  * than that, regardless of the outcome of the command. Returns the result of the latest attempt.
  */
-(function() {
-"use strict";
 
-load("jstests/libs/override_methods/override_helpers.js");
-load("jstests/libs/retryable_writes_util.js");
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
+import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 
 Random.setRandomSeed();
 
@@ -47,4 +45,3 @@ function runWithRetries(mongo, cmdObj, clientFunction, clientFunctionArguments) 
 
 OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/retry_writes_at_least_once.js");
-})();

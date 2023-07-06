@@ -1,4 +1,3 @@
-(function() {
 // test compound sorting
 const t = db.sort5;
 t.drop();
@@ -40,4 +39,3 @@ function testWithProj(proj, sort, expected) {
     assert.eq(t.find({}, proj).sort(sort).limit(500).map((doc) => doc._id), expected);
 }
 testWithProj({"y.a": 1, "y.b": 1, _id: 1}, {"y.a": 1, "y.b": 1, _id: 1}, [2, 5, 7, 9]);
-})();

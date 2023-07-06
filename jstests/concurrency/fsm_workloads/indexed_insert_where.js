@@ -5,6 +5,7 @@
  * Note: This workload is extended by remove_where.js, update_where.js, and upsert_where.js.
  * data.insertedDocuments is used as a counter by all of those workloads for their own checks.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     var data = {

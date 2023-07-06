@@ -2,9 +2,6 @@
 // Tests running with experimental CQF behavior require test commands to be enabled.
 // @tags: [cqf_experimental_incompatible]
 
-(function() {
-'use strict';
-
 function assertFails(opts) {
     assert.throws(() => MongoRunner.runMongod(opts), [], "Mongod startup up");
 }
@@ -43,4 +40,3 @@ assertFails({
         },
     });
 });
-}());

@@ -15,12 +15,8 @@
  *   uses_transactions,
  * ]
  */
-
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -214,4 +210,3 @@ assert.commandWorked(PrepareHelpers.commitTransaction(session2, prepareTimestamp
 assert.eq(testColl.findOne({_id: 1}), {_id: 1, a: 2});
 
 replTest.stopSet();
-})();

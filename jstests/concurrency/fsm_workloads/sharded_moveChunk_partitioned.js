@@ -9,8 +9,10 @@
  *  assumes_balancer_off,
  * ]
  */
-
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/sharded_base_partitioned.js";
@@ -117,8 +119,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // with the toShard. If the operation failed, verify that the config kept the chunk's shard
         // as the fromShard.
         var chunkAfter = config.getDB('config').chunks.findOne({_id: chunk._id});
-        var msg =
-            msgBase + '\nchunkBefore: ' + tojson(chunk) + '\nchunkAfter: ' + tojson(chunkAfter);
+        msg = msgBase + '\nchunkBefore: ' + tojson(chunk) + '\nchunkAfter: ' + tojson(chunkAfter);
         if (moveChunkRes.ok) {
             msg = "moveChunk succeeded but chunk's shard was not new shard.\n" + msg;
             assertWhenOwnColl.eq(chunkAfter.shard, toShard, msg);
@@ -150,7 +151,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // sees all data in the chunk's range on only the fromShard.
             var shardsForChunk =
                 ChunkHelper.getShardsForRange(mongos, ns, chunk.min._id, chunk.max._id);
-            var msg =
+            msg =
                 msgBase + '\nMongos find().explain() results for chunk: ' + tojson(shardsForChunk);
             assertWhenOwnColl.eq(shardsForChunk.shards.length, 1, msg);
             if (moveChunkRes.ok) {
@@ -164,8 +165,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // If the moveChunk operation succeeded, verify that each mongos updated the chunk's
             // shard metadata with the toShard. If the operation failed, verify that each mongos
             // still sees the chunk's shard metadata as the fromShard.
-            var chunkAfter = mongos.getDB('config').chunks.findOne({_id: chunk._id});
-            var msg =
+            chunkAfter = mongos.getDB('config').chunks.findOne({_id: chunk._id});
+            msg =
                 msgBase + '\nchunkBefore: ' + tojson(chunk) + '\nchunkAfter: ' + tojson(chunkAfter);
             if (moveChunkRes.ok) {
                 msg = "moveChunk succeeded but chunk's shard was not new shard.\n" + msg;

@@ -6,12 +6,10 @@
 //   # This test has statements that do not support non-local read concern.
 //   does_not_support_causal_consistency,
 // ]
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Tests for the behavior of tailable cursors when a collection is dropped or the cursor is
 // otherwise invalidated.
-(function() {
-"use strict";
 
 const collName = "tailable_cursor_invalidation";
 const coll = db[collName];
@@ -75,4 +73,3 @@ cursorId = openCursor({tailable: true, awaitData: true});
 dropAndRecreateColl();
 assert.commandFailedWithCode(db.runCommand({getMore: cursorId, collection: collName}),
                              [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound]);
-}());

@@ -5,11 +5,9 @@
  * Note that the user's query/filter document may only contain _ONE_ array field for positional
  * projection to work correctly.
  */
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-load("jstests/aggregation/extras/utils.js");        // For documentEq.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import {documentEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.positional_projection_multiple_array_fields;
 coll.drop();
@@ -67,4 +65,3 @@ assert.commandFailedWithCode(err, 31249);
 // Multiple positional projections should fail.
 err = assert.throws(() => coll.find({"a.b": 1}, {"z.$": 1, "a.$": 1}).toArray());
 assert.commandFailedWithCode(err, 31276);
-})();

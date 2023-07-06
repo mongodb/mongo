@@ -5,9 +5,6 @@
  * @tags: [
  * ]
  */
-(function() {
-"use strict";
-
 // Returns true if timestamp 'ts1' value is greater than timestamp 'ts2' value.
 function timestampGreaterThan(ts1, ts2) {
     return ts1.getTime() > ts2.getTime() ||
@@ -203,4 +200,3 @@ result = localDb.runCommand({
 assert.commandWorked(result);
 assert(!result.cursor.hasOwnProperty("postBatchResumeToken"), result);
 rst.stopSet();
-})();

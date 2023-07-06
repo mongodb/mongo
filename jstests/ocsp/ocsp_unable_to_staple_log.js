@@ -1,13 +1,15 @@
 // Check that log messages for OCSP stapling work
 // @tags: [requires_http_client, requires_ocsp_stapling]
 
-load("jstests/ocsp/lib/mock_ocsp.js");
-
-(function() {
-"use strict";
+import {
+    OCSP_CA_PEM,
+    OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM,
+    supportsStapling,
+    waitForServer
+} from "jstests/ocsp/lib/ocsp_helpers.js";
 
 if (!supportsStapling()) {
-    return;
+    quit();
 }
 
 const logPath = MongoRunner.dataPath + "mongod.log";
@@ -40,4 +42,3 @@ assert.soon(() => {
 });
 
 MongoRunner.stopMongod(conn);
-})();

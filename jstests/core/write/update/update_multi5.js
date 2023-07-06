@@ -1,8 +1,6 @@
 // @tags: [assumes_balancer_off, requires_multi_updates, requires_non_retryable_writes]
 
 // tests that $addToSet works in a multi-update.
-(function() {
-"use strict";
 var t = db.update_multi5;
 t.drop();
 
@@ -17,4 +15,3 @@ assert.eq(res.nMatched, 2, tojson(res));
 t.find().forEach(function(z) {
     assert.eq(3, z.subscribers.length, tojson(z));
 });
-})();

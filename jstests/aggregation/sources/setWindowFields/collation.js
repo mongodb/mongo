@@ -2,9 +2,6 @@
  * Test that $setWindowFields respects collation for sorting, partitioning, and in the window
  * function.
  */
-(function() {
-"use strict";
-
 const coll = db[jsTestName()];
 coll.drop();
 
@@ -73,4 +70,3 @@ assert.eq("10", results[1].key);
 assert.eq("2", results[2].key);
 assert.eq("2", results[0].minStr);
 assert.eq("2", results[0].maxStr);
-})();

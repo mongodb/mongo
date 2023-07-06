@@ -1,9 +1,6 @@
 /**
  * Tests that the checkShardingIndex command checks shard version when run on a sharded collection.
  */
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 1});
 const dbName = "test";
 const collName = "foo";
@@ -26,4 +23,3 @@ assert.throwsWithCode(() => {
 }, ErrorCodes.StaleConfig);
 
 st.stop();
-})();

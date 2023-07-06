@@ -7,10 +7,7 @@
 // 5. Kill the stepDown operation.
 // 6. Writes should become allowed again and the primary should stay primary.
 
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 var name = "interruptStepDown";
 var replSet = new ReplSetTest({name: name, nodes: 3});
@@ -85,4 +82,3 @@ assert.eq(0, exitCode);
 assert.commandWorked(primary.getDB(name).foo.remove({}));
 restartServerReplication(secondary);
 replSet.stopSet();
-})();

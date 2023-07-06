@@ -6,10 +6,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {anyEq, arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db[jsTestName()];
 
@@ -666,4 +663,3 @@ singleDocumentTest();
 
 testDottedField();
 testArrayTraversalDisallowed();
-})();

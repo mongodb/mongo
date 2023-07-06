@@ -1,8 +1,7 @@
 // Test shard targeting for queries on a collection with a default collation.
-(function() {
-"use strict";
-
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 const caseInsensitive = {
     locale: "en_US",
@@ -557,4 +556,3 @@ assert.commandWorked(explain);
 assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 st.stop();
-})();

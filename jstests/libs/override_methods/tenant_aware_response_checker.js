@@ -1,18 +1,18 @@
 
-function getDbName(nss) {
+export function getDbName(nss) {
     if (nss.length === 0 || !nss.includes(".")) {
         return nss;
     }
     return nss.split(".")[0];
 }
 
-function wordInString(str, word) {
+export function wordInString(str, word) {
     let escapeRegExp = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     let regexp = new RegExp('\\b' + escapeRegExp + '\\b', 'i');
     return regexp.test(str);
 }
 
-function checkExpectedDbNameInString(str, dbName, prefixedDbName, originalRes) {
+export function checkExpectedDbNameInString(str, dbName, prefixedDbName, originalRes) {
     // System db names (admin, local and config) should never be tenant prefixed.
     if (dbName == "admin" || dbName == "local" || dbName == "config") {
         assert.eq(false,
@@ -30,7 +30,7 @@ function checkExpectedDbNameInString(str, dbName, prefixedDbName, originalRes) {
                   dbName}". The response is "${originalRes}"`);
 }
 
-function checkExpectedDbInErrorMsg(errMsg, dbName, prefixedDbName, originalRes) {
+export function checkExpectedDbInErrorMsg(errMsg, dbName, prefixedDbName, originalRes) {
     // The db name in error message should always include tenant prefixed db name regardless how the
     // tenantId was received in the request.
 
@@ -107,7 +107,8 @@ function assertErrorExtraInfoIfExists(res, tenantPrefix) {
  *     inject_security_toiken.js.
  * @param {*} originalResForLogging the original response for logging.
  */
-function assertExpectedDbNameInResponse(res, requestDbName, prefixedDbName, originalResForLogging) {
+export function assertExpectedDbNameInResponse(
+    res, requestDbName, prefixedDbName, originalResForLogging) {
     if (requestDbName.length === 0) {
         return;
     }
@@ -150,7 +151,7 @@ function assertExpectedDbNameInResponse(res, requestDbName, prefixedDbName, orig
  * @param {*} tenantPrefix the tenant prefix which should be removed from the response object. It's
  *     a string includes tenant id and "_", for example "636d957b2646ddfaf9b5e13f_".
  */
-function removeTenantPrefixFromResponse(res, tenantPrefix) {
+export function removeTenantPrefixFromResponse(res, tenantPrefix) {
     for (let k of Object.keys(res)) {
         let v = res[k];
         if (typeof v === "string") {

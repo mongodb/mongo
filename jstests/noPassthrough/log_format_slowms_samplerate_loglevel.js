@@ -7,15 +7,12 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 // This test looks for exact matches in log output, which does not account for implicit
 // sessions.
 TestData.disableImplicitSessions = true;
 
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
-load("jstests/libs/log.js");              // For findMatchingLogLine.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {findMatchingLogLine} from "jstests/libs/log.js";
 
 // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
 // of data logged for each op. For some of the testcases below, including the cluster time would
@@ -90,7 +87,7 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate}) {
     const ignoreFields =
             (isMongos
                  ? ["docsExamined", "keysExamined", "keysInserted", "keysDeleted", "planSummary",
-					 "usedDisk", "hasSortStage"]
+					"usedDisk", "hasSortStage"]
                  : ["nShards"]);
 
     function confirmLogContents(db, {test, logFields}, testIndex) {
@@ -464,4 +461,3 @@ for (let testDB of [shardDB, mongosDB]) {
     assert.eq(unlogged.length, 0, () => tojson(unlogged));
 }
 st.stop();
-})();

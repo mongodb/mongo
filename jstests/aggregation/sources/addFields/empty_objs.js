@@ -6,12 +6,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-// For arrayEq.
-load("jstests/aggregation/extras/utils.js");
-
 const collName = jsTest.name();
 const coll = db.getCollection(collName);
 coll.drop();
@@ -46,4 +40,3 @@ initObj["otherField"] = "value";  // Reset the input object.
 // Test that a new empty field is permitted.
 initObj["newField"] = {};
 assertAddFieldsResult({"newField": {}}, initObj);
-})();

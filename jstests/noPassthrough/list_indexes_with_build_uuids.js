@@ -5,10 +5,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/index_build.js');
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -108,4 +105,3 @@ IndexBuildTest.resumeIndexBuilds(primary);
 createIdx();
 
 replSet.stopSet();
-}());

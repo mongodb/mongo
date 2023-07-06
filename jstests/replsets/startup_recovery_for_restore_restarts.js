@@ -10,9 +10,8 @@
  * multiversion_incompatible]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+
 const SIGKILL = 9;
 
 const dbName = TestData.testName;
@@ -193,4 +192,3 @@ assert.docEq({_id: "s2"}, restoreNode.getDB(dbName)[sentinelCollName].findOne({_
 stopReplProducer2.off();
 stopReplProducer3.off();
 rst.stopSet();
-})();

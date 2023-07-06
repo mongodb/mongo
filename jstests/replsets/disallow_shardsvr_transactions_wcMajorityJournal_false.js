@@ -5,9 +5,6 @@
  * @tags: [uses_transactions]
  */
 
-(function() {
-"use strict";
-
 // A testing exemption was made to allow transactions on shard server even if
 // writeConcernMajorityJournalDefault = false. So we need to disable the exemption in this test
 // in order to test the behavior.
@@ -50,4 +47,3 @@ assert.commandWorked(
 assert.docEq([{_id: 1}, {_id: 3}], sessionColl.find().sort({_id: 1}).toArray());
 
 replSet.stopSet();
-}());

@@ -2,8 +2,8 @@
  * Tests that hybrid index builds result in a consistent state and correct multikey behavior across
  * various index types.
  */
-load("jstests/noPassthrough/libs/index_build.js");
 import {getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const conn = MongoRunner.runMongod();
 const dbName = 'test';

@@ -3,9 +3,6 @@
  *
  * @tags: [requires_wiredtiger, requires_persistence]
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB("test");
 const coll = db.getCollection(jsTest.name());
@@ -22,4 +19,3 @@ for (const failPoint of failPoints) {
 }
 
 MongoRunner.stopMongod(conn);
-}());

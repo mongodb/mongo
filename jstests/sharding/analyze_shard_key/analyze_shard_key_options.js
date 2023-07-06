@@ -2,10 +2,9 @@
  * Tests that the analyzeShardKey command supports analyzing the characteristics of the shard
  * key and/or the read and write distribution.
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 const numNodesPerRS = 2;
 // The write concern to use when inserting documents into test collections. Waiting for the
@@ -88,4 +87,3 @@ function runTest(conn) {
     runTest(rst.getPrimary());
     rst.stopSet();
 }
-})();

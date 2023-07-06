@@ -17,9 +17,6 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 3, mongos: 1, other: {rs: true, rsOptions: {nodes: 2}}});
 
 var mongos = st.s0;
@@ -427,4 +424,3 @@ assert.writeError(mongosConnNew.getCollection(collUnsharded.toString()).insert({
 gc();  // Clean up new connections
 
 st.stop();
-})();

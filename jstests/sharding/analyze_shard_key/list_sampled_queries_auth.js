@@ -4,12 +4,6 @@
  * @tags: [requires_fcv_70]
  */
 
-(function() {
-
-'use strict';
-
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
-
 function runTest(conn) {
     const dbName = "testDb";
     const collName0 = "testColl0";
@@ -95,4 +89,3 @@ function runTest(conn) {
 
     rst.stopSet();
 }
-})();

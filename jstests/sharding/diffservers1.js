@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 var s = new ShardingTest({shards: 2});
 
 assert.eq(2, s.config.shards.count(), "server count wrong");
@@ -22,4 +19,3 @@ assert.commandFailed(
     "Allowed shard in IP when config is localhost");
 
 s.stop();
-})();

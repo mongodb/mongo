@@ -28,12 +28,13 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/profiler.js');
-load('jstests/sharding/libs/last_lts_mongod_commands.js');
-load('jstests/sharding/libs/last_lts_mongos_commands.js');
+import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
+import {
+    commandsRemovedFromMongodSinceLastLTS
+} from "jstests/sharding/libs/last_lts_mongod_commands.js";
+import {
+    commandsRemovedFromMongosSinceLastLTS
+} from "jstests/sharding/libs/last_lts_mongos_commands.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -1118,4 +1119,3 @@ rst.stopSet();
 let st = new ShardingTest({mongos: 1, shards: {rs0: {nodes: 1}}});
 runTests(st.s0, st.rs0.getPrimary(), st.configRS.getPrimary(), true);
 st.stop();
-})();

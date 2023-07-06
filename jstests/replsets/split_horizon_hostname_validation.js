@@ -2,9 +2,6 @@
  * Ensure that IPs cannot be used as hostnames for split horizon configurations.
  */
 
-(function() {
-"use strict";
-
 // Tests that when replSetInitiate/Reconfig are called with one member with the given host name and
 // horizon name, with the given mongod startup options, we fail the split horizon IP check if
 // expectedReject.
@@ -51,4 +48,3 @@ testConfig("a", "12.34.56.78/20", true);
 // Make sure setting this parameter disables the check
 testConfig("a", "12.34.56.78", false, {setParameter: {disableSplitHorizonIPCheck: true}});
 testConfig("a", "12.34.56.78/20", false, {setParameter: {disableSplitHorizonIPCheck: true}});
-}());

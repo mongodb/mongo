@@ -6,9 +6,6 @@
  *  - Documents at the maximum BSON size limit can be written and read back.
  *  - Documents over the maximum BSON size limit cannot be written.
  */
-(function() {
-'use strict';
-
 const maxBsonObjectSize = db.hello().maxBsonObjectSize;
 const docOverhead = Object.bsonsize({_id: new ObjectId(), x: ''});
 const maxStrSize = maxBsonObjectSize - docOverhead;
@@ -69,4 +66,3 @@ assert.commandFailedWithCode(db.runCommand({
     updates: [{q: {_id: objectId}, u: {$set: {x: largerThanMaxString}}}]
 }),
                              17419);
-})();

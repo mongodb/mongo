@@ -4,9 +4,6 @@
  * @tags: [
  * ]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({
     // Set the syncdelay to 1s to speed up checkpointing.
     nodeOptions: {syncdelay: 1},
@@ -75,4 +72,3 @@ assert.commandFailedWithCode(localDb.runCommand({
 jsTest.log("End of test");
 
 rst.stopSet();
-})();

@@ -6,13 +6,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/sources/densify/libs/parse_util.js");
+import {parseUtil} from "jstests/aggregation/sources/densify/libs/parse_util.js";
 
 const coll = db.densify_parse;
 coll.drop();
 
 parseUtil(db, coll, "$densify");
-})();

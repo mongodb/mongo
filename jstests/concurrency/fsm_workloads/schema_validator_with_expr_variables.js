@@ -8,8 +8,7 @@
  * error.
  * @tags: [requires_non_retryable_writes, requires_persistence, catches_command_failures]
  */
-
-"use strict";
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     function setup(db, collName) {

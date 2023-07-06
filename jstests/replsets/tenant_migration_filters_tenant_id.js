@@ -11,12 +11,11 @@
  * ]
  */
 
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     isNamespaceForTenant,
 } from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/uuid_util.js");
 
 const baseDBName = "testDB";
 const collName = "testColl";

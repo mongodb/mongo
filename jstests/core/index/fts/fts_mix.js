@@ -1,6 +1,5 @@
-(function() {
-load("jstests/libs/fts.js");
-load("jstests/aggregation/extras/utils.js");  // For resultsEq.
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
+import {getIDS, queryIDS} from "jstests/libs/fts.js";
 
 // test collection
 const tc = db.text_mix;
@@ -210,4 +209,3 @@ assert.eq([2], queryIDS(tc, "Mahim", {_id: {$lte: 4}}));
 
 // using regex conditional filtering
 assert.eq([9], queryIDS(tc, "members", {title: {$regex: /Phy.*/i}}));
-})();

@@ -4,9 +4,6 @@
  * @tags: [requires_wiredtiger]
  */
 
-(function() {
-"use strict";
-
 let oldRes, newRes;
 let coll = db.dropindexes_duplicate_fields;
 
@@ -45,4 +42,3 @@ try {
     assert.commandWorked(
         db.adminCommand({configureFailPoint: 'WTWriteConflictException', mode: "off"}));
 }
-})();

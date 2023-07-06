@@ -2,9 +2,6 @@
  * Helpers for verifying versions of started MongoDB processes.
  */
 
-var Mongo, assert;
-(function() {
-"use strict";
 Mongo.prototype.getBinVersion = function() {
     var result = assert.commandWorked(this.getDB("admin").runCommand({serverStatus: 1}));
     return result.version;
@@ -38,4 +35,3 @@ assert.allBinVersions = function(versionsWanted, versionsFound) {
                    " in " + versionsFound);
     }
 };
-}());

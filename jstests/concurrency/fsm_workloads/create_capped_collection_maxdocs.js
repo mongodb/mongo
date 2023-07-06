@@ -12,6 +12,7 @@
  *
  * @tags: [does_not_support_stepdowns, requires_capped]
  */
+import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig

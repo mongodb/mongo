@@ -14,10 +14,7 @@
 /**
  * Tests that map reduce works with stored javascript.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 // Use a unique database name to avoid conflicts with other tests that directly modify
 // system.js.
@@ -71,6 +68,7 @@ function assertCorrect(results) {
 assert.commandWorked(testDB.runCommand({
     mapReduce: coll.getName(),
     map: function() {
+        // eslint-disable-next-line
         mr_stored_map(this);
     },
     reduce: reduce,
@@ -86,6 +84,7 @@ assert.commandWorked(testDB.runCommand({
     mapReduce: coll.getName(),
     map: notStoredMap,
     reduce: function(k, v) {
+        // eslint-disable-next-line
         return mr_stored_reduce(k, v);
     },
     finalize: finalize,
@@ -101,6 +100,7 @@ assert.commandWorked(testDB.runCommand({
     map: notStoredMap,
     reduce: reduce,
     finalize: function(key, reducedValue) {
+        // eslint-disable-next-line
         return mr_stored_finalize(key, reducedValue);
     },
     out: "mr_stored_out"
@@ -113,12 +113,15 @@ out.drop();
 assert.commandWorked(testDB.runCommand({
     mapReduce: coll.getName(),
     map: function() {
+        // eslint-disable-next-line
         mr_stored_map(this);
     },
     reduce: function(k, v) {
+        // eslint-disable-next-line
         return mr_stored_reduce(k, v);
     },
     finalize: function(key, reducedValue) {
+        // eslint-disable-next-line
         return mr_stored_finalize(key, reducedValue);
     },
     out: "mr_stored_out"
@@ -130,4 +133,3 @@ out.drop();
 assert.commandWorked(testDB.system.js.remove({_id: "mr_stored_map"}));
 assert.commandWorked(testDB.system.js.remove({_id: "mr_stored_reduce"}));
 assert.commandWorked(testDB.system.js.remove({_id: "mr_stored_finalize"}));
-}());

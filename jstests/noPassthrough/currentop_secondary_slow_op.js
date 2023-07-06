@@ -4,10 +4,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({
     nodes: [
@@ -59,4 +56,3 @@ try {
 }
 
 rst.stopSet();
-})();

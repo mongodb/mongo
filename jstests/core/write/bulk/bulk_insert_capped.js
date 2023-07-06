@@ -15,8 +15,6 @@
  * ]
  */
 
-(function() {
-"use strict";
 var t = db.capped_multi_insert;
 t.drop();
 
@@ -35,4 +33,3 @@ assert.eq(t.find().hint({_id: 1}).itcount(), 1);              // Index scan with
 
 // Ensure that the second document is the one that is kept.
 assert.eq(t.findOne(), {_id: 2});
-}());

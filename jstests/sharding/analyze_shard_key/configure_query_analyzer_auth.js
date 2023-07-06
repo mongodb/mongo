@@ -5,10 +5,6 @@
  * @tags: [requires_fcv_70]
  */
 
-(function() {
-
-'use strict';
-
 function testConfigureQueryAnalyzer(conn) {
     const dbName = "testDb";
     const collName0 = "testColl0";
@@ -143,4 +139,3 @@ function testRefreshQueryAnalyzerConfiguration(conn) {
 
     rst.stopSet();
 }
-})();

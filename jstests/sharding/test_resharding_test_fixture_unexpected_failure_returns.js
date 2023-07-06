@@ -8,11 +8,7 @@
  *   uses_atclustertime,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/discover_topology.js');
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 1, numRecipients: 2});
 reshardingTest.setup();
@@ -52,4 +48,3 @@ const err = assert.throws(() => {
 assert(/ResumableRangeDeleterDisabled/.test(err.message), err);
 
 reshardingTest.teardown();
-})();

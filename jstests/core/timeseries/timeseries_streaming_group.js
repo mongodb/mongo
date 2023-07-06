@@ -11,7 +11,6 @@
  * ]
  */
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/fail_point_util.js");  // For configureFailPoint
 
 const ts = db.timeseries_streaming_group;
 ts.drop();

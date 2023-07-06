@@ -6,10 +6,7 @@
  *     requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
+import {waitForState} from "jstests/replsets/rslib.js";
 
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
@@ -53,4 +50,3 @@ assert.soonNoExcept(() => {
 waitForState(restartedNode, ReplSetTest.State.PRIMARY);
 
 replTest.stopSet();
-}());

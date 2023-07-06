@@ -4,9 +4,8 @@
  * array_index_and_nonIndex_consistent.js
  */
 
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
+
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
@@ -125,4 +124,3 @@ assert(arrayEq(resultSet, expected), generateFailedEqString(resultSet, expected)
 resultSet = coll.find({val: {$lt: []}}).toArray();
 expected = generateExpectedResults([3, 6, 7, 8, 16]);
 assert(arrayEq(resultSet, expected), generateFailedEqString(resultSet, expected));
-})();

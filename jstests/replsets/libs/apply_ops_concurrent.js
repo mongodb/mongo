@@ -19,11 +19,7 @@
  *     Fully qualified namespace of second set of CRUD operations. This may be the same namespace as
  *     ns1. As with ns1, only insert operations will be used.
  */
-var ApplyOpsConcurrentTest = function(options) {
-    'use strict';
-
-    load('jstests/concurrency/fsm_workload_helpers/server_types.js');
-
+export var ApplyOpsConcurrentTest = function(options) {
     if (!(this instanceof ApplyOpsConcurrentTest)) {
         return new ApplyOpsConcurrentTest(options);
     }
@@ -44,10 +40,6 @@ var ApplyOpsConcurrentTest = function(options) {
      * Creates an array of insert operations for applyOps into collection 'coll'.
      */
     function generateInsertOps(coll, numOps, id) {
-        // Explicit 'use strict' to prevent mozjs from injecting its own "use strict" directive
-        // (with incorrect indentation) when we convert this function into a string for
-        // startParallelShell().
-        'use strict';
         const ops = Array(numOps).fill('ignored').map((unused, i) => {
             return {op: 'i', ns: coll.getFullName(), o: {_id: (id * numOps + i), id: id}};
         });
@@ -58,7 +50,6 @@ var ApplyOpsConcurrentTest = function(options) {
      * Runs applyOps to insert 'numOps' documents into collection 'coll'.
      */
     function applyOpsInsert(coll, numOps, id) {
-        'use strict';
         const ops = generateInsertOps(coll, numOps, id);
         const mydb = coll.getDB();
         assert.commandWorked(mydb.runCommand({applyOps: ops}),
@@ -87,8 +78,6 @@ var ApplyOpsConcurrentTest = function(options) {
      *     collide with collections with different indexes.
      */
     function insertFunction(options) {
-        'use strict';
-
         const coll = db.getMongo().getCollection(options.ns);
         const numOps = options.numOps;
         const id = options.id;

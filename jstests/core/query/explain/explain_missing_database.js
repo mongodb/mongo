@@ -1,5 +1,4 @@
 // Test explain of various operations against a non-existent database
-(function() {
 var explainMissingDb = db.getSiblingDB("explainMissingDb");
 
 var explain;
@@ -41,4 +40,3 @@ assert("executionStats" in explain);
 explainMissingDb.dropDatabase();
 explain = explainMissingDb.collection.explain("executionStats").aggregate([{$match: {a: 1}}]);
 assert.commandWorked(explain);
-}());

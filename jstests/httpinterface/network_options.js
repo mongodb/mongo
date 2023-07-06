@@ -1,8 +1,7 @@
-var baseName = "jstests_core_network_options";
-
 // Tests for command line option canonicalization.  See SERVER-13379.
+import {testGetCmdLineOptsMongod} from "jstests/libs/command_line/test_parsed_options.js";
 
-load('jstests/libs/command_line/test_parsed_options.js');
+var baseName = "jstests_core_network_options";
 
 // Object Check
 jsTest.log("Testing \"objcheck\" command line option");

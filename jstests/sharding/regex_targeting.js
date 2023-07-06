@@ -1,10 +1,9 @@
 // This checks to make sure that sharded regex queries behave the same as unsharded regex queries.
 // Note, when the updateOneWithoutShardKey feature flag is enabled, upsert operations with queries
 // that do not match on the entire shard key are successful.
-(function() {
-'use strict';
-
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 var st = new ShardingTest({shards: 2});
 
@@ -307,4 +306,3 @@ assert.commandWorked(collNested.remove({a: {b: /abcde.*/}}));
 assert.eq(2, collNested.find().itcount());
 
 st.stop();
-})();

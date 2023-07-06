@@ -1,7 +1,9 @@
-load("jstests/replsets/rslib.js");
-load('jstests/replsets/libs/election_metrics.js');
+import {
+    verifyServerStatusElectionReasonCounterValue
+} from "jstests/replsets/libs/election_metrics.js";
+import {reconnect} from "jstests/replsets/rslib.js";
 
-function basicReplsetTest(signal, ssl_options1, ssl_options2, ssl_name) {
+export function basicReplsetTest(signal, ssl_options1, ssl_options2, ssl_name) {
     // Test basic replica set functionality.
     // -- Replication
     // -- Failover

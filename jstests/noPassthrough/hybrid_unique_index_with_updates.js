@@ -7,9 +7,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 let replSetTest = new ReplSetTest({name: "hybrid_updates", nodes: 2});
 replSetTest.startSet();
 replSetTest.initiate();
@@ -184,4 +181,3 @@ for (let i = 0; i <= 4; i++) {
 }
 
 replSetTest.stopSet();
-})();

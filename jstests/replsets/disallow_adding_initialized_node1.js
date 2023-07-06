@@ -7,9 +7,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const name = jsTestName();
 const replSetA = new ReplSetTest({
     name,
@@ -93,4 +90,3 @@ assert.eq(ReplSetTest.State.PRIMARY, statusB.members[0].state);
 
 replSetB.stopSet();
 replSetA.stopSet();
-})();

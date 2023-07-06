@@ -1,5 +1,3 @@
-(function() {
-"use strict";
 var t = db.update_serializability1;
 t.drop();
 
@@ -24,4 +22,3 @@ s2();
 
 // both operations should happen on every document
 assert.eq(N, t.find({x: 2, y: 2}).count());
-})();

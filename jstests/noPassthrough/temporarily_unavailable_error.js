@@ -9,9 +9,6 @@
  *   requires_wiredtiger,
  * ]
  */
-(function() {
-"use strict";
-
 const replSet = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
@@ -109,4 +106,3 @@ for (let j = 0; j < 50000; j++)
 })();
 
 replSet.stopSet();
-})();

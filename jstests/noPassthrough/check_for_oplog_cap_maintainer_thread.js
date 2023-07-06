@@ -8,9 +8,6 @@
  *
  * @tags: [requires_replication, requires_persistence]
  */
-(function() {
-"use strict";
-
 // Verify that the oplog cap maintainer thread is running under normal circumstances.
 jsTestLog("Testing single node replica set mode");
 const rst = new ReplSetTest(
@@ -67,4 +64,3 @@ conn = MongoRunner.runMongod({
 });
 assert(!conn);
 verifyOplogCapMaintainerThreadNotStarted(rawMongoProgramOutput());
-}());

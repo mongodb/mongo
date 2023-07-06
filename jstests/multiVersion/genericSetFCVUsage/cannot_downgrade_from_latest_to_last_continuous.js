@@ -2,9 +2,6 @@
  * Tests that we cannot downgrade from latest to last continuous.
  */
 
-(function() {
-"use strict";
-
 TestData.setParameters = TestData.setParameters || {};
 TestData.setParameters.disableTransitionFromLatestToLastContinuous = true;
 
@@ -75,4 +72,3 @@ if (lastContinuousFCV != lastLTSFCV) {
 }
 
 TestData.setParameters.disableTransitionFromLatestToLastContinuous = false;
-})();

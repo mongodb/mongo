@@ -2,12 +2,11 @@
  * Tests $unionWith with various levels of nesting and stages.
  */
 
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");        // For arrayEq.
-load("jstests/libs/collection_drop_recreate.js");   // For assertDropAndRecreateCollection.
-load("jstests/libs/fixture_helpers.js");            // For FixtureHelpers.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
+
+import {anyEq} from "jstests/aggregation/extras/utils.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;
@@ -326,4 +325,3 @@ checkResults(
     testDB.runCommand(
         {aggregate: "emptyCollection", pipeline: [{$unionWith: collA.getName()}], cursor: {}}),
     resSet);
-})();

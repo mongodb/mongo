@@ -12,9 +12,6 @@
 /**
  * Tests related to the aggregate commands behavior with writeConcern and writeConcern + explain.
  */
-(function() {
-"use strict";
-
 const collName = "explain_agg_write_concern";
 let coll = db[collName];
 let outColl = db[collName + "_out"];
@@ -71,4 +68,3 @@ assert.throws(function() {
         writeConcern: {w: 1}
     });
 });
-}());

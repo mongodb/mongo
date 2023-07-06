@@ -1,4 +1,4 @@
-load("jstests/replsets/rslib.js");
+import {syncFrom} from "jstests/replsets/rslib.js";
 
 function myprint(x) {
     print("chaining output: " + x);

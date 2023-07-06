@@ -6,10 +6,8 @@
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
-load('jstests/libs/fail_point_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const kDbName = 'db';
 const kCollectionName = 'test';
@@ -186,4 +184,3 @@ let getCurrentOpOfDDL = (ddlOpThread, desc) => {
 }
 
 st.stop();
-})();

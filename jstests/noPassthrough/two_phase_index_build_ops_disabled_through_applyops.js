@@ -7,8 +7,6 @@
  * ]
  */
 
-(function() {
-
 const replSet = new ReplSetTest({
     nodes: [
         {},
@@ -48,4 +46,3 @@ assert.commandFailedWithCode(testDB.adminCommand({
                              [ErrorCodes.CommandNotSupported, ErrorCodes.FailedToParse]);
 
 replSet.stopSet();
-})();

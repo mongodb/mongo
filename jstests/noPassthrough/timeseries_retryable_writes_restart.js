@@ -7,9 +7,6 @@
  *     requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
 function testRetryableRestart(ordered) {
     const replTest = new ReplSetTest({nodes: 1});
     replTest.startSet();
@@ -86,4 +83,3 @@ function testRetryableRestart(ordered) {
 
 testRetryableRestart(true);
 testRetryableRestart(false);
-})();

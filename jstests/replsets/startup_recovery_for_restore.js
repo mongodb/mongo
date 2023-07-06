@@ -9,9 +9,7 @@
  * multiversion_incompatible]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const dbName = TestData.testName;
 
@@ -201,4 +199,3 @@ restoreNodeSession.abortTransaction();
 stopReplProducer2.off();
 stopReplProducer3.off();
 rst.stopSet();
-})();

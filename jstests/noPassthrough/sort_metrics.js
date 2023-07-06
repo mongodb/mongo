@@ -1,7 +1,4 @@
 // Test metrics.query.sort.* ServerStatus counters
-(function() {
-'use strict';
-
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 
@@ -34,4 +31,3 @@ assert.gt(
     "Expect metric query.sort.totalKeysSorted to increment after pipeline " + tojson(pipeline));
 
 MongoRunner.stopMongod(conn);
-})();

@@ -11,8 +11,7 @@
  */
 
 import {getPlanStage} from "jstests/libs/analyze_plan.js";
-
-load("jstests/libs/fixture_helpers.js");  // For 'isMongos'
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";

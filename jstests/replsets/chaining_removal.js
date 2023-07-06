@@ -1,8 +1,6 @@
 // ensure removing a chained node does not break reporting of replication progress (SERVER-15849)
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
+import {syncFrom} from "jstests/replsets/rslib.js";
 
 var numNodes = 5;
 var host = getHostName();
@@ -75,4 +73,3 @@ options.writeConcern.w = 4;
 assert.commandWorked(primary.getDB(name).foo.insert({x: 2}, options));
 
 replTest.stopSet();
-}());

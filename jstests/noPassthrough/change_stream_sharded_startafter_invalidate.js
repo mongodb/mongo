@@ -6,9 +6,6 @@
 //   requires_sharding,
 //   uses_change_streams,
 // ]
-(function() {
-"use strict";
-
 // The edge case we are testing occurs on an unsharded collection in a sharded cluster. We
 // create a cluster with just one shard to ensure the test never blocks for another shard.
 const st = new ShardingTest(
@@ -76,4 +73,3 @@ assert(mongosColl.drop());
 })();
 
 st.stop();
-})();

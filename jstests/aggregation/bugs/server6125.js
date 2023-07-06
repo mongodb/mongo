@@ -1,4 +1,3 @@
-(function() {
 //
 // testing $sort aggregation pipeline for heterogeneity (SERVER-6125)
 // method:
@@ -34,11 +33,11 @@ function runAsserts(chkArray, problem) {
     // check the _id at [0] to determine which way around this has been sorted
     // then check for gt / lt.  Done rather than neq to preclude a < b > c issues
     if (chkArray[0]._id == 0) {
-        for (var x = 0; x < chkArray.length - 1; x++) {
+        for (let x = 0; x < chkArray.length - 1; x++) {
             assert.lt(chkArray[x]._id, chkArray[x + 1]._id);
         }
     } else if (chkArray[chkArray.length - 1]._id == 0) {
-        for (var x = 0; x < chkArray.length - 1; x++) {
+        for (let x = 0; x < chkArray.length - 1; x++) {
             assert.gt(chkArray[x]._id, chkArray[x + 1]._id);
         }
     } else {
@@ -94,4 +93,3 @@ runSort({a: -1}, false, "p3");
 // problem 4, reverse order sort with nested array
 runSort({"a": -1}, true, "p4a");
 runSort({"a.b": -1}, true, "p4b");
-})();

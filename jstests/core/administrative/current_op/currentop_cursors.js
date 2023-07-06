@@ -12,12 +12,9 @@
  *   docker_incompatible,
  * ]
  */
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-(function() {
-"use strict";
 const coll = db.jstests_currentop_cursors;
-
-load("jstests/libs/fixture_helpers.js");  // for FixtureHelpers
 
 // Avoiding using the shell helper to avoid the implicit collection recreation.
 db.runCommand({drop: coll.getName()});
@@ -243,4 +240,3 @@ runTest({
         assert.eq(session.getSessionId().id, result[0].lsid.id);
     }
 });
-})();

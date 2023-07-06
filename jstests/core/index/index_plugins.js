@@ -1,6 +1,4 @@
 // Test creation of compound indexes with special index types.
-(function() {
-"use strict";
 const coll = db.index_plugins;
 coll.drop();
 
@@ -62,4 +60,3 @@ for (let indexType1 of incompatableIndexTypes) {
     assert.commandFailedWithCode(coll.createIndex({"$**": 1, b: indexType1}),
                                  ErrorCodes.CannotCreateIndex);
 }
-})();

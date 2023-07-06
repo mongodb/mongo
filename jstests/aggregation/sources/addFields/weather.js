@@ -4,11 +4,7 @@
  * the same result. Use the sample case of computing weather metadata.
  */
 
-(function() {
-"use strict";
-
-// For arrayEq.
-load("jstests/aggregation/extras/utils.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const collName = jsTest.name();
 const coll = db.getCollection(collName);
@@ -81,4 +77,3 @@ let addFieldsResult = coll.aggregate(addFieldsWeatherPipe).toArray();
 // Then assert they are the same.
 assert(arrayEq(addFieldsResult, correctWeather),
        "$addFields does not work the same as a $project with computed and included fields");
-}());

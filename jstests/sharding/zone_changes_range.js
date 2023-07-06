@@ -1,11 +1,15 @@
 /**
  * Test that chunks and documents are moved correctly after zone changes.
  */
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/zone_changes_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {
+    assertChunksOnShards,
+    assertDocsOnShards,
+    assertShardTags,
+    moveZoneToShard,
+    runBalancer,
+    updateZoneKeyRange,
+} from "jstests/sharding/libs/zone_changes_util.js";
 
 const st = new ShardingTest({shards: 3, other: {chunkSize: 1}});
 let primaryShard = st.shard0;
@@ -197,4 +201,3 @@ assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey);
 assert.eq(docs.length, st.shard0.getCollection(ns).count());
 
 st.stop();
-})();

@@ -19,11 +19,8 @@
  *   incompatible_with_gcov,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/index_catalog_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 var rst = new ReplSetTest({name: "initial_sync_move_forward", nodes: 1});
 rst.startSet();
@@ -93,4 +90,3 @@ var indexSpec = IndexCatalogHelpers.findByKeyPattern(secondaryColl.getIndexes(),
 assert.neq(null, indexSpec);
 assert.eq(true, indexSpec.unique);
 rst.stopSet();
-})();

@@ -4,11 +4,11 @@
  *
  * @tags: [requires_fcv_70]
  */
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");  // For Thread.
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
-load("jstests/sharding/analyze_shard_key/libs/validation_common.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
+import {ValidationTest} from "jstests/sharding/analyze_shard_key/libs/validation_common.js";
 
 const queryAnalysisSamplerConfigurationRefreshSecs = 1;
 const analyzeShardKeyNumRanges = 10;
@@ -91,8 +91,9 @@ function runAnalyzeShardKeyTest(conn, testCase, fpConn, fpName) {
     const {docs} = validationTest.makeDocuments(numDocs);
     assert.commandWorked(conn.getCollection(ns).insert(docs));
 
-    const runCmdFunc = (host, ns) => {
-        load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+    const runCmdFunc = async (host, ns) => {
+        const {AnalyzeShardKeyUtil} =
+            await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
         const conn = new Mongo(host);
         sleep(AnalyzeShardKeyUtil.getRandInteger(10, 100));
         return conn.adminCommand({analyzeShardKey: ns, key: {_id: 1}});
@@ -111,7 +112,7 @@ function runAnalyzeShardKeyTest(conn, testCase, fpConn, fpName) {
     assert.commandWorkedOrFailedWithCode(runCmdThread.returnData(), testCase.expectedErrCodes);
 }
 
-function runConfigureQueryAnalyzerTest(conn, testCase, {rst} = {}) {
+async function runConfigureQueryAnalyzerTest(conn, testCase, {rst} = {}) {
     const validationTest = ValidationTest(conn);
 
     const dbName = validationTest.dbName;
@@ -120,8 +121,9 @@ function runConfigureQueryAnalyzerTest(conn, testCase, {rst} = {}) {
 
     jsTest.log(`Testing configureQueryAnalyzer command ${tojson({testCase, dbName, collName})}`);
 
-    const runCmdFunc = (host, ns, mode, samplesPerSecond) => {
-        load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+    const runCmdFunc = async (host, ns, mode, samplesPerSecond) => {
+        const {AnalyzeShardKeyUtil} =
+            await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
         const conn = new Mongo(host);
         sleep(AnalyzeShardKeyUtil.getRandInteger(10, 100));
         return conn.adminCommand({configureQueryAnalyzer: ns, mode, samplesPerSecond});
@@ -156,10 +158,10 @@ function runConfigureQueryAnalyzerTest(conn, testCase, {rst} = {}) {
     // lead to a crash.
     sleep(queryAnalysisSamplerConfigurationRefreshSecs);
     assert.commandWorkedOrFailedWithCode(
-        runCmdFunc(conn.host, ns, "full" /* mode */, 10 /* samplesPerSecond */),
+        await runCmdFunc(conn.host, ns, "full" /* mode */, 10 /* samplesPerSecond */),
         testCase.expectedErrCodes);
     sleep(queryAnalysisSamplerConfigurationRefreshSecs);
-    assert.commandWorkedOrFailedWithCode(runCmdFunc(conn.host, ns, "off" /* mode */),
+    assert.commandWorkedOrFailedWithCode(await runCmdFunc(conn.host, ns, "off" /* mode */),
                                          testCase.expectedErrCodes);
 }
 
@@ -184,7 +186,7 @@ function runConfigureQueryAnalyzerTest(conn, testCase, {rst} = {}) {
         }
     }
     for (let testCase of configureQueryAnalyzerTestCases) {
-        runConfigureQueryAnalyzerTest(st.s, testCase);
+        await runConfigureQueryAnalyzerTest(st.s, testCase);
     }
 
     st.stop();
@@ -203,7 +205,7 @@ function runConfigureQueryAnalyzerTest(conn, testCase, {rst} = {}) {
         }
     }
     for (let testCase of configureQueryAnalyzerTestCases) {
-        runConfigureQueryAnalyzerTest(primary, testCase, {rst});
+        await runConfigureQueryAnalyzerTest(primary, testCase, {rst});
     }
 
     rst.stopSet();

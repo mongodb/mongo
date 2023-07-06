@@ -6,10 +6,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/noPassthrough/libs/index_build.js');
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({
     nodes: [
@@ -83,4 +80,3 @@ createIdx();
 IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
 
 rst.stopSet();
-})();

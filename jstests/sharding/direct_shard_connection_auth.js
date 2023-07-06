@@ -3,9 +3,6 @@
  *
  * @tags: [featureFlagCheckForDirectShardOperations, requires_fcv_71]
  */
-(function() {
-'use strict';
-
 // Create a new sharded cluster for testing and enable auth.
 const st = new ShardingTest({name: jsTestName(), keyFile: "jstests/libs/key1", shards: 1});
 
@@ -91,4 +88,3 @@ jsTest.log("Running tests with two shards.");
 // Stop the sharding test before the additional shard to ensure the test hooks run successfully.
 st.stop();
 newShard.stopSet();
-})();

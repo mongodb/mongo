@@ -7,15 +7,11 @@
  *   assumes_read_concern_unchanged
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.searchCollector;
 coll.drop();
 const buildInfo = assert.commandWorked(db.runCommand({"buildInfo": 1}));
 if (buildInfo["modules"].includes("enterprise")) {
-    // This is a test of behavior without enterprise.
-    return;
+    quit();
 }
 assert.commandWorked(coll.insert({"_id": 1, "title": "cakes"}));
 
@@ -37,4 +33,3 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     coll.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$vectorSearch: {}}]}),
     [6047401]);
-})();

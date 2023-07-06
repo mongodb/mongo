@@ -2,9 +2,6 @@
  * Tests that an $elemMatch-$or query is evaluated correctly. Designed to reproduce SERVER-33005 and
  * SERVER-38164.
  */
-(function() {
-"use strict";
-
 const coll = db.elemmatch_or_pushdown;
 coll.drop();
 
@@ -83,4 +80,3 @@ for (let hint of [keyPattern, {$natural: 1}]) {
             .toArray(),
         [{_id: 0}, {_id: 2}, {_id: 4}, {_id: 6}]);
 }
-}());

@@ -13,9 +13,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 function getPreImage(collectionIndex, ts) {
     const farOffDate = ISODate("2100-01-01");
     const epochSeconds = farOffDate.valueOf() / 1000;
@@ -119,4 +116,3 @@ try {
 }
 // Tear down the nodes now without checking for consistency.
 replSetTest.stopSet(undefined, undefined, {skipCheckDBHashes: true});
-})();

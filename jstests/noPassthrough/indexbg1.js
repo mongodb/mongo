@@ -1,10 +1,7 @@
 // Test background index creation
 // @tags: [SERVER-40561]
 
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/index_build.js");
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
@@ -126,4 +123,3 @@ print("about to drop index");
 assert.commandWorked(t.dropIndex({i: 1}));
 
 MongoRunner.stopMongod(conn);
-})();

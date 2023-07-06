@@ -9,8 +9,6 @@
  * ]
  */
 
-(function() {
-'use strict';
 const kDbName = "test";
 
 const st = new ShardingTest({shards: 2});
@@ -91,4 +89,3 @@ jsTest.log(
 }
 
 st.stop();
-})();

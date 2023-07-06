@@ -4,9 +4,6 @@
  *
  * @tags: [requires_fcv_70, featureFlagTransitionToCatalogShard]
  */
-(function() {
-"use strict";
-
 var st = new ShardingTest({mongos: 1, shards: 1, config: 1, configShard: true});
 
 let mongosAdminDB = st.s0.getDB("admin");
@@ -111,4 +108,3 @@ assert.commandWorked(res);
 
 // TODO SERVER-74570: Enable parallel shutdown
 st.stop({parallelSupported: false});
-})();

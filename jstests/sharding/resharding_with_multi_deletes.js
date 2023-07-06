@@ -6,10 +6,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest();
 
@@ -38,4 +35,3 @@ reshardingTest.withReshardingInBackground(
         assert.commandWorked(sourceCollection.remove({x: 1}, {justOne: false}));
     });
 reshardingTest.teardown();
-})();

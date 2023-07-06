@@ -3,8 +3,6 @@
  * functionality, so we'll just check that it succeeds and fails when it's supposed to.
  */
 
-(function() {
-"use strict";
 var name = "getstatus";
 var numNodes = 4;
 var replTest = new ReplSetTest({name: name, nodes: numNodes});
@@ -25,4 +23,3 @@ var primary = replTest.getPrimary();
 assert.commandWorked(primary.getDB("admin").runCommand({replSetGetStatus: 1}));
 
 replTest.stopSet();
-}());

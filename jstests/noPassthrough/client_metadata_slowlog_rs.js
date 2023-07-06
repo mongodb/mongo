@@ -5,9 +5,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
 const numNodes = 2;
 const rst = new ReplSetTest({nodes: numNodes});
 
@@ -49,4 +46,3 @@ assert.eq(count.length, 1, "expected 1 document");
 assert(checkLog.checkContainsOnce(rst.getSecondary(), predicate));
 
 rst.stopSet();
-})();

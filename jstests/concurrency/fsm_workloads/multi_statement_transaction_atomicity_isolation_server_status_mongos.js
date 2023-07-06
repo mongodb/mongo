@@ -8,9 +8,11 @@
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
+    checkServerStatusInvariants
+} from "jstests/concurrency/fsm_workload_helpers/check_transaction_server_status_invariants.js";
+import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation.js";
-load('jstests/concurrency/fsm_workload_helpers/check_transaction_server_status_invariants.js');
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.teardown = function(db, collName, cluster) {

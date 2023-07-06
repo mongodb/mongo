@@ -19,10 +19,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/index_build.js");
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const dbName = jsTest.name();
 const collName = "commitQuorumWithInitialSync";
@@ -128,4 +125,3 @@ assert.eq(8, indexes.length);
 indexes = coll.getIndexes();
 assert.eq(8, indexes.length);
 rst.stopSet();
-}());

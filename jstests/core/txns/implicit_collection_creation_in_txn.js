@@ -5,9 +5,6 @@
 //   not_allowed_with_security_token,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "implicit_collection_creation_in_txn";
 const testDB = db.getSiblingDB(dbName);
@@ -99,4 +96,3 @@ assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(null, testColl.findOne({_id: "doc"}));
 
 session.endSession();
-}());

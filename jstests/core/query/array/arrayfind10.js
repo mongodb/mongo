@@ -1,10 +1,7 @@
 /**
  * Tests some of the find command's semantics with respect to how arrays are handled.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const t = db.jstests_arrayfind10;
 t.drop();
@@ -197,4 +194,3 @@ runWithAndWithoutIndex({a: 1}, () => {
     assert.eq(9, t.find({a: {$gt: [1, 2, 3]}}).itcount());
     assert.eq(10, t.find({a: {$gte: [1, 2, 3]}}).itcount());
 });
-})();

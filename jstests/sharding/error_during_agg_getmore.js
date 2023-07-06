@@ -1,8 +1,5 @@
 // This test was designed to reproduce SERVER-31475. It issues sharded aggregations with an error
 // returned from one shard, and a delayed response from another shard.
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 2, useBridge: true});
 
 const mongosDB = st.s0.getDB(jsTestName());
@@ -48,4 +45,3 @@ for (let i = 1; i < 10; ++i) {
 }
 
 st.stop();
-}());

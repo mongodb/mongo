@@ -9,8 +9,10 @@ import {
     getUriForColl,
     startMongodOnExistingPath
 } from "jstests/disk/libs/wt_file_helper.js";
-
-load("jstests/libs/collection_drop_recreate.js");
+import {
+    assertCreateCollection,
+    assertDropCollection
+} from "jstests/libs/collection_drop_recreate.js";
 
 const dbName = jsTestName();
 const collName = "test";

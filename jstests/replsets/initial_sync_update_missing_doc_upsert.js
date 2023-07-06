@@ -9,9 +9,11 @@
  * successfully.
  */
 
-(function() {
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {
+    finishAndValidate,
+    reInitiateSetWithSecondary
+} from "jstests/replsets/libs/initial_sync_update_missing_doc.js";
 
 const replSet = new ReplSetTest({nodes: 1});
 
@@ -90,4 +92,3 @@ failPoint.off();
 finishAndValidate(replSet, collectionName, numDocuments);
 
 replSet.stopSet();
-})();

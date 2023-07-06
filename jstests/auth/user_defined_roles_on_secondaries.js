@@ -35,12 +35,10 @@
  * @tags: [requires_replication]
  */
 
-(function() {
-
-load("jstests/replsets/rslib.js");
+import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
 var name = 'user_defined_roles_on_secondaries';
-var m0, m1;
+var m0;
 
 function assertListContainsRole(list, role, msg) {
     var i;
@@ -221,7 +219,7 @@ rstest.nodes.forEach(function(node) {
     assert.eq(1, role.roles.length, tojson(node));
     assertListContainsRole(role.roles, {role: "read", db: "db1"}, node);
 
-    var role = node.getDB("db1").getRole("t2");
+    role = node.getDB("db1").getRole("t2");
     assert.eq(1, role.roles.length, tojson(node));
     assertListContainsRole(role.roles, {role: "readWrite", db: "db1"}, node);
 });
@@ -237,4 +235,3 @@ rstest.nodes.forEach(function(node) {
 });
 
 rstest.stopSet();
-}());

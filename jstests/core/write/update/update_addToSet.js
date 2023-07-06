@@ -6,9 +6,6 @@
 //   assumes_unsharded_collection,
 // ]
 
-(function() {
-"use strict";
-
 const collNamePrefix = 'update_addToSet_';
 let collCount = 0;
 let coll = db.getCollection(collNamePrefix + collCount++);
@@ -141,4 +138,3 @@ assert.eq(coll.findOne({_id: doc._id}).a[2], fooDocRef);
 
 assert.commandWorked(coll.update({_id: doc._id}, {$addToSet: {a: {b: fooDocRef}}}));
 assert.eq(coll.findOne({_id: doc._id}).a[3].b, fooDocRef);
-}());

@@ -7,9 +7,8 @@
  * ]
  */
 
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
-load("jstests/libs/fail_point_util.js");      // For configureFailPoint
+import {getExplainedPipelineFromAggregation} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 function checkResults(pipeline, expectedNumberOfStatesInPipeline) {
     FixtureHelpers.runCommandOnEachPrimary({

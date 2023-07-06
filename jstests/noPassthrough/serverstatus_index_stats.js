@@ -7,9 +7,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const assertStats = (db, assertFn) => {
     const stats = db.serverStatus().indexStats;
     try {
@@ -266,4 +263,3 @@ assert.commandWorked(db.dropDatabase());
 assertZeroCounts(db);
 
 replSet.stopSet();
-})();

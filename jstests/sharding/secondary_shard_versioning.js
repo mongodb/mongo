@@ -1,10 +1,7 @@
 /**
  * Tests that secondaries participate in the shard versioning protocol.
  */
-(function() {
-"use strict";
-
-load('jstests/libs/profiler.js');  // for profilerHasSingleMatchingEntryOrThrow()
+import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 // Set the secondaries to priority 0 and votes 0 to prevent the primaries from stepping down.
 let rsOpts = {nodes: [{}, {rsConfig: {priority: 0}}]};
@@ -96,4 +93,3 @@ profilerHasSingleMatchingEntryOrThrow({
 });
 
 st.stop();
-})();

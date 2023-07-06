@@ -4,11 +4,9 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 const kSize10MB = 10 * 1024 * 1024;
 
@@ -295,4 +293,3 @@ const setParameterOpts = {
 
     rst.stopSet();
 }
-})();

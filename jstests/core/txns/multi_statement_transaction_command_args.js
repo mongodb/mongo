@@ -11,10 +11,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load('jstests/libs/uuid_util.js');
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Makes assertions on commands run without logical session ids.
 TestData.disableImplicitSessions = true;
@@ -319,4 +316,3 @@ assert.commandFailedWithCode(
 // Aborting the transaction should succeed.
 assert.commandWorked(sessionDb.adminCommand(
     {abortTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
-}());

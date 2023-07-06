@@ -1,14 +1,11 @@
 /**
  * This tests using DB commands with authentication enabled when sharded.
  */
-(function() {
-'use strict';
-
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
-load("jstests/replsets/rslib.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // Replica set nodes started with --shardsvr do not enable key generation until they are added
 // to a sharded cluster and reject commands with gossiped clusterTime from users without the
@@ -310,4 +307,3 @@ checkAddShard(true);
 st.printShardingStatus();
 
 st.stop();
-})();

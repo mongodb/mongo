@@ -9,9 +9,6 @@
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
 // ]
-(function() {
-"use strict";
-
 const coll = db.mr_fail_invalid_js;
 const outputColl = db.mr_fail_invalid_js_out;
 
@@ -53,10 +50,10 @@ const outputColl = db.mr_fail_invalid_js_out;
         emit(this._id, this.missing_field.nested_missing);
     };
 
-    assert.throws(
-        () => coll.mapReduce(newMapFn, reduceFn, {out: {merge: outputColl.getName()}}),
-        [],
-        "expected mapReduce to throw because map function references path that does not exist");
+    assert.throws(() => {
+        // eslint-disable-next-line
+        return coll.mapReduce(newMapFn, reduceFn, {out: {merge: outputColl.getName()}});
+    }, [], "expected mapReduce to throw because map function references path that does not exist");
 
     // Test the same thing but in the reduce function.
     reduceFn = function(k, v) {
@@ -115,5 +112,4 @@ const outputColl = db.mr_fail_invalid_js_out;
     assert.eq([{_id: 1, value: 1}, {_id: 2, value: 2}, {_id: 3, value: 2}, {_id: 4, value: 1}],
               outputColl.find().sort({_id: 1}).toArray());
     assert(outputColl.drop());
-}());
 }());

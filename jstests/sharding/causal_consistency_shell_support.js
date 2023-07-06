@@ -5,9 +5,6 @@
  *
  * @tags: [requires_majority_read_concern]
  */
-(function() {
-"use strict";
-
 // Verifies the command works and properly updates operation or cluster time.
 function runCommandAndCheckLogicalTimes(cmdObj, db, shouldAdvance) {
     const session = db.getSession();
@@ -179,4 +176,3 @@ assert.commandFailedWithCode(testDB.runCommand(invalidCmd),
 
 rst.stopSet();
 st.stop();
-})();

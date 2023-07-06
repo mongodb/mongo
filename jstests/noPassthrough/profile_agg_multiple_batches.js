@@ -2,10 +2,7 @@
 // through DocumentSourceCursor.
 // @tags: [requires_profiling]
 
-(function() {
-"use strict";
-
-load("jstests/libs/profiler.js");
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 // Setting internalDocumentSourceCursorBatchSizeBytes=1 ensures that multiple batches pass
 // through DocumentSourceCursor.
@@ -34,4 +31,3 @@ assert.eq(profileObj.keysExamined, 8, tojson(profileObj));
 assert.eq(profileObj.docsExamined, 8, tojson(profileObj));
 
 MongoRunner.stopMongod(conn);
-})();

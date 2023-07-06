@@ -11,10 +11,7 @@
 // @tags: [
 //   requires_snapshot_read,
 // ]
-
-(function() {
-'use strict';
-load('jstests/replsets/rslib.js');
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const name = 'awaitdata_getmore_new_last_committed_optime';
 const replSet = new ReplSetTest({name: name, nodes: 5, settings: {chainingAllowed: false}});
@@ -55,8 +52,8 @@ jsTestLog('Secondary has replicated data');
 
 jsTestLog('Starting parallel shell');
 // Start a parallel shell because we'll be enabling a failpoint that will make the thread hang.
-let waitForGetMoreToFinish = startParallelShell(() => {
-    load('jstests/replsets/rslib.js');
+let waitForGetMoreToFinish = startParallelShell(async () => {
+    const {getLastOpTime} = await import("jstests/replsets/rslib.js");
 
     const secondary = db.getMongo();
     secondary.setSecondaryOk();
@@ -131,4 +128,3 @@ waitForGetMoreToFinish();
 jsTestLog('Parallel shell successfully exited');
 
 replSet.stopSet();
-})();

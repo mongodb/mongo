@@ -1,7 +1,4 @@
 // SERVER-2905 sorting with missing fields
-(function() {
-'use strict';
-
 var coll = db.jstests_sorta;
 coll.drop();
 
@@ -26,4 +23,3 @@ assert.eq(coll.find().sort({a: 1, _id: 1}).toArray(), docs);
 
 assert.commandWorked(coll.createIndex({a: 1, _id: 1}));
 assert.eq(coll.find().sort({a: 1, _id: 1}).toArray(), docs);
-})();

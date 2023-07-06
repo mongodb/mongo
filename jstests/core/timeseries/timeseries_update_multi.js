@@ -12,9 +12,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const timeFieldName = "time";
 const metaFieldName = "tag";
 const dateTime = ISODate("2021-07-12T16:00:00Z");
@@ -916,4 +913,3 @@ if (!db.getMongo().isMongos()) {
         });
     })();
 }
-})();

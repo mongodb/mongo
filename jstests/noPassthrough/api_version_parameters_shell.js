@@ -7,9 +7,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const testCases = [
     // [requireApiVersion server parameter, expect success, command, API parameters]
     [false, true, {ping: 1}, {}],
@@ -306,4 +303,3 @@ for (let requireApiVersion of [false, true]) {
 assert.commandWorked(m.getDB('admin').runCommand({setParameter: 1, requireApiVersion: false}));
 
 rst.stopSet();
-})();

@@ -4,17 +4,14 @@
  *
  * @tags: [uses_transactions]
  */
-(function() {
-"use strict";
-
 // This test implicitly write the confif.transactions collection, which is not allowed under a
 // session.
 TestData.disableImplicitSessions = true;
 
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {makeLsidFilter} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -324,4 +321,3 @@ jsTest.log("Test deleting config.transactions document for an internal transacti
 }
 
 rst.stopSet();
-})();

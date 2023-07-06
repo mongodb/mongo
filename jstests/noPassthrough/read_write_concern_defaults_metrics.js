@@ -1,10 +1,7 @@
 // Verifies the serverStatus output and FTDC output for the read write concern defaults.
 //
 // @tags: [requires_sharding]
-(function() {
-"use strict";
-
-load("jstests/libs/ftdc.js");
+import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 
 // Verifies the transaction server status response has the fields that we expect.
 function verifyServerStatus(conn,
@@ -213,4 +210,3 @@ jsTestLog("Testing standalone server...");
 
     MongoRunner.stopMongod(standalone);
 }
-}());

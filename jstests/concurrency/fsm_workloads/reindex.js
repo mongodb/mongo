@@ -6,7 +6,10 @@
  *
  * @tags: [SERVER-40561]
  */
-load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {
+    assertWorkedHandleTxnErrors
+} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
 
 export const $config = (function() {
     var data = {

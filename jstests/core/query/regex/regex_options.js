@@ -2,8 +2,6 @@
  * Test regex options in a find context.
  * @tags: [requires_fcv_51]
  */
-(function() {
-'use strict';
 const coll = db.jstests_regex_options;
 
 coll.drop();
@@ -36,4 +34,3 @@ assert.commandFailedWithCode(
     assert.throws(() => coll.find({}, {p: {$regexFind: {input: '$txt', regex: /^hello.*/g}}})
                             .itcount()),
                  51108);
-})();

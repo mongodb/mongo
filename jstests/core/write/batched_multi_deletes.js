@@ -14,9 +14,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 function populateAndMassDelete(queryPredicate) {
     const testDB = db.getSiblingDB('test');
     const coll = testDB['c'];
@@ -54,4 +51,3 @@ function populateAndMassDelete(queryPredicate) {
 
 populateAndMassDelete({_id: {$gte: 0}});
 populateAndMassDelete({a: {$gte: 0}});
-})();

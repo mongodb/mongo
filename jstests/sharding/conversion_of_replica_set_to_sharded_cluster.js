@@ -8,11 +8,8 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load('jstests/replsets/rslib.js');
-load('jstests/sharding/libs/remove_shard_util.js');
+import {waitForAllMembers} from "jstests/replsets/rslib.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -334,4 +331,3 @@ checkDDLCommands(st.s0.getDB(DDLDbName));
 rst0.stopSet();
 
 st.stop();
-})();

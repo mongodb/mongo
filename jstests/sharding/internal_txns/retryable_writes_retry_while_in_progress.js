@@ -4,10 +4,10 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {
+    makeCommitTransactionCmdObj,
+    makePrepareTransactionCmdObj
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({shards: 1});
 let shard0Primary = st.rs0.getPrimary();
@@ -70,4 +70,3 @@ runTest({prepareBeforeRetry: false});
 runTest({prepareBeforeRetry: true});
 
 st.stop();
-})();

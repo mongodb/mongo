@@ -6,9 +6,7 @@
  *   requires_fcv_51
  * ]
  */
-(function() {
-"use strict";
-load("jstests/libs/doc_validation_utils.js");  // for assertDocumentValidationFailure
+import {assertDocumentValidationFailure} from "jstests/libs/doc_validation_utils.js";
 
 const thirdPartyJSONSchemaDirectory =
     "src/third_party/schemastore.org/src/schemas/json/";  // schemastore.org schemas.
@@ -528,4 +526,3 @@ const testCases = [
     }
 ];
 testCases.forEach(executeDocumentValidationTestCase);
-}());

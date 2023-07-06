@@ -7,9 +7,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 // Configure initial sharding cluster
 const st = new ShardingTest({});
 const mongos = st.s;
@@ -353,4 +350,3 @@ function assertNoInconsistencies() {
 })();
 
 st.stop();
-})();

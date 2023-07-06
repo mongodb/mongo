@@ -1,8 +1,5 @@
-
 // test for SERVER-6303 - if documents move backward during an initial sync.
 
-(function() {
-"use strict";
 var rt = new ReplSetTest({name: "replset8", nodes: 1});
 
 var nodes = rt.startSet();
@@ -83,4 +80,3 @@ assert.eq(doccount + 1,
 
 jsTestLog("finished");
 rt.stopSet();
-})();

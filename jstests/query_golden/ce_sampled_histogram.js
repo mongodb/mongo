@@ -11,10 +11,9 @@ import {
     runHistogramsTest,
     summarizeExplainForCE
 } from "jstests/libs/ce_stats_utils.js";
+import {loadJSONDataset} from "jstests/libs/load_ce_test_data.js";
 import {forceCE, round2} from "jstests/libs/optimizer_utils.js";
 import {computeStrategyErrors} from "jstests/query_golden/libs/compute_errors.js";
-
-load("jstests/libs/load_ce_test_data.js");  // For 'loadJSONDataset'.
 
 /**
  * Returns a 2-element array containing the number of documents returned by the 'predicate' and
@@ -63,8 +62,8 @@ const collData = 'ce_accuracy_test';
 const dataDir = 'jstests/query_golden/libs/data/';
 const sampleRate = 0.2;
 
-load(`${dataDir}${collData}.schema`);  // For 'dbMetadata'.
-load(`${dataDir}${collData}.data`);    // For 'chunkNames'.
+const {dbMetadata} = await import(`${dataDir}${collData}.schema`);
+const {chunkNames} = await import(`${dataDir}${collData}.data`);
 
 /**
  * Main testing function. Initializes histograms and sample collection, and then executes a series

@@ -11,8 +11,10 @@
  * operation has replaced the field, so the target is free to ignore the failed update operation.
  */
 
-(function() {
-load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
+import {
+    finishAndValidate,
+    reInitiateSetWithSecondary
+} from "jstests/replsets/libs/initial_sync_update_missing_doc.js";
 
 const replSet = new ReplSetTest({nodes: 1});
 
@@ -99,4 +101,3 @@ jsTestLog(`Collection on primary: ${tojson(coll.find().toArray())}`);
 finishAndValidate(replSet, collectionName, 8);
 
 replSet.stopSet();
-})();

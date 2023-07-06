@@ -3,10 +3,7 @@
  * calls, for agg commands.
  * @tags: [featureFlagQueryStats]
  */
-load("jstests/libs/query_stats_utils.js");  // For verifyMetrics and getQueryStatsAggCmd.
-
-(function() {
-"use strict";
+import {getQueryStatsAggCmd, verifyMetrics} from "jstests/libs/query_stats_utils.js";
 
 // Turn on the collecting of queryStats metrics.
 let options = {
@@ -170,4 +167,3 @@ const fooNeBatchSize = 3;
 }
 
 MongoRunner.stopMongod(conn);
-}());

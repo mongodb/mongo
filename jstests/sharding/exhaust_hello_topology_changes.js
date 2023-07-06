@@ -16,11 +16,7 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 let overrideMaxAwaitTimeMS = {'mode': 'alwaysOn', 'data': {maxAwaitTimeMS: 5 * 60 * 1000}};
 let st = new ShardingTest({
@@ -99,4 +95,3 @@ awaitRSClientHosts(
     mongos, {host: electableRsSecondary.name}, {ok: true, ismaster: true}, st.rs0, timeoutMS);
 
 st.stop();
-}());

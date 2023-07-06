@@ -1,8 +1,5 @@
 // Vaildate input to distinct command. SERVER-12642
 
-(function() {
-"use strict";
-
 var t = db.distinct4;
 
 t.drop();
@@ -51,4 +48,3 @@ assert.commandWorked(t.runCommand("distinct", {"key": "a"}));
 
 // embedded nulls are prohibited in the key field
 assert.commandFailedWithCode(t.runCommand("distinct", {"key": "a\0b"}), 31032);
-})();

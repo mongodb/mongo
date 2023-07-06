@@ -1,9 +1,7 @@
 /*
  * Tests that upgrade/downgrade works correctly even while creating a new collection.
  */
-(function() {
-"use strict";
-load("jstests/libs/parallel_shell_helpers.js");
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 function runTest(downgradeFCV) {
     jsTestLog("Running test with downgradeFCV: " + downgradeFCV);
@@ -79,4 +77,3 @@ function runTest(downgradeFCV) {
 
 runTest(lastContinuousFCV);
 runTest(lastLTSFCV);
-})();

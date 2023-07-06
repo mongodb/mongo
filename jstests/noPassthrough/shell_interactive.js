@@ -1,9 +1,6 @@
 // Test that isInteractive() returns false when running script or --eval
 // and true when running in interactive mode
 
-(function() {
-"use strict";
-
 if (!_isWindows()) {
     clearRawMongoProgramOutput();
     var rc = runProgram("mongo", "--nodb", "--quiet", "--eval", "print(isInteractive())");
@@ -20,4 +17,3 @@ if (!_isWindows()) {
     response = (output.split('\n').slice(-2)[0]).split(' ')[1];
     assert.eq(response, "true", "Expected 'true' in interactive mode");
 }
-})();

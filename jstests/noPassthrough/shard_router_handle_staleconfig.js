@@ -4,8 +4,6 @@
  *
  * @tags: [requires_sharding]
  */
-(function() {
-"use strict";
 const st = new ShardingTest({shards: 2, mongos: 2});
 const dbName = "db";
 
@@ -65,4 +63,3 @@ checkCommand(
     {aggregate: collName, pipeline: [{$match: {x: 1}}], cursor: {batchSize: 10}}, collName, true);
 
 st.stop();
-})();

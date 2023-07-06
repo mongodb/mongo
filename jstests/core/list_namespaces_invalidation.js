@@ -1,6 +1,4 @@
 // @tags: [requires_non_retryable_commands, requires_fastcount, requires_getmore]
-(function() {
-'use strict';
 let dbInvalidName = 'system_namespaces_invalidations';
 let dbInvalid = db.getSiblingDB(dbInvalidName);
 let num_collections = 3;
@@ -67,4 +65,3 @@ for (let j = 2; j < 7; j++) {
     testNamespaceInvalidation(RENAME, j);
     testNamespaceInvalidation(MOVE, j);
 }
-}());

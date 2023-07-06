@@ -1,10 +1,7 @@
 /**
  * Tests dropDatabase resilience against write conflict exceptions.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -28,4 +25,3 @@ fp.off();
 awaitDropDB();
 
 rst.stopSet();
-})();

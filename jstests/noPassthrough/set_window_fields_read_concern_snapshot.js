@@ -7,13 +7,10 @@
  *   uses_snapshot_read_concern,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/discover_topology.js");                       // For findNonConfigNodes.
-load("jstests/aggregation/extras/utils.js");                     // arrayEq.
-load("jstests/libs/profiler.js");                                // getLatestProfileEntry.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
+import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
@@ -135,4 +132,3 @@ aggregationCommand = {
 assert.commandWorked(sessionColl.runCommand(aggregationCommand));
 session.abortTransaction();
 rst.stopSet();
-})();

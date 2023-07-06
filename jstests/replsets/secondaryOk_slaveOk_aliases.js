@@ -1,8 +1,6 @@
 // Tests that member functions setSecondaryOk()/getSecondaryOk() and their
 // aliases, setSlaveOk()/getSlaveOk(), produce the same results.
 
-(function() {
-"use strict";
 const dbName = "test";
 const collName = "coll";
 const rst = new ReplSetTest({nodes: 2});
@@ -43,4 +41,3 @@ assert.commandFailedWithCode(secondary.getDB(dbName).runCommand({find: collName}
                              ErrorCodes.NotPrimaryNoSecondaryOk,
                              "find did not fail with the correct error code");
 rst.stopSet();
-})();

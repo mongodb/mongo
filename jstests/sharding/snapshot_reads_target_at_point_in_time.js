@@ -6,11 +6,7 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 function expectChunks(st, ns, chunks) {
     for (let i = 0; i < chunks.length; i++) {
@@ -119,11 +115,12 @@ function runTest(testCase, testMode, readPreferenceMode) {
             db = st.s.getDB(dbName);
             targetChunk1Cmd.readConcern = targetChunk2Cmd.readConcern = {level: "snapshot"};
             break;
-        case TestMode.SNAPSHOT_AT_CLUSTER_TIME:
+        case TestMode.SNAPSHOT_AT_CLUSTER_TIME: {
             db = st.s.getDB(dbName);
             const opTime = st.s.getDB(dbName).runCommand({ping: 1}).operationTime;
             targetChunk1Cmd.readConcern = {level: "snapshot", atClusterTime: opTime};
             break;
+        }
     }
 
     // Establish a read timestamp.
@@ -205,4 +202,3 @@ for (let testCase of kCommandTestCases) {
     }
 }
 st.stop();
-})();

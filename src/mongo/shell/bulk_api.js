@@ -963,7 +963,7 @@ var _bulk_api_module = (function() {
             executed = true;
 
             // Create final result object
-            typedResult = new BulkWriteResult(
+            let typedResult = new BulkWriteResult(
                 bulkResult, batches.length == 1 ? batches[0].batchType : null, writeConcern);
             // Throw on error
             if (typedResult.hasErrors()) {
@@ -997,7 +997,7 @@ var _bulk_api_module = (function() {
     // Exports
     //
 
-    module = {};
+    const module = {};
     module.WriteConcern = WriteConcern;
     module.WriteResult = WriteResult;
     module.BulkWriteResult = BulkWriteResult;
@@ -1016,8 +1016,8 @@ var _bulk_api_module = (function() {
 
 // Globals
 WriteConcern = _bulk_api_module.WriteConcern;
-WriteResult = _bulk_api_module.WriteResult;
-BulkWriteResult = _bulk_api_module.BulkWriteResult;
+WriteResult = _bulk_api_module.WriteResult;          // eslint-disable-line
+BulkWriteResult = _bulk_api_module.BulkWriteResult;  // eslint-disable-line
 BulkWriteError = _bulk_api_module.BulkWriteError;
 WriteCommandError = _bulk_api_module.WriteCommandError;
 WriteError = _bulk_api_module.WriteError;

@@ -1012,7 +1012,7 @@ DBCollection.prototype.mapReduce = function(map, reduce, optionsOrOutString) {
     }
 
     if (!output.ok) {
-        __mrerror__ = output;
+        __mrerror__ = output;  // eslint-disable-line
         throw _getErrorWithCode(output, "map reduce failed:" + tojson(output));
     }
     return output;
@@ -1475,8 +1475,7 @@ DBCollection.prototype.latencyStats = function(options) {
 DBCollection.prototype.watch = function(pipeline, options) {
     pipeline = pipeline || [];
     assert(pipeline instanceof Array, "'pipeline' argument must be an array");
-    let changeStreamStage;
-    [changeStreamStage, aggOptions] = this.getMongo()._extractChangeStreamOptions(options);
+    const [changeStreamStage, aggOptions] = this.getMongo()._extractChangeStreamOptions(options);
     pipeline.unshift(changeStreamStage);
     return this.aggregate(pipeline, aggOptions);
 };
@@ -1495,7 +1494,7 @@ DBCollection.prototype.checkMetadataConsistency = function(options = {}) {
  * Proxy for planCache* commands.
  */
 if ((typeof PlanCache) == "undefined") {
-    PlanCache = function(collection) {
+    globalThis.PlanCache = function(collection) {
         this._collection = collection;
     };
 }

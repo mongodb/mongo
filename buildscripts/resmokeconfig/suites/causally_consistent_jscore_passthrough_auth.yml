@@ -136,7 +136,7 @@ executor:
           db.getSiblingDB(jsTest.options().authenticationDatabase).logout();
           db.auth(username, password);
         })();
-        load("jstests/libs/override_methods/enable_causal_consistency.js");
+        await import("jstests/libs/override_methods/enable_causal_consistency.js");
       <<: *authOptions
   hooks:
   - class: CheckReplDBHash

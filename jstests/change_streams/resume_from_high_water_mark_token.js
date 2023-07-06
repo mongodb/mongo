@@ -1,11 +1,11 @@
 /**
  * Tests that a synthetic high-water-mark (HWM) token obeys the same semantics as a regular token.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/change_stream_util.js");        // For runCommandChangeStreamPassthroughAware.
+import {runCommandChangeStreamPassthroughAware} from "jstests/libs/change_stream_util.js";
+import {
+    assertCreateCollection,
+    assertDropCollection
+} from "jstests/libs/collection_drop_recreate.js";
 
 // Drop the test collections to assure a clean run.
 const collName = jsTestName();
@@ -141,7 +141,6 @@ csCursor.close();
 // Now create each of the test collections with the default simple collation.
 const testCollection = assertCreateCollection(db, collName);
 const otherCollection = assertCreateCollection(db, otherCollName);
-const adminDB = db.getSiblingDB("admin");
 
 // Open a stream on the test collection, and write a document to it.
 csCursor = testCollection.watch();
@@ -263,4 +262,3 @@ assert.soon(() => {
     return csCursor.hasNext() && csCursor.next().operationType === "invalidate";
 });
 csCursor.close();
-})();

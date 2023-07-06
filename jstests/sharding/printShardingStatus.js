@@ -2,9 +2,6 @@
 // contains important information that it should, like the major section
 // headings and the names of sharded collections and their shard keys.
 
-(function() {
-'use strict';
-
 const MONGOS_COUNT = 2;
 
 var st = new ShardingTest({shards: 1, mongos: MONGOS_COUNT});
@@ -140,7 +137,7 @@ var output = grabStatusOutput(configCopy, false);
 assertPresentInOutput(output, "most recently active mongoses:", "section header");
 assertPresentInOutput(output, tojson(version) + " : 1\n", "recent mongos version");
 
-var output = grabStatusOutput(configCopy, true);
+output = grabStatusOutput(configCopy, true);
 assertPresentInOutput(output, "most recently active mongoses:", "section header");
 assertPresentInOutput(output, '"_id" : ' + tojson(s1Host), "recent mongos hostname");
 assertNotPresentInOutput(output, '"_id" : ' + tojson(s2Host), "old mongos hostname");
@@ -148,11 +145,11 @@ assertNotPresentInOutput(output, '"_id" : ' + tojson(s2Host), "old mongos hostna
 // Older mongoses
 configCopy.mongos.remove({_id: s1Host});
 
-var output = grabStatusOutput(configCopy, false);
+output = grabStatusOutput(configCopy, false);
 assertPresentInOutput(output, "most recently active mongoses:", "section header");
 assertPresentInOutput(output, tojson(version) + " : 1\n", "recent mongos version");
 
-var output = grabStatusOutput(configCopy, true);
+output = grabStatusOutput(configCopy, true);
 assertPresentInOutput(output, "most recently active mongoses:", "section header");
 assertNotPresentInOutput(output, '"_id" : ' + tojson(s1Host), "removed mongos hostname");
 assertPresentInOutput(output, '"_id" : ' + tojson(s2Host), "recent mongos hostname");
@@ -160,10 +157,10 @@ assertPresentInOutput(output, '"_id" : ' + tojson(s2Host), "recent mongos hostna
 // No mongoses at all
 configCopy.mongos.remove({});
 
-var output = grabStatusOutput(configCopy, false);
+output = grabStatusOutput(configCopy, false);
 assertPresentInOutput(output, "most recently active mongoses:\n        none", "no mongoses");
 
-var output = grabStatusOutput(configCopy, true);
+output = grabStatusOutput(configCopy, true);
 assertPresentInOutput(
     output, "most recently active mongoses:\n        none", "no mongoses (verbose)");
 
@@ -272,4 +269,3 @@ assert(mongos.getDB("test").dropDatabase());
 MongoRunner.stopMongod(standalone);
 
 st.stop();
-})();

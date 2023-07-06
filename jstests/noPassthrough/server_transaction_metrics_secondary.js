@@ -4,9 +4,6 @@
 //   # Tests running with experimental CQF behavior require test commands to be enabled.
 //   cqf_experimental_incompatible,
 // ]
-(function() {
-"use strict";
-
 TestData.enableTestCommands = false;
 TestData.authenticationDatabase = "local";
 
@@ -83,4 +80,3 @@ jsTestLog("Done trying transaction on secondary.");
 secondarySession.endSession();
 
 replTest.stopSet();
-}());

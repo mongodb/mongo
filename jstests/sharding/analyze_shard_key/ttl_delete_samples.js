@@ -4,10 +4,7 @@
  * @tags: [requires_fcv_70]
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 const queryAnalysisSamplerConfigurationRefreshSecs = 1;
 const queryAnalysisWriterIntervalSecs = 1;
@@ -92,4 +89,3 @@ assert.soon(() => {
 });
 
 st.stop();
-})();

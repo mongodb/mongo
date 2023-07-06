@@ -13,8 +13,6 @@
  * ]
  */
 
-(function() {
-
 // Test that measurements spanning the Unix Epoch end up in the same bucket.
 (function testUnixEpoch() {
     let coll = db.timeseries_bucket_spanning_epoch;
@@ -83,5 +81,4 @@
     assert.commandWorked(coll.insert({m: 2, t: ISODate("2105-06-24T06:28:16Z")}));
     assert.commandWorked(coll.insert({m: 2, t: ISODate("1969-05-18T00:00:00.000Z")}));
     assert.eq(2, bucketsColl.find().itcount());
-})();
 })();

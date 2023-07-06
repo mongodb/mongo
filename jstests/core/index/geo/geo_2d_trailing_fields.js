@@ -1,7 +1,4 @@
 // Tests for predicates which can use the trailing field of a 2d index.
-(function() {
-"use strict";
-
 const coll = db.geo_2d_trailing_fields;
 
 coll.drop();
@@ -42,4 +39,3 @@ assert.commandWorked(coll.insert({a: [0, 0], b: [{c: 1}, {c: 2}]}));
 // array semantics.
 assert.eq(1,
           coll.find({a: {$geoWithin: {$center: [[0, 0], 1]}}, b: {$elemMatch: {c: 1}}}).itcount());
-}());

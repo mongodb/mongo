@@ -5,9 +5,6 @@
 //   requires_persistence,
 //   requires_replication,
 // ]
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -332,4 +329,3 @@ const adminDB = db.getSiblingDB("admin");
     }
 }());
 rst.stopSet();
-}());

@@ -10,12 +10,9 @@
 // 6. Unpause the thread performing the insert from step 1. If it continues to insert batches even
 //    though there was a rollback, those inserts will violate the {ordered: true} option.
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallelTester.js');
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 var name = "interrupted_batch_insert";
 var replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
@@ -120,4 +117,3 @@ conns[1].reconnect(conns[2]);
 restartServerReplication(conns[1]);
 
 replTest.stopSet(15);
-}());

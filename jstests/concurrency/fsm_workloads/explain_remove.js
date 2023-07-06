@@ -3,6 +3,7 @@
  *
  * Runs explain() and remove() on a collection.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/explain.js";
 
@@ -25,8 +26,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 db[collName].explain('executionStats').remove({i: {$lte: this.nInserted / 2}});
             assertAlways.commandWorked(res);
             assertWhenOwnColl(function() {
-                assertWhenOwnColl.eq(this.nInserted / 2 + 1,
-                                     explain.executionStats.totalDocsExamined);
+                assertWhenOwnColl.eq(
+                    this.nInserted / 2 + 1,
+                    explain.executionStats.totalDocsExamined);  // eslint-disable-line
                 // no documents should have been deleted
                 assertWhenOwnColl.eq(this.nInserted, db[collName].itcount());
             }.bind(this));

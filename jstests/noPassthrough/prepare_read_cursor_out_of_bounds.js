@@ -15,11 +15,8 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
@@ -54,4 +51,3 @@ failpoint.off();
 awaitShell();
 
 replTest.stopSet();
-})();

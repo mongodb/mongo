@@ -7,10 +7,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");  // for reconnect
+import {reconnect} from "jstests/replsets/rslib.js";
 
 const rst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0, votes: 0}}],
@@ -63,4 +60,3 @@ primary.reconnect(secondary);
 assertWriteReplicates();
 
 rst.stopSet();
-}());

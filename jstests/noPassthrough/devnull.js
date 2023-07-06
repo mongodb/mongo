@@ -1,4 +1,3 @@
-(function() {
 const emrcFalseConn =
     MongoRunner.runMongod({storageEngine: "devnull", enableMajorityReadConcern: false});
 assert(!emrcFalseConn);
@@ -8,7 +7,7 @@ assert(logContents.indexOf("enableMajorityReadConcern:false is no longer support
 // Even though enableMajorityReadConcern: true is the default, the server internally changes
 // this value to false when running with the devnull storage engine.
 const emrcDefaultConn = MongoRunner.runMongod({storageEngine: "devnull"});
-db = emrcDefaultConn.getDB("test");
+const db = emrcDefaultConn.getDB("test");
 
 let res = db.foo.insert({x: 1});
 assert.eq(1, res.nInserted, tojson(res));
@@ -17,4 +16,3 @@ assert.eq(1, res.nInserted, tojson(res));
 TestData.skipCollectionAndIndexValidation = true;
 
 MongoRunner.stopMongod(emrcDefaultConn);
-}());

@@ -2,13 +2,12 @@
 //
 // This test is to ensure that localhost authentication works correctly against a standalone
 // mongod whether it is hosted with "localhost" or a hostname.
+import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
 
 var baseName = "auth_server-6591";
 var dbpath = MongoRunner.dataPath + baseName;
 var username = "foo";
 var password = "bar";
-
-load("jstests/libs/host_ipaddr.js");
 
 var createUser = function(db) {
     print("============ adding a user.");

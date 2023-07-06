@@ -7,7 +7,7 @@
  *   requires_replication,
  * ]
  */
-load('jstests/noPassthrough/libs/index_build.js');
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const dbName = jsTestName();
 const collName1 = "test1";

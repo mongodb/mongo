@@ -1,7 +1,9 @@
 /*
  * Utilities for shard versioning testing.
  */
-var ShardVersioningUtil = (function() {
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+
+export var ShardVersioningUtil = (function() {
     /*
      * Shard version indicating that shard version checking must be skipped.
      */

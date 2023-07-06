@@ -1,18 +1,19 @@
 // Helper functions for checking transaction server status invariants that may not hold for brief
 // periods of time due to non-atomic updates.
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 /**
  * Returns all elements in the given array that evaluate to false for the given predicate
  * function 'predFn'.
  */
-function filterFalse(arr, predFn) {
+export function filterFalse(arr, predFn) {
     return arr.filter(x => !predFn(x));
 }
 
 /**
  * serverStatus invariant: currentActive + currentInactive = currentOpen
  */
-function activePlusInactiveEqualsOpen(serverStatusTxnStats) {
+export function activePlusInactiveEqualsOpen(serverStatusTxnStats) {
     // Stats are returned in NumberLong type. Convert to Number type so we are sure comparison
     // works as expected.
     let active = Number(serverStatusTxnStats["currentActive"]);
@@ -24,7 +25,7 @@ function activePlusInactiveEqualsOpen(serverStatusTxnStats) {
 /**
  * serverStatus invariant: totalCommitted + totalAborted + currentOpen = totalStarted
  */
-function committedPlusAbortedPlusOpenEqualsStarted(serverStatusTxnStats) {
+export function committedPlusAbortedPlusOpenEqualsStarted(serverStatusTxnStats) {
     let committed = Number(serverStatusTxnStats["totalCommitted"]);
     let aborted = Number(serverStatusTxnStats["totalAborted"]);
     let open = Number(serverStatusTxnStats["currentOpen"]);
@@ -35,7 +36,7 @@ function committedPlusAbortedPlusOpenEqualsStarted(serverStatusTxnStats) {
 /**
  * serverStatus invariant: all counts are non-negative
  */
-function allCountsNonNegative(serverStatusTxnStats) {
+export function allCountsNonNegative(serverStatusTxnStats) {
     let active = Number(serverStatusTxnStats["currentActive"]);
     let inactive = Number(serverStatusTxnStats["currentInactive"]);
     let committed = Number(serverStatusTxnStats["totalCommitted"]);
@@ -50,7 +51,7 @@ function allCountsNonNegative(serverStatusTxnStats) {
  * serverStatus invariant: totalPreparedThenAborted + totalPreparedThenCommitted +
  * currentPrepared = totalPrepared
  */
-function preparedAbortedPlusPreparedCommittedPlusCurrentPreparedEqualsTotalPrepared(
+export function preparedAbortedPlusPreparedCommittedPlusCurrentPreparedEqualsTotalPrepared(
     serverStatusTxnStats) {
     let preparedAborted = Number(serverStatusTxnStats["totalPreparedThenAborted"]);
     let preparedCommitted = Number(serverStatusTxnStats["totalPreparedThenCommitted"]);
@@ -65,7 +66,7 @@ function preparedAbortedPlusPreparedCommittedPlusCurrentPreparedEqualsTotalPrepa
  * serverStatus invariant: unpreparedAborted + unpreparedCommitted + unpreparedOpen =
  * totalUnprepared
  */
-function unpreparedAbortedPlusUnpreparedCommittedPlusUnpreparedOpenEqualsTotalUnprepared(
+export function unpreparedAbortedPlusUnpreparedCommittedPlusUnpreparedOpenEqualsTotalUnprepared(
     serverStatusTxnStats) {
     let unpreparedAborted = Number(serverStatusTxnStats["totalAborted"]) -
         Number(serverStatusTxnStats["totalPreparedThenAborted"]);
@@ -81,7 +82,7 @@ function unpreparedAbortedPlusUnpreparedCommittedPlusUnpreparedOpenEqualsTotalUn
 /**
  * serverStatus invariant: totalCommitted = sum of each commit type's successful counter.
  */
-function totalCommittedEqualsSumOfSuccessfulCommitTypes(txnStats) {
+export function totalCommittedEqualsSumOfSuccessfulCommitTypes(txnStats) {
     const totalCommitted = Number(txnStats["totalCommitted"]);
 
     const commitTypeKeys = Object.keys(txnStats.commitTypes);
@@ -95,7 +96,7 @@ function totalCommittedEqualsSumOfSuccessfulCommitTypes(txnStats) {
 /**
  * serverStatus invariant: totalAborted = sum of all abort cause counters.
  */
-function totalAbortedEqualsSumOfAbortCauses(txnStats) {
+export function totalAbortedEqualsSumOfAbortCauses(txnStats) {
     const totalAborted = Number(txnStats["totalAborted"]);
 
     const abortCauseKeys = Object.keys(txnStats.abortCause);
@@ -110,7 +111,7 @@ function totalAbortedEqualsSumOfAbortCauses(txnStats) {
  * Checks that the invariant described by 'predFn' holds for the given samples, with a
  * maximum error of maxErrPct.
  */
-function checkInvariant(samples, predFn, maxErrPct) {
+export function checkInvariant(samples, predFn, maxErrPct) {
     let failedSamples = filterFalse(samples, predFn);
     let errRate = failedSamples.length / samples.length;
     assertAlways.lte(errRate, maxErrPct, () => {
@@ -137,7 +138,7 @@ function checkInvariant(samples, predFn, maxErrPct) {
  * was made that broke these metrics significantly, it would be picked up by these tests.
  * This test should not be sensitive to small fluctuations in metrics output.
  */
-function checkServerStatusInvariants(db, nSamples, isMongos) {
+export function checkServerStatusInvariants(db, nSamples, isMongos) {
     // Sample serverStatus several times, sleeping a bit in between.
     let samples = [];
     for (let i = 0; i < nSamples; ++i) {

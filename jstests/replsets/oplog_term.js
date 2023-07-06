@@ -1,7 +1,5 @@
 // Term counter should be present in oplog entries under protocol version 1.
-(function() {
-'use strict';
-load('jstests/replsets/rslib.js');
+import {getLatestOp} from "jstests/replsets/rslib.js";
 
 var name = 'oplog_term';
 var replSet = new ReplSetTest({name: name, nodes: 1});
@@ -30,4 +28,3 @@ assert.eq(status.term,
           'term in oplog entry does not match term in status: ' + tojson(oplogEntry));
 
 replSet.stopSet();
-})();

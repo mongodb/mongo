@@ -2,11 +2,9 @@
  * Tests that unconditional step down terminates writes, but not reads. And, doesn't disconnect
  * the connections if primary is stepping down to secondary.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
-load("jstests/libs/fail_point_util.js");
+import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 const testName = "txnsDuringStepDown";
 const dbName = testName;
@@ -158,7 +156,6 @@ function runStepsDowntoRemoved(params) {
 runStepDownTest({
     testMsg: "reconfig command",
     stepDownFn: () => {
-        load("jstests/replsets/rslib.js");
         var newConfig = rst.getReplSetConfigFromNode();
 
         var oldMasterId = rst.getNodeId(primary);
@@ -176,7 +173,6 @@ runStepDownTest({
 runStepDownTest({
     testMsg: "reconfig via heartbeat",
     stepDownFn: () => {
-        load("jstests/replsets/rslib.js");
         var newConfig = rst.getReplSetConfigFromNode();
 
         var oldMasterId = rst.getNodeId(primary);
@@ -194,7 +190,6 @@ runStepDownTest({
 runStepsDowntoRemoved({
     testMsg: "reconfig via heartbeat - primary to removed",
     stepDownFn: () => {
-        load("jstests/replsets/rslib.js");
         var newConfig = rst.getReplSetConfigFromNode();
 
         var oldMasterId = rst.getNodeId(primary);
@@ -213,9 +208,7 @@ runStepsDowntoRemoved({
 runStepDownTest({
     testMsg: "stepdown via heartbeat",
     stepDownFn: () => {
-        load("jstests/replsets/rslib.js");
         var newConfig = rst.getReplSetConfigFromNode();
-
         var newMasterId = rst.getNodeId(secondary);
 
         newConfig.members[newMasterId].priority = 2;
@@ -230,4 +223,3 @@ runStepDownTest({
 });
 
 rst.stopSet();
-})();

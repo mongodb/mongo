@@ -15,10 +15,7 @@
  * @tags: [requires_v4_0]
  */
 
-(function() {
-'use strict';
-
-load('jstests/libs/index_catalog_helpers.js');
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 const dbpath = MongoRunner.dataPath + 'skip_level_upgrade';
 resetDbpath(dbpath);
@@ -85,4 +82,3 @@ for (let i = 0; i < versions.length; i++) {
 
     resetDbpath(dbpath);
 }
-})();

@@ -1,9 +1,6 @@
 // Test background index creation w/ constraints
 // @tags: [SERVER-40561]
 
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
 
@@ -139,7 +136,6 @@ let succeedWithoutWriteErrors = function(coll, newKey) {
 };
 
 let doTest = function() {
-    "use strict";
     const size = 10;
 
     let coll = db[baseName];
@@ -165,4 +161,3 @@ let doTest = function() {
 doTest();
 
 MongoRunner.stopMongod(conn);
-})();

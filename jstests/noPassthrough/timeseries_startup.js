@@ -5,9 +5,6 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
 let conn = MongoRunner.runMongod();
 
 const dbName = jsTestName();
@@ -27,4 +24,3 @@ MongoRunner.stopMongod(conn);
 conn = MongoRunner.runMongod({dbpath: conn.dbpath, noCleanData: true});
 assert(conn);
 MongoRunner.stopMongod(conn);
-})();

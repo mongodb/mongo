@@ -10,8 +10,6 @@
  * ]
  */
 
-(function() {
-
 (function testSeconds() {
     let coll = db.bucket_timestamp_rounding_granularitySeconds;
     coll.drop();
@@ -126,5 +124,4 @@
     buckets = bucketsColl.find().toArray();
     assert.eq(2, buckets.length);
     assert.eq(buckets[1].control.min.t, ISODate("2021-06-24T00:00:00.000Z"));
-})();
 })();

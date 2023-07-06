@@ -21,10 +21,8 @@
  *   skip_for_query_stats
  * ]
  */
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-(function() {
-"use strict";
 const runningOnMongos = FixtureHelpers.isMongos(db);
 const isStandalone = !runningOnMongos && !db.runCommand({hello: 1}).hasOwnProperty("setName");
 
@@ -154,4 +152,3 @@ runTest({_id: 7, viewOn: "collection", pipeline: []});
 runTest({_id: "invalid_system_views.embedded\0null", viewOn: "collection", pipeline: []});
 runTest({_id: "invalidNotFullyQualifiedNs", viewOn: "collection", pipeline: []});
 runTest({_id: "invalid_system_views.missingViewOnField", pipeline: []});
-}());

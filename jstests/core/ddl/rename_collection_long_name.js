@@ -8,9 +8,6 @@
 //   requires_non_retryable_commands,
 // ]
 
-(function() {
-'use strict';
-
 const testDB = db.getSiblingDB("test");
 const srcName = "renameSRC";
 const src = testDB.getCollection(srcName);
@@ -40,4 +37,3 @@ assert.eq(0, src.getIndexes().length, "No indexes expected on already renamed co
 assert.eq(originalNumberOfIndexes,
           dst.getIndexes().length,
           "Expected exactly same number of indexes of source collection before rename");
-})();

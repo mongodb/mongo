@@ -2,7 +2,6 @@
  * Basic test of a succesful replica set rollback for CRUD operations.
  */
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
-load("jstests/replsets/rslib.js");
 
 // Helper function for verifying contents at the end of the test.
 const checkFinalResults = function(db) {

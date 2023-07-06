@@ -6,8 +6,6 @@
  * uses_change_streams, uses_curop_agg_stage]
  */
 
-"use strict";
-
 export const $config = (function() {
     // The 'setup' function is run once by the parent thread after the cluster has been initialized,
     // before the worker threads have been spawned. The 'this' argument is bound as '$config.data'.

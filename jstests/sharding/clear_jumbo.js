@@ -5,11 +5,8 @@
 // Cannot run the filtering metadata check on tests that run clearJumboFlag.
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/find_chunks_util.js");
-load("jstests/libs/fail_point_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 
 let st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 
@@ -164,4 +161,3 @@ chunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 assert.eq(st.shard1.shardName, chunk.shard);
 
 st.stop();
-})();

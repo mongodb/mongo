@@ -2,9 +2,6 @@
 //   requires_replication,
 //   requires_sharding,
 // ]
-(function() {
-'use strict';
-
 // This test makes assertions about the number of sessions, which are not compatible with
 // implicit sessions.
 TestData.disableImplicitSessions = true;
@@ -164,4 +161,3 @@ Fixture.prototype.stop = function() {
         fixture.stop();
     }
 });
-})();

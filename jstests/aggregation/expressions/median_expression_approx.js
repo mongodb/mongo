@@ -5,11 +5,6 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");
-
 const coll = db[jsTestName()];
 
 function testWithProject({doc, medianSpec, expectedResult, msg}) {
@@ -74,4 +69,3 @@ testWithProject({
     expectedResult: null,
     msg: "Median of completely non-numeric data with input as a scalar"
 });
-})();

@@ -1,9 +1,6 @@
 // This tests that when a chunk migration occurs, all replica set members of the destination shard
 // get the correct _id index version for the collection.
-(function() {
-"use strict";
-
-load("jstests/libs/index_catalog_helpers.js");
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 var st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 var testDB = st.s.getDB("test");
@@ -46,4 +43,3 @@ assert.neq(spec, null, "_id index spec not found");
 assert.eq(spec.v, 1, tojson(spec));
 
 st.stop();
-})();

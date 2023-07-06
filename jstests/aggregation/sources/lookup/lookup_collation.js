@@ -12,8 +12,8 @@
  *  1. '_internalCollation' overrides all others
  *  2. 'collation' option overrides local collection's collation
  */
-load("jstests/aggregation/extras/utils.js");  // For anyEq.
-import {getWinningPlan, getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {getAggPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());

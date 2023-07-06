@@ -2,13 +2,8 @@
  * Test that the read operations are not killed and their connections are also not
  * closed during step up.
  */
-load('jstests/libs/parallelTester.js');
-load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
-load("jstests/replsets/rslib.js");
-
-(function() {
-
-"use strict";
+import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const testName = jsTestName();
 const dbName = "test";
@@ -47,7 +42,7 @@ const cursorIdToBeReadAfterStepUp =
 jsTestLog("2. Start blocking getMore cmd before step up");
 const joinGetMoreThread = startParallelShell(() => {
     // Open another cursor on secondary before step up.
-    secondaryDB = db.getSiblingDB(TestData.dbName);
+    const secondaryDB = db.getSiblingDB(TestData.dbName);
     secondaryDB.getMongo().setSecondaryOk();
 
     const cursorIdToBeReadDuringStepUp =
@@ -58,7 +53,7 @@ const joinGetMoreThread = startParallelShell(() => {
     assert.commandWorked(db.adminCommand(
         {configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch", mode: "alwaysOn"}));
 
-    getMoreRes = assert.commandWorked(secondaryDB.runCommand(
+    const getMoreRes = assert.commandWorked(secondaryDB.runCommand(
         {"getMore": cursorIdToBeReadDuringStepUp, collection: TestData.collName}));
     assert.docEq([{_id: 0}], getMoreRes.cursor.nextBatch);
 }, secondary.port);
@@ -69,7 +64,7 @@ waitForCurOpByFailPoint(
 
 jsTestLog("2. Start blocking find cmd before step up");
 const joinFindThread = startParallelShell(() => {
-    secondaryDB = db.getSiblingDB(TestData.dbName);
+    const secondaryDB = db.getSiblingDB(TestData.dbName);
     secondaryDB.getMongo().setSecondaryOk();
 
     // Enable the fail point for find cmd.
@@ -130,4 +125,3 @@ assert.gte(replMetrics.stateTransition.userOperationsRunning, 2);
 assert.eq(replMetrics.network.notPrimaryUnacknowledgedWrites, startingNumNotMasterErrors);
 
 rst.stopSet();
-})();

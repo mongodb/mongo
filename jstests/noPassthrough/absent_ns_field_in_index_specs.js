@@ -6,9 +6,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
 const dbName = 'test';
 const collName = 'absent_ns';
 
@@ -63,4 +60,3 @@ spec = assert.commandWorked(db.runCommand({listIndexes: collName})).cursor.first
 assert.eq(false, spec.hasOwnProperty('ns'));
 
 MongoRunner.stopMongod(conn);
-}());

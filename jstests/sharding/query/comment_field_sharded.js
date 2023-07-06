@@ -3,11 +3,7 @@
  * and profiler. This test also verifies that for a sharded collection, the 'comment' fields gets
  * passed on from mongos to the respective shards.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
-load("jstests/libs/profiler.js");         // For profilerHas*OrThrow helper functions.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // This test runs manual getMores using different connections, which will not inherit the
 // implicit session of the cursor establishing command.
@@ -621,4 +617,3 @@ runCommentParamTest({
 });
 
 st.stop();
-})();

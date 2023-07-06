@@ -12,12 +12,9 @@
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
-load("jstests/sharding/libs/defragmentation_util.js");
+import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {defragmentationUtil} from "jstests/sharding/libs/defragmentation_util.js";
 
 Random.setRandomSeed();
 
@@ -283,4 +280,3 @@ jsTest.log("Refined shard key causes defragmentation to restart");
 }
 
 st.stop();
-})();

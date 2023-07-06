@@ -2,8 +2,6 @@
  * Tests that serverStatus metrics correctly print commands.hello if the user sends hello
  * and commands.isMaster if the user sends isMaster or ismaster
  */
-(function() {
-"use strict";
 const mongod = MongoRunner.runMongod();
 const dbName = "server_status_metrics_hello_command";
 const db = mongod.getDB(dbName);
@@ -44,4 +42,3 @@ assert.eq(
 ++currentIsMasterTotal;
 
 MongoRunner.stopMongod(mongod);
-})();

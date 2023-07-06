@@ -1,9 +1,6 @@
 // Tests timeout behavior of waiting for write concern as well as its interaction with maxTimeMs
 
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 var replTest = new ReplSetTest({nodes: 3});
 replTest.startSet();
@@ -81,4 +78,3 @@ assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
 
 restartServerReplication(secondary);
 replTest.stopSet();
-})();

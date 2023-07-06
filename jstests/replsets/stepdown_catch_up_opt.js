@@ -3,10 +3,7 @@
  * correctly, and will affect the delay appropriately.
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/write_concern_util.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 var name = 'stepdown_catch_up_opt';
 // Only 2 nodes, so that we can control whether the secondary is caught up.
@@ -88,4 +85,3 @@ assert.eq(primaryStatus.myState,
           'Expected original primary node to still be primary');
 
 replTest.stopSet();
-}());

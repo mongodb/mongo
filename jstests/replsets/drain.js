@@ -9,8 +9,6 @@
 // 7. Enable applying ops.
 // 8. Ensure the ops in queue are applied and that the PRIMARY begins to accept writes as usual.
 
-(function() {
-"use strict";
 var replSet = new ReplSetTest({name: 'testSet', nodes: 3});
 var nodes = replSet.nodeList();
 replSet.startSet();
@@ -99,4 +97,3 @@ assert.commandWorked(primary.getDB("foo").flag.insert({sentinel: 1}));
 // shutting down the original primary.
 assert.gte(primary.getDB("foo").foo.find().itcount(), 2);
 replSet.stopSet();
-})();

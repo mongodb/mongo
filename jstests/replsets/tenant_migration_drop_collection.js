@@ -17,18 +17,17 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     makeTenantDB,
     makeX509OptionsForTest,
     runMigrationAsync
 } from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
-load("jstests/replsets/rslib.js");  // 'createRstArgs'
+import {createRstArgs} from "jstests/replsets/rslib.js";
 
 function runDropTest({failPointName, failPointData, expectedLog, createNew}) {
     // Configure batch size for recipient clone.

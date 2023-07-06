@@ -11,8 +11,8 @@
  *   uses_transactions,
  * ]
  */
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
-load("jstests/core/txns/libs/prepare_helpers.js");
 
 const dbName = "test";
 const collName = "prepare_failover_rollback_commit";

@@ -9,9 +9,10 @@
  */
 // TODO SERVER-76309: re-purpose this test to show that the resume token does advance with the
 // global oplog, or remove the test in favour of existing coverage elsewhere.
-load("jstests/serverless/libs/change_collection_util.js");
+import {
+    ChangeStreamMultitenantReplicaSetTest
+} from "jstests/serverless/libs/change_collection_util.js";
 
-(function() {
 const tenantIds = [ObjectId(), ObjectId()];
 const rst = new ChangeStreamMultitenantReplicaSetTest({
     nodes: 3,
@@ -67,9 +68,8 @@ assert.soon(() => {
 // Try to get a new resume token for tenant 1. We shouldn't be able to get a new resume token
 // greater than the last resume token we got.
 assert.eq(csCursor.hasNext(), false);
-hwmToken2 = csCursor.getResumeToken();
+const hwmToken2 = csCursor.getResumeToken();
 assert.neq(undefined, hwmToken2);
 assert.eq(bsonWoCompare(hwmToken, hwmToken2), 0);
 
 rst.stopSet();
-})();

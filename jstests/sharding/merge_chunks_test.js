@@ -1,10 +1,7 @@
 //
 // Tests that merging chunks via mongos works/doesn't work with different chunk configurations
 //
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var st = new ShardingTest({shards: 2, mongos: 2});
 
@@ -155,4 +152,3 @@ assert.eq(1,
               .itcount());
 
 st.stop();
-})();

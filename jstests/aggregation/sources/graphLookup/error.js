@@ -1,10 +1,8 @@
 // In MongoDB 3.4, $graphLookup was introduced. In this file, we test the error cases.
 
-load("jstests/aggregation/extras/utils.js");        // For "assertErrorCode".
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
 
-(function() {
-"use strict";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var local = db.local;
 var foreign = db.foreign;
@@ -351,9 +349,9 @@ assertErrorCode(local, pipeline, 40099, "maximum memory usage reached");
 // usage over 100MB.
 foreign.drop();
 
-var bulk = foreign.initializeUnorderedBulkOp();
-for (var i = 0; i < 14; i++) {
-    var obj = {from: 0, to: 1};
+bulk = foreign.initializeUnorderedBulkOp();
+for (let i = 0; i < 14; i++) {
+    let obj = {from: 0, to: 1};
     obj['s'] = new Array(7 * 1024 * 1024).join(' ');
     bulk.insert(obj);
 }
@@ -373,9 +371,9 @@ assertErrorCode(local, pipeline, 40099, "maximum memory usage reached");
 // Here, we test that the cache keeps memory usage under 100MB, and does not cause an error.
 foreign.drop();
 
-var bulk = foreign.initializeUnorderedBulkOp();
-for (var i = 0; i < 13; i++) {
-    var obj = {from: 0, to: 1};
+bulk = foreign.initializeUnorderedBulkOp();
+for (let i = 0; i < 13; i++) {
+    let obj = {from: 0, to: 1};
     obj['s'] = new Array(7 * 1024 * 1024).join(' ');
     bulk.insert(obj);
 }
@@ -395,4 +393,3 @@ var res = local
                 .toArray();
 
 assert.eq(res.length, 13);
-}());

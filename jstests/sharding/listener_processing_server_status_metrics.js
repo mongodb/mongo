@@ -6,9 +6,6 @@
  * monotonically increasing.
  */
 
-(function() {
-"use strict";
-
 const numConnections = 10;
 const st = new ShardingTest({shards: 1, mongos: 1});
 const admin = st.s.getDB("admin");
@@ -27,4 +24,3 @@ for (var i = 0; i < numConnections; i++) {
 assert.gt(previous, 0);
 
 st.stop();
-})();

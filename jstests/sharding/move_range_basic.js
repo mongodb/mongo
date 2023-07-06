@@ -5,11 +5,8 @@
  *    assumes_balancer_off
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/sharding/libs/find_chunks_util.js');
-load('jstests/sharding/libs/chunk_bounds_util.js');
+import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2, chunkSize: 1});
 const kDbName = 'db';
@@ -149,4 +146,3 @@ test('nonHashedCompundShardKey', {a: 1, b: 1});
 test('hashedShardKey', {a: 'hashed'});
 
 st.stop();
-})();

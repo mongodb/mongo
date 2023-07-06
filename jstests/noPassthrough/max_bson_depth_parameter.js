@@ -2,9 +2,6 @@
  * Tests that the server properly respects the maxBSONDepth parameter, and will fail to start up if
  * given an invalid depth.
  */
-(function() {
-"use strict";
-
 const maxBSONDepth = 21;
 
 // Start mongod with a valid BSON depth, then test that it accepts and rejects command
@@ -54,4 +51,3 @@ assert.throws(() => MongoRunner.runMongod({setParameter: "maxBSONDepth=-4"}),
 assert.throws(() => MongoRunner.runMongod({setParameter: "maxBSONDepth=20"}),
               [],
               "Expected mongod to fail at startup because depth was too low");
-}());

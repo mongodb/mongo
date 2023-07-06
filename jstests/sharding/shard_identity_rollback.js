@@ -4,18 +4,15 @@
  * @tags: [multiversion_incompatible, requires_persistence]
  */
 
-(function() {
-"use strict";
-
 // This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
 TestData.skipEnforceFastCountOnValidate = true;
 
-load('jstests/libs/write_concern_util.js');
+import {stopServerReplication, restartServerReplication} from "jstests/libs/write_concern_util.js";
 
 var st = new ShardingTest({shards: 1});
 
 var replTest = new ReplSetTest({nodes: 3});
-var nodes = replTest.startSet({shardsvr: ''});
+replTest.startSet({shardsvr: ''});
 replTest.initiate();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
@@ -127,4 +124,3 @@ assert.eq(null, priConn.getDB('admin').system.version.findOne({_id: 'shardIdenti
 replTest.stopSet();
 
 st.stop();
-})();

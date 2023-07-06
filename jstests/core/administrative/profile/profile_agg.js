@@ -9,11 +9,8 @@
 
 // Confirms that profiled aggregation execution contains all expected metrics with proper values.
 
-(function() {
-"use strict";
-
-load("jstests/libs/os_helpers.js");  // For isLinux().
-load("jstests/libs/profiler.js");    // For 'getLatestProfilerEntry()'.
+import {isLinux} from "jstests/libs/os_helpers.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const testDB = db.getSiblingDB("profile_agg");
 assert.commandWorked(testDB.dropDatabase());
@@ -125,4 +122,3 @@ assert.eq(coll.aggregate([{$match: matchPredicate}, {$addFields: {c: 1}}], {comm
 profileObj = getLatestProfilerEntry(testDB);
 assert.eq((typeof profileObj.command.$truncated), "string", tojson(profileObj));
 assert.eq(profileObj.command.comment, "profile_agg", tojson(profileObj));
-})();

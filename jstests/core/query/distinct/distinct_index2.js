@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 // Uniformly distributed dataset.
 // If we use a randomly generated dataset, we might not
 // generate all the distinct values in the range [0, k).
@@ -44,4 +41,3 @@ t.drop();
 assert.commandWorked(t.createIndex({a: "hashed"}));
 assert.commandWorked(t.insert(docs));
 check("a");
-})();

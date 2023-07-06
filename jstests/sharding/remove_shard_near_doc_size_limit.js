@@ -10,9 +10,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-load('jstests/sharding/libs/remove_shard_util.js');
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -77,4 +75,3 @@ removeShard(st, st.shard1.shardName);
 assertDocsExist(shardKeys, numDocs, bigDocSize);
 
 st.stop();
-})();

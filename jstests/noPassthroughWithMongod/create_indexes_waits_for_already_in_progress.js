@@ -16,11 +16,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");
-load('jstests/libs/test_background_ops.js');
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const dbName = "test";
 const collName = "create_indexes_waits_for_already_in_progress";
@@ -138,4 +134,3 @@ assert.commandWorked(
 // Make sure the parallel shells sucessfully built the index. We should now have the _id index,
 // the 'the_b_1_index' index and the 'the_c_1_index' just built in the parallel shells.
 assert.eq(testColl.getIndexes().length, 3);
-})();

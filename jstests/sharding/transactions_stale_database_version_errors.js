@@ -1,10 +1,11 @@
 // Tests mongos behavior on stale database version errors received in a transaction.
 //
 // @tags: [requires_sharding, uses_transactions, uses_multi_shard_transaction]
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {
+    assertNoSuchTransactionOnAllShards,
+    disableStaleVersionAndSnapshotRetriesWithinTransactions,
+    enableStaleVersionAndSnapshotRetriesWithinTransactions,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -130,4 +131,3 @@ assert.commandWorked(st.rs0.getPrimary().adminCommand(
 disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 st.stop();
-})();

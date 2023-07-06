@@ -3,10 +3,7 @@
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
 // ]
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
-
-(function() {
-"use strict";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const caseInsensitive = {
     locale: "en_US",
@@ -206,4 +203,3 @@ pipeline = {
     $project: {included: {$in: [1, 2, 3]}}
 };
 assertErrorCode(coll, pipeline, 16020, "$in requires two arguments");
-}());

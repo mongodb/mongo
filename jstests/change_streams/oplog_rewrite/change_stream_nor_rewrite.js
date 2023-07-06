@@ -3,9 +3,6 @@
  * $nor array. Exercises the fix for SERVER-78650.
  */
 
-(function() {
-'use strict';
-
 const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
@@ -20,4 +17,3 @@ assert.eq(nextEvent.operationType, "insert");
 assert.eq(nextEvent.documentKey._id, 1);
 
 watchCursor.close();
-})();

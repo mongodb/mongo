@@ -6,10 +6,7 @@
  * @tags: [does_not_support_stepdowns, requires_streamable_rsm]
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharding_state_test.js");
+import {ShardingStateTest} from "jstests/sharding/libs/sharding_state_test.js";
 
 const st = new ShardingTest({
     config: 1,
@@ -27,4 +24,3 @@ ShardingStateTest.failoverToMember(configRS, newNode);
 ShardingStateTest.checkShardingState(st);
 
 st.stop();
-})();

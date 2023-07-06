@@ -1,12 +1,10 @@
 // This tests readConcern handling for the find/findOne shell helpers.
 // @tags: [requires_majority_read_concern]
-(function() {
-"use strict";
 var testServer = MongoRunner.runMongod();
 if (!testServer.getDB('admin').serverStatus().storageEngine.supportsCommittedReads) {
     jsTest.log("skipping test since storage engine doesn't support committed reads");
     MongoRunner.stopMongod(testServer);
-    return;
+    quit();
 }
 var coll = testServer.getDB("test").readMajority;
 
@@ -24,4 +22,3 @@ assert.doesNotThrow(function() {
 });
 
 MongoRunner.stopMongod(testServer);
-}());

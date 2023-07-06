@@ -2,7 +2,7 @@
  * Tests that initial sync works correctly when multitenancySupport is enabled.
  */
 
-load('jstests/aggregation/extras/utils.js');  // For arrayEq()
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const rst = new ReplSetTest({

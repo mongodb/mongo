@@ -5,12 +5,7 @@
  * @tags: [requires_replication]
  */
 
-(function() {
-'use strict';
-
-load('jstests/replsets/rslib.js');
-load("jstests/libs/log.js");
-load("jstests/libs/parallelTester.js");
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const kKeyFile = 'jstests/libs/key1';
 const replTest = new ReplSetTest({nodes: 1, nodeOptions: {auth: ""}, keyFile: kKeyFile});
@@ -64,4 +59,3 @@ conf.version++;
 assert.commandWorked(admin.runCommand({replSetReconfig: conf}));
 
 replTest.stopSet();
-}());

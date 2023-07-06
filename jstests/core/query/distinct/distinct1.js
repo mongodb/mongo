@@ -1,6 +1,4 @@
 // @tags: [requires_fcv_53]
-(function() {
-"use strict";
 const collName = "distinct1";
 const coll = db.getCollection(collName);
 coll.drop();
@@ -66,4 +64,3 @@ res = assert.commandWorked(db.runCommand({distinct: collName, key: "a", query: {
 assert.eq([1, 2, 3], res.values.sort());
 
 assert.commandFailed(db.runCommand({distinct: collName, key: "a", query: 1}));
-}());

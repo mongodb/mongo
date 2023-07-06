@@ -13,18 +13,17 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     forgetMigrationAsync,
     makeX509OptionsForTest,
     runMigrationAsync,
 } from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/replsets/libs/rollback_test.js");
-load("jstests/replsets/rslib.js");  // 'createRstArgs'
+import {createRstArgs} from "jstests/replsets/rslib.js";
 
 const kTenantId = ObjectId().str;
 

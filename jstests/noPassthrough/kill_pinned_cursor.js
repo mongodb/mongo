@@ -14,15 +14,12 @@
 // Test killing a pinned cursor. Since cursors are generally pinned for short periods while result
 // batches are generated, this requires some special machinery to keep a cursor permanently pinned.
 
-(function() {
-"use strict";
-
 // This test runs manual getMores using different connections, which will not inherit the
 // implicit session of the cursor establishing command.
 TestData.disableImplicitSessions = true;
 
-load("jstests/libs/fixture_helpers.js");     // For "isMongos".
-load("jstests/libs/pin_getmore_cursor.js");  // For "withPinnedCursor".
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {withPinnedCursor} from "jstests/libs/pin_getmore_cursor.js";
 const st = new ShardingTest({shards: 2});
 
 // Enables the specified 'failPointName', executes 'runGetMoreFunc' function in a parallel
@@ -115,4 +112,3 @@ for (let conn of connsToRunOn) {
 }
 
 st.stop();
-})();

@@ -5,11 +5,12 @@
  * don't account for background activity on a config server.
  * @tags: [requires_fcv_63, config_shard_incompatible]
  */
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/conn_pool_helpers.js");
-
-(function() {
-"use strict";
+import {
+    assertHasConnPoolStats,
+    configureReplSetFailpoint,
+    launchFinds
+} from "jstests/libs/conn_pool_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 let st = new ShardingTest({shards: 1});
 
@@ -148,4 +149,3 @@ for (let counter = 1; counter <= totalIterations; ++counter) {
 refreshConnectionFailPoint.off();
 
 st.stop();
-})();

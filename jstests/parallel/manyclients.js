@@ -1,7 +1,5 @@
-(function() {
-"use strict";
 // perform inserts in parallel from a large number of clients
-load('jstests/libs/parallelTester.js');
+import {EventGenerator, ParallelTester} from "jstests/libs/parallelTester.js";
 
 const f = db.jstests_parallel_manyclients;
 f.drop();
@@ -39,4 +37,3 @@ print("done preparing test");
 t.run("one or more tests failed");
 
 assert(f.validate().valid);
-})();

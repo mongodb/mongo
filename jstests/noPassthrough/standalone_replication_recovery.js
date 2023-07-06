@@ -9,10 +9,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");
-load("jstests/libs/write_concern_util.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {reconnect} from "jstests/replsets/rslib.js";
 
 const name = 'standalone_replication_recovery';
 const dbName = name;
@@ -166,4 +164,3 @@ restartServerReplication(secondary);
 // Skip checking db hashes since we do a write as a standalone.
 TestData.skipCheckDBHashes = true;
 rst.stopSet();
-})();

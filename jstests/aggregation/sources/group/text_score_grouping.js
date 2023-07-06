@@ -1,8 +1,6 @@
 /**
  * Tests that a user can group on the text score.
  */
-(function() {
-"use strict";
 const coll = db.text_score_grouping;
 
 coll.drop();
@@ -27,4 +25,3 @@ results = coll.aggregate([
               ])
               .toArray();
 assert.eq(results.length, 2);
-}());

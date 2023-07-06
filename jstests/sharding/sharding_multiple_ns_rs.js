@@ -5,10 +5,7 @@
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
-load("jstests/replsets/rslib.js");
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 var s = new ShardingTest({
     shards: {rs0: {nodes: [{}, {}, {rsConfig: {priority: 0}}]}},
@@ -62,4 +59,3 @@ assert.eq(5, dbother.bar.findOne({_id: 5}).x);
 assert.eq(5, dbother.foo.findOne({_id: 5}).x);
 
 s.stop();
-})();

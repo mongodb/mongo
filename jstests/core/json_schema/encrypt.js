@@ -5,10 +5,7 @@
  *   requires_non_retryable_commands,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/assert_schema_match.js");
+import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 
 const coll = db.jstests_schema_encrypt;
 const encryptedBinDataElement = BinData(6, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA");
@@ -62,4 +59,3 @@ assert.commandFailedWithCode(coll.runCommand({
     filter: {$jsonSchema: {properties: {bin: {encrypt: {}, bsonType: 'object'}}}}
 }),
                              ErrorCodes.FailedToParse);
-}());

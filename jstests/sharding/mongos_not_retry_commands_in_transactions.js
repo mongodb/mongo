@@ -3,9 +3,6 @@
  * @tags: [
  * ]
  */
-(function() {
-'use strict';
-
 const setCommandToFail = (nodeConnection, command, namespace) => {
     return nodeConnection.adminCommand({
         configureFailPoint: 'failCommand',
@@ -73,4 +70,3 @@ assert.commandWorked(mongosDB.runCommand(
     {insert: kCollName, documents: [kDoc1], txnNumber: NumberLong(transactionNumber++)}));
 
 st.stop();
-})();

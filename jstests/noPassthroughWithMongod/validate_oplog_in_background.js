@@ -3,9 +3,6 @@
  *
  * @tags: [requires_wiredtiger, requires_persistence]
  */
-(function() {
-'use strict';
-
 let localDb = db.getSiblingDB("local");
 
 // Create the oplog collection so background validation has something upon which to run.
@@ -23,4 +20,3 @@ assert.commandWorked(localDb.fsyncLock());
 assert.commandWorked(localDb.fsyncUnlock());
 
 assert.commandWorked(localDb.runCommand({validate: "oplog.rs", background: true}));
-}());

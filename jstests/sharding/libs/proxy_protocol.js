@@ -2,8 +2,9 @@
  * Control the proxy protocol server.
  */
 
-load("jstests/libs/python.js");
-class ProxyProtocolServer {
+import {getPython3Binary} from "jstests/libs/python.js";
+
+export class ProxyProtocolServer {
     /**
      * Create a new proxy protocol server.
      */

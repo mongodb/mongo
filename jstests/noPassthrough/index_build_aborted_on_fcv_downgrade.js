@@ -10,11 +10,10 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/noPassthrough/libs/index_build.js');
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({
     nodes: [
@@ -72,11 +71,10 @@ const hangAfterBlockingIndexBuildsForFcvDowngrade =
     configureFailPoint(primary, "hangAfterBlockingIndexBuildsForFcvDowngrade");
 
 // Ensure index build block and abort happens during the FCV transitioning state.
-const failAfterReachingTransitioningState =
-    configureFailPoint(primary, "failAfterReachingTransitioningState");
+configureFailPoint(primary, "failAfterReachingTransitioningState");
 
 const awaitSetFcv = startParallelShell(
-    funWithArgs(function(collName) {
+    funWithArgs(function() {
         // Should fail due to failAfterReachingTransitioningState.
         assert.commandFailedWithCode(
             db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}), 7555200);
@@ -130,4 +128,3 @@ createIdxBlocked();
 IndexBuildTest.assertIndexesSoon(primaryColl, 3, ['_id_', 'b_1', 'c_1']);
 
 rst.stopSet();
-})();

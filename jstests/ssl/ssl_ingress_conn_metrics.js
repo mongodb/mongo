@@ -1,19 +1,10 @@
-/**
- * Tests ingress connection metrics.
- *
- * @tags: [requires_fcv_63]
- */
-
-"use strict";
-
-(function() {
-load("jstests/ssl/libs/ssl_helpers.js");
+import {detectDefaultTLSProtocol, determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Short circuits for system configurations that do not support this setParameter, (i.e. OpenSSL
 // versions that don't support TLS 1.3)
 if (determineSSLProvider() === "openssl" && detectDefaultTLSProtocol() !== "TLS1_3") {
     jsTestLog("Platform does not support TLS 1.3; skipping test.");
-    return;
+    quit();
 }
 
 // We use 'opensslCipherSuiteConfig' to deterministically set the cipher suite negotiated when
@@ -117,4 +108,3 @@ let runTest = (connectionHealthLoggingOn) => {
 // Parameterized on turning connection health logging on/off.
 runTest(true);
 runTest(false);
-}());

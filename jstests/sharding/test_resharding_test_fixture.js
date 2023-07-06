@@ -7,10 +7,7 @@
  *   uses_atclustertime
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
 reshardingTest.setup();
@@ -63,4 +60,3 @@ const ops = mongos.getDB("admin")
 assert.eq(1, ops.length, "failed to find reshardCollection in $currentOp output");
 
 reshardingTest.teardown();
-})();

@@ -9,9 +9,6 @@
  *
  * @tags: [requires_persistence, requires_wiredtiger]
  */
-(function() {
-"use strict";
-
 jsTestLog("Scenario 1a: testing the default compressor for regular collections");
 let conn = MongoRunner.runMongod({});
 
@@ -73,4 +70,3 @@ stats = conn.getDB("db").getCollection("b").stats();
 assert(stats["wiredTiger"]["creationString"].search("block_compressor=zlib") > -1);
 
 MongoRunner.stopMongod(conn);
-}());

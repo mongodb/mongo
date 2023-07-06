@@ -6,9 +6,6 @@
 // Tests that the update and delete batch write operations account for the size of the collation
 // specification in the write operation document.
 
-(function() {
-"use strict";
-
 // Setup the test collection.
 db.batch_write_collation_estsize.drop();
 assert.commandWorked(db.batch_write_collation_estsize.insert({str: "FOO"}));
@@ -113,4 +110,3 @@ res = db.batch_write_collation_estsize.bulkWrite([{
     }
 }]);
 assert.eq(1, res.deletedCount);
-})();

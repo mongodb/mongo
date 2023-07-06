@@ -9,9 +9,6 @@
 //   # errors.
 //   tenant_migration_incompatible,
 // ]
-(function() {
-"use strict";
-
 // Use a special db to support running other tests in parallel.
 const profileDB = db.getSiblingDB("profile_sampling");
 const coll = profileDB.profile_sampling;
@@ -79,4 +76,3 @@ try {
 
     assert.commandWorked(profileDB.runCommand(profileCmd));
 }
-}());

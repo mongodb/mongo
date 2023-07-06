@@ -9,9 +9,6 @@
  *     requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
@@ -26,7 +23,7 @@ const failpoint = 'failTimeseriesViewCreation';
 if (primaryDb.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn", data: {ns: viewNs}})
         .ok === 0) {
     jsTestLog("Skipping test because the " + failpoint + " fail point is missing");
-    return;
+    quit();
 }
 assert.commandWorked(primaryDb.adminCommand({configureFailPoint: failpoint, mode: "off"}));
 
@@ -102,4 +99,3 @@ assert.contains(viewName, primaryDb.getCollectionNames());
 assert.contains(bucketsCollName, primaryDb.getCollectionNames());
 
 rst.stopSet();
-})();

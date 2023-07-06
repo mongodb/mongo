@@ -3,11 +3,7 @@
  * entries from the previous config in the current config.
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
-load("jstests/libs/write_concern_util.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 // Start a 3 node replica set with two non-voting nodes. In this case, only one node is
 // needed to satisfy the oplog commitment check.
@@ -59,4 +55,3 @@ restartServerReplication(nodes[1]);
 replTest.awaitReplication();
 
 replTest.stopSet();
-}());

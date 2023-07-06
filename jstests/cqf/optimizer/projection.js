@@ -3,7 +3,7 @@
  * Many of these tests are similar/repeats of core/projection_semantics.js
  */
 
-load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {usedBonsaiOptimizer} from "jstests/libs/optimizer_utils.js";
 
 const coll = db.cqf_project;

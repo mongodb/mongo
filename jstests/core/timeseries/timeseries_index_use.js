@@ -20,6 +20,7 @@ import {
     getRejectedPlan,
     getRejectedPlans
 } from "jstests/libs/analyze_plan.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const generateTest = (useHint) => {
     return (insert) => {

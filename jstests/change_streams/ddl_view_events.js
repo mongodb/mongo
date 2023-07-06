@@ -3,11 +3,8 @@
  *
  * @tags: [ requires_fcv_60, ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/change_stream_util.js');
-load('jstests/libs/collection_drop_recreate.js');
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 
@@ -206,4 +203,3 @@ assertChangeStreamEventEq(event, {
     fullDocument: {_id: 0},
     documentKey: {_id: 0}
 });
-}());

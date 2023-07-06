@@ -1,7 +1,4 @@
 // Test write re-routing on version mismatch.
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 2, mongos: 2});
 
 var mongos = st.s;
@@ -68,4 +65,3 @@ jsTest.log("All docs written this time!");
 assert.eq(coll.find().itcount(), 6);
 
 st.stop();
-})();

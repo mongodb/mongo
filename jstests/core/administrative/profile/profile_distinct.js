@@ -8,11 +8,8 @@
 
 // Confirms that profiled distinct execution contains all expected metrics with proper values.
 
-(function() {
-"use strict";
-
-load("jstests/libs/os_helpers.js");  // For isLinux().
-load("jstests/libs/profiler.js");    // For 'getLatestProfilerEntry()'.
+import {isLinux} from "jstests/libs/os_helpers.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 var testDB = db.getSiblingDB("profile_distinct");
 assert.commandWorked(testDB.dropDatabase());
@@ -66,4 +63,3 @@ profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.fromMultiPlanner, true, tojson(profileObj));
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
-})();

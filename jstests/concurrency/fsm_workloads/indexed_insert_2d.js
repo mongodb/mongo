@@ -5,6 +5,7 @@
  * appear in both a collection scan and an index scan. The indexed value is a
  * legacy coordinate pair, indexed with a 2d index.
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_base.js";
 

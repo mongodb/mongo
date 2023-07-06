@@ -9,13 +9,9 @@
 //   uses_atclustertime,
 //
 // ]
-(function() {
-"use strict";
-
-load('jstests/libs/change_stream_util.js');
-load("jstests/libs/discover_topology.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 // Use a higher frequency for periodic noops to speed up the test.
 const reshardingTest = new ReshardingTest({
@@ -126,4 +122,3 @@ reshardingTest.withReshardingInBackground(
     });
 
 reshardingTest.teardown();
-})();

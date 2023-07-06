@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
@@ -134,4 +131,3 @@ const rst2TestDB = rst2Primary.getDB(kDbName);
 
 rst1.stopSet();
 rst2.stopSet();
-})();

@@ -7,8 +7,7 @@
  *   requires_profiling,
  * ]
  */
-(function() {
-load('jstests/replsets/rslib.js');
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 var NODES = 2;
 
@@ -45,4 +44,3 @@ doTest(st, false);
 doTest(st, true);
 
 st.stop();
-})();

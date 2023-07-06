@@ -4,11 +4,8 @@
  * @tags: [requires_fcv_71]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 function setUpCollection(conn, {isShardedColl, st}) {
     const dbName = "testDb-" + extractUUIDFromObject(UUID());
@@ -202,4 +199,3 @@ const mongosSetParametersOpts = {
 
     rst.stopSet();
 }
-})();

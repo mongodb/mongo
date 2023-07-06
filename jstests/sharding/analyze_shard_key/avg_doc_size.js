@@ -3,9 +3,6 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
 function testUnshardedCollection(conn) {
     const dbName = "testDb";
     const collName = "testCollUnsharded";
@@ -92,4 +89,3 @@ function testShardedCollection(st) {
 
     rst.stopSet();
 }
-})();

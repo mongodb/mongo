@@ -11,9 +11,7 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-'use strict';
-load("jstests/replsets/rslib.js");
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 // Replica set nodes started with --shardsvr do not enable key generation until they are added
 // to a sharded cluster and reject commands with gossiped clusterTime from users without the
@@ -118,4 +116,3 @@ priAdminDB.auth('user', 'password');
 priAdminDB.dropUser('user');
 
 st.stop();
-})();

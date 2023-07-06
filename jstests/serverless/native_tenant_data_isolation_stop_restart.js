@@ -1,7 +1,7 @@
 // Test that the collection catalog is restored correctly after a restart in a multitenant
 // environment.
 
-load('jstests/aggregation/extras/utils.js');  // For arrayEq()
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const rst =
     new ReplSetTest({nodes: 3, nodeOptions: {auth: '', setParameter: {multitenancySupport: true}}});

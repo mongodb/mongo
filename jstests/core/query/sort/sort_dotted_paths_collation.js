@@ -16,9 +16,6 @@
  *   multiversion_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.sort_dotted_paths_collation;
 coll.drop();
 
@@ -327,4 +324,3 @@ testSortAndSortWithLimit({"obj.a": -1, "obj.b": 1},
                          [{_id: 4}, {_id: 5}, {_id: 6}, {_id: 1}, {_id: 2}, {_id: 3}]);
 testSortAndSortWithLimit({"obj.a": -1, "obj.b": -1},
                          [{_id: 6}, {_id: 5}, {_id: 4}, {_id: 3}, {_id: 2}, {_id: 1}]);
-})();

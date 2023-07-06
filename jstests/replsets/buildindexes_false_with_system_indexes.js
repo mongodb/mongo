@@ -4,11 +4,6 @@
  *
  * @tags: [requires_persistence]
  */
-(function() {
-'use strict';
-
-load("jstests/replsets/rslib.js");
-
 const testName = "buildindexes_false_with_system_indexes";
 
 let rst = new ReplSetTest({
@@ -86,4 +81,3 @@ assert.eq(["_id_"], hiddenAdminDb.system.users.getIndexes().map(x => x.name).sor
 assert.eq(["_id_"], hiddenAdminDb.system.roles.getIndexes().map(x => x.name).sort());
 
 rst.stopSet();
-}());

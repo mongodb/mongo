@@ -3,12 +3,10 @@
  *
  * @tags: [requires_persistence]
  */
-(function() {
-"use strict";
 var isDirectoryPerDBSupported =
     jsTest.options().storageEngine == "wiredTiger" || !jsTest.options().storageEngine;
 if (!isDirectoryPerDBSupported)
-    return;
+    quit();
 
 const dbName = "test-hyphen";
 let conn = MongoRunner.runMongod({directoryperdb: ''});
@@ -21,4 +19,3 @@ assert(res.fsUsedSize > 0);
 assert(res.fsTotalSize > 0);
 
 MongoRunner.stopMongod(conn);
-})();

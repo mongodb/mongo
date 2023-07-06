@@ -3,9 +3,6 @@
  * updates lexicographically for array indexes.
  */
 
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({
     nodes: 2,
     nodeOptions: {binVersion: "latest"},
@@ -26,4 +23,3 @@ assert.commandWorked(
     coll.update({_id: 0}, {$bit: {"a.9": {or: NumberInt(0)}, "a.10": {or: NumberInt(0)}}}));
 
 rst.stopSet();
-})();

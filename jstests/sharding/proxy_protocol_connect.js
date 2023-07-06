@@ -3,17 +3,13 @@
  * @tags: [requires_fcv_52]
  */
 
-(function() {
 if (_isWindows()) {
-    // The proxy protocol python package currently doesn't support Windows.
-    return;
+    quit();
 }
-load("jstests/sharding/libs/proxy_protocol.js");
+import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 
 // Test that you can connect to the load balancer port over a proxy.
 function testProxyProtocolConnect(ingressPort, egressPort, version) {
-    'use strict';
-
     let proxy_server = new ProxyProtocolServer(ingressPort, egressPort, version);
     proxy_server.start();
 
@@ -30,15 +26,13 @@ function testProxyProtocolConnect(ingressPort, egressPort, version) {
 
 // Test that you can't connect to the load balancer port without being proxied.
 function testProxyProtocolConnectFailure(lbPort, sendLoadBalanced) {
-    'use strict';
-
     let st = new ShardingTest(
         {shards: 1, mongos: 1, mongosOptions: {setParameter: {"loadBalancerPort": lbPort}}});
 
     const hostName = st.s.host.substring(0, st.s.host.indexOf(":"));
     const uri = `mongodb://${hostName}:${lbPort}/?loadBalanced=${sendLoadBalanced}`;
     try {
-        var conn = new Mongo(uri);
+        new Mongo(uri);
         assert(false, 'Client was unable to connect to the load balancer port');
     } catch (err) {
         assert(checkLog.checkContainsOnceJsonStringMatch(
@@ -55,4 +49,3 @@ testProxyProtocolConnect(ingressPort, egressPort, 1);
 testProxyProtocolConnect(ingressPort, egressPort, 2);
 testProxyProtocolConnectFailure(egressPort, "true");
 testProxyProtocolConnectFailure(egressPort, "false");
-})();

@@ -3,10 +3,12 @@
  *
  * @tags: [requires_fcv_70]
  */
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 // This command involves running commands outside a session.
 TestData.disableImplicitSessions = true;

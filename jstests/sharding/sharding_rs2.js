@@ -10,9 +10,6 @@
 //    requires_fsync,
 // ]
 
-(function() {
-'use strict';
-
 // The mongod secondaries are set to priority 0 to prevent the primaries from stepping down during
 // migrations on slow evergreen builders.
 var s = new ShardingTest({
@@ -94,6 +91,7 @@ for (var i = 0; i < 5; i++) {
     try {
         db.foo.findOne();
     } catch (e) {
+        //
     }
 }
 
@@ -117,13 +115,13 @@ var ts = m.getDB("test").foo;
 
 var before = rs.getPrimary().adminCommand("serverStatus").opcounters;
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne().x, "B1");
 }
 
 m.setSecondaryOk();
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne().x, "B2");
 }
 
@@ -139,7 +137,7 @@ assert.lte(before.query + 10, after.query, "B3");
 db.foo.createIndex({x: 1});
 
 var bulk = db.foo.initializeUnorderedBulkOp();
-for (var i = 0; i < 100; i++) {
+for (let i = 0; i < 100; i++) {
     if (i == 17)
         continue;
     bulk.insert({x: i});
@@ -193,12 +191,12 @@ ts = m.getDB("test").foo;
 
 before = rs.getPrimary().adminCommand("serverStatus").opcounters;
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne({_id: 5}).x, "D1");
 }
 
 m.setSecondaryOk();
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne({_id: 5}).x, "D2");
 }
 
@@ -216,12 +214,12 @@ ts = m.getDB("test").foo;
 
 before = rs.getPrimary().adminCommand("serverStatus").opcounters;
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.eq(57, ts.findOne({x: 57}).x, "E1");
 }
 
 m.setSecondaryOk();
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     assert.eq(57, ts.findOne({x: 57}).x, "E2");
 }
 
@@ -257,14 +255,14 @@ rs.getSecondaries().forEach(function(secondary) {
 assert.commandWorked(ts.remove({primaryOnly: true, x: 60}, {writeConcern: {w: 3}}));
 
 rs.awaitReplication();
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     m = new Mongo(s.s.name);
     m.setSecondaryOk();
     ts = m.getDB("test").foo;
     assert.eq(100, ts.find().batchSize(5).itcount(), "F2." + i);
 }
 
-for (var i = 0; i < 10; i++) {
+for (let i = 0; i < 10; i++) {
     m = new Mongo(s.s.name);
     ts = m.getDB("test").foo;
     assert.eq(100, ts.find().batchSize(5).itcount(), "F3." + i);
@@ -273,4 +271,3 @@ for (var i = 0; i < 10; i++) {
 printjson(db.adminCommand("getShardMap"));
 
 s.stop();
-})();

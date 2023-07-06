@@ -13,10 +13,7 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/fail_point_util.js');  // For configureFailPoint
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // Asserts that there is no change stream event.
 function assertNoChanges(csCursor) {
@@ -218,4 +215,3 @@ const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
 suspendRangeDeletionShard0.off();
 
 st.stop();
-})();

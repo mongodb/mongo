@@ -37,7 +37,7 @@
 
 import {CollectionValidator} from "jstests/hooks/validate_collections.js";
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
-load("jstests/replsets/rslib.js");
+import {waitForState} from "jstests/replsets/rslib.js";
 
 Random.setRandomSeed();
 
@@ -295,12 +295,13 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
             case RollbackTestDeluxe.RoleCycleMode.kFixedRollbackSecondary:
                 [standbySecondary, curPrimary] = [curPrimary, standbySecondary];
                 break;
-            case RollbackTestDeluxe.RoleCycleMode.kRandom:
+            case RollbackTestDeluxe.RoleCycleMode.kRandom: {
                 let oldStandbySecondary = standbySecondary;
                 [standbySecondary, rollbackSecondary] =
                     Array.shuffle([curPrimary, rollbackSecondary]);
                 curPrimary = oldStandbySecondary;
                 break;
+            }
             default:
                 throw new Error(`Unknown role cycle mode ${curRoleCycleMode}`);
         }

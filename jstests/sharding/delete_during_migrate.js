@@ -7,9 +7,6 @@
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [resource_intensive]
  */
-(function() {
-'use strict';
-
 const isCodeCoverageEnabled = buildInfo().buildEnvironment.ccflags.includes('-ftest-coverage');
 const isSanitizerEnabled = buildInfo().buildEnvironment.ccflags.includes('-fsanitize');
 const slowTestVariant = isCodeCoverageEnabled || isSanitizerEnabled;
@@ -53,4 +50,3 @@ try {
 join();
 
 st.stop();
-})();

@@ -6,9 +6,7 @@
  *   no_selinux,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");  // For 'arrayEq'.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const docs = [{a: 5.01}, {a: NumberDecimal("5.01")}, {a: NumberDecimal("5.0100")}];
 const coll = db[jsTestName()];
@@ -34,4 +32,3 @@ assert.eq(doubleQueryIndexResults, [{a: 5.01}], doubleQueryIndexResults);
 assert(
     arrayEq(decimalQueryIndexResults, [{a: NumberDecimal("5.01")}, {a: NumberDecimal("5.0100")}]),
     decimalQueryIndexResults);
-}());

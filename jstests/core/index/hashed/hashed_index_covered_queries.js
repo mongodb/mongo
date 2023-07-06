@@ -8,7 +8,7 @@
  *   assumes_no_implicit_index_creation,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For arrayEq().
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
 
 const coll = db.compound_hashed_index;

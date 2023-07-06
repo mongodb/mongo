@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 var coll = db.sort1;
 coll.drop();
 
@@ -62,4 +59,3 @@ cursor = coll.find({strs: {$lt: '1000'}}).sort({strs: 1}).collation({
 assert.eq(cursor.next(), {_id: 1, strs: ['2000', '60']});
 assert.eq(cursor.next(), {_id: 0, strs: ['1000', '500']});
 assert(!cursor.hasNext());
-})();

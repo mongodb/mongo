@@ -3,9 +3,6 @@
  *
  * @tags: [requires_fcv_60]
  */
-(function() {
-"use strict";
-
 // The test command is meant to test the "no session" transaction API case.
 TestData.disableImplicitSessions = true;
 
@@ -184,4 +181,3 @@ runTestGetMore({lsid: {id: new UUID()}});
 runTestGetMore({lsid: {id: new UUID()}, txnNumber: NumberLong(0)});
 
 st.stop();
-})();

@@ -1,9 +1,7 @@
 // Integration tests for version 2 text index, ensuring that it maintains old behavior.
 
-load('jstests/libs/fts.js');
+import {queryIDS} from "jstests/libs/fts.js";
 
-(function() {
-"use strict";
 var coll = db.fts_index_version2;
 
 coll.drop();
@@ -27,4 +25,3 @@ assert.eq([], queryIDS(coll, "\"proxIMO\"", null));
 assert.eq([], queryIDS(coll, "\"poé\" atlânTico", null));
 assert.eq([], queryIDS(coll, "\"próximo voo\" \"unico médico\"", null));
 assert.eq([], queryIDS(coll, "\"próximo Vôo\" -\"único Médico\"", null));
-})();

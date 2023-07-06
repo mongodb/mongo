@@ -1,8 +1,5 @@
 // Confirms that JavaScript heap limits are respected in aggregation. Includes testing for mapReduce
 // and $where which use aggregation for execution.
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 2});
 const mongos = st.s;
 
@@ -170,4 +167,3 @@ runCommonTests(shardDB);
 runShardTests(shardDB);
 
 st.stop();
-}());

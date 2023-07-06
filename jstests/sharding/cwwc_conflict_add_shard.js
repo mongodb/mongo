@@ -8,9 +8,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load('jstests/sharding/libs/remove_shard_util.js');
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -145,4 +143,3 @@ for (var i = 0; i < cwwc.length; i++) {
 
 st.stop();
 shardServer.stopSet({skipValidation: true});
-})();

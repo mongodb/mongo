@@ -1,10 +1,7 @@
 // Test that sharded $lookup can resolve sharded views correctly.
 // @tags: [requires_sharding, requires_fcv_51]
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load("jstests/libs/profiler.js");             // For profilerHasSingleMatchingEntryOrThrow.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 const sharded = new ShardingTest({
     mongos: 1,
@@ -596,4 +593,3 @@ profilerHasSingleMatchingEntryOrThrow({
 });
 
 sharded.stop();
-}());

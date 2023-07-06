@@ -1,7 +1,5 @@
 // this tests 1% of all points using $near and $nearSphere
-(function() {
-"use strict";
-load("jstests/libs/geo_near_random.js");
+import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
@@ -28,4 +26,3 @@ test.testPt(test.mkPt(0.8), opts);
 test.testPt(test.mkPt(0.8), opts);
 
 MongoRunner.stopMongod(conn);
-})();

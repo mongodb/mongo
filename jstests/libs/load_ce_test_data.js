@@ -2,7 +2,7 @@
  * Analyze all fields and create statistics.
  * Create single-field indexes on the fields with indexed flag.
  */
-function analyzeAndIndexEnabledFields(db, coll, fields) {
+export function analyzeAndIndexEnabledFields(db, coll, fields) {
     for (const field of fields) {
         assert.commandWorked(db.runCommand({analyze: coll.getName(), key: field.fieldName}));
         if (field.indexed) {
@@ -14,7 +14,7 @@ function analyzeAndIndexEnabledFields(db, coll, fields) {
 /**
  * Load a dataset described in the 'dbMetadata' global variable.
  */
-function importDataset(dbName, dataDir, dbMetadata) {
+export function importDataset(dbName, dataDir, dbMetadata) {
     const testDB = db.getSiblingDB(dbName);
     print("Running mongoimport\n");
     for (const collMetadata of dbMetadata) {
@@ -45,7 +45,7 @@ function importDataset(dbName, dataDir, dbMetadata) {
  * ce_data_20_1 = {collName: "ce_data_20",
  *                 collData: [{"_id": 0, "uniform_int_0-1000-1": 899, ...}, ...]}
  */
-function loadJSONDataset(db, dataSet, dataDir, dbMetadata) {
+export async function loadJSONDataset(db, dataSet, dataDir, dbMetadata) {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsaiExperimental"}));
 
@@ -57,7 +57,7 @@ function loadJSONDataset(db, dataSet, dataDir, dbMetadata) {
     for (const chunkName of dataSet) {
         let chunkFilePath = `${dataDir}${chunkName}`;
         print(`Loading chunk file: ${chunkFilePath}\n`);
-        load(chunkFilePath);
+        await import(chunkFilePath);
         // At this point there is a variable named as the value of chunkName.
         let coll = eval(`db[${chunkName}.collName]`);
         eval(`assert.commandWorked(coll.insertMany(${chunkName}.collData, {ordered: false}));`);

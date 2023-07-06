@@ -2,10 +2,7 @@
  * Tests that apiStrict forbids authentication as multiple users.
  * @tags: [requires_auth]
  */
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallel_shell_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 function runTest(conn) {
     const db1 = "foo";
@@ -88,4 +85,3 @@ function runTest(conn) {
 
     MongoRunner.stopMongod(conn);
 }
-})();

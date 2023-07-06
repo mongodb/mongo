@@ -1,7 +1,4 @@
 // Test sorting with text score metadata.
-(function() {
-"use strict";
-
 const kUnavailableMetadataErrCode = 40218;
 
 const coll = db.getSiblingDB("test").getCollection("fts_score_sort");
@@ -121,4 +118,3 @@ results = coll.aggregate([
 assert.eq(
     results,
     [{_id: 0, a: "textual content", score: 1.5}, {_id: 1, a: "additional content", score: 0.75}]);
-}());

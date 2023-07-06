@@ -13,9 +13,6 @@
  *   requires_fcv_63
  * ]
  */
-(function() {
-"use strict";
-
 var st = new ShardingTest({shards: 2});
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
 st.ensurePrimaryShard('test', st.shard1.shardName);
@@ -34,4 +31,3 @@ var docsSystemBuckets = testDB.system.buckets.coll.find().toArray();
 assert.eq(1, docsSystemBuckets.length);
 
 st.stop();
-})();

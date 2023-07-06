@@ -14,9 +14,6 @@
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
 // ]
-(function() {
-"use strict";
-
 const coll = db.mr_blog_posts;
 coll.drop();
 
@@ -93,4 +90,3 @@ assert.eq(9, resultAsSingleObj.a.avg, () => tojson(resultAsSingleObj));
 assert.eq(16, resultAsSingleObj.b.avg, () => tojson(resultAsSingleObj));
 assert.eq(18, resultAsSingleObj.c.avg, () => tojson(resultAsSingleObj));
 assert(!("result" in res), () => `Expected inline output with 'results': ${tojson(res)}`);
-}());

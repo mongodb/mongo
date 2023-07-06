@@ -7,10 +7,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/index_build.js');
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const replTest = new ReplSetTest({
     nodes: [
@@ -92,4 +89,3 @@ indexx();
 indexy();
 
 replTest.stopSet();
-}());

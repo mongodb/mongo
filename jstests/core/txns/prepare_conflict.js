@@ -11,9 +11,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const dbName = "test";
 const collName = "prepare_conflict";
@@ -123,4 +121,3 @@ findAwait({checkExitSuccess: true});
 
 // The document should be unmodified, because we aborted.
 assert.eq(txnDoc, testColl.findOne(txnDoc));
-})();

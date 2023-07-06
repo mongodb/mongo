@@ -15,8 +15,6 @@
  * 4. Explaining findAndModify should not modify any contents of the collection.
  * 5. The reported stats should reflect how the command would be executed.
  */
-(function() {
-"use strict";
 var cName = "explain_find_and_modify";
 var t = db.getCollection(cName);
 
@@ -314,4 +312,3 @@ function assertDBDoesNotExist(db, msg) {
 function assertCollDoesNotExist(cName, msg) {
     assert.eq(db.getCollectionNames().indexOf(cName), -1, msg + "collection " + cName + " exists.");
 }
-})();

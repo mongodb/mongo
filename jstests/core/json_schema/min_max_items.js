@@ -5,10 +5,7 @@
 /**
  * Tests the JSON Schema keywords "minItems" and "maxItems".
  */
-(function() {
-"use strict";
-
-load("jstests/libs/assert_schema_match.js");
+import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 
 const coll = db.getCollection("json_schema_min_max_items");
 coll.drop();
@@ -46,4 +43,3 @@ assertSchemaMatch(coll, {properties: {a: {maxItems: 1}}}, {a: [0, 1]}, false);
 
 // Test that "maxItems" has no effect when specified at the top level.
 assertSchemaMatch(coll, {maxItems: 2}, {}, true);
-}());

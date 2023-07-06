@@ -7,11 +7,12 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    disableStaleVersionAndSnapshotRetriesWithinTransactions,
+    enableCoordinateCommitReturnImmediatelyAfterPersistingDecision,
+    enableStaleVersionAndSnapshotRetriesWithinTransactions,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -142,4 +143,3 @@ runTest(st, session, multiDelete, false /*staleRouter*/);
 disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 st.stop();
-})();

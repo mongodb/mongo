@@ -4,9 +4,6 @@
  * @tags: [
  * ]
  */
-(function() {
-"use strict";
-
 function testInitiate(gleDefaults) {
     const replTest = new ReplSetTest({name: jsTestName(), nodes: 1});
     clearRawMongoProgramOutput();
@@ -74,4 +71,3 @@ runTest({getLastErrorDefaults: {w: 1, wtimeout: 0, fsync: true}});
 
 jsTestLog("Testing getLastErrorDefaults with {w:1, wtimeout: 0, j: false}");
 runTest({getLastErrorDefaults: {w: 1, wtimeout: 0, j: false}});
-}());

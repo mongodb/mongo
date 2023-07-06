@@ -7,9 +7,8 @@
 // requires_fcv_71
 // ]
 //
-load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest and
-                                             // assert[Valid|Invalid]ChangeStreamNss.
 import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
+import {canonicalizeEventForTesting, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 
 if (!buildInfo().modules.includes("enterprise")) {
     jsTestLog("Skipping test as it requires the enterprise module");
@@ -23,8 +22,6 @@ const testDb = db.getSiblingDB(dbName);
 const placeholderBinData0 = BinData(0, "WMdGo/tcDkE4UL6bgGYTN6oKFitgLXvhyhB9sbKxprk=");
 const placeholderBinData6 = BinData(6, "WMdGo/tcDkE4UL6bgGYTN6oKFitgLXvhyhB9sbKxprk=");
 const placeholderOID = ObjectId();
-
-const origCanonicalizeEventForTesting = canonicalizeEventForTesting;
 
 function replaceRandomDataWithPlaceholders(event) {
     for (let field in event) {
@@ -44,11 +41,11 @@ function replaceRandomDataWithPlaceholders(event) {
         }
     }
 }
-canonicalizeEventForTesting = function(event, expected) {
+const eventModifier = function(event, expected) {
     if (event.hasOwnProperty("fullDocument") || event.hasOwnProperty("documentKey")) {
         replaceRandomDataWithPlaceholders(event);
     }
-    return origCanonicalizeEventForTesting(event, expected);
+    return canonicalizeEventForTesting(event, expected);
 };
 
 testDb.dropDatabase();
@@ -67,7 +64,7 @@ assert.commandWorked(encryptedClient.createEncryptionCollection(collName, {
     }
 }));
 
-const cst = new ChangeStreamTest(testDb);
+const cst = new ChangeStreamTest(testDb, {eventModifier});
 const ecoll = encryptedClient.getDB()[collName];
 const [escName, ecocName] = (() => {
     let names = encryptedClient.getStateCollectionNamespaces(collName);
@@ -387,5 +384,3 @@ jsTestLog("Testing cleanup");
 }
 
 cst.cleanUp();
-
-canonicalizeEventForTesting = origCanonicalizeEventForTesting;

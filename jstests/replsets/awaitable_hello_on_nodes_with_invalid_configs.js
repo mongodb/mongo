@@ -1,10 +1,8 @@
 /**
  * Tests the streamable hello protocol against nodes with invalid replica set configs.
  */
-(function() {
-"use strict";
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 // Never retry on network error, because this test needs to detect the network error.
 TestData.skipRetryOnNetworkError = true;
@@ -184,4 +182,3 @@ assert.eq(0, numAwaitingTopologyChangeOnPrimary);
 assert.eq(0, numAwaitingTopologyChangeOnSecondary);
 
 replTest.stopSet();
-})();

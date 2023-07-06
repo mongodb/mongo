@@ -22,9 +22,11 @@
  *   uses_write_concern,
  * ]
  */
+import "jstests/libs/sbe_assert_error_override.js";
+
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/secondary_reads.js";
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.buildIndex = function buildIndex(db, spec) {

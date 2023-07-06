@@ -1,7 +1,4 @@
 // Test $geoNear + $within.
-(function() {
-'use strict';
-
 const t = db.geo_s2nearwithin;
 t.drop();
 
@@ -60,4 +57,3 @@ let res = assert.commandFailedWithCode(t.runCommand("aggregate", {
 }),
                                        ErrorCodes.NoQueryExecutionPlans);
 assert(res.errmsg.includes("unable to find index for $geoNear query"), tojson(res));
-}());

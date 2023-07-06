@@ -11,10 +11,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 // Create a resharding test instance and enable higher frequency no-ops to avoid test case from
 // failing because of timeout while waiting for next change stream event.
@@ -206,4 +204,3 @@ verifyChangeStreamEvents(csCursor, [
 ]);
 
 reshardingTest.teardown();
-})();

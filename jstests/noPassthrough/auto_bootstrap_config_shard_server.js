@@ -13,9 +13,6 @@
  * ]
  * */
 
-(function() {
-"use strict";
-
 const node0 = MongoRunner.runMongod({
     setParameter: {
         featureFlagAllMongodsAreSharded: true,
@@ -110,4 +107,3 @@ MongoRunner.stopMongod(node1);
 MongoRunner.stopMongod(node2);
 MongoRunner.stopMongod(node3);
 MongoRunner.stopMongos(mongos);
-}());

@@ -1,8 +1,5 @@
 // This test is designed to reproduce the test described in SERVER-65270, where a query
 // which uses multi-planning and large documents does not respect the sort order.
-(function() {
-"use strict";
-
 const coll = db.sort_big_documents_with_multi_planning;
 coll.drop();
 
@@ -43,4 +40,3 @@ const kExpectedNums = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
     // The results should be in order.
     assert.eq(nums, kExpectedNums);
 }
-})();

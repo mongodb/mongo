@@ -2,9 +2,6 @@
  * Test that explained aggregation commands behave correctly with the readConcern option.
  * @tags: [requires_majority_read_concern]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest(
     {name: "aggExplainReadConcernSet", nodes: 1, nodeOptions: {enableMajorityReadConcern: ""}});
 rst.startSet();
@@ -53,4 +50,3 @@ nonLocalReadConcerns.forEach(function(readConcernLevel) {
 
 session.endSession();
 rst.stopSet();
-}());

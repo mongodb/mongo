@@ -1,11 +1,9 @@
 // Tests write-concern-related batch write protocol functionality
-(function() {
-
 // Skip this test when running with storage engines other than inMemory, as the test relies on
 // journaling not being active.
 if (jsTest.options().storageEngine !== "inMemory") {
     jsTest.log("Skipping test because it is only applicable for the inMemory storage engine");
-    return;
+    quit();
 }
 
 var request;
@@ -170,4 +168,3 @@ assert.eq(1, coll.find().itcount());
 
 jsTest.log("DONE no journal/repl tests");
 rst.stopSet();
-})();

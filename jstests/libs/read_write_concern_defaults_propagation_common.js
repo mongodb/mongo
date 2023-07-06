@@ -1,6 +1,4 @@
-var ReadWriteConcernDefaultsPropagation = (function() {
-    "use strict";
-
+export var ReadWriteConcernDefaultsPropagation = (function() {
     const kDefaultReadConcernField = "defaultReadConcern";
     const kDefaultWriteConcernField = "defaultWriteConcern";
     const kUpdateOpTimeField = "updateOpTime";

@@ -6,9 +6,6 @@
  *   uses_change_streams,
  * ]
  */
-(function() {
-"use strict";
-
 // Skip cross-cluster consistency checks, since this test prematurely shuts down a shard.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
@@ -161,4 +158,3 @@ if (TestData.configShard) {
     st.rs0.startSet(undefined, true /* forRestart */);
 }
 st.stop();
-}());

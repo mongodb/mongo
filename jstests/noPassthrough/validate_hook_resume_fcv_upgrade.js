@@ -37,7 +37,7 @@ function countMatches(pattern, output) {
     return numMatches;
 }
 
-async function runValidateHook(testCase) {
+function runValidateHook(testCase) {
     clearRawMongoProgramOutput();
 
     // NOTE: once modules are imported they are cached, so we need to run this in a parallel shell.
@@ -57,7 +57,7 @@ async function runValidateHook(testCase) {
     return output;
 }
 
-async function testStandalone(additionalSetupFn, {
+function testStandalone(additionalSetupFn, {
     expectedAtTeardownFCV,
     expectedSetLastLTSFCV: expectedSetLastLTSFCV = 0,
     expectedSetLatestFCV: expectedSetLatestFCV = 0
@@ -72,7 +72,7 @@ async function testStandalone(additionalSetupFn, {
     // Run the additional setup function to put the server into the desired state.
     additionalSetupFn(conn);
 
-    const output = await runValidateHook({
+    const output = runValidateHook({
         conn: conn,
         teardown: () => {
             // The validate hook should leave the server with a feature compatibility version of
@@ -182,23 +182,23 @@ function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {
 }
 
 // testStandaloneInLatestFCV
-await testStandalone(conn => checkFCV(conn.getDB("admin"), latestFCV),
-                     {expectedAtTeardownFCV: latestFCV});
+testStandalone(conn => checkFCV(conn.getDB("admin"), latestFCV),
+               {expectedAtTeardownFCV: latestFCV});
 
 // testStandaloneInLastLTSFCV
-await testStandalone(conn => {
+testStandalone(conn => {
     assert.commandWorked(
         conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     checkFCV(conn.getDB("admin"), lastLTSFCV);
 }, {expectedAtTeardownFCV: lastLTSFCV, expectedSetLastLTSFCV: 1, expectedSetLatestFCV: 1});
 
 // testStandaloneWithInterruptedFCVDowngrade
-await testStandalone(conn => {
+testStandalone(conn => {
     forceInterruptedUpgradeOrDowngrade(conn, lastLTSFCV);
 }, {expectedAtTeardownFCV: lastLTSFCV, expectedSetLastLTSFCV: 2, expectedSetLatestFCV: 1});
 
 // testStandaloneWithInterruptedFCVUpgrade
-await testStandalone(conn => {
+testStandalone(conn => {
     assert.commandWorked(
         conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     forceInterruptedUpgradeOrDowngrade(conn, latestFCV);

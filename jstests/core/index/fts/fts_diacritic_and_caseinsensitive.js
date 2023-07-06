@@ -1,9 +1,7 @@
 // Integration tests for no case or diacritic options to $text query operator.
 
-load('jstests/libs/fts.js');
+import {queryIDS} from "jstests/libs/fts.js";
 
-(function() {
-"use strict";
 var coll = db.fts_diacritic_and_caseinsensitive;
 
 coll.drop();
@@ -28,4 +26,3 @@ assert.eq([], queryIDS(coll, "à proximo -voo", null));
 assert.eq([], queryIDS(coll, "mo vo", null));
 assert.eq([], queryIDS(coll, "\"unico atlantico\"", null));
 assert.eq([], queryIDS(coll, "\"próximo Vôo\" -\"unico medico\"", null));
-})();

@@ -6,10 +6,10 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {addRecipientNodes, commitSplitAsync} from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/libs/uuid_util.js");
 
 function canStartShardSplitWithAbortedMigration({protocol, runOnRecipient}) {
     const recipientTagName = "recipientTag";

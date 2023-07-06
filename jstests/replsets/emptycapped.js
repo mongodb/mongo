@@ -1,7 +1,5 @@
 // This tests the emptycapped command in a replica set.
 
-(function() {
-"use strict";
 var rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
@@ -93,4 +91,3 @@ assert.commandWorked(
 assert.commandFailedWithCode(primaryTestDB.runCommand({emptycapped: "system.views"}),
                              ErrorCodes.IllegalOperation);
 rst.stopSet();
-})();

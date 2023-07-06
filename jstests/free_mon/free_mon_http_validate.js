@@ -1,9 +1,6 @@
 // Ensure free monitoring gives up if registration fails
 //
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {FAULT_INVALID_REGISTER, FreeMonWebServer} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer(FAULT_INVALID_REGISTER);
 
@@ -32,4 +29,3 @@ assert.eq(stats.registers, 1);
 MongoRunner.stopMongod(conn);
 
 mock_web.stop();
-})();

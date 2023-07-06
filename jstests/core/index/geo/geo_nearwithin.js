@@ -1,7 +1,4 @@
 // Test $near + $within.
-(function() {
-'use strict';
-
 const t = db.geo_nearwithin;
 t.drop();
 
@@ -42,4 +39,3 @@ resNear = t.find({
                ]
            }).toArray();
 assert.eq(resNear.length, 4, tojson(resNear));
-}());

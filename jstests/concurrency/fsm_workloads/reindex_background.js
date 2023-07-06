@@ -10,6 +10,9 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    assertWorkedHandleTxnErrors
+} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/reindex.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {

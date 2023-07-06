@@ -4,11 +4,8 @@
  *   assumes_balancer_off
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/fixture_helpers.js');      // For FixtureHelpers.
-load('jstests/aggregation/extras/utils.js');  // For resultsEq.
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const collNamePrefix = 'query_bound_inclusion_';
 let collCount = 0;
@@ -150,4 +147,3 @@ testBoundsInclusivityCompound(1, 1);
 testBoundsInclusivityCompound(-1, 1);
 testBoundsInclusivityCompound(1, -1);
 testBoundsInclusivityCompound(-1, -1);
-})();

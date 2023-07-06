@@ -5,9 +5,9 @@
  * ReplSetTest instance associated with the replica set/shard.
  */
 
-load("jstests/libs/write_concern_util.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-function testReadCommittedLookup(db, secondary, rst) {
+export function testReadCommittedLookup(db, secondary, rst) {
     /**
      * stopServerReplication uses the 'stopReplProducer' fail point to stop server replication on
      * the given secondary.

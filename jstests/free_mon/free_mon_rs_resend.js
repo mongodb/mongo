@@ -1,9 +1,13 @@
 // Validate resend registration works in a replica set
 //
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {
+    FAULT_RESEND_REGISTRATION_AT_3,
+    FAULT_RESEND_REGISTRATION_ONCE,
+    FreeMonWebServer,
+    ValidateFreeMonReplicaSet,
+    WaitForFreeMonServerStatusState,
+    WaitForRegistration,
+} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer(FAULT_RESEND_REGISTRATION_AT_3);
 let mock_web_sec = new FreeMonWebServer(FAULT_RESEND_REGISTRATION_ONCE, true);
@@ -63,4 +67,3 @@ rst.stopSet();
 
 mock_web.stop();
 mock_web_sec.stop();
-})();

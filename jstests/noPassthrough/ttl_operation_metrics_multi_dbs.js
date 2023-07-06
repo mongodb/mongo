@@ -5,8 +5,7 @@
  *   requires_replication,
  * ]
  */
-load('jstests/noPassthrough/libs/index_build.js');  // For IndexBuildTest
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {TTLUtil} from "jstests/libs/ttl_util.js";
 
 var rst = new ReplSetTest({

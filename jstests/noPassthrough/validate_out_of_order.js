@@ -2,9 +2,6 @@
  * Tests that out-of-order keys are detected by validation during both the collection and index scan
  * phases.
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -34,4 +31,3 @@ assert.commandWorked(
     primary.adminCommand({configureFailPoint: "failIndexKeyOrdering", mode: "off"}));
 
 rst.stopSet();
-})();

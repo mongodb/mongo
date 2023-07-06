@@ -4,8 +4,7 @@
  * "executionStats" and "allPlansExecution".
  */
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
-
-load("jstests/libs/fixture_helpers.js");  // For isReplSet().
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.explain_per_stage_exec_stats;
 coll.drop();

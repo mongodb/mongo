@@ -6,9 +6,6 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
-"use strict";
-
 const testName = "view_definition_feature_compatibility_version_multiversion";
 const dbpath = MongoRunner.dataPath + testName;
 
@@ -234,4 +231,3 @@ testViewDefinitionFCVBehavior(
 testViewDefinitionFCVBehavior("last-continuous", testCasesLastContinuous);
 testViewDefinitionFCVBehavior(
     "last-continuous", testCasesLastContinuousWithFeatureFlags, featureFlagsToEnable);
-}());

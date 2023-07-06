@@ -1,10 +1,7 @@
 // Test keep-alive when using mongod's internal HttpClient.
 // @tags: [requires_http_client]
 
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/configExpand/lib.js');
+import {ConfigExpandRestServer} from "jstests/noPassthrough/libs/configExpand/lib.js";
 
 function runTest(mongod, web) {
     assert(mongod);
@@ -62,4 +59,3 @@ const mongod = MongoRunner.runMongod({setParameter: 'enableTestCommands=1'});
 runTest(mongod, web);
 MongoRunner.stopMongod(mongod);
 web.stop();
-})();

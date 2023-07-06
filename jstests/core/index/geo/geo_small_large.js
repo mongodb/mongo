@@ -3,10 +3,7 @@
  * Additionally, this test also randomizes the precision for the geo index specified in
  * 'bits' index option. See SERVER-2386.
  */
-(function() {
-'use strict';
-
-load("jstests/libs/geo_near_random.js");
+import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
 
 // Do some random tests (for near queries) with very large and small ranges
 
@@ -157,4 +154,3 @@ for (let i = 0; i < scales.length; i++) {
               1 + inPoints,
               "Incorrect random center points found near!\n" + tojson(randoms));
 }
-})();

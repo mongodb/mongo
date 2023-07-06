@@ -2,8 +2,6 @@
  * Tests that cursors opened before a chunk is moved will not see the effects of the chunk
  * migration.
  */
-(function() {
-"use strict";
 const dbName = "test";
 const collName = jsTest.name();
 const testNs = dbName + "." + collName;
@@ -49,4 +47,3 @@ assert.eq(findCursor.itcount(),
           nDocs,
           "expected find cursor to return all matching documents, even though some have migrated");
 st.stop();
-}());

@@ -2,8 +2,6 @@
 // Run 'listDatabases' while renaming a collection concurrently. See SERVER-34531.
 //
 
-(function() {
-"use strict";
 const dbName = "do_concurrent_rename";
 const collName = "collA";
 const otherName = "collB";
@@ -11,8 +9,8 @@ const repeatListDatabases = 20;
 const listDatabasesCmd = {
     "listDatabases": 1
 };
-load("jstests/noPassthrough/libs/concurrent_rename.js");
-load("jstests/libs/parallel_shell_helpers.js");
+import {doRenames} from "jstests/noPassthrough/libs/concurrent_rename.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
@@ -56,4 +54,3 @@ jsTestLog("Finished running listDatabases.");
 
 renameShell();
 MongoRunner.stopMongod(conn);
-}());

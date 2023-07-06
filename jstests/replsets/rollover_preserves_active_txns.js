@@ -9,10 +9,8 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/storage_helpers.js");  // getOldestRequiredTimestampForCrashRecovery()
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {getOldestRequiredTimestampForCrashRecovery} from "jstests/libs/storage_helpers.js";
 
 // A new replica set for both the commit and abort tests to ensure the same clean state.
 function doTest(commitOrAbort) {
@@ -95,4 +93,3 @@ function doTest(commitOrAbort) {
 
 doTest("commit");
 doTest("abort");
-})();

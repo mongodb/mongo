@@ -8,9 +8,6 @@
 // than the collection being queried.
 //
 
-(function() {
-"use strict";
-
 var coll = db.foo;
 var adminDB = db.getSiblingDB('admin');
 coll.drop();
@@ -37,4 +34,3 @@ assert.eq(101,
 assert.eq(101,
           db.runCommand(dataSizeCommand).numObjects,
           "dataSize command with max number of objects set failed on 'admin' DB");
-})();

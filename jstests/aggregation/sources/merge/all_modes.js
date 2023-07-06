@@ -1,8 +1,5 @@
 // Tests basic use cases for all $merge modes.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const source = db.all_modes_source;
 const target = db.all_modes_target;
@@ -300,4 +297,3 @@ const target = db.all_modes_target;
     // Ensure the target collection has not been modified.
     assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, a: 10}]});
 })();
-}());

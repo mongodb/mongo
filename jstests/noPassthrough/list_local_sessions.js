@@ -11,9 +11,6 @@
 //   requires_sharding,
 // ]
 
-(function() {
-'use strict';
-
 const st = new ShardingTest({
     shards: 1,
     mongos: 1,
@@ -90,4 +87,3 @@ try {
 }
 
 st.stop();
-})();

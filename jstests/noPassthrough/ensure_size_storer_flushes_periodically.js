@@ -6,9 +6,6 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
-"use strict";
-
 // Set up the data files to be reused across server restarts.
 const dbpath = MongoRunner.dataPath + jsTestName();
 resetDbpath(dbpath);
@@ -71,4 +68,3 @@ assert.gte(testColl.count(),
            "Fast count should still be 100 + 1 after crash. Fast count: " + testColl.count());
 
 MongoRunner.stopMongod(conn);
-}());

@@ -8,10 +8,7 @@
  *   directly_against_shardsvrs_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const viewsDB = db.getSiblingDB(jsTestName());
 viewsDB.dropDatabase();
@@ -76,4 +73,3 @@ compareDistinctResults('2');
 compareDistinctResults('2.0');
 compareDistinctResults('numeric');
 compareDistinctResults('arrayNumeric');
-})();

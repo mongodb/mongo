@@ -1,9 +1,5 @@
 // Tests for the $mergeObjects aggregation expression.
-(function() {
-"use strict";
-
-// For assertErrorCode().
-load("jstests/aggregation/extras/utils.js");
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 let coll = db.merge_object_expr;
 coll.drop();
@@ -144,4 +140,3 @@ result = coll.aggregate([
              ])
              .toArray();
 assert.eq(result, [{_id: 17, mergedDocument: {b: 2}}]);
-}());

@@ -4,9 +4,6 @@
  *
  * @tags: [requires_persistence, requires_majority_read_concern]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 const localDB = rst.nodes[0].getDB('local');
@@ -53,4 +50,3 @@ assert.commandFailedWithCode(localDB.runCommand({
 }),
                              ErrorCodes.NotPrimaryOrSecondary);
 rst.stopSet();
-}());

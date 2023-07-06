@@ -8,12 +8,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
-load("jstests/replsets/libs/sync_source.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {forceSyncSource} from "jstests/replsets/libs/sync_source.js";
 
 let st = new ShardingTest({shards: 1});
 
@@ -117,4 +113,3 @@ sessionDb.getSession().endSession();
 replTest.stopSet();
 
 st.stop();
-})();

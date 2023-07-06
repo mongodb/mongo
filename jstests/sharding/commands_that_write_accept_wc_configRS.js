@@ -14,11 +14,13 @@
  * config server to still satisfy majority write concern, which can't be true for a config shard.
  * @tags: [resource_intensive, config_shard_incompatible]
  */
-load('jstests/libs/write_concern_util.js');
-load('jstests/multiVersion/libs/auth_helpers.js');
-
-(function() {
-"use strict";
+import {
+    assertWriteConcernError,
+    restartReplicationOnAllShards,
+    runCommandCheckAdmin,
+    stopReplicationOnSecondaries,
+    stopReplicationOnSecondariesOfAllShards,
+} from "jstests/libs/write_concern_util.js";
 
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
@@ -244,4 +246,3 @@ commands.forEach(function(cmd) {
 });
 
 st.stop();
-})();

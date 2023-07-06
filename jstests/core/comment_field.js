@@ -18,10 +18,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/profiler.js");  // For profilerHas*OrThrow helper functions.
+import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 // This test runs manual getMores using different connections, which will not inherit the
 // implicit session of the cursor establishing command.
@@ -146,4 +143,3 @@ runCommentParamTest({
     coll: coll,
     command: {explain: {aggregate: coll.getName(), pipeline: [], cursor: {}, comment: innerComment}}
 });
-})();

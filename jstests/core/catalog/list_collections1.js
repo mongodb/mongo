@@ -23,9 +23,6 @@
  * listCollections output.
  */
 
-(function() {
-"use strict";
-
 var mydb = db.getSiblingDB("list_collections1");
 var cursor;
 var res;
@@ -352,4 +349,3 @@ assert.commandFailedWithCode(
     mydb.runCommand("listCollections",
                     {includePendingDrops: false, apiVersion: "1", apiStrict: true}),
     ErrorCodes.APIStrictError);
-}());

@@ -11,10 +11,12 @@
  *   featureFlagReshardingImprovements,
  * ]
  */
-load("jstests/libs/discover_topology.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-load("jstests/libs/parallelTester.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {Thread} from "jstests/libs/parallelTester.js";
+import {getUUIDFromConfigCollections, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const originalReshardingUUID = UUID();
 

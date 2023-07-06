@@ -14,11 +14,7 @@
  * @tags: [ requires_fcv_53 ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 var name = "interruptStepDown";
 // Set the fassert timeout to shorter than the default to avoid having a long-running test.
@@ -80,4 +76,3 @@ bgInserter({checkExitSuccess: false});
 replSet.stop(
     primary.nodeId, undefined, {forRestart: false, allowedExitCode: MongoRunner.EXIT_ABORT});
 replSet.stopSet();
-})();

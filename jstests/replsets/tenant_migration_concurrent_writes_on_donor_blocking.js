@@ -11,6 +11,8 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     checkTenantMigrationAccessBlockerForConcurrentWritesTest,
@@ -19,10 +21,6 @@ import {
     setupTestForConcurrentWritesTest,
     TenantMigrationConcurrentWriteUtil
 } from "jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({
     name: jsTestName(),

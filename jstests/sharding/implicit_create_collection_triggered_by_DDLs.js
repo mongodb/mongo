@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 function shardKnowledgeIsShardedOrUnknown(shard, nss) {
     let res = assert.commandWorked(shard.adminCommand({getShardVersion: nss, fullMetadata: true}));
     return (typeof res.global == 'string' && res.global == 'UNKNOWN') ||
@@ -51,4 +48,3 @@ void function testmovePrimary() {
 }();
 
 st.stop();
-})();

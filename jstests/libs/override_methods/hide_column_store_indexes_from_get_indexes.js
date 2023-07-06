@@ -4,10 +4,7 @@
  * intended to increase the number of tests that can run when a column store index is implicitly
  * added to every collection.
  */
-(function() {
-'use strict';
-
-load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 DBCollection.prototype.getIndexes = function(filter) {
     return this
@@ -29,4 +26,3 @@ DBCollection.prototype.getIndexSpecs = DBCollection.prototype.getIndexes;
 
 OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/hide_column_store_indexes_from_get_indexes.js");
-}());

@@ -4,9 +4,6 @@
  *
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-
 const numNodes = 2;
 
 function checkOplogEntry(entry, lsid, txnNum, stmtId, prevTs, retryImageArgs) {
@@ -308,4 +305,3 @@ const st = new ShardingTest({shards: {rs0: {nodes: numNodes}}});
 runTests(lsid, st.s, st.rs0.getPrimary(), st.rs0.getSecondary(), 70);
 runTests(lsid, st.s, st.rs0.getPrimary(), st.rs0.getSecondary(), 80);
 st.stop();
-})();

@@ -3,7 +3,7 @@
 // run a command on a latest version shard that no longer supports that command. To increase test
 // coverage and allow us to run on same- and mixed-version suites, we allow these commands to have a
 // test defined without always existing on the servers being used.
-const commandsRemovedFromMongosSinceLastLTS = [
+export const commandsRemovedFromMongosSinceLastLTS = [
     "repairShardedCollectionChunksHistory",
     // last-continuos
     "getLastError",
@@ -11,10 +11,11 @@ const commandsRemovedFromMongosSinceLastLTS = [
     "driverOIDTest",
     "transitionToCatalogShard",
 ];
+
 // These commands were added in mongos since the last LTS version, so will not appear in the
 // listCommands output of a last LTS version mongos. We will allow these commands to have a test
 // defined without always existing on the mongos being used.
-const commandsAddedToMongosSinceLastLTS = [
+export const commandsAddedToMongosSinceLastLTS = [
     "_clusterQueryWithoutShardKey",
     "_clusterWriteWithoutShardKey",
     "abortReshardCollection",

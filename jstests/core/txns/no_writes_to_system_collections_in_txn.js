@@ -1,8 +1,5 @@
 // Tests that it is illegal to write to system collections within a transaction.
 // @tags: [uses_transactions, uses_snapshot_read_concern]
-(function() {
-"use strict";
-
 const session = db.getMongo().startSession();
 
 // Use a custom database, to avoid conflict with other tests that use the system.js collection.
@@ -70,4 +67,3 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 
 assert.commandWorked(systemColl.remove({_id: {$exists: true}}));
 assert.eq(systemColl.find().itcount(), 0);
-}());

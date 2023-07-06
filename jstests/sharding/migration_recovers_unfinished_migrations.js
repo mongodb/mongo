@@ -12,12 +12,8 @@
  *     config_shard_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/chunk_manipulation_util.js');
-load('jstests/replsets/rslib.js');
+import {moveChunkParallel} from "jstests/libs/chunk_manipulation_util.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
 // StaleShardVersion exception on the shards and cause them to refresh their sharding metadata. That
@@ -116,4 +112,3 @@ joinMoveChunk2();
 
 MongoRunner.stopMongod(staticMongod);
 st.stop();
-})();

@@ -3,9 +3,6 @@
  *
  *  @tags: [multiversion_incompatible]
  */
-(function() {
-'use strict';
-
 function changeObserverIntensity(observer, intensity) {
     let paramValue = {"values": [{"type": observer, "intensity": intensity}]};
     assert.commandWorked(
@@ -95,4 +92,3 @@ assert(testObserver.timeSinceLastCheckStartedMs >= 1);
 assert(testObserver.timeSinceLastCheckCompletedMs >= 1);
 
 st.stop();
-})();

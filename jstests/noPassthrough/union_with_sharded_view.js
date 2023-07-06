@@ -1,10 +1,7 @@
 // Test that sharded $unionWith can resolve sharded views correctly when target shards are on
 // different, non-primary shards.
 // @tags: [requires_sharding, requires_fcv_50]
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const sharded = new ShardingTest({mongos: 1, shards: 4, config: 1});
 assert(sharded.adminCommand({enableSharding: "test"}));
@@ -95,4 +92,3 @@ testUnionWithView(
     ]);
 
 sharded.stop();
-}());

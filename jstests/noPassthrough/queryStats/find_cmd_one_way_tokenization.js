@@ -1,9 +1,7 @@
 /**
  * Test that $queryStats properly tokenizes find commands, on mongod and mongos.
  */
-load("jstests/libs/query_stats_utils.js");
-(function() {
-"use strict";
+import {getQueryStatsFindCmd} from "jstests/libs/query_stats_utils.js";
 
 const kHashedFieldName = "lU7Z0mLRPRUL+RfAD5jhYPRRpXBsZBxS/20EzDwfOG4=";
 
@@ -92,4 +90,3 @@ st = new ShardingTest({
 });
 runTest(st.s);
 st.stop();
-}());

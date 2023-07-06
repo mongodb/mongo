@@ -1,6 +1,3 @@
-(function() {
-"use script";
-
 // This test makes assertions about the number of sessions, which are not compatible with
 // implicit sessions.
 TestData.disableImplicitSessions = true;
@@ -89,4 +86,3 @@ assert.commandWorked(res, "failed to refresh");
 }
 
 MongoRunner.stopMongod(conn);
-}());

@@ -10,9 +10,7 @@
  * multiversion_incompatible]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
 const dbName = TestData.testName;
 const logLevel = tojson({storage: {recovery: 2}});
@@ -155,4 +153,3 @@ rst.remove(primary);
 rst.remove(restoreNode);
 // Shut down the set.
 rst.stopSet();
-})();

@@ -7,9 +7,6 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-'use strict';
-
 function countUniqueIndexes(coll, key) {
     const all = coll.getIndexes().filter(function(z) {
         return z.unique && friendlyEqual(z.key, key);
@@ -87,4 +84,3 @@ assert.eq(countUniqueIndexes(s1Coll, {a: 1}),
           'index should be unique: ' + tojson(s1Coll.getIndexes()));
 
 st.stop();
-})();

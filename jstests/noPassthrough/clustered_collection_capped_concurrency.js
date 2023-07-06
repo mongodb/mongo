@@ -9,13 +9,9 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/libs/collection_drop_recreate.js");
-load('jstests/libs/dateutil.js');
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const replSet = new ReplSetTest({name: "clustered_capped_concurrency", nodes: 1});
 replSet.startSet();
@@ -91,4 +87,3 @@ function validateCappedInsertConcurrency(db, coll, clustered, expectedConcurrent
 }
 
 replSet.stopSet();
-})();

@@ -1,9 +1,6 @@
 /**
  * Test that verifies client metadata is logged as part of slow query logging in MongoD.
  */
-(function() {
-'use strict';
-
 let conn = MongoRunner.runMongod({useLogFiles: true});
 assert.neq(null, conn, 'mongod was unable to start up');
 
@@ -33,4 +30,3 @@ assert(predicate.test(log),
        "'Slow query' log line missing in mongod log file!\n" +
            "Log file contents: " + conn.fullOptions.logFile);
 MongoRunner.stopMongod(conn);
-})();

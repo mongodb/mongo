@@ -7,9 +7,6 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
 const dbToDropName = jsTestName() + "_drop";
 const dbToKeepName = jsTestName() + "_keep";
 
@@ -55,4 +52,3 @@ runTest(false);
 runTest(true);
 
 rst.stopSet();
-})();

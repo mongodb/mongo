@@ -1,10 +1,8 @@
 // Tests for the $dayOfYear, $dayOfMonth, and $dayOfWeek expressions.
 
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
-load("jstests/libs/sbe_assert_error_override.js");
+import {arrayEq, assertArrayEq, assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.dayOfExpressions;
 
@@ -119,4 +117,3 @@ pipeline = {
     $project: {date: {'$dayOfYear': {date: "$date", "timezone": "DoesNot/Exist"}}}
 };
 assertErrorCode(coll, pipeline, 40485);
-})();

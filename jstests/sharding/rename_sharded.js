@@ -2,14 +2,13 @@
  * Test all the possible succeed/fail cases around sharded collections renaming.
  */
 
-load('jstests/libs/uuid_util.js');
+import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
 
 /**
  * Initialize a "from" sharded collection with 2 chunks - on 2 different nodes - each containing 1
  * document. Rename to `toNs` with the provided options and get sure it succeeds/fails as expected.
  */
 function testRename(st, dbName, toNs, dropTarget, mustFail) {
-    const db = st.getDB(dbName);
     const mongos = st.s0;
 
     const fromNs = dbName + '.from';
@@ -171,7 +170,6 @@ const mongos = st.s0;
 // Successful rename must pass tags from source to the target collection
 {
     const dbName = 'testRenameFromTaggedCollection';
-    const db = st.getDB(dbName);
     const fromNs = dbName + '.from';
     const toNs = dbName + '.to';
 

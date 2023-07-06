@@ -7,12 +7,15 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/chunk_manipulation_util.js');
-load('jstests/sharding/libs/remove_shard_util.js');
-load('jstests/libs/fail_point_util.js');
+import {
+    moveChunkParallel,
+    moveChunkStepNames,
+    pauseMoveChunkAtStep,
+    unpauseMoveChunkAtStep,
+    waitForMoveChunkStep,
+} from "jstests/libs/chunk_manipulation_util.js";
+import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -59,4 +62,3 @@ st.s.getDB('config').chunks.find().forEach(function(chunk) {
 st.stop();
 
 MongoRunner.stopMongod(staticMongod);
-})();

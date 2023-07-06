@@ -1,8 +1,5 @@
 // Test several different kinds of size limits on user-defined (Javascript) accumulators.
 // @tags: [resource_intensive]
-(function() {
-"use strict";
-
 const coll = db.accumulator_js_size_limits;
 
 function runExample(groupKey, accumulatorSpec, aggregateOptions = {}) {
@@ -154,4 +151,3 @@ res =
         ])
         .toArray();
 assert.sameMembers(res, [{_id: 1, count: 1000000}, {_id: 2, count: 1000000}]);
-})();

@@ -9,11 +9,12 @@
  * This workload was designed to reproduce an issue similar to SERVER-18304 for update operations
  * using the findAndModify command where the old version of the document is returned.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/findAndModify_remove_queue.js";
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod.
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Use the workload name as the database name, since the workload name is assumed to be

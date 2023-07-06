@@ -5,11 +5,8 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
@@ -128,4 +125,3 @@ assert.commandWorked(sessionDB.adminCommand({
 }));
 
 rst.stopSet();
-})();

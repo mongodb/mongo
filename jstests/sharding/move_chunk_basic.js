@@ -2,10 +2,7 @@
 // Basic tests for moveChunk.
 //
 
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var st = new ShardingTest({mongos: 1, shards: 2});
 var kDbName = 'db';
@@ -83,4 +80,3 @@ testNotHashed({a: 1});
 testNotHashed({a: 1, b: 1});
 
 st.stop();
-})();

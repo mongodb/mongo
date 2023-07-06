@@ -7,9 +7,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 // This test appends 'insert' and 'delete' oplogs directly to the oplog system collection in
 // standalone mode, When restarting as a replica set member we assume the collections will play
 // forward to the appropriate count. But because we added a new oplog entry that's going to turn
@@ -111,4 +108,3 @@ function runTest(op, result) {
 }
 
 ops.forEach(op => oplogApplicationResults.forEach(result => runTest(op, result)));
-}());

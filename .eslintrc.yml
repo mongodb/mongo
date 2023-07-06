@@ -6,40 +6,220 @@ parserOptions:
   ecmaVersion: 2022
   sourceType: "module"
 
+extends: "eslint:recommended"
 rules:
-  # Rules are documented at http://eslint.org/docs/rules/
-  no-cond-assign: 2
-  no-console: 2
-  no-control-regex: 2
-  no-debugger: 2
-  no-div-regex: 2
-  no-dupe-args: 2
-  no-dupe-keys: 2
-  no-duplicate-case: 2
-  no-empty-character-class: 2
-  no-empty-pattern: 2
-  no-ex-assign: 2
-  no-extra-boolean-cast: 2
-  no-extra-semi: 2
-  no-fallthrough: 2
-  no-func-assign: 2
-  no-invalid-regexp: 2
-  no-labels: 2
-  no-negated-in-lhs: 2
-  no-obj-calls: 2
-  no-octal-escape: 2
-  no-octal: 2
-  no-regex-spaces: 2
-  no-return-assign: 2
-  no-script-url: 2
-  no-self-compare: 2
-  no-sequences: 2
-  no-sparse-arrays: 2
-  no-unexpected-multiline: 2
-  no-unreachable: 2
-  no-unused-expressions: 2
-  no-useless-call: 2
-  no-with: 2
-  semi: 2
-  use-isnan: 2
-  valid-typeof: 2
+  no-prototype-builtins: 0
+  no-useless-escape: 0
+  no-irregular-whitespace: 0
+  no-inner-declarations: 0
+  no-unused-vars: [0, { "varsIgnorePattern": "^_", "args": "none" }]
+  no-empty: 0
+  no-redeclare: 0
+  no-constant-condition: 0
+  no-loss-of-precision: 0
+
+globals:
+  TestData: true
+  # TODO(mbroadst): Remove the next line when ReplSetTest and ShardingTest are converted to modules.
+  Thread: true
+  ReplSetTest: true
+  ShardingTest: true
+  WriteError: true
+  WriteCommandError: true
+  BulkWriteError: true
+  DB: true
+  DBCollection: true
+  DBQuery: true
+  DBExplainQuery: true
+  DBCommandCursor: true
+  MongoBridge: true
+  MongoURI: true
+  WriteConcern: true
+  SessionOptions: true
+  CollInfos: true
+  CountDownLatch: true
+
+  # FCV-related
+  latestFCV: true
+  lastLTSFCV: true
+  lastContinuousFCV: true
+  checkFCV: true
+  isFCVEqual: true
+  binVersionToFCV: true
+  numVersionsSinceLastLTS: true
+  getFCVConstants: true
+  removeFCVDocument: true
+  targetFCV: true
+
+  assert: true
+  doassert: true
+  authutil: true
+  tojson: true
+  tojsononeline: true
+  tostrictjson: true
+  tojsonObject: true
+  print: true
+  printjson: true
+  printjsononeline: true
+  jsTest: true
+  jsTestLog: true
+  jsonTestLog: true
+  ErrorCodes: true
+  ErrorCodeStrings: true
+  checkProgram: true
+  Random: true
+  checkLog: true
+  sleep: true
+  resetDbpath: true
+  copyDbpath: true
+  jsTestName: true
+  startParallelShell: true
+  buildInfo: true
+  getBuildInfo: true
+  jsTestOptions: true
+  printShardingStatus: true
+  _getErrorWithCode: true
+  isNetworkError: true
+  __magicNoPrint: true
+  computeSHA256Block: true
+  emit: true
+  _awaitRSHostViaRSMonitor: true
+  convertShardKeyToHashed: true
+  benchRun: true
+  benchRunSync: true
+  gc: true
+  DataConsistencyChecker: true
+  isNumber: true
+  isObject: true
+  isString: true
+  _createSecurityToken: true
+  _isAddressSanitizerActive: true
+  allocatePort: true
+  allocatePorts: true
+  resetAllocatedPorts: true
+  bsonObjToArray: true
+  _writeTestPipeObjects: true
+  _writeTestPipe: true
+  _writeTestPipeBsonFile: true
+  _readTestPipes: true
+  runFeatureFlagMultiversionTest: true
+  isRetryableError: true
+  numberDecimalsAlmostEqual: true
+  numberDecimalsEqual: true
+  debug: true
+  bsonsize: true
+  globalAssertLevel: true
+  _DelegatingDriverSession: true
+  _DummyDriverSession: true
+  _ServerSession: true
+  sortDoc: true
+  executeNoThrowNetworkError: true
+  _readDumpFile: true
+  _openGoldenData: true
+  _writeGoldenData: true
+  _threadInject: true
+  port: true
+  _buildBsonObj: true
+  convertTrafficRecordingToBSON: true
+  _setShellFailPoint: true
+  shellHelper: true
+  _srand: true
+  _shouldUseImplicitSessions: true
+  testingReplication: true
+  myPort: true
+  retryOnNetworkError: true
+  getJSHeapLimitMB: true
+  _getEnv: true
+  indentStr: true
+  _forgetReplSet: true
+
+  # likely could be replaced with `path`
+  _copyFileRange: true
+  copyFile: true
+  writeFile: true
+  fileExists: true
+  pathExists: true
+  umask: true
+  getFileMode: true
+
+  # likely could be replaced with `child_process`
+  MongoRunner: true
+  run: true
+  runProgram: true
+  runMongoProgram: true
+  runNonMongoProgram: true
+  _runMongoProgram: true
+  _startMongoProgram: true
+  startMongoProgram: true
+  _stopMongoProgram: true
+  stopMongoProgramByPid: true
+  clearRawMongoProgramOutput: true
+  rawMongoProgramOutput: true
+  waitProgram: true
+  waitMongoProgram: true
+  _runningMongoChildProcessIds: true
+  startMongoProgramNoConnect: true
+
+  # shell-specific
+  shellPrintHelper: true
+  shellAutocomplete: true
+  __autocomplete__: true
+  getActiveCommands: true
+  defaultPrompt: true
+  ___it___: true
+  __promptWrapper__: true
+  passwordPrompt: true
+  isInteractive: true
+
+  # built-in BSON types and helpers
+  Code: true
+  MaxKey: true
+  MinKey: true
+  HexData: true
+  DBPointer: true
+  DBRef: true
+  BinData: true
+  NumberLong: true
+  NumberDecimal: true
+  Timestamp: true
+  MD5: true
+  Geo: true
+  bsonWoCompare: true
+  bsonUnorderedFieldsCompare: true
+  bsonBinaryEqual: true
+  friendlyEqual: true
+  timestampCmp: true
+  decompressBSONColumn: true
+
+  hex_md5: true
+  QueryHelpers: true
+  chatty: true
+  DriverSession: true
+  ToolTest: true
+  uncheckedParallelShellPidsString: true
+  _shouldRetryWrites: true
+
+  # from_cpp:
+  __prompt__: true
+  _replMonitorStats: true
+
+  # explainable.js
+  Explainable: true
+
+  # utils.js
+  _verboseShell: true
+  __quiet: true
+  printStackTrace: true
+  setVerboseShell: true
+  _barFormat: true
+  compare: true
+  compareOn: true
+  shellPrint: true
+  _originalPrint: true
+  disablePrint: true
+  enablePrint: true
+  replSetMemberStatePrompt: true
+  helloStatePrompt: true
+  _validateMemberIndex: true
+  help: true
+

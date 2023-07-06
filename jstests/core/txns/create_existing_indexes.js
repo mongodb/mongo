@@ -9,9 +9,6 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
 const session = db.getMongo().startSession();
 const collName = "create_existing_indexes";
 
@@ -51,4 +48,3 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.endSession();
-}());

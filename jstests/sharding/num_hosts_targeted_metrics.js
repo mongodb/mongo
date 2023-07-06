@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const st = new ShardingTest({shards: 3});
 const mongos = st.s;
 const testDb = mongos.getDB("test");
@@ -216,4 +213,3 @@ assertShardingStats(serverStatusInitial.shardingStatistics.numHostsTargeted,
                     {"aggregate": {"allShards": 1}});
 
 st.stop();
-})();

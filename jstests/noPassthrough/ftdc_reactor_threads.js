@@ -5,12 +5,8 @@
  *   requires_sharding,
  * ]
  */
-load('jstests/libs/fail_point_util.js');
-load('jstests/libs/ftdc.js');
-load('jstests/libs/parallelTester.js');
-
-(function() {
-'use strict';
+import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 function getDiagnosticData(mongos) {
     let db = mongos.getDB('admin');
@@ -87,4 +83,3 @@ assert.soon(() => {
 }, 'Expected to find at least one long running task', 30000);
 
 st.stop();
-})();

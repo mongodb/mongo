@@ -11,6 +11,7 @@
  * unconditionally, which need not be true in a sharded cluster.
  * @tags: [uses_transactions, requires_replication]
  */
+import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     var states = (function() {

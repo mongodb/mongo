@@ -3,7 +3,7 @@
  *
  * @return {Timestamp} oldest required timestamp for crash recovery.
  */
-function getOldestRequiredTimestampForCrashRecovery(database) {
+export function getOldestRequiredTimestampForCrashRecovery(database) {
     const res = database.serverStatus().storageEngine;
     const ts = res.oldestRequiredTimestampForCrashRecovery;
     assert(ts instanceof Timestamp,

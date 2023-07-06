@@ -9,9 +9,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 let testDb = db.getSiblingDB("convert_to_capped");
 let coll = testDb.coll;
 testDb.dropDatabase();
@@ -26,4 +23,3 @@ for (let i = 0; i < num; ++i) {
 assert.commandFailedWithCode(
     testDb.runCommand({convertToCapped: coll.getName(), size: 5308156746568725891247}),
     ErrorCodes.BadValue);
-})();

@@ -1,9 +1,7 @@
 /**
  * Test the $binarySize expression.
  */
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.expression_binarySize;
 coll.drop();
@@ -41,4 +39,3 @@ assert.eq(result, [
 // $binarySize only accepts strings and BinData.
 assert.commandWorked(coll.insert({x: 42}));
 assertErrorCode(coll, {$project: {s: {$binarySize: "$x"}}}, 51276);
-}());

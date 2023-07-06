@@ -12,9 +12,10 @@
 //   requires_pipeline_optimization,
 //   requires_persistence,
 // ]
-load("jstests/aggregation/extras/utils.js");
-load('jstests/libs/fixture_helpers.js');            // For 'FixtureHelpers'
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
+
+import {arrayEq, assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 

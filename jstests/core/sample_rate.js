@@ -5,9 +5,6 @@
  *     incompatible_with_gcov,
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.expression_sample_rate;
 coll.drop();
 
@@ -76,4 +73,3 @@ assert.commandFailedWithCode(db.runCommand({
     pipeline: [{$match: {$sampleRate: {$const: 0.25}}}]
 }),
                              ErrorCodes.BadValue);
-}());

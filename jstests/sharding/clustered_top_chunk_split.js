@@ -6,9 +6,6 @@
  *
  * This test mimics the existing top_chunk_split.js but on a clustered collection.
  */
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 1});
 var testDB = st.s.getDB('test');
 assert.commandWorked(testDB.adminCommand({enableSharding: 'test'}));
@@ -144,4 +141,3 @@ tests.forEach(function(test) {
 });
 
 st.stop();
-})();

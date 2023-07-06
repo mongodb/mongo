@@ -19,7 +19,7 @@
  */
 import {aggPlanHasStage, planHasStage} from "jstests/libs/analyze_plan.js";
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.isMongos.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     quit();

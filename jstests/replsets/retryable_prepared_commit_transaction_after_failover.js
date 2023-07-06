@@ -4,10 +4,7 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -104,4 +101,3 @@ assert.eq(priConn.getDB(dbName)[collName].count(), 2);
 assert.eq(priConn.getDB(dbName)[collName].find().itcount(), 2);
 
 rst.stopSet();
-}());

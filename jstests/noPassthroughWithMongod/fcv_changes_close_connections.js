@@ -1,9 +1,6 @@
 // Test closing connections from internal clients on featureCompatibilityVersion changes.
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const adminDB = db.getSiblingDB("admin");
 const testDB = db.getSiblingDB("test");
@@ -106,4 +103,3 @@ if (lastContinuousFCV !== lastLTSFCV) {
 
 // Test upgrade/downgrade between 'latest' and 'last-lts'.
 runTest(lastLTSFCV);
-})();

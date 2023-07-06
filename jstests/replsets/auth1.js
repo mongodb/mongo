@@ -3,10 +3,7 @@
 // This test requires users to persist across a restart.
 // @tags: [requires_persistence, multiversion_incompatible]
 
-load("jstests/replsets/rslib.js");
-
-(function() {
-"use strict";
+import {wait} from "jstests/replsets/rslib.js";
 
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
@@ -222,4 +219,3 @@ assert.soon(function() {
 });
 MongoRunner.stopMongod(conn);
 rs.stopSet();
-})();

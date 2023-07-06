@@ -5,8 +5,6 @@
  *
  * This test was intended to reproduce a bug, SERVER-54128.
  */
-(function() {
-
 const coll = db.expression_swap_limit;
 coll.drop();
 
@@ -79,4 +77,3 @@ const pipeline2 = [
         coll.aggregate([{$_internalInhibitOptimization: {}}].concat(pipeline2)).toArray();
     assert.docEq([{_id: 99, b: 123}], noOptResult);
 }
-})();

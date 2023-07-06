@@ -12,8 +12,6 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 const st = new ShardingTest({mongos: 1, shards: 2});
 const kDbName = 'db';
 const collName = 'foo';
-const timeFieldName = "time";
-const timeseriesCollName = "ts";
 const mongos = st.s0;
 const numInitialDocs = 10;
 const db = st.rs0.getPrimary().getDB(kDbName);

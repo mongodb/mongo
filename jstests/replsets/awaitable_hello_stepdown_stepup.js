@@ -1,10 +1,8 @@
 /**
  * Tests the fields returned by hello responses as a node goes through a step down and step up.
  */
-(function() {
-"use strict";
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 // Test hello paramaters on a single node replica set.
 const replSetName = "awaitable_hello_stepup";
@@ -146,4 +144,3 @@ hangFailPoint.off();
 awaitHelloAfterStepUp();
 
 replTest.stopSet();
-})();

@@ -2,7 +2,7 @@
 // Utilities for testing chunk manipulation: moveChunk, mergeChunks, etc.
 //
 
-load('jstests/libs/test_background_ops.js');
+import {startParallelOps} from "jstests/libs/test_background_ops.js";
 
 //
 // Start a background moveChunk.
@@ -19,14 +19,14 @@ load('jstests/libs/test_background_ops.js');
 // Returns a join function; call it to wait for moveChunk to complete.
 //
 
-function moveChunkParallel(staticMongod,
-                           mongosURL,
-                           findCriteria,
-                           bounds,
-                           ns,
-                           toShardId,
-                           expectSuccess = true,
-                           forceJumbo = false) {
+export function moveChunkParallel(staticMongod,
+                                  mongosURL,
+                                  findCriteria,
+                                  bounds,
+                                  ns,
+                                  toShardId,
+                                  expectSuccess = true,
+                                  forceJumbo = false) {
     assert((findCriteria || bounds) && !(findCriteria && bounds),
            'Specify either findCriteria or bounds, but not both.');
 
@@ -67,7 +67,7 @@ function moveChunkParallel(staticMongod,
 
 // moveChunk starts at step 0 and proceeds to 1 (it has *finished* parsing
 // options), 2 (it has reloaded config and installed MigrationSourceManager) and so on.
-var moveChunkStepNames = {
+export var moveChunkStepNames = {
     parsedOptions: 1,
     installedMigrationSourceManager: 2,
     startedMoveChunk: 3,    // called _recvChunkStart on recipient
@@ -76,7 +76,7 @@ var moveChunkStepNames = {
     committed: 6
 };
 
-function numberToName(names, stepNumber) {
+export function numberToName(names, stepNumber) {
     for (var name in names) {
         if (names.hasOwnProperty(name) && names[name] == stepNumber) {
             return name;
@@ -89,18 +89,18 @@ function numberToName(names, stepNumber) {
 //
 // Configure a failpoint to make moveChunk hang at a step.
 //
-function pauseMoveChunkAtStep(shardConnection, stepNumber) {
+export function pauseMoveChunkAtStep(shardConnection, stepNumber) {
     configureMoveChunkFailPoint(shardConnection, stepNumber, 'alwaysOn');
 }
 
 //
 // Allow moveChunk to proceed past a step.
 //
-function unpauseMoveChunkAtStep(shardConnection, stepNumber) {
+export function unpauseMoveChunkAtStep(shardConnection, stepNumber) {
     configureMoveChunkFailPoint(shardConnection, stepNumber, 'off');
 }
 
-function proceedToMoveChunkStep(shardConnection, stepNumber) {
+export function proceedToMoveChunkStep(shardConnection, stepNumber) {
     jsTest.log('moveChunk proceeding from step "' +
                numberToName(moveChunkStepNames, stepNumber - 1) + '" to "' +
                numberToName(moveChunkStepNames, stepNumber) + '".');
@@ -110,7 +110,7 @@ function proceedToMoveChunkStep(shardConnection, stepNumber) {
     waitForMoveChunkStep(shardConnection, stepNumber);
 }
 
-function configureMoveChunkFailPoint(shardConnection, stepNumber, mode) {
+export function configureMoveChunkFailPoint(shardConnection, stepNumber, mode) {
     assert.between(moveChunkStepNames.parsedOptions,
                    stepNumber,
                    moveChunkStepNames.committed,
@@ -124,7 +124,7 @@ function configureMoveChunkFailPoint(shardConnection, stepNumber, mode) {
 // Wait for moveChunk to reach a step (1 through 7). Assumes only one active
 // moveChunk running in shardConnection.
 //
-function waitForMoveChunkStep(shardConnection, stepNumber) {
+export function waitForMoveChunkStep(shardConnection, stepNumber) {
     var searchString = 'step ' + stepNumber, admin = shardConnection.getDB('admin');
 
     assert.between(moveChunkStepNames.parsedOptions,
@@ -157,7 +157,7 @@ function waitForMoveChunkStep(shardConnection, stepNumber) {
     }, msg);
 }
 
-var migrateStepNames = {
+export var migrateStepNames = {
     deletedPriorDataInRange: 1,
     copiedIndexes: 2,
     rangeDeletionTaskScheduled: 3,
@@ -170,18 +170,18 @@ var migrateStepNames = {
 //
 // Configure a failpoint to make migration thread hang at a step (1 through 5).
 //
-function pauseMigrateAtStep(shardConnection, stepNumber) {
+export function pauseMigrateAtStep(shardConnection, stepNumber) {
     configureMigrateFailPoint(shardConnection, stepNumber, 'alwaysOn');
 }
 
 //
 // Allow _recvChunkStart to proceed past a step.
 //
-function unpauseMigrateAtStep(shardConnection, stepNumber) {
+export function unpauseMigrateAtStep(shardConnection, stepNumber) {
     configureMigrateFailPoint(shardConnection, stepNumber, 'off');
 }
 
-function proceedToMigrateStep(shardConnection, stepNumber) {
+export function proceedToMigrateStep(shardConnection, stepNumber) {
     jsTest.log('Migration thread proceeding from step "' +
                numberToName(migrateStepNames, stepNumber - 1) + '" to "' +
                numberToName(migrateStepNames, stepNumber) + '".');
@@ -191,7 +191,7 @@ function proceedToMigrateStep(shardConnection, stepNumber) {
     waitForMigrateStep(shardConnection, stepNumber);
 }
 
-function configureMigrateFailPoint(shardConnection, stepNumber, mode) {
+export function configureMigrateFailPoint(shardConnection, stepNumber, mode) {
     assert.between(migrateStepNames.deletedPriorDataInRange,
                    stepNumber,
                    migrateStepNames.done,
@@ -206,7 +206,7 @@ function configureMigrateFailPoint(shardConnection, stepNumber, mode) {
 //
 // Wait for moveChunk to reach a step (1 through 7).
 //
-function waitForMigrateStep(shardConnection, stepNumber) {
+export function waitForMigrateStep(shardConnection, stepNumber) {
     var searchString = 'step ' + stepNumber, admin = shardConnection.getDB('admin');
 
     assert.between(migrateStepNames.deletedPriorDataInRange,
@@ -239,7 +239,7 @@ function waitForMigrateStep(shardConnection, stepNumber) {
 //
 // Run the given function in the transferMods phase.
 //
-function runCommandDuringTransferMods(
+export function runCommandDuringTransferMods(
     mongos, staticMongod, ns, findCriteria, bounds, fromShard, toShard, cmdFunc) {
     // Turn on the fail point and wait for moveChunk to hit the fail point.
     pauseMoveChunkAtStep(fromShard, moveChunkStepNames.startedMoveChunk);
@@ -255,7 +255,7 @@ function runCommandDuringTransferMods(
     joinMoveChunk();
 }
 
-function killRunningMoveChunk(admin) {
+export function killRunningMoveChunk(admin) {
     let inProgressOps = admin.aggregate([{$currentOp: {'allUsers': true}}]);
     var abortedMigration = false;
     let inProgressStr = '';

@@ -17,10 +17,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {supportArbitraryClusterKeyIndex: true}});
 
@@ -33,4 +32,3 @@ nonReplicatedColl.drop();
 ClusteredCollectionUtil.testBasicClusteredCollection(nonReplicatedDB, collName, 'ts');
 
 MongoRunner.stopMongod(conn);
-})();

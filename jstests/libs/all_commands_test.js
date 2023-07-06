@@ -12,8 +12,7 @@
  * All the logic about how exactly a test should run is defined by the user.
  * See the 'testAllCommands' function.
  */
-const AllCommandsTest = (function() {
-    "use strict";
+export const AllCommandsTest = (function() {
     /**
      * Verifies that the command map contains an entry for every command that exists on the server.
      * This is already called in 'testAllCommands', so there is no need to call this directly.

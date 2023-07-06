@@ -10,7 +10,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-load("jstests/noPassthrough/libs/index_build.js");
+import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();

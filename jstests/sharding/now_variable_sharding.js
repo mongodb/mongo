@@ -2,9 +2,6 @@
  * Tests for the $$NOW and $$CLUSTER_TIME system variable on a sharded cluster.
  */
 
-(function() {
-"use strict";
-
 var st = new ShardingTest({mongos: 1, shards: 2});
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
@@ -167,4 +164,3 @@ assert.commandWorked(
 assert.commandWorked(coll.explain().aggregate([{$addFields: {timeField: "$$CLUSTER_TIME"}}]));
 
 st.stop();
-}());

@@ -1,11 +1,9 @@
 // SERVER-18427: Add $log, $log10, $ln, $pow, and $exp aggregation expressions.
 
-// For assertErrorCode.
-load('jstests/aggregation/extras/utils.js');
-load('jstests/libs/sbe_assert_error_override.js');  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
 
-(function() {
-'use strict';
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+
 var coll = db.log_exponential_expressions;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: 8, b: 2}));
@@ -156,4 +154,3 @@ assertErrorCode(coll, [{$project: {pow: {$pow: [5, "string"]}}}], 28763);
 assertErrorCode(coll, [{$project: {exp: {$exp: ["string"]}}}], 28765);
 assertErrorCode(coll, [{$project: {pow: {$pow: [NumberDecimal(0), NumberLong("-1")]}}}], 28764);
 assertErrorCode(coll, [{$project: {pow: {$pow: ["string", NumberDecimal(5)]}}}], 28762);
-}());

@@ -14,10 +14,7 @@
  *
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
-(function() {
-"use strict";
-
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {waitForFailpoint} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
@@ -78,4 +75,3 @@ assert.commandWorked(
     st.rs0.getPrimary().adminCommand(addTxnFieldsToCmd({abortTransaction: 1}, lsid, txnNumber)));
 
 st.stop();
-})();

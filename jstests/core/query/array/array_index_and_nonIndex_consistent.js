@@ -5,9 +5,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {arrayDiff, arrayEq} from "jstests/aggregation/extras/utils.js";
 
 function buildErrorString(q, indexed, nonIndexed) {
     const arrDiff = arrayDiff(indexed, nonIndexed);
@@ -108,4 +106,3 @@ multiIntQueryList.forEach(function(q) {
     const nonIndexedRes = nonIndexedColl.find(q, projOutId).sort({val: 1}).toArray();
     assert(arrayEq(indexRes, nonIndexedRes), buildErrorString(q, indexRes, nonIndexedRes));
 });
-})();

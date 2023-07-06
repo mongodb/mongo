@@ -1,8 +1,5 @@
 // Test X509 auth with custom OIDs.
 
-(function() {
-'use strict';
-
 const SERVER_CERT = 'jstests/libs/server.pem';
 const CA_CERT = 'jstests/libs/ca.pem';
 
@@ -52,4 +49,3 @@ const mongod = MongoRunner.runMongod({
 });
 runTest(mongod);
 MongoRunner.stopMongod(mongod);
-})();

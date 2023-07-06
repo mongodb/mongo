@@ -7,9 +7,9 @@
  * opening a connection to the database.
  * @tags: [requires_majority_read_concern]
  */
-
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
-load("jstests/replsets/rslib.js");
+import {reconnect} from "jstests/replsets/rslib.js";
 
 const dbName = "test";
 const collName = "not_primary_errors_returned_during_rollback_if_helloOk";

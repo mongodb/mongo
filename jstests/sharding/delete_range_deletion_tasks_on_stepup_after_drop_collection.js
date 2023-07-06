@@ -9,11 +9,8 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 /*
  * Runs moveChunk on the host to move the chunk to the given shard.
@@ -100,4 +97,3 @@ assert.soon(() => {
 });
 
 st.stop();
-})();

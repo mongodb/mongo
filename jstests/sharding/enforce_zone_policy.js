@@ -1,9 +1,6 @@
 // Tests changing the zones on a shard at runtime results in a correct distribution of chunks across
 // the cluster
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 3, mongos: 1, other: {chunkSize: 1}});
 const dbName = 'test';
@@ -107,4 +104,3 @@ st.removeTagRange(ns, {_id: MinKey}, {_id: MaxKey});
 assertBalanceCompleteAndStable(checkClusterEvenlyBalanced, 'final');
 
 st.stop();
-})();

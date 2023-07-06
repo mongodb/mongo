@@ -7,10 +7,8 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
-load('jstests/noPassthrough/libs/index_build.js');
 const rst = new ReplSetTest({
     nodes: [
         {},
@@ -115,4 +113,3 @@ function restartStandalone(node) {
 })();
 
 createIndexCmd();
-})();

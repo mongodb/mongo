@@ -3,11 +3,8 @@
  * before starting another reconfig.
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
 var replTest = new ReplSetTest({nodes: 2, useBridge: true});
 replTest.startSet();
@@ -52,4 +49,3 @@ assert.soon(() => isConfigCommitted(primary));
 reconfigFailPoint.off();
 
 replTest.stopSet();
-}());

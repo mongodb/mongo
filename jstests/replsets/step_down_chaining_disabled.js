@@ -3,9 +3,6 @@
  * the new primary.
  */
 
-(function() {
-"use strict";
-
 const replSet = new ReplSetTest({
     nodes: 3,
     settings: {chainingAllowed: false},
@@ -30,4 +27,3 @@ assert.commandWorked(newPrimary.adminCommand({setParameter: 1, writePeriodicNoop
 replSet.awaitSyncSource(secondary, newPrimary);
 
 replSet.stopSet();
-})();

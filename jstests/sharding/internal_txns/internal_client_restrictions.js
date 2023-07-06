@@ -3,9 +3,6 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-"use strict";
-
 const kCollName = "testColl";
 
 function verifyInternalSessionsForExternalClients(testDB, {expectFail}) {
@@ -108,4 +105,3 @@ authutil.asCluster(st.s, keyFile, function() {
 });
 
 st.stop();
-})();

@@ -2,9 +2,6 @@
 // after restarting.
 // @tags: [requires_persistence]
 
-(function() {
-'use strict';
-
 var st = new ShardingTest({name: "write_commands", mongos: 2, shards: 2});
 
 var dbTestName = 'WriteCommandsTestDB';
@@ -81,4 +78,3 @@ assert.eq(1, st.shard0.getDB(dbTestName).TestColl.find({Key: 11}).count());
 assert.eq(1, st.shard1.getDB(dbTestName).TestColl.find({Key: 21}).count());
 
 st.stop();
-})();

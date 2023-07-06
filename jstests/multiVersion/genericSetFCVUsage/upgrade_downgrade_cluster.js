@@ -1,14 +1,11 @@
-/**
- * Tests that CRUD and aggregation commands through the mongos continue to work as expected on both
- * sharded and unsharded collection at each step of cluster upgrade/downgrade between last-lts and
- * latest and between last-continuous and latest.
- */
-(function() {
-"use strict";
+import "jstests/multiVersion/libs/multi_rs.js";
+import "jstests/multiVersion/libs/multi_cluster.js";
 
-load('jstests/multiVersion/libs/multi_rs.js');
-load('jstests/multiVersion/libs/multi_cluster.js');
-load('jstests/multiVersion/libs/upgrade_downgrade_cluster_shared.js');
+import {
+    testCRUDAndAgg,
+    testDDLOps
+} from "jstests/multiVersion/libs/upgrade_downgrade_cluster_shared.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 // When checking UUID consistency, the shell attempts to run a command on the node it believes is
 // primary in each shard. However, this test restarts shards, and the node that is elected primary
@@ -157,4 +154,3 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
 
     st.stop();
 }
-})();

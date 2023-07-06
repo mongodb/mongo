@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 const coll = db.agg_expr_bsonSize;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1}));
@@ -46,4 +43,3 @@ checkExpectsDocument("abc");
 checkExpectsDocument(BinData(0, "aaaa"));
 checkExpectsDocument([123, 456]);
 checkExpectsDocument([{x: 1}, {y: 2}]);
-}());

@@ -5,10 +5,7 @@
 /**
  * Tests for the JSON Schema 'additionalProperties' keyword.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/assert_schema_match.js");
+import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 
 const coll = db.schema_allowed_properties;
 
@@ -236,4 +233,3 @@ assertSchemaMatch(coll,
                   },
                   {obj: {a: 1, ba: 1, c: "str"}},
                   false);
-}());

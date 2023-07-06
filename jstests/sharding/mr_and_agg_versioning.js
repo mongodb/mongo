@@ -1,7 +1,4 @@
 // Test that map reduce and aggregate properly handle shard versioning.
-(function() {
-"use strict";
-
 // Test delibarately inserts orphaned data outside of migrations.
 TestData.skipCheckOrphans = true;
 
@@ -60,4 +57,3 @@ res = staleMongos2.getCollection(nsString).aggregate(
 validateOutput(res.toArray());
 
 st.stop();
-})();

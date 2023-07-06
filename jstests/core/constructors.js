@@ -12,8 +12,6 @@
 
 // Takes a list of constructors and returns a new list with an extra entry for each constructor with
 // "new" prepended
-(function() {
-"use strict";
 const out = db.map_reduce_constructors_out;
 function addConstructorsWithNew(constructorList) {
     function prependNew(constructor) {
@@ -302,4 +300,3 @@ whereConstructorTest(uuidConstructors);
 whereConstructorTest(md5Constructors);
 whereConstructorTest(hexdataConstructors);
 whereConstructorTest(dateConstructors);
-})();

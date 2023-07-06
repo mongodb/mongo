@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 var s = new ShardingTest({});
 var db = s.getDB("test");
 
@@ -89,4 +86,3 @@ assert.eq(1, s.getDB('otherDBSamePrimary').foo.countDocuments({}));
 }
 
 s.stop();
-})();

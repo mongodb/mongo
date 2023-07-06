@@ -7,11 +7,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");
-
 const collName = jsTest.name();
 const coll = db[collName];
 
@@ -76,4 +71,3 @@ assert.commandFailedWithCode(err, 5860401);
 err = assert.throws(() => coll.aggregate([{$geoNear: {near: "$$pt", distanceField: "distance"}}],
                                          {let : {pt: "abc"}}));
 assert.commandFailedWithCode(err, 5860401);
-}());

@@ -1,9 +1,6 @@
 // Ensure that sort behavior for undefined, missing, and null fields is the same for both find and
 // aggregation. This test validates the fix for SERVER-42565, which was caused by inconsistent
 // behavior for generating sort keys in aggregation.
-(function() {
-"use strict";
-
 const coll = db.sort_key_with_missing_fields;
 coll.drop();
 
@@ -60,4 +57,3 @@ assert.commandWorked(coll.insert([
 
 checkFindAndAggSorts({"a.b": 1, _id: 1}, expectedOrderForward);
 checkFindAndAggSorts({"a.b": -1, _id: -1}, expectedOrderReverse);
-}());

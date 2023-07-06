@@ -1,9 +1,6 @@
 // SERVER-20163 introduced the $zip expression. In this test file, we check the behavior and error
 // cases of the expression.
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
-
-(function() {
-"use strict";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.zip;
 coll.drop();
@@ -203,4 +200,3 @@ res = coll.aggregate([{$project: {zipped: {$zip: zipObj}}}]);
 output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].zipped, [[1, "A"], [2, "B"], [3, null]]);
-}());

@@ -1,9 +1,6 @@
 //
 // Tests that we can dump collection metadata via getShardVersion()
 //
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 2, mongos: 1});
 
 var mongos = st.s0;
@@ -54,4 +51,3 @@ assert(metadata.chunks[1][1]._id + "" == MaxKey + "");
 assert(tojson(metadata.shardVersion) == tojson(result.global));
 
 st.stop();
-})();

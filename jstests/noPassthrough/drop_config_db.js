@@ -3,9 +3,6 @@
  * Tests running with experimental CQF behavior require test commands to be enabled.
  * @tags: [cqf_experimental_incompatible]
  */
-(function() {
-"use strict";
-
 TestData.enableTestCommands = false;
 
 const mongod = MongoRunner.runMongod();
@@ -17,4 +14,3 @@ assert.commandWorked(config.runCommand({create: 'test'}));
 assert.commandWorked(config.dropDatabase());
 
 MongoRunner.stopMongod(mongod);
-})();

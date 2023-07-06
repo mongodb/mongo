@@ -7,9 +7,6 @@
  * @tags: [featureFlagToaster, featureFlagSpoon]
  */
 
-(function() {
-'use strict';
-
 let numLastLTSRuns = 0;
 let numLastContRuns = 0;
 
@@ -77,4 +74,3 @@ if (lastLTSFCV === lastContinuousFCV) {
     assert.eq(numLastLTSRuns, 2);
     assert.eq(numLastContRuns, 1);
 }
-})();

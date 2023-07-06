@@ -12,9 +12,8 @@
  * ]
  */
 
-(function() {
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
-load('jstests/libs/transactions_util.js');
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 
 function getWtCacheSizeBytes() {
     let serverStatus;
@@ -82,4 +81,3 @@ assert.soon(() => {
 
     return true;
 }, "Expected a transaction to eventually fail with TransactionTooLargeForCache error.");
-}());

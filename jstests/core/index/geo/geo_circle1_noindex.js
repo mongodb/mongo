@@ -1,8 +1,5 @@
 // SERVER-7343: allow $within without a geo index.
 
-(function() {
-'use strict';
-
 const t = db.geo_circle1_noindex;
 t.drop();
 
@@ -36,4 +33,3 @@ for (let i = 0; i < searches.length; i++) {
     assert.eq(correct[i].length, t.find(q).count(), "count : " + tojson(searches[i]));
     assert.eq(correct[i].length, t.countDocuments(q), "aggregation : " + tojson(searches[i]));
 }
-})();

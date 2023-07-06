@@ -7,9 +7,6 @@
 
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-(function() {
-"use strict";
-
 function runTest(downgradeVersion) {
     jsTestLog("Running test with downgradeVersion: " + downgradeVersion);
     const downgradeFCV = binVersionToFCV(downgradeVersion);
@@ -64,4 +61,3 @@ function runTest(downgradeVersion) {
 
 runTest('last-continuous');
 runTest('last-lts');
-})();

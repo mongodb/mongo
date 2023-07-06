@@ -16,9 +16,9 @@
  *   not_allowed_with_security_token,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For "resultsEq."
-import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
+import {assertArrayEq, resultsEq} from "jstests/aggregation/extras/utils.js";
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     quit();

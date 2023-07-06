@@ -15,21 +15,17 @@
  * @tags: [requires_persistence, uses_prepare_transaction, uses_transactions]
  */
 
-(function() {
-"use strict";
-
 const isCodeCoverageEnabled = buildInfo().buildEnvironment.ccflags.includes('-ftest-coverage');
 const isSanitizerEnabled = buildInfo().buildEnvironment.ccflags.includes('-fsanitize');
 const slowTestVariant = isCodeCoverageEnabled || isSanitizerEnabled;
 
 if (slowTestVariant) {
     jsTestLog("Skipping test on slow test variant");
-    return;
+    quit();
 }
 
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/parallel_shell_helpers.js");
-load('jstests/libs/test_background_ops.js');
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -124,4 +120,3 @@ assert.commandFailedWithCode(primary.getDB(dbName).runCommand({
 
 // Skip validation because it requires a lock that the prepared transaction is blocking.
 rst.stopSet(true /*use default exit signal*/, false /*forRestart*/, {skipValidation: true});
-})();

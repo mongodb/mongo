@@ -8,6 +8,7 @@
  * This workload was designed to reproduce SERVER-25039.
  */
 
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/kill_rooted_or.js";
 

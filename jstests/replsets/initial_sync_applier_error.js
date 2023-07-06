@@ -9,9 +9,7 @@
  * and subsequently have to retry the initial sync.
  */
 
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 var name = 'initial_sync_applier_error';
 var replSet = new ReplSetTest({
@@ -51,4 +49,3 @@ assert.eq(0, secondary.getDB('test').getCollection(name).count());
 assert.eq(1, secondary.getDB('test').getCollection(newCollName).count());
 assert.eq("hi", secondary.getDB('test').getCollection(newCollName).findOne({_id: 0}).content);
 replSet.stopSet();
-})();

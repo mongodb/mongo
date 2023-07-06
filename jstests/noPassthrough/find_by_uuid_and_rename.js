@@ -1,15 +1,13 @@
 //
 // Run 'find' by UUID while renaming a collection concurrently. See SERVER-34615.
 //
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {doRenames} from "jstests/noPassthrough/libs/concurrent_rename.js";
 
-(function() {
-"use strict";
 const dbName = "do_concurrent_rename";
 const collName = "collA";
 const otherName = "collB";
 const repeatFind = 100;
-load("jstests/noPassthrough/libs/concurrent_rename.js");
-load("jstests/libs/parallel_shell_helpers.js");
 
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
@@ -58,4 +56,3 @@ while (conn.getDB("test").await_data.findOne({_id: "rename has ended"}) == null)
 }
 renameShell();
 MongoRunner.stopMongod(conn);
-}());

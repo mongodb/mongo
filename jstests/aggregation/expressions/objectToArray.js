@@ -1,10 +1,7 @@
 // Tests for the $objectToArray aggregation expression.
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-// For assertErrorCode().
-load("jstests/aggregation/extras/utils.js");
-load("jstests/libs/sbe_assert_error_override.js");
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 let coll = db.object_to_array_expr;
 coll.drop();
@@ -101,4 +98,3 @@ assert(coll.drop());
 assert.commandWorked(coll.insert({_id: 16}));
 result = coll.aggregate([object_to_array_expr]).toArray();
 assert.eq(result, [{_id: 16, expanded: null}]);
-}());

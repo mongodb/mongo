@@ -5,10 +5,10 @@
  *   featureFlagColumnstoreIndexes,
  * ]
  */
+import {assertArrayEq, documentEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanStages} from "jstests/libs/analyze_plan.js";
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     quit();

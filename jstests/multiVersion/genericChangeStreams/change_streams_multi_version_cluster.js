@@ -7,11 +7,8 @@
 // stepdowns.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-(function() {
-"use strict";
-
-load("jstests/multiVersion/libs/multi_rs.js");       // Used by upgradeSet.
-load("jstests/multiVersion/libs/multi_cluster.js");  // For upgradeCluster.
+await import("jstests/multiVersion/libs/multi_rs.js");
+await import("jstests/multiVersion/libs/multi_cluster.js");
 
 const dbName = "test";
 const collName = "change_streams_multi_version_sortkey";
@@ -126,4 +123,3 @@ function runTest(downgradeVersion) {
 
 runTest("last-continuous");
 runTest("last-lts");
-}());

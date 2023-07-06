@@ -1,11 +1,9 @@
 /**
  * Sets up a test for initial sync when there are index builds in progress on the primary.
  */
-var IndexInitialSyncTest = function(options) {
-    "use strict";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
-    load('jstests/noPassthrough/libs/index_build.js');
-
+export var IndexInitialSyncTest = function(options) {
     if (!(this instanceof IndexInitialSyncTest)) {
         return new IndexInitialSyncTest(options);
     }

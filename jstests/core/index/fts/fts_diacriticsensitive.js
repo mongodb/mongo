@@ -1,9 +1,7 @@
 // Integration tests for {$diacriticSensitive: true} option to $text query operator.
 
-load('jstests/libs/fts.js');
+import {queryIDS} from "jstests/libs/fts.js";
 
-(function() {
-"use strict";
 var coll = db.fts_diacriticsensitive;
 
 coll.drop();
@@ -35,4 +33,3 @@ assert.eq([], queryIDS(coll, "mo vô", null, {$diacriticSensitive: true}));
 assert.eq([], queryIDS(coll, "\"unico medico\"", null, {$diacriticSensitive: true}));
 assert.eq([],
           queryIDS(coll, "\"próximo vôo\" -\"único médico\"", null, {$diacriticSensitive: true}));
-})();

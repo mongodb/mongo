@@ -8,9 +8,6 @@
  *  ]
  */
 
-(function() {
-"use strict";
-
 assert.throws(function() {
     MinKey().__proto__.singleton = 1000;
     MinKey();
@@ -20,4 +17,3 @@ assert.throws(function() {
     MaxKey().__proto__.singleton = 1000;
     MaxKey();
 }, [], "make sure manipulating MaxKey's proto is safe");
-})();

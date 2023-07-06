@@ -1,9 +1,8 @@
 // Test that currentOp works as expected in a multitenant environment.
 // @tags: [requires_fcv_62]
-load('jstests/aggregation/extras/utils.js');     // For arrayEq()
-load("jstests/libs/fail_point_util.js");         // For configureFailPoint()
-load("jstests/libs/parallel_shell_helpers.js");  // For funWithArgs()
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const kTenant = ObjectId();
 const kOtherTenant = ObjectId();

@@ -3,9 +3,6 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-'use strict';
-
 TestData.disableImplicitSessions = true;
 
 const st = new ShardingTest({
@@ -175,4 +172,3 @@ const kConfigSessionNs = "config.system.sessions";
 })();
 
 st.stop();
-})();

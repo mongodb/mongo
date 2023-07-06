@@ -133,7 +133,6 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
     const windowSize = 10;
     // The partition iterator will only hold five documents at once. After they are added to the
     // removable document executor they will be released.
-    const numDocsHeld = 5;
     let pipeline = [
         {
             $setWindowFields: {

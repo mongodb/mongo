@@ -1,8 +1,5 @@
 // Test for saslStart invoked with invalid/missing mechanism.
 
-(function() {
-'use strict';
-
 const mongod = MongoRunner.runMongod({auth: ''});
 const admin = mongod.getDB('admin');
 
@@ -46,4 +43,3 @@ const kIDLParserMissingRequiredField = 40414;
 saslStartFailure(undefined, kIDLParserMissingRequiredField);
 
 MongoRunner.stopMongod(mongod);
-})();

@@ -2,11 +2,8 @@
  * Verifies that the dropIndexes command does not invariant if it sees a similar index build
  * completed that it successfully aborted.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/noPassthrough/libs/index_build.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const dbName = "test";
 const collName = "dropIndexesOnRecreatedIndex";
@@ -67,4 +64,3 @@ let indexes = coll.getIndexes();
 assert.eq(1, indexes.length);
 
 MongoRunner.stopMongod(conn);
-}());

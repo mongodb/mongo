@@ -1,8 +1,5 @@
 // Test X509 auth when --sslAllowInvalidCertificates is enabled
 
-(function() {
-'use strict';
-
 const CLIENT_NAME = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
 const CLIENT_CERT = 'jstests/libs/client.pem';
 const SERVER_CERT = 'jstests/libs/server.pem';
@@ -78,4 +75,3 @@ testClient(CLIENT_CERT, CLIENT_NAME, true);
 testClient(SELF_SIGNED_CERT, CLIENT_NAME, false);
 testClient(CLIENT_CERT, null, true);
 testClient(SELF_SIGNED_CERT, null, false);
-})();

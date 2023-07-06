@@ -2,12 +2,9 @@
  * Test to verify when majority commit quorum is enabled for index build, the primary index builder
  * should not commit the index until majority of nodes finishes building their index.
  */
-(function() {
-
-"use strict";
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
-load('jstests/noPassthrough/libs/index_build.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 var rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
@@ -100,4 +97,3 @@ assert.eq(false, isIndexBuildInProgress(secondary, indexName));
 IndexBuildTest.assertIndexes(primaryColl, 2, ['_id_', 'x_1']);
 
 rst.stopSet();
-})();

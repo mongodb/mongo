@@ -4,7 +4,7 @@
  * Test is loosely based from read_pref_cmd.js.
  */
 
-load("jstests/replsets/rslib.js");
+import {awaitRSClientHosts, reconnect} from "jstests/replsets/rslib.js";
 
 var assertCorrectTargeting = function(explain, isMongos, secExpected) {
     assert.commandWorked(explain);

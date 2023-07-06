@@ -1,7 +1,6 @@
 // Test auth of the explain command.
 
 var conn = MongoRunner.runMongod({auth: ""});
-var authzErrorCode = 13;
 
 var admin = conn.getDB("admin");
 admin.createUser({user: "adminUser", pwd: "pwd", roles: ["root"]});

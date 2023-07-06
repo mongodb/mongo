@@ -15,12 +15,15 @@
 // chunk is empty.
 //
 
-load('jstests/libs/chunk_manipulation_util.js');
+import {
+    migrateStepNames,
+    moveChunkParallel,
+    pauseMigrateAtStep,
+    unpauseMigrateAtStep,
+    waitForMigrateStep,
+} from "jstests/libs/chunk_manipulation_util.js";
 
-(function() {
-"use strict";
-
-var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+var staticMongod = MongoRunner.runMongod({});
 
 /**
  * Start up new sharded cluster, stop balancer that would interfere in manual chunk management.
@@ -140,4 +143,3 @@ assert.eq(1, recipientCollUpdatedNum, "Update failed on recipient shard during m
 jsTest.log('DONE!');
 MongoRunner.stopMongod(staticMongod);
 st.stop();
-})();

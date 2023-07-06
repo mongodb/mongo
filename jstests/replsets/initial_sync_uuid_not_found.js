@@ -4,10 +4,7 @@
  * cases where using UUIDs results in NamespaceNotFound while using namespace strings
  * results in an empty result or zero count.
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
 const basename = 'initial_sync_rename_collection';
 
@@ -44,8 +41,6 @@ function ResyncWithFailpoint(failpointName, failpointData) {
 
     jsTestLog('Wait for new node to start cloning');
     secondary.setSecondaryOk();
-    const secondaryDB = secondary.getDB(primaryDB.getName());
-    const secondaryColl = secondaryDB[primaryColl.getName()];
 
     rst.reInitiate();
     assert.commandWorked(secondary.adminCommand({
@@ -80,4 +75,3 @@ ResyncWithFailpoint(
     'hangAfterClonerStage',
     {cloner: 'DatabaseCloner', stage: 'listCollections', database: primaryDB.getName()});
 rst.stopSet();
-})();

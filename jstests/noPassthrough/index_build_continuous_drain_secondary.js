@@ -10,8 +10,7 @@
  * ]
  *
  */
-(function() {
-load("jstests/noPassthrough/libs/index_build.js");
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const replSet = new ReplSetTest({
     nodes: [
@@ -84,4 +83,3 @@ jsTestLog("elapsed on secondary: " + (secondaryEnd - start));
 
 IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1_b_1']);
 replSet.stopSet();
-})();

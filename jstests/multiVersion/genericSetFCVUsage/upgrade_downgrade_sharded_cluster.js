@@ -1,16 +1,4 @@
-/**
- * Verify that some metadata is properly changed after the upgrade and downgrade of a sharded
- * cluster. More specifically:
- *
- *   1. Create a sharded cluster in replica set running an old binary version
- *   2. Setup some data on cluster
- *   3. Upgrade binaries and FCV of the cluster to the latest version
- *   4. Verify the data consistency after the upgrade procedure
- *   5. Downgrade binaries and FCV of the cluster to an old version
- *   6. Verify the data consistency after the downgrade procedure
- */
-
-load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster
+import "jstests/multiVersion/libs/multi_cluster.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbName = jsTestName();

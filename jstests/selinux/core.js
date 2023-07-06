@@ -1,9 +1,7 @@
 
-'use strict';
+import {SelinuxBaseTest} from "jstests/selinux/lib/selinux_base_test.js";
 
-load('jstests/selinux/lib/selinux_base_test.js');
-
-class TestDefinition extends SelinuxBaseTest {
+export class TestDefinition extends SelinuxBaseTest {
     async run() {
         // On RHEL7 there is no python3, but check_has_tag.py will also work with python2
         const python = (0 == runNonMongoProgram("which", "python3")) ? "python3" : "python2";

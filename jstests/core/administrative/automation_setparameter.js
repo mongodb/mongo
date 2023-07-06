@@ -8,8 +8,6 @@
 // Tests that using setParameter to update the parameter 'automationServiceDescriptor' causes a
 // field with that name to be echoed back in hello. See SERVER-18399 for more details.
 
-(function() {
-
 // Run hello, and if it contains an automation service descriptor, save it, so we can restore
 // it later. If it wasn't set, original will just be undefined.
 var res = assert.commandWorked(db.runCommand({hello: 1}));
@@ -55,4 +53,3 @@ if (!original)
     original = "";
 assert.commandWorked(db.adminCommand({setParameter: 1, automationServiceDescriptor: original}));
 db.getMongo().promptPrefix = originalPrompt;
-}());

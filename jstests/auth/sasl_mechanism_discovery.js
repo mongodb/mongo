@@ -1,8 +1,5 @@
 // Tests that a client may discover a user's supported SASL mechanisms via hello.
 // @tags: [requires_sharding]
-(function() {
-"use strict";
-
 function runTest(conn) {
     const db = conn.getDB("admin");
     const externalDB = conn.getDB("$external");
@@ -87,4 +84,3 @@ var st = new ShardingTest({
 });
 runTest(st.s0);
 st.stop();
-})();

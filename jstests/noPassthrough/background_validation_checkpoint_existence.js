@@ -5,9 +5,6 @@
  *
  * @tags: [requires_fsync, requires_wiredtiger, requires_persistence]
  */
-(function() {
-'use strict';
-
 // To prevent the checkpoint thread from running during this test, change its frequency to the
 // largest possible value using the 'syncdelay' parameter.
 const kMaxSyncDelaySecs = 3600;
@@ -58,4 +55,3 @@ assert.eq(true, res.valid, res);
 assert.eq(2, res.nIndexes, res);
 
 MongoRunner.stopMongod(conn);
-}());

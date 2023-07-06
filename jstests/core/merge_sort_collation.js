@@ -6,9 +6,6 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  * ]
  */
-(function() {
-"use strict";
-
 const collNamePrefix = 'merge_sort_collation_';
 let collCount = 0;
 
@@ -474,4 +471,3 @@ const testCases = [
 ];
 
 testCases.forEach(executeQueryTestCase);
-}());

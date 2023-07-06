@@ -1,6 +1,6 @@
 // Utility functions for FTS tests
 //
-function queryIDS(coll, search, filter, extra, limit) {
+export function queryIDS(coll, search, filter, extra, limit) {
     var query = {"$text": {"$search": search}};
     if (extra)
         query = {"$text": Object.extend({"$search": search}, extra)};
@@ -20,7 +20,7 @@ function queryIDS(coll, search, filter, extra, limit) {
 }
 
 // Return an array of _ids from a cursor
-function getIDS(cursor) {
+export function getIDS(cursor) {
     if (!cursor)
         return [];
 

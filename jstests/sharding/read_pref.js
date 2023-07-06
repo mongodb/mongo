@@ -9,10 +9,7 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
-load("jstests/replsets/rslib.js");
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 var PRI_TAG = {dc: 'ny'};
 var SEC_TAGS = [{dc: 'sf', s: "1"}, {dc: 'ma', s: "2"}, {dc: 'eu', s: "3"}, {dc: 'jp', s: "4"}];
@@ -188,4 +185,3 @@ var doTest = function() {
 };
 
 doTest();
-})();

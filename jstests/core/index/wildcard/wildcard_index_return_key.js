@@ -5,10 +5,7 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/aggregation/extras/utils.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.wildcard_return_key;
 coll.drop();
@@ -59,4 +56,3 @@ assertArrayEq(coll.find({"c.d": 1}).returnKey().toArray(), [{"$_path": "c.d", "c
 // Path specified $** index return key with irrelevant query. We expect this query to be
 // answered with a COLLSCAN, in which case returnKey is expected to return empty objects.
 assertArrayEq(coll.find({a: 1, b: 1}).returnKey().toArray(), [{}]);
-})();

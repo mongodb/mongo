@@ -9,9 +9,6 @@
  * Test that projection with a positional operator works with findAndModify
  * when remove=true or new=false, but not when new=true.
  */
-(function() {
-'use strict';
-
 var collName = 'find_and_modify_server6865';
 var t = db.getCollection(collName);
 t.drop();
@@ -290,4 +287,3 @@ testFAMFailed(
         update: {$set: {name: 'james'}},
         new: true
     });
-})();

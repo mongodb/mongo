@@ -1,8 +1,6 @@
 // Tests multi-document transactions metrics in the serverStatus output.
 // @tags: [uses_transactions]
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");  // For configureFailPoint
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // Verifies that the server status response has the fields that we expect.
 function verifyServerStatusFields(serverStatusResponse) {
@@ -202,4 +200,3 @@ verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "cu
 // End the session and stop the replica set.
 session.endSession();
 rst.stopSet();
-}());

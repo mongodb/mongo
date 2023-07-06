@@ -4,9 +4,6 @@
 
 import {ShardedServerlessTest} from "jstests/serverless/libs/sharded_serverless_test.js";
 
-(function() {
-"use strict";
-
 let st = new ShardedServerlessTest();
 
 (() => {
@@ -19,4 +16,3 @@ let st = new ShardedServerlessTest();
 })();
 
 st.stop();
-})();

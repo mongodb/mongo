@@ -11,11 +11,8 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/index_build.js");
-load('jstests/replsets/libs/secondary_reads_test.js');
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {SecondaryReadsTest} from "jstests/replsets/libs/secondary_reads_test.js";
 
 const dbName = "drop_indexes_aborts_in_progress_index_builds_simple_name";
 
@@ -91,4 +88,3 @@ awaitDropIndex();
 assert.eq(1, testDB.getCollection(collName).getIndexes().length);
 
 secondaryReadsTest.stop();
-}());

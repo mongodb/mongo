@@ -5,10 +5,7 @@
  *  assumes_read_concern_unchanged
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For isReplSet() and isSharded().
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const baseColl = db["base"];
 baseColl.drop();
@@ -77,4 +74,3 @@ if (FixtureHelpers.isSharded(baseColl)) {
     assertFailsWithCode([{$unionWith: {coll: unionColl.getName(), pipeline: subPipe}}],
                         ErrorCodes.InvalidNamespace);
 }
-})();

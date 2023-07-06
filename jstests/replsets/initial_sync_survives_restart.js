@@ -4,10 +4,7 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
 const testName = "initial_sync_survives_restart";
 const rst = new ReplSetTest({name: testName, nodes: 1});
@@ -119,4 +116,3 @@ jsTestLog("Waiting for initial sync to complete.");
 // Wait for initial sync to complete.
 rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
 rst.stopSet();
-})();

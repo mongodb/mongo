@@ -1,9 +1,6 @@
 // In SERVER-22580, the $substrCP expression was introduced. In this file, we test the error cases
 // of this expression.
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
-
-(function() {
-"use strict";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.substrCP;
 coll.drop();
@@ -45,4 +42,3 @@ assertErrorCode(coll,
                 34454,
                 "$substrCP " +
                     "does not accept negative integers as inputs.");
-}());

@@ -6,9 +6,6 @@
  *   uses_change_streams,
  * ]
  */
-(function() {
-"use strict";
-
 const rsNodeOptions = {
     setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}
 };
@@ -118,4 +115,3 @@ st.stop();
 // Stop the new shards manually since the ShardingTest doesn't know anything about them.
 newShard1.stopSet();
 newShard2.stopSet();
-})();

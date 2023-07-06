@@ -2,10 +2,8 @@
  * Tests that the periods of the periodic jobs for refreshing query sampling configurations and
  * writing sampled queries and diffs are configurable in runtime.
  */
-(function() {
-"use strict";
 
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 const numNodesPerRS = 2;
 // The write concern to use when inserting documents into test collections. Waiting for the
@@ -125,4 +123,3 @@ const mongosSetParameterCmdObj = {
     testQuerySampling(rst.getPrimary(), {rst});
     rst.stopSet();
 }
-})();

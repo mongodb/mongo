@@ -1,9 +1,6 @@
 /**
  * Some more tests $and/$or being nested in various ways.
  */
-(function() {
-"use strict";
-
 const coll = db.jstests_and_or_index_sort;
 coll.drop();
 
@@ -136,4 +133,3 @@ runWithDifferentIndexes(
                              return obj;
                          }));
     });
-})();

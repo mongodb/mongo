@@ -5,8 +5,8 @@
  * ]
  */
 
-load("jstests/libs/load_ce_test_data.js");
 import {runHistogramsTest} from "jstests/libs/ce_stats_utils.js";
+import {loadJSONDataset} from "jstests/libs/load_ce_test_data.js";
 
 const dbName = 'ce_accuracy_test';
 const dataDir = 'jstests/query_golden/libs/data/';
@@ -14,12 +14,12 @@ const testDB = db.getSiblingDB(dbName);
 
 // The schema script creates a global variable dbMetadata that holds a description of all
 // collections.
-load(`${dataDir}${dbName}.schema`);
+const {dbMetadata} = await import(`${dataDir}${dbName}.schema`);
 print(`Metadata: ${tojson(dbMetadata)}\n`);
 
 // This load command will create a variable named 'chunkNames' that contains the names of
 // all chunks that must be loaded.
-load(`${dataDir}${dbName}.data`);
+const {chunkNames} = await import(`${dataDir}${dbName}.data`);
 
 runHistogramsTest(function() {
     loadJSONDataset(testDB, chunkNames, dataDir, dbMetadata);

@@ -8,9 +8,6 @@
  *    requires_scripting,
  * ]
  */
-(function() {
-"use strict";
-
 // Given the output from the listDatabases command, ensures that the total size reported is the
 // sum of the individual db sizes.
 function verifySizeSum(listDatabasesOut) {
@@ -99,4 +96,3 @@ assert.commandFailed(db.adminCommand({
     listDatabases: 1,
     filter: {a: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}}
 }));
-}());

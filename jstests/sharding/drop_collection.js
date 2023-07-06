@@ -2,12 +2,8 @@
  * Basic test from the drop collection command on a sharded cluster that verifies collections are
  * cleaned up properly.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var st = new ShardingTest({shards: 2});
 
@@ -411,4 +407,3 @@ jsTest.log("Test that dropping a sharded collection, the range deletion document
 }
 
 st.stop();
-})();

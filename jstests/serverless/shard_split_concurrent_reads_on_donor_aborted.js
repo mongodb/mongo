@@ -14,16 +14,16 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {
     assertMigrationState,
     findSplitOperation,
     ShardSplitTest
 } from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/serverless/shard_split_concurrent_reads_on_donor_util.js");
+import {
+    runCommandForConcurrentReadTest,
+    shardSplitConcurrentReadTestCases
+} from "jstests/serverless/shard_split_concurrent_reads_on_donor_util.js";
 
 const kCollName = "testColl";
 

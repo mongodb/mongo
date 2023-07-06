@@ -3,9 +3,6 @@
  * TransientTransactionErrors.
  * @tags: [requires_capped, uses_transactions]
  */
-(function() {
-"use strict";
-
 const dbName = "test";
 const testDB = db.getSiblingDB(dbName);
 const testCollName = "transactions_write_errors";
@@ -187,4 +184,3 @@ runInTxn({
     nExpected: 0,
     expectedErrorIndex: 0
 });
-}());

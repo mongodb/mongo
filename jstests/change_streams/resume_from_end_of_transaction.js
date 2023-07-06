@@ -11,11 +11,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/auto_retry_transaction_in_sharding.js");  // For withTxnAndAutoRetryOnMongos.
-load("jstests/libs/collection_drop_recreate.js");            // For assert[Drop|Create]Collection.
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const coll = assertDropAndRecreateCollection(db, "change_stream_resume_from_end_of_transaction");
 const changeStreamIterator = coll.watch([], {showExpandedEvents: true});
@@ -63,4 +60,3 @@ for (let i = 0; i + 1 < events.length; i += 1) {
 }
 
 changeStreamIterator.close();
-}());

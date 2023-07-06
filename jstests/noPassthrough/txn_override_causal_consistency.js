@@ -4,9 +4,6 @@
  *
  * @tags: [requires_replication, uses_transactions]
  */
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "foo";
 
@@ -132,7 +129,7 @@ TestData.networkErrorAndTxnOverrideConfig = {
     wrapCRUDinTransactions: true,
     retryOnNetworkErrors: true
 };
-load("jstests/libs/override_methods/network_error_and_txn_override.js");
+await import("jstests/libs/override_methods/network_error_and_txn_override.js");
 
 TestData.logRetryAttempts = true;
 
@@ -207,4 +204,3 @@ runTest();
 delete TestData.enableMajorityReadConcern;
 
 rst.stopSet();
-})();

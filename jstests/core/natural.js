@@ -1,7 +1,4 @@
 // Tests for $natural sort and $natural hint.
-(function() {
-'use strict';
-
 var results;
 
 var coll = db.jstests_natural;
@@ -40,4 +37,3 @@ assert.throws(() => coll.find().hint({a: 1, $natural: 1, b: 1}).itcount());
 assert.throws(() => coll.find().sort({a: 1, $natural: 1}).itcount());
 assert.throws(() => coll.find().sort({$natural: 1, b: 1}).itcount());
 assert.throws(() => coll.find().sort({a: 1, $natural: 1, b: 1}).itcount());
-})();

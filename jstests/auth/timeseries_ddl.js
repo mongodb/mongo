@@ -6,17 +6,11 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const dbName = jsTest.name() + "_db";
 const normalCollName = "normalColl";
 const timeseriesCollName = "timeseriesColl";
 const bucketCollName = "system.buckets." + timeseriesCollName;
 const pass = "password";
-const skeyPattern = {
-    k: 1
-};
 
 const st = new ShardingTest({keyFile: "jstests/libs/key1", other: {shardOptions: {auth: ""}}});
 
@@ -63,4 +57,3 @@ function createCollectionsAsRegularUser() {
 }
 
 st.stop();
-}());

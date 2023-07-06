@@ -1,7 +1,4 @@
 // This test was designed to reproduce a memory leak that was fixed by SERVER-35455.
-(function() {
-"use strict";
-
 const coll = db.contained_or_with_nested_or;
 coll.drop();
 assert.commandWorked(coll.insert([
@@ -38,4 +35,3 @@ const results = coll.find({
 // restricting the plans the query planner can consider.
 const matchingIds = results.map(result => result._id);
 assert.setEq(new Set([7, 8, 9, 10]), new Set(matchingIds), tojson(results));
-}());

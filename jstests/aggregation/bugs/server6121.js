@@ -13,9 +13,6 @@
  * 4) Run an aggregation comparing two timestamps to show inc matters
  */
 
-// load test utilities
-load('jstests/aggregation/extras/utils.js');
-
 // Clear db
 db.s6121.drop();
 // Populate db
@@ -48,7 +45,7 @@ db.s6121.drop();
 db.s6121.save({time: new Timestamp(0, 1234), date: new Date(1234)});
 db.s6121.save({time: new Timestamp(1, 1234), date: new Date(1234)});
 printjson(db.s6121.find().toArray());
-var s6121 = db.s6121.aggregate({
+s6121 = db.s6121.aggregate({
     $project: {
         _id: 0,
         // comparison is different code path based on order (same as in bson)
@@ -61,7 +58,7 @@ assert.eq(s6121.toArray(), [{ts_date: false, date_ts: false}, {ts_date: false, d
 // Clear db for timestamp comparison tests
 db.s6121.drop();
 db.s6121.save({time: new Timestamp(1341337661, 1), time2: new Timestamp(1341337661, 2)});
-var s6121 = db.s6121.aggregate({
+s6121 = db.s6121.aggregate({
     $project: {
         _id: 0,
         cmp: {$cmp: ['$time', '$time2']},

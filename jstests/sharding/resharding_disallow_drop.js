@@ -5,10 +5,7 @@
  *  featureFlagRecoverableShardsvrReshardCollectionCoordinator,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 var st = new ShardingTest({
     shards: {rs0: {nodes: 2}},
@@ -59,4 +56,3 @@ assert.commandWorked(db.adminCommand({reshardCollection: ns, key: {newKey: 1}}))
 assert.commandWorked(db.runCommand({drop: collName}));
 
 st.stop();
-})();

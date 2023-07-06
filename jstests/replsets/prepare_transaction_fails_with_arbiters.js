@@ -5,9 +5,6 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-
 const name = "prepare_transaction_fails_with_arbiters";
 const rst = new ReplSetTest({name: name, nodes: 2});
 const nodes = rst.nodeList();
@@ -37,4 +34,3 @@ assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1}),
                              ErrorCodes.ReadConcernMajorityNotEnabled);
 
 rst.stopSet();
-})();

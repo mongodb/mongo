@@ -1,7 +1,4 @@
-(function() {
-'use strict';
-
-load("jstests/libs/log.js");  // For findMatchingLogLine.
+import {findMatchingLogLine} from "jstests/libs/log.js";
 
 const mongo = MongoRunner.runMongod({auth: "", keyFile: "jstests/libs/key1"});
 const admin = mongo.getDB("admin");
@@ -27,4 +24,3 @@ assert(
     "Did not find log line concerning \"Different user name was supplied to saslSupportedMechs\" when we expected to.");
 
 MongoRunner.stopMongod(mongo);
-})();

@@ -11,8 +11,8 @@
  * ]
  */
 
-load('jstests/libs/index_catalog_helpers.js');
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();

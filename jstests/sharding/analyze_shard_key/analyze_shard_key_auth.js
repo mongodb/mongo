@@ -4,10 +4,6 @@
  * @tags: [requires_fcv_70]
  */
 
-(function() {
-
-'use strict';
-
 function runTest(conn) {
     const dbName = "testDb";
     const collName0 = "testColl0";
@@ -112,4 +108,3 @@ function runTest(conn) {
 
     rst.stopSet();
 }
-})();

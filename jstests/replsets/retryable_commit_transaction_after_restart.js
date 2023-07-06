@@ -1,9 +1,6 @@
 // Test committed transaction state is restored after restart.
 // @tags: [uses_transactions, requires_persistence]
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
+import {reconnect} from "jstests/replsets/rslib.js";
 
 const dbName = "test";
 const collName = "retryable_commit_transaction_after_restart";
@@ -94,4 +91,3 @@ assert.commandFailedWithCode(sessionDb.runCommand({
 
 session.endSession();
 rst.stopSet();
-}());

@@ -4,7 +4,7 @@ if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wired
 
     var m = MongoRunner.runMongod(
         {dbpath: dbpath, wiredTigerDirectoryForIndexes: '', directoryperdb: ''});
-    db = m.getDB("foo");
+    const db = m.getDB("foo");
     db.bar.insert({x: 1});
     assert.eq(1, db.bar.count());
 

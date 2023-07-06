@@ -4,9 +4,6 @@
  *
  * Originally intended to reproduce SERVER-71387.
  */
-(function() {
-"use strict";
-
 const coll = db.set_window_fields_range_wrong_type;
 coll.drop();
 assert.commandWorked(coll.insert([
@@ -33,4 +30,3 @@ const err = assert.throws(() => {
         .toArray();
 });
 assert.eq(err.code, 5429414, err);
-})();

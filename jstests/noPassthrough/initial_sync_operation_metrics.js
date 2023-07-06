@@ -8,9 +8,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const assertMetricsExist = function(metrics) {
     try {
         assert.neq(metrics, undefined);
@@ -95,4 +92,3 @@ replSet.awaitReplication();
 }
 
 replSet.stopSet();
-})();

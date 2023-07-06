@@ -1,9 +1,6 @@
 /**
  * Verifies that we disallow renaming collections to system collections and vice-versa.
  */
-(function() {
-"use strict";
-
 const dbName = "cannot_rename_collection_to_system_collection";
 
 const testDB = db.getSiblingDB(dbName);
@@ -21,4 +18,3 @@ assert.commandFailedWithCode(testDB.getCollection("a").renameCollection("system.
 assert.commandFailedWithCode(
     db.getSiblingDB("admin").getCollection("system.version").renameCollection("a"),
     ErrorCodes.IllegalOperation);
-}());

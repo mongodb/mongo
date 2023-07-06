@@ -7,9 +7,6 @@
  *  references_foreign_collection
  * ]
  */
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB("aggregation_accepts_write_concern");
 assert.commandWorked(testDB.dropDatabase());
 const collName = "test";
@@ -32,4 +29,3 @@ assert.commandWorked(testDB.runCommand({
     cursor: {},
     writeConcern: {w: "majority"}
 }));
-})();

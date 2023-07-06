@@ -2,11 +2,8 @@
  *  Tests that migrations work correctly across shards with mixed FCV state.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -244,4 +241,3 @@ testMigrateFromLastLTSToLastLTS();
 testMigrateFromLatestToLastLTS();
 testMigrateFromLastLTSToLatest();
 testSetFCVDoesNotBlockWhileMigratingChunk();
-})();

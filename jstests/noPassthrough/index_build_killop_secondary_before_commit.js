@@ -8,7 +8,8 @@
  *   requires_replication,
  * ]
  */
-load('jstests/noPassthrough/libs/index_build.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 TestData.skipEnforceFastCountOnValidate = true;
 

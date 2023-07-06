@@ -1,9 +1,6 @@
 // SERVER-75670 Incorrect projection pushdown caused by dependency analysis for multiple $project
 // stages on the same dotted path.
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');  // For resultsEq.
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);
@@ -27,4 +24,3 @@ assert(resultsEq(
         ])
         .toArray(),
     ));
-})();

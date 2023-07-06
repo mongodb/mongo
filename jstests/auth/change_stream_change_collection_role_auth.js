@@ -10,9 +10,6 @@
  *   __TEMPORARILY_DISABLED__,
  * ]
  */
-(function() {
-'use strict';
-
 const password = "password";
 const keyFile = "jstests/libs/key1";
 
@@ -221,4 +218,3 @@ for (const userName of Object.keys(users)) {
 }
 
 replSetTest.stopSet();
-})();

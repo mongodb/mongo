@@ -2,10 +2,10 @@
  * Specifies for each command whether it is expected to send a databaseVersion, and verifies that
  * the commands match the specification.
  */
-(function() {
-'use strict';
-
-load('jstests/sharding/libs/last_lts_mongos_commands.js');
+import {
+    commandsAddedToMongosSinceLastLTS,
+    commandsRemovedFromMongosSinceLastLTS
+} from "jstests/sharding/libs/last_lts_mongos_commands.js";
 
 function getNewDbName(dbName) {
     if (!getNewDbName.counter) {
@@ -925,4 +925,3 @@ for (let command of Object.keys(listCommandsRes.commands)) {
 })();
 
 st.stop();
-})();

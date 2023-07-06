@@ -1,5 +1,3 @@
-load("jstests/libs/parallelTester.js");
-
 /**
  * @tags: [requires_replication, requires_sharding]
  *
@@ -7,9 +5,6 @@ load("jstests/libs/parallelTester.js");
  * pid when they connect as a client to a mongod.
  *
  */
-
-(function() {
-"use strict";
 
 const rsMin = 10;
 const rsMax = 20;
@@ -48,4 +43,3 @@ let hits = log.map(line => JSON.parse(line))
 assert(hits.length > 0);
 
 st.stop();
-})();

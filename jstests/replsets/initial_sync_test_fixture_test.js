@@ -15,11 +15,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/replsets/libs/initial_sync_test.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {InitialSyncTest} from "jstests/replsets/libs/initial_sync_test.js";
 
 /**
  * Helper function to check that specific messages appeared or did not appear in the logs.
@@ -282,4 +279,3 @@ try {
     initialSyncTest.fail();
     throw errorDuringTest;
 }
-})();

@@ -11,11 +11,12 @@
  * 7.  Try to create a new connection to the shut down primary and expect an error
  *
  */
-(function() {
-"use strict";
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries
+} from "jstests/libs/write_concern_util.js";
 
-load("jstests/libs/write_concern_util.js");  // for stopReplicationOnSecondaries,
-                                             // restartReplicationOnSecondaries
+// restartReplicationOnSecondaries
 var name = "shutdown_primary";
 
 var replTest = new ReplSetTest({name: name, nodes: 3});
@@ -64,4 +65,3 @@ assert.soonNoExcept(function() {
 }, "expected primary node to shut down and not be connectable");
 
 replTest.stopSet();
-})();

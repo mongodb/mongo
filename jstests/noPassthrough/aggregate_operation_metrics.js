@@ -5,10 +5,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/os_helpers.js");  // For isLinux().
+import {isLinux} from "jstests/libs/os_helpers.js";
 
 var rst = new ReplSetTest({
     nodes: 2,
@@ -252,4 +249,3 @@ const secondary = rst.getSecondary();
 });
 
 rst.stopSet();
-}());

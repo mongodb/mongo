@@ -8,7 +8,10 @@
  *  ]
  */
 
-load("jstests/concurrency/fsm_workload_helpers/state_transition_utils.js");
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {
+    uniformDistTransitions
+} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbPrefix = jsTestName() + '_DB_';

@@ -6,9 +6,6 @@
  *   assumes_unsharded_collection,
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.find_and_modify_invalid_inputs;
 coll.drop();
 coll.insert({_id: 0});
@@ -138,4 +135,3 @@ assertWorked({
     remove: 0
 },
              "usedHint");
-})();

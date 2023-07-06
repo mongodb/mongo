@@ -12,7 +12,7 @@ import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 // implicit session of the cursor establishing command.
 TestData.disableImplicitSessions = true;
 
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Set up a 2-shard cluster. Configure 'internalQueryExecYieldIterations' on both shards such
 // that operations will yield on each PlanExecuter iteration.

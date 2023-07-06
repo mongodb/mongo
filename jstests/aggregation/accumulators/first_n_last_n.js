@@ -1,11 +1,6 @@
-/**
- * Basic tests for the $firstN/$lastN accumulators.
- */
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
-load("jstests/aggregation/extras/utils.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -323,4 +318,3 @@ assert.commandFailedWithCode(
         "aggregate",
         {pipeline: [{$group: {_id: {'st': '$state'}, sales: {$firstN: {n: 2}}}}], cursor: {}}),
     5787907);
-})();

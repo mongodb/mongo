@@ -6,13 +6,14 @@
 //  uses_multi_shard_transaction,
 //  assumes_balancer_off
 // ]
-(function() {
-"use strict";
+import "jstests/multiVersion/libs/verify_versions.js";
 
-load("jstests/libs/fail_point_util.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
-load("jstests/multiVersion/libs/verify_versions.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {
+    assertNoSuchTransactionOnAllShards,
+    disableStaleVersionAndSnapshotRetriesWithinTransactions,
+    enableStaleVersionAndSnapshotRetriesWithinTransactions,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 function expectChunks(st, ns, chunks) {
     for (let i = 0; i < chunks.length; i++) {
@@ -262,4 +263,3 @@ assert.commandWorked(st.rs0.getPrimary().adminCommand(
 disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 st.stop();
-})();

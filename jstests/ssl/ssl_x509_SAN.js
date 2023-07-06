@@ -1,8 +1,3 @@
-load('jstests/ssl/libs/ssl_helpers.js');
-
-(function() {
-"use strict";
-
 const SERVER1_CERT = "jstests/libs/server_SAN.pem";
 const SERVER2_CERT = "jstests/libs/server_SAN2.pem";
 const CA_CERT = "jstests/libs/ca.pem";
@@ -72,4 +67,3 @@ print("1. Test parsing different values in SAN DNS and IP fields. ");
 authAndTest({sslPEMKeyFile: SERVER1_CERT});
 print("2. Test parsing IP Addresses in SAN DNS fields. ");
 authAndTest({sslPEMKeyFile: SERVER2_CERT});
-}());

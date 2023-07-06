@@ -6,8 +6,6 @@
  *   not_allowed_with_security_token,requires_persistence, uses_transactions]
  */
 
-(function() {
-"use strict";
 const dbName = "test";
 const collName = "no_read_concern_snapshot_outside_txn";
 const testDB = db.getSiblingDB(dbName);
@@ -64,4 +62,3 @@ tryCommands({testDB: sessionDb, message: "in session."});
 tryCommands({testDB: testDB, message: "outside session."});
 
 session.endSession();
-}());

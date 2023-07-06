@@ -18,9 +18,6 @@ const timeField = 'time';
 const metaField = 'hostid';
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
-const sDB = st.s.getDB(dbName);
-const shard0DB = st.shard0.getDB(dbName);
-const shard1DB = st.shard1.getDB(dbName);
 
 // Helpers.
 let currentId = 0;

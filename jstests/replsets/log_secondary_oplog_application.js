@@ -5,11 +5,8 @@
  * issuing them. See below for details on how we simulate quickness and slowness.
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
 let name = "log_secondary_oplog_application";
 let rst = ReplSetTest({name: name, nodes: 2});
@@ -138,4 +135,3 @@ rst.awaitReplication();
 checkLog.contains(secondary, "snail");
 
 rst.stopSet();
-})();

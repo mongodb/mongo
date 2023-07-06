@@ -4,10 +4,6 @@
  *
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-
 // Declare constants.
 const DB_NAME = "db_large_txn_correctness";
 const COLL_NAME = "db_large_txn_correctness";
@@ -52,4 +48,3 @@ try {
     session.endSession();
     replSet.stopSet();
 }
-})();

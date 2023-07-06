@@ -2,7 +2,7 @@
  * Fixture to test rollback permutations with index builds.
  */
 
-load("jstests/noPassthrough/libs/index_build.js");  // for IndexBuildTest
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 export class RollbackIndexBuildsTest {
@@ -79,10 +79,11 @@ export class RollbackIndexBuildsTest {
                         assert.commandWorked(primary.adminCommand(
                             {configureFailPoint: 'disableSnapshotting', mode: 'alwaysOn'}));
                         break;
-                    case "transitionToRollback":
+                    case "transitionToRollback": {
                         const curPrimary = self.rollbackTest.transitionToRollbackOperations();
                         assert.eq(curPrimary, primary);
                         break;
+                    }
                     case "transitionToSteadyState":
                         self.rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 
@@ -123,12 +124,13 @@ export class RollbackIndexBuildsTest {
                         IndexBuildTest.resumeIndexBuilds(primary);
                         IndexBuildTest.waitForIndexBuildToStop(primaryDB, collName, "a_1");
                         break;
-                    case "abort":
+                    case "abort": {
                         const opId = IndexBuildTest.getIndexBuildOpId(primaryDB, collName, "a_1");
                         assert.commandWorked(primaryDB.killOp(opId));
                         IndexBuildTest.resumeIndexBuilds(primary);
                         IndexBuildTest.waitForIndexBuildToStop(primaryDB, collName, "a_1");
                         break;
+                    }
                     case "drop":
                         collection.dropIndexes(indexSpec);
                         break;

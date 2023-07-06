@@ -5,11 +5,8 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // Start one of the nodes with priority: 0 to avoid elections.
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
@@ -109,4 +106,3 @@ assert.commandWorked(sessionDB.adminCommand({
 }));
 
 rst.stopSet();
-})();

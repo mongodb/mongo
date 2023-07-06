@@ -4,9 +4,6 @@
  * @tags: [multiversion_incompatible]
  */
 
-(function() {
-"use strict";
-
 {
     const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
     const mongodConns = [];
@@ -129,7 +126,7 @@
     assert.commandWorked(testColl.updateMany({}, {$set: {array: 'string', doc: 'string'}}));
 
     // batch update: 2 more, so 5 updates in total
-    var request = {
+    let request = {
         update: testColl.getName(),
         updates: [{q: {}, u: {$set: {c: 3}}, multi: true}, {q: {}, u: {$set: {a: 5}}, multi: true}],
         writeConcern: {w: 1},
@@ -160,4 +157,3 @@
 
     rst.stopSet();
 }
-})();

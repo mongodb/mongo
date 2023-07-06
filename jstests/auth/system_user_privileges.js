@@ -10,10 +10,6 @@
  * __system@test and __system@admin users are _not_ shadowed in any way by the keyfile user.
  */
 
-(function() {
-
-"use strict";
-
 // Runs the "count" command on a database in a way that returns the result document, for easier
 // inspection of the errmsg.
 function runCountCommand(conn, dbName, collectionName) {
@@ -99,4 +95,3 @@ assertCountUnauthorized(conn, "local", "foo");
 assertCountUnauthorized(conn, "test", "foo");
 
 MongoRunner.stopMongod(conn, null, {user: 'admin', pwd: 'a'});
-})();

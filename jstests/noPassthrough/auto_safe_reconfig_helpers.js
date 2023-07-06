@@ -5,10 +5,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
+import {assertSameConfigContent, reconfig, waitAllNodesHaveConfig} from "jstests/replsets/rslib.js";
 
 // Make secondaries unelectable.
 const replTest =
@@ -189,4 +186,3 @@ reconfig(replTest, origConfig);
 // nodes may fail to answer certain commands and fail the test.
 waitAllNodesHaveConfig(replTest, config);
 replTest.stopSet();
-})();

@@ -3,9 +3,6 @@
  * and that regular startup without --repair fails if the FCV document is missing.
  */
 
-(function() {
-"use strict";
-
 let dbpath = MongoRunner.dataPath + "feature_compatibility_version";
 resetDbpath(dbpath);
 let connection;
@@ -81,4 +78,3 @@ MongoRunner.stopMongod(connection);
 
 returnCode = runMongoProgram("mongod", "--port", connection.port, "--repair", "--dbpath", dbpath);
 assert.eq(returnCode, 0);
-})();

@@ -5,9 +5,6 @@
  *
  * @tags: [requires_majority_read_concern]
  */
-(function() {
-"use strict";
-
 function printStatus() {
     var primaryStatus;
     replTest.nodes.forEach((n) => {
@@ -132,4 +129,3 @@ log(replTest.status());
 assert.eq(doCommittedRead(op2), 2);
 log("test success!");
 replTest.stopSet();
-}());

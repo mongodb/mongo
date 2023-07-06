@@ -3,11 +3,7 @@
  * are only legal in sharded clusters (e.g., the two phase commit commands).
  * @tags: [uses_transactions]
  */
-(function() {
-"use strict";
-
 const dbName = "test";
-const collName = "foo";
 
 const txnNumber = 0;
 const lsid = {
@@ -63,4 +59,3 @@ standaloneReplSet.startSet();
 standaloneReplSet.initiate();
 checkCoordinatorCommandsRejected(standaloneReplSet.getPrimary(), ErrorCodes.NoShardingEnabled);
 standaloneReplSet.stopSet();
-})();

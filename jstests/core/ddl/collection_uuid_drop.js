@@ -7,9 +7,6 @@
  *   requires_non_retryable_commands,
  * ]
  */
-(function() {
-'use strict';
-
 const testDB = db.getSiblingDB(jsTestName());
 const coll = testDB["coll"];
 assert.commandWorked(testDB.dropDatabase());
@@ -90,4 +87,3 @@ assert.eq(res.actualCollection, coll.getName());
 
 // The command succeeds when the correct UUID is provided.
 assert.commandWorked(testDB.runCommand({drop: coll.getName(), collectionUUID: uuid}));
-})();

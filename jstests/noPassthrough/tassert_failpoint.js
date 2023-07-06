@@ -1,9 +1,6 @@
 /**
  * Configures the failCommand failpoint to test the firing of a tripwire assertion (tassert).
  */
-(function() {
-'use strict';
-
 let conn, testDB, adminDB;
 
 const mongoRunnerSetupHelper = () => {
@@ -161,4 +158,3 @@ assert.commandWorked(adminDB.runCommand({
 assert.commandWorked(testDB.runCommand({ping: 1}));
 
 mongoRunnerExitHelper(MongoRunner.EXIT_CLEAN);
-})();

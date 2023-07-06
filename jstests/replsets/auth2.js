@@ -8,7 +8,6 @@
 // it has been signed with a dummy key results in an authorization error.
 TestData.skipGossipingClusterTime = true;
 
-(function() {
 var testInvalidAuthStates = function(replSetTest) {
     jsTestLog("check that 0 is in recovering");
     replSetTest.waitForState(replSetTest.nodes[0], ReplSetTest.State.RECOVERING);
@@ -76,4 +75,3 @@ replSetTest.nodes[2].getDB("admin").auth("foo", "bar");
 testInvalidAuthStates(replSetTest);
 
 replSetTest.stopSet();
-}());

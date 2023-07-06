@@ -4,11 +4,6 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
-
 const st = new ShardingTest({shards: 2, mongos: 1});
 const testName = "sharded_lookup_in_txn";
 
@@ -57,4 +52,3 @@ assertFailsInTransaction([{
 28769);
 
 st.stop();
-}());

@@ -12,10 +12,9 @@
  * ]
  */
 
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
-load("jstests/libs/uuid_util.js");
-load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
 
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), allowStaleReadsOnDonor: false});

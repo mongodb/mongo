@@ -1,8 +1,5 @@
 // Test that 'notablescan' parameter does not affect queries internal namespaces.
 // @tags: [uses_transactions]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "coll";
 
@@ -68,4 +65,3 @@ ReplSet.prototype.getConn = function() {
 };
 
 [ReplSet, Sharding].forEach(runTests);
-}());

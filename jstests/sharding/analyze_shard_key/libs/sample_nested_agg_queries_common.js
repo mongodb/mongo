@@ -3,6 +3,7 @@
  * $lookup, $graphLookup, $unionWith) on a sharded cluster.
  */
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
 // period of 1 second to speed up the test.
@@ -10,50 +11,47 @@ export const queryAnalysisSamplerConfigurationRefreshSecs = 1;
 
 export const queryAnalysisWriterIntervalSecs = 1;
 
-export const outerAggTestCases = [
-    // The test cases for singly-nested aggregate queries.
-    {
-        name: "lookup_custom_pipeline",
-        supportCustomPipeline: true,
-        makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
-            return [{$lookup: {from: foreignCollName, as: "joined", pipeline}}];
+export const outerAggTestCases =
+    [
+        // The test cases for singly-nested aggregate queries.
+        {
+            name: "lookup_custom_pipeline",
+            supportCustomPipeline: true,
+            makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
+                return [{$lookup: {from: foreignCollName, as: "joined", pipeline}}];
+            },
+            requireShardToRouteFunc: (db, collName, isShardedColl) => true
         },
-        requireShardToRouteFunc: (db, collName, isShardedColl) => true
-    },
-    {
-        name: "lookup_non_custom_pipeline",
-        supportCustomPipeline: false,
-        makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
-            return [
+        {
+            name: "lookup_non_custom_pipeline",
+            supportCustomPipeline: false,
+            makeOuterPipelineFunc:
+                (localCollName, foreignCollName, pipeline) => {
+                    return [
                 {$lookup: {from: foreignCollName, as: "joined", localField: "a", foreignField: "x"}}
             ];
+                },
+            requireShardToRouteFunc: (db, collName, isShardedColl) => {
+                // When SBE is used, the shard will not create a separate pipeline to execute the
+                // inner side of a $lookup stage so there is no nested aggregate query to route,
+                // because SBE does $lookup pushdown whereas Classic does not.
+                const isEligibleForSBELookupPushdown = !isShardedColl && checkSBEEnabled(db);
+                return !isEligibleForSBELookupPushdown;
+            }
         },
-        requireShardToRouteFunc: (db, collName, isShardedColl) => {
-            const listCollectionRes =
-                assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
-            const isClusteredColl =
-                listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
-
-            // When SBE is used, the shard will not create a separate pipeline to execute the inner
-            // side of a $lookup stage so there is no nested aggregate query to route, because SBE
-            // does $lookup pushdown whereas Classic does not.
-            const isEligibleForSBELookupPushdown = !isShardedColl && checkSBEEnabled(db);
-            return !isEligibleForSBELookupPushdown;
-        }
-    },
-    {
-        name: "unionWith",
-        supportCustomPipeline: true,
-        makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
-            return [{$unionWith: {coll: foreignCollName, pipeline}}];
+        {
+            name: "unionWith",
+            supportCustomPipeline: true,
+            makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
+                return [{$unionWith: {coll: foreignCollName, pipeline}}];
+            },
+            requireShardToRouteFunc: (db, collName, isShardedColl) => true
         },
-        requireShardToRouteFunc: (db, collName, isShardedColl) => true
-    },
-    {
-        name: "graphLookup",
-        supportCustomPipeline: false,
-        makeOuterPipelineFunc: (localCollName, foreignCollName) => {
-            return [{
+        {
+            name: "graphLookup",
+            supportCustomPipeline: false,
+            makeOuterPipelineFunc: (localCollName, foreignCollName) => {
+                return [{
                     $graphLookup: {
                         from: foreignCollName,
                         startWith: "$x",
@@ -63,15 +61,15 @@ export const outerAggTestCases = [
                         as: "connected"
                     }
                 }];
+            },
+            requireShardToRouteFunc: (db, collName, isShardedColl) => true
         },
-        requireShardToRouteFunc: (db, collName, isShardedColl) => true
-    },
-    // The test cases for doubly-nested aggregate queries.
-    {
-        name: "lookup+lookup",
-        supportCustomPipeline: true,
-        makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
-            return [{
+        // The test cases for doubly-nested aggregate queries.
+        {
+            name: "lookup+lookup",
+            supportCustomPipeline: true,
+            makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
+                return [{
                     $lookup: {
                         from: localCollName,
                         as: "joined",
@@ -84,14 +82,14 @@ export const outerAggTestCases = [
                         }]
                     }
                 }];
+            },
+            requireShardToRouteFunc: (db, collName, isShardedColl) => true
         },
-        requireShardToRouteFunc: (db, collName, isShardedColl) => true
-    },
-    {
-        name: "lookup+unionWith",
-        supportCustomPipeline: true,
-        makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
-            return [{
+        {
+            name: "lookup+unionWith",
+            supportCustomPipeline: true,
+            makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
+                return [{
                     $lookup: {
                         from: localCollName,
                         as: "joined",
@@ -103,14 +101,14 @@ export const outerAggTestCases = [
                         }]
                     }
                 }];
+            },
+            requireShardToRouteFunc: (db, collName, isShardedColl) => true
         },
-        requireShardToRouteFunc: (db, collName, isShardedColl) => true
-    },
-    {
-        name: "lookup+graphLookUp",
-        supportCustomPipeline: false,
-        makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
-            return [{
+        {
+            name: "lookup+graphLookUp",
+            supportCustomPipeline: false,
+            makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
+                return [{
                     $lookup: {
                         from: localCollName,
                         as: "joined",
@@ -126,40 +124,40 @@ export const outerAggTestCases = [
                         }]
                     }
                 }];
+            },
+            requireShardToRouteFunc: (db, collName, isShardedColl) => true
         },
-        requireShardToRouteFunc: (db, collName, isShardedColl) => true
-    },
-    {
-        name: "unionWith+lookup",
-        supportCustomPipeline: true,
-        makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
-            return [{
-                $unionWith: {
-                    coll: localCollName,
-                    pipeline: [{$lookup: {from: foreignCollName, as: "joined", pipeline}}]
-                }
-            }];
+        {
+            name: "unionWith+lookup",
+            supportCustomPipeline: true,
+            makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
+                return [{
+                    $unionWith: {
+                        coll: localCollName,
+                        pipeline: [{$lookup: {from: foreignCollName, as: "joined", pipeline}}]
+                    }
+                }];
+            },
+            requireShardToRouteFunc: (db, collName, isShardedColl) => true
         },
-        requireShardToRouteFunc: (db, collName, isShardedColl) => true
-    },
-    {
-        name: "unionWith+unionWith",
-        supportCustomPipeline: true,
-        makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
-            return [{
-                $unionWith: {
-                    coll: localCollName,
-                    pipeline: [{$unionWith: {coll: foreignCollName, pipeline}}]
-                }
-            }];
+        {
+            name: "unionWith+unionWith",
+            supportCustomPipeline: true,
+            makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
+                return [{
+                    $unionWith: {
+                        coll: localCollName,
+                        pipeline: [{$unionWith: {coll: foreignCollName, pipeline}}]
+                    }
+                }];
+            },
+            requireShardToRouteFunc: (db, collName, isShardedColl) => true
         },
-        requireShardToRouteFunc: (db, collName, isShardedColl) => true
-    },
-    {
-        name: "unionWith+graphLookup",
-        supportCustomPipeline: false,
-        makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
-            return [{
+        {
+            name: "unionWith+graphLookup",
+            supportCustomPipeline: false,
+            makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
+                return [{
                     $unionWith: {
                         coll: localCollName,
                         pipeline: [{
@@ -174,18 +172,18 @@ export const outerAggTestCases = [
                         }]
                     }
                 }];
+            },
+            requireShardToRouteFunc: (db, collName, isShardedColl) => true,
         },
-        requireShardToRouteFunc: (db, collName, isShardedColl) => true,
-    },
-    {
-        name: "facet",
-        supportCustomPipeline: false,
-        makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
-            return [{$facet: {foo: [{$match: {}}]}}];
-        },
-        requireShardToRouteFunc: (db, collName, isShardedColl) => false,
-    }
-];
+        {
+            name: "facet",
+            supportCustomPipeline: false,
+            makeOuterPipelineFunc: (localCollName, foreignCollName, pipeline) => {
+                return [{$facet: {foo: [{$match: {}}]}}];
+            },
+            requireShardToRouteFunc: (db, collName, isShardedColl) => false,
+        }
+    ];
 
 export const innerAggTestCases = [
     {

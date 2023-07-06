@@ -6,9 +6,6 @@
 //   requires_non_retryable_commands,
 // ]
 
-(function() {
-'use strict';
-
 // Setup some sample roles.
 const dbname = db.getName();
 const fqReadRoleName = {
@@ -108,4 +105,3 @@ checkForBuiltinRole(multiRoles, fqReadRoleName);
 checkForBuiltinRole(multiRoles, {db: dbname, role: 'readWrite'});
 
 assert.commandWorked(db.runCommand({dropRole: 'testRoleJSCoreRolesInfo'}));
-})();

@@ -6,7 +6,7 @@
  * ]
  */
 
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");
+import {testNumericServerParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 // Valid parameter values are in the range [0, infinity).
 testNumericServerParameter('timeseriesBucketMaxCount',

@@ -4,10 +4,7 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-'use strict';
-
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 function checkEvents(changeStream, expectedEvents) {
     expectedEvents.forEach((event) => {
@@ -27,7 +24,7 @@ function makeEvent(docId, opType) {
 // TODO WT-3864: Re-enable test for LSM once transaction visibility bug in LSM is resolved.
 if (jsTest.options().wiredTigerCollectionConfigString === "type=lsm") {
     jsTestLog("Skipping test because we're running with WiredTiger's LSM tree.");
-    return;
+    quit();
 }
 
 const rsNodeOptions = {
@@ -269,4 +266,3 @@ assert(!changeStreamNewShard.hasNext());
 
 st.stop();
 newShard.stopSet();
-})();

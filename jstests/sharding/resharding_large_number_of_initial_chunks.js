@@ -8,10 +8,7 @@
  *   exclude_from_large_txns
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({
     mongos: 1,
@@ -67,4 +64,3 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 // config.chunks documents exceeds 100MB and fails.
 TestData.skipCheckRoutingTableConsistency = true;
 st.stop();
-})();

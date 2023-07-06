@@ -14,7 +14,7 @@
  * ]
  */
 
-load("jstests/aggregation/extras/utils.js");  // For getExplainedPipelineFromAggregation
+import {getExplainedPipelineFromAggregation} from "jstests/aggregation/extras/utils.js";
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 const coll = db.bucket_unpack_with_match_fixed_buckets;

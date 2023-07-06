@@ -11,9 +11,7 @@
  *   uses_prepare_transaction,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const failureTimeout = 5 * 1000;  // 5 seconds.
 const dbName = "test";
@@ -93,4 +91,3 @@ assert.commandFailedWithCode(testDB.runCommand({
                              ErrorCodes.IllegalOperation);
 
 session.endSession();
-}());

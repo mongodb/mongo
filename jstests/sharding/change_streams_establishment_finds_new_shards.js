@@ -4,9 +4,6 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-'use strict';
-
 const rsNodeOptions = {
     // Use a higher frequency for periodic noops to speed up the test.
     setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}
@@ -77,4 +74,3 @@ assert(!changeStream.hasNext());
 
 st.stop();
 newShard.stopSet();
-})();

@@ -1,10 +1,7 @@
 // Tests that interrupting a filemd5 command while the PlanExecutor is yielded will correctly clean
 // up the PlanExecutor without crashing the server. This test was designed to reproduce
 // SERVER-35361.
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn);
@@ -34,4 +31,3 @@ assert.commandWorked(db.adminCommand({configureFailPoint: kFailPointName, mode: 
 
 failingMD5Shell();
 MongoRunner.stopMongod(conn);
-}());

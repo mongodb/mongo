@@ -1,6 +1,6 @@
-load("jstests/aggregation/extras/utils.js");
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
-function shardCollectionMoveChunks(
+export function shardCollectionMoveChunks(
     st, kDbName, ns, shardKey, docsToInsert, splitDoc, moveChunkDoc) {
     assert.commandWorked(st.s.getDB(kDbName).foo.createIndex(shardKey));
 
@@ -25,7 +25,7 @@ function shardCollectionMoveChunks(
     st.refreshCatalogCacheForNs(st.s, ns);
 }
 
-function assertUpdateSucceeds(st, session, sessionDB, inTxn, query, update, upsert) {
+export function assertUpdateSucceeds(st, session, sessionDB, inTxn, query, update, upsert) {
     let res;
     if (inTxn) {
         st.refreshCatalogCacheForNs(st.s, sessionDB.foo.getFullName());
@@ -47,16 +47,16 @@ function assertUpdateSucceeds(st, session, sessionDB, inTxn, query, update, upse
     }
 }
 
-function runUpdateCmdSuccess(st,
-                             kDbName,
-                             session,
-                             sessionDB,
-                             inTxn,
-                             queries,
-                             updates,
-                             upsert,
-                             collectionSplitPoint,
-                             pipelineUpdateResult) {
+export function runUpdateCmdSuccess(st,
+                                    kDbName,
+                                    session,
+                                    sessionDB,
+                                    inTxn,
+                                    queries,
+                                    updates,
+                                    upsert,
+                                    collectionSplitPoint,
+                                    pipelineUpdateResult) {
     for (let i = 0; i < queries.length; i++) {
         assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[i], updates[i], upsert);
 
@@ -75,17 +75,17 @@ function runUpdateCmdSuccess(st,
     }
 }
 
-function runFindAndModifyCmdSuccess(st,
-                                    kDbName,
-                                    session,
-                                    sessionDB,
-                                    inTxn,
-                                    queries,
-                                    updates,
-                                    upsert,
-                                    returnNew,
-                                    collectionSplitPoint,
-                                    pipelineUpdateResult) {
+export function runFindAndModifyCmdSuccess(st,
+                                           kDbName,
+                                           session,
+                                           sessionDB,
+                                           inTxn,
+                                           queries,
+                                           updates,
+                                           upsert,
+                                           returnNew,
+                                           collectionSplitPoint,
+                                           pipelineUpdateResult) {
     let res;
     for (let i = 0; i < queries.length; i++) {
         let oldDoc;
@@ -130,16 +130,16 @@ function runFindAndModifyCmdSuccess(st,
     }
 }
 
-function runUpdateCmdFail(st,
-                          kDbName,
-                          session,
-                          sessionDB,
-                          inTxn,
-                          query,
-                          update,
-                          multiParamSet,
-                          errorCode,
-                          pipelineUpdateResult) {
+export function runUpdateCmdFail(st,
+                                 kDbName,
+                                 session,
+                                 sessionDB,
+                                 inTxn,
+                                 query,
+                                 update,
+                                 multiParamSet,
+                                 errorCode,
+                                 pipelineUpdateResult) {
     let res;
     if (inTxn) {
         st.refreshCatalogCacheForNs(st.s, sessionDB.foo.getFullName());
@@ -168,7 +168,7 @@ function runUpdateCmdFail(st,
     }
 }
 
-function runFindAndModifyCmdFail(
+export function runFindAndModifyCmdFail(
     st, kDbName, session, sessionDB, inTxn, query, update, upsert, pipelineUpdateResult) {
     if (inTxn) {
         session.startTransaction();
@@ -191,17 +191,17 @@ function runFindAndModifyCmdFail(
     }
 }
 
-function assertCanUpdatePrimitiveShardKey(st,
-                                          kDbName,
-                                          ns,
-                                          session,
-                                          sessionDB,
-                                          inTxn,
-                                          isFindAndModify,
-                                          queries,
-                                          updates,
-                                          upsert,
-                                          pipelineUpdateResult) {
+export function assertCanUpdatePrimitiveShardKey(st,
+                                                 kDbName,
+                                                 ns,
+                                                 session,
+                                                 sessionDB,
+                                                 inTxn,
+                                                 isFindAndModify,
+                                                 queries,
+                                                 updates,
+                                                 upsert,
+                                                 pipelineUpdateResult) {
     let docsToInsert = upsert
         ? [{"x": 1}, {"x": 100}]
         : [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
@@ -253,17 +253,17 @@ function assertCanUpdatePrimitiveShardKey(st,
     sessionDB.foo.drop();
 }
 
-function assertCanUpdateDottedPath(st,
-                                   kDbName,
-                                   ns,
-                                   session,
-                                   sessionDB,
-                                   inTxn,
-                                   isFindAndModify,
-                                   queries,
-                                   updates,
-                                   upsert,
-                                   pipelineUpdateResult) {
+export function assertCanUpdateDottedPath(st,
+                                          kDbName,
+                                          ns,
+                                          session,
+                                          sessionDB,
+                                          inTxn,
+                                          isFindAndModify,
+                                          queries,
+                                          updates,
+                                          upsert,
+                                          pipelineUpdateResult) {
     let docsToInsert = upsert ? [{"x": {"a": 1}}, {"x": {"a": 100}}] : [
         {"x": {"a": 4, "y": 1}, "a": 3},
         {"x": {"a": 100, "y": 1}},
@@ -319,17 +319,17 @@ function assertCanUpdateDottedPath(st,
     sessionDB.foo.drop();
 }
 
-function assertCanUpdatePartialShardKey(st,
-                                        kDbName,
-                                        ns,
-                                        session,
-                                        sessionDB,
-                                        inTxn,
-                                        isFindAndModify,
-                                        queries,
-                                        updates,
-                                        upsert,
-                                        pipelineUpdateResult) {
+export function assertCanUpdatePartialShardKey(st,
+                                               kDbName,
+                                               ns,
+                                               session,
+                                               sessionDB,
+                                               inTxn,
+                                               isFindAndModify,
+                                               queries,
+                                               updates,
+                                               upsert,
+                                               pipelineUpdateResult) {
     let docsToInsert = upsert
         ? [{"x": 1, "y": 1}, {"x": 100, "y": 50}]
         : [{"x": 4, "y": 3}, {"x": 100, "y": 50}, {"x": 300, "y": 80}, {"x": 500, "y": 600}];
@@ -388,17 +388,17 @@ function assertCanUpdatePartialShardKey(st,
     sessionDB.foo.drop();
 }
 
-function assertCanDoReplacementUpdateWhereShardKeyMissingFields(st,
-                                                                kDbName,
-                                                                ns,
-                                                                session,
-                                                                sessionDB,
-                                                                inTxn,
-                                                                isFindAndModify,
-                                                                queries,
-                                                                updates,
-                                                                upsert,
-                                                                pipelineUpdateResult) {
+export function assertCanDoReplacementUpdateWhereShardKeyMissingFields(st,
+                                                                       kDbName,
+                                                                       ns,
+                                                                       session,
+                                                                       sessionDB,
+                                                                       inTxn,
+                                                                       isFindAndModify,
+                                                                       queries,
+                                                                       updates,
+                                                                       upsert,
+                                                                       pipelineUpdateResult) {
     assertCanUpdatePartialShardKey(st,
                                    kDbName,
                                    ns,
@@ -412,28 +412,28 @@ function assertCanDoReplacementUpdateWhereShardKeyMissingFields(st,
                                    pipelineUpdateResult);
 }
 
-function assertCanUnsetSKField(
+export function assertCanUnsetSKField(
     st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, query, update, upsert) {
     assertCanUpdatePrimitiveShardKey(
         st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, query, update, upsert);
 }
 
-function assertCanUnsetSKFieldUsingPipeline(
+export function assertCanUnsetSKFieldUsingPipeline(
     st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, query, update, upsert) {
     assertCanUpdatePrimitiveShardKey(
         st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, query, update, upsert);
 }
 
-function assertCannotUpdate_id(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               inTxn,
-                               isFindAndModify,
-                               query,
-                               update,
-                               pipelineUpdateResult) {
+export function assertCannotUpdate_id(st,
+                                      kDbName,
+                                      ns,
+                                      session,
+                                      sessionDB,
+                                      inTxn,
+                                      isFindAndModify,
+                                      query,
+                                      update,
+                                      pipelineUpdateResult) {
     let docsToInsert =
         [{"_id": 4, "a": 3}, {"_id": 100}, {"_id": 300, "a": 3}, {"_id": 500, "a": 6}];
     shardCollectionMoveChunks(
@@ -458,16 +458,16 @@ function assertCannotUpdate_id(st,
     sessionDB.foo.drop();
 }
 
-function assertCannotUpdate_idDottedPath(st,
-                                         kDbName,
-                                         ns,
-                                         session,
-                                         sessionDB,
-                                         inTxn,
-                                         isFindAndModify,
-                                         query,
-                                         update,
-                                         pipelineUpdateResult) {
+export function assertCannotUpdate_idDottedPath(st,
+                                                kDbName,
+                                                ns,
+                                                session,
+                                                sessionDB,
+                                                inTxn,
+                                                isFindAndModify,
+                                                query,
+                                                update,
+                                                pipelineUpdateResult) {
     let docsToInsert = [
         {"_id": {"a": 4, "y": 1}, "a": 3},
         {"_id": {"a": 100, "y": 1}},
@@ -496,7 +496,7 @@ function assertCannotUpdate_idDottedPath(st,
     sessionDB.foo.drop();
 }
 
-function assertCannotUpdateWithMultiTrue(
+export function assertCannotUpdateWithMultiTrue(
     st, kDbName, ns, session, sessionDB, inTxn, query, update, pipelineUpdateResult) {
     let docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
@@ -507,7 +507,7 @@ function assertCannotUpdateWithMultiTrue(
     sessionDB.foo.drop();
 }
 
-function assertCannotUpdateSKToArray(
+export function assertCannotUpdateSKToArray(
     st, kDbName, ns, session, sessionDB, inTxn, isFindAndModify, query, update) {
     let docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
@@ -522,7 +522,7 @@ function assertCannotUpdateSKToArray(
 }
 
 // Shard key updates are allowed in bulk ops if the update doesn't cause the doc to move shards
-function assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(
+export function assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(
     st, kDbName, ns, session, sessionDB, inTxn, ordered) {
     let bulkOp;
     let bulkRes;
@@ -621,7 +621,7 @@ function assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(
     sessionDB.foo.drop();
 }
 
-function assertCannotUpdateInBulkOpWhenDocsMoveShards(
+export function assertCannotUpdateInBulkOpWhenDocsMoveShards(
     st, kDbName, ns, session, sessionDB, inTxn, ordered) {
     let bulkOp;
     let bulkRes;
@@ -798,7 +798,7 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
     sessionDB.foo.drop();
 }
 
-function assertHashedShardKeyUpdateCorrect(
+export function assertHashedShardKeyUpdateCorrect(
     st, sessionDB, kDbName, query, update, upsert, shouldExistOnShard0) {
     let updatedVal = update["$set"] ? update["$set"] : update;
     assert.eq(0, sessionDB.foo.find(query).itcount());
@@ -816,7 +816,7 @@ function assertHashedShardKeyUpdateCorrect(
 // upon insertion. This test inserts some documents, shards a collection using a hashed shard key,
 // and then checks which of these documents are placed on which shard so that we can craft update
 // commands that will change the shard key value and cause a document to move to a different shard.
-function assertCanUpdatePrimitiveShardKeyHashedChangeShards(
+export function assertCanUpdatePrimitiveShardKeyHashedChangeShards(
     st, kDbName, ns, session, sessionDB, inTxn) {
     let docsToInsert =
         [{"x": 4, "a": 3}, {"x": 78}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
@@ -872,7 +872,7 @@ function assertCanUpdatePrimitiveShardKeyHashedChangeShards(
     st.s.getDB(kDbName).foo.drop();
 }
 
-function assertCanUpdatePrimitiveShardKeyHashedSameShards(
+export function assertCanUpdatePrimitiveShardKeyHashedSameShards(
     st, kDbName, ns, session, sessionDB, inTxn) {
     let docsToInsert =
         [{"x": 4, "a": 3}, {"x": 78}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];

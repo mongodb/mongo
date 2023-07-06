@@ -2,10 +2,7 @@
  * Tests that query options are not dropped by mongos when a query against a view is rewritten as an
  * aggregation against the underlying collection.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/profiler.js");  // For profilerHasSingleMatchingEntryOrThrow.
+import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({
     name: "view_rewrite",
@@ -31,10 +28,6 @@ const coll = mongosDB.getCollection("coll");
 assert.commandWorked(config.adminCommand({enableSharding: mongosDB.getName()}));
 st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 
-const rs0Secondary = st.rs0.getSecondary();
-const rs1Primary = st.rs1.getPrimary();
-const rs1Secondary = st.rs1.getSecondary();
-
 assert.commandWorked(config.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
 assert.commandWorked(mongos.adminCommand({split: coll.getFullName(), middle: {a: 5}}));
 assert.commandWorked(
@@ -45,7 +38,6 @@ for (let i = 0; i < 10; ++i) {
 }
 
 assert.commandWorked(mongosDB.createView("view", coll.getName(), []));
-const view = mongosDB.getCollection("view");
 
 //
 // Confirms that queries run against views on mongos result in execution of a rewritten
@@ -241,4 +233,3 @@ confirmReadPreference(st.rs0.getSecondary().getDB(mongosDB.getName()));
 confirmReadPreference(st.rs1.getSecondary().getDB(mongosDB.getName()));
 
 st.stop();
-})();

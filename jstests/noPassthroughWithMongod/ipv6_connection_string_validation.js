@@ -4,7 +4,6 @@
 // This file runs in two modes: outer and inner.  This is to enable testing with --ipv6.
 // The outer mode test starts a mongod with --ipv6 and then starts a mongo shell with --ipv6
 // and a command line to run the test in inner_mode.  The inner mode test is the actual test.
-(function() {
 if ("undefined" == typeof inner_mode) {
     // Start a mongod with --ipv6
     jsTest.log("Outer mode test starting mongod with --ipv6");
@@ -15,7 +14,7 @@ if ("undefined" == typeof inner_mode) {
     var mongod = MongoRunner.runMongod({ipv6: "", bind_ip: "::1,127.0.0.1"});
     if (mongod == null) {
         jsTest.log("Unable to run test because ipv6 is not on machine, see BF-10990");
-        return;
+        quit();
     }
     var args = [
         "mongo",
@@ -37,7 +36,7 @@ if ("undefined" == typeof inner_mode) {
         doassert("inner test failed with exit code " + exitCode);
     }
     MongoRunner.stopMongod(mongod);
-    return;
+    quit();
 }
 
 var goodStrings = [
@@ -170,4 +169,3 @@ for (i = 0; i < badStrings.length; ++i) {
 }
 
 jsTest.log("SUCCESSFUL test completion");
-})();

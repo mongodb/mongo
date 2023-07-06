@@ -5,9 +5,8 @@
  *   requires_replication,
  * ]
  */
-(function() {
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/change_stream_util.js");        // For 'ChangeStreamTest'.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const st = new ShardingTest({
     shards: 2,
@@ -66,4 +65,3 @@ assert.commandWorked(testDB.adminCommand({
 cst.assertNextChangesEqual({cursor: csCursor, expectedChanges: [{docId: 0}, {docId: 1}]});
 
 st.stop();
-})();

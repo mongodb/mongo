@@ -4,11 +4,10 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 const numNodesPerRS = 2;
 const numMostCommonValues = 5;
@@ -196,4 +195,3 @@ const setParameterOpts = {
 
     rst.stopSet();
 }
-})();

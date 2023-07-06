@@ -3,10 +3,8 @@
  * operations are allowed to continue and new operations are accepted, but hello requests return
  * a ShutdownInProgress error, so that clients begin routing operations elsewhere.
  */
-(function() {
-"use strict";
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const replTest = new ReplSetTest({
     name: "quiesce_mode",
@@ -221,4 +219,3 @@ checkTopologyVersion(assert.commandFailedWithCode(primaryDB.runCommand({find: co
                      topologyVersionField);
 
 replTest.stopSet();
-})();

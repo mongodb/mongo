@@ -11,9 +11,6 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
 function runTest(setParams, connPoolStatsCheck, extraOptions) {
     const test = new ShardingTest({shards: 2, mongosOptions: setParams});
     var db = test.getDB("test");
@@ -126,4 +123,3 @@ if (!TestData.configShard) {
     // up.
     runTest(shutdownNodeParams, shutdownNodeConnPoolStatsCheck, shutdownNodeExtraOptions);
 }
-})();

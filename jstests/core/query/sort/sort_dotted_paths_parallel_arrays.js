@@ -9,9 +9,6 @@
  *   does_not_support_transactions,
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.sort_dotted_paths_parallel_arrays;
 coll.drop();
 
@@ -44,4 +41,3 @@ assert.commandWorked(coll.insert({a: {b: [1, 2]}, c: {d: [3, 4]}}));
 
 assert.commandFailedWithCode(db.runCommand({find: coll.getName(), sort: {"a.b": 1, "c.d": 1}}),
                              [ErrorCodes.BadValue, ErrorCodes.CannotIndexParallelArrays]);
-})();

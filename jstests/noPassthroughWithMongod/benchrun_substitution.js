@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 function benchrun_sub_insert() {
     const t = db.benchrun_sub;
     t.drop();
@@ -76,4 +73,3 @@ function benchrun_sub_remove() {
 benchrun_sub_insert();
 benchrun_sub_update();
 benchrun_sub_remove();
-})();

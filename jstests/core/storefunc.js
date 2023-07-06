@@ -4,9 +4,6 @@
 //   requires_non_retryable_writes,
 // ]
 
-(function() {
-'use strict';
-
 // Use a private sister database to avoid conflicts with other tests that use system.js
 const testdb = db.getSiblingDB("storefunc");
 let res;
@@ -42,4 +39,3 @@ assert(s.getIndexKeys()[0]._id, "no _id index");
 assert.commandFailedWithCode(s.renameCollection('system.js_old'),
                              [ErrorCodes.IllegalOperation, ErrorCodes.Unauthorized]);
 assert.commandFailedWithCode(s.renameCollection('old_system_js'), ErrorCodes.IllegalOperation);
-})();

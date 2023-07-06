@@ -2,9 +2,6 @@
  * Tests explode for sort query planner behavior when the input query plan contains OR > FETCH >
  * IXSCAN, OR > IXSCAN subtrees or a mix of both.
  */
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 const coll = testDB.explode_for_sort_fetch;
@@ -117,4 +114,3 @@ const testCases = [
     },
 ];
 testCases.forEach(executeQueryTestCase);
-}());

@@ -1,9 +1,6 @@
 // @tags: [requires_non_retryable_writes, requires_fastcount]
 
 // Test removal of a substantial proportion of inserted documents.
-(function() {
-"use strict";
-
 const t = db.jstests_removea;
 
 Random.setRandomSeed();
@@ -29,4 +26,3 @@ for (let v = 0; v < 2; ++v) {  // Try each index version.
     }
     assert.commandWorked(t.remove({a: {$in: toDrop}}));
 }
-})();

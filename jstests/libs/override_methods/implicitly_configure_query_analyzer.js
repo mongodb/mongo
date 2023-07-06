@@ -5,11 +5,10 @@
  * sharding.
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
-load("jstests/libs/override_methods/shard_collection_util.js");
+import {
+    denylistedNamespaces,
+    ShardingOverrideCommon
+} from "jstests/libs/override_methods/shard_collection_util.js";
 
 const kShardProbability = 0.5;
 const kSamplesPerSecond = 1000;  // per second.
@@ -152,4 +151,3 @@ DBCollection.prototype.drop = function() {
 
     return result;
 };
-})();

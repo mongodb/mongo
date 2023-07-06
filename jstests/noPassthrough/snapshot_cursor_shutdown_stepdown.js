@@ -2,9 +2,6 @@
 // @tags: [
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "coll";
 
@@ -97,4 +94,3 @@ function stepDownOnLossOfQuorum(replSetTest) {
     rst.stop(secondaryId);
 }
 testStepdown(stepDownOnLossOfQuorum);
-})();

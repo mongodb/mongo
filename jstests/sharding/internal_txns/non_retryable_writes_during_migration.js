@@ -4,10 +4,9 @@
  *
  * @tags: [requires_fcv_60, uses_transactions, requires_persistence, exclude_from_large_txns]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/internal_txns/libs/chunk_migration_test.js");
+import {
+    InternalTransactionChunkMigrationTest
+} from "jstests/sharding/internal_txns/libs/chunk_migration_test.js";
 
 const transactionTest = new InternalTransactionChunkMigrationTest();
 transactionTest.runTestForInsertUpdateDeleteDuringChunkMigration(
@@ -15,4 +14,3 @@ transactionTest.runTestForInsertUpdateDeleteDuringChunkMigration(
 transactionTest.runTestForInsertUpdateDeleteDuringChunkMigration(
     transactionTest.InternalTxnType.kNonRetryable, true /* abortOnInitialTry */);
 transactionTest.stop();
-})();

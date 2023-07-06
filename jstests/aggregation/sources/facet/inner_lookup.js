@@ -2,9 +2,6 @@
  * Tests that using a $lookup stage inside of a $facet stage will yield the same results as using
  * the $lookup stage outside of the $facet stage.
  */
-(function() {
-"use strict";
-
 var local = db.facetLookupLocal;
 var foreign = db.facetLookupForeign;
 
@@ -51,4 +48,3 @@ runTest({
             as: "joined"
         }
     });
-}());

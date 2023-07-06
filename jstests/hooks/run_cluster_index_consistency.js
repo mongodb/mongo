@@ -1,8 +1,7 @@
-"use strict";
-
-(function(keyFile) {
-load("jstests/libs/check_cluster_index_consistency_helpers.js");  // For check implementation.
-load("jstests/libs/discover_topology.js");  // For Topology and DiscoverTopology.
+import {
+    ClusterIndexConsistencyChecker
+} from "jstests/libs/check_cluster_index_consistency_helpers.js";
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
 assert.neq(typeof db, "undefined", "No `db` object, is the shell connected to a server?");
 
@@ -14,5 +13,4 @@ if (topology.type !== Topology.kShardedCluster) {
         "Cluster index consistency check must be run against a sharded cluster, but got: " +
         tojson(topology));
 }
-ClusterIndexConsistencyChecker.run(db.getMongo(), keyFile);
-})(this.keyFile);
+ClusterIndexConsistencyChecker.run(db.getMongo(), globalThis.keyFile);

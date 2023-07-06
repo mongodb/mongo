@@ -1,14 +1,11 @@
 // Tests "stacking" multiple migration cleanup threads and their behavior when the collection
 // changes
 // @tags: [assumes_balancer_off]
-(function() {
-'use strict';
 
 // start up a new sharded cluster
 var st = new ShardingTest({shards: 2, mongos: 1, other: {enableBalancer: false}});
 
 var mongos = st.s;
-var admin = mongos.getDB("admin");
 var coll = mongos.getCollection("foo.bar");
 
 // Enable sharding of the collection
@@ -27,7 +24,7 @@ jsTest.log("Inserting a lot of small documents...");
 
 // Insert a lot of small documents to make multiple cursor batches
 var bulk = coll.initializeUnorderedBulkOp();
-for (var i = 0; i < 10 * 1000; i++) {
+for (let i = 0; i < 10 * 1000; i++) {
     bulk.insert({_id: i});
 }
 assert.commandWorked(bulk.execute());
@@ -36,12 +33,12 @@ jsTest.log("Opening a mongod cursor...");
 
 // Open a new cursor on the mongod
 var cursor = coll.find();
-var next = cursor.next();
+cursor.next();
 
 jsTest.log("Moving a bunch of chunks to stack cleanup...");
 
 // Move a bunch of chunks, but don't close the cursor so they stack.
-for (var i = 0; i < numChunks; i++) {
+for (let i = 0; i < numChunks; i++) {
     assert.commandWorked(
         mongos.adminCommand({moveChunk: coll + "", find: {_id: i}, to: st.shard1.shardName}));
 }
@@ -58,7 +55,7 @@ jsTest.log("Dropping and re-creating collection...");
 coll.drop();
 
 bulk = coll.initializeUnorderedBulkOp();
-for (var i = 0; i < numChunks; i++) {
+for (let i = 0; i < numChunks; i++) {
     bulk.insert({_id: i});
 }
 assert.commandWorked(bulk.execute());
@@ -72,9 +69,8 @@ assert.soon(() => {
 
 jsTest.log("Checking that the new collection's documents were not cleaned up...");
 
-for (var i = 0; i < numChunks; i++) {
+for (let i = 0; i < numChunks; i++) {
     assert.neq(null, coll.findOne({_id: i}));
 }
 
 st.stop();
-})();

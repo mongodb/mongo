@@ -1,7 +1,4 @@
 // Tests write passthrough
-(function() {
-'use strict';
-
 var s = new ShardingTest({shards: 2, mongos: 2});
 var s2 = s.s1;
 
@@ -57,4 +54,3 @@ assert.soon(function() {
 assert.eq(2, s.onNumShards("test", "foo"), "on 2 shards");
 
 s.stop();
-})();

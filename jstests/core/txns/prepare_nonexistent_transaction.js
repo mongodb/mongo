@@ -5,9 +5,6 @@
  * @tags: [
  *   not_allowed_with_security_token,uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "prepare_nonexistent_transaction";
 const testDB = db.getSiblingDB(dbName);
@@ -99,4 +96,3 @@ assert.commandFailedWithCode(sessionDB.adminCommand({
                              ErrorCodes.OperationNotSupportedInTransaction);
 
 session.endSession();
-}());

@@ -1,9 +1,10 @@
 // Validate a user deleting free monitoring in system.version does
 // not crash mongod
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {
+    FreeMonWebServer,
+    WaitForFreeMonServerStatusState,
+    WaitForRegistration
+} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer();
 
@@ -63,4 +64,3 @@ WaitForRegistration(rst.getSecondary());
 rst.stopSet();
 
 mock_web.stop();
-})();

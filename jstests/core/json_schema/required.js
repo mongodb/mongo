@@ -5,10 +5,7 @@
 /**
  * Tests for handling of the JSON Schema 'required' keyword.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/assert_schema_match.js");
+import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 
 const coll = db.jstests_schema_required;
 
@@ -26,4 +23,3 @@ assertSchemaMatch(coll, {properties: {a: {required: ["b"]}}}, {a: 1}, true);
 assertSchemaMatch(coll, {properties: {a: {required: ["b"]}}}, {a: {b: 1}}, true);
 assertSchemaMatch(coll, {properties: {a: {required: ["b"]}}}, {a: {c: 1}}, false);
 assertSchemaMatch(coll, {properties: {a: {required: ["b"]}}}, {a: {}}, false);
-}());

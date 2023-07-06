@@ -16,21 +16,21 @@
  * 5) Assert that all four position return the expected error
  */
 
-load('jstests/aggregation/extras/utils.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 // Use aggdb
-db = db.getSiblingDB('aggdb');
+const testDb = db.getSiblingDB('aggdb');
 
 // Empty and fill aggdb
-db.agg.drop();
-db.agg.insert({key: "string", value: 17});
-db.agg.insert({key: "yarn", value: 42});
+testDb.agg.drop();
+testDb.agg.insert({key: "string", value: 17});
+testDb.agg.insert({key: "yarn", value: 42});
 
 // As pipeline
-assertErrorCode(db.agg, [{}], 40323);
+assertErrorCode(testDb.agg, [{}], 40323);
 // Start of pipeline
-assertErrorCode(db.agg, [{$project: {value: 1}}, {}], 40323);
+assertErrorCode(testDb.agg, [{$project: {value: 1}}, {}], 40323);
 // End of pipeline
-assertErrorCode(db.agg, [{}, {$project: {value: 1}}], 40323);
+assertErrorCode(testDb.agg, [{}, {$project: {value: 1}}], 40323);
 // Middle of pipeline
-assertErrorCode(db.agg, [{$project: {value: 1}}, {}, {$project: {value: 1}}], 40323);
+assertErrorCode(testDb.agg, [{$project: {value: 1}}, {}, {$project: {value: 1}}], 40323);

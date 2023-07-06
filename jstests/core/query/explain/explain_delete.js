@@ -11,9 +11,6 @@
  *  ]
  */
 
-(function() {
-"use strict";
-
 var collName = "jstests_explain_delete";
 var t = db[collName];
 t.drop();
@@ -74,4 +71,3 @@ assert.eq(10, t.count());
 var deleteResult = db.runCommand({delete: collName, deletes: [{q: {a: 1}, limit: 0}]});
 assert.commandWorked(deleteResult);
 assert.eq(0, t.count());
-}());

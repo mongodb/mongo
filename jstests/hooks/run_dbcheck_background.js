@@ -1,16 +1,12 @@
 /**
  * Runs dbCheck in background.
  */
-'use strict';
-
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 import {
-    runDbCheckForDatabase,
-    assertForDbCheckErrorsForAllNodes
+    assertForDbCheckErrorsForAllNodes,
+    runDbCheckForDatabase
 } from "jstests/replsets/libs/dbcheck_utils.js";
-
-(function() {
-load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
-load('jstests/libs/parallelTester.js');     // For Thread.
 
 if (typeof db === 'undefined') {
     throw new Error(
@@ -130,6 +126,7 @@ if (topology.type === Topology.kReplicaSet) {
             }
         });
         if (exception) {
+            // eslint-disable-next-line
             throw exception;
         }
 
@@ -141,4 +138,3 @@ if (topology.type === Topology.kReplicaSet) {
 } else {
     throw new Error('Unsupported topology configuration: ' + tojson(topology));
 }
-})();

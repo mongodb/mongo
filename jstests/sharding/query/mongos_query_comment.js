@@ -4,11 +4,7 @@
  * and query operator are passed to the shards correctly, and that an attempt to attach a non-string
  * comment to the find command fails.
  */
-(function() {
-"use strict";
-
-// For profilerHasSingleMatchingEntryOrThrow.
-load("jstests/libs/profiler.js");
+import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({name: "mongos_comment_test", mongos: 1, shards: 1});
 
@@ -23,7 +19,6 @@ const shardDB = shard.getDB("mongos_comment");
 assert.commandWorked(mongosDB.dropDatabase());
 
 const mongosColl = mongosDB.test;
-const shardColl = shardDB.test;
 
 const collNS = mongosColl.getFullName();
 
@@ -33,7 +28,6 @@ for (let i = 0; i < 5; ++i) {
 
 // The profiler will be used to verify that comments are present on the shard.
 assert.commandWorked(shardDB.setProfilingLevel(2));
-const profiler = shardDB.system.profile;
 
 // TEST CASE: Verify that find.comment and non-string find.filter.$comment propagate.
 assert.eq(mongosColl.find({a: 1, $comment: {b: "TEST"}}).comment("TEST").itcount(), 1);
@@ -53,4 +47,3 @@ profilerHasSingleMatchingEntryOrThrow({
 });
 
 st.stop();
-})();

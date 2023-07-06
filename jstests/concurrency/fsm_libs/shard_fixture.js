@@ -1,6 +1,6 @@
-load('jstests/libs/discover_topology.js');
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
-var FSMShardingTest = class {
+export var FSMShardingTest = class {
     constructor(connStr) {
         /**
          * `topology` has the following format:

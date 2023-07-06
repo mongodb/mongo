@@ -3,16 +3,13 @@
  *
  * may need more checks, see: jstests/concurrency/fsm_workloads/drop_database_sharded_setFCV.js
  */
-'use strict';
-
-(function() {
-load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
-load('jstests/libs/parallelTester.js');     // For Thread.
 
 if (typeof db === 'undefined') {
     throw new Error(
         "Expected mongo shell to be connected a server, but global 'db' object isn't defined");
 }
+
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 // Disable implicit sessions so FSM workloads that kill random sessions won't interrupt the
 // operations in this test that aren't resilient to interruptions.
@@ -89,4 +86,3 @@ while (currSleep <= maxSleep) {
         // At this point FCV is back to latestFCV.
     }
 }
-})();

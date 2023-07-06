@@ -5,9 +5,6 @@
  * requires_fcv_61, featureFlagGlobalIndexes, multiversion_incompatible
  * ]
  */
-(function() {
-"use strict";
-
 delete TestData.setParameters.featureFlagGlobalIndexes;
 delete TestData.setParametersMongos.featureFlagGlobalIndexes;
 
@@ -31,4 +28,3 @@ res = assert.commandWorked(shardPrimary.adminCommand(serverStatusCmd));
 assert(!res.shardingStatistics.hasOwnProperty("globalIndex"), res.shardingStatistics);
 
 st.stop();
-})();

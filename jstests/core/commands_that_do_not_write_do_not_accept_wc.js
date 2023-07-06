@@ -11,8 +11,6 @@
  * ]
  */
 
-(function() {
-"use strict";
 var collName = 'leaves';
 
 var commands = [];
@@ -60,4 +58,3 @@ commands.forEach(function(cmd) {
         testUnsupportedWriteConcern(wc, cmd);
     });
 });
-})();

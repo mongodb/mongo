@@ -1,7 +1,7 @@
 /**
  * Utilities for testing the analyzeShardKey command.
  */
-var AnalyzeShardKeyUtil = (function() {
+export var AnalyzeShardKeyUtil = (function() {
     /**
      * Returns true if the given key pattern contains a hashed key.
      */

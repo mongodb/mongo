@@ -5,11 +5,6 @@
  * This setParameter behavior does not yet exist on earlier versions.
  * @tags: [multiversion_incompatible]
  */
-(function() {
-'use strict';
-
-load('jstests/replsets/rslib.js');
-
 // A secondary cannot compute retryable images during initial sync. Thus we skip db hash checks as
 // its expected for config.image_collection to not match.
 TestData.skipCheckDBHashes = true;
@@ -130,4 +125,3 @@ assert.eq(2,
               {invalidatedReason: "initial sync"}));
 
 rst.stopSet();
-}());

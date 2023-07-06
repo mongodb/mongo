@@ -4,8 +4,6 @@
 // @tags: [
 //   assumes_unsharded_collection,
 // ]
-(function() {
-"use strict";
 const t = db.ts1;
 t.drop();
 
@@ -43,4 +41,3 @@ assert.commandWorked(t.insert({_id: 100, x: new Timestamp(123456, 50)}));
 const x = t.findOne({_id: 100}).x;
 assert.eq(123456, x.t);
 assert.eq(50, x.i);
-}());

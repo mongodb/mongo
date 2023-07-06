@@ -1,11 +1,8 @@
 /**
  * Tests that convertToCapped does not conflict with a database MODE_IX lock.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/wait_for_command.js");
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
 const collName = "convert_to_capped_no_conflicts";
 const testDB = db.getSiblingDB("test");
@@ -35,4 +32,3 @@ assert(testColl.isCapped());
 // Interrupt the sleep command.
 assert.commandWorked(testDB.getSiblingDB("admin").killOp(sleepID));
 sleepCommand();
-})();

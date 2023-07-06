@@ -7,9 +7,6 @@
 // The test runs commands that are not allowed with security token: endSession, setParameter.
 // @tags: [
 //   not_allowed_with_security_token,uses_transactions]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "abort_transaction_thread_does_not_block_on_locks";
 const testDB = db.getSiblingDB(dbName);
@@ -108,4 +105,3 @@ try {
         transactionLifetimeLimitSeconds: originalTransactionLifetimeLimitSeconds
     }));
 }
-}());

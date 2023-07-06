@@ -1,5 +1,5 @@
 // Wrapper around the validate command that can be used to validate index key counts.
-import {Thread} from "jstests/libs/parallelTester_module.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 export class CollectionValidator {
     validateCollections(db, obj) {

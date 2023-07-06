@@ -1,9 +1,6 @@
 /**
  * Tests to verify that $graphLookup can use the variables defined in an outer scope.
  */
-(function() {
-"use strict";
-
 let local = db.graph_lookup_var_local;
 let foreign = db.graph_lookup_var_foreign;
 local.drop();
@@ -37,4 +34,3 @@ assert.eq(res.length, 1);
 assert.eq(res[0].resultsFromLookup.length, 1);
 assert.eq(res[0].resultsFromLookup[0].resultsFromGraphLookup.length, 1);
 assert.eq(res[0].resultsFromLookup[0].resultsFromGraphLookup[0], {_id: 0, from: "b", to: "a"});
-})();

@@ -9,11 +9,6 @@
  *   resource_intensive,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
-
 // Skip db hash check because delayed secondary will not catch up to primary.
 TestData.skipCheckDBHashes = true;
 
@@ -21,12 +16,12 @@ TestData.skipCheckDBHashes = true;
 var storageEngine = jsTest.options().storageEngine || "wiredTiger";
 if (storageEngine !== "wiredTiger") {
     print('Skipping test because storageEngine is not "wiredTiger"');
-    return;
+    quit();
 } else if (jsTest.options().wiredTigerCollectionConfigString === "type=lsm") {
     // Readers of old data, such as a lagged secondary, can lead to stalls when using
     // WiredTiger's LSM tree.
     print("WT-3742: Skipping test because we're running with WiredTiger's LSM tree");
-    return;
+    quit();
 } else {
     var rst = new ReplSetTest({
         nodes: 2,
@@ -82,4 +77,3 @@ if (storageEngine !== "wiredTiger") {
     }
     rst.stopSet();
 }
-})();

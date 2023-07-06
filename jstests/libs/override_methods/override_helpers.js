@@ -2,9 +2,7 @@
  * The OverrideHelpers object defines convenience methods for overriding commands and functions in
  * the mongo shell.
  */
-var OverrideHelpers = (function() {
-    "use strict";
-
+export const OverrideHelpers = (function() {
     function makeIsAggregationWithFirstStage(stageName) {
         return function(commandName, commandObj) {
             if (commandName !== "aggregate" || typeof commandObj !== "object" ||
@@ -64,12 +62,12 @@ var OverrideHelpers = (function() {
             if (typeof jsCode === "function") {
                 // Load the override file and immediately invoke the supplied function.
                 if (jsCode.constructor.name === 'AsyncFunction') {
-                    newCode = `load("${overrideFile}"); await (${jsCode.toString()})();`;
+                    newCode = `await import("${overrideFile}"); await (${jsCode.toString()})();`;
                 } else {
-                    newCode = `load("${overrideFile}"); (${jsCode.toString()})();`;
+                    newCode = `await import("${overrideFile}"); (${jsCode.toString()})();`;
                 }
             } else {
-                newCode = `load("${overrideFile}"); ${jsCode};`;
+                newCode = `await import("${overrideFile}"); ${jsCode};`;
             }
 
             return startParallelShellOriginal(newCode, port, noConnect);

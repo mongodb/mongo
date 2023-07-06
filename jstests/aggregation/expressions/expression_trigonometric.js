@@ -1,10 +1,8 @@
 // SERVER-32930: Basic integration tests for trigonometric aggregation expressions.
 
-(function() {
-"use strict";
-// For assertErrorCode.
-load("jstests/aggregation/extras/utils.js");
-load('jstests/libs/sbe_assert_error_override.js');  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
+
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.expression_trigonometric;
 coll.drop();
@@ -290,4 +288,3 @@ testErrorCode("$tan", "string", 28765);
 testErrorCode("$tanh", "string", 28765);
 testErrorCode("$degreesToRadians", "string", 28765);
 testErrorCode("$radiansToDegrees", "string", 28765);
-}());

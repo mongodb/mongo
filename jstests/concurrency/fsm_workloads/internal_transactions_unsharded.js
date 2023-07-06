@@ -12,9 +12,13 @@
  *  assumes_unsharded_collection,
  * ]
  */
+import "jstests/libs/override_methods/retry_writes_at_least_once.js";
+
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
-load("jstests/libs/override_methods/retry_writes_at_least_once.js");
+import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
+import {
+    withTxnAndAutoRetry
+} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 
 // This workload involves running commands outside a session.
 TestData.disableImplicitSessions = true;

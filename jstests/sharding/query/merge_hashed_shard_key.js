@@ -1,17 +1,14 @@
 // Tests that the $merge stage works correctly when the shard key is hashed. This includes the case
 // when the "on" field is not explicitly specified and also when there is a unique, non-hashed index
 // that matches the "on" field(s).
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode,
-                                                      // assertMergeFailsWithoutUniqueIndex,
-// assertMergeSucceedsWithExpectedUniqueIndex.
+import {
+    assertMergeFailsWithoutUniqueIndex,
+    assertMergeSucceedsWithExpectedUniqueIndex,
+} from "jstests/aggregation/extras/merge_helpers.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 const mongosDB = st.s0.getDB("merge_hashed_shard_key");
-const foreignDB = st.s0.getDB("merge_hashed_shard_key_foreign");
 const source = mongosDB.source;
 const target = mongosDB.target;
 source.drop();
@@ -86,4 +83,3 @@ assertMergeSucceedsWithExpectedUniqueIndex({source: source, target: target});
 assertMergeSucceedsWithExpectedUniqueIndex({source: source, target: target, uniqueKey: {_id: 1}});
 
 st.stop();
-})();

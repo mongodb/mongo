@@ -3,9 +3,6 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-'use strict';
-
 // This test intentionally runs commands without a logical session id, which is not compatible
 // with implicit sessions.
 TestData.disableImplicitSessions = true;
@@ -240,4 +237,3 @@ runTestGetMore(primary, {lsid: {id: new UUID()}, txnNumber: NumberLong(0)}, true
 
 rst.stopSet();
 st.stop();
-})();

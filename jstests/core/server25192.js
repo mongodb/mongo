@@ -1,7 +1,3 @@
-(function() {
-
-"use strict";
-
 var x = {};
 
 assert.doesNotThrow(function() {
@@ -9,4 +5,3 @@ assert.doesNotThrow(function() {
 }, [], "Extending an object with a null field does not throw");
 
 assert.eq(x.a, null);
-}());

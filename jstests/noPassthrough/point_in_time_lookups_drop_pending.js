@@ -8,9 +8,6 @@
  *     requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
@@ -57,4 +54,3 @@ assert.eq(kNumDocs, res.cursor.firstBatch.length);
 checkLog.containsJson(db, 6825401);
 
 rst.stopSet();
-})();

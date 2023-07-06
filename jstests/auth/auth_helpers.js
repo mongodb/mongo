@@ -1,8 +1,5 @@
 // Test the db.auth() shell helper.
 
-(function() {
-'use strict';
-
 const conn = MongoRunner.runMongod();
 const admin = conn.getDB('admin');
 
@@ -21,4 +18,3 @@ assert(admin.logout());
 // Invalid mechanisms shouldn't lead to authentication, but also shouldn't crash.
 assert(!admin.auth({mechanism: 'this-mechanism-is-fake', user: 'andy', pwd: 'a'}));
 MongoRunner.stopMongod(conn);
-})();

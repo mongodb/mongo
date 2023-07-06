@@ -18,11 +18,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const dbName = "db_background_validation_repl";
 const collName = "coll_background_validation_repl";
@@ -131,4 +127,3 @@ const doTest = replSet => {
 const replSet = initTest();
 doTest(replSet);
 replSet.stopSet();
-})();

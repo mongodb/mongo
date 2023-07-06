@@ -3,9 +3,6 @@
  * Note: noPassthrough/commit_quorum.js - Verifies the commitQuorum behavior for replica sets.
  */
 
-(function() {
-'use strict';
-
 const standalone = MongoRunner.runMongod();
 const db = standalone.getDB("test");
 
@@ -16,4 +13,3 @@ assert.commandFailedWithCode(
     ErrorCodes.BadValue);
 
 MongoRunner.stopMongod(standalone);
-})();

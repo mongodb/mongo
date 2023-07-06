@@ -1,9 +1,6 @@
 /**
  * Test to verify the behaviour of compound hashed indexes.
  */
-(function() {
-"use strict";
-
 const coll = db.hashed_index_with_arrays;
 coll.drop();
 
@@ -73,4 +70,3 @@ assert.commandFailedWithCode(coll.insert({a: [1], b: 6}), 16766);
 
 // Array insertion allowed when the document doesn't match the partial filter predication.
 assert.commandWorked(coll.insert({a: [1], b: 1}));
-})();

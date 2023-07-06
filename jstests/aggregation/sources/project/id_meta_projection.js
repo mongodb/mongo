@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 const coll = db.id_meta_projection;
 coll.drop();
 
@@ -21,4 +18,3 @@ const projectNotPushedDownRes = coll.aggregate([
                                     ])
                                     .toArray();
 assert.eq(projectPushedDownRes, projectNotPushedDownRes);
-})();

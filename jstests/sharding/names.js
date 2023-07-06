@@ -1,7 +1,4 @@
 // Test that having replica set names the same as the names of other shards works fine
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: TestData.configShard ? 1 : 0, mongos: 1});
 
 var rsA = new ReplSetTest({nodes: 2, name: "rsA", nodeOptions: {shardsvr: ""}});
@@ -16,7 +13,6 @@ rsB.getPrimary();
 
 var mongos = st.s;
 var config = mongos.getDB("config");
-var admin = mongos.getDB("admin");
 
 assert.commandWorked(mongos.adminCommand({addShard: rsA.getURL(), name: rsB.name}));
 printjson(config.shards.find().toArray());
@@ -59,4 +55,3 @@ assert.eq(
 rsA.stopSet();
 rsB.stopSet();
 st.stop();
-})();

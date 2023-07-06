@@ -5,9 +5,6 @@
  * mode, regardless of the configuration of the variant running the task. This is needed because the
  * suite definition cannot override a knob which is also defined by the variant.
  */
-(function() {
-'use strict';
-
 if (typeof db !== "undefined") {
     assert.commandWorked(db.adminCommand({
         setParameter: 1,
@@ -24,4 +21,3 @@ if (typeof TestData !== "undefined" && TestData.hasOwnProperty("setParameters") 
     TestData["setParameters"]["internalQueryCardinalityEstimatorMode"] = "sampling";
     TestData["setParametersMongos"]["internalQueryCardinalityEstimatorMode"] = "sampling";
 }
-})();

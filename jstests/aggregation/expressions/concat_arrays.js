@@ -11,8 +11,9 @@
 //   # tests from implicit index creation suites.
 //   assumes_no_implicit_index_creation,
 // ]
-load("jstests/aggregation/extras/utils.js");        // For assertArrayEq.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
+
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.projection_expr_concat_arrays;

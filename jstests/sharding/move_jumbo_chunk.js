@@ -6,11 +6,8 @@
  * @tags: [__TEMPORARILY_DISABLED__]
  */
 
-(function() {
-'use strict';
-
-load('jstests/sharding/libs/find_chunks_util.js');
-load('jstests/sharding/libs/remove_shard_util.js');
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -154,4 +151,3 @@ assert.eq(
     st.shard0.shardName, jumboChunk.shard, 'jumbo chunk ' + tojson(jumboChunk) + ' was not moved');
 
 st.stop();
-})();

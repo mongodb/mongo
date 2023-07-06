@@ -2,11 +2,8 @@
  * Tests that WriteConflictException is handled when applying transfer mods during migrations.
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -65,4 +62,3 @@ assert.commandWorked(testColl.update({x: 49}, {$set: {c: 1}}));
 assert.commandWorked(testColl.update({x: 50}, {$set: {c: 1}}));
 
 st.stop();
-})();

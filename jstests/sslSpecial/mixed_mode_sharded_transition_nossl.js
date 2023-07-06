@@ -12,10 +12,7 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-load('jstests/ssl/libs/ssl_helpers.js');
-
-(function() {
-'use strict';
+import {allowSSL, mixedShardTest} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Disable auth explicitly
 var noAuthOptions = {noauth: ''};
@@ -28,4 +25,3 @@ mixedShardTest(transitionToX509AllowSSL, noAuthOptions, true);
 
 print('=== Testing transitionToAuth/transitionToAuth cluster ===');
 mixedShardTest(transitionToX509AllowSSL, transitionToX509AllowSSL, true);
-}());

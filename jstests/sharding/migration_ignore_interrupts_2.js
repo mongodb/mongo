@@ -1,12 +1,15 @@
 // When a migration between shard0 and shard1 is about to enter the commit phase, a commit command
 // with different migration session ID is rejected.
 
-load('jstests/libs/chunk_manipulation_util.js');
+import {
+    moveChunkParallel,
+    moveChunkStepNames,
+    pauseMoveChunkAtStep,
+    unpauseMoveChunkAtStep,
+    waitForMoveChunkStep,
+} from "jstests/libs/chunk_manipulation_util.js";
 
-(function() {
-"use strict";
-
-var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+var staticMongod = MongoRunner.runMongod({});
 
 var st = new ShardingTest({shards: 2});
 
@@ -57,4 +60,3 @@ assert.eq(1, shard1Coll1.find().itcount());
 
 st.stop();
 MongoRunner.stopMongod(staticMongod);
-})();

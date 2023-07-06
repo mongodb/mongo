@@ -12,13 +12,10 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/auto_retry_transaction_in_sharding.js");  // For withTxnAndAutoRetryOnMongos.
-load("jstests/libs/change_stream_util.js");                  // For ChangeStreamTest.
-load("jstests/libs/collection_drop_recreate.js");            // For assert[Drop|Create]Collection.
-load("jstests/libs/fixture_helpers.js");                     // For FixtureHelpers.isMongos.
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const otherCollName = "change_stream_end_of_transaction_2";
 const coll = assertDropAndRecreateCollection(db, "change_stream_end_of_transaction");
@@ -175,4 +172,3 @@ assertNextChangesEqual(
     {cursor: dbChangeStream, expectedChanges: expectedChangesDb, expectInvalidate: false});
 
 cst.cleanUp();
-}());

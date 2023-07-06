@@ -1,9 +1,5 @@
-// Test various error cases of $regexMatch, $regexFind and $regexFindAll aggregation expressions.
-(function() {
-'use strict';
-
-load('jstests/libs/sbe_assert_error_override.js');   // Override error-code-checking APIs.
-load('jstests/libs/aggregation_pipeline_utils.js');  // For executeAggregationTestCase().
+import "jstests/libs/sbe_assert_error_override.js";
+import {executeAggregationTestCase} from "jstests/libs/aggregation_pipeline_utils.js";
 
 const coll = db.regex_error_cases;
 coll.drop();
@@ -114,4 +110,3 @@ assertFails({regex: '[a-'}, 51111);
 
 // Regex flags must be valid.
 assertFails({regex: '.*', options: 'ish'}, 51108);
-}());

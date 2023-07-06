@@ -3,10 +3,7 @@
  *
  * @tags: [assumes_unsharded_collection]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/doc_validation_utils.js");  // For assertDocumentValidationFailure.
+import {assertDocumentValidationFailure} from "jstests/libs/doc_validation_utils.js";
 
 const testDB = db.getSiblingDB("out_bypass_doc_val");
 const sourceColl = testDB.getCollection("source");
@@ -211,5 +208,4 @@ assertFailsValidation({bypassDocumentValidation: false});
     assertDocumentValidationFailure(testDB.runCommand(cmd), sourceColl);
 
     assert.eq(0, foreignColl.find().itcount());
-}());
 }());

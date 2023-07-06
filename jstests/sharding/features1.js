@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 var s = new ShardingTest({name: "features1", shards: 2, mongos: 1});
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
 s.ensurePrimaryShard('test', s.shard1.shardName);
@@ -128,4 +125,3 @@ assert.commandWorked(s.s0.adminCommand({flushRouterConfig: 'TestDB'}));
 assert.commandWorked(s.s0.adminCommand({flushRouterConfig: 'TestDB.TestColl'}));
 
 s.stop();
-})();

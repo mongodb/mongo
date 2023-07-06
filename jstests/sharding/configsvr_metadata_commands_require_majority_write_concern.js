@@ -4,9 +4,7 @@
  * convert it up to majority WC),
  * 2) Issuing a metadata command directly to a config server with non-majority write concern fails.
  */
-(function() {
-'use strict';
-load('jstests/sharding/libs/remove_shard_util.js');
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -191,4 +189,3 @@ checkCommand(st.s.getDB(dbName),
 
 newShard.stopSet();
 st.stop();
-})();

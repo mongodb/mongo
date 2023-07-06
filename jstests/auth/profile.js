@@ -1,9 +1,6 @@
 // Check that username information gets recorded properly in profiler.
 // @tags: [requires_profiling]
 
-(function() {
-'use strict';
-
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("profile");
 const username = "user";
@@ -40,4 +37,3 @@ db.logout();
 db.setProfilingLevel(0);
 db.dropDatabase();
 MongoRunner.stopMongod(conn);
-})();

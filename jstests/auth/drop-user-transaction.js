@@ -1,9 +1,6 @@
 // Validate dropUser performed via transaction.
 // @tags: [requires_replication,exclude_from_large_txns]
 
-(function() {
-'use strict';
-
 function runTest(conn, testCB) {
     const admin = conn.getDB('admin');
     const test = conn.getDB('test');
@@ -134,4 +131,3 @@ function runTest(conn, testCB) {
 
     rst.stopSet();
 }
-})();

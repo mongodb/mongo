@@ -9,20 +9,17 @@
 //  no_selinux,
 //  incompatible_with_preimages_by_default,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.isReplSet().
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load(
-    "jstests/libs/change_stream_util.js");  // For
-                                            // assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
-                                            // assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent,
-                                            // preImagesForOps.
+import {
+    assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent,
+    assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
+    preImagesForOps,
+} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Pre-images are only recorded in the replica set mode.
 if (!FixtureHelpers.isReplSet(db)) {
-    return;
+    quit();
 }
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -230,4 +227,3 @@ testPreImageRecording({
         assert.eq(coll.findAndModify({remove: true}), replacedDoc);
     }
 });
-}());

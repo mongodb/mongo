@@ -12,7 +12,7 @@ function testTransition(newSSLMode, newClusterAuthMode) {
     var res = adminDB.runCommand({"setParameter": 1, "sslMode": newSSLMode});
     assert.commandFailedWithCode(res, ErrorCodes.BadValue);
 
-    var res = adminDB.runCommand({"setParameter": 1, "clusterAuthMode": newClusterAuthMode});
+    res = adminDB.runCommand({"setParameter": 1, "clusterAuthMode": newClusterAuthMode});
     assert.commandFailedWithCode(res, ErrorCodes.BadValue);
     MongoRunner.stopMongod(conn);
 }

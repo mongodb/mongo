@@ -4,10 +4,9 @@
  *
  * @tags: [uses_transactions]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({shards: 1});
 
@@ -46,4 +45,3 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 
 session.endSession();
 st.stop();
-})();

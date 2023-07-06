@@ -4,10 +4,7 @@
  *
  *  @tags: [multiversion_incompatible]
  */
-(function() {
-'use strict';
-
-load('jstests/replsets/rslib.js');
+import {reconfig} from "jstests/replsets/rslib.js";
 
 const kActiveFaultDurationSec = 12;
 
@@ -125,4 +122,3 @@ try {
 } catch (e) {
     jsTestLog(`Exception during shutdown: ${e}`);
 }
-}());

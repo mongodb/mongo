@@ -16,8 +16,7 @@
  * ]
  */
 
-(function() {
-load('jstests/libs/uuid_util.js');
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 function container(uuid) {
     return db.getSiblingDB("system").getCollection("globalIndex." + extractUUIDFromObject(uuid));
@@ -313,4 +312,3 @@ jsTestLog("Dropping global index uuid0=" + uuid0 + " and validating that transac
 
 jsTestLog("Dropping global index uuid1=" + uuid1 + ".");
 assert.commandWorked(db.getSiblingDB("admin").runCommand({_shardsvrDropGlobalIndex: uuid1}));
-})();

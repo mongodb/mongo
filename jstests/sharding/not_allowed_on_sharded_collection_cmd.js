@@ -1,7 +1,5 @@
 // Tests that commands that should not be runnable on sharded collections cannot be run on sharded
 // collections.
-(function() {
-
 const st = new ShardingTest({shards: 2, mongos: 2});
 
 const dbName = 'test';
@@ -22,4 +20,3 @@ assert.commandFailedWithCode(staleMongos.runCommand({convertToCapped: coll, size
                              ErrorCodes.IllegalOperation);
 
 st.stop();
-})();

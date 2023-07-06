@@ -1,10 +1,8 @@
 // In SERVER-8951, $indexOfCP was introduced. In this file, we test the correctness and error
 // cases of the expression.
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExpression.
-load("jstests/libs/sbe_assert_error_override.js");
+import "jstests/libs/sbe_assert_error_override.js";
 
-(function() {
-"use strict";
+import {assertErrorCode, testExpression} from "jstests/aggregation/extras/utils.js";
 
 function testExpressionCodePoints(coll, expression, result, shouldTestEquivalence = true) {
     testExpression(coll, expression, result);
@@ -254,4 +252,3 @@ pipeline = {
     $project: {output: {$indexOfCP: ["abc", "b", 1, -1]}}
 };
 assertErrorCode(coll, pipeline, 40097);
-}());

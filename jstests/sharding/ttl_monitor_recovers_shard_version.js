@@ -10,11 +10,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
-
 var st = new ShardingTest({
     mongos: 1,
     shards: 1,
@@ -28,7 +23,6 @@ var kDbName = 'db';
 var kCollName = 'foo';
 
 var mongos = st.s0;
-var shard0 = st.shard0.shardName;
 
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 
@@ -50,4 +44,3 @@ st.restartShardRS(0);
 assert.soon(() => st.shard0.getDB(kDbName)[kCollName].find({}).count() == 0);
 
 st.stop();
-})();

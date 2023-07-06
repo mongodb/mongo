@@ -1,9 +1,6 @@
 /**
  * Verifies behavior around implicit sessions in the mongo shell.
  */
-(function() {
-"use strict";
-
 /**
  * Runs the given function, inspecting the outgoing command object and making assertions about
  * its logical session id.
@@ -234,4 +231,3 @@ assert(_shouldUseImplicitSessions());
 
 TestData.disableImplicitSessions = true;
 runTestDisabled();
-})();

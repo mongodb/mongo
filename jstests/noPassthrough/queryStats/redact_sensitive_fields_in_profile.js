@@ -2,11 +2,8 @@
  * Test that the queryStats HMAC key is not leaked during profiling.
  * @tags: [featureFlagQueryStatsFindCommand]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/profiler.js");           // For getLatestProfilerEntry.
-load("jstests/libs/query_stats_utils.js");  // For getQueryStatsFindCmd
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
+import {getQueryStatsFindCmd} from "jstests/libs/query_stats_utils.js";
 
 const conn = MongoRunner.runMongod({setParameter: {internalQueryStatsRateLimit: -1}, profile: 2});
 const adminDB = conn.getDB("admin");
@@ -60,4 +57,3 @@ assert.neq(loggedHmacKey, hmacKey);
 assert.eq(loggedHmacKey, "###");
 
 MongoRunner.stopMongod(conn);
-}());

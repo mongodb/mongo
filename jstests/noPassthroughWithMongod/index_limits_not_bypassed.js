@@ -2,9 +2,6 @@
  * Ensures that we cannot bypass the 64 index limit or the 1 text index limit per collection using
  * the 'createIndexes()' command to create multiple indexes in one request.
  */
-(function() {
-"use strict";
-
 const collName = "index_limits_not_bypassed";
 const coll = db.getCollection(collName);
 coll.drop();
@@ -34,4 +31,3 @@ assert.commandFailedWithCode(
 
 assert.commandFailedWithCode(coll.dropIndex("x"), ErrorCodes.IndexNotFound);
 assert.commandFailedWithCode(coll.dropIndex("y"), ErrorCodes.IndexNotFound);
-}());

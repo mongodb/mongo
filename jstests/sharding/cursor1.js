@@ -1,8 +1,6 @@
 // cursor1.js
 // checks that cursors survive a chunk's move
-(function() {
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var s = new ShardingTest({name: "sharding_cursor1", shards: 2});
 
@@ -13,7 +11,7 @@ s.adminCommand({enablesharding: "test"});
 s.ensurePrimaryShard('test', s.shard1.shardName);
 s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
 
-db = s.getDB("test");
+const db = s.getDB("test");
 let primary = s.getPrimaryShard("test").getDB("test");
 let secondary = s.getOther(primary).getDB("test");
 
@@ -74,4 +72,3 @@ assert.soon(function() {
 TestData.disableImplicitSessions = false;
 
 s.stop();
-})();

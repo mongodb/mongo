@@ -1,6 +1,5 @@
-var defragmentationUtil = (function() {
-    load("jstests/sharding/libs/find_chunks_util.js");
-
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+export var defragmentationUtil = (function() {
     let createFragmentedCollection = function(mongos,
                                               ns,
                                               numChunks,

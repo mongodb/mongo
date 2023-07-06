@@ -1,6 +1,6 @@
 // Helper functions for failpoint tests.
 
-const failCommandWithError = function(rst, {commandToFail, errorCode, closeConnection}) {
+export const failCommandWithError = function(rst, {commandToFail, errorCode, closeConnection}) {
     rst.nodes.forEach(function(node) {
         assert.commandWorked(node.getDB("admin").runCommand({
             configureFailPoint: "failCommand",
@@ -15,14 +15,14 @@ const failCommandWithError = function(rst, {commandToFail, errorCode, closeConne
     });
 };
 
-const failCommandWithWriteConcernError = function(rst, commandToFail) {
+export const failCommandWithWriteConcernError = function(rst, commandToFail) {
     if (typeof commandToFail === "string") {
         commandToFail = [commandToFail];
     }
     failCommandsWithWriteConcernError(rst, commandToFail);
 };
 
-const failCommandsWithWriteConcernError = function(rst, commandsToFail) {
+export const failCommandsWithWriteConcernError = function(rst, commandsToFail) {
     rst.nodes.forEach(function(node) {
         assert.commandWorked(node.getDB("admin").runCommand({
             configureFailPoint: "failCommand",
@@ -36,7 +36,7 @@ const failCommandsWithWriteConcernError = function(rst, commandsToFail) {
     });
 };
 
-const turnOffFailCommand = function(rst) {
+export const turnOffFailCommand = function(rst) {
     rst.nodes.forEach(function(node) {
         assert.commandWorked(
             node.getDB("admin").runCommand({configureFailPoint: "failCommand", mode: "off"}));

@@ -8,9 +8,6 @@
  *   requires_non_retryable_writes,
  * ]
  */
-(function() {
-"use strict";
-
 let topDB = db.getSiblingDB("topdrop");
 assert.commandWorked(topDB.dropDatabase());
 
@@ -84,4 +81,3 @@ topDB.bar.remove({});
 checkTopEntries([]);
 
 assert.commandWorked(topDB.dropDatabase());
-}());

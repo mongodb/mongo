@@ -6,10 +6,15 @@
  * ]
  */
 
-load("jstests/aggregation/sources/densify/libs/densify_in_js.js");
+import {
+    densifyUnits,
+    getArithmeticFunctionsForUnit,
+    insertDocumentsOnPredicate,
+    insertDocumentsOnStep,
+    interestingSteps,
+    testDensifyStage,
+} from "jstests/aggregation/sources/densify/libs/densify_in_js.js";
 
-(function() {
-"use strict";
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
@@ -124,4 +129,3 @@ let stage = {
     },
 };
 testDensifyStage(stage, coll, "Ensure no docs before range");
-})();

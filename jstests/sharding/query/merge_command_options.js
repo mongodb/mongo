@@ -1,8 +1,5 @@
 // Tests that aggregations with a $merge stage respect the options set on the command.
-(function() {
-'use strict';
-
-load("jstests/libs/profiler.js");  // For profilerHasNumMatchingEntriesOrThrow.
+import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 
@@ -185,4 +182,3 @@ assert.commandWorked(st.rs0.getPrimary().getDB('test').adminCommand(
 })();
 
 st.stop();
-})();

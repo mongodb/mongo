@@ -9,12 +9,10 @@
  * shard.
  */
 
-(function() {
-"use strict";
+import "jstests/multiVersion/libs/multi_rs.js";
 
-load("jstests/libs/fail_point_util.js");
-load("jstests/multiVersion/libs/multi_rs.js");
-load('jstests/replsets/rslib.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {reconfig} from "jstests/replsets/rslib.js";
 
 function createUser(rst) {
     rst.getPrimary().getDB("admin").createUser({user: "root", pwd: "root", roles: ["root"]},
@@ -231,4 +229,3 @@ if (st) {
     st.stop();
 }
 rst.stopSet();
-})();

@@ -6,13 +6,15 @@
  *
  * @tags: [uses_transactions]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/chunk_manipulation_util.js');
-load('jstests/libs/fail_point_util.js');
-load('jstests/sharding/libs/create_sharded_collection_util.js');
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {
+    moveChunkParallel,
+    moveChunkStepNames,
+    pauseMoveChunkAtStep,
+    unpauseMoveChunkAtStep,
+    waitForMoveChunkStep,
+} from "jstests/libs/chunk_manipulation_util.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const staticMongod = MongoRunner.runMongod({});  // Mongod used for startParallelOps().
 const st = new ShardingTest({shards: {rs0: {nodes: 1}, rs1: {nodes: 1}}});
@@ -129,4 +131,3 @@ assert.eq(diff, {
 
 st.stop();
 MongoRunner.stopMongod(staticMongod);
-})();

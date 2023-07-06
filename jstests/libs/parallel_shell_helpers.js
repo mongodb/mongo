@@ -1,7 +1,7 @@
 /**
  * Allows passing arguments to the function executed by startParallelShell.
  */
-const funWithArgs = (fn, ...args) => {
+export const funWithArgs = (fn, ...args) => {
     const result = `(${fn.toString()})(${args.map(x => tojson(x)).reduce((x, y) => `${x}, ${y}`)})`;
     if (fn.constructor.name === 'AsyncFunction') {
         return `await ${result}`;
@@ -13,7 +13,7 @@ const funWithArgs = (fn, ...args) => {
 /**
  * Internal function used by _doAssertCommandInParallelShell().
  */
-const _parallelShellRunCommand = function(
+export const _parallelShellRunCommand = function(
     dbName, cmdObj, expectedCode, checkResultFn, checkResultArgs) {
     const expectedCodeStr =
         (expectedCode === undefined ? '' : '; expectedCode: ' + tojson(expectedCode));
@@ -46,7 +46,7 @@ const _parallelShellRunCommand = function(
  * Internal function used by assertCommandWorkedInParallelShell() and
  * assertCommandFailedWithCodeInParallelShell().
  */
-const _doAssertCommandInParallelShell = function(
+export const _doAssertCommandInParallelShell = function(
     conn, db, cmdObj, expectedCode, checkResultFn, checkResultArgs) {
     // Return joinable object to caller.
     return startParallelShell(funWithArgs(_parallelShellRunCommand,
@@ -62,7 +62,7 @@ const _doAssertCommandInParallelShell = function(
  * Starts command in a parallel shell.
  * Provides similar behavior to assert.commandWorked().
  */
-const assertCommandWorkedInParallelShell = function(
+export const assertCommandWorkedInParallelShell = function(
     conn, db, cmdObj, checkResultFn, checkResultArgs) {
     return _doAssertCommandInParallelShell(conn, db, cmdObj, checkResultFn, checkResultArgs);
 };
@@ -71,7 +71,7 @@ const assertCommandWorkedInParallelShell = function(
  * Starts command in a parallel shell.
  * Provides similar behavior to assert.commandFailedWithCode().
  */
-const assertCommandFailedWithCodeInParallelShell = function(
+export const assertCommandFailedWithCodeInParallelShell = function(
     conn, db, cmdObj, expectedCode, checkResultFn, checkResultArgs) {
     assert(expectedCode,
            'expected error code(s) must be provided to run command in parallel shell - host: ' +

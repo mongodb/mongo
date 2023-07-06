@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 const t = db.index_hammer1;
 t.drop();
 
@@ -40,4 +37,3 @@ const res = benchRun({ops: ops, parallel: 5, seconds: 20, host: db.getMongo().ho
 printjson(res);
 
 assert.eq(10000, t.count());
-})();

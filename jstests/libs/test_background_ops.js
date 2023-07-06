@@ -5,7 +5,7 @@
 /**
  * Allows synchronization between background ops and the test operations
  */
-var waitForLock = function(mongo, name) {
+export var waitForLock = function(mongo, name) {
     var ts = new ObjectId();
     var lockColl = mongo.getCollection("config.testLocks");
 
@@ -47,7 +47,7 @@ var waitForLock = function(mongo, name) {
 /**
  * Allows a test or background op to say it's finished
  */
-var setFinished = function(mongo, name, finished) {
+export var setFinished = function(mongo, name, finished) {
     if (finished || finished == undefined)
         mongo.getCollection("config.testFinished").update({_id: name}, {_id: name}, true);
     else
@@ -57,14 +57,14 @@ var setFinished = function(mongo, name, finished) {
 /**
  * Checks whether a test or background op is finished
  */
-var isFinished = function(mongo, name) {
+export var isFinished = function(mongo, name) {
     return mongo.getCollection("config.testFinished").findOne({_id: name}) != null;
 };
 
 /**
  * Sets the result of a background op
  */
-var setResult = function(mongo, name, result, err) {
+export var setResult = function(mongo, name, result, err) {
     mongo.getCollection("config.testResult")
         .update({_id: name}, {_id: name, result: result, err: err}, true);
 };
@@ -72,11 +72,11 @@ var setResult = function(mongo, name, result, err) {
 /**
  * Gets the result for a background op
  */
-var getResult = function(mongo, name) {
+export var getResult = function(mongo, name) {
     return mongo.getCollection("config.testResult").findOne({_id: name});
 };
 
-var startParallelOps = function(mongo, proc, args, context) {
+export var startParallelOps = function(mongo, proc, args, context) {
     var procName = proc.name + "-" + new ObjectId();
     var seed = new ObjectId(new ObjectId().valueOf().split("").reverse().join(""))
                    .getTimestamp()
@@ -96,16 +96,16 @@ var startParallelOps = function(mongo, proc, args, context) {
         setResult: setResult,
 
         setup: function(context, stored) {
-            waitForLock = function() {
+            globalThis.waitForLock = function() {
                 return context.waitForLock(db.getMongo(), context.procName);
             };
-            setFinished = function(finished) {
+            globalThis.setFinished = function(finished) {
                 return context.setFinished(db.getMongo(), context.procName, finished);
             };
-            isFinished = function() {
+            globalThis.isFinished = function() {
                 return context.isFinished(db.getMongo(), context.procName);
             };
-            setResult = function(result, err) {
+            globalThis.setResult = function(result, err) {
                 return context.setResult(db.getMongo(), context.procName, result, err);
             };
         }
@@ -167,17 +167,17 @@ var startParallelOps = function(mongo, proc, args, context) {
 
     // Save the global db object if it exists, so that we can restore it after starting the parallel
     // shell.
-    var oldDB = undefined;
+    let oldDB = undefined;
     if (typeof db !== 'undefined') {
         oldDB = db;
     }
-    db = mongo.getDB("test");
+    globalThis.db = mongo.getDB("test");
 
     jsTest.log("Starting " + proc.name + " operations...");
 
     var rawJoin = startParallelShell(bootstrapStartup);
 
-    db = oldDB;
+    globalThis.db = oldDB;
 
     var join = function(options = {}) {
         const {checkExitSuccess = true} = options;
@@ -202,7 +202,7 @@ var startParallelOps = function(mongo, proc, args, context) {
     return join;
 };
 
-var RandomFunctionContext = function(context) {
+export var RandomFunctionContext = function(context) {
     Random.srand(context.seed);
 
     Random.randBool = function() {
@@ -252,7 +252,7 @@ var RandomFunctionContext = function(context) {
 // Some utility operations
 //
 
-function moveOps(collName, options) {
+export function moveOps(collName, options) {
     options = options || {};
 
     var admin = db.getMongo().getDB("admin");
@@ -276,7 +276,7 @@ function moveOps(collName, options) {
     jsTest.log("Stopping moveOps...");
 }
 
-function splitOps(collName, options) {
+export function splitOps(collName, options) {
     options = options || {};
 
     var admin = db.getMongo().getDB("admin");

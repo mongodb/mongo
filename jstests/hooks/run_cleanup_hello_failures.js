@@ -1,8 +1,5 @@
-'use strict';
-
-(function() {
-load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
-load('jstests/libs/fixture_helpers.js');
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 function cleanupHelloFailInjection(connection) {
     jsTestLog(`Cleanup Hello fail injection in ${connection}`);
@@ -32,4 +29,3 @@ if (topology.type === Topology.kShardedCluster) {
     doFailInjectionCleanup(db);
 }
 jsTestLog(`Hello fail hook completed`);
-})();

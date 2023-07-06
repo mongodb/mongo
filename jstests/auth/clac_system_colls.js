@@ -5,14 +5,12 @@
 
 // Verify that system collections are treated correctly
 function runTest(admindb) {
-    var authzErrorCode = 13;
-
     admindb.createUser({user: "admin", pwd: "pwd", roles: ["userAdminAnyDatabase"]});
     assert.eq(1, admindb.auth("admin", "pwd"));
 
     var sysCollections = ["system.js", "system.profile", "system.roles", "system.users"];
     var sysPrivs = new Array();
-    for (var i in sysCollections) {
+    for (let i in sysCollections) {
         sysPrivs.push(
             {resource: {db: admindb.getName(), collection: sysCollections[i]}, actions: ['find']});
     }
@@ -32,7 +30,7 @@ function runTest(admindb) {
     assert.doesNotThrow(function() {
         admindb.foo.findOne();
     });
-    for (var i in sysCollections) {
+    for (let i in sysCollections) {
         assert.commandFailed(admindb.runCommand({count: sysCollections[i]}));
     }
 
@@ -43,7 +41,7 @@ function runTest(admindb) {
     assert.throws(function() {
         admindb.foo.findOne();
     });
-    for (var i in sysCollections) {
+    for (let i in sysCollections) {
         assert.commandWorked(admindb.runCommand({count: sysCollections[i]}));
     }
 

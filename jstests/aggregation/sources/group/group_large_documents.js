@@ -9,10 +9,7 @@
  *   assumes_against_mongod_not_mongos,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.group_large_documents_local;
 coll.drop();
@@ -34,4 +31,3 @@ for (let preventProjectPushdown of [false, true]) {
     assert(arrayEq(results, [{a: 2}]),
            "Pipeline:\n" + tojson(pipeline) + "Actual results:\n" + tojson(results));
 }
-}());

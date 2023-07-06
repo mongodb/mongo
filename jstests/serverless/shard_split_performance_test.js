@@ -5,14 +5,9 @@
  */
 
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/replsets/rslib.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 function runOneMoveChunk() {
-    'use strict';
-
-    load("jstests/sharding/libs/find_chunks_util.js");
-
     var st = new ShardingTest({mongos: 1, shards: 2});
     var kDbName = 'db';
 
@@ -94,8 +89,6 @@ function extractTimingsForSplitSteps(connection) {
 }
 
 function runOneSplit() {
-    "use strict";
-
     const test = new ShardSplitTest({
         quickGarbageCollection: true,
         nodeOptions: {

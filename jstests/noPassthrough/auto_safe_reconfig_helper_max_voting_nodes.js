@@ -6,10 +6,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
+import {assertSameConfigContent, reconfig, waitAllNodesHaveConfig} from "jstests/replsets/rslib.js";
 
 // Make secondaries unelectable. Add 7 voting nodes, which is the maximum allowed.
 const replTest = new ReplSetTest({
@@ -83,4 +80,3 @@ reconfig(replTest, config);
 // nodes may fail to answer certain commands and fail the test.
 waitAllNodesHaveConfig(replTest, config);
 replTest.stopSet();
-})();

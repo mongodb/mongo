@@ -3,7 +3,7 @@
 
 let s = new ShardingTest({name: 'shard7', shards: 2});
 
-db = s.admin._mongo.getDB('test');
+const db = s.admin._mongo.getDB('test');
 let c = db['foo'];
 c.drop();
 

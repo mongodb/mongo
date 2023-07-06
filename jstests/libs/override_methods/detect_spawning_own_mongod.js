@@ -2,9 +2,6 @@
  * Define overrides to prevent any test from spawning its own test fixture since certain passthrough
  * suites should not contain JS tests that start their own mongod/s.
  */
-(function() {
-'use strict';
-
 MongoRunner.runMongod = function() {
     throw new Error("Detected MongoRunner.runMongod() call in js test from passthrough suite. " +
                     "Consider moving the test to one of the jstests/noPassthrough/, " +
@@ -48,4 +45,3 @@ ReplSetTest.overridenConstructor = ReplSetTest;
 // ReplSetTest.kDefaultTimeoutMS property, which should be accessible to tests in the
 // passthrough suite.
 ReplSetTest = Object.assign(RSTOverrideConstructor, ReplSetTest);
-})();

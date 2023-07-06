@@ -6,9 +6,6 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.timeseries_expire_collmod;
 coll.drop();
 
@@ -77,4 +74,3 @@ runTest(coll, 'off');
 
 // Enable expireAfterSeconds again.
 runTest(coll, 100);
-})();

@@ -5,6 +5,8 @@
  *
  * @tags: [assumes_balancer_off]
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var states = {
         remove: function remove(db, collName) {

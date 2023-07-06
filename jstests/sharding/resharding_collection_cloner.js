@@ -5,11 +5,8 @@
  *   uses_atclustertime,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/uuid_util.js");
-load("jstests/sharding/libs/create_sharded_collection_util.js");
+import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const st = new ShardingTest({
     mongos: 1,
@@ -142,4 +139,3 @@ testReshardCloneCollection(st.shard1, [
 ]);
 
 st.stop();
-})();

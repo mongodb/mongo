@@ -3,8 +3,6 @@
 // @tags: [assumes_no_implicit_collection_creation_after_drop]
 
 // Integration tests for collation-aware updates.
-(function() {
-'use strict';
 var coll = db.getCollection("collation_update_test");
 
 const caseInsensitive = {
@@ -315,4 +313,3 @@ assert.commandWorked(coll.bulkWrite([{
     }
 }]));
 assert.eq(coll.findOne().newField, 3, `actual=${coll.findOne()}`);
-})();

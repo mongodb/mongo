@@ -3,11 +3,10 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 // The write concern to use when inserting documents into test collections. Waiting for the
 // documents to get replicated to all nodes is necessary since the test later runs the
@@ -95,4 +94,3 @@ runTest({mode: "primary"});
 runTest({mode: "secondary"});
 
 st.stop();
-})();

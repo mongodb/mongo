@@ -10,8 +10,8 @@
  * ]
  */
 
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-load("jstests/libs/uuid_util.js");
 
 function assertNoCertificateOrPrivateKeyLogsForCmd(conn, cmdName) {
     assert(checkLog.checkContainsOnce(conn, new RegExp(`Slow query.*${cmdName}`)),

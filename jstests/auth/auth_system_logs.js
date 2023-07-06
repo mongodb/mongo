@@ -1,7 +1,4 @@
-(function() {
-'use strict';
-
-load('jstests/libs/parallel_shell_helpers.js');
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const mongod = MongoRunner.runMongod({auth: ''});
 mongod.getDB('admin').createUser(
@@ -65,4 +62,3 @@ runTest(2, true, 1);
 runTest(2, false, 2);
 
 MongoRunner.stopMongod(mongod);
-})();

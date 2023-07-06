@@ -5,9 +5,6 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-"use strict";
-
 // Create a cluster with only 1 shard.
 const st = new ShardingTest({
     shards: 1,
@@ -47,4 +44,3 @@ stream.close();
 wholeDbStream.close();
 
 st.stop();
-})();

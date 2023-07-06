@@ -2,9 +2,6 @@
 //
 // This test uses the fsync command to induce locking.
 // @tags: [requires_fsync]
-(function() {
-'use strict';
-
 function testBlockTime(blockTimeMillis) {
     // Lock the database, and in parallel start an operation that needs the lock, so it blocks.
     assert.commandWorked(db.fsyncLock());
@@ -66,4 +63,3 @@ var conn = MongoRunner.runMongod();
 var db = conn.getDB('test');
 printjson([1, 10, 100, 500, 1000, 1500].map(testBlockTime));
 MongoRunner.stopMongod(conn);
-})();

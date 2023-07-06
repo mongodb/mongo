@@ -2,7 +2,6 @@
 //
 // Can't shard collection with invalid db name.
 // @tags: [assumes_unsharded_collection]
-(function() {
 var invalidDB = db.getSiblingDB("NonExistentDB");
 
 // This is a hack to bypass invalid database name checking by the DB constructor
@@ -15,4 +14,3 @@ var dbList = db.getSiblingDB('admin').runCommand({listDatabases: 1}).databases;
 dbList.forEach(function(dbInfo) {
     assert.neq('Invalid DB Name', dbInfo.name, 'database with invalid name was created');
 });
-}());

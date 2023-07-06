@@ -2,9 +2,6 @@
  * Tests that unique indexes can be built with a large number of unique values.
  */
 
-(function() {
-"use strict";
-
 let coll = db.stress_test_unique_index_unique;
 coll.drop();
 
@@ -27,4 +24,3 @@ function loadCollectionWithDocs(collection, numDocs) {
 loadCollectionWithDocs(coll, kNumDocs);
 
 assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
-})();

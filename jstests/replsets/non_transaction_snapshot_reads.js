@@ -6,10 +6,7 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/global_snapshot_reads_util.js");
+import {SnapshotReadsTest} from "jstests/libs/global_snapshot_reads_util.js";
 
 const options = {
     // Set a large snapshot window of 10 minutes for the test.
@@ -49,4 +46,3 @@ const distinctResult = assert.commandWorked(primaryDB.runCommand({distinct: "tes
 assert(!distinctResult.hasOwnProperty("atClusterTime"));
 
 replSet.stopSet();
-})();

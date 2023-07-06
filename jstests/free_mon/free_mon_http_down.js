@@ -1,9 +1,10 @@
 // Validate registration retries if the web server is down.
 //
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {
+    FAULT_FAIL_REGISTER,
+    FreeMonGetServerStatus,
+    FreeMonWebServer
+} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer(FAULT_FAIL_REGISTER);
 
@@ -29,4 +30,3 @@ assert.soon(function() {
 MongoRunner.stopMongod(conn);
 
 mock_web.stop();
-})();

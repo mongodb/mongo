@@ -2,9 +2,6 @@
 //
 // Tests running with experimental CQF behavior require test commands to be enabled.
 // @tags: [requires_sharding, cqf_experimental_incompatible]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "coll";
 
@@ -44,4 +41,3 @@ expectSnapshotReadConcernIsSupported();
 // Snapshot readConcern should succeed when 'enableTestCommands' is set to true.
 TestData.enableTestCommands = true;
 expectSnapshotReadConcernIsSupported();
-}());

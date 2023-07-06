@@ -12,9 +12,6 @@
  *   requires_latch_analyzer
  * ]
  */
-(function() {
-"use strict";
-
 const adminDB = db.getSiblingDB("admin");
 
 // This test causes an extra thread with a self-contended lock to be created so that currentOp can
@@ -106,4 +103,3 @@ try {
         }
     });
 }
-})();

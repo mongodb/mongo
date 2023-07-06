@@ -1,12 +1,9 @@
-load("jstests/replsets/rslib.js");
-
 /**
  * Test for making sure that the replica seed list in the config server does not
  * become invalid when a replica set reconfig happens.
  * @tags: [multiversion_incompatible]
  */
-(function() {
-"use strict";
+import {awaitRSClientHosts, reconfig} from "jstests/replsets/rslib.js";
 
 // Skip the following checks since the removed node has wrong config and is still alive.
 TestData.skipCheckDBHashes = true;
@@ -87,4 +84,3 @@ assert.soon(
     });
 
 st.stop({parallelSupported: false});
-}());

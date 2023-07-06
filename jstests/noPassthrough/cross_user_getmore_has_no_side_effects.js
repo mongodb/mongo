@@ -3,7 +3,6 @@
 // will work.
 // @tags: [requires_sharding]
 
-(function() {
 const st = new ShardingTest({shards: 2, config: 1, other: {keyFile: "jstests/libs/key1"}});
 const kDBName = "test";
 const adminDB = st.s.getDB('admin');
@@ -74,4 +73,3 @@ assert.commandWorked(testDB.runCommand({getMore: cursorID, collection: coll.getN
 logout(userA);
 
 st.stop();
-})();

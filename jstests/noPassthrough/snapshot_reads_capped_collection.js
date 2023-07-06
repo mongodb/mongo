@@ -7,9 +7,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const replSet = new ReplSetTest({nodes: 1});
 
 replSet.startSet();
@@ -42,4 +39,3 @@ assert.commandFailedWithCode(sessionDB.runCommand({find: collName}),
                              ErrorCodes.SnapshotUnavailable);
 
 replSet.stopSet();
-})();

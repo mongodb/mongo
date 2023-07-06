@@ -6,8 +6,8 @@
  *     requires_replication,
  * ]
  */
-load("jstests/libs/fail_point_util.js");
-load("jstests/noPassthrough/libs/index_build.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const replTest = new ReplSetTest({
     nodes: 1,

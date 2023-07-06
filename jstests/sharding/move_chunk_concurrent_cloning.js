@@ -4,10 +4,7 @@
  *   requires_fcv_63,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/chunk_manipulation_util.js');
+import {moveChunkParallel} from "jstests/libs/chunk_manipulation_util.js";
 
 const runParallelMoveChunk = (numThreads) => {
     // For startParallelOps to write its state
@@ -112,4 +109,3 @@ runParallelMoveChunk(1);
 for (let i = 1; i <= 4; i++) {
     runParallelMoveChunk(Math.floor(Math.random() * 31) + 1);
 }
-})();

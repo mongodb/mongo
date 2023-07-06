@@ -3,9 +3,7 @@
  *
  * @tags: [requires_fcv_70]
  */
-import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
-
-load("jstests/sharding/analyze_shard_key/libs/validation_common.js");
+import {ValidationTest} from "jstests/sharding/analyze_shard_key/libs/validation_common.js";
 
 function makeAnalyzeShardKeyAggregateCmdObj(collName, key, splitPointsShardId) {
     const analyzeShardKeyId = UUID();

@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const coll = db[jsTestName()];
 coll.drop();
 
@@ -86,4 +83,3 @@ result = coll.aggregate(pipeline).toArray();
 // Add ten, have two originally for each partition.
 assert.eq(result.length, 1, result);
 assert.eq(result[0].count, 24, result[0]);
-})();

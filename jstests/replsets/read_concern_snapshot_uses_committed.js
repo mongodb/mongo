@@ -10,10 +10,10 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries.
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries
+} from "jstests/libs/write_concern_util.js";
 
 const replSet = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 replSet.startSet();
@@ -79,4 +79,3 @@ for (let db of [primaryDB, secondaryDB]) {
 
 restartReplicationOnSecondaries(replSet);
 replSet.stopSet();
-}());

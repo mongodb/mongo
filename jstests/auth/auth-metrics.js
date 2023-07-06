@@ -1,8 +1,5 @@
 // Test for auth counters in serverStatus.
 
-(function() {
-'use strict';
-
 let expectedSuccessLogs = 0;
 let expectedFailureLogs = 0;
 
@@ -258,4 +255,3 @@ let runTest = (connectionHealthLoggingOn) => {
 // Parameterized on enabling/disabling connection health logging.
 runTest(true);
 runTest(false);
-})();

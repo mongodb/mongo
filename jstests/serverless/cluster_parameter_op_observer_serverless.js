@@ -8,10 +8,9 @@
  *  ]
  */
 
-(function() {
-'use strict';
-// For ChangeStreamMultitenantReplicaSetTest.
-load("jstests/serverless/libs/change_collection_util.js");
+import {
+    ChangeStreamMultitenantReplicaSetTest
+} from "jstests/serverless/libs/change_collection_util.js";
 
 const getTenantConnection = ChangeStreamMultitenantReplicaSetTest.getTenantConnection;
 
@@ -49,4 +48,3 @@ assert.commandWorked(
 
 runTest(rst.getPrimary());
 rst.stopSet();
-})();

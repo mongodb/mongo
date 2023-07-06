@@ -4,9 +4,6 @@
  * @tags: [ do_not_wrap_aggregations_in_facets ]
  */
 
-(function() {
-"use strict";
-
 const coll = db.multiple_unpack_bucket_error;
 coll.drop();
 
@@ -57,4 +54,3 @@ assert.commandFailedWithCode(db.runCommand({
     cursor: {}
 }),
                              7183900);
-})();

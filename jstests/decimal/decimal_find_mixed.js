@@ -1,7 +1,5 @@
 // Tests finding NumberDecimal from the shell in mixed collections.
 
-(function() {
-"use strict";
 var col = db.decimal_find_mixed;
 col.drop();
 
@@ -67,4 +65,3 @@ assert.eq(col.find({"a": NumberDecimal("36028797018963967")}).count(), 1, "E1");
 // Not representable as double
 assert.eq(col.find({"a": 36028797018963967}).count(), 0, "E2");
 assert.eq(col.find({"a": NumberLong("36028797018963967")}).count(), 1, "E3");
-}());

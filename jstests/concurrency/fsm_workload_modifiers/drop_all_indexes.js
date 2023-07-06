@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * drop_all_indexes.js
  *
@@ -7,8 +5,9 @@
  * base workload's setup function. The implicit _id index and any indexes
  * that already existed at the start of setup are not dropped.
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
-function dropAllIndexes($config, $super) {
+export function dropAllIndexes($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         var oldIndexes = db[collName].getIndexes().map(function(ixSpec) {
             return ixSpec.name;

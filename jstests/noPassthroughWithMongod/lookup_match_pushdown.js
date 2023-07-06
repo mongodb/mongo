@@ -1,7 +1,7 @@
 /**
  * Tests that the $match stage is pushed before $lookup stage.
  */
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.lookup_match_pushdown;

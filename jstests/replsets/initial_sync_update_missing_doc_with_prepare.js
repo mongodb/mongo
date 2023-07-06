@@ -14,9 +14,14 @@
  * ]
  */
 
-(function() {
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/replsets/libs/initial_sync_update_missing_doc.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {
+    finishAndValidate,
+    insertUpdateRemoveLarge,
+    reInitiateSetWithSecondary,
+    turnOffHangBeforeCopyingDatabasesFailPoint,
+    updateRemove,
+} from "jstests/replsets/libs/initial_sync_update_missing_doc.js";
 
 function doTest(doTransactionWork, numDocuments) {
     const replSet = new ReplSetTest({nodes: 1});
@@ -80,4 +85,3 @@ jsTestLog("Testing with large prepared transaction");
 // secondary should apply each operation separately (one insert, one update, and one delete)
 // during initial sync.
 doTest(insertUpdateRemoveLarge, 2 /* numDocuments after initial sync */);
-})();

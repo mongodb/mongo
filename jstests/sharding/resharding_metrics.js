@@ -1,8 +1,5 @@
-(function() {
-'use strict';
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const kNamespace = 'test.resharding';
 function getCurrentOpSection(mongo, role) {
@@ -66,7 +63,7 @@ reshardingTest.withReshardingInBackground(
             {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
         ],
     },
-    (tempNs) => {
+    () => {
         // Wait for the resharding operation and the donor services to start.
         const mongos = inputCollection.getMongo();
         assert.soon(() => {
@@ -127,4 +124,3 @@ allNodes.forEach((hostName) => {
 });
 
 reshardingTest.teardown();
-})();

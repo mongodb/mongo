@@ -1,5 +1,3 @@
-"use strict";
-
 /**
  * Repeatedly creates a time-series collection, inserts data and drops it.
  *
@@ -8,6 +6,8 @@
  *   does_not_support_stepdowns,
  * ]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var data = {prefix: "create_timeseries_collection"};
 

@@ -1,8 +1,6 @@
 // Tests that $unionWith can successfully read from a view that is backed by a sharded collection.
 
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");  // For 'resultsEq'.
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const st = new ShardingTest({shards: 2});
 
@@ -179,4 +177,3 @@ assert.commandWorked(db.runCommand({
 testQueryOverUnionedData(db["union_view"]);
 
 st.stop();
-}());

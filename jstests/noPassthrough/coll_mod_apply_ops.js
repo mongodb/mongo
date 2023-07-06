@@ -1,8 +1,6 @@
 // SERVER-30665 Ensure that a non-empty collMod with a nonexistent UUID is not applied
 // in applyOps.
 
-(function() {
-"use strict";
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up with empty options");
 
@@ -41,4 +39,3 @@ assert.commandWorked(dbCollMod.adminCommand({"applyOps": [collModApplyOpsEntry]}
 assert.eq(dbCollMod.getCollectionInfos()[0].name, collName);
 assert.eq(dbCollMod.getCollectionInfos()[0].options.validationLevel, "off");
 MongoRunner.stopMongod(conn);
-}());

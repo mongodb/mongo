@@ -8,10 +8,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // for anyEq.
+import {anyEq} from "jstests/aggregation/extras/utils.js";
 
 const nDocs = 100;
 const readCollName = "readColl";
@@ -68,4 +65,3 @@ const primaryProfile =
 assert.eq(1, primaryProfile);
 
 rs.stopSet();
-}());

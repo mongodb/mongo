@@ -9,9 +9,7 @@
  *  multiversion_incompatible,
  * ]
  */
-(function() {
-'use strict';
-load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]});
 rst.startSet();
@@ -78,4 +76,3 @@ primaryCST.assertNoChange(primaryChangeStream);
 secondaryCST.assertNoChange(secondaryChangeStream);
 
 rst.stopSet();
-})();

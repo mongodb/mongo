@@ -3,9 +3,6 @@
  *
  *  @tags: [multiversion_incompatible]
  */
-(function() {
-'use strict';
-
 const kWaitForCompletedChecksCount = 30;
 const kWaitForPassedChecksCount = 10;
 const kMonitoringIntervalMs = 200;
@@ -67,4 +64,3 @@ assert.soon(() => {
 });
 
 st.stop();
-})();

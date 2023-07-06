@@ -1,38 +1,39 @@
 // Test correctness of replication while a secondary's get more requests are killed on the primary
 // using killop.  SERVER-7952
 
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+
 let numDocs = 1e5;
 
 // Set up a replica set.
 let replTest = new ReplSetTest({name: 'test', nodes: 3});
-let nodes = replTest.startSet();
+replTest.startSet();
 replTest.initiate();
 let primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
-db = primary.getDB('test');
-db.test.save({a: 0});
+let testDb = primary.getDB('test');
+testDb.test.save({a: 0});
 replTest.awaitReplication();
 assert.soon(function() {
     return secondary.getDB('test').test.find().itcount() == 1;
 });
 
 // Start a parallel shell to insert new documents on the primary.
-let inserter = startParallelShell(
-    'var bulk = db.test.initializeUnorderedBulkOp(); \
-     for( i = 1; i < ' +
-    numDocs +
-    '; ++i ) { \
-         bulk.insert({ a: i });  \
-     } \
-     bulk.execute();');
+let inserter = startParallelShell(funWithArgs(function(numDocs) {
+                                      var bulk = db.test.initializeUnorderedBulkOp();
+                                      for (let i = 1; i < numDocs; ++i) {
+                                          bulk.insert({a: i});
+                                      }
+                                      bulk.execute();
+                                  }, numDocs), primary.port);
 
 // Periodically kill replication get mores.
 for (let i = 0; i < 1e3; ++i) {
-    let allOps = db.currentOp();
+    let allOps = testDb.currentOp();
     for (let j in allOps.inprog) {
         let op = allOps.inprog[j];
         if (op.ns == 'local.oplog.rs' && op.op == 'getmore') {
-            db.killOp(op.opid);
+            testDb.killOp(op.opid);
         }
     }
     sleep(100);
@@ -41,7 +42,7 @@ for (let i = 0; i < 1e3; ++i) {
 // Wait for the inserter to finish.
 inserter();
 
-assert.eq(numDocs, db.test.find().itcount());
+assert.eq(numDocs, testDb.test.find().itcount());
 
 // Return true when the correct number of documents are present on the secondary.  Otherwise print
 // which documents are missing and return false.

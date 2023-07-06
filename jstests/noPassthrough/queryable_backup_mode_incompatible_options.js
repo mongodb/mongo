@@ -8,9 +8,6 @@
  */
 
 // Check that starting mongod with both --queryableBackupMode and --replSet fails.
-(function() {
-"use strict";
-
 var name = "queryable_backup_mode_repl_set";
 var dbdir = MongoRunner.dataPath + name + "/";
 
@@ -53,4 +50,3 @@ assert.throws(
         {dbpath: dbdir, noCleanData: true, queryableBackupMode: '', profile: 1}),
     [],
     "mongod should fail to start when both --queryableBackupMode and --profile are provided");
-})();

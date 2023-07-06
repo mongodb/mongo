@@ -1,14 +1,11 @@
 // Test role restrictions when using security tokens.
 // @tags: [requires_replication]
 
-(function() {
-'use strict';
-
 const tenantID = ObjectId();
 const isSecurityTokenEnabled = TestData.setParameters.featureFlagSecurityToken;
 
 if (!isSecurityTokenEnabled) {
-    return;
+    quit();
 }
 
 function runTest(conn, rst = undefined) {
@@ -77,4 +74,3 @@ const opts = {
     runTest(rst.getPrimary(), rst);
     rst.stopSet();
 }
-})();

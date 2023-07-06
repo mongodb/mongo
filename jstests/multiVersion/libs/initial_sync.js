@@ -1,8 +1,5 @@
 
-'use strict';
-
-load("jstests/multiVersion/libs/multi_rs.js");
-load("jstests/replsets/rslib.js");
+import "jstests/multiVersion/libs/multi_rs.js";
 
 /**
  * Test that starts up a replica set with 2 nodes of version 'replSetVersion', inserts some data,
@@ -10,7 +7,7 @@ load("jstests/replsets/rslib.js");
  * to complete. If the 'fcv' argument is given, sets the feature compatibility version of the
  * replica set to 'fcv' before adding the third node.
  */
-var multversionInitialSyncTest = function(
+export var multversionInitialSyncTest = function(
     name, replSetVersion, newNodeVersion, configSettings, fcv) {
     var nodes = {n1: {binVersion: replSetVersion}, n2: {binVersion: replSetVersion}};
 

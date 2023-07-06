@@ -1,7 +1,7 @@
 import {
     RoutingTableConsistencyChecker
 } from "jstests/libs/check_routing_table_consistency_helpers.js";
-load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a server?');
 

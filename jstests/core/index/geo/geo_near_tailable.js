@@ -4,9 +4,6 @@
 //
 // Tests that combine $geoNear and tailable cursors.
 //
-(function() {
-"use strict";
-
 let cmdRes;
 const collName = 'geo_near_tailable';
 const cappedCollName = 'geo_near_tailable_capped';
@@ -24,4 +21,3 @@ cmdRes = db.runCommand({find: collName, filter: {a: {$geoNear: [1, 2]}}, tailabl
 assert.commandFailedWithCode(cmdRes, ErrorCodes.BadValue);
 cmdRes = db.runCommand({find: cappedCollName, filter: {a: {$geoNear: [1, 2]}}, tailable: true});
 assert.commandFailedWithCode(cmdRes, ErrorCodes.BadValue);
-})();

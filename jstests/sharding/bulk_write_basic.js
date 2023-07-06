@@ -4,10 +4,7 @@
  * @tags: [multiversion_incompatible, featureFlagBulkWriteCommand]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/namespace_utils.js");  // getDBNameAndCollNameFromFullNamespace()
+import {getDBNameAndCollNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 
 function bulkWriteBasicTest(ordered) {
     jsTestLog(`Running bulkWrite command sharding test with ordered: ${ordered}`);
@@ -178,4 +175,3 @@ function bulkWriteBasicTest(ordered) {
 
 bulkWriteBasicTest(true);
 bulkWriteBasicTest(false);
-})();

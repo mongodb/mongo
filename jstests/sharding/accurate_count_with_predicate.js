@@ -6,9 +6,6 @@
  * of the shards. It then runs a count() and ensures that the orphan documents are not counted
  * twice.
  */
-(function() {
-"use strict";
-
 // Deliberately inserts orphans outside of migration.
 TestData.skipCheckOrphans = true;
 
@@ -43,4 +40,3 @@ for (let i = middle + 1; i < middle + 3; i++) {
 assert.eq(st.getDB("test").slowcount.count({one: 1}), num);
 
 st.stop();
-})();

@@ -1,8 +1,5 @@
 // Tests user queries over the config servers.
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var getListCollectionsCursor = function(database, options, subsequentBatchSize) {
     return new DBCommandCursor(
@@ -28,10 +25,6 @@ var sortArrayByName = function(array) {
     return array.sort(function(a, b) {
         return a.name > b.name;
     });
-};
-
-var cursorGetIndexNames = function(cursor) {
-    return arrayGetNames(sortArrayByName(cursor.toArray()));
 };
 
 var sortArrayById = function(array) {
@@ -222,6 +215,7 @@ var queryConfigChunks = function(st) {
 
     // Map reduce query.
     const coll = configDB.collections.findOne({_id: testColl.getFullName()});
+    /* eslint-disable */
     var mapFunction = function() {
         if (xx.timestamp) {
             if (this.uuid.toString() == xx.uuid.toString()) {
@@ -233,6 +227,7 @@ var queryConfigChunks = function(st) {
             }
         }
     };
+    /* eslint-enable */
     var reduceFunction = function(key, values) {
         // We may be re-reducing values that have already been partially reduced. In that case, we
         // expect to see an object like {chunks: <count>} in the array of input values.
@@ -369,4 +364,3 @@ queryConfigChunks(st);
 queryUserCreated(configDB);
 queryUserCreated(adminDB);
 st.stop();
-})();

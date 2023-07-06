@@ -8,7 +8,6 @@
  *   requires_non_retryable_writes,
  * ]
  */
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
 import {
     testClusteredCollectionHint
 } from "jstests/libs/clustered_collections/clustered_collection_hint_common.js";

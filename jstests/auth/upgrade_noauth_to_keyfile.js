@@ -1,11 +1,4 @@
-/**
- * This test checks the upgrade path from noauth to keyFile.
- *
- * This test requires users to persist across a restart.
- * @tags: [requires_persistence, requires_replication]
- */
-
-load('jstests/multiVersion/libs/multi_rs.js');
+import "jstests/multiVersion/libs/multi_rs.js";
 
 // We turn off gossiping the mongo shell's clusterTime because this test connects to replica sets
 // and sharded clusters as a user other than __system. Attempting to advance the clusterTime while
@@ -13,8 +6,6 @@ load('jstests/multiVersion/libs/multi_rs.js');
 TestData.skipGossipingClusterTime = true;
 TestData.skipCheckOrphans = true;
 
-(function() {
-'use strict';
 var keyFilePath = 'jstests/libs/key1';
 
 // Disable auth explicitly
@@ -56,4 +47,3 @@ rstConn3.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'});
 assert.eq(3, rstConn3.getDB('test').a.count(), 'Error interacting with replSet');
 
 rst.stopSet();
-}());

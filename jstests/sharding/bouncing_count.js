@@ -1,9 +1,6 @@
 /**
  * Tests whether new sharding is detected on insert by mongos
  */
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 10, mongos: 3});
 
 var mongosA = st.s0;
@@ -64,4 +61,3 @@ printjson(collB.count());
 printjson(collC.find().toArray());
 
 st.stop();
-})();

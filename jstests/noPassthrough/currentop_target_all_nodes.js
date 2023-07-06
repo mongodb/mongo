@@ -4,9 +4,6 @@
 // @tags: [
 // requires_fcv_71,
 // ]
-(function() {
-"use strict";
-
 const shardCount = 2;
 const rsNodesPerShardCount = 2;
 const st = new ShardingTest({shards: shardCount, rs: {nodes: rsNodesPerShardCount}});
@@ -29,4 +26,3 @@ assert.eq(
     shardCount * rsNodesPerShardCount, targetAllNodesTrue.itcount(), tojson(targetAllNodesTrue));
 
 st.stop();
-}());

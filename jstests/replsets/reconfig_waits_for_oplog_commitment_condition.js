@@ -3,10 +3,8 @@
  * previous config to be committed in the current config.
  *
  */
-(function() {
-"use strict";
-load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/rslib.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {isConfigCommitted, isMemberNewlyAdded, reconnect} from "jstests/replsets/rslib.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -146,4 +144,3 @@ config.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 assert.soon(() => isConfigCommitted(primary));
 rst.stopSet();
-}());

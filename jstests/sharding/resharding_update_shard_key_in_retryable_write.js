@@ -5,13 +5,7 @@
  *
  * @tags: [requires_fcv_60]
  */
-(function() {
-
-"use strict";
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 function runTest(reshardInPlace) {
     const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace});
@@ -168,4 +162,3 @@ function runTest(reshardInPlace) {
 
 runTest(true /* reshardInPlace */);
 runTest(false /* reshardInPlace */);
-})();

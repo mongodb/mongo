@@ -7,8 +7,10 @@
  *   uses_transactions,
  * ]
  */
-load("jstests/libs/create_collection_txn_helpers.js");
-load("jstests/libs/auto_retry_transaction_in_sharding.js");
+import {
+    retryOnceOnTransientAndRestartTxnOnMongos
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {createCollAndCRUDInTxn} from "jstests/libs/create_collection_txn_helpers.js";
 
 const dbName = 'test_txns_create_collection_parallel';
 

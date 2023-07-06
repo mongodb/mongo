@@ -6,10 +6,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/index_build.js');  // for assertIndexes().
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 // Skip db hash check because secondary will have different number of indexes due to
 // buildIndexes:false.
@@ -78,4 +75,3 @@ IndexBuildTest.assertIndexes(secondaryDbs[2][collName], 1, ['_id_']);
 IndexBuildTest.assertIndexes(secondaryDbs[3][collName], 1, ['_id_']);
 
 replTest.stopSet();
-}());

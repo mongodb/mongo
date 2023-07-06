@@ -1,8 +1,5 @@
 // SERVER-17224 An aggregation result with exactly the right size could crash the server rather than
 //              returning an error.
-(function() {
-'use strict';
-
 var t = db.server17224;
 t.drop();
 
@@ -22,4 +19,3 @@ assert.commandFailed(db.runCommand({
 
 // Make sure the server is still up.
 assert.commandWorked(db.runCommand('ping'));
-}());

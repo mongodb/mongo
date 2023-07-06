@@ -1,11 +1,5 @@
-// SERVER-23029 added a new expression, $reverseArray, which consumes an array or a nullish value
-// and produces either the reversed version of that array, or null. In this test file, we check the
-// behavior and error cases.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode.
-
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.reverseArray;
 coll.drop();
@@ -30,68 +24,67 @@ var output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, [2, 1]);
 
-var res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: [[1, 2]]}}}}]);
-var output = res.toArray();
+res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: [[1, 2]]}}}}]);
+output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, [[1, 2]]);
 
-var res = coll.aggregate([{$project: {reversed: {$reverseArray: "$notAField"}}}]);
-var output = res.toArray();
+res = coll.aggregate([{$project: {reversed: {$reverseArray: "$notAField"}}}]);
+output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, null);
 
-var res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: [[1, 2], [3, 4]]}}}}]);
-var output = res.toArray();
+res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: [[1, 2], [3, 4]]}}}}]);
+output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, [[3, 4], [1, 2]]);
 
-var res = coll.aggregate([{$project: {reversed: {$reverseArray: "$embedded"}}}]);
-var output = res.toArray();
+res = coll.aggregate([{$project: {reversed: {$reverseArray: "$embedded"}}}]);
+output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, [[3, 4], [1, 2]]);
 
-var res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: null}}}}]);
-var output = res.toArray();
+res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: null}}}}]);
+output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, null);
 
-var res = coll.aggregate([{$project: {reversed: {$reverseArray: "$nullField"}}}]);
-var output = res.toArray();
+res = coll.aggregate([{$project: {reversed: {$reverseArray: "$nullField"}}}]);
+output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, null);
 
-var res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: undefined}}}}]);
-var output = res.toArray();
+res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: undefined}}}}]);
+output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, null);
 
-var res = coll.aggregate([{$project: {reversed: {$reverseArray: "$undefField"}}}]);
-var output = res.toArray();
+res = coll.aggregate([{$project: {reversed: {$reverseArray: "$undefField"}}}]);
+output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, null);
 
-var res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: [1]}}}}]);
-var output = res.toArray();
+res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: [1]}}}}]);
+output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, [1]);
 
-var res = coll.aggregate([{$project: {reversed: {$reverseArray: "$singleElem"}}}]);
-var output = res.toArray();
+res = coll.aggregate([{$project: {reversed: {$reverseArray: "$singleElem"}}}]);
+output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, [1]);
 
-var res = coll.aggregate([{$project: {reversed: {$reverseArray: "$normal"}}}]);
-var output = res.toArray();
+res = coll.aggregate([{$project: {reversed: {$reverseArray: "$normal"}}}]);
+output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, [3, 2, 1]);
 
-var res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: []}}}}]);
-var output = res.toArray();
+res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: []}}}}]);
+output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, []);
 
-var res = coll.aggregate([{$project: {reversed: {$reverseArray: "$empty"}}}]);
-var output = res.toArray();
+res = coll.aggregate([{$project: {reversed: {$reverseArray: "$empty"}}}]);
+output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, []);
-}());

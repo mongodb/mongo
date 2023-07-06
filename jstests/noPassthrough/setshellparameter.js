@@ -1,8 +1,5 @@
 // Test --setShellParameter CLI switch.
 
-(function() {
-'use strict';
-
 function test(ssp, succeed) {
     const result = runMongoProgram('mongo', '--setShellParameter', ssp, '--nodb', '--eval', ';');
     assert.eq(
@@ -17,4 +14,3 @@ test('enableTestCommands=1', false);
 
 // Unknown
 test('theAnswerToTheQuestionOfLifeTheUniverseAndEverything=42', false);
-})();

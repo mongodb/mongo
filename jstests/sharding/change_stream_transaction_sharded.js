@@ -5,9 +5,6 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "change_stream_transaction_sharded";
 const namespace = dbName + "." + collName;
@@ -256,4 +253,3 @@ confirmResumeForChangeList(changeListShard2, changeListShard1, changeListShard2)
 })();
 
 st.stop();
-})();

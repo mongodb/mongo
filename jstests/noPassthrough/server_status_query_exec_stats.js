@@ -1,9 +1,6 @@
 /**
  * Tests for serverStatus metrics.queryExecutor stats.
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB(jsTest.name());
@@ -56,4 +53,3 @@ assert.eq((nDocs * 2) + 1, getCollectionScans());
 assert.eq(nDocs + 1, getCollectionScansNonTailable());
 
 MongoRunner.stopMongod(conn);
-}());

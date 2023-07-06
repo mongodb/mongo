@@ -2,7 +2,6 @@
 // direct connection to a shard without failing, and $sample behaves as if we sampled an unsharded
 // collection.
 // @tags: [requires_fcv_51]
-(function() {
 let st = new ShardingTest({shards: 1});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
@@ -21,4 +20,3 @@ const res = assert.commandWorked(
 assert.eq(res.cursor.firstBatch.length, 3);
 
 st.stop();
-})();

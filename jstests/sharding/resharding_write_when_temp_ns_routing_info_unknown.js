@@ -7,12 +7,9 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/auto_retry_transaction_in_sharding.js");
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest();
 reshardingTest.setup();
@@ -111,4 +108,3 @@ for (const {desc, ns, opFn} of testCases) {
 }
 
 reshardingTest.teardown();
-})();

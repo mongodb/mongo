@@ -1,4 +1,4 @@
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertValueOnPlanPath} from "jstests/libs/optimizer_utils.js";
 
 const c = db.cqf_not;

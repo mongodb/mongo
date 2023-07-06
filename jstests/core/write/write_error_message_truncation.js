@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 var coll = db.write_error_message_truncation;
 coll.drop();
 
@@ -39,4 +36,3 @@ assert.eq(3, writeErrors.length);
 assert.neq('', writeErrors[0].errmsg);
 assert.neq('', writeErrors[1].errmsg);
 assert.neq('', writeErrors[2].errmsg);
-})();

@@ -5,9 +5,6 @@
  *  resource_intensive,
  * ]
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB(jsTestName());
@@ -31,4 +28,3 @@ assert.commandWorked(db.runCommand({"listCollections": 1}));
 
 // Do not validate collections since that is an expensive action.
 MongoRunner.stopMongod(conn, undefined, {skipValidation: true});
-})();

@@ -1,8 +1,6 @@
 /**
  * Tests for the $isNumber aggregation expression.
  */
-(function() {
-'use strict';
 const coll = db.isNumber_expr;
 coll.drop();
 
@@ -115,4 +113,3 @@ testIsNumber(new Date(), [{"isNum": false}], 21);
 
 // Test when $isNumber's input expression is a literal BinData.
 testIsNumber(UUID(), [{"isNum": false}], 21);
-}());

@@ -12,8 +12,8 @@
 //   cqf_experimental_incompatible,
 //   requires_fcv_71,
 // ]
-load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
 import {getPlanCacheKeyFromExplain} from "jstests/libs/analyze_plan.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.plan_cache_stats_shard_and_host;
 coll.drop();

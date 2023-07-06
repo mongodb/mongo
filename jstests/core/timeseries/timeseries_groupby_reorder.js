@@ -10,7 +10,7 @@
  *   requires_fcv_61,
  * ]
  */
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.timeseries_groupby_reorder;
 coll.drop();

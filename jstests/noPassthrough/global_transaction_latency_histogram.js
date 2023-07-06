@@ -1,8 +1,5 @@
 // Checks that the global histogram counter for transactions are updated as we expect.
 // @tags: [requires_replication, uses_transactions]
-(function() {
-"use strict";
-
 // Set up the replica set.
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -118,4 +115,3 @@ for (let i = 0; i < 3; i++) {
 
 session.endSession();
 rst.stopSet();
-}());

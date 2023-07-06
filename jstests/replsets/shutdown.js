@@ -1,9 +1,5 @@
 // Attempt to shut the server down as it is initializing replication, and confirm it doesn't crash.
 //
-load('jstests/replsets/rslib.js');
-(function() {
-"use strict";
-
 let ns = "test.coll";
 
 let rst = new ReplSetTest({
@@ -28,4 +24,3 @@ let program = rst.start(
 let exitCode = waitProgram(program.pid);
 assert.eq(0, exitCode);
 rst.stopSet();
-})();

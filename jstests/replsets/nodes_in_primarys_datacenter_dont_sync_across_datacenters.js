@@ -9,12 +9,13 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/libs/sync_source.js");
-load('jstests/replsets/rslib.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {
+    DataCenter,
+    delayMessagesBetweenDataCenters,
+    forceSyncSource
+} from "jstests/replsets/libs/sync_source.js";
+import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();
 const rst = new ReplSetTest({
@@ -123,4 +124,3 @@ assert.eq(numSyncSourceChanges + 1,
           serverStatus.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode);
 
 rst.stopSet();
-})();

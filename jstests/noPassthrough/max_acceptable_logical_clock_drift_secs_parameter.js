@@ -6,9 +6,6 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
 // maxAcceptableLogicalClockDriftSecs cannot be negative, zero, or a non-number.
 assert.throws(() => MongoRunner.runMongod({setParameter: {maxAcceptableLogicalClockDriftSecs: -1}}),
               [],
@@ -55,4 +52,3 @@ assert.commandFailedWithCode(testDB.runCommand({hello: 1, $clusterTime: tooFarTi
                              "expected command to not pass the rate limiter");
 
 st.stop();
-})();

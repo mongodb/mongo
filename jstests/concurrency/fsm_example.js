@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * fsm_example.js
  *

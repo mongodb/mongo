@@ -4,12 +4,11 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");   // For waitForCurOpByFailPoint().
-load("jstests/libs/parallelTester.js");  // for Thread.
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 // Verifies the transaction server status response has the fields that we expect.
 function verifyServerStatusFields(res) {
@@ -734,4 +733,3 @@ jsTest.log("Change shard key with retryable write - batch write command.");
 
 session.endSession();
 st.stop();
-}());

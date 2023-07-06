@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 // Test privileges
 function testPrivileges() {
     // Create new role with the exact privileges to execute $allCollectionStats
@@ -83,4 +80,3 @@ for (let i = 0; i < 6; i++) {
 testPrivileges();
 
 st.stop();
-})();

@@ -10,9 +10,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 function runTest(db, supportsTransactions, writeConcern = {}, secondaries = []) {
     assert.commandWorked(db.runCommand({setParameter: 1, requireApiVersion: true}));
     for (const secondary of secondaries) {
@@ -177,4 +174,3 @@ rst.stopSet();
 const st = new ShardingTest({});
 runTest(st.s0.getDB("admin"), true /* supportsTransactions */);
 st.stop();
-}());

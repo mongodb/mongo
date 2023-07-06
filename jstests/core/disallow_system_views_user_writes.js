@@ -5,9 +5,6 @@
  *   requires_non_retryable_writes,
  * ]
  */
-(function() {
-"use strict";
-
 const viewNs = "test.view";
 const viewDefinition = {
     _id: viewNs,
@@ -24,4 +21,3 @@ assert.commandFailedWithCode(
     db.runCommand({findAndModify: "system.views", query: {}, update: invalidField}),
     ErrorCodes.InvalidNamespace);
 assert.commandFailedWithCode(db.system.views.remove({}), ErrorCodes.InvalidNamespace);
-})();

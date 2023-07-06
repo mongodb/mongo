@@ -4,9 +4,6 @@
  *
  *  @tags: [multiversion_incompatible]
  */
-(function() {
-'use strict';
-
 const params = {
     setParameter: {
         healthMonitoringIntensities: tojson({
@@ -69,4 +66,3 @@ waitForState("TransientFault");
 jsTestLog("Test was successful");
 
 st.stop();
-})();

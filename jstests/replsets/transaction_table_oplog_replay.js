@@ -1,10 +1,7 @@
 /**
  * Tests that the transaction table is properly updated on secondaries through oplog replay.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/retryable_writes_util.js");
+import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 
 /**
  * Runs each command on the primary, awaits replication then asserts the secondary's transaction
@@ -201,4 +198,3 @@ deleteCommands = deleteCommands.map(function(cmd) {
 runCommandsWithSameId(primary, secondary, deleteCommands);
 
 replTest.stopSet();
-})();

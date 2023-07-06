@@ -1,7 +1,4 @@
-load("jstests/sharding/move_chunk_with_session_helper.js");
-
-(function() {
-"use strict";
+import {testMoveChunkWithSession} from "jstests/sharding/move_chunk_with_session_helper.js";
 
 // Prevent unnecessary elections in the first shard replica set. Shard 'rs1' shard will need its
 // secondary to get elected, so we don't give it a zero priority.
@@ -38,4 +35,3 @@ var checkDocuments = function(coll) {
 testMoveChunkWithSession(st, coll, cmd, setup, checkRetryResult, checkDocuments);
 
 st.stop();
-})();

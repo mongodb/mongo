@@ -3,13 +3,11 @@
  * with the client's writeConcern.
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/write_concern_util.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {
+    enableCoordinateCommitReturnImmediatelyAfterPersistingDecision
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({
     mongos: 1,
@@ -103,7 +101,7 @@ function isCommitDecision(decision) {
  * Returns the number of coordinator replica set nodes that have written the commit decision
  * to the config.transactions collection.
  */
-function getNumNodesWithCommitDecision(coordinatorRs) {
+function getNumNodesWithCommitDecision() {
     const decision = getDecision(st.rs0.getPrimary(), lsid, txnNumber);
     assert(isCommitDecision(decision));
     let numNodes = 1;
@@ -129,7 +127,7 @@ function assertDecisionCommittedOnNodes(coordinatorRs, numNodes) {
 /*
  * Asserts that the coordinator doc has been majority replicated.
  */
-function assertDecisionMajorityCommitted(coordinatorRs, numNodes) {
+function assertDecisionMajorityCommitted(coordinatorRs) {
     assert.gte(getNumNodesWithCommitDecision(coordinatorRs), coordinatorRs.nodes.length / 2);
 }
 
@@ -201,4 +199,3 @@ testCommitDecisionWriteConcern({w: "majority"});
 testCommitDecisionWriteConcern({w: 3});
 
 st.stop();
-})();

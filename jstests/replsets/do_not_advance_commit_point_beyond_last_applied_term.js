@@ -4,12 +4,8 @@
  * committed.
  * @tags: [requires_majority_read_concern]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
-load("jstests/libs/write_concern_util.js");  // for [stop|restart]ServerReplication.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -119,4 +115,3 @@ assert.eq(0, nodeE.getDB(dbName)[collName].find({term: 2}).itcount());
 assert.eq(1, nodeE.getDB(dbName)[collName].find({term: 3}).itcount());
 
 rst.stopSet();
-}());

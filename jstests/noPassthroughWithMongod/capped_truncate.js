@@ -6,9 +6,6 @@
  *
  * @tags: [requires_capped]
  */
-(function() {
-'use strict';
-
 db.capped_truncate.drop();
 assert.commandWorked(
     db.runCommand({create: "capped_truncate", capped: true, size: 1000, autoIndexId: true}));
@@ -53,4 +50,3 @@ for (var j = 1; j <= 10; j++) {
 }
 assert.commandFailed(db.runCommand({captrunc: collName, n: 5}),
                      "captrunc didn't return an error for a non-capped collection");
-})();

@@ -7,7 +7,8 @@
  * @tags: [requires_compact, does_not_support_wiredtiger_lsm]
  */
 
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeral
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {isEphemeral} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 // WiredTiger eviction is slow on Windows debug variants and can cause timeouts when taking a
 // checkpoint through compaction.

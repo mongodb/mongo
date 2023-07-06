@@ -6,6 +6,7 @@
  *
  * @tags: [requires_capped]
  */
+import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     // Returns a document of the form { _id: ObjectId(...), field: '...' }
@@ -53,9 +54,7 @@ export const $config = (function() {
 
         // Define this function in data so that it can be used by workloads inheriting this one
         verifySizeTruncation: function verifySizeTruncation(db, myCollName, options) {
-            // Define a small document to be an eighth the size of the capped collection,
-            // and a large document to be half the size of the capped collection.
-            var smallDocSize = Math.floor(options.size / 8) - 1;
+            // Define a large document to be half the size of the capped collection.
             var largeDocSize = Math.floor(options.size / 2) - 1;
 
             // Truncation of capped collections is generally unreliable. Instead of relying on it

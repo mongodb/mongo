@@ -6,9 +6,6 @@
 
 import {ShardedServerlessTest} from "jstests/serverless/libs/sharded_serverless_test.js";
 
-(function() {
-"use strict";
-
 let st = new ShardedServerlessTest();
 
 let donor = st.rs0;
@@ -56,4 +53,3 @@ donor.nodes.forEach(
     node => assert.commandWorked(node.adminCommand(
         {configureFailPoint: "tenantMigrationDonorAllowsNonTimestampedReads", mode: "alwaysOn"})));
 st.stop();
-}());

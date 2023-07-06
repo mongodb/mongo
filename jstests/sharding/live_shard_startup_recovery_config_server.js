@@ -5,11 +5,9 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");  // For getLatestOp()
-load("jstests/sharding/libs/sharding_state_test.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {getLatestOp} from "jstests/replsets/rslib.js";
+import {ShardingStateTest} from "jstests/sharding/libs/sharding_state_test.js";
 
 const st = new ShardingTest({
     config: 1,
@@ -60,4 +58,3 @@ st.stop();
 rs1.stopSet();
 rs2.stopSet();
 rs3.stopSet();
-})();

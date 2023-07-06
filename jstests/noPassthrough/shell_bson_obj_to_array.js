@@ -2,8 +2,6 @@
  * Tests that bsonObjToArray converts BSON objects to JS arrays.
  */
 
-(function() {
-'use strict';
 const conn = MongoRunner.runMongod();
 const db = conn.getDB('test');
 const tests = [];
@@ -30,4 +28,3 @@ tests.forEach((test) => {
 });
 
 MongoRunner.stopMongod(conn);
-})();

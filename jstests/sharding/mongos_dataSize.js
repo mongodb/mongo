@@ -2,9 +2,6 @@
  * Tests the dataSize command on mongos.
  * @tags: [requires_fcv_61]
  */
-(function() {
-'use strict';
-
 const kDbName = "foo";
 const kCollName = "bar";
 const kNs = kDbName + "." + kCollName;
@@ -110,4 +107,3 @@ assertDataSizeCmdWorked(st.s1, shardKey2, 0);
 assertDataSizeCmdFailedWithBadValue(st.s2, shardKey1);
 
 st.stop();
-})();

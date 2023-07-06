@@ -2,7 +2,7 @@
  * This test checks if different mixtures of ssl modes
  * in a sharded cluster can or cannot function
  */
-load("jstests/ssl/libs/ssl_helpers.js");
+import {allowSSL, mixedShardTest, preferSSL, requireSSL} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Due to mixed SSL mode settings, a shard will be unable to establish an outgoing
 // connection to the config server in order to load relevant collection UUIDs into

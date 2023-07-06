@@ -1,11 +1,8 @@
 /**
  * Test that stepdown during collection cloning and oplog fetching does not interrupt initial sync.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
-load("jstests/libs/fail_point_util.js");
+import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
 const testName = "initialSyncDuringStepDown";
 const dbName = testName;
@@ -184,4 +181,3 @@ finishTest({
 });
 
 rst.stopSet();
-})();

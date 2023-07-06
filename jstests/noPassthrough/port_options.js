@@ -1,7 +1,5 @@
 // Check --port= edge behaviors.
 
-(function() {
-'use strict';
 jsTest.log("Setting port=0 is okay unless binding to multiple IP interfaces.");
 
 function runTest(bindIP, expectOk) {
@@ -53,4 +51,3 @@ function runTest(bindIP, expectOk) {
 
 runTest("127.0.0.1", true);
 runTest("127.0.0.1,::1", false);
-}());

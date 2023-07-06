@@ -9,7 +9,9 @@
  *  uses_change_streams
  * ];
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
@@ -31,8 +33,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         let res = undefined;
         try {
             res = fn();
-        } catch (e) {
-            throw e;
         } finally {
             TestData.skipRetryOnNetworkError = previousSkipRetryOnNetworkError;
         }
@@ -54,7 +54,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.states.multiUpdate = function(db, collName, connCache) {
-        const collection = db[collName];
         const id = this.getIdForThread(collName);
 
         const doMultiUpdate = () => {
@@ -100,7 +99,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.states.multiDelete = function(db, collName, connCache) {
-        const collection = db[collName];
         const id = this.getIdForThread(collName);
 
         const doMultiDelete = () => {
@@ -187,7 +185,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 // Check that this event corresponds to the next outstanding operation one of the
                 // worker threads did.
                 var found = false;
-                for (var tid = 0; tid < $config.threadCount; ++tid) {
+                for (let tid = 0; tid < $config.threadCount; ++tid) {
                     const nextOperationForTid = operationsByTid[tid][0];
                     if (nextOperationForTid &&
                         nextOperationForTid.operationDetails.operationType ===
@@ -237,7 +235,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // txn suites because on non-txn suites we have no guarantee that a multi-update/delete
         // actually was actually applied on all the intended documents (SERVER-20361).
         if (TestData.runInsideTransaction) {
-            for (var tid = 0; tid < $config.threadCount; ++tid) {
+            for (let tid = 0; tid < $config.threadCount; ++tid) {
                 assertAlways(
                     operationsByTid[tid].length === 0,
                     "Did not observe change stream event for all worker thread operations. Outstanding operations: " +

@@ -9,9 +9,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 // data.
 TestData.skipCheckDBHashes = true;
 
-load("jstests/libs/index_catalog_helpers.js");
-load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/rslib.js");
+import {stopServerReplication, restartServerReplication} from "jstests/libs/write_concern_util.js";
+import {reconfig} from "jstests/replsets/rslib.js";
 
 let dbpath = MongoRunner.dataPath + "feature_compatibility_version";
 resetDbpath(dbpath);

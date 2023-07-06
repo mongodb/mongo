@@ -7,15 +7,12 @@
  *
  * @tags: [requires_fcv_51]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     // Use the workload name as a prefix for the view names, since the workload name is assumed
     // to be unique.
     const prefix = 'view_catalog_cycle_lookup_';
-
-    // Store the default value of the max sub pipeline view depth so it can be reset at the end of
-    // the test.
-    var oldMaxSubPipelineViewDepth;
 
     var data = {
         viewList: ['viewA', 'viewB', 'viewC', 'viewD', 'viewE'].map(viewName => prefix + viewName),

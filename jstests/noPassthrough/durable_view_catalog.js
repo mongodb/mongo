@@ -4,9 +4,6 @@
  * This test requires persistence to ensure data survives a restart.
  * @tags: [requires_persistence]
  */
-(function() {
-'use strict';
-
 // The following test verifies that writeConcern: {j: true} ensures that the view catalog is
 // durable.
 let dbpath = MongoRunner.dataPath + '_durable_view_catalog';
@@ -93,4 +90,3 @@ assert.commandWorked(viewsDB.runCommand({collMod: "view2", viewOn: "view4"}));
 assert.commandWorked(viewsDB.runCommand({drop: "view4"}));
 assert.commandWorked(viewsDB.runCommand({listCollections: 1}));
 MongoRunner.stopMongod(conn);
-})();

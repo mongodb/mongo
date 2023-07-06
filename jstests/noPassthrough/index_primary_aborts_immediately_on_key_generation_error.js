@@ -8,11 +8,8 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/noPassthrough/libs/index_build.js');
-load('jstests/libs/fail_point_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({
     nodes: [
@@ -80,4 +77,3 @@ IndexBuildTest.assertIndexesSoon(coll, 1, ['_id_'], []);
 IndexBuildTest.assertIndexesSoon(secondaryColl, 1, ['_id_'], []);
 
 rst.stopSet();
-})();

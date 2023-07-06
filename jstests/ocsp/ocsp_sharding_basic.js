@@ -1,13 +1,12 @@
 // Check that OCSP verification works
 // @tags: [requires_http_client]
 
-load("jstests/ocsp/lib/mock_ocsp.js");
-
-(function() {
-"use strict";
+import {FAULT_REVOKED, MockOCSPServer} from "jstests/ocsp/lib/mock_ocsp.js";
+import {clearOCSPCache, OCSP_CA_CERT, OCSP_SERVER_CERT} from "jstests/ocsp/lib/ocsp_helpers.js";
+import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 if (determineSSLProvider() === "apple") {
-    return;
+    quit();
 }
 
 const ocsp_options = {
@@ -86,4 +85,3 @@ st.restartMongos(0);
 
 mock_ocsp.stop();
 st.stop();
-}());

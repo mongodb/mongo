@@ -6,9 +6,6 @@
 //   do_not_wrap_aggregations_in_facets,
 //   requires_fcv_62,
 // ]
-(function() {
-"use strict";
-
 const coll = db.exclusion_projection_does_not_affect_field_order;
 coll.drop();
 
@@ -38,4 +35,3 @@ assert.commandWorked(coll.insert({_id: 4, c: {y: 11, z: 22, a: 33}, a: 1}));
 
 assert.eq([{_id: 1}, {_id: 2, c: 1}, {_id: 3, y: 1, z: 1}, {_id: 4, c: {y: 11, a: 33}, a: 1}],
           coll.aggregate([{$project: {"c.z": 0}}, {$sort: {_id: 1}}]).toArray());
-}());

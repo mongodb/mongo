@@ -9,7 +9,6 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
 
 TimeseriesTest.run((insert) => {
     const testDB = db.getSiblingDB(jsTestName());

@@ -6,9 +6,6 @@
  *   cqf_experimental_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB('test');
 const coll1 = db.query_metrics1;
@@ -144,4 +141,3 @@ assert.commandWorked(coll.dropIndexes());
 assert.eq(getPlanCacheSize(), originalPlanCacheSize);
 
 MongoRunner.stopMongod(conn);
-})();

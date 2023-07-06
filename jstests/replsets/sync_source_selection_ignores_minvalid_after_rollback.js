@@ -4,11 +4,8 @@
  *
  * TODO SERVER-49738: remove this test.
  */
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
-load('jstests/replsets/rslib.js');  // For syncFrom and awaitOpTime.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {awaitOpTime, setLogVerbosity, syncFrom} from "jstests/replsets/rslib.js";
 
 // Disable primary catchup since this test relies on new primaries not catching up to other nodes.
 const rst = new ReplSetTest(
@@ -129,4 +126,3 @@ assert.eq(node2Coll.find({_id: "proper branch of history"}).itcount(), 1);
 assert.eq(node2Coll.find({_id: "diverging point"}).itcount(), 0);
 
 rst.stopSet();
-})();

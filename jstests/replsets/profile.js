@@ -2,8 +2,6 @@
 // In order to implicitly create a profile collection with a read, we must set up the server with
 // some data to read without the profiler being active.
 // @tags: [requires_persistence]
-(function() {
-"use strict";
 let rst = new ReplSetTest({nodes: {n0: {profile: "0"}}});
 rst.startSet();
 rst.initiate();
@@ -38,4 +36,3 @@ try {
 }
 
 rst.stopSet();
-})();

@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 // Tests for SERVER-20080
 //
 // Verify that various types cannot be invoked as constructors
@@ -26,4 +23,3 @@ assert.throws(function() {
 
     new cursor._cursor._cursorHandle();
 }, [], "invoke constructor on CursorHandle");
-})();

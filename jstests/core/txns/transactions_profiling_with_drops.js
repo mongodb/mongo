@@ -7,11 +7,11 @@
 //   # Uses $where
 //   requires_scripting]
 
-(function() {
-"use strict";
-
-load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
-load("jstests/libs/wait_for_command.js");
+import {
+    profilerHasSingleMatchingEntryOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
 const dbName = "test";
 const collName = "transactions_profiling_with_drops";
@@ -105,4 +105,3 @@ jsTest.log("Both writes should succeed");
 assert.docEq({_id: "doc", good: 2}, sessionColl.findOne());
 
 session.endSession();
-}());

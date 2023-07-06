@@ -4,6 +4,7 @@
  * Intersperse queries which use the TEXT stage with updates and deletes of documents they may
  * match.
  */
+import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield.js";
 

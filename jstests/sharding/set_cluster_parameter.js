@@ -9,9 +9,10 @@
  *   requires_persistence,
  *  ]
  */
-load('jstests/libs/fail_point_util.js');
-load('jstests/sharding/libs/remove_shard_util.js');
-load('jstests/replsets/rslib.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {reconfig} from "jstests/replsets/rslib.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 const clusterParameter1Value = {
     intData: 42

@@ -11,10 +11,7 @@
  *  - not
  *  - enum
  */
-(function() {
-"use strict";
-
-load("jstests/libs/assert_schema_match.js");
+import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 
 const coll = db.jstests_json_schema_logical;
 
@@ -276,4 +273,3 @@ assertSchemaMatch(coll, {enum: [{}]}, {}, false);
 assertSchemaMatch(coll, {enum: [null]}, {}, false);
 assertSchemaMatch(coll, {enum: [{_id: 0, a: "str"}]}, {_id: 0, a: "str", b: 1}, false);
 assertSchemaMatch(coll, {enum: [1, 2]}, {}, false);
-}());

@@ -3,8 +3,6 @@
  * issues.
  */
 
-(function() {
-"use strict";
 let node = MongoRunner.runMongod();
 let hostname = node.host;
 
@@ -43,4 +41,3 @@ try {
     jsTestLog("Caught exception after exhausting retries: " + e);
 }
 assert.eq(attempts, numRetries + 1);
-}());

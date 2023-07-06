@@ -17,13 +17,12 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {forgetMigrationAsync, makeTenantDB} from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
-load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
-load("jstests/libs/parallelTester.js");   // For the Thread().
-load('jstests/replsets/rslib.js');        // 'createRstArgs'
+import {createRstArgs} from "jstests/replsets/rslib.js";
 
 const tenantMigrationTest = new TenantMigrationTest({
     name: jsTestName(),

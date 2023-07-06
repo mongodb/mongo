@@ -3,9 +3,6 @@
  * @tags: [
  * ]
  */
-(function() {
-"use strict";
-
 function runTest(conn) {
     let expectedDefaultWC = {w: "majority", wtimeout: 0};
     let res = conn.adminCommand({getDefaultRWConcern: 1});
@@ -54,4 +51,3 @@ const st = new ShardingTest({name: name});
 const mongos = st.s;
 runTest(mongos);
 st.stop();
-})();

@@ -42,9 +42,8 @@ Array defining each of the cases to be tested for each command.
     Boolean field indicating if the command is expected to fail and return error.
 */
 
-(function() {
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/fixture_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const tests = [
     {
@@ -124,7 +123,7 @@ const tests = [
         setup: function(db) {
             // Insert a document to avoid empty collection optimisation for index build.
             assert.commandWorked(db.x.insert({}));
-            primary = FixtureHelpers.getPrimaryForNodeHostingDatabase(db);
+            const primary = FixtureHelpers.getPrimaryForNodeHostingDatabase(db);
             let awaitShell;
             const failPoint = configureFailPoint(primary, "hangAfterIndexBuildFirstDrain");
             awaitShell = startParallelShell(function() {
@@ -225,4 +224,3 @@ tests.forEach((test) => {
 
 st.stop();
 rst.stopSet();
-}());

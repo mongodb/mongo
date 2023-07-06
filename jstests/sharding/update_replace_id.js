@@ -16,9 +16,13 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-load("jstests/libs/profiler.js");  // For profilerHas*OrThrow helper functions.
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    profilerHasSingleMatchingEntryOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 // Test deliberately inserts orphans outside of migrations.
 TestData.skipCheckOrphans = true;
@@ -215,4 +219,3 @@ mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: "ha
 runReplacementUpdateTestsForHashedShardKey();
 
 st.stop();
-})();

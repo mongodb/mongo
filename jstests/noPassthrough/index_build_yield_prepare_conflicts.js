@@ -8,13 +8,9 @@
  *   uses_prepare_transaction,
  * ]
  */
-load("jstests/core/txns/libs/prepare_helpers.js");  // For PrepareHelpers.
-load("jstests/noPassthrough/libs/index_build.js");  // For IndexBuildTest
-load("jstests/libs/fail_point_util.js");
-
-(function() {
-
-"use strict";
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -74,4 +70,3 @@ session.abortTransaction_forTesting();
 awaitIndex();
 
 rst.stopSet();
-})();

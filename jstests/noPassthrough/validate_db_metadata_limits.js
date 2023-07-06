@@ -2,9 +2,6 @@
  * Tests to verify that the validateDBMetadata command returns response correctly when the expected
  * output data is larger than the max BSON size.
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("validate_db_metadaba");
 const coll = testDB.getCollection("test");
@@ -25,4 +22,3 @@ assert(res.apiVersionErrors, res);
 assert(res.apiVersionErrors.length < 100, res);
 
 MongoRunner.stopMongod(conn);
-})();

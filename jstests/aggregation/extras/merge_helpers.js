@@ -2,9 +2,7 @@
  * Collection of helper functions for testing the $merge aggregation stage.
  */
 
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
-
-function withEachKindOfWriteStage(targetColl, callback) {
+export function withEachKindOfWriteStage(targetColl, callback) {
     callback({$out: targetColl.getName()});
     callback({$merge: {into: targetColl.getName()}});
 }
@@ -13,7 +11,7 @@ function withEachKindOfWriteStage(targetColl, callback) {
  * Executes the callback function with each valid combination of 'whenMatched' and 'whenNotMatched'
  * modes (as named arguments). Note that one mode is a pipeline.
  */
-function withEachMergeMode(callback) {
+export function withEachMergeMode(callback) {
     callback({whenMatchedMode: "replace", whenNotMatchedMode: "insert"});
     callback({whenMatchedMode: "replace", whenNotMatchedMode: "fail"});
     callback({whenMatchedMode: "replace", whenNotMatchedMode: "discard"});
@@ -31,7 +29,7 @@ function withEachMergeMode(callback) {
     callback({whenMatchedMode: [], whenNotMatchedMode: "discard"});
 }
 
-function assertMergeFailsForAllModesWithCode(
+export function assertMergeFailsForAllModesWithCode(
     {source, target, onFields, options, prevStages = [], errorCodes}) {
     withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
         const mergeStage = {
@@ -52,12 +50,13 @@ function assertMergeFailsForAllModesWithCode(
     });
 }
 
-function assertMergeFailsWithoutUniqueIndex({source, target, onFields, options, prevStages}) {
+export function assertMergeFailsWithoutUniqueIndex(
+    {source, target, onFields, options, prevStages}) {
     assertMergeFailsForAllModesWithCode(
         {source, target, onFields, options, prevStages, errorCodes: [51183, 51190]});
 }
 
-function assertMergeSucceedsWithExpectedUniqueIndex(
+export function assertMergeSucceedsWithExpectedUniqueIndex(
     {source, target, onFields, options, prevStages = []}) {
     withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
         // Skip the combination of merge modes which will fail depending on the contents of the
@@ -84,6 +83,6 @@ function assertMergeSucceedsWithExpectedUniqueIndex(
 
 // Helper to drop a collection without using the shell helper, and thus avoiding the implicit
 // recreation in the sharded collections passthrough suites.
-function dropWithoutImplicitRecreate(collName) {
+export function dropWithoutImplicitRecreate(collName) {
     db.runCommand({drop: collName});
 }

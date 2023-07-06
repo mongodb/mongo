@@ -8,9 +8,6 @@
  *    uses_transactions,
  *  ]
  */
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
 
 const mongos = st.s;
@@ -95,4 +92,3 @@ testWriteOplogDocumentKey({sharded: true, inTransaction: false});
 testWriteOplogDocumentKey({sharded: true, inTransaction: true});
 
 st.stop();
-}());

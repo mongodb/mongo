@@ -3,7 +3,7 @@
  *
  * @tags: [requires_fcv_51]
  */
-load("jstests/aggregation/extras/utils.js");  // For arrayEq, documentEq.
+import {documentEq} from "jstests/aggregation/extras/utils.js";
 import {planHasStage} from "jstests/libs/analyze_plan.js";
 
 // Test deliberately inserts orphans.
@@ -118,7 +118,7 @@ function setUpTestColl(generateAdditionalData) {
     ];
     assert.commandWorked(testColl.insertMany(data), {ordered: false});
 
-    let expectedDocs = data.reduce((acc, measure, i) => {
+    let expectedDocs = data.reduce((acc, measure) => {
         acc[measure._id] = {
             _id: measure._id,
             time: measure.time,

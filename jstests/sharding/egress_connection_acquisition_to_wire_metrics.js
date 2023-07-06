@@ -4,13 +4,6 @@
  *
  * @tags: [requires_fcv_63]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/log.js");
-load("jstests/libs/parallel_shell_helpers.js");
-
 function getConnAcquiredToWireMicros(conn) {
     return conn.adminCommand({serverStatus: 1})
         .metrics.network.totalTimeForEgressConnectionAcquiredToWireMicros;
@@ -61,4 +54,3 @@ assert.gt(afterConnAcquiredToWireTime,
           initialConnAcquiredToWireTime,
           shardPrimary.adminCommand({serverStatus: 1}));
 st.stop();
-})();

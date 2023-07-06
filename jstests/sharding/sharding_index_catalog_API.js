@@ -7,9 +7,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 function registerIndex(rs, nss, pattern, name, uuid) {
     rs.getPrimary().adminCommand({
         _shardsvrRegisterIndex: nss,
@@ -636,4 +633,3 @@ assert.eq(2, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments
 }));
 
 st.stop();
-})();

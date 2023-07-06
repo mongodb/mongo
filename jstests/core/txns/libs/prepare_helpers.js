@@ -7,7 +7,7 @@
  *   not_allowed_with_security_token,uses_transactions]
  *
  */
-const PrepareHelpers = (function() {
+export const PrepareHelpers = (function() {
     /**
      * Prepares the active transaction on the session. This expects the 'prepareTransaction' command
      * to succeed and return a non-null 'prepareTimestamp'.

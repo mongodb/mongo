@@ -9,9 +9,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 function testCount(coll, indexKeyPattern, doc, filter) {
     coll.drop();
     coll.createIndex(indexKeyPattern);
@@ -72,4 +69,3 @@ const filter = {
 for (const doc of docs) {
     testCount(db.testColl, indexKeyPattern, doc, filter);
 }
-}());

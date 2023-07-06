@@ -7,7 +7,7 @@
 /**
  * Tests for JSON Schema document validation.
  */
-load("jstests/libs/assert_schema_match.js");
+import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const isSBEEnabled = checkSBEEnabled(db);

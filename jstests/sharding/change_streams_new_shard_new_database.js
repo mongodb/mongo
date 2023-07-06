@@ -7,10 +7,6 @@
  *   uses_change_streams,
  * ]
  */
-(function() {
-
-"use strict";
-
 const rsNodeOptions = {
     setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}
 };
@@ -108,4 +104,3 @@ for (let csCursor of [singleCollCS, wholeDBCS, wholeClusterCS]) {
 // Stop the new shard manually since the ShardingTest doesn't know anything about it.
 st.stop();
 newShard1.stopSet();
-})();

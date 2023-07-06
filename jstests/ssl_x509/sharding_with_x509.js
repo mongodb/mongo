@@ -1,9 +1,6 @@
 // Tests basic sharding with x509 cluster auth. The purpose is to verify the connectivity between
 // mongos and the shards.
-(function() {
-'use strict';
-
-load("jstests/libs/log.js");  // For findMatchingLogLine.
+import {findMatchingLogLine} from "jstests/libs/log.js";
 
 var x509_options = {
     sslMode: "requireSSL",
@@ -90,4 +87,3 @@ if (st.configRS) {
 }
 
 st.stop();
-})();

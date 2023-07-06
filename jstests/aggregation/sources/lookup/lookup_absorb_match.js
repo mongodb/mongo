@@ -2,9 +2,6 @@
  * Tests that $match stages with a variety of expressions still return the correct results if they
  * have been absorbed by $lookup stages.
  */
-(function() {
-"use strict";
-
 let testDB = db.getSiblingDB("lookup_absorb_match");
 testDB.dropDatabase();
 
@@ -256,4 +253,3 @@ result = testDB.animals
 expected =
     [{_id: "dog", locationId: "doghouse", location: {_id: "doghouse", coordinates: [25.0, 60.0]}}];
 assert.eq(result, expected);
-}());

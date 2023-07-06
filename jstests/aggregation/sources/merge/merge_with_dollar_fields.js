@@ -3,10 +3,7 @@
 // Sharded collections have special requirements on the join field.
 // @tags: [assumes_unsharded_collection]
 
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const sourceName = 'merge_with_dollar_fields_source';
 const source = db[sourceName];
@@ -132,4 +129,3 @@ assert.docEq(targetDocAddFields,
              runTestMatched({whenMatched: pipeline, whenNotMatched: 'discard'}));
 
 assert.eq(null, runTestNotMatched({whenMatched: pipeline, whenNotMatched: 'discard'}));
-}());

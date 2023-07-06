@@ -7,9 +7,6 @@
  *  no_selinux
  * ]
  */
-(function() {
-'use strict';
-
 let dbTest = db.getSiblingDB('create_encrypted_collection_db');
 
 dbTest.basic.drop();
@@ -29,4 +26,3 @@ assert.commandFailedWithCode(
     db.runCommand({create: "basic", encryptedFields: sampleEncryptedFields}),
     6346402,
     "Create with encryptedFields passed on standalone");
-}());

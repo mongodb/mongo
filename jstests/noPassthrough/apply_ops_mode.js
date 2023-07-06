@@ -4,9 +4,6 @@
  * that these default values do not lead to command failure.
  */
 
-(function() {
-'use strict';
-
 var standalone = MongoRunner.runMongod();
 var db = standalone.getDB("test");
 
@@ -91,4 +88,3 @@ assert.commandWorked(db.adminCommand({
 }));
 
 MongoRunner.stopMongod(standalone);
-})();

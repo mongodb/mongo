@@ -8,11 +8,8 @@
  * we ensure that the disconnected secondary is able to update its commit point from the initial
  * syncing node via heartbeats.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();
 const rst = new ReplSetTest({
@@ -149,4 +146,3 @@ hangBeforeFinish.off();
 waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
 
 rst.stopSet();
-})();

@@ -13,9 +13,6 @@
 //   does_not_support_stepdowns,
 // ]
 
-(function() {
-'use strict';
-
 const admin = db.getSiblingDB('admin');
 
 // Get current log level.
@@ -44,4 +41,3 @@ try {
 } finally {
     admin.setLogLevel(originalLogLevel);
 }
-})();

@@ -1,9 +1,6 @@
 // Test that indexKey $meta projection works in find and aggregate commands and produces correct
 // result depending on whether index key metadata is available or not.
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For 'isMongos' and 'isSharded'.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.projection_meta_index_key;
 coll.drop();
@@ -116,4 +113,3 @@ function testIndexKeyMetaProjection({
             });
         }
     });
-}());

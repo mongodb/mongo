@@ -6,11 +6,8 @@
  * range deletion tasks, and migration coordinator state are deleted despite the killOps.
  */
 
-(function() {
-'use strict';
-
-load('jstests/libs/parallel_shell_helpers.js');
-load('jstests/libs/fail_point_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 function getNewNs(dbName) {
     if (typeof getNewNs.counter == 'undefined') {
@@ -102,4 +99,3 @@ testKillOpAfterFailPoint("hangInReadyRangeDeletionLocallyInterruptible", "Recove
 testKillOpAfterFailPoint("hangInAdvanceTxnNumInterruptible", "RecoverRefreshThread");
 
 st.stop();
-})();

@@ -20,8 +20,8 @@ import {
     getRejectedPlans,
     getWinningPlan
 } from "jstests/libs/analyze_plan.js";
-load("jstests/libs/fixture_helpers.js");  // For isMongos and numberOfShardsForCollection.
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Asserts that the given cursors produce identical result sets.
 function assertResultsEq(cursor1, cursor2) {

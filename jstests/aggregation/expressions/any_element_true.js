@@ -1,8 +1,5 @@
-/**
- * Basic test coverage for the $anyElementTrue expression.
- */
-(function() {
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
+
 const coll = db.any_element_true;
 coll.drop();
 assert.commandWorked(coll.insert({
@@ -50,4 +47,3 @@ testOp({$anyElementTrue: "$nullTrue"}, true);
 testOp({$anyElementTrue: "$empty"}, false);
 assertThrows({$anyElementTrue: "$nonArray"});
 assertThrows({$anyElementTrue: ["$non_existent_field"]});
-}());

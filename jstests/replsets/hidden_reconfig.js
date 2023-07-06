@@ -1,8 +1,5 @@
 // Tests reconfigure with hidden.
-load("jstests/replsets/rslib.js");
-
-(function() {
-"use strict";
+import {reconfig} from "jstests/replsets/rslib.js";
 
 var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
 replTest.startSet();
@@ -32,4 +29,3 @@ config = primary.getSiblingDB("local").system.replset.findOne();
 assert.eq(config.members[2].hidden, true);
 
 replTest.stopSet();
-}());

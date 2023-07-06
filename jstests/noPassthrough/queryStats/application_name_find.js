@@ -2,9 +2,7 @@
  * Test that applicationName and namespace appear in queryStats for the find command.
  * @tags: [featureFlagQueryStatsFindCommand]
  */
-load("jstests/libs/query_stats_utils.js");
-(function() {
-"use strict";
+import {getQueryStats, getQueryStatsFindCmd} from "jstests/libs/query_stats_utils.js";
 
 const kApplicationName = "MongoDB Shell";
 
@@ -34,4 +32,3 @@ assert.eq(1, queryStats.length, queryStats);
 assert.eq(kApplicationName, queryStats[0].key.client.application.name, queryStats);
 
 MongoRunner.stopMongod(conn);
-}());

@@ -4,9 +4,6 @@
  * @tags: [requires_fcv_62]
  */
 
-(function() {
-"use strict";
-
 const collName = "validate_checkBSONConformance";
 const coll = db.getCollection(collName);
 coll.drop();
@@ -35,4 +32,3 @@ assert.commandFailedWithCode(
 
 assert.commandWorked(
     db.runCommand({validate: collName, checkBSONConformance: true, enforceFastCount: true}));
-})();

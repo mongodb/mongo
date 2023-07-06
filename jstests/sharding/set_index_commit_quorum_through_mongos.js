@@ -3,10 +3,9 @@
  *
  * @tags: [requires_fcv_51]
  */
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
-load("jstests/sharding/libs/create_sharded_collection_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1, rs: {nodes: 2}});
 const dbName = "testDB";
@@ -105,4 +104,3 @@ createIndexFailpoint.off();
 createIndexThread.join();
 
 st.stop();
-}());

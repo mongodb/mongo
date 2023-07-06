@@ -1,9 +1,6 @@
 /**
  * Test projections which have conflicts in them.
  */
-(function() {
-"use strict";
-
 const coll = db.projection_conflicts;
 coll.drop();
 
@@ -39,4 +36,3 @@ checkProjectionFailsWithCode({a: 0, "a.b": 0});
 checkProjectionFailsWithCode({"a.b": 0, a: 0});
 
 checkProjectionFailsWithCode({"a.b": 0, "a.b.c": 0});
-})();

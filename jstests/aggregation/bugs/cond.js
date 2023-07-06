@@ -1,8 +1,6 @@
 // $cond returns the evaluated second argument if the first evaluates to true but the evaluated
 // third argument if the first evaluates to false.
-(function() {
-"use strict";
-load('jstests/aggregation/extras/utils.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.jstests_aggregation_cond;
 coll.drop();
@@ -84,4 +82,3 @@ assert.eq(['breakfast', 'brunch', 'dinner', 'linner'],
                   {$sort: {meal: 1}}
               ])
               .map(doc => doc.meal));
-}());

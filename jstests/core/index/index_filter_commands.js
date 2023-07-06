@@ -49,8 +49,10 @@ import {
     isIdhack,
     isIxscan,
 } from "jstests/libs/analyze_plan.js";
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.jstests_index_filter_commands;

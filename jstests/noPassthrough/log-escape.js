@@ -1,8 +1,5 @@
 // Test escaping of user provided data in logs
 
-(function() {
-'use strict';
-
 const mongo = MongoRunner.runMongod({useLogFiles: true});
 const admin = mongo.getDB('admin');
 
@@ -37,4 +34,3 @@ for (let i = 0; i < 256; ++i) {
 }
 
 MongoRunner.stopMongod(mongo);
-})();

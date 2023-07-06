@@ -1,7 +1,4 @@
-(function() {
-'use strict';
-
-load("jstests/libs/python.js");
+import {getPython3Binary} from "jstests/libs/python.js";
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
@@ -32,4 +29,3 @@ while (true) {
     print("looping");
     sleep(1000);
 }
-})();

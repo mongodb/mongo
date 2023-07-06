@@ -39,9 +39,10 @@
  */
 
 import {CollectionValidator} from "jstests/hooks/validate_collections.js";
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
-load('jstests/libs/fail_point_util.js');
+import {waitForState} from "jstests/replsets/rslib.js";
 
 /**
  *

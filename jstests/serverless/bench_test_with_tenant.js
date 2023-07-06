@@ -5,9 +5,6 @@
  *   requires_fcv_62
  * ]
  */
-(function() {
-"use strict";
-
 // Create a replica set with multi-tenancy enabled.
 const replSetTest = ReplSetTest({nodes: 1});
 replSetTest.startSet({
@@ -198,4 +195,3 @@ response = tenantDB.id.getIndexes();
 assert.eq(response.some(index => index.name === "newId_1"), false);
 
 replSetTest.stopSet();
-})();

@@ -2,9 +2,6 @@
  * Tests 'db.collection.save()' mongo shell method.
  *
  */
-(function() {
-'use strict';
-
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
@@ -32,4 +29,3 @@ assert.throws(() => coll.save("The answer to life, the universe and everything")
 assert.throws(() => coll.save([{"fruit": "mango"}, {"fruit": "orange"}]),
               [],
               "saving an array must throw an error");
-})();

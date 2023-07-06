@@ -7,11 +7,8 @@
  *     requires_fcv_62
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallel_shell_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const st = new ShardingTest({shards: 2});
 
@@ -81,4 +78,3 @@ assert.soon(
         tojson(primary.getDB("config")["rangeDeletions"].find().toArray()));
 
 st.stop();
-})();

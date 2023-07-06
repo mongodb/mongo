@@ -5,7 +5,6 @@
 // @tags: [
 //   requires_non_retryable_writes,
 // ]
-(function() {
 const coll = db.ne_array;
 coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
@@ -59,4 +58,3 @@ assert.eq(coll.find({a: {$not: {$elemMatch: {b: [123]}}}}, {_id: 1}).sort({_id: 
 assert.eq(
     coll.find({a: {$not: {$elemMatch: {b: {$in: [[123]]}}}}}, {_id: 1}).sort({_id: 1}).toArray(),
     [{_id: 0}, {_id: 1}]);
-})();

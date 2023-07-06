@@ -1,9 +1,7 @@
 //
 // Test the listShards command by adding stand-alone and replica-set shards to a cluster
 //
-(function() {
-'use strict';
-load('jstests/sharding/libs/remove_shard_util.js');
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -56,4 +54,3 @@ assert(!checkShardName('repl', shardsArray),
 
 rs1.stopSet();
 st.stop();
-})();

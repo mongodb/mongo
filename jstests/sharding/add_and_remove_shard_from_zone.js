@@ -2,9 +2,6 @@
  * Basic integration tests for addShardToZone command. More detailed tests can be found
  * in sharding_catalog_add_shard_to_zone_test.cpp.
  */
-(function() {
-'use strict';
-
 let st = new ShardingTest({shards: 1});
 let mongos = st.s0;
 
@@ -37,4 +34,3 @@ shardDoc = config.shards.findOne();
 assert.eq([], shardDoc.tags);
 
 st.stop();
-})();

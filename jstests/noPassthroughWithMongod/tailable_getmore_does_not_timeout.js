@@ -2,9 +2,6 @@
 // interpreted as a deadline for the operation.
 // This test was designed to reproduce SERVER-33942 against a mongod.
 // @tags: [requires_capped]
-(function() {
-"use strict";
-
 // This test runs a getMore in a parallel shell, which will not inherit the implicit session of
 // the cursor establishing command.
 TestData.disableImplicitSessions = true;
@@ -58,4 +55,3 @@ assert.commandWorked(db.adminCommand({killOp: 1, op: sleepOpId}));
 
 awaitSleepShell();
 awaitGetMoreShell();
-}());

@@ -1,9 +1,6 @@
 // Tests compute mode.
 //
 // @tags: [requires_sharding]
-(function() {
-'use strict';
-
 const mongodOption = {
     setParameter: "enableComputeMode=true"
 };
@@ -66,4 +63,3 @@ const configsvrOption = {
     // This emulates that mongod is running as a config server.
     assert.throws(() => rs.startSet(configsvrOption), [], "ERROR from configsvr test");
 })();
-}());

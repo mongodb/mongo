@@ -3,8 +3,6 @@
  * new writes are being sent to the source shard.
  */
 
-load('jstests/libs/chunk_manipulation_util.js');
-
 /**
  * Test outline:
  * 1. Pause migration.
@@ -12,8 +10,14 @@ load('jstests/libs/chunk_manipulation_util.js');
  * 3. Unpause migration.
  * 4. Retry writes and confirm that writes are not duplicated.
  */
-(function() {
-"use strict";
+
+import {
+    moveChunkParallel,
+    moveChunkStepNames,
+    pauseMoveChunkAtStep,
+    unpauseMoveChunkAtStep,
+    waitForMoveChunkStep,
+} from "jstests/libs/chunk_manipulation_util.js";
 
 var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 
@@ -160,4 +164,3 @@ assert.eq(1, testDB.user.findOne({x: -30}).y);
 st.stop();
 
 MongoRunner.stopMongod(staticMongod);
-})();

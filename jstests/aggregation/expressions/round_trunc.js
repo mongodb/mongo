@@ -1,11 +1,8 @@
 // Basic integration tests for the $round and $trunc aggregation expressions.
 
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-// For assertErrorCode.
-load("jstests/aggregation/extras/utils.js");
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.server19548;
 coll.drop();
@@ -135,4 +132,3 @@ assertErrorCode(coll, [{$project: {a: {$round: [BinData(0, ""), 0]}}}], 51081);
 assertErrorCode(coll, [{$project: {a: {$round: [0, BinData(0, "")]}}}], 16004);
 assertErrorCode(coll, [{$project: {a: {$round: MinKey}}}], 51081);
 assertErrorCode(coll, [{$project: {a: {$round: MaxKey}}}], 51081);
-}());

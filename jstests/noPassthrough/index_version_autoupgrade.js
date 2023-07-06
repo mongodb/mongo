@@ -2,10 +2,7 @@
  * Tests whether various MongoDB commands automatically upgrade the index version of existing
  * indexes when they are rebuilt on a collection.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/index_catalog_helpers.js");
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 var conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
@@ -120,4 +117,3 @@ testIndexVersionAutoUpgrades(function(coll) {
 }, false);
 
 MongoRunner.stopMongod(conn);
-})();

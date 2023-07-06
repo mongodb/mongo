@@ -1,9 +1,6 @@
 // Validate registration works
 //
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {FreeMonWebServer, WaitForRegistration} from "jstests/free_mon/libs/free_mon.js";
 
 const localTime = Date.now();
 
@@ -50,4 +47,3 @@ assert.gt(new Date(last_metrics.localTime["$date"]), localTime);
 MongoRunner.stopMongod(conn);
 
 mock_web.stop();
-})();

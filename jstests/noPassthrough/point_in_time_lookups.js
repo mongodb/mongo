@@ -7,9 +7,6 @@
  *     requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
 const replTest = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
@@ -263,4 +260,3 @@ restart();
 runPointInTimeTests();
 
 replTest.stopSet();
-})();

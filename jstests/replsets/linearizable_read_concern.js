@@ -12,11 +12,7 @@
  * thread after finding the issued noop. The secondary thread should throw
  * an exception and exit.
  */
-load('jstests/replsets/rslib.js');
-load('jstests/libs/parallelTester.js');
-load('jstests/libs/write_concern_util.js');
-(function() {
-'use strict';
+import {getLatestOp} from "jstests/replsets/rslib.js";
 var send_linearizable_read = function() {
     // The primary will step down and throw an exception, which is expected.
     var coll = db.getSiblingDB("test").foo;
@@ -149,4 +145,3 @@ assert.commandWorked(
     primary.adminCommand({"replSetStepDown": 100, secondaryCatchUpPeriodSecs: 0, "force": true}));
 parallelShell();
 replTest.stopSet();
-}());

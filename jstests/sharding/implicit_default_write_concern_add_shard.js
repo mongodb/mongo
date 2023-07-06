@@ -3,15 +3,12 @@
  * w:1 and CWWC is not set.
  */
 
-(function() {
-"use strict";
-
 // Adds a shard near the end of the test that won't have metadata for the sessions collection during
 // test shutdown. This is only a problem with a config shard because otherwise there are no shards
 // so the sessions collection can't be created.
 TestData.skipCheckShardFilteringMetadata = TestData.configShard;
 
-load("jstests/replsets/rslib.js");  // For reconfig and isConfigCommitted.
+import {reconfig, isConfigCommitted} from "jstests/replsets/rslib.js";
 
 function addNonArbiterNode(nodeId, rst) {
     const config = rst.getReplSetConfigFromNode();
@@ -88,4 +85,3 @@ for (const CWWCSet of [true, false]) {
         }
     }
 }
-})();

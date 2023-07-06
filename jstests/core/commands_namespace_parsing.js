@@ -19,13 +19,11 @@
 //   does_not_support_causal_consistency,
 //   uses_compact,
 // ]
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // This file tests that commands namespace parsing rejects embedded null bytes.
 // Note that for each command, a properly formatted command object must be passed to the helper
 // function, regardless of the namespace used in the command object.
-(function() {
-"use strict";
 
 const isFullyQualified = true;
 const isNotFullyQualified = false;
@@ -375,4 +373,3 @@ assertFailsWithInvalidNamespacesForField("explain.update",
 // Test validate fails with an invalid collection name.
 assertFailsWithInvalidNamespacesForField(
     "validate", {validate: ""}, isNotFullyQualified, isNotAdminCommand);
-})();

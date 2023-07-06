@@ -1,7 +1,4 @@
-(function() {
-"use strict";
-
-load("jstests/libs/fts.js");
+import {queryIDS} from "jstests/libs/fts.js";
 
 const coll = db.text_spanish;
 coll.drop();
@@ -30,4 +27,3 @@ assert.commandWorked(coll.dropIndexes());
 assert.commandFailedWithCode(
     coll.createIndex({title: "text", text: "text"}, {default_language: "spanglish"}),
     ErrorCodes.CannotCreateIndex);
-}());

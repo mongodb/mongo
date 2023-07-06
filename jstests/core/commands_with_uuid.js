@@ -10,10 +10,8 @@
  *   assumes_no_implicit_index_creation
  * ]
  */
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-(function() {
-'use strict';
 const mainCollName = 'main_coll';
 const subCollName = 'sub_coll';
 const kOtherDbName = 'commands_with_uuid_db';
@@ -26,12 +24,12 @@ assert.commandWorked(db.runCommand({create: subCollName}));
 let collectionInfos = db.getCollectionInfos({name: mainCollName});
 let uuid = collectionInfos[0].info.uuid;
 if (uuid == null) {
-    return;
+    quit();
 }
 
 // No support for UUIDs on mongos.
 if (FixtureHelpers.isMongos(db)) {
-    return;
+    quit();
 }
 
 assert.commandWorked(db.runCommand({insert: mainCollName, documents: [{fooField: 'FOO'}]}));
@@ -105,4 +103,3 @@ for (cmd of [{count: uuid}, {distinct: uuid, key: "a"}, {find: uuid}, {listIndex
     assert.commandFailedWithCode(
         db.runCommand(cmd), ErrorCodes.NamespaceNotFound, "command: " + tojson(cmd));
 }
-}());

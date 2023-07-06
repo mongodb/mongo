@@ -1,5 +1,4 @@
 // Test --host.
-(function() {
 // This "inner_mode" method of spawning a mongod and re-running was copied from
 // ipv6_connection_string_validation.js
 if ("undefined" == typeof inner_mode) {
@@ -12,7 +11,7 @@ if ("undefined" == typeof inner_mode) {
     var mongod = MongoRunner.runMongod({ipv6: "", bind_ip: "::1,127.0.0.1"});
     if (mongod == null) {
         jsTest.log("Unable to run test because ipv6 is not on machine, see BF-10990");
-        return;
+        quit();
     }
     var args = [
         "mongo",
@@ -34,7 +33,7 @@ if ("undefined" == typeof inner_mode) {
     if (exitCode != 0) {
         doassert("inner test failed with exit code " + exitCode);
     }
-    return;
+    quit();
 }
 
 var testHost = function(host, shouldSucceed) {
@@ -116,4 +115,3 @@ for (i = 0; i < badStrings.length; ++i) {
 }
 
 jsTest.log("SUCCESSFUL test completion");
-})();

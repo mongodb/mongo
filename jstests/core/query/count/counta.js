@@ -4,9 +4,6 @@
 //   requires_fastcount
 // ]
 
-(function() {
-'use strict';
-
 var t = db.jstests_counta;
 t.drop();
 
@@ -21,6 +18,7 @@ assert.throws(function() {
             if (this.a < 5) {
                 return true;
             } else {
+                // eslint-disable-next-line
                 f();
             }
         }
@@ -29,4 +27,3 @@ assert.throws(function() {
 
 // count must return error if collection name is absent
 assert.commandFailedWithCode(db.runCommand("count"), ErrorCodes.InvalidNamespace);
-})();

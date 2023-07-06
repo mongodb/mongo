@@ -2,9 +2,6 @@
  * Tests "metrics.query.allowDiskUseFalse" counter.
  */
 
-(function() {
-"use strict";
-
 const mongod = MongoRunner.runMongod();
 const db = mongod.getDB(jsTest.name());
 
@@ -64,4 +61,3 @@ runTest({aggregate: simpleView.getName(), pipeline: [], cursor: {}});
 runTest({find: simpleView.getName()});
 
 MongoRunner.stopMongod(mongod);
-})();

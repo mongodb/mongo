@@ -7,10 +7,8 @@
  *     requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/missing_index_ident.js');
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
+import {MissingIndexIdent} from "jstests/noPassthrough/libs/missing_index_ident.js";
 
 const {replTest, dbpath} = MissingIndexIdent.run();
 
@@ -35,4 +33,3 @@ replTest.start(0, undefined, true /* restart */);
 IndexBuildTest.assertIndexes(replTest.getPrimary().getDB('test')[jsTestName()], 1, ['_id_']);
 
 replTest.stopSet();
-})();

@@ -3,10 +3,8 @@
  * changes. In this case the reconfig command would win the potential race.
  */
 
-(function() {
-"use strict";
-load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {reconfig} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();
 const rst = new ReplSetTest({
@@ -65,4 +63,3 @@ assert.commandWorked(coll.insert({a: 1}));
 rst.awaitReplication();
 
 rst.stopSet();
-})();

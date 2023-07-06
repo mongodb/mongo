@@ -5,10 +5,6 @@
  * See `src/mongo/s/load_balancing_support.h`.
  */
 (() => {
-    "use strict";
-
-    load('jstests/libs/fail_point_util.js');
-
     /**
      * The whole ShardingTest is restarted just to get a fresh connection.
      * Obviously this could be accomplished much more efficiently.

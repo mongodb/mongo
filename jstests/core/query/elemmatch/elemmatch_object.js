@@ -1,10 +1,7 @@
 /**
  * Test out ElemMatchObjectMatchExpression
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.jstests_elemmatch_object;
 coll.drop();
@@ -104,4 +101,3 @@ assert(arrayEq(coll.find({a: {$elemMatch: {$or: [{}, {}]}}}, {_id: 0}).toArray()
     {a: [1, {}]},
     {a: [{b: 1}]},
 ]));
-})();

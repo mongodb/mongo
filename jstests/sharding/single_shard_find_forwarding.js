@@ -8,8 +8,8 @@
  * meets expectation. It then runs the same test against a sharded collection with a single shard.
  */
 
-load("jstests/libs/profiler.js");  // For profilerHas*OrThrow helper functions.
 import {getPlanStages} from "jstests/libs/analyze_plan.js";
+import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 function testArraySorted(arr, key) {
     for (let i = 0; i < arr.length - 1; i++) {
@@ -24,7 +24,6 @@ const testDB = st.s.getDB(testName);
 const shardedColl = testDB.coll;
 const singleShardColl = testDB.singleShard;
 const shard0DB = st.shard0.getDB(testName);
-const shard1DB = st.shard1.getDB(testName);
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: testDB.getName()}));
 st.ensurePrimaryShard(testDB.getName(), st.shard0.shardName);

@@ -5,8 +5,6 @@
 //    uses_full_validation,
 // ]
 
-(function() {
-"use strict";
 var coll = db.index_partial_write_ops;
 
 var getNumKeys = function(idxName) {
@@ -80,4 +78,3 @@ assert.commandWorked(coll.remove({_id: 4}));
 
 // _id 3 is still in the index.
 assert.eq(1, getNumKeys("x_1"));
-})();

@@ -10,6 +10,11 @@ coll.drop();
 assert.commandWorked(coll.getDB().createCollection(coll.getName()));
 assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
 
+var getListIndexesCursor = function(coll, options, subsequentBatchSize) {
+    return new DBCommandCursor(
+        coll.getDB(), coll.runCommand("listIndexes", options), subsequentBatchSize);
+};
+
 assert.throws(function() {
     getListIndexesCursor(coll, {cursor: 0});
 });

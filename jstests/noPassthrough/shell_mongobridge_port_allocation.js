@@ -8,9 +8,6 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
 function checkBridgeOffset(node, processType) {
     const bridgePort = node.port;
     const serverPort = assert.commandWorked(node.adminCommand({getCmdLineOpts: 1})).parsed.net.port;
@@ -71,4 +68,3 @@ for (let i = 0; i < numShards; ++i) {
 }
 
 st.stop();
-})();

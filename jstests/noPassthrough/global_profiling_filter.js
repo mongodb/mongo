@@ -3,10 +3,8 @@
  *
  * @tags: [requires_sharding, requires_replication]
  */
-(function() {
-
-load("jstests/libs/log.js");              // For findMatchingLogLine.
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {findMatchingLogLine} from "jstests/libs/log.js";
 
 // Updates the global profiling filter to 'newFilter' and validates that 'oldFilter' is returned in
 // the response and the change is logged correctly. If `newFilter' is null, unsets the filter.
@@ -277,4 +275,3 @@ function runCorrectnessTests(conn) {
     runCorrectnessTests(st);
     st.stop();
 }
-})();

@@ -4,10 +4,10 @@
 //   requires_majority_read_concern,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries.
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries
+} from "jstests/libs/write_concern_util.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -73,4 +73,3 @@ testReadConcernLevel("majority");
 testReadConcernLevel("snapshot");
 
 rst.stopSet();
-}());

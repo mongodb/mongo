@@ -17,9 +17,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const t = db.apply_ops_invalid_index_spec;
 t.drop();
 
@@ -36,4 +33,3 @@ assert.commandFailedWithCode(t.createIndex({a: 1}, {v: 2, name: 'a_1_base_v2', u
                              ErrorCodes.InvalidIndexSpecificationOption);
 assert.commandFailedWithCode(t.createIndex({a: 1}, {v: 1, name: 'a_1_base_v1', unknown: 1}),
                              ErrorCodes.InvalidIndexSpecificationOption);
-})();

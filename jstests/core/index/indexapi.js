@@ -5,9 +5,6 @@
 //     # Uses $indexStats which is not supported in a transaction.
 //     does_not_support_transactions,
 // ]
-(function() {
-"use strict";
-
 const coll = db.indexapi;
 coll.drop();
 
@@ -64,4 +61,3 @@ assert.eq(2, allIndexes.length);
 xIndex = getSingleIndexWithKeyPattern(kTestKeyPattern);
 assert.eq(kTestKeyPattern, xIndex.key);
 assert(xIndex.unique);
-}());

@@ -11,9 +11,6 @@
  *   requires_non_retryable_writes,
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.fts_find_and_modify;
 coll.drop();
 
@@ -125,4 +122,3 @@ assert.eq({_id: 3, numbers: "one two", addedField: 4, score: 1.5}, coll.findAndM
     sort: {score: {$meta: "textScore"}},
     new: true
 }));
-}());

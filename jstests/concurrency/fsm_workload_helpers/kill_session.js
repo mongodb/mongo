@@ -3,9 +3,10 @@
  *
  * State function that kills a random session from config.system.sessions.
  */
-function killSession(db, collName) {
-    load("jstests/libs/killed_session_util.js");
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {KilledSessionUtil} from "jstests/libs/killed_session_util.js";
 
+export function killSession(db, collName) {
     print("Starting killSession");
     let ourSessionWasKilled;
     do {

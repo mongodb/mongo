@@ -1,10 +1,6 @@
 /**
  * Test that `movePrimary` works for databases created under a different FCV
  */
-(function() {
-
-"use strict";
-
 let st = new ShardingTest({shards: 2, mongos: 1, rs: {nodes: 1}});
 
 const mongos = st.s;
@@ -85,4 +81,3 @@ for (var i = 0; i < fcvValues.length; i++) {
 }
 
 st.stop();
-})();

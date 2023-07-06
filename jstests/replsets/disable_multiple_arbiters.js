@@ -5,8 +5,6 @@
  */
 
 function multiple_arbiters(multiple_arbiters_allowed) {
-    "use strict";
-
     jsTestLog("multiple_arbiters(" + multiple_arbiters_allowed + ")");
 
     const name = "disable_multiple_arbiters";

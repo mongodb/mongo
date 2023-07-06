@@ -11,8 +11,9 @@
  * ]
  */
 // TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
-// For retryOnceOnTransientAndRestartTxnOnMongos.
-load('jstests/libs/auto_retry_transaction_in_sharding.js');
+import {
+    retryOnceOnTransientAndRestartTxnOnMongos
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName1 = "test1";
 const dbName2 = "test2";

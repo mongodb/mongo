@@ -11,10 +11,12 @@
  *   resource_intensive,
  * ]
  */
-load('jstests/libs/write_concern_util.js');
+import {
+    assertWriteConcernError,
+    runCommandCheckAdmin,
+    shardCollectionWithChunks
+} from "jstests/libs/write_concern_util.js";
 
-(function() {
-"use strict";
 var st = new ShardingTest({
     // Set priority of secondaries to zero to prevent spurious elections.
     shards: {
@@ -546,4 +548,3 @@ commands.forEach(function(cmd) {
 });
 
 st.stop();
-})();

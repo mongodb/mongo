@@ -1,4 +1,4 @@
-load("jstests/replsets/rslib.js");
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 /**
  * High level test scenario:
@@ -11,7 +11,7 @@ load("jstests/replsets/rslib.js");
  * 7. Migrate only chunk back to original shard.
  * 8. Retry writes.
  */
-var testMoveChunkWithSession = function(
+export var testMoveChunkWithSession = function(
     st, collName, cmdObj, setupFunc, checkRetryResultFunc, checkDocumentsFunc) {
     var ns = 'test.' + collName;
     var testDB = st.s.getDB('test');

@@ -14,9 +14,9 @@
  *   requires_fcv_70,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For arrayEq().
-import {getWinningPlan, getPlanStages} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/fixture_helpers.js");  // For numberOfShardsForCollection().
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.compound_wildcard_sort;
 coll.drop();

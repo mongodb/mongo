@@ -4,9 +4,6 @@
  * @tags: [
  * ]
  */
-(function() {
-"use strict";
-
 // internalValidateFeaturesAsPrimary can be set via startup parameter.
 let conn = MongoRunner.runMongod({setParameter: "internalValidateFeaturesAsPrimary=0"});
 assert.neq(null, conn, "mongod was unable to start up");
@@ -89,4 +86,3 @@ assert.commandFailed(conn.adminCommand({setParameter: 1, internalValidateFeature
 assert.commandFailed(
     conn.adminCommand({setParameter: 1, internalValidateFeaturesAsPrimary: false}));
 MongoRunner.stopMongod(conn);
-}());

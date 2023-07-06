@@ -1,10 +1,10 @@
 /* sample articles for aggregation demonstrations */
 
 // make sure we're using the right db; this is the same as "use mydb;" in shell
-db = db.getSiblingDB("aggdb");
-db.article.drop();
+const testDb = db.getSiblingDB("aggdb");
+testDb.article.drop();
 
-db.article.save({
+testDb.article.save({
     _id: 1,
     title: "this is my title",
     author: "bob",
@@ -15,7 +15,7 @@ db.article.save({
     other: {foo: 5}
 });
 
-db.article.save({
+testDb.article.save({
     _id: 2,
     title: "this is your title",
     author: "dave",
@@ -29,7 +29,7 @@ db.article.save({
     other: {bar: 14}
 });
 
-db.article.save({
+testDb.article.save({
     _id: 3,
     title: "this is some other title",
     author: "jane",

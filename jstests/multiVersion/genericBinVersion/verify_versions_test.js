@@ -9,9 +9,6 @@
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-(function() {
-"use strict";
-
 function assertBinVersionsEqual(v1, v2) {
     assert(MongoRunner.areBinVersionsTheSame(v1, v2),
            "Expected \"" + v1 + "\" to equal \"" + v2 + "\"");
@@ -92,4 +89,3 @@ assert.throws(MongoRunner.areBinVersionsTheSame, ["3.2", "3"]);
 
 // Throw an error when versions differ only by githash.
 assert.throws(MongoRunner.compareBinVersions, ["3.4.1-abc", "3.4.1-xyz"]);
-}());

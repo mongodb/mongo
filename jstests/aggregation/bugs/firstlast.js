@@ -1,8 +1,6 @@
 /**
  * Tests the $first and $last accumulators in $group.
  */
-(function() {
-'use strict';
 const coll = db.jstests_aggregation_firstlast;
 coll.drop();
 
@@ -117,4 +115,3 @@ assert.commandWorked(coll.insert({a: 1, b: 1}));
 assert.commandWorked(coll.insert({a: 1, b: 2}));
 assertFirstLast(1, 0, [], {$mod: ['$b', 2]});
 assertFirstLast(0, 1, [], {$mod: [{$add: ['$b', 1]}, 2]});
-}());

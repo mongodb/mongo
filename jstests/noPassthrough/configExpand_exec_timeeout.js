@@ -1,9 +1,10 @@
 // Test config file expansion using EXEC.
 
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/configExpand/lib.js');
+import {
+    configExpandFailure,
+    configExpandSuccess,
+    makeReflectionCmd
+} from "jstests/noPassthrough/libs/configExpand/lib.js";
 
 assert.eq(runNonMongoProgram.apply(null, makeReflectionCmd('12345', {sleep: 0}).split(" ")), 0);
 
@@ -30,4 +31,3 @@ configExpandFailure({
 },
                     /Timeout expired/,
                     {configExpandTimeoutSecs: 5});
-})();

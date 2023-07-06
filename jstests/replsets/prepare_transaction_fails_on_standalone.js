@@ -3,9 +3,6 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-
 const standalone = MongoRunner.runMongod();
 
 const collName = "prepare_transaction_fails_on_standalone";
@@ -18,4 +15,3 @@ assert.commandFailedWithCode(testDB.adminCommand({prepareTransaction: 1}),
                              ErrorCodes.ReadConcernMajorityNotEnabled);
 
 MongoRunner.stopMongod(standalone);
-}());

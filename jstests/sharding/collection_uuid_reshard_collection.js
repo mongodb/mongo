@@ -5,9 +5,6 @@
  *   requires_fcv_60,
  * ]
  */
-(function() {
-'use strict';
-
 const st = new ShardingTest({
     shards: 1,
     other: {
@@ -121,4 +118,3 @@ assert.eq(res.expectedCollection, view.getName());
 assert.eq(res.actualCollection, coll.getName());
 
 st.stop();
-})();

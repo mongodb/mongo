@@ -1,11 +1,13 @@
 /**
  * Basic tests for the $trim, $ltrim, and $rtrim expressions.
  */
-(function() {
-"use strict";
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode, testExpression and
-                                              // testExpressionWithCollation.
-load("jstests/libs/sbe_assert_error_override.js");
+import "jstests/libs/sbe_assert_error_override.js";
+
+import {
+    assertErrorCode,
+    testExpression,
+    testExpressionWithCollation
+} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.trim_expressions;
 
@@ -165,4 +167,3 @@ for (const op of ["$trim", "$ltrim", "$rtrim"]) {
     assertErrorCode(coll, [{$project: {x: {[op]: {input: "$_id"}}}}], 50699);
     assertErrorCode(coll, [{$project: {x: {[op]: {input: "$nonObject", chars: "$_id"}}}}], 50700);
 }
-}());

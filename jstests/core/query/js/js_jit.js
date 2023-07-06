@@ -4,9 +4,6 @@
  * In SERVER-30362, the JIT would not compile natives types which had custom getProperty
  * implementations correctly. We force the JIT to kick in by using large loops.
  */
-(function() {
-'use strict';
-
 function testDBCollection() {
     const c = new DBCollection(null, null, "foo", "test.foo");
     for (let i = 0; i < 100000; i++) {
@@ -37,4 +34,3 @@ function testDBQuery() {
 testDBCollection();
 testDB();
 testDBQuery();
-})();

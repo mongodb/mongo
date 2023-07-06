@@ -22,9 +22,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const coll = db.getCollection(jsTestName());
 coll.drop();
 
@@ -68,4 +65,3 @@ applyOps([{
     o: {$v: 2, diff: {u: {b: 2}, sa: {u: {field: 2}}}}
 }]);
 assert.eq({_id: 1, a: null, b: 2}, coll.findOne());
-}());

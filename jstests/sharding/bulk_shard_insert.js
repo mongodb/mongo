@@ -6,9 +6,7 @@
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [resource_intensive]
  */
-(function() {
-'use strict';
-load("jstests/libs/fail_point_util.js");
+import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 
 var st = new ShardingTest({shards: 4, chunkSize: 1});
 
@@ -101,4 +99,3 @@ while (docsInserted < numDocs) {
 checkDocuments();
 
 st.stop();
-})();

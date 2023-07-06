@@ -98,7 +98,7 @@ executor:
       eval: |
         jsTest.authenticate(db.getMongo());
         globalThis.testingReplication = true;
-        load('jstests/libs/override_methods/inject_dollar_tenant.js');
+        await import('jstests/libs/override_methods/inject_dollar_tenant.js');
       global_vars:
         TestData: &TestData
           tenant: "636d957b2646ddfaf9b5e13f"

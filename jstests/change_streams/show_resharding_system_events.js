@@ -11,8 +11,8 @@
  *  assumes_read_preference_unchanged,
  * ]
  */
+import {assertChangeStreamEventEq} from "jstests/libs/change_stream_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-load('jstests/libs/change_stream_util.js');  // For 'assertChangeStreamEventEq'.
 
 // Create a single-shard cluster for this test.
 const st = new ShardingTest({

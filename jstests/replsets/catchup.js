@@ -1,11 +1,16 @@
 // Test the catch-up behavior of new primaries.
 
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/libs/election_metrics.js");
-load("jstests/replsets/rslib.js");
+import {restartServerReplication} from "jstests/libs/write_concern_util.js";
+import {
+    verifyCatchUpConclusionReason,
+    verifyServerStatusChange
+} from "jstests/replsets/libs/election_metrics.js";
+import {
+    getLatestOp,
+    reconfig,
+    reconnect,
+    stopReplicationAndEnforceNewPrimaryToCatchUp,
+} from "jstests/replsets/rslib.js";
 
 var name = "catch_up";
 var rst = new ReplSetTest({name: name, nodes: 3, useBridge: true, waitForKeys: true});
@@ -279,4 +284,3 @@ rst.awaitReplication();
 checkOpInOplog(steppedDownPrimary, stepUpResults.latestOpOnOldPrimary, 1);
 
 rst.stopSet();
-})();

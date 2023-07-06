@@ -3,10 +3,6 @@
 //   does_not_support_stepdowns,
 //   uses_map_reduce_with_temp_collections,
 // ]
-(function() {
-
-"use strict";
-
 const st = new ShardingTest({shards: 2});
 const testDB = st.getDB("test");
 const coll = "map_reduce_invalid_result_set";
@@ -71,4 +67,3 @@ st.shardColl(testDB[coll], {_id: 1}, {_id: "hashed"});
 runLimitTests(testDB, 31301);
 
 st.stop();
-}());

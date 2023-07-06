@@ -2,9 +2,6 @@
 // collection. Cannot be handled correctly in a stepdown suite since dropIndexes() with multiple
 // names cannot be retried properly.
 // @tags: [assumes_no_implicit_index_creation, does_not_support_stepdowns]
-(function() {
-'use strict';
-
 const t = db.drop_indexes;
 t.drop();
 
@@ -61,4 +58,3 @@ ex = assert.throws(() => {
 });
 assert.commandFailedWithCode(ex, ErrorCodes.TypeMismatch);
 assertIndexes(['a_1', 'b_1', 'e_1'], 'failed dropIndexes command with non-string index name');
-}());

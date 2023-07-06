@@ -5,6 +5,8 @@
  * The field contains non-unique values.
  * Each thread operates on the same collection.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var data = {
         randRange: function randRange(low, high) {

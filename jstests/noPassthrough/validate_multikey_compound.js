@@ -10,9 +10,6 @@
  *     requires_persistence,
  * ]
  */
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -76,4 +73,3 @@ assert(result.indexDetails.a_1_b_1.valid, tojson(result));
 assert(result.valid, tojson(result));
 
 rst.stopSet();
-})();

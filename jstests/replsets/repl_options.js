@@ -1,6 +1,6 @@
 var baseName = "jstests_repl_repl_options";
 
-load('jstests/libs/command_line/test_parsed_options.js');
+import {testGetCmdLineOptsMongod} from "jstests/libs/command_line/test_parsed_options.js";
 
 jsTest.log("Testing \"replSet\" command line option");
 var expectedResult = {"parsed": {"replication": {"replSet": "mycmdlinename"}}};

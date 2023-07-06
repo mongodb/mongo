@@ -1,7 +1,4 @@
 // Tests splitting a chunk twice
-(function() {
-'use strict';
-
 var s = new ShardingTest({name: "shard_keycount", shards: 2, mongos: 1, other: {chunkSize: 1}});
 
 var dbName = "test";
@@ -40,4 +37,3 @@ assert.commandWorked(coll.update({_id: 3}, {_id: 3}));
 assert.commandWorked(s.s0.adminCommand({split: ns, find: {_id: 3}}));
 
 s.stop();
-})();

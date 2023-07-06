@@ -5,10 +5,7 @@
  * @tags: [assumes_read_concern_unchanged, do_not_wrap_aggregations_in_facets,
  * requires_sharding]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Set up a 2-shard cluster. Configure 'internalQueryExecYieldIterations' on both shards such
 // that operations will yield on each PlanExecuter iteration.
@@ -49,8 +46,8 @@ FixtureHelpers.runCommandOnEachPrimary({
 });
 
 // Run $currentOp to confirm that the $sample getMore yields on both shards.
-const awaitShell = startParallelShell(() => {
-    load("jstests/libs/fixture_helpers.js");
+const awaitShell = startParallelShell(async () => {
+    const {FixtureHelpers} = await import("jstests/libs/fixture_helpers.js");
     assert.soon(() => db.getSiblingDB("admin")
                           .aggregate([
                               {$currentOp: {}},
@@ -77,4 +74,3 @@ assert.eq(sampleCursor.toArray().length, 3);
 // Confirm that the parallel shell completes successfully, and tear down the cluster.
 awaitShell();
 st.stop();
-})();

@@ -138,7 +138,7 @@ executor:
   config:
     shell_options:
       eval: >-
-        load("jstests/libs/override_methods/implicitly_configure_query_analyzer.js");
+        await import("jstests/libs/override_methods/implicitly_configure_query_analyzer.js");
   hooks:
   - class: AnalyzeShardKeysInBackground
   - class: CheckReplOplogs

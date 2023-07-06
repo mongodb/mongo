@@ -1,8 +1,5 @@
 // Test mongo shell output logs correct messages when not including certificates or using bad
 // certificates.
-(function() {
-'use strict';
-
 const SERVER_CERT = "jstests/libs/server.pem";
 const CA_CERT = "jstests/libs/ca.pem";
 
@@ -58,4 +55,3 @@ mongod = MongoRunner.runMongod({
 runTests();
 
 MongoRunner.stopMongod(mongod);
-})();

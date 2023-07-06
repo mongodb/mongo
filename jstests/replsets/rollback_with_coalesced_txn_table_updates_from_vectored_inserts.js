@@ -7,9 +7,7 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/write_concern_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({
     nodes: {
@@ -118,4 +116,3 @@ assert.commandWorked(primary.getCollection(ns).runCommand("insert", {
 }));
 
 rst.stopSet();
-})();

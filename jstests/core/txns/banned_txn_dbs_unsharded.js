@@ -11,9 +11,6 @@
 //  # serverless. If yes, we will remove this tag.
 //  directly_against_shardsvrs_incompatible,
 // ]
-(function() {
-"use strict";
-
 const session = db.getMongo().startSession({causalConsistency: false});
 const collName = "banned_txn_dbs";
 
@@ -43,4 +40,3 @@ runTest(session.getDatabase("config"));
 runTest(session.getDatabase("local"));
 
 session.endSession();
-}());

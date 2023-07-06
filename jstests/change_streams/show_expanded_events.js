@@ -7,13 +7,12 @@
  *   assumes_unsharded_collection,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/collection_drop_recreate.js');  // For 'assertDropAndRecreateCollection' and
-                                                   // 'assertDropCollection'.
-load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
-                                                   // 'assertChangeStreamEventEq'.
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {
+    assertCreateCollection,
+    assertDropAndRecreateCollection,
+    assertDropCollection,
+} from "jstests/libs/collection_drop_recreate.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 
@@ -176,4 +175,3 @@ assertChangeEvent(
     },
     false /* checkUuid */
 );
-}());

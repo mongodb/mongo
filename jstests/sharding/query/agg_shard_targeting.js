@@ -22,8 +22,11 @@
  *   requires_profiling,
  * ]
  */
-(function() {
-load("jstests/libs/profiler.js");  // For profilerHas*OrThrow helper functions.
+import {
+    profilerHasAtLeastOneAtMostNumMatchingEntriesOrThrow,
+    profilerHasSingleMatchingEntryOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({shards: 2, mongos: 2});
 
@@ -382,4 +385,3 @@ runAggShardTargetTest({
     });
 
 st.stop();
-})();

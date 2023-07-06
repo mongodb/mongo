@@ -1,4 +1,4 @@
-load('jstests/libs/parallelTester.js');
+import {fork} from "jstests/libs/parallelTester.js";
 
 const N = 1000;
 const HOST = db.getMongo().host;

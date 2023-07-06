@@ -9,9 +9,9 @@
  * ]
  */
 
-load('jstests/replsets/libs/rollback_files.js');
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {checkRollbackFiles} from "jstests/replsets/libs/rollback_files.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
-load('jstests/libs/uuid_util.js');
 
 function uuidToCollName(uuid) {
     return "globalIndex." + extractUUIDFromObject(uuid);

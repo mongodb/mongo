@@ -5,7 +5,6 @@
 //
 // Tests that the correct CRSes are used for geo queries (based on input geometry)
 //
-(function() {
 var coll = db.geo_operator_crs;
 coll.drop();
 
@@ -57,4 +56,3 @@ assert.close(result[0].dis, Math.PI / 2);
 assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
 result = coll.aggregate({$geoNear: {near: jsonZeroPt, distanceField: "dis"}}).toArray();
 assert.close(result[0].dis, (Math.PI / 2) * earthRadiusMeters);
-}());

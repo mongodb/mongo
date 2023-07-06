@@ -12,11 +12,14 @@
  * ]
  */
 
+import "jstests/libs/override_methods/retry_on_killed_session.js";
+
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/internal_transactions_sharded_from_mongod.js";
-load('jstests/libs/override_methods/retry_on_killed_session.js');
+import {KilledSessionUtil} from "jstests/libs/killed_session_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.retryOnKilledSession = true;

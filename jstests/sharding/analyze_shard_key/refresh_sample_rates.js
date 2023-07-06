@@ -5,11 +5,8 @@
  *
  * @tags: [requires_fcv_70, requires_persistence]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 // Used to prevent a mongos or mongod from running _refreshQueryAnalyzerConfiguration commands by
 // themselves in the background.
@@ -352,4 +349,3 @@ function runTest(createConnFn, rst, samplerNames) {
 
     rst.stopSet();
 }
-})();

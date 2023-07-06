@@ -7,9 +7,6 @@
  *   requires_fcv_53,
  * ]
  */
-(function() {
-'use strict';
-
 // Create a cluster with 2 shards.
 const numShards = 2;
 const st = new ShardingTest({shards: numShards});
@@ -77,4 +74,3 @@ function assertLookupRunsOnShards(explain) {
 })();
 
 st.stop();
-})();

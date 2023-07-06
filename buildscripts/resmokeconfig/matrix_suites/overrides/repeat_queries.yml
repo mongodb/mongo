@@ -3,7 +3,7 @@
 # cache -- do not affect correctness.
 - name: enable_eval
   value:
-    eval: load("jstests/libs/override_methods/rerun_queries.js");
+    eval: await import("jstests/libs/override_methods/rerun_queries.js");
 
 - name: excluded_files
   value:

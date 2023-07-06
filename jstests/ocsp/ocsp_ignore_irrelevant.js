@@ -1,13 +1,31 @@
 // Check that OCSP ignores statuses of irrelevant certificates in the response
 // @tags: [requires_http_client, requires_ocsp_stapling]
 
-load("jstests/ocsp/lib/mock_ocsp.js");
-
-(function() {
-"use strict";
+import {
+    FAULT_REVOKED,
+    MockOCSPServer,
+    OCSP_CA_RESPONDER,
+    OCSP_DELEGATE_RESPONDER,
+    OCSP_INTERMEDIATE_RESPONDER,
+} from "jstests/ocsp/lib/mock_ocsp.js";
+import {
+    assertClientConnectFails,
+    assertClientConnectSucceeds,
+    clearOCSPCache,
+    OCSP_CA_PEM,
+    OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM,
+    OCSP_REVOKED,
+    OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM,
+    OCSP_SERVER_CERT,
+    OCSP_SERVER_MUSTSTAPLE_CERT,
+    OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM,
+    supportsStapling,
+    waitForServer
+} from "jstests/ocsp/lib/ocsp_helpers.js";
+import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 if (determineSSLProvider() === "apple") {
-    return;
+    quit();
 }
 
 const INCLUDE_EXTRA_STATUS = true;
@@ -146,10 +164,9 @@ for (const digest of digests) {
 }
 
 if (!supportsStapling()) {
-    return;
+    quit();
 }
 
 for (const digest of digests) {
     testStapling(OCSP_SERVER_MUSTSTAPLE_CERT, OCSP_CA_PEM, OCSP_DELEGATE_RESPONDER, digest);
 }
-}());

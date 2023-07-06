@@ -5,9 +5,6 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
 const kAdminDB = "admin";
 const kCollName = "coll";
 const kConfigDB = "config";
@@ -256,4 +253,3 @@ assert.eq(cmdRes.cursor.firstBatch, [
 ]);
 
 rst.stopSet();
-}());

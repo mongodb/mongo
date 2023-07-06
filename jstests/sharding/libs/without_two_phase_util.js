@@ -1,13 +1,12 @@
 /**
  * Utilities for the find_and_modify_without_two_phase.js and delete_without_two_phase.js tests.
  */
-"use strict";
 
 /**
  * Runs an explain on the `cmdObj` and checks that the explain targets the shard given be
  * `expectedShardName`.
  */
-function assertExplainTargetsCorrectShard(db, cmdObj, expectedShardName) {
+export function assertExplainTargetsCorrectShard(db, cmdObj, expectedShardName) {
     var res = db.runCommand({explain: cmdObj});
     assert.eq(res.queryPlanner.winningPlan.shards.length, 1);
     assert.eq(res.queryPlanner.winningPlan.shards[0].shardName, expectedShardName);
@@ -17,7 +16,7 @@ function assertExplainTargetsCorrectShard(db, cmdObj, expectedShardName) {
  * Performs a split given by the `splitDoc`, and then moves the chunk containg `moveShard0Doc` to
  * shard0 and the chunk containing `moveShard1Doc` to shard1.
  */
-function splitAndMoveChunks(st, splitDoc, moveShard0Doc, moveShard1Doc) {
+export function splitAndMoveChunks(st, splitDoc, moveShard0Doc, moveShard1Doc) {
     assert.commandWorked(st.s0.adminCommand({split: "test.sharded_coll", middle: splitDoc}));
 
     assert.commandWorked(st.s0.adminCommand(

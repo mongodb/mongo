@@ -5,10 +5,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
@@ -123,4 +120,3 @@ testCommandIsRetried(
     });
 
 rst.stopSet();
-})();

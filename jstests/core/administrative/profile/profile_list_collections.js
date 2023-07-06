@@ -8,11 +8,7 @@
 
 // Confirms that a listCollections command is not profiled.
 
-(function() {
-"use strict";
-
-// For 'getLatestProfilerEntry()'.
-load("jstests/libs/profiler.js");
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 var testDB = db.getSiblingDB("profile_list_collections");
 assert.commandWorked(testDB.dropDatabase());
@@ -44,4 +40,3 @@ cmdRes = assert.commandWorked(
 assert.throws(() => getLatestProfilerEntry(testDB, {op: "getmore"}),
               [],
               "Did not expect to find entry for getMore on a listCollections cursor");
-})();

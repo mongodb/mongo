@@ -3,7 +3,8 @@
  *
  * Repeatedly creates new roles on a database.
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropRoles
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {dropRoles} from "jstests/concurrency/fsm_workload_helpers/drop_utils.js";
 
 // UMC commands are not supported in transactions.
 TestData.runInsideTransaction = false;

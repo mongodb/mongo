@@ -4,9 +4,6 @@
  *
  * @tags: [requires_sharding, uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-
 const collName = "restart_transactions";
 
 function runTest(routerDB, directDB) {
@@ -165,4 +162,3 @@ const configDB = configSession.getDatabase(configDBName);
 runTest(st.s.getDB(configDBName), configDB);
 
 st.stop();
-})();

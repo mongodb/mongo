@@ -1,6 +1,13 @@
 // Tests the test utilities themselves.
-(function() {
-load("jstests/aggregation/extras/utils.js");
+import {
+    anyEq,
+    arrayEq,
+    assertArrayEq,
+    customDocumentEq,
+    documentEq,
+    orderedArrayEq,
+    resultsEq,
+} from "jstests/aggregation/extras/utils.js";
 
 const verbose = false;
 
@@ -221,4 +228,3 @@ assert(orderedArrayEq([1, [2, 3, 4]], [1, [2, 3, 4]], verbose));
 assert(orderedArrayEq([1, [2, 3, 4]], [1, [4, 3, 2]], verbose));
 assert.eq([1, [2, 3, 4]], [1, [2, 3, 4]]);
 assert.neq([1, [2, 3, 4]], [1, [4, 3, 2]]);
-}());

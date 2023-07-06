@@ -10,12 +10,8 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");            // For "configureFailPoint()"
-load("jstests/libs/parallelTester.js");             // For "startParallelShell()"
-load("jstests/noPassthrough/libs/index_build.js");  // For "IndexBuildTest"
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
@@ -76,4 +72,3 @@ assert(!rst.getPrimary().getDB("test").getCollectionNames().includes("coll"));
 assert(!rst.getSecondary().getDB("test").getCollectionNames().includes("coll"));
 
 rst.stopSet();
-})();

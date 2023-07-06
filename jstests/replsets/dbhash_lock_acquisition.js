@@ -6,7 +6,7 @@
  *   uses_transactions,
  * ]
  */
-load("jstests/libs/parallelTester.js");  // for Thread
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();

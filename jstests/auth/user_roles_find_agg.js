@@ -2,10 +2,6 @@
 // standalone mongod and a sharded cluster).
 // @tags: [requires_fcv_70]
 
-(function() {
-"use strict";
-load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isMongos.
-
 const dbName = "test";
 const findCollName = "find_coll";
 const aggCollName = "team_budget";
@@ -109,4 +105,3 @@ const st = new ShardingTest({
 
 runTest(st.s, st);
 st.stop();
-}());

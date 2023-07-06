@@ -7,9 +7,6 @@
 // all collections created, and checking the oplog for entries logging the creation of each of those
 // collections.
 
-(function() {
-"use strict";
-
 const name = "mr_nonrepl_coll_in_local_db";
 const replSet = new ReplSetTest({name: name, nodes: 2});
 replSet.startSet();
@@ -45,7 +42,8 @@ assert.commandWorked(result);
 const logLines = checkLog.getGlobalLog(primaryDB);
 let createdCollections = [];
 logLines.forEach(function(line) {
-    if (line.match(/createCollection: (.+) with/)) {
+    const matchResult = line.match(/createCollection: (.+) with/)
+    if (matchResult) {
         createdCollections.push(matchResult[1]);
     }
 });
@@ -83,4 +81,3 @@ createdCollections.forEach(function(createdCollectionName) {
 });
 
 replSet.stopSet();
-}());

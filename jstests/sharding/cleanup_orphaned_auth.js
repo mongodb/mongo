@@ -2,9 +2,6 @@
 // Tests of cleanupOrphaned command permissions.
 //
 
-(function() {
-'use strict';
-
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
@@ -67,4 +64,3 @@ fooDB.auth('user', 'x');
 assertUnauthorized(shardAdmin.runCommand({cleanupOrphaned: 'foo.bar'}));
 
 st.stop();
-})();

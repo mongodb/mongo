@@ -2,9 +2,6 @@
 // @tags: [
 //  does_not_support_repeated_reads,
 // ]
-(function() {
-"use strict";
-
 const collName = jsTest.name();
 const coll = db[collName];
 coll.drop();
@@ -53,4 +50,3 @@ for (const indexHint of [simpleGeoNearIndexName, compoundGeoNearIndexName]) {
         assert.eq(1, indexAccesses["ops"], indexStats);
     }
 }
-}());

@@ -14,10 +14,8 @@
  *
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/index_build.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const replSet = new ReplSetTest({
     nodes: [
@@ -95,4 +93,3 @@ IndexBuildTest.resumeIndexBuilds(secondary);
 awaitIndexBuild();
 
 replSet.stopSet();
-}());

@@ -1,9 +1,6 @@
 // Test that the in memory sort capacity limit is checked for all "top N" sort candidates.
 // SERVER-4716
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const t = db[jsTestName()];
 t.drop();
@@ -47,4 +44,3 @@ assert.throwsWithCode(
     () =>
         t.find().sort({a: -1}).allowDiskUse(false).hint({b: 1}).showDiskLoc().limit(100).itcount(),
     ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
-})();

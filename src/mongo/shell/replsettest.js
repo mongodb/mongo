@@ -75,6 +75,8 @@
  *  nodes {Array.<Mongo>} - connection to replica set members
  */
 
+/* global retryOnRetryableError */
+
 var ReplSetTest = function ReplSetTest(opts) {
     'use strict';
 
@@ -93,12 +95,16 @@ var ReplSetTest = function ReplSetTest(opts) {
     // Publicly exposed variables
 
     /**
-     * Tries to load the 'jstests/libs/parallelTester.js' dependency. Returns true if the file is
-     * loaded successfully, and false otherwise.
+     * Tries to load the 'jstests/libs/legacyThreadSupport.js' dependency. Returns true if the file
+     * is loaded successfully, and false otherwise.
      */
     function tryLoadParallelTester() {
+        if (typeof globalThis.Thread !== 'undefined') {
+            return true;
+        }
+
         try {
-            load("jstests/libs/parallelTester.js");  // For Thread.
+            load("jstests/libs/legacyThreadSupport.js");  // For Thread.
             return true;
         } catch (e) {
             return false;
@@ -3360,7 +3366,7 @@ var ReplSetTest = function ReplSetTest(opts) {
         // Perform collection validation on each node in parallel.
         let validators = [];
         for (let i = 0; i < ports.length; i++) {
-            let validator = new Thread(async function(port) {
+            const validator = new Thread(async function(port) {
                 const {CommandSequenceWithRetries} =
                     await import("jstests/libs/command_sequence_with_retries.js");
                 const {validateCollections} = await import("jstests/hooks/validate_collections.js");
@@ -3433,6 +3439,7 @@ var ReplSetTest = function ReplSetTest(opts) {
             print("ReplSetTest stopSet skipping validation before stopping nodes.");
         } else if (parallelValidate) {
             print("ReplSetTest stopSet validating all replica set nodes before stopping them.");
+            print(`   FOR PORTS: [${tojson(this.ports)}]`);
             this._validateNodes(this.ports);
         }
 

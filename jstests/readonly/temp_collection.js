@@ -4,8 +4,7 @@
  *
  * @tags: [requires_replication]
  */
-'use strict';
-load('jstests/readonly/lib/read_only_test.js');
+import {runReadOnlyTest} from "jstests/readonly/lib/read_only_test.js";
 
 runReadOnlyTest((function() {
     return {

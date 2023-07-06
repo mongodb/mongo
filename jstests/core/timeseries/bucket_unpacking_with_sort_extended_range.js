@@ -14,11 +14,8 @@
  *     requires_timeseries,
  * ]
  */
-
-load("jstests/aggregation/extras/utils.js");  // For getExplainedPipelineFromAggregation.
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
-
-const timeFieldName = "t";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Create unindexed collection
 const coll = db.timeseries_internal_bounded_sort_extended_range;
@@ -122,8 +119,6 @@ function assertSorted(result, ascending) {
 function checkAgainstReferenceBoundedSortUnexpected(
     collection, reference, pipeline, hint, sortOrder) {
     const options = hint ? {hint: hint} : {};
-
-    const bucket = db['system.buckets.' + coll.getName()];
 
     const plan = collection.explain().aggregate(pipeline, options);
     if (FixtureHelpers.isSharded(buckets) && numShards() >= 2) {

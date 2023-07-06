@@ -95,7 +95,7 @@ executor:
     shell_options:
       eval: >-
         globalThis.testingReplication = true;
-        load("jstests/libs/override_methods/retry_aborted_db_and_index_creation.js");
+        await import("jstests/libs/override_methods/retry_aborted_db_and_index_creation.js");
   hooks:
   - class: CheckReplOplogs
   - class: CheckReplDBHash

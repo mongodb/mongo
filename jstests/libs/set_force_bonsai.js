@@ -3,9 +3,5 @@
  * bonsai regardless of the configuration of the variant running the task, since the suite
  * definition cannot override a knob which is also defined by the variant.
  */
-(function() {
-'use strict';
-
 assert.commandWorked(
     db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
-})();

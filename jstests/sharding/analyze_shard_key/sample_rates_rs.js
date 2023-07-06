@@ -5,11 +5,17 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallelTester.js");
-load("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
+import {Thread} from "jstests/libs/parallelTester.js";
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
+import {
+    assertDiffWindow,
+    runDeleteCmdsOnRepeat,
+    runFindCmdsOnRepeat,
+    runNestedAggregateCmdsOnRepeat,
+} from "jstests/sharding/analyze_shard_key/libs/sample_rates_common.js";
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
 // period of 1 second to speed up the test.
@@ -174,4 +180,3 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
 testQuerySampling(dbName, collNameNotSampled, collNameSampled);
 
 rst.stopSet();
-})();

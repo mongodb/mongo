@@ -1,8 +1,5 @@
 
-(function() {
-'use strict';
-
-load("jstests/libs/retryable_writes_util.js");
+import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 
 function runConfigsvrSetAllowMigrationsWithRetries(st, ns, lsid, txnNumber, allowMigrations) {
     var res;
@@ -62,4 +59,3 @@ assert.eq(true, collectionMetadata.hasOwnProperty('allowMigrations'));
 assert.eq(false, collectionMetadata.allowMigrations);
 
 st.stop();
-})();

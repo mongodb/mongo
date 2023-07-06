@@ -11,13 +11,11 @@
  * Alternative $lookup syntax:
  *        {$lookup: {from: {db:<>, coll:<>},...}}
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
-load("jstests/libs/discover_topology.js");    // For findNonConfigNodes.
-load("jstests/libs/profiler.js");             // For profilerHasSingleMatchingEntryOrThrow.
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({shards: 2});
 const dbName = jsTestName();
@@ -67,7 +65,7 @@ const invalidLookups = [
     },
     {
         $lookup: {
-            from: {db: "config", coll: "validDB.LetLookup.invalidCollectionName"}, 
+            from: {db: "config", coll: "validDB.LetLookup.invalidCollectionName"},
             let: {x_field: "$x"},
             pipeline: [
                 {$match: {$expr: { $eq: ["$_id.x", "$$x_field"]}}}
@@ -77,7 +75,7 @@ const invalidLookups = [
     },
     {
         $lookup: {
-            from: {db: "wrongDBWithLet", coll: `${chunksCollName}`}, 
+            from: {db: "wrongDBWithLet", coll: `${chunksCollName}`},
             let: {x_field: "$x"},
             pipeline: [
                 {$match: {$expr: { $eq: ["$_id.x", "$$x_field"]}}}
@@ -129,4 +127,3 @@ const lookupLet = {
 };
 testLookupFromConfigCacheChunks(lookupLet);
 st.stop();
-}());

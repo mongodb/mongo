@@ -4,9 +4,6 @@
  * @tags: [uses_transactions, requires_db_locking]
  */
 
-(function() {
-"use strict";
-
 let rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -30,4 +27,3 @@ assert.eq(db.view.find().toArray().length, 1);
 assert.commandWorked(session.commitTransaction_forTesting());
 
 rst.stopSet();
-})();

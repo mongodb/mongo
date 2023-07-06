@@ -1,9 +1,6 @@
 // Tests that you cannot use aggregation to output to a system collection.
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');  // For 'assertErrorCode'.
-load("jstests/libs/fixture_helpers.js");      // For 'isMongos'.
+import {assertErrorCode, collectionExists} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const input = db.no_output_to_system;
 input.drop();
@@ -50,4 +47,3 @@ if (!FixtureHelpers.isMongos(db)) {
     // $out allows for the source collection to be the same as the destination collection.
     assertErrorCode(outputToLocal, {$out: outputToLocal.getName()}, 31321);
 }
-})();

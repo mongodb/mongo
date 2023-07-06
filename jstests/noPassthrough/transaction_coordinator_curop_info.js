@@ -7,10 +7,8 @@
  * ]
  */
 
-(function() {
-'use strict';
-load('jstests/libs/fail_point_util.js');
-load('jstests/sharding/libs/sharded_transactions_helpers.js');  // for waitForFailpoint
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {waitForFailpoint} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 function commitTxn(st, lsid, txnNumber, expectedError = null) {
     let cmd = "db.adminCommand({" +
@@ -208,4 +206,3 @@ jsTest.log("Testing that coordinator threads show up in currentOp for an abort d
 }
 
 st.stop();
-})();

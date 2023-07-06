@@ -4,13 +4,10 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {makeCommitTransactionCmdObj} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 // This test runs the reapLogicalSessionCacheNow command. That can lead to direct writes to the
 // config.transactions collection, which cannot be performed on a session.
@@ -185,54 +182,54 @@ function assertNumEntries(
         {numSessionsCollEntries: 1, numTransactionsCollEntries: 2, numImageCollEntries: 1});
 
     const runInternalTxn =
-        (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
-            load("jstests/sharding/libs/sharded_transactions_helpers.js");
+        async (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
+        const {makeCommitTransactionCmdObj} =
+            await import("jstests/sharding/libs/sharded_transactions_helpers.js");
+        const primary = new Mongo(primaryHost);
+        const testDB = primary.getDB(dbName);
 
-            const primary = new Mongo(primaryHost);
-            const testDB = primary.getDB(dbName);
-
-            const childLsid = {
-                id: UUID(parentLsidUUIDString),
-                txnNumber: NumberLong(parentTxnNumber),
-                txnUUID: UUID()
-            };
-            const childTxnNumber = NumberLong(0);
-
-            assert.commandWorked(testDB.runCommand({
-                insert: collName,
-                documents: [{x: 2}],
-                lsid: childLsid,
-                txnNumber: childTxnNumber,
-                startTransaction: true,
-                autocommit: false,
-                stmtId: NumberInt(2),
-            }));
-
-            // Retry the write statement executed in the external session.
-            assert.commandWorked(testDB.runCommand({
-                findAndModify: collName,
-                query: {x: 0},
-                update: {$inc: {y: 1}},
-                new: true,
-                lsid: childLsid,
-                txnNumber: childTxnNumber,
-                autocommit: false,
-                stmtId: NumberInt(0),
-            }));
-
-            // Retry the write statement executed in the committed internal transaction.
-            assert.commandWorked(testDB.runCommand({
-                insert: collName,
-                documents: [{x: 1}],
-                lsid: childLsid,
-                txnNumber: childTxnNumber,
-                autocommit: false,
-                stmtId: NumberInt(1),
-            }));
-
-            assert.commandWorked(
-                primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+        const childLsid = {
+            id: UUID(parentLsidUUIDString),
+            txnNumber: NumberLong(parentTxnNumber),
+            txnUUID: UUID()
         };
+        const childTxnNumber = NumberLong(0);
+
+        assert.commandWorked(testDB.runCommand({
+            insert: collName,
+            documents: [{x: 2}],
+            lsid: childLsid,
+            txnNumber: childTxnNumber,
+            startTransaction: true,
+            autocommit: false,
+            stmtId: NumberInt(2),
+        }));
+
+        // Retry the write statement executed in the external session.
+        assert.commandWorked(testDB.runCommand({
+            findAndModify: collName,
+            query: {x: 0},
+            update: {$inc: {y: 1}},
+            new: true,
+            lsid: childLsid,
+            txnNumber: childTxnNumber,
+            autocommit: false,
+            stmtId: NumberInt(0),
+        }));
+
+        // Retry the write statement executed in the committed internal transaction.
+        assert.commandWorked(testDB.runCommand({
+            insert: collName,
+            documents: [{x: 1}],
+            lsid: childLsid,
+            txnNumber: childTxnNumber,
+            autocommit: false,
+            stmtId: NumberInt(1),
+        }));
+
+        assert.commandWorked(
+            primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+    };
 
     // Start another internal transaction in a separate thread, and make it hang right after it
     // finishes executing the first statement.
@@ -543,44 +540,45 @@ function assertNumEntries(
         {numSessionsCollEntries: 1, numTransactionsCollEntries: 1, numImageCollEntries: 1});
 
     const runInternalTxn =
-        (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
-            load("jstests/sharding/libs/sharded_transactions_helpers.js");
+        async (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
+        const {makeCommitTransactionCmdObj} =
+            await import("jstests/sharding/libs/sharded_transactions_helpers.js");
 
-            const primary = new Mongo(primaryHost);
-            const testDB = primary.getDB(dbName);
+        const primary = new Mongo(primaryHost);
+        const testDB = primary.getDB(dbName);
 
-            const childLsid = {
-                id: UUID(parentLsidUUIDString),
-                txnNumber: NumberLong(parentTxnNumber),
-                txnUUID: UUID()
-            };
-            const childTxnNumber = NumberLong(0);
-
-            assert.commandWorked(testDB.runCommand({
-                insert: collName,
-                documents: [{x: 1}],
-                lsid: childLsid,
-                txnNumber: childTxnNumber,
-                startTransaction: true,
-                autocommit: false,
-                stmtId: NumberInt(1),
-            }));
-
-            // Retry the write statement executed in the external session.
-            assert.commandWorked(testDB.runCommand({
-                findAndModify: collName,
-                query: {x: 0},
-                update: {$inc: {y: 1}},
-                new: true,
-                lsid: childLsid,
-                txnNumber: childTxnNumber,
-                autocommit: false,
-                stmtId: NumberInt(0),
-            }));
-
-            assert.commandWorked(
-                primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+        const childLsid = {
+            id: UUID(parentLsidUUIDString),
+            txnNumber: NumberLong(parentTxnNumber),
+            txnUUID: UUID()
         };
+        const childTxnNumber = NumberLong(0);
+
+        assert.commandWorked(testDB.runCommand({
+            insert: collName,
+            documents: [{x: 1}],
+            lsid: childLsid,
+            txnNumber: childTxnNumber,
+            startTransaction: true,
+            autocommit: false,
+            stmtId: NumberInt(1),
+        }));
+
+        // Retry the write statement executed in the external session.
+        assert.commandWorked(testDB.runCommand({
+            findAndModify: collName,
+            query: {x: 0},
+            update: {$inc: {y: 1}},
+            new: true,
+            lsid: childLsid,
+            txnNumber: childTxnNumber,
+            autocommit: false,
+            stmtId: NumberInt(0),
+        }));
+
+        assert.commandWorked(
+            primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+    };
 
     const fp = configureFailPoint(primary, "hangAfterSessionCheckOut", {}, {skip: 1});
     const internalTxnThread = new Thread(runInternalTxn,
@@ -638,33 +636,33 @@ function assertNumEntries(
         {numSessionsCollEntries: 1, numTransactionsCollEntries: 1, numImageCollEntries: 1});
 
     const runInternalTxn =
-        (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
-            load("jstests/sharding/libs/sharded_transactions_helpers.js");
+        async (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
+        const {makeCommitTransactionCmdObj} =
+            await import("jstests/sharding/libs/sharded_transactions_helpers.js");
+        const primary = new Mongo(primaryHost);
+        const testDB = primary.getDB(dbName);
 
-            const primary = new Mongo(primaryHost);
-            const testDB = primary.getDB(dbName);
-
-            const childLsid = {
-                id: UUID(parentLsidUUIDString),
-                txnNumber: NumberLong(parentTxnNumber),
-                txnUUID: UUID()
-            };
-            const childTxnNumber = NumberLong(0);
-
-            assert.commandWorked(testDB.runCommand({
-                findAndModify: collName,
-                query: {x: 0},
-                update: {$inc: {y: 1}},
-                new: true,
-                lsid: childLsid,
-                txnNumber: childTxnNumber,
-                startTransaction: true,
-                autocommit: false,
-                stmtId: NumberInt(0),
-            }));
-            assert.commandWorked(
-                primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+        const childLsid = {
+            id: UUID(parentLsidUUIDString),
+            txnNumber: NumberLong(parentTxnNumber),
+            txnUUID: UUID()
         };
+        const childTxnNumber = NumberLong(0);
+
+        assert.commandWorked(testDB.runCommand({
+            findAndModify: collName,
+            query: {x: 0},
+            update: {$inc: {y: 1}},
+            new: true,
+            lsid: childLsid,
+            txnNumber: childTxnNumber,
+            startTransaction: true,
+            autocommit: false,
+            stmtId: NumberInt(0),
+        }));
+        assert.commandWorked(
+            primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+    };
 
     const fp = configureFailPoint(primary, "hangAfterSessionCheckOut");
     const internalTxnThread = new Thread(runInternalTxn,
@@ -734,54 +732,55 @@ function assertNumEntries(
         {numSessionsCollEntries: 1, numTransactionsCollEntries: 2, numImageCollEntries: 1});
 
     const runInternalTxn =
-        (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
-            load("jstests/sharding/libs/sharded_transactions_helpers.js");
+        async (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
+        const {makeCommitTransactionCmdObj} =
+            await import("jstests/sharding/libs/sharded_transactions_helpers.js");
 
-            const primary = new Mongo(primaryHost);
-            const testDB = primary.getDB(dbName);
+        const primary = new Mongo(primaryHost);
+        const testDB = primary.getDB(dbName);
 
-            const childLsid = {
-                id: UUID(parentLsidUUIDString),
-                txnNumber: NumberLong(parentTxnNumber),
-                txnUUID: UUID()
-            };
-            const childTxnNumber = NumberLong(0);
-
-            assert.commandWorked(testDB.runCommand({
-                insert: collName,
-                documents: [{x: 2}],
-                lsid: childLsid,
-                txnNumber: childTxnNumber,
-                startTransaction: true,
-                autocommit: false,
-                stmtId: NumberInt(2),
-            }));
-
-            // Retry the write statement executed in the external session.
-            assert.commandWorked(testDB.runCommand({
-                findAndModify: collName,
-                query: {x: 0},
-                update: {$inc: {y: 1}},
-                new: true,
-                lsid: childLsid,
-                txnNumber: childTxnNumber,
-                autocommit: false,
-                stmtId: NumberInt(0),
-            }));
-
-            // Retry the write statement executed in the committed internal transaction.
-            assert.commandWorked(testDB.runCommand({
-                insert: collName,
-                documents: [{x: 1}],
-                lsid: childLsid,
-                txnNumber: childTxnNumber,
-                autocommit: false,
-                stmtId: NumberInt(1),
-            }));
-
-            assert.commandWorked(
-                primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+        const childLsid = {
+            id: UUID(parentLsidUUIDString),
+            txnNumber: NumberLong(parentTxnNumber),
+            txnUUID: UUID()
         };
+        const childTxnNumber = NumberLong(0);
+
+        assert.commandWorked(testDB.runCommand({
+            insert: collName,
+            documents: [{x: 2}],
+            lsid: childLsid,
+            txnNumber: childTxnNumber,
+            startTransaction: true,
+            autocommit: false,
+            stmtId: NumberInt(2),
+        }));
+
+        // Retry the write statement executed in the external session.
+        assert.commandWorked(testDB.runCommand({
+            findAndModify: collName,
+            query: {x: 0},
+            update: {$inc: {y: 1}},
+            new: true,
+            lsid: childLsid,
+            txnNumber: childTxnNumber,
+            autocommit: false,
+            stmtId: NumberInt(0),
+        }));
+
+        // Retry the write statement executed in the committed internal transaction.
+        assert.commandWorked(testDB.runCommand({
+            insert: collName,
+            documents: [{x: 1}],
+            lsid: childLsid,
+            txnNumber: childTxnNumber,
+            autocommit: false,
+            stmtId: NumberInt(1),
+        }));
+
+        assert.commandWorked(
+            primary.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+    };
 
     // Start another internal transaction in a separate thread, and make it hang right after it
     // finishes executing the first statement.
@@ -844,32 +843,32 @@ function assertNumEntries(
         {numSessionsCollEntries: 1, numTransactionsCollEntries: 1, numImageCollEntries: 1});
 
     const runInternalTxn =
-        (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
-            load("jstests/sharding/libs/sharded_transactions_helpers.js");
+        async (primaryHost, parentLsidUUIDString, parentTxnNumber, dbName, collName) => {
+        const {makeCommitTransactionCmdObj} =
+            await import("jstests/sharding/libs/sharded_transactions_helpers.js");
+        const primary = new Mongo(primaryHost);
+        const testDB = primary.getDB(dbName);
 
-            const primary = new Mongo(primaryHost);
-            const testDB = primary.getDB(dbName);
-
-            const childLsid = {
-                id: UUID(parentLsidUUIDString),
-                txnNumber: NumberLong(parentTxnNumber),
-                txnUUID: UUID()
-            };
-            const childTxnNumber = NumberLong(0);
-
-            // Retry the statement executed in the external session.
-            assert.commandWorked(testDB.runCommand({
-                insert: collName,
-                documents: [{y: 0}],
-                lsid: childLsid,
-                txnNumber: childTxnNumber,
-                startTransaction: true,
-                autocommit: false,
-                stmtId: NumberInt(0),
-            }));
-            assert.commandWorked(
-                testDB.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+        const childLsid = {
+            id: UUID(parentLsidUUIDString),
+            txnNumber: NumberLong(parentTxnNumber),
+            txnUUID: UUID()
         };
+        const childTxnNumber = NumberLong(0);
+
+        // Retry the statement executed in the external session.
+        assert.commandWorked(testDB.runCommand({
+            insert: collName,
+            documents: [{y: 0}],
+            lsid: childLsid,
+            txnNumber: childTxnNumber,
+            startTransaction: true,
+            autocommit: false,
+            stmtId: NumberInt(0),
+        }));
+        assert.commandWorked(
+            testDB.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+    };
 
     const fp = configureFailPoint(primary, "hangBeforeSessionCheckOut");
     const internalTxnThread = new Thread(runInternalTxn,
@@ -906,4 +905,3 @@ function assertNumEntries(
 }
 
 rst.stopSet();
-})();

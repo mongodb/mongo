@@ -1,10 +1,8 @@
 // Integration tests for {$diacriticSensitive: true, $caseSensitive: true} option to $text query
 // operator.
 
-load('jstests/libs/fts.js');
+import {queryIDS} from "jstests/libs/fts.js";
 
-(function() {
-"use strict";
 var coll = db.fts_diacritic_and_casesensitive;
 
 coll.drop();
@@ -51,4 +49,3 @@ assert.eq([],
                    "\"próximo Vôo\" -\"único Médico\"",
                    null,
                    {$diacriticSensitive: true, $caseSensitive: true}));
-})();

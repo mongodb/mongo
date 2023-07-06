@@ -17,9 +17,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 const indexName = "textIndex";
 
 const collNamePrefix = 'fts_index1_';
@@ -279,4 +276,3 @@ assert.commandFailedWithCode(coll.createIndex({a: "text", b: Number.MAX_VALUE}),
 assert.commandFailedWithCode(coll.createIndex({a: "text", b: -Number.MAX_VALUE}),
                              ErrorCodes.CannotCreateIndex);
 jsTestLog('indexes ' + coll.getFullName() + ':' + tojson(coll.getIndexes()));
-})();

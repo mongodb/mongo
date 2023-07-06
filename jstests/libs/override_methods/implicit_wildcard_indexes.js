@@ -2,10 +2,7 @@
  * This file defines command overrides in order to implcitly create additional wildcard indexes for
  * tests running in this suite.
  */
-(function() {
-'use strict';
-
-load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 const prefix = "HIDDEN_WILDCARD_";
 const isHiddenWildcardIndex = {
@@ -201,4 +198,3 @@ DBCollection.prototype.getIndexSpecs = DBCollection.prototype.getIndexes;
 OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/implicit_wildcard_indexes.js");
 OverrideHelpers.overrideRunCommand(runCommandOverride);
-}());

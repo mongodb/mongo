@@ -1,12 +1,11 @@
-'use strict';
-load('jstests/aggregation/extras/utils.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 // This test makes assertions about the number of sessions, which are not compatible with
 // implicit sessions.
 TestData.disableImplicitSessions = true;
 
 // All tests for the $listLocalSessions aggregation stage.
-function runListLocalSessionsTest(mongod) {
+export function runListLocalSessionsTest(mongod) {
     assert(mongod);
     const admin = mongod.getDB('admin');
     const db = mongod.getDB("test");
@@ -35,7 +34,6 @@ function runListLocalSessionsTest(mongod) {
     const resultArray = assert.doesNotThrow(listLocalSessions).toArray();
     assert.eq(resultArray.length, 1);
     const cacheid = resultArray[0]._id.id;
-    const myuid = resultArray[0]._id.uid;
     assert(cacheid !== undefined);
     assert.eq(0, bsonWoCompare({x: cacheid}, {x: myid}));
 

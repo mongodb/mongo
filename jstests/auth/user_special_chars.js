@@ -1,7 +1,5 @@
-"use strict";
 // Test creating and authenticating users with special characters.
 
-(function() {
 var conn = MongoRunner.runMongod({auth: ''});
 
 var adminDB = conn.getDB('admin');
@@ -52,4 +50,3 @@ var testUserAndDatabaseAtSymbolConflation = function() {
 testUserAndDatabaseAtSymbolConflation();
 
 MongoRunner.stopMongod(conn);
-})();

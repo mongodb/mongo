@@ -8,9 +8,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 Random.setRandomSeed();
 
 const dbName = 'testDB';
@@ -74,4 +71,3 @@ function runTest(shardKey) {
 runTest("_id");
 runTest("b");
 st.stop();
-})();

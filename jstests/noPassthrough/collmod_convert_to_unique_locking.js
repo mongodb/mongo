@@ -10,11 +10,8 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load('jstests/libs/fail_point_util.js');
-load('jstests/libs/parallel_shell_helpers.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {assertCommandFailedWithCodeInParallelShell} from "jstests/libs/parallel_shell_helpers.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -28,7 +25,7 @@ const collModIndexUniqueEnabled =
 if (!collModIndexUniqueEnabled) {
     jsTestLog('Skipping test because the collMod unique index feature flag is disabled');
     rst.stopSet();
-    return;
+    quit();
 }
 
 const testDB = primary.getDB('test');
@@ -68,4 +65,3 @@ assert.commandWorked(
     testDB.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}));
 
 rst.stopSet();
-})();

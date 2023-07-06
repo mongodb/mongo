@@ -3,8 +3,6 @@
 // @tags: [cannot_create_unique_index_when_using_hashed_shard_key, requires_non_retryable_writes]
 
 // Test that multiple indexes behave correctly together.
-(function() {
-'use strict';
 var coll = db.index_multiple_compatibility;
 coll.drop();
 
@@ -236,4 +234,3 @@ assert.commandWorked(coll.insert({a: "a"}));
 assert.commandWorked(coll.insert({}));
 assert.commandWorked(coll.insert({}));
 assert.writeError(coll.insert({a: "a"}));
-})();

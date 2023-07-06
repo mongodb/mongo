@@ -1,8 +1,5 @@
 // This is a regression test for SERVER-32048. It checks that index keys are correctly updated when
 // an update modifier implicitly creates a new array element.
-(function() {
-"use strict";
-
 let coll = db.update_affects_indexes;
 coll.drop();
 let indexKeyPattern = {"a.b": 1};
@@ -91,4 +88,3 @@ assert.commandWorked(coll.insert({_id: 10, a: [{b: 0}]}));
 assertExpectedIndexKeys({_id: 10}, [{"a.b": 0}], [{"a.b": null}]);
 assert.commandWorked(coll.update({_id: 10}, {$push: {"a.1.c": 0}}));
 assertExpectedIndexKeys({_id: 10}, [{"a.b": 0}, {"a.b": null}], []);
-}());

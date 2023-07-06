@@ -3,11 +3,8 @@
  * further inserts from landing in that bucket, including the case where a concurrent catalog write
  * causes a write conflict.
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallel_shell_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const conn = MongoRunner.runMongod();
 
@@ -85,4 +82,3 @@ assert.eq(buckets[0].control.min[timeFieldName], times[2]);
 assert.eq(buckets[0].control.max[timeFieldName], times[2]);
 
 MongoRunner.stopMongod(conn);
-})();

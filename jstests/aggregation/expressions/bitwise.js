@@ -3,9 +3,7 @@
 //   requires_fcv_63,
 //   featureFlagBitwiseAggOperators,
 // ]
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-(function() {
-"use strict";
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -89,4 +87,3 @@ assert.commandFailedWithCode(coll.runCommand({
     }]
 }),
                              16020);  // Error for incorrect number of arguments.
-}());

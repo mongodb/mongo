@@ -6,11 +6,7 @@
  *   uses_parallel_shell,
  * ]
  */
-
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
-
-(function() {
-"use strict";
 
 const dbName = "test";
 const collName = "collTest";
@@ -43,8 +39,10 @@ function waitUntilOpCountIs(opFilter, num, st) {
     });
 }
 
-function runTransaction() {
-    load("jstests/libs/auto_retry_transaction_in_sharding.js");
+async function runTransaction() {
+    const {withTxnAndAutoRetryOnMongos} =
+        await import("jstests/libs/auto_retry_transaction_in_sharding.js");
+
     // Start the transaction and insert a document.
     const sessionOptions = {causalConsistency: false};
     const session = db.getSiblingDB("test").getMongo().startSession(sessionOptions);
@@ -131,4 +129,3 @@ ConfigShardUtil.transitionToDedicatedConfigServer(st);
 performFsyncLockUnlockWithReadWriteOperations();
 
 st.stop();
-}());

@@ -1,9 +1,6 @@
 // Check that rotation works for the cluster certificate
 
-(function() {
-"use strict";
-
-load('jstests/ssl/libs/ssl_helpers.js');
+import {copyCertificateFile} from "jstests/ssl/libs/ssl_helpers.js";
 
 const dbPath = MongoRunner.toRealDir("$dataDir/cluster_x509_rotate_test/");
 mkdir(dbPath);
@@ -118,4 +115,3 @@ for (let node of rst.nodeList()) {
 }
 
 rst.stopSet();
-}());

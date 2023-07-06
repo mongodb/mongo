@@ -5,9 +5,6 @@
  *   requires_wiredtiger,
  * ]
  */
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({
     nodes: [
         {
@@ -69,4 +66,3 @@ assert.commandWorked(secondary.adminCommand({configureFailPoint: 'rsSyncApplySto
 rst.awaitReplication();
 
 rst.stopSet();
-})();

@@ -1,9 +1,6 @@
 // SERVER-28594 Ensure non-atomic ops are individually logged in applyOps
 // and atomic ops are collectively logged in applyOps.
 // @tags: [requires_replication]
-(function() {
-"use strict";
-
 let rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -64,4 +61,3 @@ assert.eq(oplogColl.find({"o.applyOps": {"$exists": true}}).count(), 0);
 assert.eq(oplogColl.find({op: "i", ns: testColl.getFullName()}).count(), 2);
 
 rst.stopSet();
-})();

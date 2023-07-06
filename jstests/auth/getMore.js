@@ -1,8 +1,5 @@
 // Tests that a user can only run a getMore on a cursor that they created.
 // @tags: [requires_sharding]
-(function() {
-"use strict";
-
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
@@ -261,4 +258,3 @@ const cluster = new ShardingTest(
     {shards: 1, mongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: {auth: ""}}});
 runTest(cluster);
 cluster.stop();
-}());

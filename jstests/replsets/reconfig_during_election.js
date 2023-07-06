@@ -3,10 +3,8 @@
  * does not result in an invariant.
  */
 
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/libs/election_handoff.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ElectionHandoffTest} from "jstests/replsets/libs/election_handoff.js";
 
 const rst = ReplSetTest({nodes: 2});
 const nodes = rst.startSet();
@@ -51,4 +49,3 @@ assert.commandWorkedOrFailedWithCode(
 failPoint.off();
 
 rst.stopSet();
-})();

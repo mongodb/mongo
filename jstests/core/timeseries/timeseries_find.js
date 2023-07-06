@@ -14,10 +14,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.isMongos().
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const timeFieldName = "time";
 
@@ -138,4 +135,3 @@ runTest(
 // multiple bounds on 'a.b'.
 runTest([{a: {b: [3, 4]}}, {a: [{b: 1}, {b: 2}]}], {"a.b": {$lt: 2}}, [{a: [{b: 1}, {b: 2}]}]);
 runTest([{a: {b: [3, 4]}}, {a: [{b: 1}, {b: 2}]}], {"a.b": {$gte: 3}}, [{a: {b: [3, 4]}}]);
-})();

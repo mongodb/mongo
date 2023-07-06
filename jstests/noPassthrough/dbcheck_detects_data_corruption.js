@@ -2,8 +2,6 @@
  * This tests that errors are logged when dbCheck finds evidence of corruption, but does not cause
  * the operation to fail.
  */
-(function() {
-
 const replSet = new ReplSetTest({nodes: 2});
 replSet.startSet();
 replSet.initiate();
@@ -60,4 +58,3 @@ assert.commandWorked(db.runCommand({"dbCheck": 1}));
 });
 
 replSet.stopSet(undefined /* signal */, false /* forRestart */, {skipValidation: true});
-})();

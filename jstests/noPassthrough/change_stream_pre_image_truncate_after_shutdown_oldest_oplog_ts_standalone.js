@@ -8,11 +8,10 @@
 //  assumes_against_mongod_not_mongos,
 //  requires_replication,
 // ]
-(function() {
-"use strict";
 
-// For 'PreImageTruncateAfterShutdownTest'.
-load('jstests/noPassthrough/libs/change_stream_pre_image_truncate_after_shutdown.js');
+import {
+    PreImageTruncateAfterShutdownTest
+} from "jstests/noPassthrough/libs/change_stream_pre_image_truncate_after_shutdown.js";
 
 const testName = "pre_image_truncate_after_shutdown_oldest_oplog_ts_standalone";
 const preImageTruncateAfterShutdownTest = new PreImageTruncateAfterShutdownTest(testName);
@@ -138,4 +137,3 @@ preImageTruncateAfterShutdownTest.testTruncateByOldestOplogTSStandalone({
 });
 
 preImageTruncateAfterShutdownTest.teardown();
-})();

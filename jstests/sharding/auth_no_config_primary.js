@@ -14,9 +14,6 @@ TestData.skipCheckDBHashes = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 1, other: {keyFile: 'jstests/libs/key1'}});
 
 st.s.getDB('admin').createUser({user: 'root', pwd: 'pass', roles: ['root']});
@@ -56,4 +53,3 @@ assert.eq('world', res.hello);
 
 st.stop();
 MongoRunner.stopMongos(otherMongos);
-})();

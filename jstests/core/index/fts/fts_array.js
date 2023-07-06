@@ -1,9 +1,6 @@
 /**
  * Tests for the interaction between FTS indexes and arrays.
  */
-(function() {
-"use strict";
-
 let coll = db.jstests_fts_array;
 coll.drop();
 assert.commandWorked(coll.createIndex({"a.b": 1, words: "text"}));
@@ -50,4 +47,3 @@ assert.commandWorked(coll.createIndex({"a.0.1": 1, words: "text"}));
 assert.commandWorked(coll.insert({a: [[8, 9], 1, 2], words: "dander"}));
 assert.eq({a: [[8, 9], 1, 2], words: "dander"},
           coll.findOne({"a.0.1": 9, $text: {$search: "dander"}}, {_id: 0, a: 1, words: 1}));
-}());

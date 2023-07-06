@@ -7,9 +7,6 @@
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
 // ]
-(function() {
-"use strict";
-
 const testName = "mr_reduce_merge_other_db";
 const testDB = db.getSiblingDB(testName);
 const coll = testDB.mr_replace;
@@ -62,4 +59,3 @@ const reduceFn = function(k, vs) {
     let actual = outColl.find().sort({_id: 1}).toArray();
     assert.eq(expected, actual);
 })();
-}());

@@ -6,17 +6,20 @@
  * @tags: [uses_transactions, uses_prepare_transaction, requires_persistence]
  */
 
-(function() {
-"use strict";
-load('jstests/libs/chunk_manipulation_util.js');
-load('jstests/replsets/rslib.js');
-load('jstests/sharding/libs/create_sharded_collection_util.js');
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {
+    migrateStepNames,
+    moveChunkParallel,
+    moveChunkStepNames,
+    pauseMigrateAtStep,
+    unpauseMigrateAtStep,
+    waitForMoveChunkStep,
+} from "jstests/libs/chunk_manipulation_util.js";
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const dbName = "test";
 const collName = "user";
 
-const staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+const staticMongod = MongoRunner.runMongod({});
 
 const TestMode = {
     kBasic: 'basic',
@@ -187,4 +190,3 @@ runTest(TestMode.kWithStepUp);
 runTest(TestMode.kWithRestart);
 
 MongoRunner.stopMongod(staticMongod);
-})();

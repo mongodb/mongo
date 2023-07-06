@@ -3,9 +3,7 @@
  * lastApplied but is not immediately electable. (See SERVER-53612)
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/libs/election_handoff.js");
+import {ElectionHandoffTest} from "jstests/replsets/libs/election_handoff.js";
 
 const testName = jsTestName();
 const rst = ReplSetTest({name: testName, nodes: 2});
@@ -29,4 +27,3 @@ ElectionHandoffTest.testElectionHandoff(
     rst, 0, 1, {stepDownPeriodSecs: 30, secondaryCatchUpPeriodSecs: 30});
 
 rst.stopSet();
-})();

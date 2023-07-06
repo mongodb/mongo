@@ -5,6 +5,7 @@
  * The indexed field contains unique values.
  * Each thread operates on a separate collection.
  */
+import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/distinct.js";
 

@@ -18,9 +18,6 @@
  *   requires_fcv_61,
  * ]
  */
-(function() {
-"use strict";
-
 Random.setRandomSeed();
 
 // Significantly reduce the number of ttlIndexDeleteTargetDocs and ttlMonitorSubPassTargetSecs to
@@ -157,4 +154,3 @@ function runTests(batchingEnabled) {
 runTests(true /** batchingEnabled **/);
 runTests(false /** batchingEnabled **/);
 MongoRunner.stopMongod(conn);
-})();

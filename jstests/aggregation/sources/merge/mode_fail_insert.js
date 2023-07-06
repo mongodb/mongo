@@ -1,10 +1,7 @@
 // Tests the behavior of $merge with whenMatched: "fail" and whenNotMatched: "insert".
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
-load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
-load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isMongos.
+import {dropWithoutImplicitRecreate} from "jstests/aggregation/extras/merge_helpers.js";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.merge_insert_only;
 coll.drop();
@@ -184,4 +181,3 @@ if (!FixtureHelpers.isMongos(db)) {
 //
 assert.doesNotThrow(() => coll.aggregate(pipelineDifferentOutputDb));
 assert.eq(foreignTargetColl.find().itcount(), 2);
-}());

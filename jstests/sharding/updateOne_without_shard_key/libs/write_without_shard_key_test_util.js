@@ -2,8 +2,7 @@
  * Utilities for performing writes without shard key under various test configurations.
  */
 
-'use strict';
-var WriteWithoutShardKeyTestUtil = (function() {
+export var WriteWithoutShardKeyTestUtil = (function() {
     const Configurations = {
         noSession: "Running without a session",
         sessionNotRetryableWrite:
@@ -54,7 +53,7 @@ var WriteWithoutShardKeyTestUtil = (function() {
             if (isReplacementTest) {
                 let matches = 0;
                 docs.forEach(doc => {
-                    let {_id: idDoc, ...docWithoutId} = doc;
+                    let {_id: _, ...docWithoutId} = doc;
                     if (tojson(docWithoutId) == tojson(mod)) {
                         matches++;
                     }

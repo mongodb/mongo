@@ -4,9 +4,6 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 const sourceDB = st.s.getDB("test");
 const sourceColl = sourceDB.source;
@@ -34,4 +31,3 @@ let result = sourceDB.runCommand({
 assert.commandWorked(result);
 
 st.stop();
-}());

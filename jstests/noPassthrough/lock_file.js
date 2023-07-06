@@ -1,7 +1,6 @@
 // The mongod process should always create a mongod.lock file in the data directory
 // containing the process ID regardless of the storage engine requested.
 
-(function() {
 // Ensures that mongod.lock exists and returns size of file.
 function getMongodLockFileSize(dir) {
     var files = listFiles(dir);
@@ -26,4 +25,3 @@ MongoRunner.stopMongod(mongod);
 
 // mongod.lock must be empty after shutting server down.
 assert.eq(0, getMongodLockFileSize(dbpath), 'mongod.lock not truncated after shutting server down');
-}());

@@ -1,10 +1,8 @@
 // SERVER-14872: Aggregation expression to concatenate multiple arrays into one
 
-(function() {
-'use strict';
+import "jstests/libs/sbe_assert_error_override.js";
 
-load('jstests/aggregation/extras/utils.js');        // For assertErrorCode.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.agg_concat_arrays_expr;
 coll.drop();
@@ -32,4 +30,3 @@ assert.eq(coll.aggregate(pipeline).toArray(), [{all: null}]);
 // Error on any non-array, non-null inputs.
 pipeline = [{$project: {_id: 0, all: {$concatArrays: ['$a', '$str']}}}];
 assertErrorCode(coll, pipeline, 28664);
-}());

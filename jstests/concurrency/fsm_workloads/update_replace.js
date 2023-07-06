@@ -5,8 +5,8 @@
  * The collection has indexes on some but not all fields.
  */
 
-// For isMongod.
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
     // explicitly pass db to avoid accidentally using the global `db`

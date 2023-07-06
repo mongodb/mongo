@@ -2,17 +2,13 @@
  * This test checks that authentication restrictions can be set and respected.
  * @tags: [requires_sharding, requires_replication]
  */
-
-(function() {
-'use strict';
+import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
 
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
 function testConnection(
     conn, eventuallyConsistentConn, sleepUntilUserDataPropagated, sleepUntilUserDataRefreshed) {
-    load("jstests/libs/host_ipaddr.js");
-
     // Create a session which observes an eventually consistent view of user data
     const eventualDb = eventuallyConsistentConn.getDB("admin");
 
@@ -227,4 +223,3 @@ testConnection(st.s0,
                    sleep(40 * 1000);  // Wait for mongos user cache invalidation
                });
 st.stop();
-}());

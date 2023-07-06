@@ -1,9 +1,6 @@
 // Tests for sharded limit + batchSize. Make sure that various combinations
 // of limit and batchSize with sort return the correct results, and do not issue
 // unnecessary getmores (see SERVER-14299).
-(function() {
-'use strict';
-
 /**
  * Test the correctness of queries with sort and batchSize on a sharded cluster,
  * running the queries against collection 'coll'.
@@ -147,4 +144,3 @@ jsTest.log("Running limit tests against non-sharded collection.");
 testLimit(unshardedCol, st.shard0);
 
 st.stop();
-})();

@@ -1,7 +1,4 @@
-(function() {
-'use strict';
-
-load("jstests/replsets/libs/rename_across_dbs.js");
+import {RenameAcrossDatabasesTest} from "jstests/replsets/libs/rename_across_dbs.js";
 
 const nodes = [{binVersion: 'last-lts'}, {binVersion: 'latest'}, {}];
 const options = {
@@ -10,4 +7,3 @@ const options = {
 };
 
 new RenameAcrossDatabasesTest(options).run();
-}());

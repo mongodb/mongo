@@ -1,8 +1,5 @@
 // SERVER-42756 Test that commutative arithmetic operations with special arguments doesn't violate
 // commutativity.
-(function() {
-"use strict";
-
 const coll = db[jsTest.name()];
 coll.drop();
 const numbers = [1.0, NumberInt("1"), NumberLong("1"), NumberDecimal("1.0")];
@@ -43,4 +40,3 @@ assert.commandWorked(coll.insert({inf: Infinity, nan: NaN}));
         });
     })();
 });
-})();

@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 const coll = db[jsTestName()];
 coll.drop();
 
@@ -260,4 +257,3 @@ for (const test of makeTests()) {
             test.expectedResult);
     }
 }
-})();

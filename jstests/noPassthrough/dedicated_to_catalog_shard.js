@@ -7,9 +7,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const dbName = "foo";
 const collName = "bar";
 const ns = dbName + "." + collName;
@@ -71,4 +68,3 @@ let shardList = st.getDB('config').shards.find().toArray();
 assert.eq(1, shardList.length, tojson(shardList));
 
 st.stop();
-}());

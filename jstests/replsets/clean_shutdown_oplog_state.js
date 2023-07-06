@@ -7,10 +7,7 @@
 //   requires_persistence,
 //   requires_majority_read_concern,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 // Skip db hash check because secondary restarted as standalone.
 TestData.skipCheckDBHashes = true;
@@ -106,4 +103,3 @@ if (storageEngine !== "wiredTiger") {
 assert.eq(oplogTruncateAfterPointDoc.oplogTruncateAfterPoint, Timestamp());
 
 rst.stopSet();
-})();

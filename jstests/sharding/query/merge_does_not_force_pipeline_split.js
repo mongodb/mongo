@@ -6,10 +6,7 @@
  *   requires_fcv_53,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
+import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
@@ -113,4 +110,3 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
 });
 
 st.stop();
-}());

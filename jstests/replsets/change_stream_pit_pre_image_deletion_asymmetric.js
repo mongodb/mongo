@@ -7,12 +7,8 @@
  * requires_fcv_60,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/change_stream_util.js");  // For getPreImages().
-load("jstests/libs/fail_point_util.js");
-load('jstests/replsets/rslib.js');  // For getLatestOp, getFirstOplogEntry.
+import {getPreImages} from "jstests/libs/change_stream_util.js";
+import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 
 const oplogSizeMB = 1;
 const replTest = new ReplSetTest({
@@ -103,4 +99,3 @@ assert.soon(() => {
 // Verify that all nodes get in sync and do not crash.
 replTest.awaitReplication();
 replTest.stopSet();
-})();

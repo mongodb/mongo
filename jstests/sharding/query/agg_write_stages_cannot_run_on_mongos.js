@@ -1,8 +1,5 @@
 // Tests that special stages which must run on mongos cannot be run in combination with an $out or
 // $merge stage.
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 const db = st.s0.getDB("db");
 
@@ -40,4 +37,3 @@ assert.commandFailedWithCode(
     ErrorCodes.IllegalOperation);
 
 st.stop();
-}());

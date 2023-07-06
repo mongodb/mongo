@@ -3,8 +3,6 @@
  *
  *  @tags: [multiversion_incompatible]
  */
-(function() {
-'use strict';
 const ACTIVE_FAULT_DURATION_SECS = 1;
 
 const params = {
@@ -52,4 +50,3 @@ assert.eq(result.state, "TransientFault");
 assert(result.faultInformation.facets.testObserver.description.includes("InternalError: test msg"));
 
 st.stop();
-})();

@@ -1,8 +1,8 @@
 /**
  * Represents a MongoDB cluster.
  */
+import {FSMShardingTest} from "jstests/concurrency/fsm_libs/shard_fixture.js";
 import {validateCollections} from "jstests/hooks/validate_collections.js";
-load('jstests/concurrency/fsm_libs/shard_fixture.js');  // For FSMShardingTest.
 
 export const Cluster = function(options) {
     if (!(this instanceof Cluster)) {
@@ -470,7 +470,6 @@ export const Cluster = function(options) {
     this.validateAllCollections = function validateAllCollections(phase) {
         assert(initialized, 'cluster must be initialized first');
 
-        const isSteppingDownConfigServers = this.isSteppingDownConfigServers();
         var _validateCollections = function _validateCollections(db, isMongos = false) {
             // Validate all the collections on each node.
             var res = db.adminCommand({listDatabases: 1});
@@ -508,7 +507,6 @@ export const Cluster = function(options) {
 
         replSets.forEach(rst => {
             var startTime = Date.now();
-            var res;
             var primary = rst.getPrimary();
 
             if (shouldCheckDBHashes) {

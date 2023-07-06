@@ -5,11 +5,8 @@
  *   multiversion_incompatible,
  * ]
  */
-(function() {
-'use strict';
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
-load("jstests/libs/log.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 {
     let st = new ShardingTest({shards: {rs0: {nodes: 2}}});
     let mongos = st.s;
@@ -63,4 +60,3 @@ load("jstests/libs/log.js");
     monitorDelayFailPoint.off();
     st.stop();
 }
-})();

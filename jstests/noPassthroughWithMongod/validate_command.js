@@ -1,6 +1,5 @@
 // Tests that the basic values returned from the validate command are correct
 
-(function() {
 // Set the number of documents to insert
 var count = 10;
 
@@ -37,4 +36,3 @@ testValidate(output);
 // TEST FULL
 var output = t.validate({full: true});
 testValidate(output);
-}());

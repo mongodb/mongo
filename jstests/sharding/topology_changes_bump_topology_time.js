@@ -4,6 +4,7 @@
 3) remove shard
 4) topology time must increase
 */
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 function assertTopologyGt(topologyTime1, topologyTime2, msg) {
     let msgError = `[${tojson(topologyTime1)} <= ${tojson(topologyTime2)}] ${msg}`;
@@ -28,11 +29,6 @@ function getTopologyTime(st) {
 function printConfigShards(st, msg) {
     print(msg, tojson(st.s.getDB("config").shards.find().toArray()));
 }
-
-(function() {
-
-'use strict';
-load('jstests/sharding/libs/remove_shard_util.js');
 
 var st = new ShardingTest({shards: 1, rs: {nodes: 1}, config: 3});
 
@@ -66,4 +62,3 @@ assertTopologyGt(topologyTimeAfterRemoveShard,
 
 rs.stopSet();
 st.stop();
-})();

@@ -2,15 +2,11 @@
  * Overrides the runCommand method to append $tenant on command body, so that the requests send by
  * client will pass the tenant information to server.
  */
-(function() {
-'use strict';
-
-load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
-load(
-    "jstests/libs/override_methods/tenant_aware_response_checker.js");  // For
-                                                                        // `assertExpectedDbNameInResponse`
-                                                                        // and
-                                                                        // `removeTenantPrefixFromResponse`.
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
+import {
+    assertExpectedDbNameInResponse,
+    removeTenantPrefixFromResponse
+} from "jstests/libs/override_methods/tenant_aware_response_checker.js";
 
 const kTenantId = ObjectId(TestData.tenant);
 
@@ -32,4 +28,3 @@ function runCommandWithDollarTenant(
 OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/inject_dollar_tenant.js");
 OverrideHelpers.overrideRunCommand(runCommandWithDollarTenant);
-})();

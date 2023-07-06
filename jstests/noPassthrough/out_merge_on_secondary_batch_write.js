@@ -4,7 +4,6 @@
  *
  * @tags: [uses_$out, assumes_read_preference_unchanged]
  */
-(function() {
 const dbName = "db";
 const collName = "movies";
 const targetCollName = "movies2";
@@ -108,4 +107,3 @@ jsTestLog("Testing against a sharded cluster");
 const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
 testFn(st.s.getDB(dbName));
 st.stop();
-}());

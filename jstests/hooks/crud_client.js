@@ -1,7 +1,5 @@
 // Basic CRUD client to provide load for Powercycle testing.
 
-'use strict';
-
 function randString(maxLength) {
     maxLength = maxLength || 1024;
     const randChars = "ABCDEFGHIKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";

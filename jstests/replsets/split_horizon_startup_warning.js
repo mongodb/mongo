@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 // Tests that ReplSets that start with an IP address in the previous SplitHorizon configuration will
 // emit a startupWarning. The warning itself should not crash the server, but
 // disableSplitHorizonIPCheck is required to prevent crashing when the bad config is initially set.
@@ -53,4 +50,3 @@ function testStartupWarnings(horizonName, options = {}) {
 // Check for startup warnings about IP addresses in SplitHorizon mappings
 testStartupWarnings("12.34.56.78");
 testStartupWarnings("12.34.56.78/20");
-})();

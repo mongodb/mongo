@@ -3,10 +3,8 @@
  *
  * @tags: [requires_sharding, requires_replication]
  */
-(function() {
-
-load("jstests/libs/log.js");              // For findMatchingLogLine.
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {findMatchingLogLine} from "jstests/libs/log.js";
 
 function runTest(conn) {
     const db = conn.getDB("test");
@@ -42,7 +40,7 @@ function runTest(conn) {
     // Setting the filter to null is an error: we don't want people to assume that {filter: null}
     // unsets the filter, and we don't want people to assume {filter: null} is equivalent to not
     // specifying a new filter.
-    assert.throws(() => db.setProfilingLevel(level, {filter: null}),
+    assert.throws(() => db.setProfilingLevel(0, {filter: null}),
                   [],
                   "Expected an object, or the string 'unset'.");
 
@@ -170,4 +168,3 @@ function runTest(conn) {
     runTest(st);
     st.stop();
 }
-})();

@@ -4,9 +4,6 @@
  *
  * This test was designed to reproduce SERVER-24386.
  */
-(function() {
-'use strict';
-
 const options = {
     setParameter: 'internalDocumentSourceCursorBatchSizeBytes=1'
 };
@@ -91,4 +88,3 @@ runTest([
     ]);
 
 MongoRunner.stopMongod(conn);
-})();

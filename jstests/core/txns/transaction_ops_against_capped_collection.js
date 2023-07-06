@@ -7,9 +7,6 @@
  * @tags: [
  *   not_allowed_with_security_token,requires_capped, uses_transactions]
  */
-(function() {
-"use strict";
-
 const dbName = "test";
 const cappedCollName = "transaction_ops_against_capped_collection";
 const testDB = db.getSiblingDB(dbName);
@@ -99,4 +96,3 @@ assert.eq(1, aggRes.cursor.firstBatch[0].a);
 assert.commandWorked(session.abortTransaction_forTesting());
 
 session.endSession();
-})();

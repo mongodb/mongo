@@ -3,10 +3,6 @@
  */
 
 (() => {
-    "use strict";
-
-    load('jstests/libs/fail_point_util.js');
-
     const numConnections = 10;
 
     function createTemporaryConnection(uri, dbName, collectionName) {

@@ -1,7 +1,4 @@
 // Basic test that the two-phase commit coordinator metrics fields appear in serverStatus output.
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 1});
 
 const res = assert.commandWorked(st.shard0.adminCommand({serverStatus: 1}));
@@ -18,4 +15,3 @@ assert.hasFields(res.twoPhaseCommitCoordinator.currentInSteps, ["waitingForDecis
 assert.hasFields(res.twoPhaseCommitCoordinator.currentInSteps, ["deletingCoordinatorDoc"]);
 
 st.stop();
-})();

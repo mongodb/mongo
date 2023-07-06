@@ -2,9 +2,6 @@
  * Test that opcounters are correct for getMore operations on awaitData cursors.
  * @tags: [requires_capped]
  */
-(function() {
-"use strict";
-
 const coll = db.getmore_awaitdata_opcounters;
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {capped: true, size: 1024}));
@@ -48,16 +45,15 @@ assert.eq(3, newCollLatency.ops - oldCollLatency.ops);
 // find op.
 let oldTop = getTop();
 if (oldTop === undefined) {
-    return;
+    quit();
 }
 
 assert.eq(3, coll.find().tailable(true).itcount());
 
 let newTop = getTop();
 if (newTop === undefined) {
-    return;
+    quit();
 }
 
 assert.eq(1, newTop.getmore.count - oldTop.getmore.count);
 assert.eq(1, newTop.queries.count - oldTop.queries.count);
-}());

@@ -30,7 +30,7 @@ export function isShardMergeEnabled(db) {
  * Checks the FCV and the command object passed to see if tenantIds should be set for shard
  * merge.
  */
-function shouldUseMergeTenantIds(db) {
+export function shouldUseMergeTenantIds(db) {
     const fcvDoc =
         assert.commandWorked(db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
 
@@ -120,7 +120,7 @@ export function isMigrationCompleted(res) {
 export async function runMigrationAsync(migrationOpts, donorRstArgs, opts = {}) {
     const {isMigrationCompleted, makeMigrationCertificatesForTest, runDonorStartMigrationCommand} =
         await import("jstests/replsets/libs/tenant_migration_util.js");
-    load("jstests/replsets/rslib.js");  // createRst
+    const {createRst} = await import("jstests/replsets/rslib.js");
 
     const {
         retryOnRetryableErrors = false,
@@ -159,7 +159,7 @@ export async function forgetMigrationAsync(
     migrationIdString, donorRstArgs, retryOnRetryableErrors = false) {
     const {runTenantMigrationCommand} =
         await import("jstests/replsets/libs/tenant_migration_util.js");
-    load("jstests/replsets/rslib.js");  // createRst
+    const {createRst} = await import("jstests/replsets/rslib.js");
 
     const donorRst = createRst(donorRstArgs, retryOnRetryableErrors);
     const cmdObj = {donorForgetMigration: 1, migrationId: UUID(migrationIdString)};
@@ -181,7 +181,7 @@ export async function tryAbortMigrationAsync(
     migrationOpts, donorRstArgs, retryOnRetryableErrors = false) {
     const {runTenantMigrationCommand} =
         await import("jstests/replsets/libs/tenant_migration_util.js");
-    load("jstests/replsets/rslib.js");  // createRst
+    const {createRst} = await import("jstests/replsets/rslib.js");
 
     const donorRst = createRst(donorRstArgs, retryOnRetryableErrors);
     const cmdObj = {

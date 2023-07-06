@@ -1,12 +1,8 @@
 // Test that we can create and auth a tenant (user) using a security token.
 // Then create an op (insert) for that tenant, find it using `currentOp` and kill it using `killOp`.
 
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');     // For arrayEq()
-load("jstests/libs/fail_point_util.js");         // For configureFailPoint()
-load("jstests/libs/parallel_shell_helpers.js");  // For funWithArgs()
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 function killCurrentOpTest() {
     function operationToKillFunc(securityToken, dbName, colName) {
@@ -104,4 +100,3 @@ function killCurrentOpTest() {
     rst.stopSet();
 }
 killCurrentOpTest();
-})();

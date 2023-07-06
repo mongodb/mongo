@@ -1,10 +1,9 @@
 //
 // Tests that multi-writes (update/delete) target *all* shards and not just shards in the collection
 //
-(function() {
-'use strict';
-
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 var st = new ShardingTest({shards: 3, mongos: 2});
 
@@ -84,4 +83,3 @@ assert.eq(null, st.shard0.getCollection(coll.toString()).findOne({x: 1}));
 assert.eq(null, st.shard2.getCollection(coll.toString()).findOne({x: 1}));
 
 st.stop();
-})();

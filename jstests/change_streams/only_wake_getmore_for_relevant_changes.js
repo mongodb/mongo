@@ -2,13 +2,11 @@
 // @tags: [
 //   uses_multiple_connections,
 // ]
-// return early.
-(function() {
-"use strict";
-
-load('jstests/libs/uuid_util.js');
-load("jstests/libs/fixture_helpers.js");           // For 'FixtureHelpers'.
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection
+} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 /**
  * Uses a parallel shell to execute the javascript function 'event' at the same time as an
@@ -111,7 +109,6 @@ function assertEventWakesCursor({collection, awaitDataCursorId, identifyingComme
 // Refresh all collections which will be required in the course of this test.
 const shellSentinelCollection = assertDropAndRecreateCollection(db, "shell_sentinel");
 const changesCollection = assertDropAndRecreateCollection(db, "changes");
-const unrelatedCollection = assertDropCollection(db, "unrelated_collection");
 
 // Start a change stream cursor.
 const wholeCollectionStreamComment = "change stream on entire collection";
@@ -175,4 +172,3 @@ assertEventDoesNotWakeCursor({
 });
 assert.commandWorked(
     db.runCommand({killCursors: changesCollection.getName(), cursors: [res.cursor.id]}));
-}());

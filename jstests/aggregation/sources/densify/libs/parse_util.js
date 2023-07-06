@@ -2,7 +2,7 @@
  * Utility for testing the parsing of densify-like commands. I.e. $_internalDensify and $densify.
  */
 
-let parseUtil = (function(db, coll, stageName, options = {}) {
+export let parseUtil = (function(db, coll, stageName, options = {}) {
     function run(stage, extraCommandArgs = options) {
         return coll.runCommand(Object.merge(
             {aggregate: coll.getName(), pipeline: [stage], cursor: {}}, extraCommandArgs));

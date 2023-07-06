@@ -2,10 +2,7 @@
  * Tests that the shardCollection command obtains the collection's UUID from the primary shard and
  * persists it in config.collections.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/uuid_util.js");
+import {getUUIDFromConfigCollections, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 
 let db = "test";
 
@@ -38,4 +35,3 @@ for (let i = 0; i < 3; i++) {
 }
 
 st.stop();
-})();

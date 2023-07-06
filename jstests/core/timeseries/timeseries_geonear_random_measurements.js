@@ -9,7 +9,7 @@
  * ]
  */
 
-load("jstests/core/timeseries/libs/geo.js");
+import {randomLongLat} from "jstests/core/timeseries/libs/geo.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 Random.setRandomSeed();

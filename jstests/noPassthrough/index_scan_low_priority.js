@@ -6,13 +6,10 @@
  *   requires_wiredtiger,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/os_helpers.js');
+import {isLinux} from "jstests/libs/os_helpers.js";
 
 if (!isLinux()) {
-    return;
+    quit();
 }
 
 const conn = MongoRunner.runMongod();
@@ -84,4 +81,3 @@ assert.commandWorked(
 runTest(false);
 
 MongoRunner.stopMongod(conn);
-}());

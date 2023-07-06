@@ -6,11 +6,6 @@
  *   requires_fcv_51,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-
 const coll = db[jsTestName()];
 coll.drop();
 
@@ -99,4 +94,3 @@ assert.commandFailedWithCode(db.runCommand({
                              6053600);
 
 coll.drop();
-})();

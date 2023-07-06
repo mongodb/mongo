@@ -15,13 +15,14 @@
  * ]
  */
 
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {makeTenantDB, runMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/clustered_collections/clustered_collection_util.js");  // ClusteredCollectionUtil
-load("jstests/libs/parallelTester.js");                                   // Thread()
-load("jstests/libs/uuid_util.js");                                        // extractUUIDFromObject()
-load('jstests/replsets/rslib.js');                                        // 'createRstArgs'
+import {createRstArgs} from "jstests/replsets/rslib.js";
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 

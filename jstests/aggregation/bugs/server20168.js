@@ -1,7 +1,4 @@
 // SERVER-20168: Add option to $unwind to output a null result for empty arrays.
-(function() {
-"use strict";
-
 var coll = db.server20168;
 coll.drop();
 
@@ -35,4 +32,3 @@ function testPreserveNullAndEmptyArraysParam(inputDoc, unwindPath, outputDoc) {
 testPreserveNullAndEmptyArraysParam({_id: 0}, "$x", {_id: 0});
 testPreserveNullAndEmptyArraysParam({_id: 0, x: null}, "$x", {_id: 0, x: null});
 testPreserveNullAndEmptyArraysParam({_id: 0, x: []}, "$x", {_id: 0});
-}());

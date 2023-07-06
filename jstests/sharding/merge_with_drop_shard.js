@@ -1,10 +1,7 @@
 // Tests that the $merge aggregation stage is resilient to drop shard in both the source and
 // output collection during execution.
-(function() {
-'use strict';
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
-load('jstests/sharding/libs/remove_shard_util.js');   // For removeShard.
+import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -73,7 +70,7 @@ function runMergeWithMode(
                 cursor: {},
                 comment: "${comment}"
             });
-            
+
             if (${expectFailCode} !== undefined) {
                 assert.commandFailedWithCode(cmdRes, ${expectFailCode});
             } else {
@@ -146,4 +143,3 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
 });
 
 st.stop();
-})();

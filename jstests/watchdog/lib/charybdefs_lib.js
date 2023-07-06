@@ -1,17 +1,14 @@
+import {getPython3Binary} from "jstests/libs/python.js";
+
 // Exit code that the watchdog uses on exit
-const EXIT_WATCHDOG = 61;
+export const EXIT_WATCHDOG = 61;
 
 /**
  * Control the Charybdefs file system for Fault Injectiong testing
  *
  * @param {string} test_name unique name for test directories
  */
-
-load("jstests/libs/python.js");
-
-function CharybdefsControl(test_name) {
-    'use strict';
-
+export function CharybdefsControl(test_name) {
     const python = getPython3Binary();
     let control_py = "/data/charybdefs/mongo/control.py";
 

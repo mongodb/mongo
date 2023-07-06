@@ -1,7 +1,6 @@
-load("jstests/readonly/lib/read_only_test.js");
+import {runReadOnlyTest} from "jstests/readonly/lib/read_only_test.js";
 
 runReadOnlyTest(function() {
-    'use strict';
     return {
         name: 'write_ops',
         load: function(writableCollection) {

@@ -1,8 +1,5 @@
 // Test to make sure that tag ranges get split when partial keys are used for the tag ranges
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var s = new ShardingTest({shards: 2, mongos: 1});
 
@@ -49,4 +46,3 @@ assert.eq(
     1, findChunksUtil.findChunksByNs(s.config, "test.foo", {min: {_id: 15, a: MinKey}}).itcount());
 
 s.stop();
-})();

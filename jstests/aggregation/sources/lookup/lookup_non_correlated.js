@@ -1,10 +1,7 @@
 /**
  * Confirms that $lookup with a non-correlated foreign pipeline returns expected results.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // documentEq
+import {documentEq} from "jstests/aggregation/extras/utils.js";
 
 const testDB = db.getSiblingDB("lookup_non_correlated");
 const localName = "local";
@@ -59,4 +56,3 @@ cursor = localColl.aggregate([
 assert(cursor.hasNext());
 documentEq({_id: "A", foreignDocs: {_id: 2}}, cursor.next());
 assert(!cursor.hasNext());
-})();

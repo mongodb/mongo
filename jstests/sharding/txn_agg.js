@@ -2,10 +2,6 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
-(function() {
-
-"use strict";
-
 const st = new ShardingTest({shards: 2});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
@@ -121,4 +117,3 @@ assert.eq([{_id: -1}, {_id: 0}, {_id: 1}], sessionColl.aggregate(pipeline).toArr
 assert.commandWorked(session.commitTransaction_forTesting());
 
 st.stop();
-})();

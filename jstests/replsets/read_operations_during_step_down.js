@@ -2,13 +2,8 @@
  * Test that the read operations are not killed and their connections are also not
  * closed during step down.
  */
-load('jstests/libs/parallelTester.js');
-load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
-load("jstests/replsets/rslib.js");
-
-(function() {
-
-"use strict";
+import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const testName = "readOpsDuringStepDown";
 const dbName = "test";
@@ -38,7 +33,7 @@ const cursorIdToBeReadAfterStepDown =
 jsTestLog("2. Start blocking getMore cmd before step down");
 const joinGetMoreThread = startParallelShell(() => {
     // Open another cursor on primary before step down.
-    primaryDB = db.getSiblingDB(TestData.dbName);
+    const primaryDB = db.getSiblingDB(TestData.dbName);
     const cursorIdToBeReadDuringStepDown =
         assert.commandWorked(primaryDB.runCommand({"find": TestData.collName, batchSize: 0}))
             .cursor.id;
@@ -114,4 +109,3 @@ assert.gte(replMetrics.stateTransition.userOperationsRunning, 2);
 assert.eq(replMetrics.network.notPrimaryUnacknowledgedWrites, 0);
 
 rst.stopSet();
-})();

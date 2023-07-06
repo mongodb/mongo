@@ -4,10 +4,8 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/parallelTester.js");  // for ScopedThread.
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const name = "kill_prepared_transaction_commit_abort";
 const rst = new ReplSetTest({
@@ -169,4 +167,3 @@ for (let i = 0; i < sessions.length; i++) {
 }
 
 rst.stopSet();
-})();

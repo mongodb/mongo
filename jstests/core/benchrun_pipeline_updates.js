@@ -10,8 +10,6 @@
  *     tenant_migration_incompatible,
  * ]
  */
-(function() {
-"use strict";
 const coll = db.benchrun_pipeline_updates;
 coll.drop();
 
@@ -58,4 +56,3 @@ res = benchRun(benchArgs);
 assert.eq(res.errCount, 0);
 assert.lte(
     coll.findOne({_id: 0}).x, 3, "Expected 'x' to be no more than 3 after randInt replacement");
-}());

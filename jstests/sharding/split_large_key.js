@@ -1,8 +1,5 @@
 // Test for splitting a chunk with a very large shard key value.
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // Tests
 //  - name: Name of test, used in collection name
@@ -48,4 +45,3 @@ tests.forEach(function(test) {
 });
 
 st.stop();
-})();

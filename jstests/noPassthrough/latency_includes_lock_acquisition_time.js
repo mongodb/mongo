@@ -3,9 +3,6 @@
  * CRUD operations.
  * @tags: [requires_profiling]
  */
-(function() {
-"use strict";
-
 /**
  * Configures the server to wait for 'millis' while acquiring locks in the CRUD path, then
  * invokes the no-arguments function 'func', then disables the aforementioned lock wait
@@ -24,7 +21,7 @@ function runWithWait(millis, func) {
     }));
 }
 
-load("jstests/libs/profiler.js");
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 let hangMillis = 200;
 let padding = hangMillis / 10;
@@ -133,4 +130,3 @@ assert.gte(profileEntry.millis, hangMillis - padding);
 checkLog.contains(conn, '"command":{"delete":"lock_acquisition_time"');
 
 MongoRunner.stopMongod(conn);
-}());

@@ -5,8 +5,7 @@
  * ]
  */
 
-load("jstests/libs/fixture_helpers.js");
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();

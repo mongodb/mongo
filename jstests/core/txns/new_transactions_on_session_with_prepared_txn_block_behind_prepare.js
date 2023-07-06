@@ -11,11 +11,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
-load("jstests/libs/parallel_shell_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 /**
  * Launches a parallel shell to start a new transaction on the session with the given lsid. It
@@ -158,4 +156,3 @@ assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "maj
 
     session.endSession();
 })();
-}());

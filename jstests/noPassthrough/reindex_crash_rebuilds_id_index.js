@@ -6,9 +6,7 @@
  *   requires_persistence
  * ]
  */
-(function() {
-
-load("jstests/libs/index_catalog_helpers.js");  // For IndexCatalogHelpers.
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 // This test triggers an unclean shutdown, which may cause inaccurate fast counts.
 TestData.skipEnforceFastCountOnValidate = true;
@@ -54,4 +52,3 @@ assert.neq(null, spec, "_id index not found");
 assert.eq("_id_", spec.name, tojson(spec));
 
 MongoRunner.stopMongod(conn);
-})();

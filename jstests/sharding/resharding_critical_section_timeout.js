@@ -6,11 +6,8 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 function setupTest(reshardingTest, namespace, timeout) {
     reshardingTest.setup();
@@ -77,8 +74,7 @@ failureReshardingTest.withReshardingInBackground(
             {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
         ],
     },
-    (tempNs) => {},
+    () => {},
     {expectedErrorCode: ErrorCodes.ReshardingCriticalSectionTimeout});
 
 failureReshardingTest.teardown();
-})();

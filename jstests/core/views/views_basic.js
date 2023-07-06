@@ -6,11 +6,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-// For arrayEq.
-load("jstests/aggregation/extras/utils.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 let viewsDB = db.getSiblingDB("views_basic");
 assert.commandWorked(viewsDB.dropDatabase());
@@ -56,4 +52,3 @@ assertCmdResultEq({
     cursor: {}
 },
                   [{_id: "CA", totalPop: 17}]);
-}());

@@ -5,7 +5,6 @@
  *
  * @tags: [requires_capped]
  */
-(function() {
 var coll = db.capped6;
 
 Random.setRandomSeed();
@@ -105,4 +104,3 @@ doTest(false);
 // Same test as above, but now the newer documents take less space than the
 // older documents instead of more.
 doTest(true);
-})();

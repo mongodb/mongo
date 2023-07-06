@@ -11,11 +11,8 @@
 
 // Confirms that profiled getMore execution contains all expected metrics with proper values.
 
-(function() {
-"use strict";
-
-load("jstests/libs/os_helpers.js");  // For isLinux().
-load("jstests/libs/profiler.js");    // For getLatestProfilerEntry.
+import {isLinux} from "jstests/libs/os_helpers.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const testDB = db.getSiblingDB("profile_getmore");
 assert.commandWorked(testDB.dropDatabase());
@@ -157,4 +154,3 @@ assert.eq(cursor.itcount(), 4);  // Consume result set and trigger getMore.
 profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
 assert.eq((typeof profileObj.originatingCommand.$truncated), "string", profileObj);
 assert.eq(profileObj.originatingCommand.comment, "profile_getmore", profileObj);
-})();

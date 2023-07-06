@@ -2,10 +2,7 @@
  * Simple test to ensure that an invalid reconfig fails, a valid one succeeds, and a reconfig won't
  * succeed without force if force is needed.
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
+import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
@@ -67,4 +64,3 @@ assert.soonNoExcept(() => {
 jsTestLog("Finished waiting for the last node to be REMOVED.");
 
 replTest.stopSet();
-}());

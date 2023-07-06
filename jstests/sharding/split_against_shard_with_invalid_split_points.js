@@ -1,8 +1,5 @@
 // Tests that executing splitChunk directly against a shard, with an invalid split point will not
 // corrupt the chunks metadata
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 1});
 
 var testDB = st.s.getDB('TestSplitDB');
@@ -38,4 +35,3 @@ assert.eq(chunksBefore,
           'Split chunks failed, but the chunks were updated in the config database');
 
 st.stop();
-})();

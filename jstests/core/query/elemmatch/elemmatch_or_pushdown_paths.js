@@ -1,7 +1,7 @@
 /**
  * Test OR-pushdown fixes for elemMatch based on SERVER-74954.
  */
-load("jstests/aggregation/extras/utils.js");  // for "arrayEq".
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.jstests_elemmatch_or_pushdown_paths;
 

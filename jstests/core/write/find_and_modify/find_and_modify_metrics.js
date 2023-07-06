@@ -15,9 +15,6 @@
  *   does_not_support_config_fuzzer,
  * ]
  */
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 const coll = testDB.findAndModify_metrics;
@@ -80,4 +77,3 @@ serverStatusAfterTest = testDB.serverStatus();
 assert.eq(serverStatusBeforeTest.metrics.commands.findAndModify.arrayFilters + 1,
           serverStatusAfterTest.metrics.commands.findAndModify.arrayFilters,
           `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
-})();

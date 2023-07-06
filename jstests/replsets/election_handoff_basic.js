@@ -4,9 +4,7 @@
  * so there is only one secondary that can take over.
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/libs/election_handoff.js");
+import {ElectionHandoffTest} from "jstests/replsets/libs/election_handoff.js";
 
 const testName = "election_handoff_vanilla";
 const numNodes = 2;
@@ -21,4 +19,3 @@ rst.initiateWithHighElectionTimeout();
 ElectionHandoffTest.testElectionHandoff(rst, 0, 1);
 
 rst.stopSet();
-})();

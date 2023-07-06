@@ -2,9 +2,6 @@
  * Tests for the command assertion functions in mongo/shell/assert.js.
  */
 
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("commandAssertions");
 const kFakeErrCode = 1234567890;
@@ -410,4 +407,3 @@ tests.forEach((test) => {
 
 /* cleanup */
 MongoRunner.stopMongod(conn);
-})();

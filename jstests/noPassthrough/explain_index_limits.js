@@ -1,8 +1,6 @@
 // Test that explain correctly outputs whether the planner hit or, and, or scan limits.
 
-(function() {
-"use strict";
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const conn = MongoRunner.runMongod({});
 const testDB = conn.getDB(jsTestName());
@@ -93,4 +91,3 @@ FixtureHelpers.runCommandOnEachPrimary({
     }
 });
 MongoRunner.stopMongod(conn);
-})();

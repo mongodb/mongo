@@ -1,8 +1,5 @@
 // Test that missing values are not returned when the connectFrom value in a $graphLookup is null.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // arrayEq
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 var local = db[jsTestName()];
 
@@ -86,4 +83,3 @@ result = local.aggregate([
 expected =
     [{"_id": 0, "x": 1, "arr": []}, {"_id": 1, "x": 2, "arr": []}, {"_id": 3, "x": 1, "arr": []}];
 assert(arrayEq(expected, result), "Expected:\n" + tojson(expected) + "\nGot:\n" + tojson(result));
-}());

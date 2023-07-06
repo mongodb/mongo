@@ -10,9 +10,6 @@
  *   no_selinux,
  * ]
  */
-(function() {
-'use strict';
-
 const hashOfMaxNumberLong = NumberLong("1136124329541638701");
 const hashOfLowestNumberLong = NumberLong("5744114172487291558");
 const hashOfZeroNumberLong = NumberLong("5574369198691456941");
@@ -65,4 +62,3 @@ hashTests.forEach(test => {
     assert.commandWorked(hashResult);
     assert.eq(test.expected, hashResult.out, tojson(test.key));
 });
-})();

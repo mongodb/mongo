@@ -2,11 +2,8 @@
 // database string prefixes, $tenant, and security token.  Combinations including prefixes will
 // require the use of the expectPrefix field.
 
-load('jstests/aggregation/extras/utils.js');                        // For arrayEq()
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";  // for isEnabled
-
-(function() {
-"use strict";
 
 const kTenant = ObjectId();
 const kTestDb = 'testDb0';
@@ -243,4 +240,3 @@ function runTestWithoutSecurityToken() {
 
 runTestWithoutSecurityToken();
 runTestWithSecurityTokenFlag();
-})();

@@ -6,9 +6,6 @@
  *     requires_ttl_index,
  * ]
  */
-(function() {
-'use strict';
-
 let coll = db.core_ttl_index_options;
 coll.drop();
 
@@ -16,7 +13,7 @@ coll.drop();
 assert.commandFailedWithCode(
     coll.createIndexes([{x: 1}], {expireAfterSeconds: 9223372036854775808}),
     ErrorCodes.CannotCreateIndex);
-assert.commandFailedWithCode(coll.createIndexes([{x: 1}], {expireAfterSeconds: 9999999999999999}),
+assert.commandFailedWithCode(coll.createIndexes([{x: 1}], {expireAfterSeconds: 999999999999999}),
                              ErrorCodes.CannotCreateIndex);
 
 // Ensure that we can provide a time that is larger than the current epoch time.
@@ -42,4 +39,3 @@ assert.commandWorked(coll.createIndexes([{x: 1, expireAfterSeconds: 3600}]));
 
 // Create a valid TTL index.
 assert.commandWorked(coll.createIndexes([{x: 1}, {y: 1}], {expireAfterSeconds: 3600}));
-}());

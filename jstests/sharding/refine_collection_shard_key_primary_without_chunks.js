@@ -4,9 +4,6 @@
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 2});
 
 // The orphan hook assumes every shard has the shard key index, which is not true for test_primary
@@ -31,4 +28,3 @@ assert.commandWorked(st.rs1.getPrimary().getCollection(ns).createIndex({x: 1, y:
 assert.commandWorked(st.s.adminCommand({refineCollectionShardKey: ns, key: {x: 1, y: 1}}));
 
 st.stop();
-})();

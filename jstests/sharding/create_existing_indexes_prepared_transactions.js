@@ -7,9 +7,6 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
 const dbName = "TestDB";
 const collName = "foo";
 const ns = dbName + '.' + collName;
@@ -78,4 +75,3 @@ st.shard1.getDB(dbName).getCollection(collName).runCommand(
     {createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]});
 
 st.stop();
-})();

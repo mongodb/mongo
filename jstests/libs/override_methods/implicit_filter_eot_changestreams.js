@@ -6,10 +6,7 @@
  * by setting the 'noPassthrough' flag, are passed through as-is.
  */
 
-load("jstests/libs/override_methods/override_helpers.js");
-
-(function() {
-'use strict';
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 const endOfTransactionFilter = {
     $match: {operationType: {$ne: "endOfTransaction"}}
@@ -26,4 +23,3 @@ const runCommandWithPassthroughEotFilter = function(
 };
 
 OverrideHelpers.overrideRunCommand(runCommandWithPassthroughEotFilter);
-}());

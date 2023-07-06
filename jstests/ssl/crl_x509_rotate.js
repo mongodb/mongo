@@ -1,12 +1,9 @@
 // Check that rotation works for the CRL
 
-(function() {
-"use strict";
-
-load('jstests/ssl/libs/ssl_helpers.js');
+import {copyCertificateFile, determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 if (determineSSLProvider() === "apple") {
-    return;
+    quit();
 }
 
 const dbPath = MongoRunner.toRealDir("$dataDir/cluster_x509_rotate_test/");
@@ -68,4 +65,3 @@ out = runMongoProgram("mongo",
 assert.eq(out, 0, "Mongo invocation failed");
 
 MongoRunner.stopMongod(mongod);
-}());

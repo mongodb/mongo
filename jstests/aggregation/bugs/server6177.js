@@ -1,7 +1,6 @@
 // SERVER-6177: better error when projecting into a subfield with an existing expression
 
-// load the test utilities
-load('jstests/aggregation/extras/utils.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var c = db.c;
 c.drop();

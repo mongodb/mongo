@@ -17,11 +17,7 @@
  * @tags: [uses_transactions]
  */
 
-(function() {
-
-"use strict";
-
-load('jstests/libs/parallelTester.js');  // for Thread.
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const dbName = "test";
 const collName = "write_conflicts_with_non_txns";
@@ -149,4 +145,3 @@ assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.
 
 // Check the final documents.
 assert.sameMembers([nonTxnDoc], testColl.find().toArray());
-}());

@@ -4,6 +4,8 @@
  * Base workload for aggregation. Inserts a bunch of documents in its setup,
  * then each thread does an aggregation with an empty $match.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var data = {
         numDocs: 1000,

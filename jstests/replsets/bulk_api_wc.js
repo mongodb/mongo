@@ -1,13 +1,11 @@
 // Tests write-concern-related bulk api functionality
-(function() {
-
 jsTest.log("Starting bulk api write concern tests...");
 
 // Skip this test when running with storage engines other than inMemory, as the test relies on
 // journaling not being active.
 if (jsTest.options().storageEngine !== "inMemory") {
     jsTest.log("Skipping test because it is only applicable for the inMemory storage engine");
-    return;
+    quit();
 }
 
 // Start a 2-node replica set with no journal.
@@ -116,4 +114,3 @@ assert.eq(coll.find().itcount(), 3);
 
 jsTest.log("DONE bulk api wc tests");
 rst.stopSet();
-})();

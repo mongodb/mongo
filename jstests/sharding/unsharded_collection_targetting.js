@@ -1,8 +1,5 @@
 // Tests that a stale mongos would route writes correctly to the right shard after
 // an unsharded collection was moved to another shard.
-(function() {
-"use strict";
-
 const st = new ShardingTest({
     shards: 2,
     mongos: 2,
@@ -29,4 +26,3 @@ st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
 assert.commandWorked(mongos2Coll.insert({_id: 1, a: 0}));
 
 st.stop();
-})();

@@ -2,10 +2,7 @@
  * Confirms that a parent operation correctly inherits 'numYields' from each of its child operations
  * as the latter are popped off the CurOp stack.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+import {waitForCurOpByFailPoint, waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 
 // Start a single mongoD using MongoRunner.
 const conn = MongoRunner.runMongod({});
@@ -108,4 +105,3 @@ assert.commandWorked(testDB.test.insert(docsToTest));
 runYieldTest(docsToTest);
 
 MongoRunner.stopMongod(conn);
-})();

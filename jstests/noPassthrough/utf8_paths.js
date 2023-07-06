@@ -1,8 +1,6 @@
 /**
  * Test that verifies mongod can start using paths that contain UTF-8 characters that are not ASCII.
  */
-(function() {
-'use strict';
 var db_name = "ελληνικά";
 var path = MongoRunner.dataPath + "Росси́я";
 
@@ -34,4 +32,3 @@ testMongoD();
 
 // Start a second time to test things like log rotation.
 testMongoD();
-})();

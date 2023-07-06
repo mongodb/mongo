@@ -7,13 +7,10 @@
  *   requires_fcv_53
  * ]
  */
+import {HybridGeoIndexTest, Operation} from "jstests/noPassthrough/libs/hybrid_geo_index.js";
 
 // Use hybrid_geo_index.js to exercise RecordId::serializeToken
 (function testRecordSerializationForSkippedRecordTracker() {
-    'use strict';
-
-    load('jstests/noPassthrough/libs/hybrid_geo_index.js');
-
     const rsOptions = {
         wiredTigerEngineConfigString: 'eviction_dirty_trigger=80'  // needed for larger recordIds
     };
@@ -27,8 +24,6 @@
 })();
 
 (function testDuplicateKeyErrorsForLargeKeys() {
-    'use strict';
-
     const rst = new ReplSetTest({name: 'testName', nodes: 1, nodeOptions: {}});
     const nodes = rst.startSet();
     rst.initiate();

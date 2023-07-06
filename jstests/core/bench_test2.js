@@ -6,9 +6,6 @@
  *   uses_parallel_shell,
  * ]
  */
-(function() {
-"use strict";
-
 const t = db.bench_test2;
 t.drop();
 
@@ -59,4 +56,3 @@ print("Avg: " + avg);
 print("Std: " + std);
 print("Min: " + min);
 print("Max: " + max);
-})();

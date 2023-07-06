@@ -5,7 +5,6 @@
  * We restart mongod during the test and expect it to have the same data after restarting.
  * @tags: [requires_persistence]
  */
-(function() {
 const testName = "invalid_collection_validator_at_startup";
 const dbpath = MongoRunner.dataPath + testName;
 const collName = "collectionWithMalformedValidator";
@@ -49,5 +48,4 @@ const collName = "collectionWithMalformedValidator";
     assert.eq(testDB.someOtherCollection.find().itcount(), 1);
 
     MongoRunner.stopMongod(conn);
-})();
 })();

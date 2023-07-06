@@ -4,9 +4,6 @@
 
 // Ensure that the find and getMore commands can handle documents nearing the 16 MB size limit for
 // user-stored BSON documents.
-(function() {
-'use strict';
-
 var cmdRes;
 var collName = 'find_getmore_bsonsize';
 var coll = db[collName];
@@ -87,4 +84,3 @@ assert.commandWorked(cmdRes);
 assert.eq(cmdRes.cursor.id, NumberLong(0));
 assert.eq(cmdRes.cursor.ns, coll.getFullName());
 assert.eq(cmdRes.cursor.firstBatch.length, 1);
-})();

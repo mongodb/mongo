@@ -4,9 +4,6 @@
 // requires_persistence because it restarts a shard.
 // @tags: [requires_persistence]
 
-(function() {
-"use strict";
-
 // This test restarts a shard.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
@@ -97,4 +94,3 @@ function testBadStartingFromKeys(shardAdmin) {
 testBadStartingFromKeys(shardAdmin);
 
 st.stop();
-})();

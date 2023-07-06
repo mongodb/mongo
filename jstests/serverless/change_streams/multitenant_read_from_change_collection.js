@@ -5,13 +5,10 @@
 //   assumes_against_mongod_not_mongos,
 // ]
 
-(function() {
-"use strict";
-
-// For ChangeStreamMultitenantReplicaSetTest.
-load("jstests/serverless/libs/change_collection_util.js");
-// For assertDropAndRecreateCollection.
-load("jstests/libs/collection_drop_recreate.js");
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {
+    ChangeStreamMultitenantReplicaSetTest
+} from "jstests/serverless/libs/change_collection_util.js";
 
 const replSetTest = new ChangeStreamMultitenantReplicaSetTest({nodes: 2});
 const primary = replSetTest.getPrimary();
@@ -186,4 +183,3 @@ verifyEventsAndGetResumeTokens(secondTenantCsCursorWithPreAndPostImages,
                                [["update", {_id: "amzn", price: 300}, {_id: "amzn", price: 3000}]]);
 
 replSetTest.stopSet();
-}());

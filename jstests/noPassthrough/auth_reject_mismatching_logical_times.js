@@ -6,9 +6,6 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
 // Given a valid cluster time object, returns one with the same signature, but a mismatching
 // cluster time.
 function mismatchingLogicalTime(lt) {
@@ -70,4 +67,3 @@ assertAcceptsValidLogicalTime(st.configRS.getPrimary().getDB("admin"));
 
 st.stop();
 rst.stopSet();
-})();

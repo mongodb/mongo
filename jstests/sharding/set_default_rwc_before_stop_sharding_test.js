@@ -2,9 +2,6 @@
  * Tests that none of the operations in the ShardingTest shutdown consistency checks are affected by
  * the cluster wide default read and write concern.
  */
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
 
 // Create a sharded collection so the index and uuid hooks have something to check.
@@ -22,4 +19,3 @@ assert.commandWorked(st.s.adminCommand({
 }));
 
 st.stop();
-})();

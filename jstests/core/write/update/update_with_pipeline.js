@@ -5,10 +5,7 @@
  *   requires_non_retryable_writes,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const collName = "update_with_pipeline";
 const coll = db[collName];
@@ -293,4 +290,3 @@ assert.commandFailedWithCode(
     51198);
 assert.commandFailedWithCode(
     db.runCommand({update: collName, updates: [{q: {_id: 1}, u: {$set: {x: "1"}}, c: {}}]}), 51198);
-})();

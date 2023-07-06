@@ -1,9 +1,7 @@
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode and assertErrMsgContains.
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
-
 // Tests for $subtract aggregation expression
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
+
+import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.subtract_coll;
 coll.drop();
@@ -78,4 +76,3 @@ assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.Overflow, "date overfl
 
 pipeline = [{$project: {res: {$subtract: [new Date(-1), "$decimalNaN"]}}}];
 assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.Overflow, "date overflow");
-}());

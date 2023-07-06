@@ -1,6 +1,4 @@
-(function() {
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var s1 = new ShardingTest({name: "count2", shards: 2, mongos: 2});
 var s2 = s1._mongos[1];
@@ -54,4 +52,3 @@ assert.eq(6, db2.find().limit(0).count(true));
 assert.eq(6, db2.getDB().runCommand({count: db2.getName(), limit: 0}).n);
 
 s1.stop();
-})();

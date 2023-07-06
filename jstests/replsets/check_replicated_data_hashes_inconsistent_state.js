@@ -5,9 +5,6 @@
  * @tags: [uses_testing_only_commands]
  */
 
-(function() {
-"use strict";
-
 // Skip DB hash check in stopSet() since we expect it to fail in this test.
 TestData.skipCheckDBHashes = true;
 
@@ -44,4 +41,3 @@ assert(err.message.includes("dbhash mismatch between primary and secondary"),
        `caught error didn't mention dbhash mismatch: ${tojson(err)}`);
 
 rst.stopSet();
-})();

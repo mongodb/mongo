@@ -1,9 +1,6 @@
 // Change a write concern mode from 2 to 3 servers
 // @tags: [multiversion_incompatible]
 
-(function() {
-"use strict";
-
 var host = getHostName();
 var replTest = new ReplSetTest({nodes: 4});
 var nodes = replTest.startSet();
@@ -58,4 +55,3 @@ var db = primary.getDB("test");
 assert.commandWorked(db.foo.insert({x: 3}, {writeConcern: {w: 'backedUp', wtimeout: wtimeout}}));
 
 replTest.stopSet();
-}());

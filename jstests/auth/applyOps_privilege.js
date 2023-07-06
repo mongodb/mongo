@@ -1,7 +1,4 @@
 // Tests that a user can only run a applyops while having applyOps privilege.
-(function() {
-"use strict";
-
 // Special privilege required to run applyOps command.
 // Role dbAdminAnyDatabase has this privilege.
 const applyOps_priv = {
@@ -89,4 +86,3 @@ function runTest(conn) {
 let conn = MongoRunner.runMongod({auth: ""});
 runTest(conn);
 MongoRunner.stopMongod(conn);
-}());

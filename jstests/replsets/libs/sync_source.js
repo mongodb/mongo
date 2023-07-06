@@ -2,13 +2,13 @@
  * Contains helper functions for testing sync source selection and evaluation.
  */
 
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 /**
  * Asserts that the node is allowed to sync from 'syncSource'. The node is unable to sync from
  * 'syncSource' if it will create a cycle in the topology.
  */
-const assertNodeAllowedToSyncFromSource = (node, syncSource) => {
+export const assertNodeAllowedToSyncFromSource = (node, syncSource) => {
     const syncSourceStatus = assert.commandWorked(syncSource.adminCommand({replSetGetStatus: 1}));
 
     let currHost = syncSource.host;
@@ -33,7 +33,7 @@ const assertNodeAllowedToSyncFromSource = (node, syncSource) => {
  * check (for example, if the topology changes while the check is running). The caller of this
  * function should be defensive against this case.
  */
-const forceSyncSource = (rst, node, syncSource) => {
+export const forceSyncSource = (rst, node, syncSource) => {
     const primary = rst.getPrimary();
 
     assert.neq(primary, node);
@@ -68,14 +68,14 @@ const forceSyncSource = (rst, node, syncSource) => {
  * Asserts that the sync source of the given node will match syncSourceName soon. Additional
  * arguments are passed to the assert.soon.
  */
-const assertSyncSourceMatchesSoon = (node, syncSourceName, ...assertSoonArgs) => {
+export const assertSyncSourceMatchesSoon = (node, syncSourceName, ...assertSoonArgs) => {
     return assert.soon(() => {
         const res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
         return res.syncSourceHost === syncSourceName;
     }, ...assertSoonArgs);
 };
 
-const DataCenter = class {
+export const DataCenter = class {
     constructor(name, nodes) {
         this.name = name;
         this.nodes = nodes;
@@ -85,7 +85,7 @@ const DataCenter = class {
 /**
  * Sets a delay between every node in 'firstDataCenter' and every node in 'secondDataCenter'.
  */
-const delayMessagesBetweenDataCenters = (firstDataCenter, secondDataCenter, delayMillis) => {
+export const delayMessagesBetweenDataCenters = (firstDataCenter, secondDataCenter, delayMillis) => {
     const firstDataCenterNodes = firstDataCenter.nodes;
     const secondDataCenterNodes = secondDataCenter.nodes;
 

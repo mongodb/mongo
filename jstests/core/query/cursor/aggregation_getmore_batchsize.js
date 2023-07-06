@@ -3,9 +3,6 @@
 // this is a simple test to make sure that batchSize gets propagated to the cursors returned
 // from the aggregate sell helper
 
-(function() {
-'use strict';
-
 var coll = db["aggregation_getmore_batchsize"];
 
 // Insert some data to query for
@@ -36,4 +33,3 @@ assert.eq(cursor.objsLeftInBatch(), 5);
 // Check that the default cursor behavior works if you specify a cursor but no batch size.
 cursor = coll.aggregate([{$match: {a: 1}}, {$limit: 6}], {cursor: {}});
 assert.eq(cursor.objsLeftInBatch(), 6);
-})();

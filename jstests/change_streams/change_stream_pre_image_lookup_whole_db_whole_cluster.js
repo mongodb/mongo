@@ -8,11 +8,6 @@
  *   uses_change_streams,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
-
 const testDB = db.getSiblingDB("preImage_lookup_whole_db_whole_cluster");
 const adminDB = db.getSiblingDB("admin");
 const collWithPreImageName = "coll_with_pre_images";
@@ -109,4 +104,3 @@ for (let runOnDB of [testDB, adminDB]) {
         assert.eq(observedEvent.fullDocumentBeforeChange, expectedEvent.fullDocumentBeforeChange);
     }
 }
-})();

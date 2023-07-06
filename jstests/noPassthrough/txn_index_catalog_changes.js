@@ -6,9 +6,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
 replTest.initiate();
@@ -71,4 +68,3 @@ db.c.drop();
 }
 
 replTest.stopSet();
-})();

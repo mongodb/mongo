@@ -6,9 +6,6 @@
  *   assumes_unsharded_collection,
  * ]
  */
-(function() {
-"use strict";
-
 const viewsDB = db.getSiblingDB("views_dbref_projection");
 assert.commandWorked(viewsDB.dropDatabase());
 
@@ -28,4 +25,3 @@ function checkViewAndBaseCollection(projection, expectedResult) {
 checkViewAndBaseCollection({"link.$ref": 1}, [{_id: 0, link: {$ref: "otherColl"}}]);
 checkViewAndBaseCollection({"link.$db": 1}, [{_id: 0, link: {$db: viewsDB.getName()}}]);
 checkViewAndBaseCollection({"link.$id": 1}, [{_id: 0, link: {$id: "someId"}}]);
-}());

@@ -5,9 +5,6 @@
 //   operations_longer_than_stepdown_interval,  # large bulk inserts
 // ]
 
-(function() {
-'use strict';
-
 const t = db.jstests_explain5;
 t.drop();
 
@@ -41,4 +38,3 @@ jsTestLog('explain5 explain output after additional documents: ' + tojson(explai
 const stats2 = explain2.executionStats;
 assert.eq(666, stats2.nReturned, 'wrong nReturned for explain2');
 assert.eq(2000, stats2.totalKeysExamined, 'wrong totalKeysExamined for explain2');
-})();

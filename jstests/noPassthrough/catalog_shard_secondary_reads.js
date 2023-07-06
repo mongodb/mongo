@@ -5,12 +5,10 @@
  *   requires_fcv_70,
  * ]
  */
+import {moveChunkParallel} from "jstests/libs/chunk_manipulation_util.js";
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/chunk_manipulation_util.js');
-
-var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+var staticMongod = MongoRunner.runMongod({});
 
 const st = new ShardingTest({
     shards: {rs0: {nodes: 2}, rs1: {nodes: 2}},

@@ -3,9 +3,6 @@
 // not just on the mongos.
 //
 
-(function() {
-'use strict';
-
 const dbName = "test";
 const collName = "coll";
 
@@ -48,4 +45,3 @@ let docs = coll.find().toArray();
 assert.sameMembers(docs, [{_id: 0}]);
 
 st.stop();
-})();

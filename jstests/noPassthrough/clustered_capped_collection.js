@@ -9,7 +9,6 @@
  *   cqf_experimental_incompatible,
  * ]
  */
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
 import {ClusteredCappedUtils} from "jstests/libs/clustered_collections/clustered_capped_utils.js";
 
 {

@@ -8,11 +8,9 @@
  *   assumes_unsharded_collection,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/libs/clustered_collections/clustered_collection_create_index_clustered_common.js");
+import {
+    CreateIndexesClusteredTest
+} from "jstests/libs/clustered_collections/clustered_collection_create_index_clustered_common.js";
 
 const conn = MongoRunner.runMongod();
 
@@ -23,4 +21,3 @@ const nonReplicatedColl = nonReplicatedDB[collName];
 CreateIndexesClusteredTest.runBaseTests(nonReplicatedDB, collName);
 
 MongoRunner.stopMongod(conn);
-})();

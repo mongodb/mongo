@@ -1,9 +1,6 @@
 // SERVER-16262: Write-conflict during map-reduce operations
 
-(function() {
-"use strict";
-
-load('jstests/libs/parallelTester.js');
+import {Thread} from "jstests/libs/parallelTester.js";
 
 var makeDoc = function(keyLimit, valueLimit) {
     return {_id: ObjectId(), key: Random.randInt(keyLimit), value: Random.randInt(valueLimit)};
@@ -66,4 +63,3 @@ main();
 for (i = 0; i < numThreads - 1; ++i) {
     t[i].join();
 }
-}());

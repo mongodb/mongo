@@ -1,7 +1,4 @@
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');  // For assertArrayEq
+import {arrayEq, assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const t = db.type_bracket;
 t.drop();
@@ -161,4 +158,3 @@ for (const testData of tests) {
                    tojson(testData.expectedList)}`);
     }
 }
-}());

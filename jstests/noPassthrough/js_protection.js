@@ -10,9 +10,6 @@
  *    the shell.
  */
 
-(function() {
-"use strict";
-
 var testServer = MongoRunner.runMongod({setParameter: "javascriptProtection=true"});
 assert.neq(
     null, testServer, "failed to start mongod with --setParameter=javascriptProtection=true");
@@ -21,6 +18,7 @@ var db = testServer.getDB("test");
 var t = db.js_protection;
 
 function assertMongoClientCorrect() {
+    /* eslint-disable */
     var functionToEval = function() {
         var doc = db.js_protection.findOne({_id: 0});
         assert.neq(null, doc);
@@ -34,6 +32,7 @@ function assertMongoClientCorrect() {
         assert.neq("undefined", typeof addOne, "addOne function should have been eval()ed locally");
         assert.eq(5, addOne(4));
     };
+    /* eslint-enable */
 
     var exitCode = runMongoProgram("mongo",
                                    "--port",
@@ -91,4 +90,3 @@ assertMongoClientCorrect();
 assertNoStoredWhere();
 
 MongoRunner.stopMongod(testServer);
-})();

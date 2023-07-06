@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 const chance = TestData.WTWriteConflictExceptionChance;
 assert.gte(chance, 0, "WTWriteConflictExceptionChance must be >= 0");
 assert.lte(chance, 1, "WTWriteConflictExceptionChance must be <= 1");
@@ -16,4 +13,3 @@ assert.commandWorked(db.adminCommand({
     configureFailPoint: 'WTWriteConflictExceptionForReads',
     mode: {activationProbability: readChance}
 }));
-})();

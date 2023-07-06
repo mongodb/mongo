@@ -2,7 +2,6 @@
  * Tests that a standalone node started with --verbose, --profile, and --keyfile can
  * successfully run the replSetInitiate command.
  */
-(function() {
 let options = {verbose: 1, profile: 1, keyFile: 'jstests/libs/key1', replSet: "rs0", port: 27017};
 
 const conn = MongoRunner.runMongod(options);
@@ -25,4 +24,3 @@ admin.createUser({user: 'foo', pwd: 'bar', roles: jsTest.adminUserRoles});
 assert(admin.auth({user: 'foo', pwd: 'bar'}));
 assert.commandWorked(admin.test.insert({x: 1}));
 MongoRunner.stopMongod(conn);
-})();

@@ -13,9 +13,9 @@ executor:
     - ValidateCollections
   config:
     shell_options:
-      eval: globalThis.testingReplication = true; load('jstests/libs/override_methods/set_read_and_write_concerns.js');;
-        load('jstests/libs/override_methods/implicit_whole_cluster_changestreams.js');;
-        load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+      eval: globalThis.testingReplication = true; await import('jstests/libs/override_methods/set_read_and_write_concerns.js');;
+        await import('jstests/libs/override_methods/implicit_whole_cluster_changestreams.js');;
+        await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
       global_vars:
         TestData:
           defaultReadConcernLevel: null

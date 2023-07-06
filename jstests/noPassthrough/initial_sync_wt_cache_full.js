@@ -5,9 +5,6 @@
  *   requires_wiredtiger,
  * ]
  */
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({
     nodes: [
         {
@@ -70,4 +67,3 @@ rst.awaitReplication();
 rst.awaitSecondaryNodes();
 
 rst.stopSet();
-})();

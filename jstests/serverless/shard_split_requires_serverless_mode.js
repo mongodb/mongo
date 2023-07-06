@@ -3,9 +3,6 @@
  * @tags: [requires_fcv_63, serverless]
  */
 
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 const migrationId = UUID();
 const tenantIds = [ObjectId(), ObjectId()];
@@ -22,4 +19,3 @@ assert.commandFailedWithCode(conn.adminCommand({forgetShardSplit: 1, migrationId
 assert(!checkLog.checkContainsOnce(conn, "ShardSplitDonorService"),
        "Expected no mention of ShardSplitDonorService in logs");
 MongoRunner.stopMongod(conn);
-})();

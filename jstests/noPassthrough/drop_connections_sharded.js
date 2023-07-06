@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const st = new ShardingTest({
     config: {nodes: 1},
     shards: 1,
@@ -52,4 +49,3 @@ cfg.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: cfg}));
 
 st.stop({parallelSupported: false});
-})();

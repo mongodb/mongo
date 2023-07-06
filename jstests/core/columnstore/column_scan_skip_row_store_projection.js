@@ -21,12 +21,9 @@
  *   not_allowed_with_security_token,
  * ]
  */
-load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-load(
-    "jstests/libs/clustered_collections/clustered_collection_util.js");  // For
-                                                                         // areAllCollectionsClustered.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const columnstoreEnabled =
     checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"], true /* checkAllNodes */);

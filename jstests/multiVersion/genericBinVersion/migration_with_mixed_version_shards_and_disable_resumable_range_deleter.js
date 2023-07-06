@@ -6,9 +6,6 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
-"use strict";
-
 const dbName = "test";
 
 function getNewNs(dbName) {
@@ -128,4 +125,3 @@ assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard1.shard
 })();
 
 st.stop();
-})();

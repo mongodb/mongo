@@ -8,9 +8,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const name = "single_shard_transaction_with_arbiter";
 const dbName = "test";
 const collName = name;
@@ -50,4 +47,3 @@ assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq({_id: 0}, sessionColl.findOne({_id: 0}));
 
 shardingTest.stop();
-})();

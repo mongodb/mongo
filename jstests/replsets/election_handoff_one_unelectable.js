@@ -5,9 +5,7 @@
  * chosen for election handoff.
  */
 
-(function() {
-"use strict";
-load("jstests/replsets/libs/election_handoff.js");
+import {ElectionHandoffTest} from "jstests/replsets/libs/election_handoff.js";
 
 const testName = "election_handoff_one_unelectable";
 const numNodes = 3;
@@ -28,4 +26,3 @@ rst.initiate(config);
 ElectionHandoffTest.testElectionHandoff(rst, 0, 2);
 
 rst.stopSet();
-})();

@@ -6,10 +6,7 @@
  * waiting prior to failure is properly recorded in serverStatus.
  */
 
-load("jstests/libs/fail_point_util.js");
-
-(function() {
-"use strict";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 let collName = "testColl";
 let numOps = 10;
@@ -53,4 +50,3 @@ testConnectionTimeoutMetric("forceConnectionNetworkTimeout", 6496500, numOps);
 testConnectionTimeoutMetric("triggerSendRequestNetworkTimeout", 6496501, numOps * 2);
 
 st.stop();
-})();

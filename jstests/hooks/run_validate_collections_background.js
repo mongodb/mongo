@@ -1,13 +1,5 @@
-/**
- * Runs the validate command with {background:true} against all nodes (replica set members and
- * standalone nodes, not sharded clusters) concurrently with running tests.
- */
-
-'use strict';
-
-(function() {
-load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
-load('jstests/libs/parallelTester.js');     // For Thread.
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 if (typeof db === 'undefined') {
     throw new Error(
@@ -169,6 +161,7 @@ if (topology.type === Topology.kStandalone) {
         });
 
         if (gatheredErrors.length) {
+            // eslint-disable-next-line
             throw new Error(
                 "Background collection validation was not successful against all replica set " +
                 "members: \n" + tojson(gatheredErrors));
@@ -177,4 +170,3 @@ if (topology.type === Topology.kStandalone) {
 } else {
     throw new Error('Unsupported topology configuration: ' + tojson(topology));
 }
-})();

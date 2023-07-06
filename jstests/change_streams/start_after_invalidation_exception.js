@@ -2,10 +2,10 @@
 // specified which filters out the invalidate event.
 // @tags: [do_not_run_in_whole_cluster_passthrough]
 
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
+import {
+    assertCreateCollection,
+    assertDropAndRecreateCollection
+} from "jstests/libs/collection_drop_recreate.js";
 
 const testDB = db.getSiblingDB("change_stream_check_resumability");
 const collName = "test";
@@ -47,4 +47,3 @@ assert.soon(() => cursor.hasNext());
 next = cursor.next();
 assert.eq(next.operationType, "insert");
 assert.docEq({_id: 1, a: 101}, next.fullDocument);
-}());

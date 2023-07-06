@@ -2,13 +2,12 @@
 // identify documents by checking that there is a supporting unique, non-partial,
 // collator-compatible index in the index catalog. This is meant to test sharding-related
 // configurations that are not covered by the aggregation passthrough suites.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode,
-                                                      // assertMergeFailsWithoutUniqueIndex,
-// assertMergeSucceedsWithExpectedUniqueIndex.
+import {
+    assertMergeFailsWithoutUniqueIndex,
+    assertMergeSucceedsWithExpectedUniqueIndex,
+    withEachMergeMode,
+} from "jstests/aggregation/extras/merge_helpers.js";
+import {assertErrCodeAndErrMsgContains, assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
@@ -290,4 +289,3 @@ testAgainstDB(mongosDB);
 testAgainstDB(foreignDB);
 
 st.stop();
-})();

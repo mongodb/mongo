@@ -1,7 +1,5 @@
-'use strict';
-
 // Auth test the listDatabases command.
-function runTest(mongod) {
+export function runTest(mongod) {
     const admin = mongod.getDB('admin');
     admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
     assert(admin.auth('admin', 'pass'));

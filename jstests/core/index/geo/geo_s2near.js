@@ -3,7 +3,6 @@
 // ]
 
 // Test 2dsphere near search, called via find and $geoNear.
-(function() {
 let t = db.geo_s2near;
 t.drop();
 
@@ -148,4 +147,3 @@ assert.commandFailedWithCode(db.runCommand({
     }]
 }),
                              2);
-}());

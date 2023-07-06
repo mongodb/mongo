@@ -3,11 +3,7 @@
  * shard, and for a sharded collection the command sends and checks shard versions and only
  * targets the shard that owns the MinKey chunk.
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/shard_versioning_util.js");
-load("jstests/libs/fail_point_util.js");
+import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
 // This test makes shards have inconsistent indexes.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
@@ -86,4 +82,3 @@ assert.eq(0,
           `expected listIndexes to return index {c: 1} but found: ${tojson(indexes)}`);
 
 st.stop();
-})();

@@ -1,9 +1,6 @@
 // Test for logging of certificate information
 
-(function() {
-'use strict';
-
-load("jstests/ssl/libs/ssl_helpers.js");
+import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 const CA_CERT = "jstests/libs/ca.pem";
 const SERVER_CERT = "jstests/libs/server.pem";
@@ -122,4 +119,3 @@ function runTests(checkMongos) {
 
 // runTests(true);
 runTests(false);
-})();

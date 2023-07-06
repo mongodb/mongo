@@ -2,9 +2,6 @@
  * Test that 'failGetMoreAfterCursorCheckout' works.
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -42,4 +39,3 @@ for (let testCursor of [coll.find({}).sort({_id: 1}).batchSize(2),
 }
 
 rst.stopSet();
-}());

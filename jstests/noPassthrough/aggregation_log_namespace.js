@@ -1,10 +1,10 @@
 // Tests that a source collection namespace is correctly logged in the global log for an aggregate
 // command when a pipeline contains a stage that can write into an output collection.
 // @tags: [requires_profiling]
-(function() {
-'use strict';
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachKindOfWriteStage.
+import {
+    withEachKindOfWriteStage,
+    withEachMergeMode
+} from "jstests/aggregation/extras/merge_helpers.js";
 
 // Runs the given 'pipeline' and verifies that the namespace is correctly logged in the global
 // log for the aggregate command. The 'comment' parameter is used to match a log entry against
@@ -49,4 +49,3 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => verifyLoggedNamespa
                   }));
 
 MongoRunner.stopMongod(conn);
-})();

@@ -12,11 +12,8 @@
 
 // Confirms that profiled findAndModify execution contains all expected metrics with proper values.
 
-(function() {
-"use strict";
-
-load("jstests/libs/os_helpers.js");  // For isLinux().
-load("jstests/libs/profiler.js");    // For 'getLatestProfilerEntry()'.
+import {isLinux} from "jstests/libs/os_helpers.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const testDB = db.getSiblingDB("profile_mapreduce");
 assert.commandWorked(testDB.dropDatabase());
@@ -107,4 +104,3 @@ profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.fromMultiPlanner, true, tojson(profileObj));
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
-})();

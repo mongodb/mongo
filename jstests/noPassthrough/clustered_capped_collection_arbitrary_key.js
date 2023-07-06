@@ -7,7 +7,6 @@
  *   does_not_support_stepdowns,
  * ]
  */
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
 import {ClusteredCappedUtils} from "jstests/libs/clustered_collections/clustered_capped_utils.js";
 
 const replSet = new ReplSetTest({name: "clustered_capped_collections", nodes: 1});

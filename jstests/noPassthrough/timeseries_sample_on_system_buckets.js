@@ -1,9 +1,6 @@
 /**
  * Verifies that a direct $sample stage on system.buckets collection works.
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 
 const dbName = jsTestName();
@@ -22,4 +19,3 @@ const res = testDB.system.buckets.t.aggregate([{$sample: {size: kNoOfSamples}}])
 assert.eq(res.length, kNoOfSamples);
 
 MongoRunner.stopMongod(conn);
-})();

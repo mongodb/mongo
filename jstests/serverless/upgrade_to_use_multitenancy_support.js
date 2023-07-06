@@ -3,8 +3,8 @@
  * multitenancySupport in a rolling fashion in a replica set.
  */
 
-load("jstests/aggregation/extras/utils.js");
-load("jstests/replsets/rslib.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {waitForState} from "jstests/replsets/rslib.js";
 
 // In production, we will upgrade to start using multitenancySupport before enabling this feature
 // flag, and this test is meant to exercise that upgrade behavior, so don't run if the feature flag

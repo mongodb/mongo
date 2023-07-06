@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 var testDB = db.getSiblingDB('dbcommand_cursor_throws_on_closed_conn');
 testDB.dropDatabase();
 var coll = testDB.collection;
@@ -13,4 +10,3 @@ var res = assert.commandWorked(testDB.runCommand({
 
 conn.close();
 assert.throws(() => new DBCommandCursor(testDB, res));
-}());

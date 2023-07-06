@@ -1,8 +1,5 @@
 // Test read after opTime functionality with maxTimeMS on config servers (CSRS only)`.
 
-(function() {
-'use strict';
-
 var shardingTest = new ShardingTest({shards: TestData.configShard ? 1 : 0});
 
 assert(shardingTest.configRS, 'this test requires config servers to run in CSRS mode');
@@ -13,7 +10,6 @@ var primaryConn = configReplSetTest.getPrimary();
 var lastOp = configReplSetTest.awaitLastOpCommitted();
 assert(lastOp, 'invalid op returned from ReplSetTest.awaitLastOpCommitted()');
 
-var config = configReplSetTest.getReplSetConfigFromNode();
 var term = lastOp.t;
 
 var runFindCommand = function(ts) {
@@ -48,4 +44,3 @@ assert.soon(function() {
     return false;
 }, 'Did not see any log entries containing the following message: ' + msg, 60000, 300);
 shardingTest.stop();
-})();

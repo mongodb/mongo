@@ -3,9 +3,6 @@
 // time.  This would cause us to update stale items in the cache when secondaries
 // reported their progress to a primary.
 
-(function() {
-"use strict";
-
 // Start a replica set with 3 nodes
 var host = getHostName();
 var replTest = new ReplSetTest({nodes: 3});
@@ -70,4 +67,3 @@ assert.commandWorked(db.foo.insert({x: 3}, {writeConcern: {w: 'anydc', wtimeout:
 assert.commandWorked(db.foo.insert({x: 4}, {writeConcern: {w: 'alldc', wtimeout: wtimeout}}));
 
 replTest.stopSet();
-}());

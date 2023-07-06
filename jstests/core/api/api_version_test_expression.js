@@ -12,9 +12,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_version_test_expression";
 const coll = testDb[collName];
@@ -262,4 +259,3 @@ checkExplainInnerCommandGetsAPIVersionParameters(findCmd, ErrorCodes.APIDeprecat
 
 testDb[validatedCollName].drop();
 testDb.unstableView.drop();
-})();

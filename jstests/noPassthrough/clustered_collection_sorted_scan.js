@@ -4,8 +4,6 @@
  */
 import {getPlanStage, planHasStage} from "jstests/libs/analyze_plan.js";
 
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
-
 Random.setRandomSeed();
 
 const testConnection =

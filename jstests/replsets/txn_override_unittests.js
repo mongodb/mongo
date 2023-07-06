@@ -27,11 +27,6 @@
  *
  * @tags: [requires_replication, uses_transactions]
  */
-(function() {
-"use strict";
-load("jstests/libs/transactions_util.js");
-load('jstests/libs/write_concern_util.js');
-
 // Commands not to override since they can log excessively.
 const runCommandOverrideDenylistedCommands =
     ["getCmdLineOpts", "serverStatus", "configureFailPoint"];
@@ -1349,6 +1344,7 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
             failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotWritablePrimary});
 
             assert.commandWorked(coll1.insert({a: 2, b: {c: 7, d: "d is good"}}));
+            /* eslint-disable */
             const cursor = coll1.find({
                 $where: function() {
                     assert.eq(3, Object.keySet(obj).length);
@@ -1358,6 +1354,7 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
                     return true;
                 }
             });
+            /* eslint-enable */
             assert.eq(1, cursor.toArray().length);
         }
     },
@@ -1878,7 +1875,7 @@ TestData.overrideRetryAttempts = 3;
 let session = conn.startSession(TestData.sessionOptions);
 let testDB = session.getDatabase(dbName);
 
-load("jstests/libs/override_methods/network_error_and_txn_override.js");
+await import("jstests/libs/override_methods/network_error_and_txn_override.js");
 
 jsTestLog("=-=-=-=-=-= Testing with 'retry on network error' by itself. =-=-=-=-=-=");
 TestData.sessionOptions = new SessionOptions({retryWrites: true});
@@ -1966,4 +1963,3 @@ doNotRetryReadErrorWithOutBackgroundReconfigTest.forEach(
     (testCase) => runTest("doNotRetryReadErrorWithOutBackgroundReconfigTest", testCase));
 
 rst.stopSet();
-})();

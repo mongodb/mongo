@@ -15,9 +15,7 @@
  *   not_allowed_with_security_token,
  * ]
  */
-load("jstests/libs/fail_point_util.js");
 import {planHasStage} from "jstests/libs/analyze_plan.js";
-load("jstests/aggregation/extras/utils.js");  // For "resultsEq."
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 if (!setUpServerForColumnStoreIndexTest(db)) {

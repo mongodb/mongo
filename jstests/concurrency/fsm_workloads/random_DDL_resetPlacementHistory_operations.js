@@ -16,9 +16,9 @@
  *  ]
  */
 
-load("jstests/libs/uuid_util.js");
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-load('jstests/concurrency/fsm_workload_helpers/chunks.js');
 
 export const $config = (function() {
     const testCollectionsState = 'testCollectionsState';
@@ -73,8 +73,6 @@ export const $config = (function() {
                 assertAlways.commandWorked(
                     db.adminCommand({shardCollection: db[collName].getFullName(), key: {_id: 1}}));
                 jsTestLog(`shardCollection state for ${collName} completed`);
-            } catch (e) {
-                throw e;
             } finally {
                 releaseCollectionName(db, collName);
             }
@@ -89,8 +87,6 @@ export const $config = (function() {
                 // Avoid checking the outcome, as the drop may result into a no-op.
                 db[collName].drop();
                 jsTestLog(`dropCollection state for ${collName} completed`);
-            } catch (e) {
-                throw e;
             } finally {
                 releaseCollectionName(db, collName, true /*wasDropped*/);
             }
@@ -105,8 +101,6 @@ export const $config = (function() {
                 // reverse the rename before leaving the state.
                 assertAlways.commandWorked(db[renamedCollName].renameCollection(collName));
                 jsTestLog(`renameCollection state for ${collName} completed`);
-            } catch (e) {
-                throw e;
             } finally {
                 releaseCollectionName(db, collName);
             }
@@ -127,8 +121,6 @@ export const $config = (function() {
                 ChunkHelper.moveChunk(
                     db, collName, [chunkToMove.min, chunkToMove.max], destination._id, true);
                 jsTestLog(`moveChunk state for ${collName} completed`);
-            } catch (e) {
-                throw e;
             } finally {
                 releaseCollectionName(db, collName);
             }

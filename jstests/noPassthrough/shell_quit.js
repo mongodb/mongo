@@ -1,5 +1,3 @@
-(function() {
-'use strict';
 var checkShell = function(retCode) {
     var args = [
         "mongo",
@@ -14,4 +12,3 @@ var checkShell = function(retCode) {
 
 checkShell(0);
 checkShell(5);
-})();

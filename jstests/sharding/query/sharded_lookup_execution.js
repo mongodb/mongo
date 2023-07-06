@@ -8,12 +8,12 @@
  * @tags: [requires_fcv_51]
  */
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-load("jstests/libs/profiler.js");             // For profilerHas*OrThrow helper functions.
-load("jstests/libs/log.js");                  // For findMatchingLogLines.
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
+import {findMatchingLogLines} from "jstests/libs/log.js";
+import {
+    profilerHasNumMatchingEntriesOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({shards: 2, mongos: 2});
 const testName = "sharded_lookup";
@@ -797,4 +797,3 @@ assertLookupExecution(pipeline, {comment: "foreign_becomes_sharded", batchSize: 
 });
 
 st.stop();
-}());

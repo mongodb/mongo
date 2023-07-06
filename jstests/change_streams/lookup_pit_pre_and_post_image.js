@@ -1,9 +1,6 @@
 // Tests that the point-in-time pre- and post-images are loaded correctly in $changeStream running
 // with different arguments for collections with 'changeStreamPreAndPostImages' being enabled.
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const collName = "test";
@@ -249,4 +246,3 @@ preAndPostImageTest({
         preImage: replacedDoc,
     }
 });
-}());

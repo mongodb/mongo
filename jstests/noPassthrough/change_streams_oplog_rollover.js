@@ -4,11 +4,8 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-"use strict";
-
-load('jstests/replsets/rslib.js');           // For getLatestOp, getFirstOplogEntry.
-load('jstests/libs/change_stream_util.js');  // For ChangeStreamTest.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 
 const oplogSize = 1;  // size in MB
 const rst = new ReplSetTest({nodes: 1, oplogSize: oplogSize});
@@ -131,4 +128,3 @@ ChangeStreamTest.assertChangeStreamThrowsCode({
 
 cst.cleanUp();
 rst.stopSet();
-})();

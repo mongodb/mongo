@@ -1,7 +1,4 @@
 // Test that the $sort stage respects the collation.
-(function() {
-"use strict";
-
 // In French, words are sometimes ordered on the secondary level (a.k.a. at the level of
 // diacritical marks) by the *last* accent difference rather than the first. This is specified
 // by the {backwards: true} option.
@@ -92,4 +89,3 @@ const results = coll.aggregate([{
 assert.eq(1, results.length);
 assert.eq(1, results[0].fct.length);
 assert.eq([9, 8, 7, 6, 5, 4, 3, 2, 1], results[0].fct[0].out);
-})();

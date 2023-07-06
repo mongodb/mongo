@@ -14,15 +14,12 @@
  *   references_foreign_collection,
  * ]
  */
+import {assertMergeFailsForAllModesWithCode} from "jstests/aggregation/extras/merge_helpers.js";
+import {arrayEq, assertErrorCode, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
+import {
+    FixtureHelpers
+} from "jstests/libs/fixture_helpers.js";  // For arrayEq, assertErrorCode, and
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-(function() {
-"use strict";
-
-// For assertMergeFailsForAllModesWithCode.
-load("jstests/aggregation/extras/merge_helpers.js");
-load("jstests/aggregation/extras/utils.js");  // For arrayEq, assertErrorCode, and
-                                              // orderedArrayEq.
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
 
 // TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature here and below.
 const featureFlagSbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
@@ -415,5 +412,4 @@ assert.commandWorked(viewsDB.runCommand({
     assert.eq(allDocuments.length,
               viewsDB[viewName].aggregate([{$group: {_id: "$_id"}}]).itcount());
     assert.eq(allDocuments.length, viewsDB[viewName].distinct("_id").length);
-})();
 })();

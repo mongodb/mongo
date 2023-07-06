@@ -15,10 +15,9 @@
  * - Read at insertTS and assert failure with StaleChunkHistory.
  * - Read at T2 - 1 sec, assert success.
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 // The snapshot window is the max of minSnapshotHistoryWindowInSeconds and
 // transactionLifetimeLimitSeconds.
@@ -138,4 +137,3 @@ assert.commandWorked(
     mongosDB.runCommand({find: "test", readConcern: {level: "snapshot", atClusterTime: recentTS}}));
 
 st.stop();
-})();

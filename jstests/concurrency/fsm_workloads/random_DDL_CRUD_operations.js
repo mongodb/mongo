@@ -15,9 +15,12 @@
  *  ]
  */
 
-load("jstests/concurrency/fsm_workload_helpers/state_transition_utils.js");
-load("jstests/libs/uuid_util.js");
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {
+    uniformDistTransitions
+} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 export const $config = (function() {
     function threadCollectionName(prefix, tid) {
@@ -268,8 +271,7 @@ export const $config = (function() {
 
                 jsTestLog('CRUD - Update tid:' + tid + ' currentTid:' + this.tid +
                           ' collection:' + targetThreadColl);
-                var res =
-                    coll.update({generation: generation}, {$set: {updated: true}}, {multi: true});
+                res = coll.update({generation: generation}, {$set: {updated: true}}, {multi: true});
                 if (res.hasWriteError()) {
                     var err = res.getWriteError();
                     if (err.code == ErrorCodes.QueryPlanKilled) {
@@ -278,7 +280,7 @@ export const $config = (function() {
                         jsTestLog('CRUD state finished earlier because query plan was killed.');
                         return;
                     }
-                    throw e;
+                    throw err;
                 }
                 assertAlways.commandWorked(res);
 

@@ -4,6 +4,7 @@
  *
  * @tags: [requires_fcv_70]
  */
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 import {
     innerAggTestCases,
     outerAggTestCases,
@@ -12,8 +13,6 @@ import {
     testCustomInnerPipeline,
     testNoCustomInnerPipeline
 } from "jstests/sharding/analyze_shard_key/libs/sample_nested_agg_queries_common.js";
-
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
 const st = new ShardingTest({
     shards: 3,

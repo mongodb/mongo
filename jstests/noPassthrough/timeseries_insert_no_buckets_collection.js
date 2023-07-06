@@ -2,11 +2,8 @@
  * Tests that inserting into a time-series collection fails if the corresponding buckets collection
  * does not exist.
  */
-(function() {
-'use strict';
-
-load('jstests/libs/fail_point_util.js');
-load("jstests/libs/parallel_shell_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB('test');
@@ -28,9 +25,9 @@ const runTest = function(ordered, insertBeforeDrop, dropBucketsColl) {
 
     const awaitDrop = startParallelShell(
         funWithArgs(
-            function(collName, fpName, fpTimesEntered) {
-                load("jstests/libs/fail_point_util.js");
-
+            async function(collName, fpName, fpTimesEntered) {
+                const {kDefaultWaitForFailPointTimeout} =
+                    await import("jstests/libs/fail_point_util.js");
                 assert.commandWorked(db.adminCommand({
                     waitForFailPoint: fpName,
                     timesEntered: fpTimesEntered + 1,
@@ -61,4 +58,3 @@ for (const dropBucketsColl of [false, true]) {
 }
 
 MongoRunner.stopMongod(conn);
-})();

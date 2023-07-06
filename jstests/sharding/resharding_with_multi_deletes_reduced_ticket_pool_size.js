@@ -6,11 +6,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const kNumWriteTickets = 5;
 const kReshardingOplogBatchTaskCount = 20;
@@ -31,9 +27,6 @@ for (let i = 0; i < 100; i++) {
     assert.commandWorked(sourceCollection.insert([{x: 1}]));
 }
 assert.commandWorked(sourceCollection.insert([{x: 3}, {x: 3}]));
-const mongos = sourceCollection.getMongo();
-const topology = DiscoverTopology.findConnectedNodes(mongos);
-const coordinator = new Mongo(topology.configsvr.nodes[0]);
 const recipientShardNames = reshardingTest.recipientShardNames;
 reshardingTest.withReshardingInBackground(
     {
@@ -47,4 +40,3 @@ reshardingTest.withReshardingInBackground(
         assert.commandWorked(sourceCollection.remove({x: 1}, {justOne: false}));
     });
 reshardingTest.teardown();
-})();

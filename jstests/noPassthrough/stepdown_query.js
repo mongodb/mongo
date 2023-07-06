@@ -11,9 +11,6 @@
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 
-(function() {
-'use strict';
-
 // Set the refresh period to 10 min to rule out races
 _setShellFailPoint({
     configureFailPoint: "modifyReplicaSetMonitorDefaultRefreshPeriod",
@@ -80,4 +77,3 @@ var st = new ShardingTest({shards: 1, rs: {nodes: 2}, config: 2});
 rst = st.rs0;
 runTest(st.s0.host, rst, true);
 st.stop();
-})();

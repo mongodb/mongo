@@ -1,9 +1,6 @@
 /*
  * Tests that an arbiter will default to the latest FCV regardless of the FCV of the replica set.
  */
-(function() {
-"use strict";
-
 function runTest(FCV) {
     let rst = new ReplSetTest(
         {nodes: [{}, {rsConfig: {arbiterOnly: true}}], nodeOpts: {binVersion: FCV}});
@@ -22,4 +19,3 @@ runTest(lastLTSFCV);
 if (lastContinuousFCV != lastLTSFCV) {
     runTest(lastContinuousFCV);
 }
-}());

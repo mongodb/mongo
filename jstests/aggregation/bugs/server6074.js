@@ -1,10 +1,6 @@
 // SERVER-6074: Add $slice aggregation expression.
 
-// For assertErrorCode.
-load('jstests/aggregation/extras/utils.js');
-
-(function() {
-'use strict';
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.agg_slice_expr;
 coll.drop();
@@ -78,4 +74,3 @@ assertErrorCode(coll, [{$project: {x: {$slice: [[1, 2], 0, -Math.pow(2, 31) - 1]
 // Third argument is not positive.
 assertErrorCode(coll, [{$project: {x: {$slice: [[1, 2], 0, 0]}}}], 28729);
 assertErrorCode(coll, [{$project: {x: {$slice: [[1, 2], 0, -1]}}}], 28729);
-}());

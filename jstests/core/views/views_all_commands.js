@@ -72,11 +72,12 @@
  *      If true, do not run this command on a standalone mongod.
  */
 
-(function() {
-"use strict";
-
-load('jstests/sharding/libs/last_lts_mongod_commands.js');
-load('jstests/sharding/libs/last_lts_mongos_commands.js');
+import {
+    commandsRemovedFromMongodSinceLastLTS
+} from "jstests/sharding/libs/last_lts_mongod_commands.js";
+import {
+    commandsRemovedFromMongosSinceLastLTS
+} from "jstests/sharding/libs/last_lts_mongos_commands.js";
 
 // Pre-written reasons for skipping a test.
 const isAnInternalCommand = "internal command";
@@ -864,4 +865,3 @@ for (let command of commands) {
             subtest.teardown(dbHandle);
     }
 }
-}());

@@ -4,8 +4,6 @@
  *
  * @tags: [no_selinux]
  */
-(function() {
-"use strict";
 const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
@@ -48,4 +46,3 @@ for (const doc of docs) {
         assert.eq(doc, item);
     }
 }
-})();

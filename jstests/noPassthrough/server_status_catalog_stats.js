@@ -5,9 +5,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const replSet = new ReplSetTest({nodes: 2});
 replSet.startSet();
 replSet.initiate();
@@ -141,4 +138,3 @@ assertCatalogStats(db1, (stats) => {
 });
 
 replSet.stopSet();
-})();

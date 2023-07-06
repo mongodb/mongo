@@ -8,7 +8,7 @@
  * command.
  * testCase.expectedErrorCode - an expected error do be produced by the "aggregate" command.
  */
-function executeAggregationTestCase(collection, testCase) {
+export function executeAggregationTestCase(collection, testCase) {
     jsTestLog(tojson(testCase));
     assert.commandWorked(collection.remove({}));
 

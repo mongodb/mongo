@@ -6,11 +6,7 @@
  * collections.
  * @tags: [assumes_unsharded_collection]
  */
-(function() {
-'use strict';
-
-load('jstests/aggregation/extras/merge_helpers.js');  // For 'withEachMergeMode'.
-load('jstests/libs/fixture_helpers.js');              // For 'FixtureHelpers'.
+import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
 
 const testDB = db.getSiblingDB("merge_to_referenced_coll");
 const coll = testDB.test;
@@ -158,4 +154,3 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
 
     testDB.dropDatabase();
 });
-}());

@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 let t = db.slice1;
 t.drop();
 
@@ -296,4 +293,3 @@ testSingleDocument({_id: 1, a: {$slice: [1, 1]}},
 
 testSingleDocument(
     {_id: 0, a: {$slice: [1, 1]}}, {_id: 123, a: [1, 2, 3]}, {a: [2]}, false /* deleteId */);
-})();

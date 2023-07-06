@@ -42,10 +42,7 @@
  *   requires_wiredtiger,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const kNumReadTickets = 5;
 const replTest = new ReplSetTest({
@@ -214,4 +211,3 @@ queuedReaders = [];
 newReaders = [];
 
 replTest.stopSet();
-})();

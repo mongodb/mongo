@@ -2,16 +2,18 @@
  * Helper function shared by createIndexes inside txns tests.
  */
 
-const indexSpecs = {
+export const indexSpecs = {
     key: {a: 1},
     name: "a_1"
 };
-const conflictingIndexSpecs = {
+
+export const conflictingIndexSpecs = {
     key: {a: -1},
     name: "a_1"
 };
 
-const createIndexAndCRUDInTxn = function(sessionDB, collName, explicitCollCreate, multikeyIndex) {
+export const createIndexAndCRUDInTxn = function(
+    sessionDB, collName, explicitCollCreate, multikeyIndex) {
     if (undefined === explicitCollCreate) {
         doassert('createIndexAndCRUDInTxn called with undefined explicitCollCreate');
     }

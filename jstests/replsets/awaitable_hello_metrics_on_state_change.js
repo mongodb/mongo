@@ -2,10 +2,8 @@
  * Tests that the server status metrics correctly reflect the number of waiting hello/isMaster
  * requests before and after a state change.
  */
-(function() {
-"use strict";
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 function runAwaitableCmd(cmd, topologyVersionField) {
     const res = assert.commandWorked(db.runCommand({
@@ -66,4 +64,3 @@ function runTest(cmd) {
 runTest("hello");
 runTest("isMaster");
 runTest("ismaster");
-})();

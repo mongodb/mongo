@@ -2,13 +2,12 @@
  * A class with helper functions which operate on change streams. The class maintains a list of
  * opened cursors and kills them on cleanup.
  */
-
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 
 /**
  * Enumeration of the possible types of change streams.
  */
-const ChangeStreamWatchMode = Object.freeze({
+export const ChangeStreamWatchMode = Object.freeze({
     kCollection: 1,
     kDb: 2,
     kCluster: 3,
@@ -17,7 +16,7 @@ const ChangeStreamWatchMode = Object.freeze({
 /**
  * Returns a truncated json object if the size of 'jsonObj' is greater than 'maxErrorSizeBytes'.
  */
-function tojsonMaybeTruncate(jsonObj) {
+export function tojsonMaybeTruncate(jsonObj) {
     // Maximum size for the json object.
     const maxErrorSizeBytes = 1024 * 1024;
 
@@ -30,7 +29,7 @@ function tojsonMaybeTruncate(jsonObj) {
  * 'changeStreamPassthroughAwareRunCommand', then this method will be overridden to allow individual
  * streams to explicitly exempt themselves from being modified by the passthrough.
  */
-function isChangeStreamPassthrough() {
+export function isChangeStreamPassthrough() {
     return typeof changeStreamPassthroughAwareRunCommand != 'undefined';
 }
 
@@ -38,15 +37,19 @@ function isChangeStreamPassthrough() {
  * Helper function to retrieve the type of change stream based on the passthrough suite in which the
  * test is being run. If no passthrough is active, this method returns the kCollection watch mode.
  */
-function changeStreamPassthroughType() {
-    return typeof ChangeStreamPassthroughHelpers === 'undefined'
+export function changeStreamPassthroughType() {
+    return typeof globalThis.ChangeStreamPassthroughHelpers === 'undefined'
         ? ChangeStreamWatchMode.kCollection
-        : ChangeStreamPassthroughHelpers.passthroughType();
+        : globalThis.ChangeStreamPassthroughHelpers.passthroughType();
 }
 
-const runCommandChangeStreamPassthroughAware =
-    (!isChangeStreamPassthrough() ? ((db, cmdObj) => db.runCommand(cmdObj))
-                                  : changeStreamPassthroughAwareRunCommand);
+export function runCommandChangeStreamPassthroughAware(db, cmdObj, noPassthrough) {
+    if (!isChangeStreamPassthrough()) {
+        return db.runCommand(cmdObj);
+    }
+
+    return globalThis.changeStreamPassthroughAwareRunCommand(db, cmdObj, noPassthrough);
+}
 
 /**
  * Asserts that the given opType triggers an invalidate entry depending on the type of change
@@ -56,7 +59,7 @@ const runCommandChangeStreamPassthroughAware =
  *     - whole cluster streams: none.
  * Returns the invalidate document if there was one, or null otherwise.
  */
-function assertInvalidateOp({cursor, opType}) {
+export function assertInvalidateOp({cursor, opType}) {
     if (!isChangeStreamPassthrough() ||
         (changeStreamPassthroughType() == ChangeStreamWatchMode.kDb && opType == "dropDatabase")) {
         assert.soon(() => cursor.hasNext());
@@ -70,7 +73,7 @@ function assertInvalidateOp({cursor, opType}) {
     return null;
 }
 
-function canonicalizeEventForTesting(event, expected) {
+export function canonicalizeEventForTesting(event, expected) {
     for (let fieldName of ["_id",
                            "clusterTime",
                            "txnNumber",
@@ -94,8 +97,9 @@ function canonicalizeEventForTesting(event, expected) {
  * the resume token, clusterTime, and other unknowable fields unless they are explicitly listed in
  * the expected event.
  */
-function isChangeStreamEventEq(actualEvent, expectedEvent) {
-    const testEvent = canonicalizeEventForTesting(Object.assign({}, actualEvent), expectedEvent);
+function isChangeStreamEventEq(
+    actualEvent, expectedEvent, eventModifier = canonicalizeEventForTesting) {
+    const testEvent = eventModifier(Object.assign({}, actualEvent), expectedEvent);
     return friendlyEqual(sortDoc(testEvent), sortDoc(expectedEvent));
 }
 
@@ -103,22 +107,19 @@ function isChangeStreamEventEq(actualEvent, expectedEvent) {
  * Helper to check whether a change event matches the given expected event. Throws assertion failure
  * if change events do not match.
  */
-function assertChangeStreamEventEq(actualEvent, expectedEvent) {
-    assert(isChangeStreamEventEq(actualEvent, expectedEvent),
+export function assertChangeStreamEventEq(actualEvent, expectedEvent, eventModifier) {
+    assert(isChangeStreamEventEq(actualEvent, expectedEvent, eventModifier),
            () => "Change events did not match. Expected: " + tojsonMaybeTruncate(expectedEvent) +
                ", Actual: " + tojsonMaybeTruncate(actualEvent));
 }
 
-function ChangeStreamTest(_db, name = "ChangeStreamTest") {
-    load("jstests/libs/namespace_utils.js");  // For getCollectionNameFromFullNamespace.
-
+export function ChangeStreamTest(_db, options) {
     // Keeps track of cursors opened during the test so that we can be sure to
     // clean them up before the test completes.
     let _allCursors = [];
     let self = this;
-
-    // Prevent accidental usages of the default db.
-    const db = null;
+    options = options || {};
+    const eventModifier = options.eventModifier || canonicalizeEventForTesting;
 
     /**
      * Starts a change stream cursor with the given pipeline on the given collection. It uses
@@ -245,8 +246,8 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
     function assertChangeIsExpected(
         expectedChanges, numChangesSeen, observedChanges, expectInvalidate) {
         if (expectedChanges) {
-            assertChangeStreamEventEq(observedChanges[numChangesSeen],
-                                      expectedChanges[numChangesSeen]);
+            assertChangeStreamEventEq(
+                observedChanges[numChangesSeen], expectedChanges[numChangesSeen], eventModifier);
         } else if (!expectInvalidate) {
             assert(!isInvalidated(observedChanges[numChangesSeen]),
                    "Change was invalidated when it should not have been. Number of changes seen: " +
@@ -302,7 +303,7 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
             assert.eq(changes.length, expectedNumChanges, errMsgFunc);
             for (let i = 0; i < changes.length; i++) {
                 assert(expectedChanges.some(expectedChange => {
-                    return isChangeStreamEventEq(changes[i], expectedChange);
+                    return isChangeStreamEventEq(changes[i], expectedChange, eventModifier);
                 }),
                        errMsgFunc);
             }
@@ -513,19 +514,21 @@ ChangeStreamTest.getDBForChangeStream = function(watchMode, dbObj) {
 /**
  * A set of functions to help validate the behaviour of $changeStreams for a given namespace.
  */
-function assertChangeStreamNssBehaviour(dbName, collName = "test", options, assertFunc) {
+export function assertChangeStreamNssBehaviour(dbName, collName = "test", options, assertFunc) {
     const testDb = db.getSiblingDB(dbName);
     options = (options || {});
     const res = testDb.runCommand(
         Object.assign({aggregate: collName, pipeline: [{$changeStream: options}], cursor: {}}));
     return assertFunc(res);
 }
-function assertValidChangeStreamNss(dbName, collName = "test", options) {
+
+export function assertValidChangeStreamNss(dbName, collName = "test", options) {
     const res = assertChangeStreamNssBehaviour(dbName, collName, options, assert.commandWorked);
     assert.commandWorked(db.getSiblingDB(dbName).runCommand(
         {killCursors: (collName == 1 ? "$cmd.aggregate" : collName), cursors: [res.cursor.id]}));
 }
-function assertInvalidChangeStreamNss(dbName, collName = "test", options) {
+
+export function assertInvalidChangeStreamNss(dbName, collName = "test", options) {
     assertChangeStreamNssBehaviour(
         dbName,
         collName,
@@ -534,14 +537,14 @@ function assertInvalidChangeStreamNss(dbName, collName = "test", options) {
             res, [ErrorCodes.InvalidNamespace, ErrorCodes.InvalidOptions]));
 }
 
-const kPreImagesCollectionDatabase = "config";
-const kPreImagesCollectionName = "system.preimages";
+export const kPreImagesCollectionDatabase = "config";
+export const kPreImagesCollectionName = "system.preimages";
 
 /**
  * Asserts that 'changeStreamPreAndPostImages' collection option is present and is enabled for
  * collection.
  */
-function assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(db, collName) {
+export function assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(db, collName) {
     const collectionInfos = db.getCollectionInfos({name: collName});
     assert(collectionInfos[0].options["changeStreamPreAndPostImages"]["enabled"] === true);
 }
@@ -549,17 +552,17 @@ function assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(db, collNam
 /**
  * Asserts that 'changeStreamPreAndPostImages' collection option is absent in the collection.
  */
-function assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(db, collName) {
+export function assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(db, collName) {
     const collectionInfos = db.getCollectionInfos({name: collName});
     assert(!collectionInfos[0].options.hasOwnProperty("changeStreamPreAndPostImages"));
 }
 
-function getPreImagesCollection(connection) {
+export function getPreImagesCollection(connection) {
     return connection.getDB(kPreImagesCollectionDatabase).getCollection(kPreImagesCollectionName);
 }
 
 // Returns the pre-images written while performing the write operations.
-function preImagesForOps(db, writeOps) {
+export function preImagesForOps(db, writeOps) {
     const preImagesColl = getPreImagesCollection(db.getMongo());
     const preImagesCollSortSpec = {"_id.ts": 1, "_id.applyOpsIndex": 1};
 
@@ -591,7 +594,7 @@ function preImagesForOps(db, writeOps) {
  * Returns documents from the pre-images collection from 'connection' ordered by _id.ts,
  * _id.applyOpsIndex ascending.
  */
-function getPreImages(connection) {
+export function getPreImages(connection) {
     return getPreImagesCollection(connection)
         .find()
         .sort({"_id.ts": 1, "_id.applyOpsIndex": 1})
@@ -599,7 +602,7 @@ function getPreImages(connection) {
         .toArray();
 }
 
-function findPreImagesCollectionDescriptions(db) {
+export function findPreImagesCollectionDescriptions(db) {
     return db.getSiblingDB(kPreImagesCollectionDatabase).runCommand("listCollections", {
         filter: {name: kPreImagesCollectionName}
     });
@@ -608,7 +611,7 @@ function findPreImagesCollectionDescriptions(db) {
 /**
  * Asserts that pre-images collection is absent in configDB.
  */
-function assertPreImagesCollectionIsAbsent(db) {
+export function assertPreImagesCollectionIsAbsent(db) {
     const result = findPreImagesCollectionDescriptions(db);
     assert.eq(result.cursor.firstBatch.length, 0);
 }
@@ -616,7 +619,7 @@ function assertPreImagesCollectionIsAbsent(db) {
 /**
  * Asserts that pre-images collection is created in the configDB and has clustered index on _id.
  */
-function assertPreImagesCollectionExists(db) {
+export function assertPreImagesCollectionExists(db) {
     const collectionInfos = findPreImagesCollectionDescriptions(db);
     assert.eq(collectionInfos.cursor.firstBatch.length, 1, collectionInfos);
     const preImagesCollectionDescription = collectionInfos.cursor.firstBatch[0];

@@ -2,9 +2,7 @@
  * Utility functions used to convert CRUD ops into a bulkWrite command.
  * Converts the bulkWrite responses into the original CRUD response.
  */
-const BulkWriteUtils = (function() {
-    "use strict";
-
+export const BulkWriteUtils = (function() {
     const commandsToBulkWriteOverride = new Set(["insert", "update", "delete"]);
 
     const commandsToAlwaysFlushBulkWrite = new Set([

@@ -9,11 +9,8 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/sharding/libs/create_sharded_collection_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 // Configure initial sharding cluster
 const st = new ShardingTest({});
@@ -88,4 +85,3 @@ function getNewDb() {
 })();
 
 st.stop();
-})();

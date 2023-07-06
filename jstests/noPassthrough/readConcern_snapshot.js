@@ -6,9 +6,6 @@
 //   requires_replication,
 //   uses_transactions,
 // ]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "coll";
 
@@ -38,7 +35,7 @@ if (!sessionDb.serverStatus().storageEngine.supportsSnapshotReadConcern) {
                                  [ErrorCodes.NoSuchTransaction, ErrorCodes.IllegalOperation]);
 
     rst.stopSet();
-    return;
+    quit();
 }
 session.endSession();
 rst.stopSet();
@@ -188,4 +185,3 @@ assert.commandFailedWithCode(
     ErrorCodes.InvalidOptions);
 
 rst.stopSet();
-}());

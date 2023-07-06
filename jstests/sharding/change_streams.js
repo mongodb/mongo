@@ -3,9 +3,12 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {
+    assertChangeStreamEventEq,
+    canonicalizeEventForTesting
+} from "jstests/libs/change_stream_util.js";
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
-load('jstests/aggregation/extras/utils.js');  // For assertErrorCode().
-load('jstests/libs/change_stream_util.js');   // For assertChangeStreamEventEq.
 
 function runTest(collName, shardKey) {
     const st = new ShardingTest({

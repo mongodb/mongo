@@ -8,8 +8,8 @@
  *   requires_replication,
  * ]
  */
-load("jstests/noPassthrough/libs/index_build.js");
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const dbName = "test";
 

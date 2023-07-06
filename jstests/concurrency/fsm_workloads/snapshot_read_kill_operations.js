@@ -5,7 +5,17 @@
  * @tags: [uses_transactions, state_functions_share_transaction]
  */
 
-load('jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js');
+import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {
+    abortTransaction,
+    cleanupOnLastIteration
+} from "jstests/concurrency/fsm_workload_helpers/cleanup_txns.js";
+import {
+    doSnapshotFind,
+    doSnapshotGetMore,
+    insertSessionDoc,
+    killSessionsFromDocs
+} from "jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js";
 
 export const $config = (function() {
     const data = {numIds: 100, batchSize: 50};

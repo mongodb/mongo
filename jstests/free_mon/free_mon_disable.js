@@ -1,9 +1,10 @@
 // Validate disable works
 //
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {
+    FreeMonGetServerStatus,
+    FreeMonGetStatus,
+    FreeMonWebServer
+} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer();
 
@@ -32,4 +33,3 @@ assert.eq(FreeMonGetServerStatus(conn).state, "disabled");
 MongoRunner.stopMongod(conn);
 
 mock_web.stop();
-})();

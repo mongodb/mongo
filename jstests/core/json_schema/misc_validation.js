@@ -22,15 +22,7 @@
  *   references_foreign_collection,
  * ]
  */
-(function() {
-"use strict";
-
-// For isWiredTiger.
-load("jstests/concurrency/fsm_workload_helpers/server_types.js");
-// For isReplSet
-load("jstests/libs/fixture_helpers.js");
-// For arrayEq.
-load("jstests/aggregation/extras/utils.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const testName = "json_schema_misc_validation";
 const testDB = db.getSiblingDB(testName);
@@ -299,4 +291,3 @@ assert.eq(1, coll.find({$jsonSchema: {required: ["a"]}, $text: {$search: "test"}
 assert.eq(
     3, coll.find({$or: [{$jsonSchema: {required: ["a"]}}, {$text: {$search: "TEST"}}]}).itcount());
 assert.eq(1, coll.find({$and: [{$jsonSchema: {}}, {$text: {$search: "TEST"}}]}).itcount());
-}());

@@ -4,9 +4,8 @@
  * @tags: [requires_fcv_63, serverless]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/libs/fail_point_util.js");
 
 function assertSplitConfigExists(donorPrimary, recipientSetName) {
     jsTestLog("Asserting a split config has been applied");
@@ -26,8 +25,6 @@ function assertSplitConfigDoesNotExist(donorPrimary) {
 }
 
 function splitConfigRemovedAfterDecision(simulateErrorToAbortOperation) {
-    "use strict";
-
     simulateErrorToAbortOperation = simulateErrorToAbortOperation || false;
 
     // Skip db hash check because secondary is left with a different config.

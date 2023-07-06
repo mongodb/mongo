@@ -1,8 +1,5 @@
 // Performs an aggregation that will execute JavaScript on mongos. This is a sanity check to confirm
 // that JavaScript is available on mongos.
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 2});
 const mongos = st.s;
 
@@ -50,4 +47,3 @@ assert.commandFailedWithCode(testDB.runCommand({aggregate: 'coll', pipeline: pip
                              31264);
 
 st.stop();
-}());

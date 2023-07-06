@@ -1,9 +1,7 @@
 // Test restricting role authorization via X509 extensions.
-load('jstests/ssl/libs/ssl_helpers.js');
+import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 requireSSLProvider('openssl', function() {
-    "use strict";
-
     const SERVER_CERT = 'jstests/libs/server.pem';
     const COMBINED_CA_CERT = 'jstests/ssl/x509/root-and-trusted-ca.pem';
     const CA_HASH = cat('jstests/libs/ca.pem.digest.sha256');

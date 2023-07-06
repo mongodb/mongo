@@ -7,7 +7,7 @@
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-load('jstests/noPassthrough/libs/index_build.js');
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 // This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
 TestData.skipEnforceFastCountOnValidate = true;

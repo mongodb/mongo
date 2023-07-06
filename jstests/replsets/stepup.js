@@ -1,11 +1,10 @@
 // Tests the replSetStepUp command.
 
-load("jstests/replsets/rslib.js");
-load('jstests/replsets/libs/election_metrics.js');
-load("jstests/libs/write_concern_util.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {
+    verifyServerStatusElectionReasonCounterChange
+} from "jstests/replsets/libs/election_metrics.js";
 
-(function() {
-"use strict";
 var name = "stepup";
 var rst = new ReplSetTest({name: name, nodes: 2});
 
@@ -74,4 +73,3 @@ verifyServerStatusElectionReasonCounterChange(
     initialSecondaryStatus.electionMetrics, newSecondaryStatus.electionMetrics, "freezeTimeout", 0);
 
 rst.stopSet();
-})();

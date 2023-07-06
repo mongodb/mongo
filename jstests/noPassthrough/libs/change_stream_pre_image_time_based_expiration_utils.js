@@ -1,9 +1,9 @@
 // Library functions for change_stream_pre_image_time_based_expiration tests.
 
-load("jstests/libs/fail_point_util.js");  // For configureFailPoint.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // Helper to verify if expected pre-images are present in pre-image collection.
-function verifyPreImages(preImageColl, expectedPreImages, collectionsInfo) {
+export function verifyPreImages(preImageColl, expectedPreImages, collectionsInfo) {
     const preImageDocs = preImageColl.find().sort({"preImage._id": 1}).toArray();
 
     assert.eq(preImageDocs.length, expectedPreImages.length, preImageDocs);
@@ -29,7 +29,7 @@ function verifyPreImages(preImageColl, expectedPreImages, collectionsInfo) {
 // replica set primary node.
 // When run on a sharded cluster, 'conn' represents the connection to the mongos while
 // 'primary' represents the connection to the shard primary node.
-function testTimeBasedPreImageRetentionPolicy(conn, primary) {
+export function testTimeBasedPreImageRetentionPolicy(conn, primary) {
     // Status for pre-images that define if pre-image is expected to expire or not.
     const shouldExpire = "shouldExpire";
     const shouldRetain = "shouldRetain";

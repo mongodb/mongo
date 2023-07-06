@@ -9,7 +9,8 @@
  * and then inserts 'modulus * countPerNum' documents. [250, 1000]
  * All threads insert into the same collection.
  */
-load("jstests/libs/fixture_helpers.js");  // For isMongos.
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
     var data = {

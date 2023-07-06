@@ -3,7 +3,6 @@
 // key.
 // @tags: [assumes_unsharded_collection, requires_multi_updates, requires_non_retryable_writes]
 
-(function() {
 var collectionName = "bulk_api_unordered";
 var coll = db.getCollection(collectionName);
 coll.drop();
@@ -159,4 +158,3 @@ assert.eq(1, error.getOperation().a);
 coll.dropIndexes();
 coll.remove({});
 coll.createIndex({a: 1}, {unique: true});
-}());

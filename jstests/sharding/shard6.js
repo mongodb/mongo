@@ -1,8 +1,7 @@
 // shard6.js
-(function() {
-"use strict";
-
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 var summary = "";
 
@@ -123,4 +122,3 @@ assert.throws(function() {
 });
 
 s.stop();
-})();

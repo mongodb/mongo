@@ -2,10 +2,6 @@
  * Tests that normal startup writes to the log files as expected.
  */
 
-(function() {
-
-'use strict';
-
 function makeRegExMatchFn(pattern) {
     return function(text) {
         return pattern.test(text);
@@ -34,4 +30,3 @@ validateWaitingMessage({
     },
     stop: MongoRunner.stopMongod
 });
-}());

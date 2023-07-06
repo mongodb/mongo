@@ -6,10 +6,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For isReplSet().
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 function retryableFindAndModify(database, collection, query, update, newImage, upsert, remove) {
     let cmd = {
@@ -83,4 +80,3 @@ function executeTest(db) {
     executeTest(conn.getDB("test"));
     MongoRunner.stopMongod(conn);
 }
-})();

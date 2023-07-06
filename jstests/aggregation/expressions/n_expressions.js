@@ -1,9 +1,6 @@
 /**
  * Tests the 'n' family of accumulators implemented as expressions.
  */
-(function() {
-'use strict';
-
 const coll = db[jsTestName()];
 const doc = {
     a: [1, 2, 3, 5, 7, 9],
@@ -56,4 +53,3 @@ testExpr({$minN: args}, [3, 4]);
 testExpr({$maxN: args}, [5, 4]);
 testExpr({$firstN: args}, [3, 4]);
 testExpr({$lastN: args}, [4, 5]);
-})();

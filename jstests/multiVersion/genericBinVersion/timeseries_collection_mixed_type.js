@@ -1,12 +1,4 @@
-/**
- * Test that variable-type fields are found correctly in upgraded timeseries collections with dirty
- * data.
- */
-
-(function() {
-"use strict";
-
-load('jstests/multiVersion/libs/multi_rs.js');
+import "jstests/multiVersion/libs/multi_rs.js";
 
 const timeFieldName = "time";
 
@@ -182,4 +174,3 @@ runTest([{a: {b: [3, 4]}}, {a: [{b: 1}, {b: 2}]}],
         [{a: {b: [3, 4]}}],
         "a",
         [{b: [3, 4]}, [{b: 1}, {b: 2}]]);
-})();

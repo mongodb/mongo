@@ -23,10 +23,6 @@ if (!Mongo.prototype.update)
         throw Error("update not implemented");
     };
 
-if (typeof mongoInject == "function") {
-    mongoInject(Mongo.prototype);
-}
-
 Mongo.prototype.setSlaveOk = function(value) {
     print(
         "WARNING: setSlaveOk() is deprecated and may be removed in the next major release. Please use setSecondaryOk() instead.");
@@ -188,7 +184,7 @@ Mongo.prototype.getLogComponents = function(driverSession = this._getDefaultSess
  */
 Mongo.prototype.setLogLevel = function(
     logLevel, component, driverSession = this._getDefaultSession()) {
-    componentNames = [];
+    let componentNames = [];
     if (typeof component === "string") {
         componentNames = component.split(".");
     } else if (component !== undefined) {
@@ -326,7 +322,7 @@ Mongo.prototype.getReadConcern = function() {
     return this._readConcernLevel;
 };
 
-connect = function(url, user, pass, apiParameters) {
+globalThis.connect = function(url, user, pass, apiParameters) {
     if (url instanceof MongoURI) {
         user = url.user;
         pass = url.password;
@@ -617,8 +613,7 @@ Mongo.prototype.watch = function(pipeline, options) {
     pipeline = pipeline || [];
     assert(pipeline instanceof Array, "'pipeline' argument must be an array");
 
-    let changeStreamStage;
-    [changeStreamStage, aggOptions] = this._extractChangeStreamOptions(options);
+    const [changeStreamStage, aggOptions] = this._extractChangeStreamOptions(options);
     changeStreamStage.$changeStream.allChangesForCluster = true;
     pipeline.unshift(changeStreamStage);
     return this.getDB("admin")._runAggregate({aggregate: 1, pipeline: pipeline}, aggOptions);

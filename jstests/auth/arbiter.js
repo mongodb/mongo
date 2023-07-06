@@ -2,8 +2,6 @@
 // any other nodes in the replset.
 // @tags: [requires_replication]
 
-(function() {
-
 const name = "arbiter_localhost_test";
 const key = "jstests/libs/key1";
 const replTest = new ReplSetTest({name: name, nodes: 2, keyFile: key});
@@ -72,4 +70,3 @@ for (var testCase of testCases) {
 }
 
 replTest.stopSet();
-})();

@@ -5,7 +5,7 @@
 //
 // @tags: [
 // ]
-load("jstests/replsets/rslib.js");
+import {syncFrom, waitForAllMembers} from "jstests/replsets/rslib.js";
 
 var replTest = new ReplSetTest({nodes: 3, useBridge: true});
 var nodes = replTest.startSet();

@@ -1,4 +1,4 @@
-load("jstests/replsets/rslib.js");
+import {waitForAllMembers} from "jstests/replsets/rslib.js";
 
 let doTest = function(signal) {
     // Test basic replica set functionality.

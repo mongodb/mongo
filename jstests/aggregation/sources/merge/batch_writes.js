@@ -7,12 +7,11 @@
  *   tsan_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode and
-                                                      // dropWithoutImplicitRecreate.
-load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
+import {
+    dropWithoutImplicitRecreate,
+    withEachMergeMode
+} from "jstests/aggregation/extras/merge_helpers.js";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.batch_writes;
 const outColl = db.batch_writes_out;
@@ -82,4 +81,3 @@ assertErrorCode(
 assert.soon(() => {
     return outColl.find().itcount() == 9;
 });
-}());

@@ -1,11 +1,9 @@
 /**
  * Tests to validate limits for $regexFind, $regexFindAll and $regexMatch aggregation expressions.
  */
-(function() {
-'use strict';
+import "jstests/libs/sbe_assert_error_override.js";
 
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode().
-load('jstests/libs/sbe_assert_error_override.js');  // Override error-code-checking APIs.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.regex_expr_limit;
 coll.drop();
@@ -92,5 +90,4 @@ function testRegexAggException(inputObj, exceptionCode, expression) {
     // Add one more and verify that regex expression throws an error.
     const patternTooLong = '(' + patternMaxDepth + ')';
     testRegexAggException({input: "$z", regex: patternTooLong}, 51111);
-})();
 })();

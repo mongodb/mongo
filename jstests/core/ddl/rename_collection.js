@@ -8,9 +8,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const collNamePrefix = "rename_coll_test_";
 let collCounter = 0;
 
@@ -107,4 +104,3 @@ jsTest.log("Rename collection with existing target");
 
     dst.drop();
 }
-})();

@@ -7,10 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest();
 reshardingTest.setup();
@@ -44,7 +41,7 @@ reshardingTest.withReshardingInBackground(
         newShardKeyPattern: {newKey: 1},
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
     },
-    (tempNs) => {
+    () => {
         awaitEstablishmentOfCloneTimestamp(whileReshardingCollection);
 
         const testDB = whileReshardingCollection.getDB();
@@ -76,8 +73,7 @@ reshardingTest.withReshardingInBackground({
     newShardKeyPattern: {newKey: 1},
     newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
 },
-                                          (tempNs) => {},
+                                          () => {},
                                           {expectedErrorCode: ErrorCodes.ShardKeyNotFound});
 
 reshardingTest.teardown();
-})();

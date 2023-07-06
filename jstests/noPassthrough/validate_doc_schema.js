@@ -1,9 +1,6 @@
 /**
  * Tests that the validate command reports documents not adhering to collection schema rules.
  */
-(function() {
-"use strict";
-
 // Disable the testing proctor. When the testing proctor is enabled, 'validate' will only warn about
 // non-compliant documents, even when the validation action is 'error'.
 TestData.testingDiagnosticsEnabled = false;
@@ -61,4 +58,3 @@ testSchemaValidation("warn");
 testSchemaValidation("error");
 
 MongoRunner.stopMongod(conn);
-}());

@@ -1,13 +1,9 @@
 // Test passing security token with op messages.
 // @tags: [requires_replication, requires_sharding]
 
-(function() {
-'use strict';
-
 const tenantID = ObjectId();
 const kLogLevelForToken = 5;
 const kAcceptedSecurityTokenID = 5838100;
-const kLogMessageID = 5060500;
 const kLogoutMessageID = 6161506;
 const kStaleAuthenticationMessageID = 6161507;
 const isSecurityTokenEnabled = TestData.setParameters.featureFlagSecurityToken;
@@ -162,4 +158,3 @@ function runTests(enabled) {
 
 runTests(true);
 runTests(false);
-})();

@@ -3,11 +3,6 @@
  * clusterTime.
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -115,4 +110,3 @@ testCommandGossipedWithClusterTime(function() {
 }, session2.getClusterTime());
 
 rst.stopSet();
-})();

@@ -5,9 +5,6 @@
  *  requires_fcv_71,
  * ]
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 
@@ -51,4 +48,3 @@ assert.throwsWithCode(function() {
 }, ErrorCodes.NoQueryExecutionPlans);
 
 MongoRunner.stopMongod(conn);
-})();

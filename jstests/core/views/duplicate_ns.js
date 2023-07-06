@@ -13,9 +13,6 @@
  *   tenant_migration_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
 const dbName = "views_duplicate_ns";
 const viewsDb = db.getSiblingDB(dbName);
 const collName = "myns";
@@ -46,4 +43,3 @@ assert.eq(2,
                   return coll.name === collName;
               })
               .length);
-}());

@@ -1,9 +1,6 @@
 /**
  * Test the behavior of $derivative.
  */
-(function() {
-"use strict";
-
 const coll = db.setWindowFields_derivative;
 
 // The default window is usually [unbounded, unbounded], but this would be surprising for
@@ -391,4 +388,3 @@ assert.docEq(
         {time: ISODate("2020-01-01T00:00:20.00Z"), y: 30, dy: (30 - 12) / (20 - 10)},
     ],
     result);
-})();

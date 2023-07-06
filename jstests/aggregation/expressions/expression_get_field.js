@@ -3,10 +3,7 @@
  * @tags: [
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.expression_get_field;
 coll.drop();
@@ -212,4 +209,3 @@ assertPipelineResultsEq([{
                             $bucket: {groupBy: {$getField: "x"}, boundaries: [0, 1, 2, 3, 4]}
                         }],  // We should get two buckets here for the two possible values of x.
                         [{_id: 0, count: 1}, {_id: 1, count: 1}]);
-})();

@@ -5,10 +5,7 @@
  * @tags: [config_shard_incompatible]
  */
 
-(function() {
-'use strict';
-
-load('jstests/replsets/rslib.js');
+import {reconfig} from "jstests/replsets/rslib.js";
 
 // Checking index consistency involves talking to the primary config server which is blackholed from
 // the mongos in this test.
@@ -94,4 +91,3 @@ configPrimary.discardMessagesFrom(st.s, 0.0);
 st.s.discardMessagesFrom(configPrimary, 0.0);
 
 st.stop();
-}());

@@ -1,10 +1,4 @@
-/**
- * Basic tests for the $top/$bottom/$topN/$bottomN accumulators.
- */
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -407,4 +401,3 @@ const testConstantOutputAndSort = (op) => {
 };
 testConstantOutputAndSort("$topN");
 testConstantOutputAndSort("$bottomN");
-})();

@@ -4,9 +4,6 @@
 // ]
 
 // Test that the $redact stage respects the collation.
-(function() {
-"use strict";
-
 var caseInsensitive = {collation: {locale: "en_US", strength: 2}};
 
 var coll = db.collation_redact;
@@ -38,4 +35,3 @@ assert.eq(1, coll.aggregate([{$redact: "$$KEEP"}, {$match: {a: "A"}}]).itcount()
 assert.throws(() => coll.aggregate([{$redact: "KEEP"}], caseInsensitive));
 assert.throws(() => coll.aggregate([{$redact: "PRUNE"}], caseInsensitive));
 assert.throws(() => coll.aggregate([{$redact: "REDACT"}], caseInsensitive));
-})();

@@ -37,7 +37,6 @@ function withMongod(extraMongodArgs, operation) {
  * cursors on the server.
  */
 function expectNumLiveCursors(mongod, expectedNumLiveCursors) {
-    var conn = new Mongo(mongod.host);
     var db = mongod.getDB('admin');
     db.auth('admin', 'admin');
     var actualNumLiveCursors = db.serverStatus().metrics.cursor.open.total;

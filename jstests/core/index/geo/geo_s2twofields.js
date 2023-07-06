@@ -6,7 +6,6 @@
 //   requires_fastcount,
 // ]
 
-(function() {
 var t = db.geo_s2twofields;
 t.drop();
 
@@ -86,4 +85,3 @@ var smallQuery = timeWithoutAndWithAnIndex({from: "2dsphere"}, {
 });
 print("Indexed time " + smallQuery[1] + " unindexed " + smallQuery[0]);
 // assert(smallQuery[0] > smallQuery[1]);
-}());

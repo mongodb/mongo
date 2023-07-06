@@ -3,8 +3,6 @@
  *
  * @tags: [requires_fcv_60]
  */
-(function() {
-"use strict";
 // The range deleter is disabled for this test, hence orphans are not cleared up
 TestData.skipCheckOrphans = true;
 
@@ -50,4 +48,3 @@ assert.soon(function() {
 assert.eq(nDocs, st.rs0.getPrimary().getCollection(collName).countDocuments({}));
 
 st.stop();
-})();

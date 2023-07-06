@@ -2,9 +2,7 @@
  * Utilities for testing clustered collections.
  */
 
-load("jstests/libs/collection_drop_recreate.js");
-
-var ClusteredCollectionUtil = class {
+export var ClusteredCollectionUtil = class {
     static areAllCollectionsClustered(conn) {
         const res =
             conn.adminCommand({getParameter: 1, "failpoint.clusterAllCollectionsByDefault": 1});

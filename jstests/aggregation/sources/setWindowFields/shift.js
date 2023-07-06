@@ -1,10 +1,7 @@
 /**
  * Test that $shift works as a window function.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // documentEq
+import {documentEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -334,4 +331,3 @@ assert.commandFailedWithCode(coll.runCommand({
     cursor: {}
 }),
                              ErrorCodes.FailedToParse);
-})();

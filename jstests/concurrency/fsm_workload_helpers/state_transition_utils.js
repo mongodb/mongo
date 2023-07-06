@@ -11,7 +11,7 @@
  * }
  */
 
-function uniformDistTransitions(states) {
+export function uniformDistTransitions(states) {
     let stateNames = Object.keys(states);
     let reachableStateNames = stateNames.filter(stateName => stateName != 'init');
     let prob = 1 / reachableStateNames.length;

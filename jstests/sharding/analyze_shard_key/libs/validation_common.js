@@ -1,10 +1,10 @@
-load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 /*
  * Utilities for testing validation within the analyzeShardKey command and configureQueryAnalyzer
  * command. Defines test cases for namespace, shard key and index validation.
  */
-function ValidationTest(conn) {
+export function ValidationTest(conn) {
     const dbName = "testDb-" + extractUUIDFromObject(UUID());
     const db = conn.getDB(dbName);
 

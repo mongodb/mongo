@@ -12,12 +12,12 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-
-load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // for isMongos
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/retryable_writes_util.js");
-load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 const aggregateInterruptErrors =
     [ErrorCodes.CursorNotFound, ErrorCodes.CursorKilled, ErrorCodes.QueryPlanKilled];

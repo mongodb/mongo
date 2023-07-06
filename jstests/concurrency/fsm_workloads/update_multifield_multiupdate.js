@@ -4,9 +4,10 @@
  * Does updates that affect multiple fields on multiple documents.
  * The collection has an index for each field, and a multikey index for all fields.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/update_multifield.js";
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // For isMongod
 
 export const $config = extendWorkload($baseConfig,
                                       function($config, $super) {

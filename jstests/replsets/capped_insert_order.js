@@ -1,9 +1,6 @@
 // Check that inserts to capped collections have the same order on primary and secondary.
 // See SERVER-21483.
 
-(function() {
-"use strict";
-
 var replTest = new ReplSetTest({name: 'capped_insert_order', nodes: 2});
 replTest.startSet();
 replTest.initiate();
@@ -46,4 +43,3 @@ checkCollection(primaryColl);
 checkCollection(secondaryColl);
 
 replTest.stopSet();
-})();

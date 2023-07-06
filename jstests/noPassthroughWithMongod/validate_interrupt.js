@@ -1,9 +1,3 @@
-// Tests that the validate command can be interrupted by enabling the maxTimeAlwaysTimeOut
-// failpoint. This should cause validate() to fail with an ExceededTimeLimit error.
-
-'use strict';
-
-(function() {
 var t = db.validate_interrupt;
 t.drop();
 
@@ -43,4 +37,3 @@ if (res.ok === 0) {
         assert(res.warnings[1].includes('EBUSY'), 'Expected an EBUSY warning:\n' + tojson(res));
     }
 }
-})();

@@ -1,7 +1,5 @@
 // Basic sanity check of log component helpers
 
-(function(db) {
-"use strict";
 var mongo = db.getMongo();
 
 // Get current log component settings. We will reset to these later.
@@ -41,4 +39,3 @@ assert.throws(function() {
 
 // Restore originalSettings
 assert.commandWorked(db.adminCommand({setParameter: 1, logComponentVerbosity: originalSettings}));
-}(db));

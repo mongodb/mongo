@@ -3,9 +3,6 @@
  * 'host' field that contains a connection string.
  */
 
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 3});
 
 rst.startSet();
@@ -44,4 +41,3 @@ config.members[2].host = memberTwoHostValue;
 config.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 rst.stopSet();
-})();

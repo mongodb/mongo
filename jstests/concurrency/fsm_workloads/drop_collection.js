@@ -3,6 +3,8 @@
  *
  * Repeatedly creates and drops a collection.
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the collection name,

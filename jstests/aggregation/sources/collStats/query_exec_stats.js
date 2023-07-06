@@ -3,11 +3,7 @@
 //   assumes_no_implicit_collection_creation_after_drop,
 //   does_not_support_repeated_reads,
 // ]
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
-load("jstests/libs/fixture_helpers.js");      // For "FixtureHelpers".
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const nDocs = 32;
 
@@ -72,4 +68,3 @@ assertErrorCode(coll, pipeline, ErrorCodes.NamespaceNotFound);
 // Test that we error when the database does not exist.
 assert.commandWorked(testDB.dropDatabase());
 assertErrorCode(coll, pipeline, ErrorCodes.NamespaceNotFound);
-}());

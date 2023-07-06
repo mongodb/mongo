@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 const collNamePrefix = 'insert1_';
 let collCount = 0;
 
@@ -84,4 +81,3 @@ assert.commandWorked(t.insert(toInsert));
 doc = t.findOne({_id: 1});
 assert.eq(5, doc.a);
 assert.eq(count, t.countDocuments({}), "bad count");
-})();

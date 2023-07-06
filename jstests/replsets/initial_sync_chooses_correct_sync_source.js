@@ -5,11 +5,8 @@
  * @tags: [
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/libs/sync_source.js");  // assertSyncSourceMatchesSoon
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {assertSyncSourceMatchesSoon} from "jstests/replsets/libs/sync_source.js";
 
 const waitForHeartbeats = initialSyncNode => {
     // Hang the node before it undergoes sync source selection.
@@ -184,4 +181,3 @@ assertSyncSourceMatchesSoon(initialSyncNode, primary.host);
 primary.delayMessagesFrom(initialSyncNode, 0);
 TestData.skipCollectionAndIndexValidation = false;
 rst.stopSet();
-})();

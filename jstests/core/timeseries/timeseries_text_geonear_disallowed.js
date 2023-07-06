@@ -8,9 +8,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const timeFieldName = "time";
 const metaFieldName = "tags";
 const testDB = db.getSiblingDB(jsTestName());
@@ -62,4 +59,3 @@ assert.commandFailedWithCode(tsColl.createIndex({"tags.descr": "text"}), ErrorCo
 // Since a Text index can't be created, a $text query should fail due to a missing index.
 assert.commandFailedWithCode(assert.throws(() => tsColl.find({$text: {$search: "1"}}).itcount()),
                                           ErrorCodes.IndexNotFound);
-})();

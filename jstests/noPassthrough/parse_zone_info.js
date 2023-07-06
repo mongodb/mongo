@@ -1,5 +1,4 @@
 // Tests the parsing of the timeZoneInfo parameter and file use.
-(function() {
 // Test that a bad file causes startup to fail.
 assert.throws(
     () => MongoRunner.runMongod({timeZoneInfo: "jstests/libs/config_files/bad_timezone_info"}),
@@ -90,4 +89,3 @@ function testWithGoodTimeZoneDir(tz_good_path) {
 // Test that startup can succeed with a good file.
 testWithGoodTimeZoneDir("jstests/libs/config_files/good_timezone_info_fat");
 testWithGoodTimeZoneDir("jstests/libs/config_files/good_timezone_info_slim");
-}());

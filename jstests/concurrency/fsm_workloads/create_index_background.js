@@ -11,7 +11,8 @@
  *   creates_background_indexes
  * ]
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
     var data = {

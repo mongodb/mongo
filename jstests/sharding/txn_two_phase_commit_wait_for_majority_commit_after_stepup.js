@@ -9,11 +9,8 @@
 // test causes failovers on a shard, so the cached connection is not usable.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/write_concern_util.js');  // for stopping/restarting replication
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {stopServerReplication, restartReplSetReplication} from "jstests/libs/write_concern_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -128,4 +125,3 @@ jsTest.log("Verify that the transaction was committed on all shards.");
 assert.eq(3, st.s.getDB(dbName).getCollection(collName).find().itcount());
 
 st.stop();
-})();

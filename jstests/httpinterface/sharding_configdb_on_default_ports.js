@@ -9,9 +9,6 @@
 // The test confirms this behavior for 1-node config servers, SCCC config servers and
 // CSRS config servers.
 
-(function() {
-"use strict";
-
 function getHostPart(hostAndPort) {
     return hostAndPort.substr(0, hostAndPort.lastIndexOf(':'));
 }
@@ -26,4 +23,3 @@ c2 = MongoRunner.runMongod({configsvr: "", storageEngine: "wiredTiger"});
 c3 = MongoRunner.runMongod({configsvr: "", storageEngine: "wiredTiger"});
 
 assert(MongoRunner.runMongos({configdb: "csrs/" + getHostPart(c1.host)}));
-}());

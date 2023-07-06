@@ -1,12 +1,9 @@
-"use strict";
-
 /**
  * This file contains helpers for testing sharding state with various operations in the system.
  */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
-var ShardingStateTest = (function() {
-    load("jstests/replsets/rslib.js");
-
+export var ShardingStateTest = (function() {
     /**
      * Adds a node to the given shard or config server replica set. Also waits for the node
      * to become a steady-state secondary.

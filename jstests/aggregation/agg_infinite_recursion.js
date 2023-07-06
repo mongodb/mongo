@@ -1,12 +1,10 @@
 // This test checks that an infinite recursion correctly produces an 'InternalError: too much
 // recursion' error and does not crash the server.
-(function() {
-"use strict";
-
 const makeBinData = () => BinData(4, "gf1UcxdHTJ2HQ/EGQrO7mQ==");
 const makeUUID = () => UUID("81fd5473-1747-4c9d-8743-f10642b3bb99");
 const makeHexData = () => new HexData(4, "81fd547317474c9d8743f10642b3bb99");
 
+/* eslint-disable */
 function whereFnTemplate() {
     let testRecursiveFn = (i) => {
         (__fn_placeholder__)();
@@ -14,6 +12,7 @@ function whereFnTemplate() {
     };
     testRecursiveFn(0);
 }
+/* eslint-enable */
 
 function recursiveFindWhere(db, collectionName, fn) {
     return db[collectionName].runCommand("find", {
@@ -67,4 +66,3 @@ assert.commandWorked(collection.insert({name: "Mo"}));
 
 runTests(db, collectionName, recursiveFindWhere);
 runTests(db, collectionName, recursiveAggregateFunction);
-})();

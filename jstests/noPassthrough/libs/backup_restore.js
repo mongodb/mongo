@@ -19,11 +19,14 @@
  *   }
  */
 
-load("jstests/libs/python.js");
+// We use the implicitly_retry_on_database_drop_pending.js override file to
+// handle the retry logic for DatabaseDropPending error responses.
+import "jstests/libs/override_methods/implicitly_retry_on_database_drop_pending.js";
 
-var BackupRestoreTest = function(options) {
-    "use strict";
+import {backupData} from "jstests/libs/backup_utils.js";
+import {getPython3Binary} from "jstests/libs/python.js";
 
+export const BackupRestoreTest = function(options) {
     if (!(this instanceof BackupRestoreTest)) {
         return new BackupRestoreTest(options);
     }
@@ -280,8 +283,6 @@ var BackupRestoreTest = function(options) {
             assert.gt(copiedFiles.length, 0, testName + ' no files copied');
             rst.start(secondary.nodeId, {}, true);
         } else if (options.backup == 'backupCursor') {
-            load("jstests/libs/backup_utils.js");
-
             backupData(secondary, hiddenDbpath);
             copiedFiles = ls(hiddenDbpath);
             jsTestLog("Copying End: " + tojson({
@@ -330,10 +331,6 @@ var BackupRestoreTest = function(options) {
             filter: {'name': {$nin: ['admin', 'config', 'local', '$external']}}
         });
         assert.commandWorked(result);
-
-        // We use the implicitly_retry_on_database_drop_pending.js override file to
-        // handle the retry logic for DatabaseDropPending error responses.
-        load("jstests/libs/override_methods/implicitly_retry_on_database_drop_pending.js");
 
         const databases = result.databases.map(dbs => dbs.name);
         databases.forEach(dbName => {

@@ -1,7 +1,5 @@
 // Validates the remove/drain shard functionality when there is data on the shard being removed
-(function() {
-'use strict';
-load('jstests/sharding/libs/remove_shard_util.js');
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -45,4 +43,3 @@ assert.eq(2, st.s0.getDB('TestDB').Coll.find({}).toArray().length);
 assert.eq(2, st.s1.getDB('TestDB').Coll.find({}).toArray().length);
 
 st.stop();
-})();

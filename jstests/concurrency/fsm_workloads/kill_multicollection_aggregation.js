@@ -10,6 +10,7 @@
  * The parent test, invalidated_cursors.js, uses $currentOp.
  * @tags: [uses_curop_agg_stage, state_functions_share_cursor]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/invalidated_cursors.js";
 

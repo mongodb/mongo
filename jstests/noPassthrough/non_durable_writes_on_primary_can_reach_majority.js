@@ -14,10 +14,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const checkTimestamps = (cmp, a, b) => {
     if (cmp === "gt") {
@@ -141,4 +138,3 @@ try {
 }
 
 rst.stopSet();
-})();

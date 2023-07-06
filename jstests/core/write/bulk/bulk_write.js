@@ -10,9 +10,6 @@
  *   featureFlagBulkWriteCommand,
  * ]
  */
-(function() {
-"use strict";
-
 var coll = db.getCollection("coll");
 var coll1 = db.getCollection("coll1");
 coll.drop();
@@ -89,4 +86,3 @@ assert.eq(res.numErrors, 0);
 assert.eq(1, coll.count({_id: 3}));
 
 coll.drop();
-})();

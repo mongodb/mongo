@@ -1,8 +1,6 @@
 /**
  * Test that verifies the TenantID prefix the namespace in slow query logs.
  */
-(function() {
-'use strict';
 
 const rst = new ReplSetTest({
     nodes: 1,
@@ -52,4 +50,3 @@ assert(predicate.test(log),
        "'Slow query' log line missing in mongod log file!\n" +
            "Log file contents: " + rst.getPrimary().fullOptions.logFile);
 rst.stopSet();
-})();

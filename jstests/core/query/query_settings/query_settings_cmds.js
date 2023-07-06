@@ -6,10 +6,8 @@
 //   does_not_support_stepdowns,
 // ]
 //
-(function() {
-'use strict';
 
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const adminDB = db.getSiblingDB("admin");
 const coll = db[jsTestName()];
@@ -167,4 +165,3 @@ if (FixtureHelpers.isMongos(db)) {
         clusterServerParameterRefreshIntervalSecs: initParameterRefreshInterval
     }));
 }
-})();

@@ -9,12 +9,12 @@
  *
  * @tags: [requires_fcv_70, requires_persistence, config_shard_incompatible]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 const numMostCommonValues = 5;
 const setParameterOpts = {
@@ -226,4 +226,3 @@ function runTest(conn, {rst, st}) {
     runTest(primary, {rst});
     rst.stopSet();
 }
-})();

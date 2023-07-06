@@ -8,14 +8,12 @@
  * exclude_from_large_txns,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/sharding/internal_txns/libs/retryable_internal_transaction_test.js");
+import {
+    RetryableInternalTransactionTest
+} from "jstests/sharding/internal_txns/libs/retryable_internal_transaction_test.js";
 
 const transactionTest =
     new RetryableInternalTransactionTest({changeStreamPreAndPostImages: {enabled: true}});
 transactionTest.runTestsForAllRetryableInternalTransactionTypes(
     transactionTest.runFindAndModifyTestsEnableImageCollection);
 transactionTest.stop();
-})();

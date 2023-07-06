@@ -7,10 +7,6 @@
  * a writeConcern too high for the from shard and sees that that fails. moveChunk does not yield
  * a writeConcernError. It should simply fail when the writeConcern is not met on the shards.
  */
-load('jstests/libs/write_concern_util.js');
-
-(function() {
-"use strict";
 var st = new ShardingTest({
     shards: {
         rs0: {nodes: 3, settings: {chainingAllowed: false}},
@@ -113,4 +109,3 @@ assert.commandFailed(res);
 assert(!res.writeConcernError, 'moveChunk had writeConcernError: ' + tojson(res));
 checkChunkCount(1, 1);
 st.stop();
-})();

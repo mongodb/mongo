@@ -6,8 +6,8 @@
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [resource_intensive]
  */
-load("jstests/replsets/rslib.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {traceMissingDoc} from "jstests/libs/trace_missing_docs.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 // Replica set nodes started with --shardsvr do not enable key generation until they are added
 // to a sharded cluster and reject commands with gossiped clusterTime from users without the
@@ -206,8 +206,6 @@ if (numDocs != num) {
     }
     assert.eq(numDocs, numDocsSeen, "More docs discovered on second find()");
     assert.eq(num - numDocs, missingDocNumbers.length);
-
-    load('jstests/libs/trace_missing_docs.js');
 
     for (var i = 0; i < missingDocNumbers.length; i++) {
         jsTest.log("Tracing doc: " + missingDocNumbers[i]);

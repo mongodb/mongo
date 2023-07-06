@@ -3,9 +3,6 @@
  *
  * @tags: [requires_replication, requires_capped]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -27,4 +24,3 @@ res = assert.commandWorked(db.runCommand({dbHash: 1, collections: ["noncapped"]}
 assert.eq([], res.capped);
 
 rst.stopSet();
-})();

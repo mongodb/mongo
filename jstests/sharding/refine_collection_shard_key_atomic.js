@@ -6,10 +6,8 @@
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-load('jstests/libs/fail_point_util.js');
-load("jstests/sharding/libs/find_chunks_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 1});
 const mongos = st.s0;
@@ -203,4 +201,3 @@ newTagsArr = mongos.getCollection(kConfigTags).find({ns: kNsName}).sort({min: 1}
 assert.eq([], newTagsArr);
 
 st.stop();
-})();

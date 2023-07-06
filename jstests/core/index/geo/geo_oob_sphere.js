@@ -3,9 +3,6 @@
  * @tags: [
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.geooobsphere;
 coll.drop();
 
@@ -41,4 +38,3 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
     }]
 }),
                              2);
-}());

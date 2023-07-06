@@ -1,11 +1,10 @@
-'use strict';
-
 /**
  * Helpers for dropping collections or databases created by a workload
  * during its execution.
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
-function dropCollections(db, pattern) {
+export function dropCollections(db, pattern) {
     assert(pattern instanceof RegExp, 'expected pattern to be a regular expression');
 
     db.getCollectionInfos()
@@ -17,7 +16,7 @@ function dropCollections(db, pattern) {
         });
 }
 
-function dropDatabases(db, pattern) {
+export function dropDatabases(db, pattern) {
     assert(pattern instanceof RegExp, 'expected pattern to be a regular expression');
 
     var res = db.adminCommand('listDatabases');
@@ -35,7 +34,7 @@ function dropDatabases(db, pattern) {
  * Helper for dropping roles or users that were created by a workload
  * during its execution.
  */
-function dropUtilRetry(elems, cb, message) {
+export function dropUtilRetry(elems, cb, message) {
     const kNumRetries = 5;
     const kRetryInterval = 5000;
 
@@ -45,7 +44,7 @@ function dropUtilRetry(elems, cb, message) {
     }, message, kNumRetries, kRetryInterval);
 }
 
-function dropRoles(db, pattern) {
+export function dropRoles(db, pattern) {
     assert(pattern instanceof RegExp, 'expected pattern to be a regular expression');
     const rolesToDrop = db.getRoles().map((ri) => ri.role).filter((r) => pattern.test(r));
 
@@ -55,7 +54,7 @@ function dropRoles(db, pattern) {
         "Failed dropping roles: " + tojson(rolesToDrop) + " from database " + db.getName());
 }
 
-function dropUsers(db, pattern) {
+export function dropUsers(db, pattern) {
     assert(pattern instanceof RegExp, 'expected pattern to be a regular expression');
     const usersToDrop = db.getUsers().map((ui) => ui.user).filter((u) => pattern.test(u));
 

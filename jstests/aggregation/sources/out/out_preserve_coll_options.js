@@ -2,10 +2,7 @@
 // @tags: [
 //   does_not_support_transactions,
 // ]
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
+import {dropWithoutImplicitRecreate} from "jstests/aggregation/extras/merge_helpers.js";
 
 // Setup and populate input collection.
 const inputName = "out_preserve_coll_options";
@@ -37,4 +34,3 @@ const targetOptionsResultsNew = new DBCommandCursor(db, targetOptionsResponseNew
 assert.eq(targetOptionsResultsNew.length, 1, targetOptionsResultsNew);
 assert.eq(
     {validationLevel: "moderate"}, targetOptionsResultsNew[0].options, targetOptionsResultsNew[0]);
-}());

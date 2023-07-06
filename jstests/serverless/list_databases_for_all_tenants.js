@@ -1,10 +1,7 @@
 /**
  * Tests for the listDatabasesForAllTenants command.
  */
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');  // For arrayEq()
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 // Given the output from the listDatabasesForAllTenants command, ensures that the total size
 // reported is the sum of the individual db sizes.
@@ -287,4 +284,3 @@ function runTestNoMultiTenancySupport() {
 
 runTestsWithMultiTenancySupport();
 runTestNoMultiTenancySupport();
-}());

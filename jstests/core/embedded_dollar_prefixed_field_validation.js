@@ -7,9 +7,6 @@
  *   requires_fcv_71,
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.field_name_validation;
 coll.drop();
 
@@ -58,4 +55,3 @@ assert.throwsWithCode(() => {
 assert.throwsWithCode(() => {
     coll.findAndModify({query: {_id: {a: {$b: 1}}}, update: {_id: {a: {$b: 1}}}, upsert: true});
 }, ErrorCodes.DollarPrefixedFieldName);
-})();

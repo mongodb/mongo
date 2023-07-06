@@ -2,10 +2,9 @@
  * Test that the explain command supports findAndModify when talking to a mongos
  * and the collection is sharded.
  */
-(function() {
-'use strict';
-
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 var collName = 'explain_find_and_modify';
 
@@ -119,4 +118,3 @@ assert.commandWorked(res);
 assertExplainResult(res, 'executionStats', 'executionStages', st.shard1.shardName, 'DELETE');
 
 st.stop();
-})();

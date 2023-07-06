@@ -6,10 +6,7 @@
  *   tsan_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const localColl = db.lookup_large_documents_local;
 const foreignCollName = 'lookup_large_documents_foreign';
@@ -39,4 +36,3 @@ for (let preventProjectPushdown of [false, true]) {
     assert(arrayEq(results, [{foo: 3}]),
            "Pipeline:\n" + tojson(pipeline) + "Actual results:\n" + tojson(results));
 }
-}());

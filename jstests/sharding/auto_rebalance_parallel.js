@@ -2,10 +2,7 @@
  * Tests that the cluster is balanced in parallel in one balancer round (standalone).
  */
 
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 4, other: {chunkSize: 1}});
 var config = st.s0.getDB('config');
@@ -75,4 +72,3 @@ assert.eq(2, countMoves('TestDB.TestColl2') - testColl2InitialMoves);
 assert.eq(0, config.changelog.find({what: 'moveChunk.error'}).itcount());
 
 st.stop();
-})();

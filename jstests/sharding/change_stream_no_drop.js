@@ -18,11 +18,9 @@ function emptyChangeStream(changeStream) {
     }
 }
 
-(function() {
-
 const dbName = 'db';
 
-load('jstests/libs/fail_point_util.js');  // For configureFailPoint
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // Enable explicitly the periodic no-op writer to allow the router to process change stream events
 // coming from all shards. This is enabled for production clusters by default.
@@ -56,4 +54,3 @@ jsTest.log(
 }
 
 st.stop();
-}());

@@ -6,10 +6,7 @@
  * In this file, we test calling "dropIndexes" with a complex index name whose index build is
  * in-progress.
  */
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/index_build.js");
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const mongodOptions = {};
 const conn = MongoRunner.runMongod(mongodOptions);
@@ -49,4 +46,3 @@ awaitDropIndex();
 assert.eq(1, testDB.getCollection(collName).getIndexes().length);
 
 MongoRunner.stopMongod(conn);
-}());

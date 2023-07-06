@@ -2,10 +2,7 @@
  * Test $match with $exists is supported and returns correct results.
  */
 
-load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
-
-(function() {
-"use strict";
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.cqf_match_with_exists;
 
@@ -77,4 +74,3 @@ runWithData(
     ],
     filters => [{filter: {'a': {$elemMatch: {$exists: true}}}, expected: [filters[0], filters[1]]},
                 {filter: {'a': {$elemMatch: {$exists: false}}}, expected: []}]);
-})();

@@ -8,11 +8,7 @@
  *   multiversion_incompatible,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/replsets/rslib.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 var rst = new ReplSetTest({
     name: TestData.testName,
@@ -97,4 +93,3 @@ createShell();
 
 rst.awaitReplication();
 rst.stopSet();
-}());

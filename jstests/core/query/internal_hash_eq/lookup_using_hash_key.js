@@ -10,7 +10,7 @@
  *   references_foreign_collection,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For 'resultsEq().'
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.lookup_using_hash_key;
 

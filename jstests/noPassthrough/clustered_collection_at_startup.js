@@ -5,9 +5,6 @@
  * @tags: [requires_persistence, requires_fcv_52, requires_replication]
  */
 
-(function() {
-"use strict";
-
 const testName = "clustered_collection_at_startup";
 const dbpath = MongoRunner.dataPath + testName;
 const coll = "clusteredCollection";
@@ -44,4 +41,3 @@ replSet.initiate();
 }
 
 replSet.stopSet();
-})();

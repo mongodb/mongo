@@ -124,7 +124,7 @@ function assertScanFilterEq({coll, pipeline, filter}) {
     const coll = db[collName];
 
     let bulk = coll.initializeUnorderedBulkOp();
-    for (var i = 0; i < 100; i++) {
+    for (let i = 0; i < 100; i++) {
         bulk.insert({t: new Date(), m: i});
     }
     assert.commandWorked(bulk.execute());

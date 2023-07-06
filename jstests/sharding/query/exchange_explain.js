@@ -3,10 +3,7 @@
  *
  * @tags: [requires_sharding]
  */
-load('jstests/aggregation/extras/utils.js');
-
-(function() {
-"use strict";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
@@ -171,4 +168,3 @@ assert.commandFailedWithCode(mongosDB.runCommand({
                              51028);
 
 st.stop();
-}());

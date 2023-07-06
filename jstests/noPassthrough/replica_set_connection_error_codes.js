@@ -5,9 +5,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 // Set the refresh period to 10 min to rule out races
 _setShellFailPoint({
     configureFailPoint: "modifyReplicaSetMonitorDefaultRefreshPeriod",
@@ -64,4 +61,3 @@ assert.soon(() => {
 awaitShell();
 
 rst.stopSet();
-})();

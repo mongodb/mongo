@@ -22,13 +22,12 @@
  *     tenant_migration_incompatible,
  * ]
  */
-load("jstests/libs/profiler.js");         // For getLatestProfileEntry.
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 import {
-    getAggPlanStages,
     getAggPlanStage,
+    getAggPlanStages,
     getPlanCacheKeyFromExplain
 } from "jstests/libs/analyze_plan.js";
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const fields = ["a", "b", "i"];
 

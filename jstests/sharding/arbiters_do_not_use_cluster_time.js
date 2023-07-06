@@ -5,8 +5,6 @@
  * @tags: [config_shard_incompatible]
  */
 
-(function() {
-"use strict";
 let st = new ShardingTest({
     shards: {
         rs0: {
@@ -42,4 +40,3 @@ for (let i = 0; i < secondaries.length; i++) {
 }
 assert.eq(foundArbiter, true);
 st.stop();
-})();

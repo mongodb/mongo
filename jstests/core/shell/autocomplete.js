@@ -6,15 +6,13 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 function testAutoComplete(prefix) {
     // This method updates a global object with an array of strings on success.
     shellAutocomplete(prefix);
     return __autocomplete__;
 }
 
+// eslint-disable-next-line
 db = db.getSiblingDB('test_autocomplete');
 
 // Create a collection.
@@ -22,6 +20,7 @@ db.auto_complete_coll.insert({});
 
 // Validate DB auto completion.
 const db_stuff = testAutoComplete('db.');
+print(db_stuff);
 
 // Verify we enumerate built-in methods.
 assert.contains('db.prototype', db_stuff);
@@ -59,4 +58,3 @@ assert.contains('ErrorCodes', empty_stuff);
 const error_codes_autocomplete = testAutoComplete('ErrorCodes.');
 
 assert.contains('ErrorCodes.BadValue', error_codes_autocomplete);
-})();

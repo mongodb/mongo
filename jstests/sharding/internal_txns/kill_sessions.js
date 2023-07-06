@@ -3,9 +3,6 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-'use strict';
-
 TestData.disableImplicitSessions = true;
 
 const st = new ShardingTest({
@@ -176,4 +173,3 @@ assert.commandWorked(shard0Primary.adminCommand({refreshLogicalSessionCacheNow: 
 })();
 
 st.stop();
-})();

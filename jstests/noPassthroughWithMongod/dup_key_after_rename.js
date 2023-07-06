@@ -1,6 +1,4 @@
 // SERVER-47647 Test that duplicate key error message has correct namespace after rename
-(function() {
-"use strict";
 const before = db.dup_key_before_rename;
 before.drop();
 
@@ -14,4 +12,3 @@ assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
 const err = res.getWriteError();
 assert.gt(
     err.errmsg.indexOf(after.getName()), 0, "error message does not contain new collection name");
-})();

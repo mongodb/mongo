@@ -7,9 +7,6 @@
  *   ]
  */
 
-(function() {
-"use strict";
-
 function listDatabases(options) {
     return assert
         .commandWorked(db.adminCommand(Object.assign({listDatabases: 1, nameOnly: true}, options)))
@@ -41,4 +38,3 @@ for (var i = 0; i < 3; i++) {
 
 assert.commandWorked(ddb.dropDatabase());
 assertDatabaseDoesNotExist(dbName);
-})();

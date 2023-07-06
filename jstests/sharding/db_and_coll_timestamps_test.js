@@ -11,11 +11,6 @@
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
-
 function checkTimestampConsistencyInPersistentMetadata(
     dbName, nss, dbTimestampInConfig, collTimestampInConfig) {
     // Checking consistency on local shard collection: config.cache.database
@@ -111,4 +106,3 @@ checkTimestampConsistencyInPersistentMetadata(
     kDbName, kNs, dbTimestampAfterRefine, collTimestampAfterRefine);
 
 st.stop();
-})();

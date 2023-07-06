@@ -3,10 +3,7 @@
  * both mongoD and mongoS.
  * @tags: [assumes_read_concern_unchanged, requires_auth, requires_replication]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // For isMongos.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Create a new sharded cluster for testing and enable auth.
 const key = "jstests/libs/key1";
@@ -159,4 +156,3 @@ jsTestLog("Running cursor tests on mongoS");
 runCursorTests(mongosConn);
 
 st.stop();
-})();

@@ -8,9 +8,6 @@
  *   incompatible_with_preimages_by_default,
  * ]
  */
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB(jsTestName());
 const tsColl = testDB.clustered_index_options;
 const tsCollName = tsColl.getName();
@@ -65,4 +62,3 @@ assert.commandFailedWithCode(testDB.createCollection('test', {expireAfterSeconds
                              ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(testDB.createCollection(bucketsCollName, {expireAfterSeconds: 10}),
                              ErrorCodes.InvalidOptions);
-})();

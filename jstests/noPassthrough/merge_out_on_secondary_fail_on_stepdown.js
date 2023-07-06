@@ -6,10 +6,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");  // For configureFailPoint(), wait(), and off().
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 let replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -91,4 +88,3 @@ const outStage = `{$out: "${outputCollName}"}`;
 runTest(outStage, outFailPoint);
 
 replTest.stopSet();
-})();

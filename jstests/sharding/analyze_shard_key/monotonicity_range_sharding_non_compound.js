@@ -4,10 +4,15 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/analyze_shard_key/libs/monotonicity_common.js");
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {
+    kOrderTypes,
+    testAnalyzeShardKeysShardedCollection,
+    testAnalyzeShardKeysUnshardedCollection,
+} from "jstests/sharding/analyze_shard_key/libs/monotonicity_common.js";
+import {numNodesPerRS} from "jstests/sharding/analyze_shard_key/libs/monotonicity_common.js";
 
 const testCases = [];
 
@@ -74,4 +79,3 @@ const numDocsRange = {
 
     rst.stopSet();
 }
-})();

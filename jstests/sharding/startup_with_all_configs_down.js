@@ -11,9 +11,6 @@
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-"use strict";
-
 var st = new ShardingTest({shards: 2});
 
 jsTestLog("Setting up initial data");
@@ -88,4 +85,3 @@ assert.eq(100, newMongosConn.getDB('test').foo.find().itcount());
 
 st.stop({parallelSupported: false});
 MongoRunner.stopMongos(newMongosInfo);
-}());

@@ -4,9 +4,6 @@
 //   assumes_read_concern_local,
 // ]
 
-(function() {
-
-"use strict";
 var t = db.jstests_server14747;
 
 t.drop();
@@ -16,4 +13,3 @@ t.insert({a: 1});
 for (var i = 0; i < 10; i++) {
     t.find({a: 1}).explain(true);
 }
-}());

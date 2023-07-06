@@ -1,9 +1,6 @@
 // Tests that manipulating the featureCompatibilityVersion document in admin.system.version changes
 // the value of the featureCompatibilityVersion server parameter.
 
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
 
@@ -96,4 +93,3 @@ assert.writeErrorWithCode(adminDB.system.version.update({_id: "featureCompatibil
 checkFCV(adminDB, latestFCV);
 
 MongoRunner.stopMongod(conn);
-}());

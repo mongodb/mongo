@@ -6,9 +6,6 @@
 // SERVER-12120 uniqueDocs is deprecated.
 // Server always returns results with implied uniqueDocs=true
 
-(function() {
-'use strict';
-
 const collNamePrefix = 'jstests_geo_uniqueDocs2_';
 let collCount = 0;
 let t = db.getCollection(collNamePrefix + collCount++);
@@ -115,4 +112,3 @@ arr.push([100, 100]);
 t.save({loc: arr});
 t.createIndex({loc: '2d'});
 assert.eq(1, t.count({loc: {$within: {$center: [[99, 99], 5]}}}));
-})();

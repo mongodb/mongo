@@ -1,9 +1,6 @@
 // Verifies that we've fixed SERVER-33158 by creating large user lsid refresh records (via large
 // usernames)
 
-(function() {
-'use strict';
-
 // This test makes assertions about the number of sessions, which are not compatible with
 // implicit sessions.
 TestData.disableImplicitSessions = true;
@@ -47,4 +44,3 @@ assert.eq(
     config.system.sessions.aggregate([{'$listSessions': {}}, {'$count': "count"}]).next().count);
 
 MongoRunner.stopMongod(mongod);
-})();

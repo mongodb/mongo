@@ -14,7 +14,7 @@
  * Check that it syncs.
  */
 
-load("jstests/replsets/rslib.js");
+import {reconnect} from "jstests/replsets/rslib.js";
 
 var name = "sync_passive";
 var host = getHostName();

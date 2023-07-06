@@ -7,9 +7,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const replSet = new ReplSetTest({name: "flow_control_logging", nodes: 3});
 replSet.startSet({
     setParameter: {
@@ -49,4 +46,3 @@ for (let sec of replSet.getSecondaries()) {
 }
 
 replSet.stopSet();
-})();

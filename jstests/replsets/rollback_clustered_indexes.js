@@ -4,9 +4,9 @@
  *   requires_replication,
  * ]
  */
+import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {checkRollbackFiles} from "jstests/replsets/libs/rollback_files.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
-load('jstests/replsets/libs/rollback_files.js');
-load("jstests/libs/uuid_util.js");
 
 // Operations that will be present on both nodes, before the common point.
 const dbName = 'test';

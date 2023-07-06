@@ -1,5 +1,3 @@
-load("jstests/replsets/rslib.js");
-
 // Tests that the replica set's term increases once per election, and persists across a restart of
 // the entire set.
 //
@@ -9,8 +7,7 @@ load("jstests/replsets/rslib.js");
 // so cannot elect a primary. This test induces such a scenario, so cannot be run on ephemeral
 // storage engines.
 // @tags: [requires_persistence]
-(function() {
-"use strict";
+import {getLatestOp} from "jstests/replsets/rslib.js";
 
 function getCurrentTerm(primary) {
     var res = primary.adminCommand({replSetGetStatus: 1});
@@ -58,4 +55,3 @@ assert.eq(primary.getDB("test").coll.find().itcount(), 1);
 assert.gte(getCurrentTerm(primary), firstSuccessfulTerm + 1);
 
 rst.stopSet();
-})();

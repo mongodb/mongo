@@ -8,6 +8,7 @@
  * Instead of inserting via coll.insert(), this workload inserts using an
  * upsert.
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_base.js";
 

@@ -4,10 +4,7 @@
  * @tags: [requires_fcv_60]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/write_concern_util.js");  // For 'shardCollectionWithChunks'
+import {shardCollectionWithChunks} from "jstests/libs/write_concern_util.js";
 
 const validateErrorResponse = function(
     res, db, collectionUUID, expectedCollection, actualCollection) {
@@ -92,4 +89,3 @@ testCommand("aggregate", {aggregate: "", pipeline: [{$collStats: {latencyStats: 
 testCommand("aggregate", {aggregate: "", pipeline: [{$indexStats: {}}], cursor: {}});
 
 st.stop();
-})();

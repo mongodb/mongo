@@ -1,12 +1,9 @@
 // Test that the dataSize command can be interrupted. Failpoint is defined for mongod only,
 // therefore this test is running only in unsharded setup.
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");         // For configureFailPoint.
-load("jstests/libs/wait_for_command.js");        // For waitForCommand.
-load("jstests/libs/parallel_shell_helpers.js");  // For funWithArgs.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
 const mongodOptions = {};
 const conn = MongoRunner.runMongod(mongodOptions);
@@ -55,4 +52,3 @@ awaitShell();
 
 assert.commandWorked(db.dropDatabase());
 MongoRunner.stopMongod(conn);
-})();

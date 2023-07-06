@@ -3,7 +3,7 @@
 // drawn from the following:
 // https://stackoverflow.com/questions/3561493/is-there-a-regexp-escape-function-in-javascript
 // https://github.com/ljharb/regexp.escape
-function* findMatchingLogLines(logLines, fields, ignoreFields) {
+export function* findMatchingLogLines(logLines, fields, ignoreFields) {
     ignoreFields = ignoreFields || [];
     function escapeRegex(input) {
         return (typeof input === "string" ? input.replace(/[\^\$\\\.\*\+\?\(\)\[\]\{\}]/g, '\\$&')
@@ -58,9 +58,10 @@ function* findMatchingLogLines(logLines, fields, ignoreFields) {
         }
     }
 }
+
 // Finds and returns a logline containing all the specified fields, or null if no such logline
 // was found.
-function findMatchingLogLine(logLines, fields, ignoreFields) {
+export function findMatchingLogLine(logLines, fields, ignoreFields) {
     for (const line of findMatchingLogLines(logLines, fields, ignoreFields)) {
         return line;
     }

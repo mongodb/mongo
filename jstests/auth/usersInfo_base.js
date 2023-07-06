@@ -1,7 +1,5 @@
-'use strict';
-
 // Test behavior and edge cases in usersInfo
-function runTest(conn) {
+export function runTest(conn) {
     let db = conn.getDB("test");
     let emptyDB = conn.getDB("test2");
     let otherDB = conn.getDB("other");

@@ -14,9 +14,6 @@
  *
  * @tags: [requires_persistence,requires_wiredtiger]
  */
-(function() {
-'use strict';
-
 // On the first iteration, start a mongod. Subsequent iterations will close and restart on the
 // same dbpath.
 let firstIteration = true;
@@ -49,4 +46,3 @@ for (let compressor of compressors) {
 }
 
 MongoRunner.stopMongod(mongo);
-}());

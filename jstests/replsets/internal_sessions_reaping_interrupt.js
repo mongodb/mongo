@@ -4,9 +4,6 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-"use strict";
-
 const logicalSessionRefreshMillis = 1000;
 const rst = new ReplSetTest({
     nodes: 2,
@@ -84,4 +81,3 @@ for (let isRetryableWriteSession of [true, false]) {
 }
 
 rst.stopSet();
-})();

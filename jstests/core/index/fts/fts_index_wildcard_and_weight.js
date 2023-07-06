@@ -1,7 +1,5 @@
 // Test that on a text index that matches all fields does not use a weight from a named field.
 // This test was designed to reproduce SERVER-45363.
-(function() {
-"use strict";
 var coll = db.getCollection(jsTestName());
 coll.drop();
 
@@ -39,4 +37,3 @@ assert.eq(results[0].name, "Kevin", results);
 assert.eq(results[1].name, "Whiskers", results);
 assert.gt(results[0].score, results[1].score, results);
 assert.eq(results[2].score, results[3].score, results);
-})();

@@ -1,9 +1,6 @@
 // Verify certificates and CAs between intra-cluster
 // and client->server communication using different CAs.
 
-(function() {
-"use strict";
-
 function testRS(opts, succeed) {
     const origSkipCheck = TestData.skipCheckDBHashes;
     const rsOpts = {
@@ -94,4 +91,3 @@ testConnect('jstests/libs/client.pem', true);
 testConnect('jstests/libs/trusted-client.pem', false);
 
 MongoRunner.stopMongod(mongod);
-}());

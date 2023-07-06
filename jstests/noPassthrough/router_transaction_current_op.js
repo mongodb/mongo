@@ -1,11 +1,8 @@
 // Verifies currentOp returns the expected fields for idle and active transactions in basic cases.
 // More cases are covered in unit tests.
 // @tags: [uses_transactions, uses_atclustertime]
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");   // For waitForCurOpByFailPoint().
-load("jstests/libs/parallelTester.js");  // for Thread.
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 function verifyCurrentOpFields(res, isActive) {
     // Verify top level fields relevant to transactions. Note this does not include every field, so
@@ -157,4 +154,3 @@ jsTest.log("Active transaction.");
 
 session.endSession();
 st.stop();
-}());

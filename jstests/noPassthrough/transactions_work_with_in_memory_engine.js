@@ -5,12 +5,9 @@
  * TODO: remove this test when general transaction testing is turned on with the inMemory storage
  * engine (SERVER-36023).
  */
-(function() {
-"use strict";
-
 if (jsTest.options().storageEngine !== "inMemory") {
     jsTestLog("Skipping test because storageEngine is not inMemory");
-    return;
+    quit();
 }
 
 const dbName = "test";
@@ -39,4 +36,3 @@ assert.commandWorked(session.commitTransaction_forTesting());
 
 session.endSession();
 replTest.stopSet();
-}());

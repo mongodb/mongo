@@ -6,9 +6,6 @@
  * @tags: [requires_persistence, requires_replication]
  */
 
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({
     nodes: 3,
     waitForKeys: false,
@@ -54,7 +51,7 @@ const rolloverConfig = function(newConfig) {
         rst.stop(nodeId);
         const configId = "n" + nodeId;
         rst.nodeOptions[configId] = Object.merge(rst.nodeOptions[configId], newConfig, true);
-        const newNode = rst.start(nodeId, {}, true, true);
+        rst.start(nodeId, {}, true, true);
         rst.awaitSecondaryNodes();
     };
 
@@ -114,4 +111,3 @@ rolloverConfig({
 });
 
 rst.stopSet();
-})();

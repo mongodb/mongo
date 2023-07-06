@@ -6,8 +6,6 @@
 /**
  * Test that findAndModify works against a non-existent collection.
  */
-(function() {
-'use strict';
 var coll = db.find_and_modify_server18054;
 coll.drop();
 
@@ -22,4 +20,3 @@ coll.drop();
 assert.eq(null, coll.findAndModify({remove: true, fields: {z: 1}}));
 assert.eq(null, coll.findAndModify({update: {$inc: {i: 1}}, fields: {z: 1}}));
 assert.eq(null, coll.findAndModify({update: {$inc: {i: 1}}, upsert: true, fields: {z: 1}}));
-})();

@@ -32,8 +32,8 @@ executor:
       # Use the overrides to implicitly shard all accessed collections, and to error if a test
       # starts its own test fixture - since such a test should not be part of this passthrough.
       eval: >-
-        load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
-        load("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
   hooks:
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground

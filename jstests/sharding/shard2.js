@@ -1,7 +1,4 @@
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 function placeCheck(num) {
     print("shard2 step: " + num);
@@ -60,7 +57,7 @@ assert.eq(1, primary.foo.find().length(), "primary should only have 1 after move
 assert.eq(2,
           findChunksUtil.countChunksForNs(s.config, "test.foo"),
           "still should have 2 shards after move not:" + s.getChunksString());
-var chunks = findChunksUtil.findChunksByNs(s.config, "test.foo").toArray();
+chunks = findChunksUtil.findChunksByNs(s.config, "test.foo").toArray();
 assert.neq(chunks[0].shard, chunks[1].shard, "servers should NOT be the same after the move");
 
 placeCheck(3);
@@ -224,4 +221,3 @@ assert.eq(3, findChunksUtil.countChunksForNs(s.config, "test.foo"), "only 3 chun
 print("YO : " + tojson(db.runCommand("serverStatus")));
 
 s.stop();
-})();

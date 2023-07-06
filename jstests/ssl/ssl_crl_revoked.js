@@ -2,7 +2,7 @@
 // Note: crl_client_revoked.pem is a CRL with the client.pem certificate listed as revoked.
 // This test should test that the user cannot connect with client.pem certificate.
 
-load('jstests/ssl/libs/ssl_helpers.js');
+import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 requireSSLProvider(['openssl', 'windows'], function() {
     var md = MongoRunner.runMongod({

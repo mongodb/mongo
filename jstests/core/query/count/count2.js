@@ -1,6 +1,4 @@
 // @tags: [requires_getmore, requires_fastcount]
-(function() {
-"use strict";
 const coll = db.count2;
 coll.drop();
 
@@ -29,4 +27,3 @@ assert.eq(5, coll.find({m: 5}).skip(45).limit(20).count(true));
 var negSkipResult = db.runCommand({count: coll.getName(), skip: -2});
 assert(!negSkipResult.ok, "negative skip value shouldn't work, n = " + negSkipResult.n);
 assert(negSkipResult.errmsg.length > 0, "no error msg for negative skip");
-}());

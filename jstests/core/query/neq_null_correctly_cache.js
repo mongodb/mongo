@@ -8,9 +8,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const coll = db.neq_null_correctly_cache;
 coll.drop();
 
@@ -40,4 +37,3 @@ function runTest(testQueryPred, cachedQueryPred) {
 runTest({$eq: null}, {$eq: true});
 runTest({$gte: null}, {$gte: true});
 runTest({$lte: null}, {$lte: true});
-}());

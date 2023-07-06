@@ -17,10 +17,6 @@
  * ]
  */
 
-load("jstests/noPassthrough/libs/backup_restore.js");
-
-(function() {
-"use strict";
+import {BackupRestoreTest} from "jstests/noPassthrough/libs/backup_restore.js";
 
 new BackupRestoreTest({backup: 'stopStart', clientTime: 30000}).run();
-}());

@@ -7,9 +7,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const replSet = new ReplSetTest({nodes: 1});
 
 replSet.startSet();
@@ -65,4 +62,3 @@ cursor = collection.aggregate([{$sort: {_id: 1}}]);
 assert.eq(cursor.getClusterTime(), undefined);
 
 replSet.stopSet();
-})();

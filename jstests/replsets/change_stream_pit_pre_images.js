@@ -11,12 +11,10 @@
  * requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");  // For PrepareHelpers.prepareTransaction.
-load("jstests/libs/change_stream_util.js");         // For getPreImages().
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/transactions_util.js");  // For TransactionsUtil.runInTransaction.
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {getPreImages, getPreImagesCollection} from "jstests/libs/change_stream_util.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 
 const testName = jsTestName();
 const replTest = new ReplSetTest({
@@ -263,4 +261,3 @@ for (const [collectionName, collectionOptions] of [
     })();
 }
 replTest.stopSet();
-})();

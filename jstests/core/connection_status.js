@@ -13,9 +13,6 @@
 // ]
 
 // Tests the connectionStatus command
-(function() {
-"use strict";
-
 const kAdminDbName = 'admin';
 const kTestDbName = 'connection_status';
 
@@ -23,7 +20,7 @@ const myDB = db.getSiblingDB(kTestDbName);
 
 myDB.dropAllUsers();
 db.logout();  // logout from the current db - anecodtally "test_autocomplete" - to avoid double
-              // authn errors
+// authn errors
 
 /**
  * Test that the output of connectionStatus makes sense.
@@ -102,4 +99,3 @@ function test(userName) {
 
 test("someone");
 test("someone else");
-})();

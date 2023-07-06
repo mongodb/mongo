@@ -5,9 +5,7 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const name = "prepared_transaction_commands_fail_on_secondaries";
 const rst = new ReplSetTest({
@@ -76,4 +74,3 @@ assert.docEq(doc, secondary.getDB(dbName)[collName].findOne());
 assert.eq(1, secondary.getDB(dbName)[collName].find().itcount());
 
 rst.stopSet();
-})();

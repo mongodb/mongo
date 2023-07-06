@@ -8,9 +8,7 @@
  * requires_fcv_63
  * ]
  */
-(function() {
-
-load("jstests/libs/log.js");  // For findMatchingLogLine.
+import {findMatchingLogLines} from "jstests/libs/log.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 st.stopBalancer();
@@ -86,4 +84,3 @@ coll.runCommand({listCollections: 1, comment: listCollectionsComment});
 }
 
 st.stop();
-})();

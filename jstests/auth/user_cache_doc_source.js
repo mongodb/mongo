@@ -1,8 +1,5 @@
 // Tests the user cache document source
 
-(function() {
-'use strict';
-
 var mongod = MongoRunner.runMongod({auth: ""});
 var db = mongod.getDB("admin");
 db.createUser({user: "root", pwd: "root", roles: ["userAdminAnyDatabase"]});
@@ -44,4 +41,3 @@ assert.soon(function() {
 
 MongoRunner.stopMongod(mongod);
 awaitShell({checkExitSuccess: false});
-})();

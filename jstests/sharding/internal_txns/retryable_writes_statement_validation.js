@@ -5,11 +5,13 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {
+    getOplogEntriesForTxn,
+    getTxnEntriesForSession,
+    makeCommitTransactionCmdObj,
+    makePrepareTransactionCmdObj,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const kDbName = "testDb";
 const kCollName = "testColl";
@@ -185,4 +187,3 @@ function makeInsertCmdObj(docs, lsid, txnNumber, stmtId, startTransaction) {
 }
 
 st.stop();
-})();

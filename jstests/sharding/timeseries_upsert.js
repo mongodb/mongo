@@ -17,7 +17,6 @@ import {
     testDB,
     timeFieldName
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
 
 setUpShardedCluster();
 

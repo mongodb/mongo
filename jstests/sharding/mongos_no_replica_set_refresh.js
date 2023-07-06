@@ -1,8 +1,5 @@
 // Tests that mongos and the shard discover changes to the shard's replica set membership.
-load("jstests/replsets/rslib.js");
-
-(function() {
-'use strict';
+import {reconfig} from "jstests/replsets/rslib.js";
 
 var five_minutes = 5 * 60 * 1000;
 
@@ -130,4 +127,3 @@ assert.soon(
     });
 
 st.stop({parallelSupported: false});
-}());

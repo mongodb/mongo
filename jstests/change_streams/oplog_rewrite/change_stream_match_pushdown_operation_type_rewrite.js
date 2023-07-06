@@ -23,9 +23,6 @@ const st = new ShardingTest({
     rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
 });
 
-const mongosConn = st.s;
-const db = mongosConn.getDB(dbName);
-
 // Create a sharded collection.
 const coll = createShardedCollection(st, "_id" /* shardKey */, dbName, collName, 2 /* splitAt */);
 

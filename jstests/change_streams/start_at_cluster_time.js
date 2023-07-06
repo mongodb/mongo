@@ -1,7 +1,5 @@
 // Tests resuming change streams based on cluster time.
-(function() {
-"use strict";
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 
@@ -76,4 +74,3 @@ assert.eq(next.documentKey._id, 1, tojson(next));
 
 // Verify that the change stream resumed from far into the future does not see any changes.
 assert(!changeStreamFuture.hasNext());
-})();

@@ -3,8 +3,7 @@
  * manner as a tradional collection.
  */
 import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
-
-load('jstests/third_party/fast_check/fc-3.1.0.js');  // For fast-check (fc).
+import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 // TODO SERVER-67506: Re-enable this test when a decision is made about how Bonsai will handle
 // comparison to null. Other semantic difference tickets are also relevant here.

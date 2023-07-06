@@ -8,9 +8,8 @@
  *   assumes_write_concern_unchanged,
  * ]
  */
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.isMongos().
+import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode().
 
 let sourceColl = db.explain_writing_aggs_source;
 let targetColl = db.explain_writing_aggs_target;

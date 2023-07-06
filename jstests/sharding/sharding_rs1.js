@@ -1,9 +1,6 @@
 /**
  * tests sharding with replica sets
  */
-(function() {
-'use strict';
-
 var s = new ShardingTest({shards: 3, other: {rs: true, chunkSize: 2, enableBalancer: true}});
 
 s.adminCommand({enablesharding: "test"});
@@ -57,4 +54,3 @@ assert.eq(num, db.foo.find().sort({x: 1}).itcount(), "C5");
 assert.eq(num, db.foo.find().sort({x: -1}).itcount(), "C6");
 
 s.stop();
-})();

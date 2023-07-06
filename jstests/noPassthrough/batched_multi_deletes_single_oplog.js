@@ -5,9 +5,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
 const dbName = jsTestName();
 const collName = "test";
 const collCount = 10;
@@ -43,4 +40,3 @@ ops = rst.findOplog(primary, {op: 'd', ns: coll.getFullName(), o: {_id: 0}}).toA
 assert.eq(1, ops.length, "Should have a delete oplog entry: " + tojson(ops));
 
 rst.stopSet();
-})();

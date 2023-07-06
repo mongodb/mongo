@@ -1,6 +1,4 @@
 var db;
-(function() {
-"use strict";
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
 db = conn.getDB("test");
@@ -34,4 +32,3 @@ join();
 assert.eq(N, t.find({x: 5}).count());
 
 MongoRunner.stopMongod(conn);
-})();

@@ -11,8 +11,8 @@
 
 // For arrayEq. We don't use array.eq as it does an ordered comparison on arrays but we don't
 // care about order in the distinct response.
-load("jstests/aggregation/extras/utils.js");
-import {getWinningPlan, getPlanStage} from "jstests/libs/analyze_plan.js";
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 // TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature here and below.

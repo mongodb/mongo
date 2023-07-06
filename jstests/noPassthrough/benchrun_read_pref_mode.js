@@ -4,9 +4,6 @@
  * @tags: [requires_replication]
  */
 
-(function() {
-"use strict";
-
 const rs = new ReplSetTest({nodes: 2});
 rs.startSet();
 rs.initiate();
@@ -96,4 +93,3 @@ invalidArgAndError.forEach(
     argAndError => assert.throwsWithCode(() => benchRun(argAndError.benchArg), argAndError.error));
 
 rs.stopSet();
-})();

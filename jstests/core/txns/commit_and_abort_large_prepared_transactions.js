@@ -6,9 +6,7 @@
  *   not_allowed_with_security_token,uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const dbName = "test";
 const collName = "large_prepared_transactions";
@@ -50,4 +48,3 @@ assert.commandWorked(sessionColl.insert(doc4));
 PrepareHelpers.prepareTransaction(session);
 assert.commandWorked(session.abortTransaction_forTesting());
 assert.sameMembers(sessionColl.find({_id: {$gt: 2}}).toArray(), []);
-}());

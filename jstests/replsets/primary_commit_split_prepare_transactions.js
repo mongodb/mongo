@@ -17,12 +17,9 @@
  *   uses_prepare_transaction,
  *]
  */
-(function() {
-"use strict";
-
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 // Verify that the documents updated in the transaction are found or not, depending on expectOld.
 const checkDocuments = function(docCount, testColl, expectOld, readConcern = null) {
@@ -167,9 +164,8 @@ jsTestLog("Committing transaction (with failpoint to pause split transaction com
 const failPointName = "hangInCommitSplitPreparedTxnOnPrimary";
 const failPoint = configureFailPoint(testDB, failPointName, {}, {skip: 2});
 
-const commitTxnFunc = function(dbName, prepareTimestamp, lsid, txnNumber) {
-    load("jstests/core/txns/libs/prepare_helpers.js");
-
+const commitTxnFunc = async function(dbName, prepareTimestamp, lsid, txnNumber) {
+    const {PrepareHelpers} = await import("jstests/core/txns/libs/prepare_helpers.js");
     const session = PrepareHelpers.createSessionWithGivenId(db.getMongo(), lsid);
     session.setTxnNumber_forTesting(txnNumber);
     const sessionDB = session.getDatabase(dbName);
@@ -277,4 +273,3 @@ checkTransaction(sessionDB, lsid, txnNumber, "committed");
 checkDocuments(docCount, testColl, false /* expectOld */);
 
 replTest.stopSet();
-}());

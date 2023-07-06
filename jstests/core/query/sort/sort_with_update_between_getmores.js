@@ -9,8 +9,6 @@
 
 // This test checks that a sort query with an update between getMores() doesn't produce out-of-order
 // results when the update touches a field on which the query is sorting.
-(function() {
-'use strict';
 const collName = jsTestName();
 const coll = db[collName];
 const kDocList =
@@ -46,4 +44,3 @@ for (const filter of kFilters) {
     assert(result.b === 2 || result.b === 1,
            "cursor returned: " + printjson(result) + " for filter: " + printjson(filter));
 }
-})();

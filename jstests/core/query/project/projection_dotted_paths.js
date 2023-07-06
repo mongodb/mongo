@@ -8,8 +8,8 @@
  * Test projections with dotted field paths. Also test that such projections result in covered plans
  * when appropriate.
  */
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {getWinningPlan, isIdhack, isIndexOnly, isIxscan} from "jstests/libs/analyze_plan.js";
-load("jstests/aggregation/extras/utils.js");  // arrayEq
 
 let coll = db["projection_dotted_paths"];
 coll.drop();

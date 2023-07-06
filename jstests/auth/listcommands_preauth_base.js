@@ -1,7 +1,5 @@
-'use strict';
-
 // Make sure that listCommands doesn't require authentication.
-function runTest(conn) {
+export function runTest(conn) {
     const admin = conn.getDB('admin');
 
     // Commands should succeed in auth-bypass mode regardless of requiresAuth().

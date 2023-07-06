@@ -1,9 +1,11 @@
-'use strict';
+import "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {
+    withTxnAndAutoRetry
+} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 
-load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
 Random.setRandomSeed();
 
-var {
+export var {
     withTxnAndAutoRetryOnMongos,
     retryOnceOnTransientOnMongos,
     retryOnceOnTransientAndRestartTxnOnMongos

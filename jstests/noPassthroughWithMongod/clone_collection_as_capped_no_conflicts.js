@@ -1,11 +1,8 @@
 /**
  * Tests that cloneCollectionAsCapped does not conflict with a database MODE_IX lock.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/wait_for_command.js");
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
 const baseName = "clone_collection_as_capped_no_conflicts";
 const fromCollName = baseName + "_from";
@@ -41,4 +38,3 @@ assert.eq(toColl.count(), 1);
 // Interrupt the sleep command.
 assert.commandWorked(testDB.getSiblingDB("admin").killOp(sleepID));
 sleepCommand();
-})();

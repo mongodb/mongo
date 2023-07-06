@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 const testFile = TestData.multiStmtTxnTestFile;
 
 try {
@@ -10,4 +7,3 @@ try {
     // Ensure this command runs even if the test errors.
     assert.commandWorked(db.runCommand({ping: 1}));
 }
-})();

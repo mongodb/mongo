@@ -1,7 +1,3 @@
-(function() {
-// Test applyOps behavior for view creation.
-"use strict";
-
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
 replTest.initiate();
@@ -18,4 +14,3 @@ assert.commandWorked(db.runCommand(cmd), tojson(cmd));
 assert.eq(db.foo.findOne({a: 1}).b, "hi");
 
 replTest.stopSet();
-}());

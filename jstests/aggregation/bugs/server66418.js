@@ -1,8 +1,5 @@
 // SERVER-66418
 // Bad projection created during dependency analysis due to string order assumption
-(function() {
-"use strict";
-
 const coll = db[jsTest.name()];
 coll.drop();
 
@@ -35,4 +32,3 @@ coll.aggregate([
         }
     }
 ]);
-})();

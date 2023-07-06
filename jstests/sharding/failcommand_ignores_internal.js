@@ -1,7 +1,4 @@
 // Tests that the "failCommand" failpoint ignores commands from internal clients: SERVER-34943.
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 1});
 const mongosDB = st.s0.getDB("test_failcommand_ignores_internal");
 
@@ -52,4 +49,3 @@ assert.commandFailedWithCode(
     st.shard0.getDB("test_failcommand_ignores_internal").runCommand(distinct), ErrorCodes.BadValue);
 
 st.stop();
-}());

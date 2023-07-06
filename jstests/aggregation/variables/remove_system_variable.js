@@ -1,9 +1,6 @@
 /**
  * Tests for the $$REMOVE system variable.
  */
-(function() {
-"use strict";
-
 let coll = db[jsTest.name()];
 coll.drop();
 
@@ -80,4 +77,3 @@ assert.eq(
                 }
             ])
             .toArray());
-}());

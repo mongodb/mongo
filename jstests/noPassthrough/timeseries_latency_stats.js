@@ -7,9 +7,6 @@
  *   requires_getmore,
  * ]
  */
-(function() {
-"use strict";
-
 const conn = MongoRunner.runMongod();
 
 const testDB = conn.getDB('test');
@@ -50,4 +47,3 @@ assert.eq(stats3.ops, 1 + reps, tojson(stats3));
 assert.gt(stats3.latency, stats2.latency, tojson(stats3));
 
 MongoRunner.stopMongod(conn);
-})();

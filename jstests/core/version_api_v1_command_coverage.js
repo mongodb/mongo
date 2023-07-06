@@ -10,9 +10,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 let counter = 0;
 const counter_fun = function() {
     return `APIV1-${counter}`;
@@ -82,4 +79,3 @@ for (let {cmd, apiVersion1} of commands) {
         }
     }
 }
-})();

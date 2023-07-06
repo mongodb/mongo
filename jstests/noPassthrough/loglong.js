@@ -1,9 +1,6 @@
 // test for SERVER-5013
 // make sure very long long lines get truncated
 
-(function() {
-"use strict";
-
 const options = {
     setParameter: "maxLogSizeKB=9"
 };
@@ -53,4 +50,3 @@ function assertLogTruncated(db, t) {
     assert(found, tojson(log));
 }
 MongoRunner.stopMongod(conn);
-})();

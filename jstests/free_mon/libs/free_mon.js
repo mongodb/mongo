@@ -3,21 +3,21 @@
  * Control the Free Monitoring Mock Webserver.
  */
 
-load("jstests/libs/python.js");
+import {getPython3Binary} from "jstests/libs/python.js";
 
 // These faults must match the list of faults in mock_http_server.py, see the
 // SUPPORTED_FAULT_TYPES list in mock_http_server.py
-const FAULT_FAIL_REGISTER = "fail_register";
-const FAULT_INVALID_REGISTER = "invalid_register";
-const FAULT_HALT_METRICS_5 = "halt_metrics_5";
-const FAULT_PERMANENTLY_DELETE_AFTER_3 = "permanently_delete_after_3";
-const FAULT_RESEND_REGISTRATION_AT_3 = "resend_registration_at_3";
-const FAULT_RESEND_REGISTRATION_ONCE = "resend_registration_once";
+export const FAULT_FAIL_REGISTER = "fail_register";
 
-const DISABLE_FAULTS = "disable_faults";
-const ENABLE_FAULTS = "enable_faults";
+export const FAULT_INVALID_REGISTER = "invalid_register";
+export const FAULT_HALT_METRICS_5 = "halt_metrics_5";
+export const FAULT_PERMANENTLY_DELETE_AFTER_3 = "permanently_delete_after_3";
+export const FAULT_RESEND_REGISTRATION_AT_3 = "resend_registration_at_3";
+export const FAULT_RESEND_REGISTRATION_ONCE = "resend_registration_once";
+export const DISABLE_FAULTS = "disable_faults";
+export const ENABLE_FAULTS = "enable_faults";
 
-class FreeMonWebServer {
+export class FreeMonWebServer {
     /**
      * Create a new webserver.
      *
@@ -220,9 +220,7 @@ class FreeMonWebServer {
  * @param {object} conn
  * @param {string} state
  */
-function WaitForDiskState(conn, state) {
-    'use strict';
-
+export function WaitForDiskState(conn, state) {
     const admin = conn.getDB("admin");
 
     // Wait for registration to occur
@@ -238,7 +236,7 @@ function WaitForDiskState(conn, state) {
  *
  * @param {object} conn
  */
-function WaitForRegistration(conn) {
+export function WaitForRegistration(conn) {
     WaitForDiskState(conn, 'enabled');
 }
 
@@ -247,7 +245,7 @@ function WaitForRegistration(conn) {
  *
  * @param {object} conn
  */
-function WaitForUnRegistration(conn) {
+export function WaitForUnRegistration(conn) {
     WaitForDiskState(conn, 'disabled');
 }
 
@@ -256,9 +254,7 @@ function WaitForUnRegistration(conn) {
  *
  * @param {object} registration document
  */
-function FreeMonGetRegistration(conn) {
-    'use strict';
-
+export function FreeMonGetRegistration(conn) {
     const admin = conn.getDB("admin");
     const docs = admin.system.version.find({_id: "free_monitoring"});
     const da = docs.toArray();
@@ -270,9 +266,7 @@ function FreeMonGetRegistration(conn) {
  *
  * @param {object} serverStatus.freeMonitoring section
  */
-function FreeMonGetServerStatus(conn) {
-    'use strict';
-
+export function FreeMonGetServerStatus(conn) {
     const admin = conn.getDB("admin");
     return assert.commandWorked(admin.runCommand({serverStatus: 1})).freeMonitoring;
 }
@@ -282,9 +276,7 @@ function FreeMonGetServerStatus(conn) {
  *
  * @param {object} getFreeMonitoringStatus document
  */
-function FreeMonGetStatus(conn) {
-    'use strict';
-
+export function FreeMonGetStatus(conn) {
     const admin = conn.getDB("admin");
     const reply = assert.commandWorked(admin.runCommand({getFreeMonitoringStatus: 1}));
     // FreeMonitoring has been deprecated and reports 'disabled' regardless of status.
@@ -300,9 +292,7 @@ function FreeMonGetStatus(conn) {
  * @param {object} conn
  * @param {string} state
  */
-function WaitForFreeMonServerStatusState(conn, state) {
-    'use strict';
-
+export function WaitForFreeMonServerStatusState(conn, state) {
     // Wait for registration to occur
     assert.soon(
         function() {
@@ -321,9 +311,7 @@ function WaitForFreeMonServerStatusState(conn, state) {
  *
  * @param {object} rst
  */
-function ValidateFreeMonReplicaSet(rst) {
-    'use strict';
-
+export function ValidateFreeMonReplicaSet(rst) {
     const primary_status = FreeMonGetStatus(rst.getPrimary());
     const primary_url = primary_status.url;
     const secondary_status = FreeMonGetStatus(rst.getSecondary());

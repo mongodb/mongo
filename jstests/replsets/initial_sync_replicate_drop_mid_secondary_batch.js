@@ -6,10 +6,7 @@
  * @tags: [requires_replication]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: 3});
 rst.startSet();
@@ -136,4 +133,3 @@ rst.waitForState(initSyncNode, ReplSetTest.State.SECONDARY);  // will time out o
 
 rst.awaitReplication();
 rst.stopSet();
-})();

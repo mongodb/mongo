@@ -1,8 +1,5 @@
 // Test the behavior of user-defined (Javascript) accumulators.
-(function() {
-"use strict";
-
-load('jstests/aggregation/extras/utils.js');
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 db.accumulator_js.drop();
 
@@ -341,4 +338,3 @@ expectedResults = [
     {_id: 1, value: {len: 3, types: ['object', 'object', 'object'], values: [null, null, null]}},
 ];
 assert(resultsEq(res.cursor.firstBatch, expectedResults), res.cursor);
-})();

@@ -4,9 +4,6 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-"use strict";
-
 const st = new ShardingTest({
     shards: 2,
     rs: {
@@ -85,4 +82,3 @@ for (let nextId of [1000, -1000]) {
 }
 
 st.stop();
-})();

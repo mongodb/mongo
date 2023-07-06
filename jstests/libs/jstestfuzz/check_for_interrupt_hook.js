@@ -1,11 +1,8 @@
 // Hook to disable the failpoint that creates random interrupts on a particular thread. We disable
 // the failpoint for the duration of the serverInfo section of the fuzzer's preamble.
+import {defineFuzzerHooks} from "jstests/libs/jstestfuzz/hook_utils.js";
 
 (function() {
-'use strict';
-
-load('jstests/libs/jstestfuzz/hook_utils.js');
-
 let threadName;
 
 const disableCheckForInterruptFailFP = function() {

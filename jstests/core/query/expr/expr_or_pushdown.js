@@ -2,9 +2,6 @@
  * Test that an $expr predicated which is eligible for being indexed with an $or pushdown executes
  * as expected.
  */
-(function() {
-"use strict";
-
 const coll = db.expr_or_pushdown;
 coll.drop();
 assert.commandWorked(coll.createIndex({"a": 1, "b": 1}));
@@ -22,4 +19,3 @@ const results = coll.find({
                     .toArray();
 
 assert.eq(results, [{_id: 0, a: "a", b: "b", d: "d"}, {_id: 1, a: "a", b: "c", d: "d"}]);
-}());

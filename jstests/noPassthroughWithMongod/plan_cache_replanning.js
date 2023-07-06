@@ -4,7 +4,7 @@
  * queries which are "ideal" for index A with queries that are "ideal" for index B.
  */
 import {getCachedPlan, getPlanCacheKeyFromShape, getPlanStage} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const isSbeEnabled = checkSBEEnabled(db);

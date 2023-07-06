@@ -2,9 +2,6 @@
  * Basic test around rename collection involving views
  */
 
-(function() {
-"use strict";
-
 const collNamePrefix = jsTestName() + "_collection";
 const viewNamePrefix = jsTestName() + "_view";
 let collCounter = 0;
@@ -83,4 +80,3 @@ jsTest.log("Rename coll to existing view should fail with NamespaceExists");
         ],
         "rename collection to existing view should fail with NamespaceExists even if dropTarget is true");
 }
-})();

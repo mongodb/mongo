@@ -6,7 +6,7 @@
  *   not_allowed_with_security_token,uses_transactions]
  *
  */
-var WriteConflictHelpers = (function() {
+export var WriteConflictHelpers = (function() {
     /**
      * Write conflict test cases.
      *

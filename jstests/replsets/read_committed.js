@@ -8,10 +8,7 @@
  * @tags: [requires_majority_read_concern]
  */
 
-load("jstests/libs/write_concern_util.js");
-
-(function() {
-"use strict";
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const majorityWriteConcern = {
     writeConcern: {w: "majority", wtimeout: 60 * 1000}
@@ -176,4 +173,3 @@ for (var testName in testCases) {
     }
 }
 replTest.stopSet();
-}());

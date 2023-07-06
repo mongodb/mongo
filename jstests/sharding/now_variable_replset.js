@@ -2,9 +2,6 @@
  * Tests for the $$NOW and $$CLUSTER_TIME system variable on a replica set.
  */
 
-(function() {
-"use strict";
-
 var replTest = new ReplSetTest({name: "now_and_cluster_time", nodes: 1});
 replTest.startSet();
 replTest.initiate();
@@ -129,4 +126,3 @@ assert.commandWorked(
 assert.commandWorked(coll.explain().aggregate([{$addFields: {timeField: "$$CLUSTER_TIME"}}]));
 
 replTest.stopSet();
-}());

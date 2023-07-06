@@ -16,11 +16,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/profiler.js");                  // For profilerHasSingleMatchingEntryOrThrow.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 // Should use a special db in this test so that it can be run in parallel tests.
 const testDb = db.getSiblingDB("profile_hide_index");
@@ -127,4 +124,3 @@ profilerHasSingleMatchingEntryOrThrow({
         "command.index.hidden": false,
     }
 });
-})();

@@ -11,11 +11,8 @@
  * ]
  */
 
-(function() {
-load("jstests/libs/profiler.js");         // For profilerHas*OrThrow helper functions.
-load('jstests/libs/geo_near_random.js');  // For GeoNearRandomTest.
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
+import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
+import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 
@@ -525,4 +522,3 @@ for (let metaDataTest of metaDataTests) {
 }
 
 st.stop();
-})();

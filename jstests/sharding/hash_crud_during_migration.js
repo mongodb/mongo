@@ -2,12 +2,9 @@
  * Test that crud and find operations target the right shards during migration.
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/chunk_manipulation_util.js');
-load("jstests/sharding/libs/chunk_bounds_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {runCommandDuringTransferMods} from "jstests/libs/chunk_manipulation_util.js";
+import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 let st = new ShardingTest({shards: 3});
 let dbName = "test";
@@ -122,4 +119,3 @@ assert.eq(1, shards[2].getCollection(ns).find({}).count());
 
 st.stop();
 MongoRunner.stopMongod(staticMongod);
-})();

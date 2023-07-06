@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * make_capped.js
  *
@@ -12,8 +10,15 @@
  * It also modifies any state named 'find' to run with a weaker assertion level:
  * only assertAlways assertions will run in that state.
  */
+import {
+    assertAlways,
+    AssertLevel,
+    assertWhenOwnColl,
+    getGlobalAssertLevel,
+    setGlobalAssertLevel
+} from "jstests/concurrency/fsm_libs/assert.js";
 
-function makeCapped($config, $super) {
+export function makeCapped($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         assertWhenOwnColl(function() {
             db[collName].drop();
@@ -28,11 +33,11 @@ function makeCapped($config, $super) {
 
     if ($super.states.find) {
         $config.states.find = function find(db, collName) {
-            var oldAssertLevel = globalAssertLevel;
+            var oldAssertLevel = getGlobalAssertLevel();
             try {
                 // Temporarily weaken the global assertion level to avoid spurious
                 // failures due to collection truncation
-                globalAssertLevel = AssertLevel.ALWAYS;
+                setGlobalAssertLevel(AssertLevel.ALWAYS);
                 $super.states.find.apply(this, arguments);
             } catch (e) {
                 if (e.message.indexOf('CappedPositionLost') >= 0) {
@@ -43,7 +48,7 @@ function makeCapped($config, $super) {
                 }
                 throw e;
             } finally {
-                globalAssertLevel = oldAssertLevel;
+                setGlobalAssertLevel(oldAssertLevel);
             }
         };
     }

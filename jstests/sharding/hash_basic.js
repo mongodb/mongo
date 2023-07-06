@@ -1,7 +1,4 @@
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var st = new ShardingTest({shards: 2, chunkSize: 1});
 
@@ -55,4 +52,3 @@ chunkList.forEach(function(chunkToMove) {
 });
 
 st.stop();
-})();

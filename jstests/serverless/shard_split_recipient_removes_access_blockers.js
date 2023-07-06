@@ -4,9 +4,8 @@
  * @tags: [requires_fcv_63, serverless]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/libs/fail_point_util.js");
 
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;

@@ -9,10 +9,7 @@
 //   requires_profiling,
 // ]
 
-(function() {
-'use strict';
-
-load("jstests/libs/profiler.js");  // For 'getLatestProfilerEntry()'.
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
@@ -68,4 +65,3 @@ function testPushedDownSBEPlanReplanning(match1, match2, pushedDownStage) {
     testPushedDownSBEPlanReplanning(
         {$match: {a: 5, b: 15}}, {$match: {a: 15, b: 10}}, {$group: {_id: "$a"}});
 })();
-}());

@@ -6,9 +6,6 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -105,4 +102,3 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 rst.stopSet();
-})();

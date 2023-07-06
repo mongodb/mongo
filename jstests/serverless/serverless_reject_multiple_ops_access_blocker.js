@@ -6,10 +6,9 @@
  * ]
  */
 
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {addRecipientNodes, commitSplitAsync} from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/libs/uuid_util.js");
 
 function cannotStartMigrationWhenThereIsAnExistingAccessBlocker(protocol) {
     // Test that we cannot start a tenant migration for a tenant that already has an access blocker.

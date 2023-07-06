@@ -8,7 +8,7 @@
  */
 
 import {getPlanStages} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/fixture_helpers.js");  // For numberOfShardsForCollection.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.regex_distinct;
 coll.drop();

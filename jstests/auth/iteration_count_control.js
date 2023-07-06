@@ -1,9 +1,6 @@
 // Test SCRAM iterationCount control.
 
-(function() {
-'use strict';
-
-load('jstests/multiVersion/libs/auth_helpers.js');
+import {getUserDoc} from "jstests/multiVersion/libs/auth_helpers.js";
 
 const conn = MongoRunner.runMongod({auth: ''});
 const adminDB = conn.getDB('admin');
@@ -40,4 +37,3 @@ assert.commandWorked(adminDB.runCommand({setParameter: 1, scramSHA256IterationCo
 assert.commandWorked(adminDB.runCommand({setParameter: 1, scramSHA256IterationCount: 1000000}));
 
 MongoRunner.stopMongod(conn);
-})();

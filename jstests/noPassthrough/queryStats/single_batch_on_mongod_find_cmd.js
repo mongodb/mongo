@@ -3,10 +3,7 @@
  * results fit into a single batch (and thus don't require a cursor), for find commands.
  * @tags: [featureFlagQueryStatsFindCommand]
  */
-load("jstests/libs/query_stats_utils.js");  // For verifyMetrics and getQueryStatsAggCmd.
-
-(function() {
-"use strict";
+import {getQueryStatsFindCmd, verifyMetrics} from "jstests/libs/query_stats_utils.js";
 
 // Turn on the collecting of queryStats metrics.
 let options = {
@@ -56,4 +53,3 @@ assert.eq(queryStatsEntry.metrics.firstResponseExecMicros, queryStatsEntry.metri
 verifyMetrics(queryStatsResults);
 
 MongoRunner.stopMongod(conn);
-}());

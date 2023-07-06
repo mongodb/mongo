@@ -1,8 +1,5 @@
 // Ensure that the api versions metric does not grow indefinitely and cause the server to crash.
 // Currently it is bounded by 'KMaxNumOfOutputAppNames = 1000' app names.
-(function() {
-"use strict";
-
 const KMaxNumOfOutputAppNames = 1000;
 const conn = MongoRunner.runMongod({verbose: 0});
 const uri = "mongodb://" + conn.host + "/test";
@@ -32,4 +29,3 @@ for (var i = 0; i < 2000; i++) {
 }
 
 MongoRunner.stopMongod(conn);
-})();

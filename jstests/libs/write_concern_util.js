@@ -2,10 +2,10 @@
  * Utilities for testing writeConcern.
  */
 
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // Shards a collection with 'numDocs' documents and creates 2 chunks, one on each of two shards.
-function shardCollectionWithChunks(st, coll, numDocs) {
+export function shardCollectionWithChunks(st, coll, numDocs) {
     var _db = coll.getDB();
     var numberDoc = numDocs || 20;
     coll.createIndex({x: 1}, {unique: true});
@@ -20,8 +20,7 @@ function shardCollectionWithChunks(st, coll, numDocs) {
 }
 
 // Stops replication on the given server(s).
-function stopServerReplication(conn, retryIntervalMS) {
-    retryIntervalMS = retryIntervalMS || 300;
+export function stopServerReplication(conn) {
     if (conn.length) {
         conn.forEach(function(n) {
             stopServerReplication(n);
@@ -40,7 +39,7 @@ function stopServerReplication(conn, retryIntervalMS) {
 
 // Stops replication at all replicaset secondaries. However, it might wait for replication before
 // stopping it.
-function stopReplicationOnSecondaries(rs, changeReplicaSetDefaultWCToLocal = true) {
+export function stopReplicationOnSecondaries(rs, changeReplicaSetDefaultWCToLocal = true) {
     if (changeReplicaSetDefaultWCToLocal == true) {
         // The default WC is majority and this test can't satisfy majority writes.
         assert.commandWorked(rs.getPrimary().adminCommand(
@@ -51,7 +50,7 @@ function stopReplicationOnSecondaries(rs, changeReplicaSetDefaultWCToLocal = tru
 }
 
 // Stops replication at all shard secondaries.
-function stopReplicationOnSecondariesOfAllShards(st) {
+export function stopReplicationOnSecondariesOfAllShards(st) {
     // The default WC is majority and this test can't satisfy majority writes.
     assert.commandWorked(st.s.adminCommand(
         {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
@@ -59,7 +58,7 @@ function stopReplicationOnSecondariesOfAllShards(st) {
 }
 
 // Restarts replication on the given server(s).
-function restartServerReplication(conn) {
+export function restartServerReplication(conn) {
     if (conn.length) {
         conn.forEach(function(n) {
             restartServerReplication(n);
@@ -74,30 +73,30 @@ function restartServerReplication(conn) {
 }
 
 // Restarts replication at all nodes in a replicaset.
-function restartReplSetReplication(rs) {
+export function restartReplSetReplication(rs) {
     restartServerReplication(rs.nodes);
 }
 
 // Restarts replication at all replicaset secondaries.
-function restartReplicationOnSecondaries(rs) {
+export function restartReplicationOnSecondaries(rs) {
     restartServerReplication(rs.getSecondaries());
 }
 
 // Restarts replication at all nodes in a sharded cluster.
-function restartReplicationOnAllShards(st) {
+export function restartReplicationOnAllShards(st) {
     st._rsObjects.forEach(restartReplSetReplication);
     restartReplSetReplication(st.configRS);
 }
 
 // Asserts that a writeConcernError was received.
-function assertWriteConcernError(res) {
+export function assertWriteConcernError(res) {
     assert(res.writeConcernError, "No writeConcernError received, got: " + tojson(res));
     assert(res.writeConcernError.code, "No writeConcernError code, got: " + tojson(res));
     assert(res.writeConcernError.errmsg, "No writeConcernError errmsg, got: " + tojson(res));
 }
 
 // Run the specified command, on the admin database if specified.
-function runCommandCheckAdmin(db, cmd) {
+export function runCommandCheckAdmin(db, cmd) {
     if (cmd.admin) {
         return db.adminCommand(cmd.req);
     } else {
@@ -106,7 +105,7 @@ function runCommandCheckAdmin(db, cmd) {
 }
 
 // Asserts that writeConcern timed out.
-function checkWriteConcernTimedOut(res) {
+export function checkWriteConcernTimedOut(res) {
     assertWriteConcernError(res);
     const errInfo = res.writeConcernError.errInfo;
     assert(errInfo, "No writeConcernError errInfo, got: " + tojson(res));
@@ -118,7 +117,7 @@ function checkWriteConcernTimedOut(res) {
  * 'setupFunc' that sets up the database state. 'setupFunc' accepts a connection to the
  * primary.
  */
-function runWriteConcernRetryabilityTest(priConn, secConn, cmd, kNodes, dbName, setupFunc) {
+export function runWriteConcernRetryabilityTest(priConn, secConn, cmd, kNodes, dbName, setupFunc) {
     dbName = dbName || "test";
     jsTestLog(`Testing ${tojson(cmd)} on ${dbName}.`);
 

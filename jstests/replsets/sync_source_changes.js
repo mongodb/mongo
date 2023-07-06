@@ -4,11 +4,9 @@
  * (eventually).
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");             // reconfig
-load("jstests/replsets/libs/sync_source.js");  // assertSyncSourceMatchesSoon
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {assertSyncSourceMatchesSoon} from "jstests/replsets/libs/sync_source.js";
+import {reconfig} from "jstests/replsets/rslib.js";
 
 // We need to wait for a heartbeat from the secondary to the sync source, then run sync
 // source selection, because:
@@ -84,4 +82,3 @@ jsTestLog("Reconfig complete");
 assertSyncSourceChangesTo(rst, newNode, rst.nodes[1]);
 
 rst.stopSet();
-})();

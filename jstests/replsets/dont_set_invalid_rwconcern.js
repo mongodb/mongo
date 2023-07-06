@@ -3,8 +3,6 @@
  * with a writeConcern set will succeed and fail on the same values of writeConcern.
  */
 
-(function() {
-"use strict";
 // Define repl set with custom write concern multiRegion which assures that writes are propagated to
 // two different regions (specified in node tags).
 const rst = new ReplSetTest({
@@ -56,4 +54,3 @@ assert.commandFailedWithCode(coll.insert({a: 1}, {writeConcern: {w: "bajority"}}
 assert.commandWorked(coll.insert({a: 1}, {writeConcern: {w: "multiRegion"}}));
 
 rst.stopSet();
-})();

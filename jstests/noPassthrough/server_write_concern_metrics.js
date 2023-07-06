@@ -3,9 +3,6 @@
 //   requires_persistence,
 //   requires_replication,
 // ]
-(function() {
-"use strict";
-
 // Verifies that the server status response has the fields that we expect.
 function verifyServerStatusFields(serverStatusResponse) {
     assert(serverStatusResponse.hasOwnProperty("opWriteConcernCounters"),
@@ -304,4 +301,3 @@ for (const isPSASet of [true, false]) {
                             isPSASet,
                             {insert: collName, documents: [{_id: 0}]});
 }
-}());

@@ -10,10 +10,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/noPassthrough/libs/index_build.js');
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({
     // We want at least two electable nodes.
@@ -101,4 +98,3 @@ IndexBuildTest.waitForIndexBuildToStop(newPrimaryDB);
 IndexBuildTest.assertIndexes(newPrimaryColl, 2, ['_id_', 'a_1_b_1']);
 
 rst.stopSet();
-})();

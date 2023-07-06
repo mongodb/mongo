@@ -5,7 +5,7 @@
  * NOTE: This tracker is only accurate if the encrypted fields being tracked all have
  * a contention factor of 0.  Also, the type of the encrypted value has to be a string.
  */
-class QEStateCollectionStatsTracker {
+export class QEStateCollectionStatsTracker {
     constructor() {
         /* fieldStats is a map of field names to a map of values mapped to objects
            containing stats counters. For example:

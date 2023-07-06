@@ -30,13 +30,10 @@
  *   requires_replication
  * ]
  */
-(function() {
-"use strict";
-
 TestData.skipEnforceFastCountOnValidate = true;
 
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/aggregation/extras/utils.js");  // For arrayEq
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 function incTs(ts) {
     return Timestamp(ts.t, ts.i + 1);
@@ -130,4 +127,3 @@ assert(arrayEq(docs,
        tojson(docs));
 
 replTest.stopSet();
-})();

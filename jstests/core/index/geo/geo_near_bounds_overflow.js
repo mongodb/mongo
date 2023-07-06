@@ -1,8 +1,5 @@
 // Tests behavior with invalid 2d bounds.
-(function() {
-"use strict";
-
-load('jstests/libs/geo_near_random.js');
+import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
 
 const test = new GeoNearRandomTest('geo_near_bounds_overflow');
 
@@ -46,4 +43,3 @@ testBounds({min: 1, max: -1});
 
 // Test min and max very close together.
 testBounds({min: 0, max: 5.56268e-309});
-}());

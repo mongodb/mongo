@@ -4,10 +4,7 @@
  * @tags: [requires_persistence, requires_wiredtiger]
  */
 
-(function() {
-'use strict';
-
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");
+import {testNumericServerParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 // Valid parameter values are in the range [0.1, infinity) or 0 (unbounded).
 testNumericServerParameter("wiredTigerMaxCacheOverflowSizeGB",
@@ -19,4 +16,3 @@ testNumericServerParameter("wiredTigerMaxCacheOverflowSizeGB",
                            "unused" /*lowerOutOfBounds*/,
                            false /*hasUpperBound*/,
                            "unused" /*upperOutOfBounds*/);
-})();

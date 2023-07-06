@@ -1,18 +1,16 @@
 // Test setParameter sslCipherSuitesConfig for TLS 1.3
 // sslCipherSuitesConfig allows the user to set the list of cipher suites for just TLS 1.3
 
-(function() {
-"use strict";
-load("jstests/ssl/libs/ssl_helpers.js");
+import {detectDefaultTLSProtocol, determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Short circuits for system configurations that do not support this setParameter, (i.e. OpenSSL
 // that don't support TLS 1.3)
 if (determineSSLProvider() !== "openssl") {
     jsTestLog("SSL provider is not OpenSSL; skipping test.");
-    return;
+    quit();
 } else if (detectDefaultTLSProtocol() !== "TLS1_3") {
     jsTestLog("Platform does not support TLS 1.3; skipping test.");
-    return;
+    quit();
 }
 
 const baseParams = {
@@ -55,4 +53,3 @@ sleep(30000);
 assert.eq(
     false, testConn(), "Client successfully connected to server with invalid ciphersuite config.");
 MongoRunner.stopMongod(mongod);
-})();

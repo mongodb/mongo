@@ -3,12 +3,9 @@
  *
  * @tags: [requires_fcv_70, featureFlagColumnstoreIndexes]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
-load("jstests/sharding/analyze_shard_key/libs/validation_common.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {ValidationTest} from "jstests/sharding/analyze_shard_key/libs/validation_common.js";
 
 const analyzeShardKeyNumRanges = 10;
 
@@ -154,4 +151,3 @@ const setParameterOpts = {analyzeShardKeyNumRanges};
 
     rst.stopSet();
 }
-})();

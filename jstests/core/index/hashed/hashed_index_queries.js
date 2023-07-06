@@ -5,7 +5,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For arrayEq().
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
 
 const collNamePrefix = 'hashed_index_queries_';

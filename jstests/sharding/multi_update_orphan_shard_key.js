@@ -6,10 +6,7 @@
  *    requires_fcv_52
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 1}});
 const dbName = "test";
@@ -59,4 +56,3 @@ assert.soon(() => {
 assert.doesNotThrow(() => collection.aggregate([{$out: "output"}]));
 
 st.stop();
-})();

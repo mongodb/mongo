@@ -12,7 +12,6 @@ var mongosA = s.s0;
 var mongosB = s.s1;
 
 let ns = "test.coll";
-let ns2 = "test.coll2";
 
 let adminSA = mongosA.getDB("admin");
 adminSA.runCommand({enableSharding: "test"});

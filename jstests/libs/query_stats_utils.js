@@ -1,11 +1,11 @@
-const kShellApplicationName = "MongoDB Shell";
-const kDefaultQueryStatsHmacKey = BinData(8, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=");
+export const kShellApplicationName = "MongoDB Shell";
+export const kDefaultQueryStatsHmacKey = BinData(8, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=");
 
 /**
  * Utility for checking that the aggregated queryStats metrics are logical (follows sum >= max >=
  * min, and sum = max = min if only one execution).
  */
-function verifyMetrics(batch) {
+export function verifyMetrics(batch) {
     batch.forEach(element => {
         if (element.metrics.execCount === 1) {
             for (const [metricName, summaryValues] of Object.entries(element.metrics)) {
@@ -48,7 +48,7 @@ function verifyMetrics(batch) {
  *  match - extraMatch - optional argument that can be used to filter the pipeline
  * }
  */
-function getQueryStats(conn, options = {
+export function getQueryStats(conn, options = {
     collName: ""
 }) {
     let match = {"key.client.application.name": kShellApplicationName, ...options.extraMatch};
@@ -77,7 +77,7 @@ function getQueryStats(conn, options = {
  *  {boolean} transformIdentifiers - whether to include transform identifiers
  * }
  */
-function getQueryStatsFindCmd(conn, options = {
+export function getQueryStatsFindCmd(conn, options = {
     collName: "",
     transformIdentifiers: false,
     hmacKey: kDefaultQueryStatsHmacKey
@@ -129,7 +129,7 @@ function getQueryStatsFindCmd(conn, options = {
  *  {boolean} transformIdentifiers - whether to include transform identifiers
  * }
  */
-function getQueryStatsAggCmd(conn, options = {
+export function getQueryStatsAggCmd(conn, options = {
     transformIdentifiers: false,
     hmacKey: kDefaultQueryStatsHmacKey
 }) {
@@ -177,7 +177,7 @@ function getQueryStatsAggCmd(conn, options = {
     return result.cursor.firstBatch;
 }
 
-function confirmAllExpectedFieldsPresent(expectedKey, resultingKey) {
+export function confirmAllExpectedFieldsPresent(expectedKey, resultingKey) {
     let fieldsCounter = 0;
     for (const field in resultingKey) {
         fieldsCounter++;
@@ -199,14 +199,14 @@ function confirmAllExpectedFieldsPresent(expectedKey, resultingKey) {
     assert.eq(fieldsCounter, Object.keys(expectedKey).length, resultingKey);
 }
 
-function assertExpectedResults(results,
-                               expectedQueryStatsKey,
-                               expectedExecCount,
-                               expectedDocsReturnedSum,
-                               expectedDocsReturnedMax,
-                               expectedDocsReturnedMin,
-                               expectedDocsReturnedSumOfSq,
-                               getMores) {
+export function assertExpectedResults(results,
+                                      expectedQueryStatsKey,
+                                      expectedExecCount,
+                                      expectedDocsReturnedSum,
+                                      expectedDocsReturnedMax,
+                                      expectedDocsReturnedMin,
+                                      expectedDocsReturnedSumOfSq,
+                                      getMores) {
     const {key, metrics} = results;
     confirmAllExpectedFieldsPresent(expectedQueryStatsKey, key);
     assert.eq(expectedExecCount, metrics.execCount);
@@ -254,10 +254,10 @@ function assertExpectedResults(results,
     }
 }
 
-function asFieldPath(str) {
+export function asFieldPath(str) {
     return "$" + str;
 }
 
-function asVarRef(str) {
+export function asVarRef(str) {
     return "$$" + str;
 }

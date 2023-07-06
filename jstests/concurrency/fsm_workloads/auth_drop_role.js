@@ -5,10 +5,10 @@
  * drops it from the database.
  * @tags: [incompatible_with_concurrency_simultaneous]
  */
-load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropRoles
-
 // UMC commands are not supported in transactions.
 TestData.runInsideTransaction = false;
+
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     const kMaxCmdTimeMs = 60000;

@@ -2,11 +2,7 @@
  * $replaceRoot can be used to extract parts of a document; here we test a simple address case.
  */
 
-(function() {
-"use strict";
-
-// For arrayEq.
-load("jstests/aggregation/extras/utils.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 Random.setRandomSeed();
 
@@ -44,7 +40,6 @@ function generateRandomDocument() {
     };
 }
 
-const dbName = "test";
 const collName = jsTest.name();
 const coll = db.getCollection(collName);
 coll.drop();
@@ -82,4 +77,3 @@ let replaceWithResult = coll.aggregate([
 // Then assert they are the same.
 assert(arrayEq(replaceWithResult, correctAddresses),
        "$replaceRoot does not work the same as $project-ing the relevant fields to the top level");
-}());

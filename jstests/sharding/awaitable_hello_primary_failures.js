@@ -14,11 +14,8 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 let st = new ShardingTest({shards: {rs0: {nodes: 1}}});
 let mongos = st.s;
@@ -81,4 +78,3 @@ if (TestData.configShard) {
 }
 
 st.stop();
-}());

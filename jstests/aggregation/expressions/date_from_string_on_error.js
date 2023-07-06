@@ -1,11 +1,9 @@
 /**
  * Tests for the $dateFromString expression with the optional 'onError' parameter.
  */
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-load("jstests/aggregation/extras/utils.js");        // For assertErrMsgContains.
-load("jstests/libs/sbe_assert_error_override.js");  // To override error codes.
+import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
 
 const onErrorValue = ISODate("2017-07-04T11:56:02Z");
 const coll = db.date_from_string_on_error;
@@ -176,4 +174,3 @@ assertErrCodeAndErrMsgContains(
     }],
     18536,
     "Invalid format character '%n' in format string");
-})();

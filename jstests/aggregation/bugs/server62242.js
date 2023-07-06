@@ -1,8 +1,5 @@
 // SERVER-62242
 // $indexOfArray does not work with duplicate values in array
-(function() {
-"use strict";
-
 const c = db[jsTest.name()];
 c.drop();
 
@@ -29,4 +26,3 @@ assert.eq([{_id: 0, number: 222, idx: 3}],
           c.aggregate([
                {$addFields: {idx: {$indexOfArray: [[111, 111, 222, 222, 333], "$number", 3, 5]}}}
            ]).toArray());
-})();

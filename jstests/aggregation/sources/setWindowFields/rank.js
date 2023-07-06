@@ -1,10 +1,7 @@
 /**
  * Test the rank based window functions.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // documentEq
+import {documentEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db[jsTestName()];
 for (let i = 0; i < 12; i++) {
@@ -110,4 +107,3 @@ verifyResults(result, function(num, baseObj) {
 });
 result = runRankBasedAccumulator({double: 1}, {$documentNumber: {}});
 verifyResults(result, noTieFunc);
-})();

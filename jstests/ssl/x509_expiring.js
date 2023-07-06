@@ -1,8 +1,5 @@
 // Verify a warning is emitted when a certificate is about to expire.
 
-(function() {
-'use strict';
-
 const SERVER_CERT = "jstests/libs/server.pem";
 const CA_CERT = "jstests/libs/ca.pem";
 const CLIENT_USER = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
@@ -34,7 +31,7 @@ function test(expiration, expect) {
     const log =
         assert.commandWorked(external.getSiblingDB("admin").runCommand({getLog: "global"})).log;
 
-    function checkPeerCertificateExpires(element, index, array) {
+    function checkPeerCertificateExpires(element /*, index, array*/) {
         const logJson = JSON.parse(element);
 
         return (logJson.id === 23221 || logJson.id === 23222) &&
@@ -50,4 +47,3 @@ assert.doesNotThrow(
     [],
     "If this fails, the server.pem certificate is expiring soon (<= 100 days) -- this is bad! Please file a ticket with the server security team to renew testing certificates.");
 test(7300, true);  // Work so long as certs expire no more than 20 years from now
-})();

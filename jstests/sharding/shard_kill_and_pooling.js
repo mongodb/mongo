@@ -13,9 +13,6 @@
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 // Run through the same test twice, once with a hard -9 kill, once with a regular shutdown
-(function() {
-'use strict';
-
 for (var test = 0; test < 2; test++) {
     var killWith = (test == 0 ? 15 : 9);
 
@@ -23,7 +20,6 @@ for (var test = 0; test < 2; test++) {
 
     var mongos = st.s0;
     var coll = mongos.getCollection("foo.bar");
-    var db = coll.getDB();
 
     assert.commandWorked(coll.insert({hello: "world"}));
 
@@ -39,7 +35,7 @@ for (var test = 0; test < 2; test++) {
 
     jsTest.log("Returning the connections back to the pool.");
 
-    for (var i = 0; i < conns.length; i++) {
+    for (let i = 0; i < conns.length; i++) {
         conns[i].close();
     }
 
@@ -69,7 +65,7 @@ for (var test = 0; test < 2; test++) {
     jsTest.log("Run queries using new connections.");
 
     var numErrors = 0;
-    for (var i = 0; i < conns.length; i++) {
+    for (let i = 0; i < conns.length; i++) {
         var newConn = new Mongo(mongos.host);
         try {
             assert.neq(null, newConn.getCollection("foo.bar").findOne());
@@ -85,4 +81,3 @@ for (var test = 0; test < 2; test++) {
 
     jsTest.log("DONE test " + test);
 }
-})();

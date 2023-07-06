@@ -6,10 +6,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/noPassthrough/libs/index_initial_sync.js');
+import {IndexInitialSyncTest} from "jstests/noPassthrough/libs/index_initial_sync.js";
 
 const nodes = [
     {},
@@ -22,4 +19,3 @@ const nodes = [
     },
 ];
 new IndexInitialSyncTest({nodes: nodes}).run();
-})();

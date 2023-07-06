@@ -23,8 +23,8 @@
 // ]
 
 import {getPlanCacheKeyFromPipeline, getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-load("jstests/libs/fixture_helpers.js");
 
 const coll = db.jstests_plan_cache_clear;
 coll.drop();

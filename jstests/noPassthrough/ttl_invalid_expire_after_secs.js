@@ -5,11 +5,8 @@
  *     requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/noPassthrough/libs/index_build.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 function test(expireAfterSecondsVal) {
     jsTestLog("Testing expireAfterSeconds = " + expireAfterSecondsVal);
@@ -132,4 +129,3 @@ test(NaN);
 const maxDouble = 1.7976931348623157e+308;
 test(maxDouble);
 test(-maxDouble);
-})();

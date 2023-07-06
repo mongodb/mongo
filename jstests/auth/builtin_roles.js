@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 function assertIsBuiltinRole(def, name, expectPrivs = false, expectAuthRest = false) {
     jsTest.log(tojson(def));
     assert.eq(def.db, name.db);
@@ -124,4 +121,3 @@ MongoRunner.stopMongod(mongod);
 const st = new ShardingTest({shards: 1, mongos: 1, config: 1});
 runTest(st.s0);
 st.stop();
-})();

@@ -3,9 +3,7 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 // This test completes with a prepared transaction still active, so we cannot enforce an accurate
 // fast count.
@@ -41,4 +39,3 @@ assert.commandWorked(
     primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
 
 replTest.stopSet();
-}());

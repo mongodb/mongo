@@ -1,9 +1,6 @@
 // Tests that an aggregation error which occurs on a sharded collection will send an error message
 // containing the host and port of the shard where the error occurred.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertErrCodeAndErrMsgContains.
+import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
 
 const st = new ShardingTest({shards: 2});
 
@@ -31,4 +28,3 @@ const divideByZeroErrorCodes = [16608, 4848401, ErrorCodes.BadValue];
 assertErrCodeAndErrMsgContains(coll, pipe, divideByZeroErrorCodes, st.rs1.getPrimary().host);
 
 st.stop();
-}());

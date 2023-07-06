@@ -3,9 +3,6 @@
 // another shard that we add later, and after the move the data is still accessible.
 // @tags: [requires_replication, requires_sharding]
 
-(function() {
-"use strict";
-
 var numDocs = 10000;
 var baseName = "moveprimary-replset";
 var testDBName = baseName;
@@ -56,4 +53,3 @@ assert.eq(testDB[testCollName].count({z: 'world'}),
           'updating and counting docs via mongos failed');
 
 shardingTest.stop();
-})();

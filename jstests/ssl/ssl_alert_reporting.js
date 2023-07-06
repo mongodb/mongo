@@ -1,9 +1,6 @@
 // Ensure that TLS version alerts are correctly propagated
 
-load('jstests/ssl/libs/ssl_helpers.js');
-
-(function() {
-'use strict';
+import {determineSSLProvider, sslProviderSupportsTLS1_1} from "jstests/ssl/libs/ssl_helpers.js";
 
 const clientOptions = [
     "--ssl",
@@ -46,17 +43,16 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
         sslDisabledProtocols: serverDisabledProtos,
     });
 
-    let shell;
     let mongoOutput;
 
     assert.soon(function() {
         clearRawMongoProgramOutput();
-        shell = runMongoProgram("mongo",
-                                "--port",
-                                md.port,
-                                ...clientOptions,
-                                "--sslDisabledProtocols",
-                                clientDisabledProtos);
+        runMongoProgram("mongo",
+                        "--port",
+                        md.port,
+                        ...clientOptions,
+                        "--sslDisabledProtocols",
+                        clientDisabledProtos);
         mongoOutput = rawMongoProgramOutput();
         return mongoOutput.match(expectedRegex);
     }, "Mongo shell output was as follows:\n" + mongoOutput + "\n************", 60 * 1000);
@@ -72,4 +68,3 @@ if (!sslProviderSupportsTLS1_1()) {
 } else {
     runTest("TLS1_0", "TLS1_1,TLS1_2");
 }
-}());

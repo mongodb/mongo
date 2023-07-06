@@ -6,9 +6,6 @@
  *   uses_api_parameters,
  * ]
  */
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB("findAndModifyAPIVersion");
 testDB.dropDatabase();
 
@@ -63,4 +60,3 @@ assert.commandWorked(testDB.runCommand({
     apiVersion: "1"
 }));
 assertStockUnits();
-})();

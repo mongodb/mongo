@@ -4,10 +4,7 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const dbName = jsTest.name();
 const collName = "coll";
@@ -58,4 +55,3 @@ primaryColl.drop();
 rst.awaitReplication();
 
 rst.stopSet();
-})();

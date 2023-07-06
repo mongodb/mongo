@@ -41,14 +41,13 @@
  * @tags: [uses_transactions, assumes_snapshot_transactions]
  */
 
-// for Graph
-load('jstests/libs/cycle_detection.js');
-
-// For withTxnAndAutoRetry, isKilledSessionCode.
-load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
-
-// For arrayEq.
-load("jstests/aggregation/extras/utils.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {
+    isKilledSessionCode,
+    withTxnAndAutoRetry
+} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {Graph} from "jstests/libs/cycle_detection.js";
 
 export const $config = (function() {
     function checkTransactionCommitOrder(documents) {
@@ -205,7 +204,7 @@ export const $config = (function() {
 
                 withTxnAndAutoRetry(this.session, () => {
                     committedTxnInfo = [];
-                    for (let [i, docId] of docIds.entries()) {
+                    for (let [_, docId] of docIds.entries()) {
                         const collection =
                             this.collections[Random.randInt(this.collections.length)];
                         const txnDbName = collection.getDB().getName();

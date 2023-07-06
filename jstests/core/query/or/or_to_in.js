@@ -7,7 +7,7 @@
 //   requires_fcv_70,
 // ]
 
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 var coll = db.orToIn;

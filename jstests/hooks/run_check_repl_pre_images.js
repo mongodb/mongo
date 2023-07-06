@@ -1,8 +1,6 @@
 // Runner for checkPreImageCollection() that compares the pre-images collection on all replica set
 // nodes to ensure all nodes have compatible data without any holes.
-'use strict';
 
-(function() {
 const startTime = Date.now();
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a mongod?');
 
@@ -30,4 +28,3 @@ if (db.getMongo().isMongos()) {
 
 const totalTime = Date.now() - startTime;
 print('Finished pre-image consistency checks of cluster in ' + totalTime + ' ms.');
-})();

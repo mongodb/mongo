@@ -8,10 +8,8 @@
  *   requires_persistence
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/fail_point_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
 // StaleShardVersion exception on the shards and cause them to refresh their sharding metadata.
@@ -79,4 +77,3 @@ let rs0Collections = assert.commandWorked(
 assert.eq(1, rs0Collections.cursor.firstBatch.length);
 
 st.stop();
-})();

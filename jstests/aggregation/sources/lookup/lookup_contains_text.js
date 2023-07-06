@@ -1,9 +1,6 @@
 // Tests that given a $text stage before a $lookup stage, the $lookup's subpipeline cannot
 // reference the text score metadata from that $text search.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const outer = db.outer;
 const inner = db.inner;
@@ -104,4 +101,3 @@ pipeline = [
     ];
 
 assertErrorCode(outer, pipeline, kNoTextScoreAvailableErrCode);
-}());

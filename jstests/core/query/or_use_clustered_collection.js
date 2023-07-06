@@ -17,7 +17,7 @@ import {
     getPlanStages,
     getWinningPlan
 } from "jstests/libs/analyze_plan.js";
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.or_use_clustered_collection;

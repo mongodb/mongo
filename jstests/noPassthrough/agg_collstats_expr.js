@@ -6,9 +6,6 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
 const dbName = jsTestName();
 const collName = "test";
 
@@ -219,4 +216,3 @@ assert.commandFailedWithCode(standaloneDb.runCommand({
                              ErrorCodes.NamespaceNotFound);
 
 MongoRunner.stopMongod(conn);
-})();

@@ -1,9 +1,6 @@
 /**
  * Test that a new primary that gets elected will properly perform shard initialization.
  */
-(function() {
-"use strict";
-
 var st = new ShardingTest({shards: 1});
 
 // Setting CWWC for addShard to work, as implicitDefaultWC is set to w:1.
@@ -60,4 +57,3 @@ assert.soon(() => shardIdentityDoc.configsvrConnectionString ==
 replTest.stopSet();
 
 st.stop();
-})();

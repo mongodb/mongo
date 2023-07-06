@@ -11,8 +11,8 @@
  * @tags: [featureFlagBulkWriteCommand] // TODO SERVER-52419: Remove this tag.
  */
 
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const name = jsTestName();
 const replTest = new ReplSetTest({
@@ -277,8 +277,8 @@ function testCommandWithWriteConcern(cmd) {
 
     let failpoint = configureFailPoint(testDB, 'hangBetweenProcessingBulkWriteOps', {}, {skip: 1});
 
-    function runBulkReq(host, cmd) {
-        load('jstests/libs/write_concern_util.js');
+    async function runBulkReq(host, cmd) {
+        const {assertWriteConcernError} = await import("jstests/libs/write_concern_util.js");
 
         // Tests that the command receives a write concern error. If we don't properly advance
         // the client's last optime to the latest oplog entry and wait for that optime to

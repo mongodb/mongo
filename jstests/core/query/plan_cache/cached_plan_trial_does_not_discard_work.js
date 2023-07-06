@@ -20,7 +20,7 @@
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_experimental_incompatible,
 // ]
-load("jstests/libs/profiler.js");  // getLatestProfileEntry.
+import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 if (!checkSBEEnabled(db)) {

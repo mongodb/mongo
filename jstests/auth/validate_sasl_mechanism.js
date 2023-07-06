@@ -1,8 +1,5 @@
 // Test for invalid sasl auth mechanisms
 
-(function() {
-'use strict';
-
 function waitFailedToStart(pid, exitCode) {
     assert.soon(function() {
         const res = checkProgram(pid);
@@ -20,4 +17,3 @@ const m = MongoRunner.runMongod({
 });
 
 waitFailedToStart(m.pid, 2);
-})();

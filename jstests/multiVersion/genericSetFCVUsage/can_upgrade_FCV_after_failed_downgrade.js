@@ -5,8 +5,6 @@
  * @tags: [requires_fcv_70]
  */
 
-load("jstests/libs/fail_point_util.js");
-
 const latest = "latest";
 
 function downgradingToUpgradingTest(conn, adminDB) {

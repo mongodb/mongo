@@ -9,16 +9,12 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 // Adds a shard near the end of the test that won't have metadata for the sessions collection during
 // test shutdown. This is only a problem with a config shard because otherwise there are no shards
 // so the sessions collection can't be created.
 TestData.skipCheckShardFilteringMetadata = TestData.configShard;
 
-load("jstests/replsets/rslib.js");  // For reconfig, isConfigCommitted and
-                                    // safeReconfigShouldFail.
+import {reconfig, safeReconfigShouldFail, isConfigCommitted} from "jstests/replsets/rslib.js";
 
 const configurationIncompatibleMsg =
     "config that would change the implicit default write concern on the shard to {w: 1}.";
@@ -144,7 +140,7 @@ testReconfig(shardServer,
 
 jsTestLog("Restarting the config servers.");
 logPrefix = "While the config server is reachable: ";
-for (var i = 0; i < st.configRS.nodes.length; i++) {
+for (let i = 0; i < st.configRS.nodes.length; i++) {
     st.restartConfigServer(i, undefined, undefined, true /* wait */);
 }
 st.configRS.awaitNodesAgreeOnPrimary();
@@ -162,4 +158,3 @@ st.stop();
 
 jsTestLog("Stopping the shard.");
 shardServer.stopSet();
-})();

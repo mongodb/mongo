@@ -72,7 +72,7 @@ export const $config = (function() {
                 // If resharding fails with SnapshopUnavailable, then this will be incorrect. But
                 // its fine since reshardCollection will succeed if the new shard key matches the
                 // existing one.
-                this.currentShardKeyIndex = shardKeyIndex;
+                this.currentShardKeyIndex = newIndex;
                 this.reshardingCount += 1;
             }
         },

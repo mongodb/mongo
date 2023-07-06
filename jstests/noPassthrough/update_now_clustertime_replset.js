@@ -8,9 +8,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({name: jsTestName(), nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -284,4 +281,3 @@ for (let result of results) {
 }
 
 rst.stopSet();
-}());

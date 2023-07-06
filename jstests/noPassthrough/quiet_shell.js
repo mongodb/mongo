@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 const mongo = MongoRunner.runMongod();
 const regexMatch = /sh([0-9]{1,10})\|/;
 
@@ -23,4 +20,3 @@ clearRawMongoProgramOutput();
 }
 
 MongoRunner.stopMongod(mongo);
-})();

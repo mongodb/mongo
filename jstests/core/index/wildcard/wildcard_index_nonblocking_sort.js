@@ -3,10 +3,10 @@
 //   assumes_read_concern_local,
 //   does_not_support_stepdowns,
 // ]
-load("jstests/aggregation/extras/utils.js");  // For arrayEq().
-import {getWinningPlan, getPlanStages} from "jstests/libs/analyze_plan.js";
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-load("jstests/libs/fixture_helpers.js");  // For numberOfShardsForCollection().
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.wildcard_nonblocking_sort;
 coll.drop();

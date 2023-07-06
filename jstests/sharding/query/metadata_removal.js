@@ -6,10 +6,7 @@
 //   requires_fcv_62
 // ]
 
-(function() {
-"use strict";
-
-function runTest(coll, keyword) {
+function runTest(coll) {
     const document = ({_id: 5, x: 1, $set: {$inc: {x: 5}}});
     assert.commandWorked(coll.insert(document));
 
@@ -43,4 +40,3 @@ try {
 } finally {
     st.stop();
 }
-})();

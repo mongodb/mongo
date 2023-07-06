@@ -5,9 +5,6 @@
  *   requires_wiredtiger,
  * ]
  */
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({
     nodes: [
         {
@@ -73,4 +70,3 @@ jsTestLog('Applying updates on secondary ' + secondary.host);
 rst.awaitReplication();
 
 rst.stopSet();
-})();

@@ -1,8 +1,7 @@
 // Tests propagation of RWC defaults across a replica set.
-(function() {
-'use strict';
-
-load("jstests/libs/read_write_concern_defaults_propagation_common.js");
+import {
+    ReadWriteConcernDefaultsPropagation
+} from "jstests/libs/read_write_concern_defaults_propagation_common.js";
 
 const rst = new ReplSetTest({nodes: 3});
 rst.startSet();
@@ -22,4 +21,3 @@ ReadWriteConcernDefaultsPropagation.runTests(
 ReadWriteConcernDefaultsPropagation.runDropAndDeleteTests(primary, [primary, ...secondaries]);
 
 rst.stopSet();
-})();

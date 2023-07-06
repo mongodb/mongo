@@ -7,12 +7,11 @@
  *   uses_multiple_connections,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
-load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection
+} from "jstests/libs/collection_drop_recreate.js";
 
 const coll = assertDropAndRecreateCollection(db, "change_stream_pre_images");
 const cst = new ChangeStreamTest(db);
@@ -158,4 +157,3 @@ latestChange.fullDocumentBeforeChange = null;
 assert.docEq(latestChange, cst.getOneChange(csPreImageWhenAvailableCursor));
 
 assertDropCollection(db, coll.getName());
-})();

@@ -1,9 +1,6 @@
 /**
  * Test regexes with various Unicode options.
  */
-(function() {
-"use strict";
-
 const coll = db.getCollection("regex_unicode");
 coll.drop();
 
@@ -120,4 +117,3 @@ assertFindResultsEq("^[[:digit:]]+$", [docAllAscii]);
 // decimal digit characters.
 assertFindResultsEq("(*UCP)[[:digit:]]", [docAllAscii, docNoAscii, docMixed]);
 assertFindResultsEq("(*UCP)^[[:digit:]]+$", [docAllAscii, docNoAscii, docMixed]);
-}());

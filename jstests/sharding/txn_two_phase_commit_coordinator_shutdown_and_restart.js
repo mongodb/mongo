@@ -15,11 +15,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 // these validation checks.
 TestData.skipCheckDBHashes = true;
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/write_concern_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rs0_opts = {
     nodes: [{}, {}]
@@ -54,7 +50,6 @@ const lsid = {
     id: UUID()
 };
 let txnNumber = 0;
-const participantList = [{shardId: st.shard0.shardName}, {shardId: st.shard1.shardName}];
 
 // Build the following command as a string since we need to persist the lsid and the txnNumber
 // into the scope of the parallel shell.
@@ -158,4 +153,3 @@ assert.commandWorked(st.s.adminCommand({
 // TODO: SERVER-59686
 commit({checkExitSuccess: false});
 st.stop();
-})();

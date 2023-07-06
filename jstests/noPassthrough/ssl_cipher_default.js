@@ -1,8 +1,5 @@
 // validate default for opensslCipherConfig
 
-(function() {
-'use strict';
-
 function getparam(mongod, field) {
     var q = {getParameter: 1};
     q[field] = 1;
@@ -46,4 +43,3 @@ assertCorrectConfig({
     tlsCipherConfig: "HIGH"
 },
                     "HIGH");
-})();

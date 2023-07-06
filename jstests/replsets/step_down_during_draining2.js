@@ -10,11 +10,8 @@
 //    cause it to finish drain mode because of the pending stepdown request.
 // 7. Allow Node 1 to finish stepping down.
 
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {reconnect} from "jstests/replsets/rslib.js";
 
 var replSet = new ReplSetTest({name: 'testSet', nodes: 3});
 var nodes = replSet.nodeList();
@@ -141,4 +138,3 @@ assert.commandWorked(secondary.getDB("foo").flag.insert({sentinel: 1}, {writeCon
 // Check that no writes were lost.
 assert.eq(secondary.getDB("foo").foo.find().itcount(), numDocuments);
 replSet.stopSet();
-})();

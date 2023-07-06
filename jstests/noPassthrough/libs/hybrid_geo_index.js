@@ -1,13 +1,10 @@
 // Helper functions to test hybrid geo index builds
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
-const Operation = Object.freeze({REMOVE: 0, UPDATE: 1});
+export const Operation = Object.freeze({REMOVE: 0, UPDATE: 1});
 
-var HybridGeoIndexTest = class {
+export var HybridGeoIndexTest = class {
     static run(rsOptions, createOptions, invalidKey, validKey, op) {
-        'use strict';
-
-        load('jstests/noPassthrough/libs/index_build.js');
-
         const rst = new ReplSetTest({
             nodes: [
                 rsOptions,

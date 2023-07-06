@@ -3,7 +3,10 @@ TestData.disableImplicitSessions = true;
 
 var baseName = "jstests_sharding_sharding_options";
 
-load('jstests/libs/command_line/test_parsed_options.js');
+import {
+    testGetCmdLineOptsMongod,
+    testGetCmdLineOptsMongodFailed
+} from "jstests/libs/command_line/test_parsed_options.js";
 
 //////////////////////////////
 // Sharding role

@@ -1,6 +1,3 @@
-load('jstests/libs/write_concern_util.js');
-load('jstests/multiVersion/libs/auth_helpers.js');
-
 /**
  * This file tests that user management commands accept write concern and wait for it properly.
  * It tests that an invalid write concern leads to a writeConcernError, as well as an ok status
@@ -8,8 +5,7 @@ load('jstests/multiVersion/libs/auth_helpers.js');
  * not yield any writeConcern errors.
  */
 
-(function() {
-"use strict";
+import {assertWriteConcernError, runCommandCheckAdmin} from "jstests/libs/write_concern_util.js";
 
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
@@ -140,4 +136,3 @@ commands.forEach(function(cmd) {
 });
 
 replTest.stopSet();
-})();

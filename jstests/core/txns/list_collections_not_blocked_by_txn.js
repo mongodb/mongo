@@ -3,13 +3,9 @@
 //   not_allowed_with_security_token,uses_transactions, uses_snapshot_read_concern]
 // This test ensures that listCollections does not conflict with multi-statement transactions
 // as a result of taking MODE_S locks that are incompatible with MODE_IX needed for writes.
-(function() {
-"use strict";
-
 // TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
-// For withTxnAndAutoRetryOnMongos.
-load('jstests/libs/auto_retry_transaction_in_sharding.js');
-load("jstests/libs/fixture_helpers.js");
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 var dbName = 'list_collections_not_blocked';
 var mydb = db.getSiblingDB(dbName);
@@ -50,4 +46,3 @@ withTxnAndAutoRetryOnMongos(session, () => {
 }, {readConcern: {level: "snapshot"}});
 
 session.endSession();
-}());

@@ -15,9 +15,9 @@
  *
  */
 
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/fixture_helpers.js");      // For 'FixtureHelpers'.
-load("jstests/aggregation/extras/utils.js");  // For 'arrayEq'.
+import {arrayEq, collectionExists} from "jstests/aggregation/extras/utils.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export class TwoPhaseDropCollectionTest {
     constructor(testName, dbName) {

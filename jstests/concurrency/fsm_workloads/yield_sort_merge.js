@@ -6,6 +6,7 @@
  *
  * Other workloads that need an index { a: 1, b: 1 } can extend this.
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield.js";
 

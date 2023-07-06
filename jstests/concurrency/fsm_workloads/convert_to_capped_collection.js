@@ -11,6 +11,7 @@
  *
  * @tags: [requires_collstats, requires_capped]
  */
+import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     // TODO: This workload may fail if an iteration multiplier is specified.

@@ -1,7 +1,5 @@
 // SERVER-44366 Test that nesting of CodeWithScope works properly
 
-(function() {
-"use strict";
 const nestedCWS = Code("function(){return 1;}", {
     f: Code("function(){return 2};", {
         f: Code("function(){return 3};", {
@@ -36,4 +34,3 @@ var coll = testDB.getCollection("test");
 coll.insert({_id: nestedCWS});
 
 MongoRunner.stopMongod(conn);
-})();

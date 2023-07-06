@@ -7,10 +7,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -115,4 +112,3 @@ const outPipeline = [{$group: {_id: "$_id", sum: {$sum: "$a"}}}, {$out: outCollN
 testMetadata(outPipeline, "out_on_secondary_metadata");
 
 replTest.stopSet();
-})();

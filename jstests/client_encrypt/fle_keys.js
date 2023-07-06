@@ -1,11 +1,7 @@
 /**
  * Check functionality of KeyVault.js
  */
-
-load('jstests/ssl/libs/ssl_helpers.js');
-
-(function() {
-"use strict";
+import {CA_CERT, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 const x509_options = {
     sslMode: "requireSSL",
@@ -14,9 +10,6 @@ const x509_options = {
 };
 
 const conn = MongoRunner.runMongod(x509_options);
-const test = conn.getDB("test");
-const collection = test.coll;
-
 const localKMS = {
     key: BinData(
         0,
@@ -75,4 +68,3 @@ keyVault.createKey("local", ['mongoKey3']);
 assert.eq(3, keyVault.getKeys().itcount());
 
 MongoRunner.stopMongod(conn);
-}());

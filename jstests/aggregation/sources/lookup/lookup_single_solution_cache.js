@@ -7,9 +7,6 @@
 //   assumes_read_preference_unchanged,
 //   tenant_migration_incompatible
 // ]
-(function() {
-"use strict";
-
 const outer = db.outer;
 const inner = db.inner;
 
@@ -64,4 +61,3 @@ inner.getPlanCache().clear();
     assert.eq(innerPlan.cachedPlan.inputStage.stage, "COLLSCAN");
     assert.eq(Object.keys(innerPlan.cachedPlan.inputStage.filter["$and"][0]), ["$expr"]);
 }
-}());

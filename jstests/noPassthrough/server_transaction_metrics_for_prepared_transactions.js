@@ -2,10 +2,8 @@
  * Tests prepared transactions metrics in the serverStatus output.
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
-load("jstests/replsets/rslib.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {getLastOpTime} from "jstests/replsets/rslib.js";
 
 /**
  * Verifies that the serverStatus response has the fields that we expect.
@@ -174,4 +172,3 @@ verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "to
 // End the session and stop the replica set.
 session.endSession();
 rst.stopSet();
-}());

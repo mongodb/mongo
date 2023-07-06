@@ -1,10 +1,7 @@
 // Test that including intermediate certificates
 // in the certificate key file will be sent to the remote.
 
-(function() {
-'use strict';
-
-load('jstests/ssl/libs/ssl_helpers.js');
+import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 // server-intermediate-ca was signed by ca.pem, not trusted-ca.pem
 const VALID_CA = 'jstests/libs/ca.pem';
@@ -61,7 +58,7 @@ runTest(VALID_CA, INVALID_CA);
 // Validate we can make a chain with intermediate certs in ca file instead of key file
 if (determineSSLProvider() === 'apple') {
     print("Skipping test as this configuration is not supported on OSX");
-    return;
+    quit();
 }
 
 // Validate the server can build a certificate chain when the chain is split across the CA and PEM
@@ -92,4 +89,3 @@ if (determineSSLProvider() === 'apple') {
 
     MongoRunner.stopMongod(mongod);
 }
-})();

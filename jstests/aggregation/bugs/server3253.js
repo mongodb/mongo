@@ -6,7 +6,7 @@
 // ]
 
 // server-3253 Unsharded support for $out
-load('jstests/aggregation/extras/utils.js');
+import {anyEq, assertErrorCode, collectionExists} from "jstests/aggregation/extras/utils.js";
 
 var input = db.server3253_in;
 var inputDoesntExist = db.server3253_doesnt_exist;

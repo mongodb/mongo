@@ -6,9 +6,6 @@
  *   requires_fcv_60,
  * ]
  */
-(function() {
-'use strict';
-
 const st = new ShardingTest({shards: 3});
 
 const db = st.s.getDB(jsTestName());
@@ -105,4 +102,3 @@ assert.eq(res.expectedCollection, shardedColl1.getName());
 assert.eq(res.actualCollection, shardedColl2.getName());
 
 st.stop();
-})();

@@ -4,9 +4,6 @@
 //
 // @tags: [uses_transactions, uses_multi_shard_transaction]
 
-(function() {
-"use strict";
-
 let st = new ShardingTest({shards: 2});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
@@ -75,4 +72,3 @@ assert.commandFailedWithCode(sessionDb.runCommand({
 session.endSession();
 
 st.stop();
-}());

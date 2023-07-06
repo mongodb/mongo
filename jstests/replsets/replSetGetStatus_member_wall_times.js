@@ -5,10 +5,7 @@
  * @tags: [multiversion_incompatible]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/rslib.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 // We use GTE to account for the possibility of other writes in the system (e.g. HMAC).
 // Comparison is GTE by default, GT if 'strict' is specified.
@@ -85,4 +82,3 @@ checkWallTimes(primary, 0 /* greater */, 1 /* lesser */);
 checkWallTimes(primary, 0 /* greater */, 2 /* lesser */);
 
 rst.stopSet();
-})();

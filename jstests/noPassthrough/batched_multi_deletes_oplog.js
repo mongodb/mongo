@@ -7,9 +7,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 // Verifies that batches replicate as applyOps entries.
 function validateBatchedDeletesOplogDocsPerBatch(conn) {
     const db = conn.getDB("test");
@@ -117,4 +114,3 @@ function runTestInIsolation(testFunc, serverParam) {
 runTestInIsolation(validateBatchedDeletesOplogDocsPerBatch);
 // Validates oplog content for batches that would exceed 16MB worth of oplog.
 runTestInIsolation(validateBatchedDeletesOplogBatchAbove16MB);
-})();

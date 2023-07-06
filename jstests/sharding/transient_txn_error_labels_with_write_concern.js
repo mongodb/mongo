@@ -4,12 +4,12 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/rslib.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {
+    checkWriteConcernTimedOut,
+    restartServerReplication,
+    stopServerReplication
+} from "jstests/libs/write_concern_util.js";
 
 const dbName = "test";
 const collName = "transient_txn_error_labels_with_write_concern";
@@ -24,7 +24,6 @@ const st = new ShardingTest({
 const rst = st.rs0;
 
 const primary = rst.getPrimary();
-const secondary = rst.getSecondary();
 assert.eq(primary, rst.nodes[0]);
 const testDB = primary.getDB(dbName);
 
@@ -115,4 +114,3 @@ runNoSuchTransactionTests({coordinateCommitTransaction: 1, participants: []},
 session.endSession();
 
 st.stop();
-}());

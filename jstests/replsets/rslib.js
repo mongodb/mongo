@@ -1,36 +1,34 @@
-var syncFrom;
-var wait;
-var occasionally;
-var reconnect;
-var getLatestOp;
-var waitForAllMembers;
-var reconfig;
-var safeReconfigShouldFail;
-var awaitOpTime;
-var waitUntilAllNodesCaughtUp;
-var waitForState;
-var reInitiateWithoutThrowingOnAbortedMember;
-var awaitRSClientHosts;
-var getLastOpTime;
-var getFirstOplogEntry;
-var setLogVerbosity;
-var stopReplicationAndEnforceNewPrimaryToCatchUp;
-var isConfigCommitted;
-var assertSameConfigContent;
-var isSameConfigContent;
-var getConfigWithNewlyAdded;
-var isMemberNewlyAdded;
-var waitForNewlyAddedRemovalForNodeToBeCommitted;
-var assertVoteCount;
-var disconnectSecondaries;
-var reconnectSecondaries;
-var createRstArgs;
-var createRst;
-var waitAllNodesHaveConfig;
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-(function() {
-"use strict";
-load("jstests/libs/write_concern_util.js");
+export var syncFrom;
+export var wait;
+export var occasionally;
+export var reconnect;
+export var getLatestOp;
+export var waitForAllMembers;
+export var reconfig;
+export var safeReconfigShouldFail;
+export var awaitOpTime;
+export var waitUntilAllNodesCaughtUp;
+export var waitForState;
+export var reInitiateWithoutThrowingOnAbortedMember;
+export var awaitRSClientHosts;
+export var getLastOpTime;
+export var getFirstOplogEntry;
+export var setLogVerbosity;
+export var stopReplicationAndEnforceNewPrimaryToCatchUp;
+export var isConfigCommitted;
+export var assertSameConfigContent;
+export var isSameConfigContent;
+export var getConfigWithNewlyAdded;
+export var isMemberNewlyAdded;
+export var waitForNewlyAddedRemovalForNodeToBeCommitted;
+export var assertVoteCount;
+export var disconnectSecondaries;
+export var reconnectSecondaries;
+export var createRstArgs;
+export var createRst;
+export var waitAllNodesHaveConfig;
 
 var count = 0;
 var w = 0;
@@ -400,7 +398,6 @@ function autoReconfig(rst, targetConfig) {
  *     secondary, or arbiter states
  */
 reconfig = function(rst, config, force, doNotWaitForMembers) {
-    "use strict";
     var primary = rst.getPrimary();
     config = rst._updateConfigIfNotDurable(config);
 
@@ -896,4 +893,3 @@ waitAllNodesHaveConfig = function(replSet, config) {
         });
     });
 };
-}());

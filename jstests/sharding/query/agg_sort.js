@@ -1,8 +1,5 @@
 // Tests that the sort order is obeyed when an aggregation requests sorted results that are
 // scattered across multiple shards.
-(function() {
-'use strict';
-
 const shardingTest = new ShardingTest({shards: 2});
 
 const db = shardingTest.getDB("test");
@@ -216,4 +213,3 @@ assertSortedByMetaField(textColl
                             .toArray());
 
 shardingTest.stop();
-})();

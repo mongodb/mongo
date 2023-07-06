@@ -3,10 +3,7 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/analyze_shard_key/libs/validation_common.js");
+import {ValidationTest} from "jstests/sharding/analyze_shard_key/libs/validation_common.js";
 
 function runTest(conn) {
     const validationTest = ValidationTest(conn);
@@ -39,4 +36,3 @@ function runTest(conn) {
     runTest(primary);
     rst.stopSet();
 }
-})();

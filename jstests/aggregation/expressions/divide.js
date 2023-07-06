@@ -1,9 +1,7 @@
 // Tests for $divide aggregation expression.
-(function() {
-"use strict";
+import "jstests/libs/sbe_assert_error_override.js";
 
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode().
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.jstests_aggregation_divide;
 coll.drop();
@@ -93,4 +91,3 @@ errorTestCases.forEach(function(testCase) {
 
     assert(coll.drop());
 });
-}());

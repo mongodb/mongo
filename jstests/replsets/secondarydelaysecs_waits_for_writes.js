@@ -10,7 +10,7 @@
 //
 // @tags: [
 // ]
-load("jstests/replsets/rslib.js");
+import {reconfig, waitForAllMembers} from "jstests/replsets/rslib.js";
 
 let doTest = function(signal) {
     var name = "secondaryDelaySecs";

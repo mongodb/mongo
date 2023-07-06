@@ -8,6 +8,8 @@
  *
  * All threads update the same TTL index on the same collection.
  */
+import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var data = {
         numDocs: 1000,

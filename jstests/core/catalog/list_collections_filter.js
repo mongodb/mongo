@@ -14,8 +14,6 @@
  * ]
  */
 
-(function() {
-"use strict";
 var mydb = db.getSiblingDB("list_collections_filter");
 assert.commandWorked(mydb.dropDatabase());
 
@@ -122,4 +120,3 @@ assert.throws(function() {
 assert.throws(function() {
     mydb.getCollectionInfos({a: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}});
 });
-}());

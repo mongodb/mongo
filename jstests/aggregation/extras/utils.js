@@ -1,8 +1,10 @@
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
 /**
  * Compute the result of evaluating 'expression', and compare it to 'result'. Replaces the contents
  * of 'coll' with a single empty document.
  */
-function testExpression(coll, expression, result) {
+export function testExpression(coll, expression, result) {
     testExpressionWithCollation(coll, expression, result);
 }
 
@@ -10,7 +12,7 @@ function testExpression(coll, expression, result) {
  * Compute the result of evaluating 'expression', and compare it to 'result', using 'collationSpec'
  * as the collation spec. Replaces the contents of 'coll' with a single empty document.
  */
-function testExpressionWithCollation(coll, expression, result, collationSpec) {
+export function testExpressionWithCollation(coll, expression, result, collationSpec) {
     assert.commandWorked(coll.remove({}));
     assert.commandWorked(coll.insert({}));
 
@@ -22,7 +24,7 @@ function testExpressionWithCollation(coll, expression, result, collationSpec) {
     assert.eq(res[0].output, result, tojson(res));
 }
 
-function _getObjectSubtypeOrUndefined(o) {
+export function _getObjectSubtypeOrUndefined(o) {
     function isNumberLong(v) {
         return v instanceof NumberLong;
     }
@@ -67,7 +69,7 @@ function _getObjectSubtypeOrUndefined(o) {
  * Compare using valueComparator if provided, or the default otherwise. Assumes al and ar have the
  * same type.
  */
-function _uncheckedCompare(al, ar, valueComparator) {
+export function _uncheckedCompare(al, ar, valueComparator) {
     // bsonBinaryEqual would return false for NumberDecimal("0.1") and NumberDecimal("0.100").
     return valueComparator ? valueComparator(al, ar) : (al === ar || bsonWoCompare(al, ar) === 0);
 }
@@ -78,7 +80,7 @@ function _uncheckedCompare(al, ar, valueComparator) {
  * If 'al' and 'ar' are neither object nor arrays, they must compare equal using 'valueComparator',
  * or == if not provided.
  */
-function anyEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
+export function anyEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
     // Helper to log 'msg' iff 'verbose' is true.
     const debug = msg => verbose ? print(msg) : null;
 
@@ -132,7 +134,7 @@ function anyEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
  * or false. Returns true or false. Only equal if they have the exact same set of properties, and
  * all the properties' values match according to 'valueComparator'.
  */
-function customDocumentEq({left, right, verbose, valueComparator, fieldsToSkip = []}) {
+export function customDocumentEq({left, right, verbose, valueComparator, fieldsToSkip = []}) {
     return documentEq(left, right, verbose, valueComparator, fieldsToSkip);
 }
 
@@ -145,7 +147,7 @@ function customDocumentEq({left, right, verbose, valueComparator, fieldsToSkip =
  * If the order of the nested arrays elements is significant for the equivalence, the assert.docEq
  * from assert.js should be used instead.
  */
-function documentEq(dl, dr, verbose = false, valueComparator, fieldsToSkip = []) {
+export function documentEq(dl, dr, verbose = false, valueComparator, fieldsToSkip = []) {
     const debug = msg => verbose ? print(msg) : null;  // Helper to log 'msg' iff 'verbose' is true.
 
     // Make sure these are both objects.
@@ -210,7 +212,7 @@ function documentEq(dl, dr, verbose = false, valueComparator, fieldsToSkip = [])
  * arguments have no nested arrays, or the order of the nested arrays is significant for the
  * equivalent assertion.
  */
-function arrayEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
+export function arrayEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
     const debug = msg => verbose ? print(msg) : null;  // Helper to log 'msg' iff 'verbose' is true.
 
     // Check that these are both arrays.
@@ -249,7 +251,7 @@ function arrayEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
     return true;
 }
 
-function arrayDiff(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
+export function arrayDiff(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
     // Check that these are both arrays.
     if (!(al instanceof Array)) {
         debug('arrayDiff: al is not an array: ' + tojson(al));
@@ -290,7 +292,7 @@ function arrayDiff(al, ar, verbose = false, valueComparator, fieldsToSkip = []) 
 /**
  * Makes a shallow copy of 'a'.
  */
-function arrayShallowCopy(a) {
+export function arrayShallowCopy(a) {
     assert(a instanceof Array, 'arrayShallowCopy: argument is not an array');
     return a.slice();  // Makes a copy.
 }
@@ -302,7 +304,7 @@ function arrayShallowCopy(a) {
  *
  * Are non-scalar values references?
  */
-function resultsEq(rl, rr, verbose = false, fieldsToSkip = []) {
+export function resultsEq(rl, rr, verbose = false, fieldsToSkip = []) {
     const debug = msg => verbose ? print(msg) : null;  // Helper to log 'msg' iff 'verbose' is true.
 
     // Make clones of the arguments so that we don't damage them.
@@ -354,7 +356,7 @@ function resultsEq(rl, rr, verbose = false, fieldsToSkip = []) {
  * Use this function if the arguments have nested arrays and the elements' order is significant at
  * the top-level and insignificant for the nested arrays.
  */
-function orderedArrayEq(al, ar, verbose = false, fieldsToSkip = []) {
+export function orderedArrayEq(al, ar, verbose = false, fieldsToSkip = []) {
     if (al.length != ar.length) {
         if (verbose)
             print(`orderedArrayEq:  array lengths do not match ${tojson(al)}, ${tojson(ar)}`);
@@ -373,7 +375,7 @@ function orderedArrayEq(al, ar, verbose = false, fieldsToSkip = []) {
  * Assert that the given aggregation fails with a specific code. Error message is optional. Note
  * that 'code' can be an array of possible codes.
  */
-function assertErrorCode(coll, pipe, code, errmsg, options = {}) {
+export function assertErrorCode(coll, pipe, code, errmsg, options = {}) {
     if (!Array.isArray(pipe)) {
         pipe = [pipe];
     }
@@ -398,7 +400,7 @@ function assertErrorCode(coll, pipe, code, errmsg, options = {}) {
  * Assert that an aggregation fails with a specific code and the error message contains the given
  * string. Note that 'code' can be an array of possible codes.
  */
-function assertErrCodeAndErrMsgContains(coll, pipe, code, expectedMessage) {
+export function assertErrCodeAndErrMsgContains(coll, pipe, code, expectedMessage) {
     const response = assert.commandFailedWithCode(
         coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipe, cursor: {}}), code);
     assert.neq(
@@ -411,7 +413,7 @@ function assertErrCodeAndErrMsgContains(coll, pipe, code, expectedMessage) {
  * Assert that an aggregation ran on admin DB fails with a specific code and the error message
  * contains the given string. Note that 'code' can be an array of possible codes.
  */
-function assertAdminDBErrCodeAndErrMsgContains(coll, pipe, code, expectedMessage) {
+export function assertAdminDBErrCodeAndErrMsgContains(coll, pipe, code, expectedMessage) {
     const response = assert.commandFailedWithCode(
         coll.getDB().adminCommand({aggregate: 1, pipeline: pipe, cursor: {}}), code);
     assert.neq(
@@ -424,7 +426,7 @@ function assertAdminDBErrCodeAndErrMsgContains(coll, pipe, code, expectedMessage
  * Assert that an aggregation fails with any code and the error message contains the given
  * string.
  */
-function assertErrMsgContains(coll, pipe, expectedMessage) {
+export function assertErrMsgContains(coll, pipe, expectedMessage) {
     const response = assert.commandFailed(
         coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipe, cursor: {}}));
     assert.neq(
@@ -437,7 +439,7 @@ function assertErrMsgContains(coll, pipe, expectedMessage) {
  * Assert that an aggregation fails with any code and the error message does not contain the given
  * string.
  */
-function assertErrMsgDoesNotContain(coll, pipe, expectedMessage) {
+export function assertErrMsgDoesNotContain(coll, pipe, expectedMessage) {
     const response = assert.commandFailed(
         coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipe, cursor: {}}));
     assert.eq(-1,
@@ -450,7 +452,8 @@ function assertErrMsgDoesNotContain(coll, pipe, expectedMessage) {
  * the 'actual' array has a matching element in the 'expected' array, without honoring elements
  * order.
  */
-function assertArrayEq({actual = [], expected = [], fieldsToSkip = [], extraErrorMsg = ""} = {}) {
+export function assertArrayEq(
+    {actual = [], expected = [], fieldsToSkip = [], extraErrorMsg = ""} = {}) {
     assert.eq(arguments.length, 1, "assertArrayEq arguments must be in an object");
     assert(arrayEq(actual, expected, false, null, fieldsToSkip),
            `actual=${tojson(actual)}, expected=${tojson(expected)}${extraErrorMsg}`);
@@ -470,7 +473,7 @@ function assertArrayEq({actual = [], expected = [], fieldsToSkip = [], extraErro
  * holding a repeating string of 'x' characters, so that the total size of the generated object
  * equals to 'docSize'.
  */
-function generateCollection({
+export function generateCollection({
     coll = null,
     numDocs = 0,
     docSize = 0,
@@ -505,7 +508,7 @@ function generateCollection({
 /**
  * Returns true if 'coll' exists or false otherwise.
  */
-function collectionExists(coll) {
+export function collectionExists(coll) {
     return Array.contains(coll.getDB().getCollectionNames(), coll.getName());
 }
 
@@ -513,7 +516,7 @@ function collectionExists(coll) {
  * Runs and asserts an explain command for an aggregation with the given stage. Returns just the
  * pipeline from the explain results regardless of cluster topology.
  */
-function desugarSingleStageAggregation(db, coll, stage) {
+export function desugarSingleStageAggregation(db, coll, stage) {
     return getExplainedPipelineFromAggregation(db, coll, [stage]);
 }
 
@@ -525,7 +528,7 @@ function desugarSingleStageAggregation(db, coll, stage) {
  * query and removes it before returning results. This is sub ideal for views. options.hint is an
  * optional hint that will get passed on to the aggregation stage. It defaults to undefined.
  */
-function getExplainedPipelineFromAggregation(
+export function getExplainedPipelineFromAggregation(
     db, coll, pipeline, {inhibitOptimization = true, postPlanningResults = false, hint} = {}) {
     // Prevent stages from being absorbed into the .find() layer
     if (inhibitOptimization) {
@@ -541,7 +544,7 @@ function getExplainedPipelineFromAggregation(
         db, result, {inhibitOptimization, postPlanningResults});
 }
 
-function getExplainPipelineFromAggregationResult(db, result, {
+export function getExplainPipelineFromAggregationResult(db, result, {
     inhibitOptimization = true,
     postPlanningResults = false,
 } = {}) {

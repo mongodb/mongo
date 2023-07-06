@@ -3,9 +3,7 @@
 // Start replica set. Ensure that highest priority node becomes primary eventually.
 // Shut down the primary and confirm that the next highest priority node becomes primary.
 // Repeat until 3 nodes are left standing.
-(function() {
-'use strict';
-load('jstests/replsets/rslib.js');
+import {waitUntilAllNodesCaughtUp} from "jstests/replsets/rslib.js";
 
 var name = 'priority_takeover_cascading_priorities';
 var replSet = new ReplSetTest({
@@ -33,4 +31,3 @@ replSet.waitForState(2, ReplSetTest.State.PRIMARY);
 
 // Cannot stop any more nodes because we will not have a majority.
 replSet.stopSet();
-})();

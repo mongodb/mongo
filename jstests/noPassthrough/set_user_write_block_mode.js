@@ -9,11 +9,7 @@
 //   requires_replication,
 // ]
 
-(function() {
-'use strict';
-
-load("jstests/noPassthrough/libs/user_write_blocking.js");
-load("jstests/libs/fail_point_util.js");  // For configureFailPoint
+import {UserWriteBlockHelpers} from "jstests/noPassthrough/libs/user_write_blocking.js";
 
 const {
     WriteBlockState,
@@ -330,4 +326,3 @@ rst.stop();
 const st = new ShardingFixture();
 runTest(st);
 st.stop();
-})();

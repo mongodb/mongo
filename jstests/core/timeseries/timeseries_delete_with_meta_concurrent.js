@@ -20,8 +20,8 @@
  * ]
  */
 
-load("jstests/libs/curop_helpers.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";

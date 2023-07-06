@@ -5,10 +5,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/index_build.js');
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 var dbname = 'dropbgindex';
 var collection = 'jstests_feh';
@@ -83,4 +80,3 @@ assert.soon(function() {
 }, "secondary did not drop index");
 
 replTest.stopSet();
-}());

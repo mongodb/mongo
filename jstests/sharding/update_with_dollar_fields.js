@@ -5,9 +5,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const st = new ShardingTest({nodes: 2});
 
 const dbName = 'testDb';
@@ -45,4 +42,3 @@ assertLastUpdateOplogEntryIsReplacement();
 })();
 
 st.stop();
-}());

@@ -1,6 +1,3 @@
-(function() {
-"use strict";
-
 const coll = db.dotted_path_in_null;
 coll.drop();
 
@@ -20,4 +17,3 @@ assert.eq([2, 4], getIds({"a.b": {$in: [null]}}), "Did not match the expected do
 
 assert.commandWorked(coll.createIndex({"a.b": 1}));
 assert.eq([2, 4], getIds({"a.b": {$in: [null]}}), "Did not match the expected documents");
-}());

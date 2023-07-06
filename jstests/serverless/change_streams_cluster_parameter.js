@@ -8,11 +8,9 @@
 //  # TODO SERVER-74811: Re-enable this test.
 //   __TEMPORARILY_DISABLED__,
 // ]
-(function() {
-"use strict";
-
-// For ChangeStreamMultitenantReplicaSetTest.
-load("jstests/serverless/libs/change_collection_util.js");
+import {
+    ChangeStreamMultitenantReplicaSetTest
+} from "jstests/serverless/libs/change_collection_util.js";
 
 // Verifies that the 'getClusterParameter' on the 'changeStreams' cluster-wide parameter returns the
 // expected response.
@@ -135,4 +133,3 @@ function testWithoutAdminDB(conn) {
 
     rst.stopSet();
 }
-}());

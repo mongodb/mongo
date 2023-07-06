@@ -4,11 +4,13 @@
  * @tags: [requires_sharding, assumes_balancer_on, antithesis_incompatible]
  */
 
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/sharded_base_partitioned.js";
-load('jstests/concurrency/fsm_workload_helpers/balancer.js');
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 5;

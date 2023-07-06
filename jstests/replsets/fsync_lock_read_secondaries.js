@@ -21,10 +21,8 @@
  * 9) Soon, the secondary should be applying the oplog again, which we should
  *    witness as an increase in the count of documents stored on the secondary.
  */
-(function() {
-"use strict";
 // Load utility methods for replica set tests
-load("jstests/replsets/rslib.js");
+import {waitForAllMembers} from "jstests/replsets/rslib.js";
 
 var replTest = new ReplSetTest({name: 'testSet', nodes: 2, oplogSize: 5});
 // Start each mongod in the replica set. Returns a list of nodes
@@ -41,7 +39,7 @@ var ret = primary.getDB("admin").fsyncLock();
 if (!ret.ok) {
     assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
     jsTestLog("Storage Engine does not support fsyncLock, so bailing");
-    return;
+    quit();
 }
 primary.getDB("admin").fsyncUnlock();
 
@@ -75,4 +73,3 @@ assert.soon(function() {
     return secondaries[0].getDB("foo").bar.find().itcount() > 100;
 }, "count of documents stored on the secondary did not increase");
 replTest.stopSet();
-}());

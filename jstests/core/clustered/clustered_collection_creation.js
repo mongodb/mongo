@@ -12,10 +12,9 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 
 const validateCompoundSecondaryIndexes = function(db, coll, clusterKey) {
     const clusterKeyField = Object.keys(clusterKey)[0];
@@ -346,4 +345,3 @@ assert.commandFailedWithCode(db.runCommand({
 // Validate that it's possible to create secondary indexes, regardless of whether they
 // include the cluster key as one of the fields.
 validateCompoundSecondaryIndexes(replicatedDB, replicatedColl, {_id: 1});
-})();

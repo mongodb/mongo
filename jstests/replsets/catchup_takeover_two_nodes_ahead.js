@@ -9,12 +9,11 @@
 // Now the primary is most-up-to-date and another node is more up-to-date than others.
 // Make a lagged node the next primary.
 // Confirm that the most up-to-date node becomes primary.
-
-(function() {
-'use strict';
-
-load('jstests/replsets/rslib.js');
-load('jstests/replsets/libs/election_metrics.js');
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
+import {
+    verifyCatchUpConclusionReason,
+    verifyServerStatusElectionReasonCounterChange,
+} from "jstests/replsets/libs/election_metrics.js";
 
 var name = 'catchup_takeover_two_nodes_ahead';
 var replSet = new ReplSetTest({name: name, nodes: 5});
@@ -78,4 +77,3 @@ verifyCatchUpConclusionReason(initialNode2Status.electionMetrics,
 // Let the nodes catchup.
 restartServerReplication(nodes.slice(1, 5));
 replSet.stopSet();
-})();

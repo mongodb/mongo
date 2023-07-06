@@ -4,10 +4,7 @@
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
 
-(function() {
-"use strict";
-
-var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+var staticMongod = MongoRunner.runMongod({});
 
 let st = new ShardingTest({shards: 2, other: {shardOptions: {verbose: 1}}});
 
@@ -74,4 +71,3 @@ commitTxn();
 
 st.stop();
 MongoRunner.stopMongod(staticMongod);
-})();

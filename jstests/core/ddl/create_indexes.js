@@ -4,9 +4,7 @@
  * ]
  * fcv49 for the change to error code in createIndexes invalid field reply.
  */
-(function() {
-'use strict';
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const kUnknownIDLFieldError = 40415;
 const runningOnMongos = FixtureHelpers.isMongos(db);
@@ -198,4 +196,3 @@ assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
 // This is consistent with server behavior prior to 6.0.
 res = configDB.runCommand({createIndexes: 'transactions', indexes: []});
 assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
-}());

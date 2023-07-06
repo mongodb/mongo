@@ -4,12 +4,6 @@
  */
 
 // Randomized property testing.
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode() and assertArrayEq().
-
 var conn = MongoRunner.runMongod();
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
@@ -94,4 +88,3 @@ for (let i = 0; i < 5; i++) {
     runRandomizedPropertyTest({op: "$multiply", min: -31415, max: 31415});
 }
 MongoRunner.stopMongod(conn);
-})();

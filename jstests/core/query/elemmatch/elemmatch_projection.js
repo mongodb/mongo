@@ -2,9 +2,6 @@
 // @tags: [
 //   requires_getmore,
 // ]
-(function() {
-"use strict";
-
 const coll = db.elemmatch_projection;
 coll.drop();
 
@@ -167,4 +164,3 @@ while (it.hasNext()) {
 }
 
 assert(coll.drop());
-}());

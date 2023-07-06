@@ -1,10 +1,9 @@
 // SERVER-10176: Add $abs aggregation expression.
 
-// For assertErrorCode.
-load('jstests/aggregation/extras/utils.js');
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
 
-(function() {
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+
 var coll = db.abs_expr;
 coll.drop();
 
@@ -69,4 +68,3 @@ assertErrorCode(coll, [{$project: {a: {$abs: "$a"}}}], 28765);
 assert(coll.drop());
 assert.commandWorked(coll.insert({_id: 0, a: NumberLong("-9223372036854775808")}));
 assertErrorCode(coll, [{$project: {a: {$abs: "$a"}}}], 28680);
-}());

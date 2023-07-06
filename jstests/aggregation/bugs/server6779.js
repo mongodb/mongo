@@ -1,8 +1,5 @@
 // server 6779: serializing ExpressionCoerceToBool
 // This test only fails in debug mode with the bug since that tests round-tripping
-(function() {
-"use strict";
-
 function test(op, val) {
     const coll = db.server6779;
     coll.drop();
@@ -17,4 +14,3 @@ function test(op, val) {
 }
 test('$and', true);
 test('$or', false);
-}());

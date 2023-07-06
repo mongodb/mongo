@@ -5,9 +5,6 @@
 //   uses_multiple_connections,
 //   docker_incompatible,
 // ]
-(function() {
-'use strict';
-
 const mongod = new MongoURI(db.getMongo().host).servers[0];
 const host = mongod.host;
 const port = mongod.port;
@@ -35,4 +32,3 @@ testConnect(false, `${host}/test`, '--port', port);
 testConnect(false, `mongodb://${host}:${port}/test`, '--port', port);
 testConnect(false, `mongodb://${host}:${port}/test`, '--host', host);
 testConnect(false, `mongodb://${host}:${port}/test`, '--host', host, '--port', port);
-})();

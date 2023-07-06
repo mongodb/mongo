@@ -3,9 +3,6 @@
  * collection.
  */
 
-(function() {
-"use strict";
-
 const collNamePrefix = "reindex_duplicate_keys_";
 let count = 0;
 
@@ -43,4 +40,3 @@ let runTest = function(doc) {
 
 runTest();
 runTest({a: 1});
-})();

@@ -2,9 +2,6 @@
 
 var db;
 
-(function() {
-'use strict';
-
 const setName = 'rs0';
 const replSet = new ReplSetTest({name: setName, nodes: 3});
 const nodes = replSet.nodeList();
@@ -33,4 +30,3 @@ assert.soon(function() {
 });
 awaitShell();
 replSet.stopSet();
-})();

@@ -6,7 +6,7 @@
  * ]
  */
 import {getPlanStage, getPlanStages, isIndexOnly, isIxscan} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/fixture_helpers.js");  // For 'isMongos'.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const collNamePrefix = 'sort_merge_';
 let collCount = 0;

@@ -15,6 +15,7 @@
  *   does_not_support_causal_consistency
  * ]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/map_reduce_inline.js";
 

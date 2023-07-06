@@ -3,7 +3,13 @@
  * mixed modes can still function
  */
 
-load("jstests/ssl/libs/ssl_helpers.js");
+import {
+    allowSSL,
+    disabled,
+    preferSSL,
+    replShouldFail,
+    replShouldSucceed
+} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Limit the amount of time we'll wait on a failure.
 // Apply equally to success tests as well so that

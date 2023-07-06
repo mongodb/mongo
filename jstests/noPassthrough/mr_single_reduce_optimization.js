@@ -1,5 +1,3 @@
-(function() {
-"use strict";
 // See SERVER-68766. Verify that the reduce function is not run on a single value if the relevant
 // flag is enabled.
 
@@ -26,4 +24,3 @@ res = assert.commandWorked(
 assert.eq(res.results[0], {_id: 0, value: "reduced value"});
 
 MongoRunner.stopMongod(conn);
-}());

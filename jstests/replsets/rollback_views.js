@@ -14,10 +14,7 @@
  * 7. The contents of A and B are compared to ensure the rollback results in consistent nodes,
  *    and have the expected collections and views..
  */
-load("jstests/replsets/rslib.js");
-
-(function() {
-"use strict";
+import {awaitOpTime} from "jstests/replsets/rslib.js";
 
 // Run a command, return the result if it worked, or assert with a message otherwise.
 let checkedRunCommand = (db, cmd) =>
@@ -141,4 +138,3 @@ replTest.checkReplicatedDataHashes();
 replTest.checkOplogs();
 
 replTest.stopSet();
-}());

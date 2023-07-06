@@ -1,10 +1,10 @@
 // Tests that $lookup and its subpipelines obey the read preference specified by the user.
 // @tags: [requires_majority_read_concern, requires_fcv_51]
-(function() {
-'use strict';
-
-load('jstests/libs/profiler.js');             // For various profiler helpers.
-load('jstests/aggregation/extras/utils.js');  // For arrayEq()
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {
+    profilerHasAtLeastOneMatchingEntryOrThrow,
+    profilerHasZeroMatchingEntriesOrThrow,
+} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({name: 'lookup_read_preference', mongos: 1, shards: 2, rs: {nodes: 2}});
 
@@ -119,4 +119,3 @@ expectedRes = [{_id: -1, bs: {_id: 1, cs: {_id: -1}}}, {_id: 1, bs: {_id: -1, cs
 assertAggRouting(pipeline, expectedRes, 'nested lookup against secondary', true);
 
 st.stop();
-}());

@@ -11,9 +11,6 @@
  *   requires_wiredtiger,
  * ]
  */
-(function() {
-"use strict";
-
 const maxRetries = 3;
 
 const replSet = new ReplSetTest({
@@ -101,4 +98,3 @@ for (const op of ["delete", "update"]) {
 }
 
 replSet.stopSet();
-})();

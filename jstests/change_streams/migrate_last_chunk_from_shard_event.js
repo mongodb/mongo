@@ -11,12 +11,9 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
-load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
-                                                   // 'assertChangeStreamEventEq'.
 const dbName = jsTestName();
 const collName = "test";
 const collNS = dbName + "." + collName;
@@ -152,4 +149,3 @@ validateExpectedEventAndConfirmResumability(1, {
 validateShowSystemEventsFalse();
 
 st.stop();
-}());

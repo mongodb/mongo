@@ -6,9 +6,6 @@
  *  requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
 const name = jsTestName();
 const rst = ReplSetTest({name: name, nodes: 2});
 rst.startSet();
@@ -83,4 +80,3 @@ for (const op of opsLogged) {
 }
 
 rst.stopSet();
-})();

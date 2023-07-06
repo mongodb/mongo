@@ -9,9 +9,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/api_version_helpers.js");  // For 'APIVersionHelpers'.
+import {APIVersionHelpers} from "jstests/libs/api_version_helpers.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_version_new_52_language_features";
@@ -97,4 +95,3 @@ for (const pipeline of stablePipelines) {
         cursor: {},
     }));
 }
-})();

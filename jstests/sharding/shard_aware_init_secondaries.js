@@ -4,9 +4,6 @@
  * @tags: [requires_persistence]
  */
 
-(function() {
-"use strict";
-
 var st = new ShardingTest({shards: 1});
 
 var replTest = new ReplSetTest({nodes: 2});
@@ -69,4 +66,3 @@ assert.soon(() => shardIdentityDoc.configsvrConnectionString ==
 replTest.stopSet();
 
 st.stop();
-})();

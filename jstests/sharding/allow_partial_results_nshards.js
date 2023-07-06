@@ -7,9 +7,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 // This test looks for exact matches in log output, which does not account for implicit sessions.
 TestData.disableImplicitSessions = true;
 
@@ -137,4 +134,3 @@ assertMatchingLogLineExists(Object.assign({nShards: 1}, findCmd));
 assert.eq(findRes.cursor.partialResultsReturned, true);
 
 st.stop();
-})();

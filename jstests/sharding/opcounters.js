@@ -4,9 +4,6 @@
  * @tags: [requires_fcv_62]
  */
 
-(function() {
-'use strict';
-
 const st = new ShardingTest({mongos: 2, shards: 1});
 
 function getOpCounters(conn) {
@@ -51,4 +48,3 @@ const mongosDB = st.s.getDB(dbName);
 }
 
 st.stop();
-})();

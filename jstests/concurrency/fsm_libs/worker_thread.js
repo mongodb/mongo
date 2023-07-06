@@ -1,7 +1,6 @@
-load('jstests/concurrency/fsm_libs/assert.js');
 import {Cluster} from "jstests/concurrency/fsm_libs/cluster.js";
-load('jstests/concurrency/fsm_libs/parse_config.js');  // for parseConfig
-load('jstests/libs/specific_secondary_reader_mongo.js');
+import {parseConfig} from "jstests/concurrency/fsm_libs/parse_config.js";
+import {SpecificSecondaryReaderMongo} from "jstests/libs/specific_secondary_reader_mongo.js";
 
 export const workerThread = (function() {
     // workloads = list of workload filenames
@@ -19,6 +18,8 @@ export const workerThread = (function() {
     // args.sessionOptions = the options to start a session with
     // run = callback that takes a map of workloads to their associated $config
     async function main(workloads, args, run) {
+        const {setGlobalAssertLevel} = await import("jstests/concurrency/fsm_libs/assert.js");
+
         var myDB;
         var configs = {};
         var connectionString = 'mongodb://' + args.host + '/?appName=tid:' + args.tid;
@@ -26,7 +27,7 @@ export const workerThread = (function() {
             connectionString += '&replicaSet=' + args.replSetName;
         }
 
-        globalAssertLevel = args.globalAssertLevel;
+        setGlobalAssertLevel(args.globalAssertLevel);
 
         // The global 'TestData' object may still be undefined if the concurrency suite isn't being
         // run by resmoke.py (e.g. if it is being run via a parallel shell in the backup/restore
@@ -38,7 +39,7 @@ export const workerThread = (function() {
             // Can be added to yml files as the following example:
             // fsmPreOverridesLoadedCallback: '
             //     testingReplication = true;
-            //     load('jstests/libs/override_methods/network_error_and_txn_override.js');
+            //     await import("jstests/libs/override_methods/network_error_and_txn_override.js");
             //     ...
             // '
             if (typeof TestData.fsmPreOverridesLoadedCallback !== 'undefined') {
@@ -48,7 +49,7 @@ export const workerThread = (function() {
             if (typeof db !== 'undefined') {
                 // The implicit database connection created within the thread's scope
                 // is unneeded, so forcibly clean it up.
-                db = null;
+                globalThis.db = undefined;
                 gc();
             }
 
@@ -61,7 +62,8 @@ export const workerThread = (function() {
 
             // Retry operations that fail due to in-progress background operations. Load this early
             // so that later overrides can be retried.
-            load('jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js');
+            await import(
+                "jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js");
 
             if (typeof args.sessionOptions !== 'undefined') {
                 let initialClusterTime;
@@ -98,11 +100,11 @@ export const workerThread = (function() {
                     // the right thing based on the DB.
                     session.getOptions().setReadPreference(undefined);
 
-                    // We load() set_read_preference_secondary.js in order to avoid running
+                    // We import set_read_preference_secondary.js in order to avoid running
                     // commands against the "admin" and "config" databases via mongos with
                     // readPreference={mode: "secondary"} when there's only a single node in
                     // the CSRS.
-                    load('jstests/libs/override_methods/set_read_preference_secondary.js');
+                    await import("jstests/libs/override_methods/set_read_preference_secondary.js");
                 }
 
                 if (typeof initialClusterTime !== 'undefined') {
@@ -153,7 +155,7 @@ export const workerThread = (function() {
 
                     assert(!TestData.hasOwnProperty('networkErrorAndTxnOverrideConfig'), TestData);
                     TestData.networkErrorAndTxnOverrideConfig = {retryOnNetworkErrors: true};
-                    load('jstests/libs/override_methods/network_error_and_txn_override.js');
+                    await import("jstests/libs/override_methods/network_error_and_txn_override.js");
                 }
 
                 // Operations that run after a "dropDatabase" command has been issued may fail with
@@ -163,11 +165,12 @@ export const workerThread = (function() {
                 // implicitly_retry_on_database_drop_pending.js file to make it so that the clients
                 // started by the concurrency framework automatically retry their operation in the
                 // face of this particular error response.
-                load('jstests/libs/override_methods/implicitly_retry_on_database_drop_pending.js');
+                await import(
+                    "jstests/libs/override_methods/implicitly_retry_on_database_drop_pending.js");
             }
 
             if (TestData.defaultReadConcernLevel || TestData.defaultWriteConcern) {
-                load('jstests/libs/override_methods/set_read_and_write_concerns.js');
+                await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
             }
 
             for (const workload of workloads) {

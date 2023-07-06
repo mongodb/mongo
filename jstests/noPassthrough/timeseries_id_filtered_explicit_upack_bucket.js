@@ -1,9 +1,6 @@
 /**
  * Tests that $_unpackBucket can still work properly if put after other stages like $match.
  */
-(function() {
-"use strict";
-
 const measurementsPerBucket = 10;
 const nBuckets = 10;
 const conn =
@@ -90,4 +87,3 @@ filteredMeasurements = getFilteredMeasurements();
 assertMeasurementsInBuckets(3, 4, filteredMeasurements);
 
 MongoRunner.stopMongod(conn);
-})();

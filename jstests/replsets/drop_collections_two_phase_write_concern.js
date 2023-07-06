@@ -3,7 +3,7 @@
  * collections, with optimes preceding or equal to the operation's optime, to be reaped.
  */
 
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 // Alias to logging function in two_phase_drops.js

@@ -2,9 +2,6 @@
  * @tags: [requires_replication, requires_persistence]
  */
 
-(function() {
-'use strict';
-
 const keyfile = 'jstests/libs/key1';
 const keyfileContents = cat(keyfile).replace(/[\011-\015\040]/g, '');
 
@@ -16,7 +13,6 @@ function runTest(name, conns, restartCallback) {
     const CREATE_ADMIN = createUserCommand('admin', ['__system'], conns.wc);
     const CREATE_USER1 = createUserCommand('user1', [], conns.wc);
     const CREATE_USER2 = createUserCommand('user2', [], conns.wc);
-    const CREATE_USER3 = createUserCommand('user3', [], conns.wc);
 
     jsTest.log('Starting: ' + name);
     assert(conns.primary);
@@ -109,4 +105,3 @@ runTest('ReplSet', {primary: replset.getPrimary(), replset: replset, wc: replset
     return {primary: replset.getPrimary(), replset: replset, wc: replsetWC};
 });
 replset.stopSet();
-})();

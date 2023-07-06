@@ -4,12 +4,14 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
-load("jstests/sharding/analyze_shard_key/libs/cardinality_and_frequency_common.js");
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {
+    assertAggregateQueryPlans,
+    getMongodConns,
+    numMostCommonValues
+} from "jstests/sharding/analyze_shard_key/libs/cardinality_and_frequency_common.js";
 
 const numNodesPerRS = 2;
 
@@ -337,4 +339,3 @@ const setParameterOpts = {
 
     rst.stopSet();
 }
-})();

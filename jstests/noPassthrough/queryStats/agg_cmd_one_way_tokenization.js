@@ -2,9 +2,12 @@
  * Test that $queryStats properly tokenizes aggregation commands, on mongod and mongos.
  * @tags: [featureFlagQueryStats]
  */
-load("jstests/libs/query_stats_utils.js");
-(function() {
-"use strict";
+import {
+    asFieldPath,
+    asVarRef,
+    getQueryStatsAggCmd,
+    kShellApplicationName
+} from "jstests/libs/query_stats_utils.js";
 
 const kHashedDbName = "iDlS7h5jf5HHxWPJpeHRbA+jLTNNZaqxVVkplrEkfko=";
 const kHashedCollName = "w6Ax20mVkbJu4wQWAMjL8Sl+DfXAr2Zqdc3kJRB7Oo0=";
@@ -192,4 +195,3 @@ const st = new ShardingTest({
 });
 runTest(st.s);
 st.stop();
-}());

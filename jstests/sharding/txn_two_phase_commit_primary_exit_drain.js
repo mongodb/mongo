@@ -6,16 +6,11 @@
  * multiversion_incompatible]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {
     checkDecisionIs,
     checkDocumentDeleted
 } from "jstests/sharding/libs/txn_two_phase_commit_util.js";
-
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
 const dbName = "test";
 const collName = "foo";
@@ -121,4 +116,3 @@ const testCommitProtocol = function() {
 testCommitProtocol();
 
 st.stop();
-})();

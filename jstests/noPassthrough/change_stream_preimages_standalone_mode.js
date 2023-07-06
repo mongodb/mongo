@@ -12,42 +12,11 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load(
-    "jstests/libs/change_stream_util.js");  // For
-                                            // assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
-                                            // preImagesForOps.
-
-// Fetches the collection with name 'collName' from database 'nodeDB'. Expects the collection to
-// exist.
-const findCollectionInfo = function(nodeDB, collName) {
-    const collInfos = nodeDB.getCollectionInfos();
-    assert.gt(collInfos.length, 0, "The database is empty");
-
-    const collInfo = collInfos.filter(collInfo => collInfo.name == collName);
-    assert.eq(collInfo.length, 1);
-    return collInfo[0];
-};
-
-// Returns the oplog entries written while performing the write operations.
-function oplogEntriesForOps(db, writeOps) {
-    const oplogColl = db.getSiblingDB('local').oplog.rs;
-    const numOplogEntriesBefore = oplogColl.find().itcount();
-
-    // Perform the write operations.
-    writeOps();
-
-    // Check the number of oplog entries written.
-    const numOplogEntriesAfter = oplogColl.find().itcount();
-    const numberOfNewOplogEntries = numOplogEntriesAfter - numOplogEntriesBefore;
-    if (numberOfNewOplogEntries == 0) {
-        return [];
-    }
-    return oplogColl.find().sort({ts: -1}).limit(numberOfNewOplogEntries).toArray();
-}
+import {preImagesForOps} from "jstests/libs/change_stream_util.js";
+import {
+    assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled
+} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 /**
  * Tests the pre-image recording behavior when the server transitions to and from the stand-alone
@@ -152,4 +121,3 @@ testStandaloneMode({
         assert.eq(writtenPreImages.length, 0, writtenPreImages);
     }
 });
-}());

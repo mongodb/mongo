@@ -1,9 +1,6 @@
 // Verify that speculative auth works with mongos.
 // @tags: [requires_sharding]
 
-(function() {
-'use strict';
-
 const CLIENT_NAME = 'CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US';
 const CLIENT_CERT = 'jstests/libs/client.pem';
 const SERVER_CERT = 'jstests/libs/server.pem';
@@ -109,4 +106,3 @@ if (st.configRS) {
 }
 
 st.stop();
-}());

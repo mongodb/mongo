@@ -1,16 +1,13 @@
 // @tags: [requires_sharding]
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
-
 /**
  * Performs basic checks on the configureFailPoint and waitForFailPoint command.
  * Also check mongo/util/fail_point_test.cpp for unit tests.
  *
  * @param adminDB {DB} the admin database database object
  */
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+
 function runBasicTest(adminDB) {
     function expectFailPointState(fpState, expectedMode, expectedData) {
         assert.eq(expectedMode, fpState.mode);
@@ -137,4 +134,3 @@ assert.lte(1, configureFailPointRes.count);
 joinHungWrite();
 
 st.stop();
-})();

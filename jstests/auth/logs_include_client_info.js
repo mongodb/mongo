@@ -1,8 +1,6 @@
 // This test just checks that the success/failure messages for authentication include the IP
 // address of the client attempting to authenticate.
 
-(function() {
-
 const kAuthenticationSucceeded = 5286306;
 const kAuthenticationFailed = 5286307;
 const kIpAndPortRegex = /(?:\d{1,3}\.){3}\d{1,3}:\d+/;
@@ -37,4 +35,3 @@ assert(checkLog.checkContainsWithCountJson(
     true));
 
 MongoRunner.stopMongod(conn);
-})();

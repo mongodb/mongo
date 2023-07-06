@@ -14,6 +14,7 @@
  *   does_not_support_transactions
  * ]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     // Hardcode time-series collection information so that the threads can all obtain it and run on

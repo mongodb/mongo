@@ -1,8 +1,5 @@
 // Tests that helper functions for creating indexes check the number of arguments passed.
 
-(function() {
-"use strict";
-
 const coll = db.create_index_helper_validation;
 coll.drop();
 
@@ -23,4 +20,3 @@ assert.throws(() => coll.createIndex(
                   /* options */ {},
                   /* commitQuorum */ "majority",
                   {unique: true}));
-}());

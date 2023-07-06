@@ -3,11 +3,8 @@
  * the persistent state (e.g. config.collections and config.tags) in the resharding commit phase
  * fails with a TransactionTooLargeForCache error.
  */
-
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 function assertEqualObj(lhs, rhs, keysToIgnore) {
     assert.eq(Object.keys(lhs).length, Object.keys(lhs).length, {lhs, rhs});
@@ -134,4 +131,3 @@ for (let i = 0; i < tagsAfter.length; i++) {
 }
 
 st.stop();
-})();

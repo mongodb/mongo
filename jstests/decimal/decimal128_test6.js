@@ -2,9 +2,6 @@
  * Derived from test cases at https://github.com/mongodb/specifications
  */
 
-(function() {
-"use strict";
-
 var parseErrors = [
     {"description": "Incomplete Exponent", "string": "1e"},
     {"description": "Exponent at the beginning", "string": "E01"},
@@ -46,4 +43,3 @@ parseErrors.forEach(function(testCase) {
     }
     assert.throws(test, [], `[Test - ${testCase.description}] should have failed with error.`);
 });
-}());

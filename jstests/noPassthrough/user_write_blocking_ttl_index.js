@@ -7,10 +7,7 @@
 //   requires_replication,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // Test on replset primary
 const rst = new ReplSetTest({
@@ -99,4 +96,3 @@ runTest(primary, [
     {dbname: "local", colName: "user_write_blocking_ttl_index", expectReap: true}
 ]);
 rst.stopSet();
-})();

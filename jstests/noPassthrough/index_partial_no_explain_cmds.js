@@ -1,8 +1,7 @@
 // Test partial indexes with commands that don't use explain.  These commands are tested against
 // mongod with the --notablescan flag set, so that they fail if the index is not used.
-load("jstests/aggregation/extras/utils.js");  // For resultsEq
-(function() {
-"use strict";
+import {resultsEq} from "jstests/aggregation/extras/utils.js";
+
 var runner = MongoRunner.runMongod({setParameter: "notablescan=1"});
 const db = runner.getDB("test");
 var coll = db.index_partial_no_explain_cmds;
@@ -58,4 +57,3 @@ assert.throws(function() {
 ret = coll.distinct("x");
 assert.eq(2, ret.length);
 MongoRunner.stopMongod(runner);
-})();

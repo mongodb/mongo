@@ -1,4 +1,4 @@
-load('jstests/libs/parallelTester.js');
+import {Thread} from "jstests/libs/parallelTester.js";
 
 var start = new Date();
 print("start: " + start);

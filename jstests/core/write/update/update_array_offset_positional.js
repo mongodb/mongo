@@ -1,9 +1,6 @@
 /**
  * Tests that array offset matches are not used to provide values for the positional operator.
  */
-(function() {
-"use strict";
-
 let coll = db.jstest_update_array_offset_positional;
 coll.drop();
 
@@ -66,4 +63,3 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: [0, 1], b: [{c: [0]}]}));
 assert.commandWorked(coll.update({_id: 0, a: 1, "b.0.c.0": 0}, {$set: {"a.$": 2}}));
 assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [0, 2], b: [{c: [0]}]});
-}());

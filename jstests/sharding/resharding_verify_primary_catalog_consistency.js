@@ -6,10 +6,7 @@
  *   uses_atclustertime
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/resharding_test_fixture.js");
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 2, reshardInPlace: false});
 reshardingTest.setup();
@@ -36,4 +33,3 @@ assert.neq(newCollInfo, null, "failed to find sharded collection after reshardin
 assert.neq(newCollInfo.info.uuid, originalCollInfo.info.uuid, {newCollInfo, originalCollInfo});
 
 reshardingTest.teardown();
-})();

@@ -1,5 +1,3 @@
-'use strict';
-
 // The validate command should work in the following scenarios on a sharded environment with 3 or
 // more shards:
 //
@@ -10,7 +8,6 @@
 //    database and splitting it across the shards. See SERVER-22588 for details.
 // 4. The previous scenario, but with validation legitimately failing on one of the shards.
 
-(function() {
 const NUM_SHARDS = 3;
 assert(NUM_SHARDS >= 3);
 
@@ -82,4 +79,3 @@ validate(false);
 setFailValidateFailPointOnShard(false, primaryShard);
 
 st.stop();
-})();

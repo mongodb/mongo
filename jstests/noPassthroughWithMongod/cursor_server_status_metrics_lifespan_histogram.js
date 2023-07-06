@@ -1,8 +1,6 @@
 /**
  * Tests for serverStatus metrics.cursor.lifespan stats.
  */
-(function() {
-'use strict';
 const coll = db[jsTest.name()];
 coll.drop();
 
@@ -82,4 +80,3 @@ while (cursorLt10Minutes.hasNext()) {
     cursorLt10Minutes.next();
 }
 assert.eq(getNumCursorsLessThan10Minutes() - initialNumCursorsLt10m, 1);
-}());

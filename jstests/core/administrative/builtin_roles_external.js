@@ -2,9 +2,6 @@
  * Attempting to enumerate roles on the $external database should return an empty set.
  * @tags: [requires_fcv_60,tenant_migration_incompatible]
  */
-(function() {
-"use strict";
-
 function assertBuiltinRoles(dbname, shouldHaveRoles) {
     const allRoles = assert
                          .commandWorked(db.getSiblingDB(dbname).runCommand(
@@ -44,4 +41,3 @@ assertBuiltinRoles('admin', true);
 assertBuiltinRoles('test', true);
 assertBuiltinRoles('$external', false);
 assertBuiltinRoles('$test', true);
-}());

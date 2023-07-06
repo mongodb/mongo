@@ -1,10 +1,7 @@
 /**
  * Perform basic tests for the split command against mongos.
  */
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var st = new ShardingTest({mongos: 2, shards: 2, other: {chunkSize: 1}});
 var configDB = st.s0.getDB('config');
@@ -119,4 +116,3 @@ assert.gt(
     1);
 
 st.stop();
-})();

@@ -1,6 +1,3 @@
-(function() {
-
-"use strict";
 var t = db.jstests_server22053;
 
 /* eslint-disable no-sparse-arrays */
@@ -16,4 +13,3 @@ assert.eq(3, doc['mys'][2]);
 assert.eq(undefined, doc['mys'][3]);
 assert.eq(undefined, doc['mys'][4]);
 assert.eq(6, doc['mys'][5]);
-}());

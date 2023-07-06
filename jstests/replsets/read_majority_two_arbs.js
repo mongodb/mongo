@@ -4,9 +4,6 @@
  *
  * @tags: [requires_majority_read_concern, requires_fcv_53]
  */
-(function() {
-"use strict";
-
 function log(arg) {
     jsTest.log(tojson(arg));
 }
@@ -64,4 +61,3 @@ jsTest.log("doing committed read");
 assert.eq(doCommittedRead(), 0);
 jsTest.log("stopping replTest; test completed successfully");
 replTest.stopSet();
-}());

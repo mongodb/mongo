@@ -12,9 +12,10 @@
  *
  * @tags: [requires_capped]
  */
+import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/agg_base.js";
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Use a smaller document size, but more iterations. The smaller documents will ensure each

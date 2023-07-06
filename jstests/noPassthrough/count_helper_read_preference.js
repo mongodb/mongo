@@ -1,7 +1,4 @@
 // Tests that the read preference set on the connection is used when we call the count helper.
-(function() {
-"use strict";
-
 var commandsRan = [];
 
 // Create a new DB object backed by a mock connection.
@@ -45,4 +42,3 @@ db.foo.count();
 // Check that we have correctly attached the read preference to the command.
 assert.eq(commandsRan.length, 1);
 assert.docEq({count: "foo", query: {}, $readPreference: {mode: "secondary"}}, commandsRan[0].cmd);
-})();

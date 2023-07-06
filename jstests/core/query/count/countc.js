@@ -9,8 +9,6 @@
 //     requires_scripting
 // ]
 
-(function() {
-'use strict';
 const collNamePrefix = 'jstests_countc_';
 let collCount = 0;
 let t = db.getCollection(collNamePrefix + collCount++);
@@ -149,4 +147,3 @@ assert.commandWorked(t.insert([
     {_id: docId++, a: 1, b: 2},
 ]));
 assert.eq(1, t.count({a: 1, $where: 'this.b == 1'}));
-})();

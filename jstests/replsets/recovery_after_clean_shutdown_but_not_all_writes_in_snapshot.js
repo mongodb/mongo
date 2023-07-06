@@ -4,9 +4,6 @@
  *
  * @tags: [requires_persistence, requires_replication]
  */
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({
     name: "recoveryAfterCleanShutdown",
     nodes: 2,
@@ -78,4 +75,3 @@ assert.commandWorked(
 
 // Fast metadata count should be correct after restart in the face of a clean shutdown.
 rst.stopSet();
-}());

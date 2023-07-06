@@ -5,10 +5,7 @@
 /**
  * Tests for the JSON Schema 'minProperties' and 'maxProperties' keywords.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/assert_schema_match.js");
+import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 
 const coll = db.jstests_schema_min_max_properties;
 
@@ -48,4 +45,3 @@ assertSchemaMatch(coll, {properties: {a: {minProperties: 1}}}, {a: 1}, true);
 assertSchemaMatch(coll, {properties: {a: {minProperties: 1}}}, {a: {}}, false);
 assertSchemaMatch(coll, {properties: {a: {minProperties: 1}}}, {a: {b: 1}}, true);
 assertSchemaMatch(coll, {properties: {a: {minProperties: 1}}}, {a: {b: 1, c: 1}}, true);
-}());

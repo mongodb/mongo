@@ -8,14 +8,11 @@
  *    uses_multi_shard_transaction,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {
+    isUpdateDocumentShardKeyUsingTransactionApiEnabled
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({shards: 2});
-const shard0Primary = st.rs0.getPrimary();
 
 const dbName = "testDb";
 const collName = "testColl";
@@ -144,4 +141,3 @@ const lsid = ({id: UUID()});
 })();
 
 st.stop();
-})();

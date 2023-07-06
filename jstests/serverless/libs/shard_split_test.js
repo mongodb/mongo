@@ -1,9 +1,8 @@
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/replsets/rslib.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
+import {createRst, createRstArgs} from "jstests/replsets/rslib.js";
 
 function runForgetShardSplitAsync(primaryHost, migrationIdString) {
     const primary = new Mongo(primaryHost);
@@ -20,8 +19,8 @@ function runAbortShardSplitAsync(primaryHost, migrationIdString) {
  * @param {rstArgs} replicaSetArgs for the replica set to connect to.
  * @param {tenantIds} perform a write operation for each tenantId.
  */
-export function doWriteOperations(rstArgs, tenantIds) {
-    load("jstests/replsets/rslib.js");
+export async function doWriteOperations(rstArgs, tenantIds) {
+    const {createRst} = await import("jstests/replsets/rslib.js");
 
     const donorRst = createRst(rstArgs, true);
     const donorPrimary = donorRst.getPrimary();
@@ -99,7 +98,7 @@ async function runCommitSplitThreadWrapper(rstArgs,
                                            recipientTagName,
                                            recipientSetName,
                                            retryOnRetryableErrors) {
-    load("jstests/replsets/rslib.js");
+    const {createRst} = await import("jstests/replsets/rslib.js");
     const {runShardSplitCommand} = await import("jstests/serverless/libs/shard_split_test.js");
 
     const donorRst = createRst(rstArgs, true);

@@ -11,9 +11,6 @@
 // ]
 
 // Tests for the arrayFilters option to update and findAndModify.
-(function() {
-"use strict";
-
 const collName = "update_arrayFilters";
 let coll = db[collName];
 coll.drop();
@@ -602,4 +599,3 @@ assert.commandWorked(coll.update({_id: 0},
                                  {arrayFilters: [{"i.x": 1}, {"j.x": 1}, {"k.y": 0}, {"m.y": 1}]}));
 assert.eq(coll.findOne({_id: 0}),
           {_id: 0, a: [{x: 0, b: [{y: 0, c: 0}]}, {x: 1, b: [{y: 0, c: 1}, {y: 1, c: 2}]}]});
-})();

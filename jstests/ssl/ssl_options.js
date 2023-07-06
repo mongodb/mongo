@@ -1,9 +1,8 @@
 // Test redaction of passwords in command line SSL option parsing.
 
-load('jstests/ssl/libs/ssl_helpers.js');
-requireSSLProvider('openssl', function() {
-    'use strict';
+import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
+requireSSLProvider('openssl', function() {
     const baseName = "jstests_ssl_ssl_options";
 
     jsTest.log("Testing censorship of ssl options");

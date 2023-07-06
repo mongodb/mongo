@@ -4,9 +4,6 @@
 
 import {tenantCommand} from "jstests/libs/cluster_server_parameter_utils.js";
 
-(function() {
-'use strict';
-
 const tenantId1 = ObjectId();
 const tenantId2 = ObjectId();
 
@@ -283,4 +280,3 @@ const opts = {
 // Do not test sharding since mongos must have an authenticated connection to
 // all mongod nodes, and this conflicts with proxying tokens which we'll be
 // performing in mongoq.
-})();

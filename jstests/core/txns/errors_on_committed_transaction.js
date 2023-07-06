@@ -5,9 +5,6 @@
  * @tags: [
  *   not_allowed_with_security_token,uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "prepare_committed_transaction";
 const testDB = db.getSiblingDB(dbName);
@@ -73,4 +70,3 @@ assert.commandFailedWithCode(
     40415 /* IDL unknown field error */);
 
 session.endSession();
-}());

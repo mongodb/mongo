@@ -1,16 +1,17 @@
 //
 // Basic tests for refineCollectionShardKey.
 //
-import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
-load('jstests/libs/fail_point_util.js');
-load('jstests/libs/profiler.js');
-load('jstests/sharding/libs/shard_versioning_util.js');
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
-load("jstests/sharding/libs/find_chunks_util.js");
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 const st = new ShardingTest({
     mongos: 2,
@@ -28,9 +29,7 @@ const kDbName = 'db';
 const kCollName = 'foo';
 const kNsName = kDbName + '.' + kCollName;
 const kConfigCollections = 'config.collections';
-const kConfigChunks = 'config.chunks';
 const kConfigTags = 'config.tags';
-const kConfigChangelog = 'config.changelog';
 const kUnrelatedName = kDbName + '.bar';
 let oldEpoch = null;
 

@@ -6,11 +6,9 @@
  * Regression test for SERVER-76550.
  */
 
-(function() {
-"use strict";
-load("jstests/sharding/libs/find_chunks_util.js");
-load("jstests/libs/fail_point_util.js");
-load('jstests/sharding/libs/remove_shard_util.js');
+import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 const st = new ShardingTest({other: {enableBalancer: false, chunkSize: 1}});
 const mongos = st.s0;
@@ -65,4 +63,3 @@ const chunksAfterDrain =
 assert.eq(12, chunksAfterDrain.length);
 
 st.stop();
-})();

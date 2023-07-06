@@ -10,14 +10,12 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-"use strict";
 
 // Check the build flags to determine whether we are running in a code-coverage variant. These
 // variants are sufficiently slow as to interfere with the operation of this test, so we skip them.
 if (buildInfo().buildEnvironment.ccflags.includes('-ftest-coverage')) {
     jsTestLog("Skipping the test case run with code-coverage enabled");
-    return;
+    quit();
 }
 
 const st = new ShardingTest({
@@ -49,18 +47,18 @@ assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), mid
 assert.commandWorked(mongosDB.adminCommand(
     {moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 
-function checkStream() {
-    load('jstests/libs/change_stream_util.js');  // For assertChangeStreamEventEq.
+async function checkStream() {
+    const {assertChangeStreamEventEq} = await import("jstests/libs/change_stream_util.js");
 
-    db = db.getSiblingDB(jsTestName());
-    let coll = db[jsTestName()];
+    const testDb = db.getSiblingDB(jsTestName());
+    let coll = testDb[jsTestName()];
     let changeStream = coll.aggregate([{$changeStream: {}}], {comment: jsTestName()});
 
     assert.soon(() => changeStream.hasNext());
     assertChangeStreamEventEq(changeStream.next(), {
         documentKey: {_id: -1000},
         fullDocument: {_id: -1000},
-        ns: {db: db.getName(), coll: coll.getName()},
+        ns: {db: testDb.getName(), coll: coll.getName()},
         operationType: "insert",
     });
 
@@ -68,7 +66,7 @@ function checkStream() {
     assertChangeStreamEventEq(changeStream.next(), {
         documentKey: {_id: 1001},
         fullDocument: {_id: 1001},
-        ns: {db: db.getName(), coll: coll.getName()},
+        ns: {db: testDb.getName(), coll: coll.getName()},
         operationType: "insert",
     });
 
@@ -76,7 +74,7 @@ function checkStream() {
     assertChangeStreamEventEq(changeStream.next(), {
         documentKey: {_id: -1002},
         fullDocument: {_id: -1002},
-        ns: {db: db.getName(), coll: coll.getName()},
+        ns: {db: testDb.getName(), coll: coll.getName()},
         operationType: "insert",
     });
     changeStream.close();
@@ -129,4 +127,3 @@ waitForShardCursor(st.rs1);
 assert.commandWorked(mongosColl.insert({_id: -1002}, {writeConcern: {w: "majority"}}));
 waitForShell();
 st.stop();
-})();

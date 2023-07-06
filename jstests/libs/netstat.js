@@ -1,5 +1,3 @@
-'use strict';
-
 /* Read the contents of /proc/net/netstat, and transform the output into a JS object.
  * Netstat contains sections of key/value pairs, for different metrics tracked by the
  * Linux kernel. Sections are encoded as two lines, prefixed by the field name. The first
@@ -19,7 +17,7 @@
  *   ...
  * }
  */
-function getNetStatObj() {
+export function getNetStatObj() {
     return cat("/proc/net/netstat")
         .split("\n")
         .filter((item) => item.length)

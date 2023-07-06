@@ -5,9 +5,6 @@
  *   no_selinux,
  * ]
  */
-(function() {
-"use strict";
-
 // Use our own database so that we're guaranteed the only collection is this one.
 const explainDB = db.getSiblingDB("explain_uuid_db");
 
@@ -55,4 +52,3 @@ assert.commandFailedWithCode(explainDB.runCommand({
     }
 }),
                              ErrorCodes.BadValue);
-})();

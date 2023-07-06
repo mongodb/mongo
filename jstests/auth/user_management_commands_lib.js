@@ -2,9 +2,7 @@
  * This tests that all the different commands for user manipulation all work properly for all valid
  * forms of input.
  */
-function runAllUserManagementCommandsTests(conn, writeConcern) {
-    'use strict';
-
+export function runAllUserManagementCommandsTests(conn, writeConcern) {
     function hasAuthzError(result) {
         assert(result instanceof WriteCommandError);
         assert.eq(ErrorCodes.Unauthorized, result.code);

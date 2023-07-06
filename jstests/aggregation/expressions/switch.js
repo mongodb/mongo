@@ -1,9 +1,6 @@
 // In SERVER-10689, the $switch expression was introduced. In this file, we test the functionality
 // of the expression.
 
-(function() {
-"use strict";
-
 var coll = db.switch;
 coll.drop();
 
@@ -141,4 +138,3 @@ res = coll.aggregate(pipeline).toArray();
 
 assert.eq(res.length, 1);
 assert.eq(res[0], {});
-}());

@@ -11,9 +11,6 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-"use strict";
-
 var st = new ShardingTest({shards: 2, config: 3});
 
 jsTest.log("Starting sharding batch write tests...");
@@ -200,4 +197,3 @@ assert.commandFailedWithCode(result, ErrorCodes.FailedToSatisfyReadPreference);
 
 jsTest.log("DONE!");
 st.stop();
-}());

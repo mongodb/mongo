@@ -1,6 +1,4 @@
 // SERVER-14421 minDistance for $geoNear aggregation operator
-(function() {
-'use strict';
 var coll = db.mindistance;
 coll.drop();
 assert.commandWorked(coll.insert([
@@ -37,4 +35,3 @@ results = coll.aggregate([{
 }]);
 assert.eq(results.itcount(), 2);
 coll.drop();
-}());

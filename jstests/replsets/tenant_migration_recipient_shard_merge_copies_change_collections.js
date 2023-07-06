@@ -13,18 +13,17 @@
  * ]
  */
 
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     isShardMergeEnabled,
     makeX509OptionsForTest
 } from "jstests/replsets/libs/tenant_migration_util.js";
-
-// For assertDropAndRecreateCollection.
-load("jstests/libs/collection_drop_recreate.js");
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
-load("jstests/serverless/libs/change_collection_util.js");
+import {
+    ChangeStreamMultitenantReplicaSetTest
+} from "jstests/serverless/libs/change_collection_util.js";
 
 function setup() {
     const donorRst = new ChangeStreamMultitenantReplicaSetTest({

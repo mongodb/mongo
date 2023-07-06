@@ -6,9 +6,6 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
 const st = new ShardingTest({mongos: 1, shards: 0, keyFile: "jstests/libs/key1"});
 
 assert.commandFailedWithCode(st.s.adminCommand({
@@ -18,4 +15,3 @@ assert.commandFailedWithCode(st.s.adminCommand({
                              ErrorCodes.ClientDisconnect);
 
 st.stop();
-})();

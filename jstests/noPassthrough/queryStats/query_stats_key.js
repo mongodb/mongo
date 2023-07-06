@@ -2,9 +2,7 @@
  * This test confirms that query stats store key fields are properly nested and none are missing.
  * @tags: [featureFlagQueryStatsFindCommand]
  */
-load("jstests/libs/query_stats_utils.js");
-(function() {
-"use strict";
+import {getQueryStats} from "jstests/libs/query_stats_utils.js";
 
 function confirmAllMetaFieldsPresent(clientSubObj) {
     const kApplicationName = "MongoDB Shell";
@@ -138,4 +136,3 @@ assert.throwsWithCode(() => {
 }, ErrorCodes.FailedToParse);
 
 MongoRunner.stopMongod(conn);
-}());

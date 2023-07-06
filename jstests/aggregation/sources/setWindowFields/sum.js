@@ -1,12 +1,11 @@
 /**
  * Test that $sum works as a window function.
  */
+import {documentEq} from "jstests/aggregation/extras/utils.js";
 import {
     seedWithTickerData,
     testAccumAgainstGroup
 } from "jstests/aggregation/extras/window_function_helpers.js";
-
-load("jstests/aggregation/extras/utils.js");  // documentEq
 
 const coll = db[jsTestName()];
 coll.drop();

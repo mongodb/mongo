@@ -2,7 +2,6 @@
  * Load this file when starting a mongo shell program in order to provide a callback to validate
  * collections and indexes before shutting down a mongod while running JS tests.
  */
-
 import {validateCollections} from "jstests/hooks/validate_collections.js";
 import {CommandSequenceWithRetries} from "jstests/libs/command_sequence_with_retries.js";
 

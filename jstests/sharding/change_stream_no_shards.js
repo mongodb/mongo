@@ -5,7 +5,6 @@
  * Requires no shards so there can't be a config shard.
  * @tags: [config_shard_incompatible]
  */
-(function() {
 const st = new ShardingTest({shards: 0});
 
 const adminDB = st.s.getDB("admin");
@@ -39,4 +38,3 @@ assert.docEq([], nonCsCmdRes.cursor.firstBatch);
 assert.eq(nonCsCmdRes.cursor.id, 0);
 
 st.stop();
-})();

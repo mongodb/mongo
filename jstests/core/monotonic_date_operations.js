@@ -2,9 +2,6 @@
  * Tests that date expressions remain monotonic despite timezone changes.
  */
 
-(function() {
-"use strict";
-
 const coll = db.monotonic_date_operations;
 
 const runTest = function(documents, pipeline, expectedDocs) {
@@ -405,4 +402,3 @@ runTest(
             diffDays: NumberLong(1)
         }
     ]);
-})();

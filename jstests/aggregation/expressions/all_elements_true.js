@@ -1,7 +1,6 @@
 /**
  * Basic test coverage for the $allElementsTrue expression.
  */
-(function() {
 const coll = db.all_elements_true;
 coll.drop();
 assert.commandWorked(
@@ -22,4 +21,3 @@ testOp({$allElementsTrue: {$literal: [true, 1, false]}}, false);
 testOp({$allElementsTrue: "$allTrue"}, true);
 testOp({$allElementsTrue: "$someTrue"}, false);
 testOp({$allElementsTrue: "$noneTrue"}, false);
-}());

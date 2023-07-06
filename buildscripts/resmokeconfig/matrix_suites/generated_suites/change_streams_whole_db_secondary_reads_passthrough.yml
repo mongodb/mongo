@@ -13,8 +13,9 @@ executor:
     - ValidateCollections
   config:
     shell_options:
-      eval: globalThis.testingReplication = true; load('jstests/libs/override_methods/set_read_and_write_concerns.js');;
-        load('jstests/libs/override_methods/set_read_preference_secondary.js');; load('jstests/libs/override_methods/implicit_whole_db_changestreams.js');
+      eval: globalThis.testingReplication = true; await import('jstests/libs/override_methods/set_read_and_write_concerns.js');;
+        await import('jstests/libs/override_methods/set_read_preference_secondary.js');;
+        await import('jstests/libs/override_methods/implicit_whole_db_changestreams.js');
       global_vars:
         TestData:
           defaultReadConcernLevel: null

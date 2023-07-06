@@ -3,10 +3,7 @@
  * the oplog while there are concurrent writers. The client copies all the timestamps it sees and
  * verifies a later scan over the range returns the same values.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallelTester.js");  // for Thread.
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const replTest = new ReplSetTest({
     name: "oplog_visibility",
@@ -127,4 +124,3 @@ writers.forEach((writer) => {
 });
 
 replTest.stopSet();
-})();

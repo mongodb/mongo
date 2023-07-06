@@ -4,10 +4,8 @@
  *   requires_sharding,
  * ]
  */
-load('jstests/libs/ftdc.js');
+import {verifyCommonFTDCParameters, verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 
-(function() {
-'use strict';
 let testPath1 = MongoRunner.toRealPath('ftdc_setdir1');
 let testPath2 = MongoRunner.toRealPath('ftdc_setdir2');
 let testPath3 = MongoRunner.toRealPath('ftdc_setdir3');
@@ -139,4 +137,3 @@ verifyFTDCStartsWithLogFile();
 verifyFTDCStartsWithRelativeLogFile();
 
 st.stop();
-})();

@@ -3,9 +3,6 @@
  *
  * This test was designed to reproduce SERVER-25585.
  */
-(function() {
-'use strict';
-
 // Cursor timeout on mongod is handled by a single thread/timer that will sleep for
 // "clientCursorMonitorFrequencySecs" and add the sleep value to each operation's duration when
 // it wakes up, timing out those whose "now() - last accessed since" time exceeds. A cursor
@@ -139,4 +136,3 @@ assertCursorTimesOut('source', [
     ]);
 
 MongoRunner.stopMongod(conn);
-})();

@@ -1,7 +1,13 @@
 // This test is related to mixed_mode_repl_nossl.js in
 // the sslSpecial test set. This test must be run with --use-ssl
 
-load("jstests/ssl/libs/ssl_helpers.js");
+import {
+    allowSSL,
+    preferSSL,
+    replShouldFail,
+    replShouldSucceed,
+    requireSSL
+} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Limit the amount of time we'll wait on a failure.
 // Apply equally to success tests as well so that

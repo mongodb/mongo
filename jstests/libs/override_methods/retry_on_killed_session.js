@@ -2,11 +2,8 @@
  * Overrides Mongo.prototype.runCommand to retry on errors that come from an operation's session
  * being killed.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/killed_session_util.js");
-load("jstests/libs/override_methods/override_helpers.js");
+import {KilledSessionUtil} from "jstests/libs/killed_session_util.js";
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 const mongoRunCommandOriginal = Mongo.prototype.runCommand;
 
@@ -67,4 +64,3 @@ function runWithKilledSessionRetries(mongo, cmdObj, clientFunction, clientFuncti
 
 OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/retry_on_killed_session.js");
-})();

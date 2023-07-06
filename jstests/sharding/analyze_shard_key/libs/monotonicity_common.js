@@ -3,9 +3,11 @@
  * metrics.
  */
 
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
-const kOrderTypes = [
+export const kOrderTypes = [
     {
         name: "constant",
         monotonicity: "not monotonic",
@@ -29,14 +31,14 @@ const kOrderTypes = [
     }
 ];
 
-const numNodesPerRS = 2;
-const insertBatchSize = 1000;
+export const numNodesPerRS = 2;
+export const insertBatchSize = 1000;
 
 /**
  * Appends the field of the specified name and type to the given documents such that the field value
  * is identical across the documents.
  */
-function appendConstantField(docs, fieldName, fieldType) {
+export function appendConstantField(docs, fieldName, fieldType) {
     const value = (() => {
         switch (fieldType) {
             case "integer":
@@ -63,7 +65,7 @@ function appendConstantField(docs, fieldName, fieldType) {
  * Appends the field of the specified name and type to the given documents such that the field value
  * is random (i.e. fluctuating).
  */
-function appendFluctuatingField(docs, fieldName, fieldType) {
+export function appendFluctuatingField(docs, fieldName, fieldType) {
     const maxIntValue = docs.length;
     const numDigits = maxIntValue.toString().length;
 
@@ -75,10 +77,11 @@ function appendFluctuatingField(docs, fieldName, fieldType) {
                     return intValue;
                 case "string":
                     return "A" + intValue.toString().padStart(numDigits, "0");
-                case "date":
+                case "date": {
                     let dateValue = new Date(1970, 0, 1);
                     dateValue.setSeconds(intValue);
                     return dateValue;
+                }
                 case "objectid":
                     throw "Cannot have a fluctuating ObjectId";
                 case "uuid":
@@ -97,7 +100,7 @@ function appendFluctuatingField(docs, fieldName, fieldType) {
  * returned by 'getNextValueFunc()' to the given documents in order, each value is appended to at
  * most 'maxFrequency' documents.
  */
-function appendDuplicatedField(docs, fieldName, getNextValueFunc, maxFrequency) {
+export function appendDuplicatedField(docs, fieldName, getNextValueFunc, maxFrequency) {
     let docIndex = 0;
     while (docIndex < docs.length) {
         const value = getNextValueFunc();
@@ -114,7 +117,7 @@ function appendDuplicatedField(docs, fieldName, getNextValueFunc, maxFrequency) 
  * Appends the field of the specified name and type to the given documents such that the field value
  * is increasing and each is duplicated at most 'maxFrequency' times.
  */
-function appendIncreasingField(docs, fieldName, fieldType, maxFrequency) {
+export function appendIncreasingField(docs, fieldName, fieldType, maxFrequency) {
     const maxIntValue = docs.length;
     const numDigits = maxIntValue.toString().length;
     let intValue = 0;
@@ -126,10 +129,11 @@ function appendIncreasingField(docs, fieldName, fieldType, maxFrequency) {
                 return intValue;
             case "string":
                 return "A" + intValue.toString().padStart(numDigits, "0");
-            case "date":
+            case "date": {
                 let dateValue = new Date(1970, 0, 1);
                 dateValue.setSeconds(intValue);
                 return dateValue;
+            }
             case "objectid":
                 return new ObjectId();
             case "uuid":
@@ -147,7 +151,7 @@ function appendIncreasingField(docs, fieldName, fieldType, maxFrequency) {
  * Appends the field of the specified name and type to the given documents such that the field value
  * is decreasing and each is duplicated at most 'maxFrequency' times.
  */
-function appendDecreasingField(docs, fieldName, fieldType, maxFrequency) {
+export function appendDecreasingField(docs, fieldName, fieldType, maxFrequency) {
     const maxIntValue = docs.length;
     const numDigits = maxIntValue.toString().length;
     let intValue = maxIntValue;
@@ -159,10 +163,11 @@ function appendDecreasingField(docs, fieldName, fieldType, maxFrequency) {
                 return intValue;
             case "string":
                 return "A" + intValue.toString().padStart(numDigits, "0");
-            case "date":
+            case "date": {
                 let dateValue = new Date(1970, 0, 1);
                 dateValue.setSeconds(intValue);
                 return dateValue;
+            }
             case "objectid":
                 throw "Cannot have a decreasing ObjectId";
             case "uuid":
@@ -179,7 +184,7 @@ function appendDecreasingField(docs, fieldName, fieldType, maxFrequency) {
 /**
  * Returns 'numDocs' documents created based on the given 'fieldOpts'.
  */
-function makeDocuments(numDocs, fieldOpts) {
+export function makeDocuments(numDocs, fieldOpts) {
     const docs = [];
     for (let i = 0; i < numDocs; i++) {
         docs.push({});
@@ -205,7 +210,7 @@ function makeDocuments(numDocs, fieldOpts) {
     return docs;
 }
 
-function testMonotonicity(conn, dbName, collName, currentShardKey, testCases, numDocsRange) {
+export function testMonotonicity(conn, dbName, collName, currentShardKey, testCases, numDocsRange) {
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
     const coll = db.getCollection(collName);
@@ -289,7 +294,7 @@ function testMonotonicity(conn, dbName, collName, currentShardKey, testCases, nu
     });
 }
 
-function testAnalyzeShardKeysUnshardedCollection(conn, testCases, numDocsRange) {
+export function testAnalyzeShardKeysUnshardedCollection(conn, testCases, numDocsRange) {
     const dbName = "testDb";
     const collName = "testCollUnsharded";
     const db = conn.getDB(dbName);
@@ -301,7 +306,7 @@ function testAnalyzeShardKeysUnshardedCollection(conn, testCases, numDocsRange) 
     assert.commandWorked(db.dropDatabase());
 }
 
-function testAnalyzeShardKeysShardedCollection(st, testCases, numDocsRange) {
+export function testAnalyzeShardKeysShardedCollection(st, testCases, numDocsRange) {
     const dbName = "testDb";
     const collName = "testCollSharded";
     const ns = dbName + "." + collName;

@@ -7,11 +7,8 @@
  * @tags: [uses_atclustertime]
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/resharding_test_fixture.js");
-load("jstests/libs/retryable_writes_util.js");
+import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
     jsTest.log(`Running test for minimumReshardingDuration = ${
@@ -133,4 +130,3 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
 const minimumOperationDurationMS = 30000;
 runTest(minimumOperationDurationMS, true);
 runTest(minimumOperationDurationMS, false);
-})();

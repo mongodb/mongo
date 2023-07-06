@@ -3,11 +3,9 @@
  * server.
  */
 
-load('jstests/ssl/libs/ssl_helpers.js');
+import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 requireSSLProvider('windows', function() {
-    'use strict';
-
     if (_isWindows()) {
         // SChannel backed follows Windows rules and only trusts Root in LocalMachine
         runProgram("certutil.exe", "-addstore", "-f", "Root", "jstests\\libs\\trusted-ca.pem");

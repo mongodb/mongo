@@ -4,10 +4,7 @@
  *
  * @tags: [requires_fcv_63]
  */
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/create_sharded_collection_util.js");
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const st = new ShardingTest({
     mongos: 1,
@@ -138,4 +135,3 @@ const futureShardVersion =
 assertOwningShardExpressionFailure(futureShardVersion);
 
 st.stop();
-})();

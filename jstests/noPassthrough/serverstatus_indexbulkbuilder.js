@@ -7,10 +7,8 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/noPassthrough/libs/index_build.js');
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {IndexBuildTest, ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const maxMemUsageMegabytes = 50;
 const numDocs = 10;
@@ -225,4 +223,3 @@ assert.between(0,
                /*inclusive=*/ true);
 
 replSet.stopSet();
-})();

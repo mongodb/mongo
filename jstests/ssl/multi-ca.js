@@ -1,10 +1,5 @@
 // Test that servers can use multiple root CAs.
 
-(function() {
-"use strict";
-
-load('jstests/ssl/libs/ssl_helpers.js');
-
 // "root-and-trusted-ca.pem" contains the combined ca.pem and trusted-ca.pem certs.
 // This *should* permit client.pem or trusted-client.pem to connect equally.
 const CA_CERT = 'jstests/ssl/x509/root-and-trusted-ca.pem';
@@ -41,4 +36,3 @@ testConnect(CLIENT_CERT);
 testConnect(TRUSTED_CLIENT_CERT);
 
 MongoRunner.stopMongod(mongod);
-}());

@@ -1,8 +1,6 @@
 /**
  * Tests for serverStatus metrics.cursor.totalOpened and metrics.cursor.moreThanOneBatch.
  */
-(function() {
-"use strict";
 const coll = db[jsTest.name()];
 coll.drop();
 
@@ -147,4 +145,3 @@ for (let i = 0; i < 20; i++) {
 
 // Cursors this test opened should be closed.
 assert.eq(initialCurrentlyOpen, db.serverStatus().metrics.cursor.open.total);
-}());

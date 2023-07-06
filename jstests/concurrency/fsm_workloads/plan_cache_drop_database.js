@@ -6,6 +6,8 @@
  * events triggers the concurrent destruction of a Collection object and
  * the updating of said object's PlanCache (SERVER-17117).
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     function populateData(db, collName) {
         var coll = db[collName];

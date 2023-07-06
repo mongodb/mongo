@@ -7,12 +7,11 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/global_snapshot_reads_util.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {SnapshotReadsTest} from "jstests/libs/global_snapshot_reads_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {
+    flushRoutersAndRefreshShardMetadata
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const nodeOptions = {
     // Set a large snapshot window of 10 minutes for the test.
@@ -165,4 +164,3 @@ for (let [scenarioName, scenario] of Object.entries(shardingScenarios)) {
         st.stop();
     });
 }
-})();

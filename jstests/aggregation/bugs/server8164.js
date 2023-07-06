@@ -1,5 +1,4 @@
 // SERVER-8164: ISODate doesn't handle years less than 100 properly.
-(function() {
 assert.eq(tojson(ISODate("0000-01-01")), 'ISODate("0000-01-01T00:00:00Z")');
 assert.eq(tojson(ISODate("0000-01-01T00:00:00")), 'ISODate("0000-01-01T00:00:00Z")');
 assert.eq(tojson(ISODate("0000-01-01T00:00:00Z")), 'ISODate("0000-01-01T00:00:00Z")');
@@ -141,4 +140,3 @@ assert.eq(ISODate("1900-01-01T00:00:00.000Z"), new Date(-2208988800000));
 assert.eq(ISODate("1899-12-31T23:59:59.999Z"), new Date(-2208988800001));
 assert.eq(ISODate("0000-01-01T00:00:00.000Z"), new Date(-62167219200000));
 assert.eq(ISODate("9999-12-31T23:59:59.999Z"), new Date(253402300799999));
-}());

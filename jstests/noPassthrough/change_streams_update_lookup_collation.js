@@ -5,9 +5,6 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -85,4 +82,3 @@ assert.eq(numIdIndexUsages(), idIndexUsagesBeforeIteration + 8);
 changeStreamDefaultCollation.close();
 strengthOneChangeStream.close();
 rst.stopSet();
-}());

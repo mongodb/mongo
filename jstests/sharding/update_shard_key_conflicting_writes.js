@@ -8,12 +8,11 @@
  * ]
  */
 
-(function() {
-
-"use strict";
-
-load('jstests/libs/parallelTester.js');  // for Thread.
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {Thread} from "jstests/libs/parallelTester.js";
+import {
+    enableCoordinateCommitReturnImmediatelyAfterPersistingDecision,
+    waitForFailpoint,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 let st = new ShardingTest({mongos: 1, shards: 2});
 let kDbName = 'db';
@@ -447,4 +446,3 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
 })();
 
 st.stop();
-}());

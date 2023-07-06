@@ -3,6 +3,8 @@
  * index in place. One specific scenario this test exercises is upsert retry in the case where an
  * upsert generates an insert, which then fails due to another operation inserting first.
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     const data = {
         numDocs: 4,

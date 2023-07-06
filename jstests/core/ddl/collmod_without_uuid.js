@@ -14,8 +14,6 @@
  * ]
  */
 
-(function() {
-"use strict";
 const collName = "collmod_without_uuid";
 
 function checkUUIDs() {
@@ -31,4 +29,3 @@ let cmd = {applyOps: [{ns: "test.$cmd", op: "c", o: {collMod: collName}}]};
 let res = db.runCommand(cmd);
 assert.commandWorked(res, tojson(cmd));
 checkUUIDs();
-})();

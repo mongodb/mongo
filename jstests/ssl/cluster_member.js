@@ -2,13 +2,11 @@
 // aka: net.tls.clusterAuthX509.extensionValue
 // @tags: [ requires_fcv_70 ]
 
-(function() {
-'use strict';
+import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
-load('jstests/ssl/libs/ssl_helpers.js');
 if (determineSSLProvider() !== "openssl") {
     jsTest.log('Test requires openssl based TLS support');
-    return;
+    quit();
 }
 
 // Fails when used without clusterAuthMode == 'X509'
@@ -113,4 +111,3 @@ function runTest(conn) {
     runTest(mongod);
     MongoRunner.stopMongod(mongod);
 }
-})();

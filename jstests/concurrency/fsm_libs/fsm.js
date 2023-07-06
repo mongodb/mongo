@@ -1,6 +1,9 @@
-'use strict';
+import {
+    withTxnAndAutoRetry
+} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 
-var fsm = (function() {
+export var fsm = (function() {
     const kIsRunningInsideTransaction = Symbol('isRunningInsideTransaction');
 
     function forceRunningOutsideTransaction(data) {
@@ -26,12 +29,12 @@ var fsm = (function() {
     //                    { stateName: { nextState1: probability,
     //                                   nextState2: ... } }
     // args.iterations = number of iterations to run the FSM for
-    function runFSM(args) {
+    async function runFSM(args) {
         if (TestData.runInsideTransaction) {
             let overridePath = "jstests/libs/override_methods/";
-            load(overridePath + "check_for_operation_not_supported_in_transaction.js");
-            load("jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js");
-            load("jstests/libs/transactions_util.js");
+            await import(overridePath + "check_for_operation_not_supported_in_transaction.js");
+            await import("jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js");
+            await import("jstests/libs/transactions_util.js");
         }
         var currentState = args.startState;
 

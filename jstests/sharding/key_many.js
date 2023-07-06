@@ -1,7 +1,4 @@
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // Values have to be sorted - you must have exactly 6 values in each array
 var types = [
@@ -242,4 +239,3 @@ for (var i = 0; i < types.length; i++) {
 }
 
 s.stop();
-})();

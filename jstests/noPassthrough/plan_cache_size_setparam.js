@@ -2,9 +2,6 @@
  * Validates that the planCacheSize parameter is set correctly at startup and runtime.
  */
 
-(function() {
-"use strict";
-
 const paramName = "planCacheSize";
 const paramStartValue = "711MB";
 
@@ -41,4 +38,3 @@ setPlanCacheSizeThrows(paramIncorrectValue, 6007012);
 validatePlanCacheSize(paramCorrectValue);
 
 MongoRunner.stopMongod(mongod);
-})();

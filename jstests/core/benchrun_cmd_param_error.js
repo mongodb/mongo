@@ -7,9 +7,6 @@
  * The test runs commands that are not allowed with security token: benchRun.
  * @tags: [not_allowed_with_security_token]
  */
-(function() {
-"use strict";
-
 const testDB = db.getSiblingDB(jsTestName());
 testDB.dropDatabase();
 const coll = testDB.coll;
@@ -113,4 +110,3 @@ opsAndErrors.forEach(opAndError => {
 
     assert.throwsWithCode(() => benchRun(benchArgs), opAndError.error);
 });
-})();

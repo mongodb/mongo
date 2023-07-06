@@ -9,8 +9,9 @@
  *   requires_fcv_60,
  *  ]
  */
-load("jstests/libs/fixture_helpers.js");  // For isMongos.
-load("jstests/libs/namespace_utils.js");  // For getCollectionNameFromFullNamespace.
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 
 const otherDbName = "otherDb";
 const otherDbCollName = "otherDbColl";

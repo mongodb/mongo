@@ -10,10 +10,7 @@
  * 5. Reset the active balancing window to a setting that overlaps the current time and make
  *    sure that some chunks are moved.
  */
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 /**
  * Simple representation for wall clock time. Hour and minutes should be integers.
@@ -100,4 +97,3 @@ shard0ChunksAfter =
 assert.neq(shard0Chunks, shard0ChunksAfter);
 
 st.stop();
-})();

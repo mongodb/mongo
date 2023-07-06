@@ -2,13 +2,8 @@
  * Verify initial chunks are properly created and distributed in various combinations of shard key
  * and empty/non-empty collections.
  */
-(function() {
-'use strict';
-
 let st = new ShardingTest({shards: 2});
 let mongos = st.s0;
-
-let config = mongos.getDB("config");
 let db = mongos.getDB('TestDB');
 
 assert.commandWorked(mongos.adminCommand({enableSharding: 'TestDB'}));
@@ -46,4 +41,3 @@ assert.commandWorked(mongos.adminCommand(
 checkChunkCounts('HashedCollNonExistent', 3, 3);
 
 st.stop();
-})();

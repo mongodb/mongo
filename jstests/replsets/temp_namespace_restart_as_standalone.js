@@ -6,7 +6,6 @@
  * # Restarting as a standalone is not supported in multiversion tests.
  * multiversion_incompatible]
  */
-(function() {
 var rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 
@@ -102,4 +101,3 @@ assert.commandWorked(primaryDB.temp_collection.insert(
     {}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
 rst.stopSet();
-})();

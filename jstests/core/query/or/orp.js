@@ -1,9 +1,6 @@
 // $or clause deduping with result set sizes > 101 (smaller result sets are now also deduped by the
 // query optimizer cursor).
 
-(function() {
-'use strict';
-
 const collNamePrefix = 'jstests_orp_';
 let collCount = 0;
 let docId = 0;
@@ -55,4 +52,3 @@ for (let i = 0; i < k; ++i) {
 }
 assert.commandWorked(t.insert(docs));
 assert.eq(k + 1, t.countDocuments({$or: [{a: 1}, {b: {$gte: 0}}]}));
-})();

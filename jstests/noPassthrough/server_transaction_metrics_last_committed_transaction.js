@@ -1,8 +1,6 @@
 // Tests the 'lastCommittedTransaction' serverStatus section.
 // @tags: [uses_transactions, uses_prepare_transaction]
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -114,4 +112,3 @@ runTests(false /*prepare*/);
 
 session.endSession();
 rst.stopSet();
-}());

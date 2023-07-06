@@ -1,8 +1,5 @@
 // Tests bulk inserts to mongos
 
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 2, mongos: 2});
 
 var mongos = st.s;
@@ -215,4 +212,3 @@ assert.commandWorked(admin.runCommand(
 assert.commandWorked(staleCollSh.insert(inserts));
 
 st.stop();
-})();

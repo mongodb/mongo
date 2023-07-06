@@ -7,13 +7,9 @@
  *   uses_atclustertime,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const databaseName = "reshardingDb";
 const collectionName = "coll";
@@ -190,4 +186,3 @@ withReshardingInBackground(() => {
 });
 
 reshardingTest.teardown();
-})();

@@ -8,11 +8,8 @@
  * ]
  *
  */
-(function() {
-'use strict';
-
-load('jstests/libs/parallel_shell_helpers.js');
-load('jstests/libs/fail_point_util.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
 // StaleShardVersion exception on the shards and cause them to refresh theirsharding metadata.
@@ -136,7 +133,7 @@ const staleMongoS = st.s1;
     st.restartShardRS(0);
     st.restartShardRS(1);
 
-    var session = staleMongoS.startSession();
+    session = staleMongoS.startSession();
     session.startTransaction();
     session.getDatabase(kDatabaseName).createCollection('TestTransactionCollCreation');
     session.getDatabase(kDatabaseName).TestTransactionCollCreation.insertOne({Key: 0});
@@ -226,4 +223,3 @@ const staleMongoS = st.s1;
 }
 
 st.stop();
-})();

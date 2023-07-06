@@ -4,8 +4,6 @@
 // ]
 // SERVER-4615:  Ensure hostInfo() command returns expected results on each platform
 
-(function() {
-"use strict";
 assert.commandWorked(db.hostInfo());
 var hostinfo = db.hostInfo();
 
@@ -52,4 +50,3 @@ if (buildInfo.buildEnvironment && buildInfo.buildEnvironment.target_arch) {
         assert.eq(hostinfo.system.cpuAddrSize, 64);
     assert.eq(hostinfo.system.cpuAddrSize, buildInfo.bits);
 }
-})();

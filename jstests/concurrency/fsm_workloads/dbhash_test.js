@@ -7,10 +7,7 @@
  *   uses_full_validation,
  * ]
  */
-
-"use strict";
-
-load("jstests/concurrency/fsm_workload_helpers/state_transition_utils.js");
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const dbPrefix = jsTestName() + '_db_';
 

@@ -6,9 +6,6 @@
 //     incompatible_with_gcov,
 // ]
 
-(function() {
-"use strict";
-
 const collNamePrefix = 'geo_s2sparse_';
 let collCount = 0;
 let coll = db.getCollection(collNamePrefix + collCount++);
@@ -144,4 +141,3 @@ bulkInsertDocs(coll, N, function(i) {
 
 // Still expect 2N keys as the neither geo docs were omitted from the index.
 assert.eq(N + N, coll.validate().keysPerIndex[indexNameOther]);
-})();

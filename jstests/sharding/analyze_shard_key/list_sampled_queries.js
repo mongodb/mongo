@@ -5,12 +5,10 @@
  * @tags: [requires_fcv_70]
  */
 
-(function() {
-'use strict';
-
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
-load("jstests/sharding/analyze_shard_key/libs/sampling_current_op_and_server_status_common.js");
+import {
+    AnalyzeShardKeyUtil
+} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 const samplesPerSecond = 10000;
 
@@ -293,4 +291,3 @@ if (!TestData.auth) {
 
     rst.stopSet();
 }
-})();

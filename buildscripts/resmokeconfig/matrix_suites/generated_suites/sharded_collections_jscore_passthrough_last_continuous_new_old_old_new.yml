@@ -14,7 +14,7 @@ executor:
     - ValidateCollections
   config:
     shell_options:
-      eval: load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js")
+      eval: await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
   fixture:
     class: ShardedClusterFixture
     enable_balancer: false

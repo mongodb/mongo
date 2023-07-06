@@ -42,7 +42,6 @@ function assertHasPrivilege(privilegeArray, privilege) {
                " not found in privilege array: " + tojson(privilegeArray));
 }
 
-(function(db) {
 var db = db.getSiblingDB("role_management_helpers");
 db.dropDatabase();
 db.dropAllRoles();
@@ -153,4 +152,3 @@ db.dropAllRoles();
 assert.eq(null, db.getRole('roleA'));
 assert.eq(null, db.getRole('roleB'));
 assert.eq(null, db.getRole('roleC'));
-}(db));

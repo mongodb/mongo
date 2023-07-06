@@ -8,9 +8,6 @@
  *    requires_fcv_53
  *  ]
  */
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -125,4 +122,3 @@ try {
 }
 
 rst.stopSet();
-})();

@@ -6,14 +6,14 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     addRecipientNodes,
     commitSplitAsync,
     waitForGarbageCollectionForSplit
 } from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/libs/uuid_util.js");
 
 function cannotStartMigrationWithDifferentTenantWhileShardSplitIsInProgress(protocol) {
     // Test that we cannot start a tenant migration while a shard split is in progress. Use a

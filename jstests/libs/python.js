@@ -1,8 +1,6 @@
 // Helper for finding the local python binary.
 
-function getPython3Binary() {
-    'use strict';
-
+export function getPython3Binary() {
     // On windows it is important to use python vs python3
     // or else we will pick up a python that is not in our venv
     clearRawMongoProgramOutput();

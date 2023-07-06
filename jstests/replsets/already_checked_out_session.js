@@ -4,10 +4,7 @@
  *
  * @tags: [uses_transactions]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallelTester.js");
+import {Thread} from "jstests/libs/parallelTester.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -82,4 +79,3 @@ assert.commandWorked(thread1.returnData());
 assert.commandWorked(thread2.returnData());
 
 rst.stopSet();
-})();

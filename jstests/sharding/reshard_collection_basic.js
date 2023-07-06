@@ -5,13 +5,8 @@
 // ]
 //
 
-load("jstests/libs/fail_point_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/reshard_collection_util.js");
-
-(function() {
-'use strict';
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2});
 const kDbName = 'db';
@@ -206,10 +201,9 @@ jsTest.log("Succeed with hashed shard key that provides enough cardinality.");
 assert.commandWorked(
     mongos.adminCommand({shardCollection: ns, key: {a: "hashed"}, numInitialChunks: 5}));
 assert.commandWorked(mongos.getCollection(ns).insert(
-    Array.from({length: 10000}, (_, i) => ({a: new ObjectId(), b: new ObjectId()}))));
+    Array.from({length: 10000}, () => ({a: new ObjectId(), b: new ObjectId()}))));
 assert.commandWorked(
     st.s.adminCommand({reshardCollection: ns, key: {b: "hashed"}, numInitialChunks: 5}));
 mongos.getDB(kDbName)[collName].drop();
 
 st.stop();
-})();

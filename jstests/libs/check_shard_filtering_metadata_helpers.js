@@ -1,6 +1,4 @@
-'use strict';
-
-var CheckShardFilteringMetadataHelpers = (function() {
+export var CheckShardFilteringMetadataHelpers = (function() {
     function run(mongosConn, nodeConn, shardId, skipCheckShardedCollections = false) {
         function checkDatabase(configDatabasesEntry) {
             // No shard other than the db-primary shard can believe to be the db-primary. Non

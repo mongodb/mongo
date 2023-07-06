@@ -1,10 +1,8 @@
 // Storage Node Watchdog common test code
 //
-load("jstests/watchdog/lib/charybdefs_lib.js");
+import {EXIT_WATCHDOG} from "jstests/watchdog/lib/charybdefs_lib.js";
 
-function testMongoDHang(control, mongod_options) {
-    'use strict';
-
+export function testMongoDHang(control, mongod_options) {
     // Now start MongoD with it enabled at startup
     //
     if (mongod_options.hasOwnProperty("dbPath")) {
@@ -37,9 +35,7 @@ function testMongoDHang(control, mongod_options) {
     MongoRunner.stopMongod(conn, undefined, {allowedExitCode: EXIT_WATCHDOG});
 }
 
-function testFuseAndMongoD(control, mongod_options) {
-    'use strict';
-
+export function testFuseAndMongoD(control, mongod_options) {
     // Cleanup previous runs
     control.cleanup();
 

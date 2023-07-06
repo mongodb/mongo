@@ -5,12 +5,11 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/noPassthrough/libs/sharded_index_consistency_metrics_helpers.js");
-load("jstests/sharding/libs/shard_versioning_util.js");
-load("jstests/libs/fail_point_util.js");
+import {
+    checkServerStatusNumCollsWithInconsistentIndexes,
+    getServerStatusNumCollsWithInconsistentIndexes,
+} from "jstests/noPassthrough/libs/sharded_index_consistency_metrics_helpers.js";
+import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
 // This test creates inconsistent indexes.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
@@ -75,4 +74,3 @@ assert.soon(
 checkLog.containsWithCount(st.configRS.getPrimary(), "Failed to check index consistency", 0);
 
 st.stop();
-}());

@@ -37,9 +37,6 @@ const DOC = {
     x7F: MaxKey(),
 };
 
-(function() {
-"use strict";
-
 let test = function(db) {
     // We have to create a collection until _configsvrCreateDatabase is in API Version 1.
     assert.commandWorked(db.createCollection("collection"));
@@ -96,4 +93,3 @@ let test = function(db) {
     test(db);
     rst.stopSet();
 }
-})();

@@ -5,9 +5,6 @@
 // Test index key generation with duplicate values addressed by array index and
 // object field.  SERVER-2902
 
-(function() {
-'use strict';
-
 const collNamePrefix = 'jstests_indexu_';
 let collCount = 0;
 let t = db.getCollection(collNamePrefix + collCount++);
@@ -142,4 +139,3 @@ t.save({a: [[{'b': 1}]]});
 assert.eq(1, t.find({'a.0.b': 1}).itcount());
 t.createIndex({'a.0.b': 1});
 assert.eq(1, t.find({'a.0.b': 1}).itcount());
-})();

@@ -1,10 +1,10 @@
 // Helper functions for testing index builds.
 
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/uuid_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
-var IndexBuildTest = class {
+export var IndexBuildTest = class {
     /**
      * Starts an index build in a separate mongo shell process with given options.
      * Ensures the index build worked or failed with one of the expected failures.
@@ -280,7 +280,7 @@ var IndexBuildTest = class {
     }
 };
 
-const ResumableIndexBuildTest = class {
+export const ResumableIndexBuildTest = class {
     /**
      * Returns a version of the given array that has been flattened into one dimension.
      */
@@ -526,9 +526,11 @@ const ResumableIndexBuildTest = class {
         const shutdownFpTimesEntered = configureFailPoint(conn, "hangBeforeShutdown").timesEntered;
 
         const awaitContinueShutdown = startParallelShell(
-            funWithArgs(function(failPoints, shutdownFpTimesEntered) {
-                load("jstests/libs/fail_point_util.js");
-                load("jstests/noPassthrough/libs/index_build.js");
+            funWithArgs(async function(failPoints, shutdownFpTimesEntered) {
+                const {ResumableIndexBuildTest} =
+                    await import("jstests/noPassthrough/libs/index_build.js");
+                const {configureFailPoint, kDefaultWaitForFailPointTimeout} =
+                    await import("jstests/libs/fail_point_util.js");
 
                 // Wait until we hang before shutdown to ensure that we do not move the index builds
                 // forward before the step down process is complete.
@@ -731,8 +733,9 @@ const ResumableIndexBuildTest = class {
         const indexNames = ResumableIndexBuildTest.generateIndexNames(indexSpecs);
 
         const awaitCreateIndexes = ResumableIndexBuildTest.createIndexesWithSideWrites(
-            rst, function(collName, indexSpecs, indexNames) {
-                load("jstests/noPassthrough/libs/index_build.js");
+            rst, async function(collName, indexSpecs, indexNames) {
+                const {ResumableIndexBuildTest} =
+                    await import("jstests/noPassthrough/libs/index_build.js");
                 ResumableIndexBuildTest.createIndexesFails(db, collName, indexSpecs, indexNames);
             }, coll, indexSpecs, indexNames, sideWrites, {hangBeforeBuildingIndex: true});
 

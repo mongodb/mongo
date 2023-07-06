@@ -1,5 +1,4 @@
-// Test $add with date
-load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+import "jstests/libs/sbe_assert_error_override.js";
 
 const coll = db.getSiblingDB(jsTestName()).coll;
 coll.drop();

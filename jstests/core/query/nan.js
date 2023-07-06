@@ -5,9 +5,6 @@
  *    cqf_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
 const coll = db.jstests_nan;
 coll.drop();
 
@@ -110,4 +107,3 @@ testNonNaNQuery();
 // Indexed.
 assert.commandWorked(coll.createIndex({a: 1}));
 testNonNaNQuery();
-}());

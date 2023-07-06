@@ -1,10 +1,6 @@
 // Tests for $merge against a stale mongos with combinations of sharded/unsharded source and target
 // collections.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
-load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
+import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
 
 const st = new ShardingTest({
     shards: 2,
@@ -245,4 +241,3 @@ assert.eq(assert.throws(() => runOutTest(staleMongosTarget)).code, ErrorCodes.Il
 */
 
 st.stop();
-}());

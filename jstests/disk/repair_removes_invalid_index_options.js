@@ -3,7 +3,7 @@
  */
 
 import {assertRepairSucceeds, startMongodOnExistingPath} from "jstests/disk/libs/wt_file_helper.js";
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const baseName = "repair_removes_invalid_index_options";
 const collName = "test";

@@ -3,10 +3,9 @@
 // operations with queries that do not match on the entire shard key are successful. NOTE: Generic
 // upsert behavior tests belong in the core suite
 //
-(function() {
-'use strict';
-
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+import {
+    WriteWithoutShardKeyTestUtil
+} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 
@@ -400,4 +399,3 @@ assert.commandWorked(upsertedResult(coll, {"_id.x": -1}, {$set: {"_id.x": -1}}))
 assert.docEq({_id: {x: -1}}, coll.findOne({}));
 
 st.stop();
-})();

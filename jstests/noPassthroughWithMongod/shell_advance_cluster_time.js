@@ -2,7 +2,6 @@
  * Santity check getClusterTime and advanceClusterTime.
  */
 
-(function() {
 assert.throws(function() {
     db.getMongo().advanceClusterTime();
 });
@@ -26,4 +25,3 @@ assert.eq({'clusterTime': 123}, db.getMongo().getClusterTime());
 db.getMongo().advanceClusterTime({'clusterTime': 456});
 
 assert.eq({'clusterTime': 456}, db.getMongo().getClusterTime());
-})();

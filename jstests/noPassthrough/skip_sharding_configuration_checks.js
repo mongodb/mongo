@@ -7,9 +7,6 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-'use strict';
-
 function expectState(rst, state) {
     assert.soon(function() {
         var status = rst.status();
@@ -52,4 +49,3 @@ shardRS.startSet({}, true);
 expectState(shardRS, ReplSetTest.State.PRIMARY);
 shardRS.stopSet();
 MongoRunner.stopMongos(st.s);
-})();

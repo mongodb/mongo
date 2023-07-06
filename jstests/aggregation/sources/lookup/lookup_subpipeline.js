@@ -1,12 +1,6 @@
 // Tests for the $lookup stage with a sub-pipeline.
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and anyEq.
-load("jstests/libs/discover_topology.js");    // For findNonConfigNodes.
-
-const testName = "lookup_subpipeline";
+import {anyEq, assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.lookUp;
 const from = db.from;
@@ -579,4 +573,3 @@ assertErrorCode(
     coll, [{$lookup: {let : 1, pipeline: [], from: "from", as: "as"}}], ErrorCodes.FailedToParse);
 assertErrorCode(
     coll, [{$lookup: {let : [], pipeline: [], from: "from", as: "as"}}], ErrorCodes.FailedToParse);
-}());

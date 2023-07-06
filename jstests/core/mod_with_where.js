@@ -6,9 +6,6 @@
 //   assumes_read_concern_local,
 // ]
 
-(function() {
-"use strict";
-
 const coll = db.mod_with_where;
 coll.drop();
 
@@ -36,4 +33,3 @@ assert.eq(
 assert.eq(1, coll.find({a: {$gt: 5, $mod: [10, 1]}}).itcount());
 
 assert(coll.drop());
-}());

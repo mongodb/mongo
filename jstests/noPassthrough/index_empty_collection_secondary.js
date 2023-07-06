@@ -13,16 +13,13 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/noPassthrough/libs/index_build.js');
-load("jstests/libs/fail_point_util.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 // Use a 3-node replica set config to ensure that the primary waits for the secondaries when the
 // commit quorum is in effect.
 const rst = new ReplSetTest({nodes: 3});
-const nodes = rst.startSet();
+rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
@@ -58,9 +55,7 @@ IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
 
 rst.awaitReplication();
 const secondary = rst.getSecondary();
-const secondaryDB = primary.getDB(testDB.getName());
 const secondaryColl = secondary.getCollection(coll.getFullName());
 IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
 
 rst.stopSet();
-})();

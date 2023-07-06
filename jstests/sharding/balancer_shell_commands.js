@@ -6,8 +6,6 @@
 
 var db;
 
-(function() {
-"use strict";
 var shardingTest =
     new ShardingTest({name: "shell_commands", shards: 1, mongos: 1, other: {enableBalancer: true}});
 db = shardingTest.getDB("test");
@@ -23,4 +21,3 @@ sh.setBalancerState(true);
 assert(sh.getBalancerState(), "Failed to re-enable balancer");
 
 shardingTest.stop();
-})();

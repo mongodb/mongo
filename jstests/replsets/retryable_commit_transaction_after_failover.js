@@ -1,9 +1,6 @@
 // Test committed transaction state is restored after failover.
 // @tags: [uses_transactions]
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
+import {reconnect} from "jstests/replsets/rslib.js";
 
 const dbName = "test";
 const collName = "retryable_commit_transaction_after_failover";
@@ -109,4 +106,3 @@ assert.commandFailedWithCode(sessionDb.runCommand({
 
 session.endSession();
 rst.stopSet();
-}());

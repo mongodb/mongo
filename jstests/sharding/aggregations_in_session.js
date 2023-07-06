@@ -1,8 +1,5 @@
 // Tests running aggregations within a client session. This test was designed to reproduce
 // SERVER-33660.
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 2});
 
 // Gate this test to transaction supporting engines only as it uses txnNumber.
@@ -10,7 +7,7 @@ let shardDB = st.rs0.getPrimary().getDB("test");
 if (!shardDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
     jsTestLog("Do not run on storage engine that does not support transactions");
     st.stop();
-    return;
+    quit();
 }
 
 const session = st.s0.getDB("test").getMongo().startSession();
@@ -38,4 +35,3 @@ assert.eq(
 assert.eq(mongosColl.aggregate([{$sort: {_id: 1}}, {$out: "testing"}]).itcount(), 0);
 
 st.stop();
-}());

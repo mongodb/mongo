@@ -2,9 +2,7 @@
  * Tests adding standalones and replica sets as shards under a variety of configurations (setName,
  * valid and invalid hosts, shardName matching or not matching a setName, etc).
  */
-(function() {
-'use strict';
-load('jstests/sharding/libs/remove_shard_util.js');
+import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -175,4 +173,3 @@ rst5.stopSet();
 
 st.stop();
 normalShard.stopSet();
-})();

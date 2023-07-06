@@ -12,17 +12,14 @@
  * ]
  */
 
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
     getCertificateAndPrivateKey,
     isShardMergeEnabled,
     kProtocolShardMerge,
     makeX509OptionsForTest,
 } from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
 
 const standalone = MongoRunner.runMongod({});
 const shardMergeFeatureFlagEnabled = isShardMergeEnabled(standalone.getDB("admin"));

@@ -1,9 +1,7 @@
 /**
  * This test makes makes sure Thread works with --enableJavaScriptProtection
  */
-(function() {
-'use strict';
-load('jstests/libs/parallelTester.js');
+import {Thread} from "jstests/libs/parallelTester.js";
 
 function testThread(threadType) {
     function threadFn(args) {
@@ -42,4 +40,3 @@ function testThread(threadType) {
 
 // Test the Thread class
 testThread(Thread);
-}());

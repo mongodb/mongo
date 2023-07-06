@@ -2,10 +2,7 @@
  * This tests all points using $near.
  */
 
-load("jstests/libs/geo_near_random.js");
-
-(function() {
-'use strict';
+import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
 
 var testName = "geo_near_random1";
 var s = new ShardingTest({shards: 3});
@@ -48,4 +45,3 @@ test.testPt(test.mkPt(), opts);
 test.testPt(test.mkPt(), opts);
 
 s.stop();
-})();

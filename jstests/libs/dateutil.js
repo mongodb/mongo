@@ -1,9 +1,7 @@
-"use strict";
-
 /**
  * Helpers for generating test dates for aggregations
  */
-var DateUtil = (function() {
+export var DateUtil = (function() {
     /**
      * local function to add leading 0 to month or day if needed.
      */

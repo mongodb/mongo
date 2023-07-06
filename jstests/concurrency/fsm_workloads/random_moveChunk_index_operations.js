@@ -8,8 +8,10 @@
  * ]
  */
 
-load("jstests/concurrency/fsm_workload_helpers/chunks.js");  // for chunk helpers
-load("jstests/sharding/libs/sharded_index_util.js");  // for findInconsistentIndexesAcrossShards
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 
 export const $config = (function() {
     function threadCollectionName(prefix, tid) {

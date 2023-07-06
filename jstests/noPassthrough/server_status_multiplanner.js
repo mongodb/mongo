@@ -9,7 +9,7 @@ function sumHistogramBucketCounts(histogram) {
     return sum;
 }
 
-load("jstests/libs/ftdc.js");
+import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const collName = jsTestName();

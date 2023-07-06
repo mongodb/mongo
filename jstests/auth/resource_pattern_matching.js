@@ -8,9 +8,6 @@
 // authenticating as the __system user.
 TestData.disableImplicitSessions = true;
 
-(function() {
-'use strict';
-
 function setup_users(granter) {
     const admin = granter.getSiblingDB("admin");
     assert.commandWorked(admin.runCommand({
@@ -109,12 +106,6 @@ function run_test_bad_resource(name, granter, resource) {
 
 function should_insert(testdb, testcol) {
     assert.doesNotThrow(function() {
-        testcol.insert({a: "b"});
-    });
-}
-
-function should_fail_insert(testdb, testcol) {
-    assert.throws(function() {
         testcol.insert({a: "b"});
     });
 }
@@ -263,4 +254,3 @@ const keyfile = "jstests/libs/key1";
     st.stop();
     print('--- sharding test done ---');
 }
-})();

@@ -9,9 +9,6 @@
 //   does_not_support_causal_consistency,
 // ]
 
-(function() {
-"use strict";
-
 function serverIsMongos() {
     const res = db.runCommand("hello");
     assert.commandWorked(res);
@@ -101,4 +98,3 @@ const statsEmptyDB = testEmptyAndNonExistingDB.runCommand({dbStats: 1, freeStora
 assert.sameMembers(Object.keys(statsNonExistingDB),
                    Object.keys(statsEmptyDB),
                    "dbStats for non-existing and empty dbs should return the same fields");
-})();

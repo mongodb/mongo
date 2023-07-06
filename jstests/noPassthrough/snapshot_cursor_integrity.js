@@ -1,9 +1,6 @@
 // Tests that a cursor is iterated in a transaction/session iff it was created in that
 // transaction/session. Specifically tests this in the context of snapshot cursors.
 // @tags: [uses_transactions]
-(function() {
-"use strict";
-
 // This test makes assertions on commands run without logical session ids.
 TestData.disableImplicitSessions = true;
 
@@ -153,4 +150,3 @@ assert.commandWorked(primaryDB.runCommand({getMore: cursorID, collection: collNa
 session1.endSession();
 session2.endSession();
 rst.stopSet();
-})();

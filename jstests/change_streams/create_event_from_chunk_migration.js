@@ -12,12 +12,9 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
-load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
-                                                   // 'assertChangeStreamEventEq'.
 const dbName = jsTestName();
 const collName = "test";
 const collNS = dbName + "." + collName;
@@ -25,7 +22,6 @@ const ns = {
     db: dbName,
     coll: collName
 };
-const numDocs = 1;
 
 const st = new ShardingTest({
     shards: 2,
@@ -39,18 +35,6 @@ const test = new ChangeStreamTest(db);
 function getCollectionUuid(coll) {
     const collInfo = db.getCollectionInfos({name: coll})[0];
     return collInfo.info.uuid;
-}
-
-function assertMigrateEventObserved(cursor, expectedEvent) {
-    let events = test.getNextChanges(cursor, 1);
-    let event = events[0];
-    // Check the presence and the type of 'wallTime' field. We have no way to check the correctness
-    // of 'wallTime' value, so we delete it afterwards.
-    assert(event.wallTime instanceof Date);
-    delete event.wallTime;
-    expectedEvent.collectionUUID = getCollectionUuid(collName);
-    assertChangeStreamEventEq(event, expectedEvent);
-    return event._id;
 }
 
 function prepareCollection() {
@@ -126,4 +110,3 @@ validateCreateEventsFromChunkMigration();
 validateShowSystemEventsFalse();
 
 st.stop();
-}());

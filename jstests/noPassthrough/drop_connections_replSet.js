@@ -5,9 +5,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const rst = new ReplSetTest({nodes: 3});
 rst.startSet();
 rst.initiate();
@@ -56,4 +53,3 @@ assert.commandWorked(primary.adminCommand({replSetReconfig: cfg}));
 rst.waitForConfigReplication(primary);
 
 rst.stopSet();
-})();

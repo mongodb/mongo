@@ -10,9 +10,11 @@
  *   cqf_incompatible,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For arrayEq().
-import {getPlanStages, getAggPlanStages} from "jstests/libs/analyze_plan.js";
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {getAggPlanStages, getPlanStages} from "jstests/libs/analyze_plan.js";
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 
 const coll = db.cover_null_queries;
 coll.drop();

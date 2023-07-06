@@ -7,10 +7,7 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction, exclude_from_large_txns]
  */
-(function() {
-"use strict";
-
-load('jstests/core/txns/libs/prepare_helpers.js');
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -108,4 +105,3 @@ jsTestLog("Testing prepared abort transaction op: " + tojson(op));
 assert.commandFailedWithCode(primarySessionDb.adminCommand({applyOps: [op]}), 50972);
 
 rst.stopSet();
-}());

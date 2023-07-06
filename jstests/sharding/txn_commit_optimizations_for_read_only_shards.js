@@ -9,11 +9,15 @@
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/write_concern_util.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {
+    assertWriteConcernError,
+    checkWriteConcernTimedOut,
+    restartServerReplication,
+    stopServerReplication,
+} from "jstests/libs/write_concern_util.js";
+import {
+    enableCoordinateCommitReturnImmediatelyAfterPersistingDecision
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 // Waits for the given log to appear a number of times in the shell's rawMongoProgramOutput.
 // Loops because it is not guaranteed the program output will immediately contain all lines
@@ -480,4 +484,3 @@ for (const failureModeName in failureModes) {
 }
 
 st.stop();
-})();

@@ -6,13 +6,15 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/replsets/rslib.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
+import {createRstArgs} from "jstests/replsets/rslib.js";
+import {
+    makeAbortTransactionCmdObj,
+    makeCommitTransactionCmdObj,
+    makePrepareTransactionCmdObj,
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
 let shard0Primary = st.rs0.getPrimary();
@@ -169,9 +171,8 @@ function runTests(retryFunc) {
         "retryable write in the parent session while the transaction has not been committed " +
         "or aborted");
 
-    let retryFunc = (testOpts) => {
-        load("jstests/replsets/rslib.js");
-        load("jstests/sharding/libs/sharded_transactions_helpers.js");
+    let retryFunc = async (testOpts) => {
+        const {createRst} = await import("jstests/replsets/rslib.js");
         const shard0Rst = createRst(testOpts.shard0RstArgs);
         let shard0Primary = shard0Rst.getPrimary();
 
@@ -201,9 +202,10 @@ function runTests(retryFunc) {
         "different retryable internal transaction while the original transaction has not been " +
         "committed or aborted");
 
-    let retryFunc = (testOpts) => {
-        load("jstests/replsets/rslib.js");
-        load("jstests/sharding/libs/sharded_transactions_helpers.js");
+    let retryFunc = async (testOpts) => {
+        const {createRst} = await import("jstests/replsets/rslib.js");
+        const {makeCommitTransactionCmdObj} =
+            await import("jstests/sharding/libs/sharded_transactions_helpers.js");
         const shard0Rst = createRst(testOpts.shard0RstArgs);
         let shard0Primary = shard0Rst.getPrimary();
 
@@ -238,4 +240,3 @@ function runTests(retryFunc) {
 }
 
 st.stop();
-})();

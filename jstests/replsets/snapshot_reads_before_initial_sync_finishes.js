@@ -7,10 +7,7 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 
 const replSet = new ReplSetTest({nodes: 2});
 
@@ -99,4 +96,3 @@ assert.sameMembers(newNodeDB
                    [{_id: 0}, {_id: 1}, {_id: 2}]);
 
 replSet.stopSet();
-})();

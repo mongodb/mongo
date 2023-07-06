@@ -10,12 +10,10 @@
  * @tags: [requires_persistence]
  */
 
-load('jstests/ssl/libs/ssl_helpers.js');
+import {allowSSL, requireSSL} from "jstests/ssl/libs/ssl_helpers.js";
 
 TestData.disableImplicitSessions = true;
 
-(function() {
-'use strict';
 var dbName = 'upgradeToX509';
 
 var transitionToX509AllowSSL =
@@ -62,4 +60,3 @@ assert.commandWorked(testDB.a.insert({a: 1, str: 'TESTTESTTEST'}));
 assert.eq(3, testDB.a.count(), 'Error interacting with replSet');
 
 rst.stopSet();
-}());

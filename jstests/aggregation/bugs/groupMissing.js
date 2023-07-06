@@ -7,10 +7,7 @@
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
 // ]
-load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
-
-(function() {
-"use strict";
+import {arrayEq, assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.getCollection(jsTestName());
 coll.drop();
@@ -43,11 +40,9 @@ coll.createIndex({a: 1});
 res = coll.aggregate({$group: {_id: {a: "$a"}}});
 assertArrayEq({actual: res.toArray(), expected: [{_id: {a: null}}]});
 
-// Correct behavior after SERVER-21992 is fixed.
-if (0) {
-    res = coll.aggregate({$group: {_id: {a: "$a"}}});
-    assertArrayEq({actual: res.toArray(), expected: [{_id: {a: null}}, {_id: {}}]});
-}
+// TODO(SERVER-21992): Re-enable the following tests
+// res = coll.aggregate({$group: {_id: {a: "$a"}}});
+// assertArrayEq({actual: res.toArray(), expected: [{_id: {a: null}}, {_id: {}}]});
 
 coll.drop();
 coll.insert({a: null, b: 1});
@@ -65,12 +60,10 @@ coll.createIndex({a: 1, b: 1});
 res = coll.aggregate({$sort: {a: 1, b: 1}}, {$group: {_id: {a: "$a", b: "$b"}}});
 assertArrayEq({actual: res.toArray(), expected: [{_id: {a: null, b: 1}}]});
 
-// Correct behavior after SERVER-23229 is fixed.
-if (0) {
-    coll.createIndex({a: 1, b: 1});
-    res = coll.aggregate({$sort: {a: 1, b: 1}}, {$group: {_id: {a: "$a", b: "$b"}}});
-    assertArrayEq({actual: res.toArray(), expected: [{_id: {b: 1}}, {_id: {a: null, b: 1}}]});
-}
+// TODO(SERVER-23229): Re-enable the following tests
+// coll.createIndex({a: 1, b: 1});
+// res = coll.aggregate({$sort: {a: 1, b: 1}}, {$group: {_id: {a: "$a", b: "$b"}}});
+// assertArrayEq({actual: res.toArray(), expected: [{_id: {b: 1}}, {_id: {a: null, b: 1}}]});
 
 // Try a simpler variation of the bug SERVER-23229, without $group.
 coll.drop();
@@ -105,4 +98,3 @@ checkActualMatchesAnExpected(
 checkActualMatchesAnExpected(
     coll.aggregate([{$match: {a: 1}}, {$project: {_id: 0, a: 1, b: 1}}], {hint: {a: 1, b: 1}})
         .toArray());
-}());

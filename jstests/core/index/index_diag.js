@@ -1,7 +1,7 @@
 // @tags: [
 //   assumes_balancer_off,
 // ]
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 let t = db.index_diag;
 t.drop();

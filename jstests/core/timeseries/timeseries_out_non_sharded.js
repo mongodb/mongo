@@ -13,6 +13,7 @@
  * ]
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const numHosts = 10;
 const numIterations = 20;

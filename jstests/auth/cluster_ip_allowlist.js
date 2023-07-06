@@ -2,9 +2,6 @@
  * This test checks that cluster IP allowlists can be set and respected.
  */
 
-(function() {
-'use strict';
-
 print("When allowlist is empty, the server does not start.");
 assert.throws(() => MongoRunner.runMongod(
                   {auth: null, keyFile: "jstests/libs/key1", clusterIpSourceAllowlist: ""}),
@@ -149,4 +146,3 @@ testIpAllowlist(
     false);
 
 testIpAllowlistRuntimeGarbage();
-}());

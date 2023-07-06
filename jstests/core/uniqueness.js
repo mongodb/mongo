@@ -8,9 +8,6 @@
 //     requires_background_index,
 // ]
 
-(function() {
-"use strict";
-
 let res;
 
 const collNamePrefix = 'jstests_uniqueness_';
@@ -76,4 +73,3 @@ t.drop();
 assert.commandWorked(t.save({_id: 'Z', k: 3}));
 assert.commandWorked(t.update({}, {k: 2}));
 assert.eq('Z', t.findOne()._id, "uniqueness.js problem with adding back _id (2)");
-})();

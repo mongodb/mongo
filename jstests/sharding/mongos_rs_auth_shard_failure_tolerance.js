@@ -28,9 +28,6 @@ TestData.skipCheckShardFilteringMetadata = true;
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
-(function() {
-'use strict';
-
 var options = {rs: true, rsOptions: {nodes: 2}, keyFile: "jstests/libs/key1"};
 
 var st = new ShardingTest({shards: 3, mongos: 1, other: options});
@@ -301,4 +298,3 @@ gc();  // Clean up new connections
 
 jsTest.log("DONE!");
 st.stop();
-})();

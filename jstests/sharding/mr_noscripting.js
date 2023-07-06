@@ -1,6 +1,4 @@
 // Tests that running mapReduce does not crash anything if the shards have scripting disabled.
-(function() {
-"use strict";
 const shardOpts = [
     {noscripting: ''},
     {}  // just use default params
@@ -37,4 +35,3 @@ assert.commandFailedWithCode(testDB.runCommand(mrCmd), 31264, () => {
 });
 
 st.stop();
-}());

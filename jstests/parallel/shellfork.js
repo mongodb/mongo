@@ -1,4 +1,4 @@
-load('jstests/libs/parallelTester.js');
+import {fork, Thread} from "jstests/libs/parallelTester.js";
 
 let a = fork(function(a, b) {
     return a / b;
@@ -18,8 +18,8 @@ assert.eq(5, a.returnData());
 assert.eq("18 is a multiple of 3", b.returnData());
 assert.eq("paisley ha ha!", c.returnData());
 
-let z = fork(function(a) {
-    load('jstests/libs/parallelTester.js');
+let z = fork(async function(a) {
+    const {fork} = await import("jstests/libs/parallelTester.js");
     var y = fork(function(a) {
         return a + 1;
     }, 5);

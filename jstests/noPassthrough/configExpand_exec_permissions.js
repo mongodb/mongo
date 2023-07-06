@@ -2,15 +2,16 @@
 // Ideally, we'd also check for foreign ownership here,
 // but that's impractical in a test suite where we're not running as root.
 
-(function() {
-'use strict';
-
 if (_isWindows()) {
     print("Skipping test on windows");
-    return;
+    quit();
 }
 
-load('jstests/noPassthrough/libs/configExpand/lib.js');
+import {
+    makeReflectionCmd,
+    configExpandSuccess,
+    configExpandFailure
+} from "jstests/noPassthrough/libs/configExpand/lib.js";
 
 const sicReflect = {
     setParameter: {scramIterationCount: {__exec: makeReflectionCmd('12345')}}
@@ -31,4 +32,3 @@ configExpandFailure(sicReflect, expect, {configExpand: 'exec', chmod: 0o606});
 
 // Explicitly world-readable/writable config file without expansions should be fine.
 configExpandSuccess({}, null, {configExpand: 'none', chmod: 0o666});
-})();

@@ -4,7 +4,7 @@
 //   uses_parallel_shell,
 // ]
 
-load("jstests/libs/parallel_shell_helpers.js");
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 // verify that join works
 db.sps.drop();

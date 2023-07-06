@@ -6,14 +6,11 @@
  * @tags: [requires_fcv_70]
  */
 
-(function() {
-'use strict';
-
-load('jstests/ssl/libs/ssl_helpers.js');
+import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 if (determineSSLProvider() !== "openssl") {
     print('Skipping test, tlsClusterAuthX509 options are only available with OpenSSL');
-    return;
+    quit();
 }
 
 const clusterMembershipAttributesDN = "title=foo, C=US, ST=New York, L=New York City";
@@ -236,4 +233,3 @@ runValidMongodTest(
         user: 'CN=server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US',
         certificate: serverDefaultOnlyCert
     });
-})();

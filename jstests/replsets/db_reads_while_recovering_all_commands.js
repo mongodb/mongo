@@ -6,11 +6,8 @@
  * @tags: [multiversion_incompatible]
  */
 
-(function() {
-"use strict";
-
 // This will verify the completeness of our map and run all tests.
-load("jstests/libs/all_commands_test.js");
+import {AllCommandsTest} from "jstests/libs/all_commands_test.js";
 
 const name = jsTestName();
 const dbName = "alltestsdb";
@@ -498,4 +495,3 @@ AllCommandsTest.testAllCommands(secondary, allCommands, function(test) {
 // Turn off maintenance mode and stop the test.
 assert.commandWorked(secondary.adminCommand({replSetMaintenance: 0}));
 rst.stopSet();
-})();

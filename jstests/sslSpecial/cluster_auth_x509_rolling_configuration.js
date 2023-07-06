@@ -6,14 +6,11 @@
  * @tags: [requires_persistence, requires_replication, requires_fcv_70]
  */
 
-(function() {
-'use strict';
-
-load('jstests/ssl/libs/ssl_helpers.js');
+import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 if (determineSSLProvider() !== "openssl") {
     print('Skipping test, tlsClusterAuthX509 options are only available with OpenSSL');
-    return;
+    quit();
 }
 
 /**
@@ -315,4 +312,3 @@ rolloverConfig({
 jsTestLog("SUCCESS - certificate rotation from extension value back to default");
 
 rst.stopSet();
-})();

@@ -3,10 +3,7 @@
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
 // ]
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.coll;
 const from = db.from;
@@ -48,4 +45,3 @@ const geonearThenLookupPipeline = [
 ];
 assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
 assert.eq(coll.aggregate(geonearThenLookupPipeline).itcount(), 1);
-}());

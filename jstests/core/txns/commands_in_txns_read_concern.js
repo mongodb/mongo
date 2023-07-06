@@ -10,12 +10,9 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/auto_retry_transaction_in_sharding.js");
-load("jstests/libs/create_collection_txn_helpers.js");
-load("jstests/libs/create_index_txn_helpers.js");
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {createCollAndCRUDInTxn} from "jstests/libs/create_collection_txn_helpers.js";
+import {createIndexAndCRUDInTxn, indexSpecs} from "jstests/libs/create_index_txn_helpers.js";
 
 const session = db.getMongo().startSession();
 const collName = jsTestName();
@@ -113,4 +110,3 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.endSession();
-}());

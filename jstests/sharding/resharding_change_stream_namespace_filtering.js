@@ -7,12 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load("jstests/libs/chunk_manipulation_util.js");   // For pauseMigrateAtStep, waitForMigrateStep and
-                                                   // unpauseMigrateAtStep.
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const st = new ShardingTest({
     shards: 2,
@@ -60,4 +55,3 @@ assert.soon(() => shardOtherCollCsCursor.hasNext());
 assert.eq(shardOtherCollCsCursor.next().operationType, "insert");
 
 st.stop();
-})();

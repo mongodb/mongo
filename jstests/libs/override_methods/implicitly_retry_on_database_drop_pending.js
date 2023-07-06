@@ -2,9 +2,6 @@
  * Loading this file overrides functions on Mongo.prototype so that operations which return a
  * "DatabaseDropPending" error response are automatically retried until they succeed.
  */
-(function() {
-"use strict";
-
 const defaultTimeout = 10 * 60 * 1000;
 
 const mongoRunCommandOriginal = Mongo.prototype.runCommand;
@@ -62,6 +59,7 @@ function runCommandWithRetries(conn, dbName, commandObj, func, makeFuncArgs) {
                         // operation that were sent to the server by finding the object's
                         // reference (i.e. using strict-equality) in 'originalOps'.
                         for (let upsertInfo of res.upserted) {
+                            /* eslint-disable-next-line */
                             upsertInfo.index = originalOps.indexOf(opsToRetry[upsertInfo.index]);
                         }
 
@@ -136,4 +134,3 @@ Mongo.prototype.runCommand = function(dbName, commandObj, options) {
                                  mongoRunCommandOriginal,
                                  (commandObj) => [dbName, commandObj, options]);
 };
-})();

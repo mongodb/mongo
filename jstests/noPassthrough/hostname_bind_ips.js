@@ -1,9 +1,6 @@
 // Check that connecting via IPv4 keeps working when
 // binding to localhost and enabling IPv6.
 
-(function() {
-'use strict';
-
 const proc = MongoRunner.runMongod({bind_ip: "localhost", "ipv6": ""});
 assert.neq(proc, null);
 
@@ -19,4 +16,3 @@ assert.soon(function() {
     }
 }, "Cannot connect to 127.0.0.1 when bound to localhost", 30 * 1000);
 MongoRunner.stopMongod(proc);
-})();

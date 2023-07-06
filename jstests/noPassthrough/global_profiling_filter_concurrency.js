@@ -5,8 +5,6 @@
  *   uses_parallel_shell,
  * ]
  */
-(function() {
-
 const conn = MongoRunner.runMongod({setParameter: {internalQueryGlobalProfilingFilter: 1}});
 
 let handles = [];
@@ -28,4 +26,3 @@ for (const handle of handles) {
 }
 
 MongoRunner.stopMongod(conn);
-})();

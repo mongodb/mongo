@@ -1,9 +1,6 @@
 // Tests that $$USER_ROLES is able to be used in an "update" and "findAndModify" commands.
 // @tags: [requires_fcv_70]
 
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "coll";
 
@@ -128,7 +125,6 @@ function runTest(conn, st = null) {
     }
 
     const db = conn.getDB(dbName);
-    let coll = db.getCollection(collName);
 
     // Create a user that has roles on more than one database. The readWriteAnyDatabase is
     // necessary for the inserts that follow to work.
@@ -171,4 +167,3 @@ const st = new ShardingTest({
 
 runTest(st.s, st);
 st.stop();
-}());

@@ -6,9 +6,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const st = new ShardingTest({shards: 1});
 const db = st.getDB("test");
 
@@ -37,4 +34,3 @@ assert.commandFailedWithCode(db.runCommand({
                              ErrorCodes.BadValue);
 
 st.stop();
-})();

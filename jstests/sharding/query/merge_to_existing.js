@@ -1,9 +1,6 @@
 // Tests for $merge with an existing target collection.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode.
-load("jstests/aggregation/extras/utils.js");          // For assertErrorCode.
+import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
@@ -147,4 +144,3 @@ testMerge(sourceColl, outputCollDiffDb, false, true);
 testMerge(sourceColl, outputCollDiffDb, true, false);
 
 st.stop();
-}());

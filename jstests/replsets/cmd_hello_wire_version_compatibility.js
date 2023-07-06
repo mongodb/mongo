@@ -12,9 +12,6 @@ const VERSION_4_9_COMPATIBILITY = {
     maxWireVersion: WIRE_VERSION_49,
 };
 
-(function() {
-"use strict";
-
 let testWireVersion = function(isSystem, compatibilityBounds) {
     const rst = new ReplSetTest({nodes: 3, auth: ""});
     rst.startSet();
@@ -47,4 +44,3 @@ let testWireVersion = function(isSystem, compatibilityBounds) {
 // external user.
 testWireVersion(false, VERSION_4_9_COMPATIBILITY);
 testWireVersion(true, VERSION_4_9_COMPATIBILITY);
-})();

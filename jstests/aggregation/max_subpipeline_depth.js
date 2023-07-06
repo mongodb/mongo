@@ -1,8 +1,5 @@
 // Tests that a pipeline isn't allowed to specify an arbitrary number of sub-pipelines within
 // $lookups and other similar stages.
-(function() {
-"use strict";
-
 const coll = db.max_subpipeline_depth;
 coll.drop();
 
@@ -39,4 +36,3 @@ assert.commandWorked(db.runCommand(
 assert.commandFailedWithCode(
     db.runCommand({aggregate: coll.getName(), pipeline: [makeLookupNDeep(maxDepth)], cursor: {}}),
     ErrorCodes.MaxSubPipelineDepthExceeded);
-}());

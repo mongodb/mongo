@@ -8,17 +8,14 @@
  *   uses_atclustertime,
  * ]
  */
-(function() {
-"use strict";
-
 if (_isWindows()) {
     jsTest.log("Skipping test on Windows because it makes assumptions about exit codes for" +
                " std::terminate()");
-    return;
+    quit();
 }
 
-const awaitShell = startParallelShell(function() {
-    load("jstests/sharding/libs/resharding_test_fixture.js");
+const awaitShell = startParallelShell(async function() {
+    const {ReshardingTest} = await import("jstests/sharding/libs/resharding_test_fixture.js");
 
     const reshardingTest = new ReshardingTest();
     reshardingTest.setup();
@@ -47,4 +44,3 @@ const awaitShell = startParallelShell(function() {
 const exitCode = awaitShell({checkExitSuccess: false});
 assert.neq(exitCode, 0);
 assert.neq(exitCode, MongoRunner.EXIT_ABORT);
-})();

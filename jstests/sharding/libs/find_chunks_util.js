@@ -1,7 +1,7 @@
 /*
  * Utilities for looking up chunk metadata
  */
-var findChunksUtil = (function() {
+export var findChunksUtil = (function() {
     /**
      * Performs a find() on config.chunks on 'configDB', targeting chunks for the collection 'ns',
      * and the optional 'extraQuery' and 'projection'.

@@ -5,9 +5,9 @@
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
-load('jstests/replsets/rslib.js');
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
@@ -26,10 +26,6 @@ const refinedShardKey = {
 
 const shardKeyValueInChunk = {
     x: 1
-};
-
-const shardKeyValueInFirstChunk = {
-    x: -2
 };
 
 const refinedShardKeyValueInChunk = {

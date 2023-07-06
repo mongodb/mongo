@@ -1,5 +1,3 @@
-(function() {
-'use strict';
 assert.commandWorked(db.runCommand({insert: 'a', documents: [{x: 1}]}));
 
 // Disallow renaming to system.views
@@ -21,4 +19,3 @@ assert.commandWorked(db.adminCommand({
 assert.commandWorked(db.adminCommand({
     applyOps: [{op: 'c', ns: 'test.$cmd', o: {renameCollection: 'test.b', to: 'test.system.views'}}]
 }));
-})();

@@ -15,9 +15,6 @@
  *  tenant_migration_incompatible,
  * ]
  */
-(function() {
-'use strict';
-
 const collModIndexUniqueEnabled = assert
                                       .commandWorked(db.getMongo().adminCommand(
                                           {getParameter: 1, featureFlagCollModIndexUnique: 1}))
@@ -25,7 +22,7 @@ const collModIndexUniqueEnabled = assert
 
 if (!collModIndexUniqueEnabled) {
     jsTestLog('Skipping test because the collMod unique index feature flag is disabled.');
-    return;
+    quit();
 }
 
 function sortViolationsArray(arr) {
@@ -114,4 +111,3 @@ assertFailedWithViolations(
 // Expects unique: true conversion to fail without size exceeding violation.
 assertFailedWithViolations(
     db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}), [{ids}], false);
-})();

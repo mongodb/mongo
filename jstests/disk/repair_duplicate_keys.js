@@ -10,8 +10,7 @@ import {
     assertRepairSucceeds,
     startMongodOnExistingPath
 } from "jstests/disk/libs/wt_file_helper.js";
-
-load("jstests/libs/uuid_util.js");
+import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 
 const baseName = "repair_duplicate_keys";
 const localBaseName = "local";

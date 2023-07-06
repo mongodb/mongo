@@ -9,8 +9,6 @@
 // Skip db hash check because node 2 is slave delayed and may time out on awaitReplication.
 TestData.skipCheckDBHashes = true;
 
-load("jstests/replsets/rslib.js");
-
 // function create the error message if an assert fails
 var generateErrorString = function(badFields, missingFields, badValues, result) {
     var str = "\nThe result was:\n" + tojson(result);
@@ -23,7 +21,7 @@ var generateErrorString = function(badFields, missingFields, badValues, result) 
         str += missingFields;
     }
     if (badValues.length !== 0) {
-        for (i = 0; i < badValues.length; i += 3) {
+        for (let i = 0; i < badValues.length; i += 3) {
             str += "\nIts value for " + badValues[i] + " is " + badValues[i + 1];
             str += " but should be " + badValues[i + 2];
         }
@@ -64,7 +62,7 @@ var checkResponseFields = function(memberInfo, cmd) {
 
     // make sure result doesn't contain anything it shouldn't
     var badFields = [];
-    for (field in result) {
+    for (let field in result) {
         if (!result.hasOwnProperty(field)) {
             continue;
         }
@@ -75,8 +73,8 @@ var checkResponseFields = function(memberInfo, cmd) {
 
     // make sure result contains the fields we want
     var missingFields = [];
-    for (i = 0; i < memberInfo.wantedFields.length; i++) {
-        field = memberInfo.wantedFields[i];
+    for (let i = 0; i < memberInfo.wantedFields.length; i++) {
+        const field = memberInfo.wantedFields[i];
         if (!result.hasOwnProperty(field)) {
             missingFields.push(field);
             print(field);
@@ -85,7 +83,7 @@ var checkResponseFields = function(memberInfo, cmd) {
 
     // make sure the result has proper values for fields with known values
     var badValues = [];  // each mistake will be saved as three entries (key, badvalue, goodvalue)
-    for (field in memberInfo.goodValues) {
+    for (let field in memberInfo.goodValues) {
         if (typeof (memberInfo.goodValues[field]) === "object") {
             // assumes nested obj is disk in tags this is currently true, but may change
             if (result[field].disk !== memberInfo.goodValues[field].disk) {
@@ -262,7 +260,7 @@ config.members[2].tags = {
     disk: "hdd"
 };
 try {
-    result = primary.getDB("admin").runCommand({replSetReconfig: config});
+    primary.getDB("admin").runCommand({replSetReconfig: config});
 } catch (e) {
     print(e);
 }

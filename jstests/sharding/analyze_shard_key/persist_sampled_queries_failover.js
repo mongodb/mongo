@@ -4,11 +4,8 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 function testStepDown(rst) {
     const dbName = "testDb";
@@ -105,4 +102,3 @@ testStepDown(st.rs0);
 testStepUp(st.rs0);
 
 st.stop();
-})();

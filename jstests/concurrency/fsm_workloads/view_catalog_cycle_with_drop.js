@@ -4,6 +4,7 @@
  * Creates a set of views and then attempts to read while remapping views against each other and the
  * underlying collection.
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     // Use the workload name as a prefix for the view names, since the workload name is assumed

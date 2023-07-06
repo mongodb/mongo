@@ -1,10 +1,7 @@
 // Confirms basic killOp execution via mongos.
 // @tags: [requires_replication, requires_sharding]
 
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 
 const st = new ShardingTest({shards: 2});
 const conn = st.s;
@@ -48,4 +45,3 @@ result = adminDB.aggregate([{$currentOp: {localOps: true}}, {$match: curOpFilter
 assert(result.length === 0, tojson(result));
 
 st.stop();
-})();

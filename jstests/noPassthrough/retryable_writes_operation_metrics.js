@@ -7,11 +7,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/retryable_writes_util.js");
-
 function setupReplicaSet() {
     var rst = new ReplSetTest({
         nodes: 2,
@@ -143,4 +138,3 @@ jsTest.log("Tests retryable insert command.");
 
 session.endSession();
 rst.stopSet();
-}());

@@ -10,10 +10,7 @@
 //   # 'throwChangeStreamTopologyChangeExceptionToClient'.
 //   multiversion_incompatible
 // ]
-(function() {
-"use strict";
-
-load('jstests/libs/change_stream_util.js');  // For ChangeStreamTest.
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 
 const testName = "change_streams_unsharded_becomes_sharded";
 const st = new ShardingTest({
@@ -203,4 +200,3 @@ testUnshardedBecomesSharded(mongosColl.getName());
 testUnshardedBecomesSharded(1);
 
 st.stop();
-})();

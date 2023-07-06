@@ -11,11 +11,8 @@
  *   featureFlagAggOutTimeseries
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/fail_point_util.js");  // for configureFailPoint.
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const dbName = "test";
 const timeFieldName = 'time';
@@ -175,4 +172,3 @@ runOutAndShardCollectionConcurrently_OutMustFail(st, testDB, primaryShard);
 fp.off();
 
 st.stop();
-}());

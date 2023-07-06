@@ -1,5 +1,5 @@
 // server-6198: disallow dots in group output field names
-load('jstests/aggregation/extras/utils.js');
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 db.server6198.drop();
 

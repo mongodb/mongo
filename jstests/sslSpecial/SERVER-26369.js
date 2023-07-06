@@ -6,10 +6,7 @@
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-(function() {
-'use strict';
-
-load("jstests/ssl/libs/ssl_helpers.js");
+import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 const st = new ShardingTest({shards: {rs0: {nodes: 1}}});
 let opts = {
@@ -26,4 +23,3 @@ requireSSLProvider('openssl', function() {
 
 st.rs0.restart(0, opts);
 st.stop();
-})();

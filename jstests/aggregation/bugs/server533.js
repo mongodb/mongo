@@ -1,10 +1,6 @@
 // SERVER-533: Aggregation stage to randomly sample documents.
 
-// For assertErrorCode.
-load('jstests/aggregation/extras/utils.js');
-
-(function() {
-'use strict';
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 var coll = db.agg_sample;
 coll.drop();
@@ -36,4 +32,3 @@ assertErrorCode(coll, [{$sample: {size: 'string'}}], 28746);
 assertErrorCode(coll, [{$sample: {size: -1}}], 28747);
 assertErrorCode(coll, [{$sample: {unknownOpt: true}}], 28748);
 assertErrorCode(coll, [{$sample: {/* no size */}}], 28749);
-}());

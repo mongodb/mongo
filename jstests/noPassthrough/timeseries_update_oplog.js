@@ -8,9 +8,6 @@
  *   requires_fcv_71,
  * ]
  */
-(function() {
-'use strict';
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -161,4 +158,3 @@ function upsertValidateFn(testDB, coll, retryableWrite) {
 })();
 
 rst.stopSet();
-})();

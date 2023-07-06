@@ -6,9 +6,6 @@
  *
  * @tags: [requires_fcv_70, featureFlagTransitionToCatalogShard]
  */
-(function() {
-"use strict";
-
 // Test that we can't create a shard specific user on the config shard if we already created a
 // cluster wide user using the localhost exception.
 var st = new ShardingTest({
@@ -49,4 +46,3 @@ assert.commandFailedWithCode(adminDB.runCommand({createUser: "joe", pwd: "joe", 
 assert(adminDB.auth('admin', 'admin'));
 
 st.stop();
-})();

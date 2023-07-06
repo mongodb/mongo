@@ -4,11 +4,7 @@
  *
  * @tags: [multiversion_incompatible]
  */
-(function() {
-
-"use strict";
-
-load("jstests/libs/write_concern_util.js");
+import {runWriteConcernRetryabilityTest} from "jstests/libs/write_concern_util.js";
 
 const kNodes = 2;
 
@@ -51,4 +47,3 @@ assert.commandWorked(
 checkFCV(priConn.getDB('admin'), latestFCV);
 
 replTest.stopSet();
-})();

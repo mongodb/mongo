@@ -1,9 +1,10 @@
 // Validate resend registration works in a replica set
 //
-load("jstests/free_mon/libs/free_mon.js");
-
-(function() {
-'use strict';
+import {
+    FAULT_RESEND_REGISTRATION_ONCE,
+    FreeMonWebServer,
+    WaitForRegistration
+} from "jstests/free_mon/libs/free_mon.js";
 
 let mock_web = new FreeMonWebServer(FAULT_RESEND_REGISTRATION_ONCE);
 
@@ -25,4 +26,3 @@ mock_web.waitRegisters(2);
 MongoRunner.stopMongod(conn);
 
 mock_web.stop();
-})();

@@ -2,9 +2,6 @@
  * Test dropDatabase command in a sharded cluster.
  */
 
-(function() {
-"use strict";
-
 var st = new ShardingTest({shards: 2});
 
 var configDB = st.s.getDB("config");
@@ -386,4 +383,3 @@ jsTest.log("Test that dropping a sharded database, relevant events are properly 
 }
 
 st.stop();
-})();

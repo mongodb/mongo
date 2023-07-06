@@ -2,8 +2,6 @@
  * Tests that `onCurrentShardSince` is always consistent with  `history[0].validAfter` on
  * config.chunks entries
  */
-load("jstests/sharding/libs/find_chunks_util.js");
-
 Random.setRandomSeed();
 
 /* Create new sharded collection on testDB with 111 initial chunks*/

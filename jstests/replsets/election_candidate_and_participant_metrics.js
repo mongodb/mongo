@@ -5,11 +5,7 @@
  * after each handoff.
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/election_handoff.js");
-load("jstests/replsets/rslib.js");
+import {ElectionHandoffTest} from "jstests/replsets/libs/election_handoff.js";
 
 const testName = jsTestName();
 const numNodes = 2;
@@ -168,7 +164,7 @@ originalPrimaryElectionCandidateMetrics = originalPrimaryReplSetGetStatus.electi
 // candidate in this election.
 assert(!originalPrimaryElectionCandidateMetrics,
        () => "Response should not have an 'electionCandidateMetrics' field: " +
-           tojson(originalPrimaryCandidateMetrics));
+           tojson(originalPrimaryElectionCandidateMetrics));
 
 // testElectionHandoff steps down the primary with a non-zero step down period, so we need to
 // unfreeze the node to allow it to initiate an election again.
@@ -244,4 +240,3 @@ assert.eq(
 assert.eq(originalPrimaryElectionParticipantMetrics.priorityAtElection, 1);
 
 rst.stopSet();
-})();

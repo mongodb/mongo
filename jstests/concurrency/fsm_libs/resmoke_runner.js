@@ -1,7 +1,8 @@
+import {AssertLevel, setGlobalAssertLevel} from "jstests/concurrency/fsm_libs/assert.js";
 import {Cluster} from "jstests/concurrency/fsm_libs/cluster.js";
 import {runner} from "jstests/concurrency/fsm_libs/runner.js";
 import {ThreadManager} from "jstests/concurrency/fsm_libs/thread_mgr.js";
-load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
 const validateExecutionOptions = runner.internals.validateExecutionOptions;
 const prepareCollections = runner.internals.prepareCollections;
@@ -15,8 +16,6 @@ const loadWorkloadContext = runner.internals.loadWorkloadContext;
 
 // Returns true if the workload's teardown succeeds and false if the workload's teardown fails.
 function cleanupWorkload(workload, context, cluster, errors, header) {
-    const phase = 'before workload ' + workload + ' teardown';
-
     try {
         teardownWorkload(workload, context, cluster);
     } catch (e) {
@@ -48,7 +47,7 @@ async function runWorkloads(workloads,
         // apply.
         assertLevel = AssertLevel.ALWAYS;
     }
-    globalAssertLevel = assertLevel;
+    setGlobalAssertLevel(assertLevel);
 
     const context = {};
     const applyMultipliers = true;

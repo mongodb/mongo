@@ -1,9 +1,6 @@
 // Test --host with a replica set.
 // @tags: [requires_replication]
 
-(function() {
-'use strict';
-
 const replSetName = 'hostTestReplSetName';
 
 // This "inner_mode" method of spawning a replset and re-running was copied from
@@ -32,7 +29,7 @@ if ("undefined" == typeof inner_mode) {
     if (exitCode != 0) {
         doassert("inner test failed with exit code " + exitCode);
     }
-    return;
+    quit();
 }
 
 function testHost(host, uri, ok) {
@@ -82,4 +79,3 @@ expFailure('mongodb://localhost:');
 expFailure(`mongodb://:${port}`);
 
 jsTest.log("SUCCESSFUL test completion");
-})();

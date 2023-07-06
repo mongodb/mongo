@@ -1,7 +1,4 @@
 // SERVER-14691: $avg aggregator should return null when it receives no input.
-(function() {
-'use strict';
-
 var coll = db.accumulate_avg_sum_null;
 
 // Test the $avg aggregator.
@@ -49,4 +46,3 @@ assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.insert({a: 1, b: 'string'}));
 assert.commandWorked(coll.insert({a: 1, b: null}));
 assert.eq(coll.aggregate(pipeline).toArray(), [{_id: 1, avg: 0}]);
-}());

@@ -12,12 +12,11 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
-                                                   // 'assertChangeStreamEventEq'.
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {
+    assertDropAndRecreateCollection,
+    assertDropCollection
+} from "jstests/libs/collection_drop_recreate.js";
 
 jsTestLog("creating sharding test");
 var st = new ShardingTest({
@@ -217,4 +216,3 @@ const pipeline = [{$changeStream: {showExpandedEvents: true}}];
 runTest(() => test.startWatchingChanges({pipeline, collection: 1}));
 runTest(() => test.startWatchingChanges({pipeline, collection: collName}));
 st.stop();
-}());

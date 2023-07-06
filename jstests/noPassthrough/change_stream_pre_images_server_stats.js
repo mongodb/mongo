@@ -2,14 +2,9 @@
  * Tests that FTDC collects information about the pre-image collection, including its purging job.
  * @tags: [ requires_replication ]
  */
+import {getPreImages, getPreImagesCollection} from "jstests/libs/change_stream_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
-(function() {
-'use strict';
-
-// For verifyGetDiagnosticData.
-load('jstests/libs/ftdc.js');
-load("jstests/libs/change_stream_util.js");
+import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 
 const getPreImagesCollStats = function(conn) {
     return getPreImagesCollection(conn)
@@ -182,4 +177,3 @@ replicaSet.nodes.forEach((node) => {
 });
 
 replicaSet.stopSet();
-}());

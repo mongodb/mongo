@@ -6,9 +6,6 @@
  * This test restarts the server and requires that data persists across restarts.
  * @tags: [requires_persistence, requires_profiling]
  */
-(function() {
-"use strict";
-
 //
 // Start mongo with profiling disabled, create an empty database, and populate it with a
 // collection that has one document.
@@ -56,4 +53,3 @@ assert.commandWorked(res);
 assert.eq(res.cursor.firstBatch.length, 1, res);
 
 MongoRunner.stopMongod(standalone);
-})();

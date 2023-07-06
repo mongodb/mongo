@@ -12,10 +12,9 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {supportArbitraryClusterKeyIndex: true}});
 
@@ -256,4 +255,3 @@ assert.commandFailedWithCode(
 validateCompoundSecondaryIndexes(nonReplicatedDB, nonReplicatedColl, {ts: 1});
 
 MongoRunner.stopMongod(conn);
-})();

@@ -13,13 +13,9 @@
  *   from two different primaries.
  * 6. Reconnect node0 to the rest of the set and verify that its reconfig fails.
  */
-(function() {
-"use strict";
-load("jstests/libs/parallel_shell_helpers.js");
-load('jstests/libs/test_background_ops.js');
-load("jstests/replsets/rslib.js");
-load('jstests/aggregation/extras/utils.js');
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
 let rst = new ReplSetTest({nodes: 4, useBridge: true});
 rst.startSet();
@@ -92,4 +88,3 @@ rst.waitForConfigReplication(node1);
 rst.awaitNodesAgreeOnPrimary();
 parallelShell();
 rst.stopSet();
-}());

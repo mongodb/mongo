@@ -12,9 +12,6 @@
 //   incompatible_with_preimages_by_default,
 // ]
 
-(function() {
-"use strict";
-
 const sourceColl = db.irap_cmd;
 const adminDB = db.getSiblingDB("admin");
 const destDB = db.getSiblingDB("irap_out_db");
@@ -69,4 +66,3 @@ commandObj.collectionOptions = {
     max: 2,
 };
 assert.commandWorked(adminDB.runCommand(commandObj));
-})();

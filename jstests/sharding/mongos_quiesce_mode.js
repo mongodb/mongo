@@ -5,11 +5,8 @@
  * begin re-routing operations.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const st = new ShardingTest({shards: [{nodes: 1}], mongos: 1});
 const mongos = st.s;
@@ -140,4 +137,3 @@ checkTopologyVersion(assert.commandFailedWithCode(mongosDB.runCommand({find: col
 st.restartMongos(0);
 
 st.stop();
-})();

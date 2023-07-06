@@ -1,4 +1,3 @@
-
 /**
  * Test that a $function behaves as expected when its return value is a BSON scalar, i.e. a value
  * that is not an object or array.
@@ -8,9 +7,6 @@
  *   requires_scripting
  * ]
  */
-
-(function() {
-'use strict';
 
 const coll = db.return_bson_scalare_from_js_function;
 
@@ -65,4 +61,3 @@ coll.aggregate(pipeline).forEach(doc => {
     assert.eq(doc.expected, doc.nested.x.constructor.name, doc);
     assert.eq(doc.expected, doc.toplevel.constructor.name, doc);
 });
-}());

@@ -3,8 +3,6 @@
  * aggregate command's pipeline inside a $facet stage, then appends an $unwind stage. This will
  * yield the same results, but stress the logic of the $facet stage.
  */
-(function() {
-'use strict';
 
 // Set the batch size of the $facet stage's buffer to be lower. This will further stress the
 // batching logic, since most pipelines will fall below the default size of 100MB.
@@ -73,4 +71,3 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     ];
     return originalRunCommand.apply(this, arguments);
 };
-}());

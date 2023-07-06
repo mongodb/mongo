@@ -1,6 +1,4 @@
 // Helper script used to validate login as x509 auth with a certificate with roles works.
-(function() {
-"use strict";
 
 // Auth as user in certificate
 let ret = db.getSiblingDB("$external").auth({
@@ -15,4 +13,3 @@ assert.commandWorked(connStatus);
 
 let expectedRoles = [{"role": "backup", "db": "admin"}, {"role": "readAnyDatabase", "db": "admin"}];
 assert.sameMembers(connStatus.authInfo.authenticatedUserRoles, expectedRoles);
-}());

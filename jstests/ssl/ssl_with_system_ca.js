@@ -6,9 +6,6 @@
 //   security add-trusted-cert -d jstests/libs/trusted-ca.pem
 // TODO BUILD-17503 Remove this tag
 // @tags: [incompatible_with_macos]
-(function() {
-'use strict';
-
 const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
 if (HOST_TYPE == "windows") {
     // OpenSSL backed imports Root CA and intermediate CA
@@ -53,4 +50,3 @@ function testWithCerts(prefix) {
 
 assert.neq(0, testWithCerts(''), 'Certs signed with untrusted CA');
 assert.eq(0, testWithCerts('trusted-'), 'Certs signed with trusted CA');
-})();

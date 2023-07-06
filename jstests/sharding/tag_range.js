@@ -1,8 +1,5 @@
 // tests to make sure that tag ranges are added/removed/updated successfully
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/find_chunks_util.js");
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 
@@ -90,4 +87,3 @@ assert.commandFailed(st.removeTagRange('test.tag_range', {_id: 5}, 35));
 countTags(1, 'Invalid max: tag range does not exist');
 
 st.stop();
-})();

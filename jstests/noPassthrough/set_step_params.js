@@ -1,11 +1,12 @@
-load("jstests/libs/conn_pool_helpers.js");
-
 /**
  * @tags: [requires_replication, requires_sharding, sets_replica_set_matching_strategy]
  */
 
-(function() {
-"use strict";
+import {
+    assertHasConnPoolStats,
+    configureReplSetFailpoint,
+    launchFinds
+} from "jstests/libs/conn_pool_helpers.js";
 
 const kDbName = 'test';
 
@@ -229,4 +230,3 @@ threads.forEach(function(thread) {
 });
 
 st.stop();
-})();

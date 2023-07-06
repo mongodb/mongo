@@ -1,18 +1,14 @@
 // Test invalid SSL keyfile settings.
 
-(function() {
-'use strict';
-
 function runTest(name, config, expect) {
     jsTest.log('Running test: ' + name);
     clearRawMongoProgramOutput();
 
     let mongod = null;
-    let err = null;
     try {
         mongod = MongoRunner.runMongod(config);
     } catch (e) {
-        err = e;
+        //
     }
     assert.eq(null, mongod, 'Mongod started unexpectedly');
 
@@ -42,4 +38,3 @@ runTest('expired', expired, validityMessage);
 // Test that startup fails with no certificate at all.
 const needKeyFile = 'need tlsCertificateKeyFile or certificateSelector when TLS is enabled';
 runTest('no-key-file', {tlsMode: 'requireTLS'}, needKeyFile);
-})();

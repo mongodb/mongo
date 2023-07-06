@@ -12,9 +12,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 const timeFieldName = "time";
 const metaFieldName = "tags";
 const testDB = db.getSiblingDB(jsTestName());
@@ -61,4 +58,3 @@ assert.commandWorked(tsColl
                              }
                          })
                          .itcount());*/
-})();

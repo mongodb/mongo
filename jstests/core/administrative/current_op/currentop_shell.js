@@ -18,10 +18,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");  // for FixtureHelpers
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.currentOp_cursor;
 coll.drop();
@@ -142,4 +139,3 @@ res.inprog.forEach((op) => {
 });
 
 shellHelperTest();
-})();

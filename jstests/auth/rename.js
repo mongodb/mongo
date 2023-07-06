@@ -3,9 +3,6 @@
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
-(function() {
-'use strict';
-
 const m = MongoRunner.runMongod({auth: ""});
 
 const db1 = m.getDB("foo");
@@ -52,4 +49,3 @@ db2.logout();
 
 assert(admin.auth('admin', 'password'));
 MongoRunner.stopMongod(m);
-})();

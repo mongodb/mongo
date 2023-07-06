@@ -3,10 +3,7 @@
  *
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = ReplSetTest({nodes: 2});
 rst.startSet();
@@ -65,4 +62,3 @@ validateRes = assert.commandWorked(secondaryDB.runCommand({validate: collName}))
 assert(validateRes.valid);
 
 rst.stopSet();
-}());

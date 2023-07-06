@@ -7,7 +7,6 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
 const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
@@ -94,4 +93,3 @@ for (const natural of badNaturals) {
     assert.commandFailedWithCode(
         runDelete(natural), ErrorCodes.BadValue, `delete {$natural: ${natural}}`);
 }
-}());

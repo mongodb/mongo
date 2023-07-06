@@ -6,12 +6,11 @@
 // ]
 //
 
-(function() {
-'use strict';
-
-load('jstests/libs/discover_topology.js');
-load('jstests/sharding/libs/resharding_test_fixture.js');
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
+import {
+    isUpdateDocumentShardKeyUsingTransactionApiEnabled
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
 reshardingTest.setup();
@@ -169,4 +168,3 @@ assert.neq(null, txnWriteEntry, 'failed to find oplog entry for transaction');
 assertOplogEntryIsDeleteInsertApplyOps(txnWriteEntry);
 
 reshardingTest.teardown();
-})();

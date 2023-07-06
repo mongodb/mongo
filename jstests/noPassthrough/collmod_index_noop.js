@@ -12,9 +12,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/index_catalog_helpers.js");
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 const rst = new ReplSetTest({nodes: 2, nodeOpts: {binVersion: "latest"}});
 rst.startSet();
@@ -238,4 +236,3 @@ if (collModIndexUniqueEnabled) {
 }
 
 rst.stopSet();
-})();

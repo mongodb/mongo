@@ -6,9 +6,6 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-"use strict";
-
 // Shard key index has collation, which is not compatible with $min/$max
 TestData.skipCheckOrphans = true;
 
@@ -153,4 +150,3 @@ assert.eq(numIdIndexUsages(st.rs1.getPrimary()), idIndexUsagesPreIteration.shard
 strengthOneChangeStream.close();
 
 st.stop();
-}());

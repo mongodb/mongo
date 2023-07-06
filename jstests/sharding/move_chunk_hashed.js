@@ -2,12 +2,8 @@
  * Test that moveChunk moves the right chunks and documents and that deleted
  * rangeDeleter delete the right documents from the donor shard.
  */
-(function() {
-'use strict';
-
-load('jstests/libs/chunk_manipulation_util.js');
-load("jstests/sharding/libs/chunk_bounds_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 /*
  * Returns the shard with the given shard name.
@@ -99,4 +95,3 @@ for (let chunk of chunksWithDocs) {
 }
 
 st.stop();
-})();

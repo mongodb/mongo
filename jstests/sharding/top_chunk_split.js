@@ -4,9 +4,6 @@
  * where extreme chunk is defined as the chunk containing either the upper or lower bound of the
  * entire shard key space.
  */
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 1});
 
 var testDB = st.s.getDB('test');
@@ -139,4 +136,3 @@ tests.forEach(function(test) {
 });
 
 st.stop();
-})();

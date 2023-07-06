@@ -1,3 +1,4 @@
+// For assertDropAndRecreateCollection.
 // Tests that a change stream can be opened on a change collection when one exists, and that an
 // exception is thrown if we attempt to open a stream while change streams are disabled.
 // @tags: [
@@ -5,13 +6,9 @@
 //   assumes_against_mongod_not_mongos,
 // ]
 
-(function() {
-"use strict";
-
-// For ChangeStreamMultitenantReplicaSetTest.
-load("jstests/serverless/libs/change_collection_util.js");
-// For assertDropAndRecreateCollection.
-load("jstests/libs/collection_drop_recreate.js");
+import {
+    ChangeStreamMultitenantReplicaSetTest
+} from "jstests/serverless/libs/change_collection_util.js";
 
 const replSetTest = new ChangeStreamMultitenantReplicaSetTest({nodes: 2});
 const primary = replSetTest.getPrimary();
@@ -78,4 +75,3 @@ assert.throwsWithCode(() => assert.soon(() => newCsCursor.hasNext()), ErrorCodes
 assert.throwsWithCode(() => testDb.stock.watch([]), ErrorCodes.ChangeStreamNotEnabled);
 
 replSetTest.stopSet();
-}());

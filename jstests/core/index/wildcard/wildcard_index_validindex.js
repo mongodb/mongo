@@ -7,9 +7,9 @@
  *   does_not_support_transactions,
  * ]
  */
-load("jstests/libs/index_catalog_helpers.js");     // For "IndexCatalogHelpers."
-load("jstests/libs/collection_drop_recreate.js");  // For "assertDropCollection."
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 const kCollectionName = "wildcard_validindex";
 const coll = db.getCollection(kCollectionName);

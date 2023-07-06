@@ -2,11 +2,6 @@
 // it is deprecated. The preferred parameter is internalValidateFeaturesAsPrimary, which is
 // tested in internal_validate_features_as_primary.js.
 
-(function() {
-"use strict";
-
-load("jstests/libs/index_catalog_helpers.js");
-
 // internalValidateFeaturesAsMaster can be set via startup parameter.
 let conn = MongoRunner.runMongod({setParameter: "internalValidateFeaturesAsMaster=1"});
 assert.neq(null, conn, "mongod was unable to start up");
@@ -31,4 +26,3 @@ conn = MongoRunner.runMongod({});
 assert.commandFailed(conn.adminCommand({setParameter: 1, internalValidateFeaturesAsMaster: true}));
 assert.commandFailed(conn.adminCommand({setParameter: 1, internalValidateFeaturesAsMaster: false}));
 MongoRunner.stopMongod(conn);
-}());

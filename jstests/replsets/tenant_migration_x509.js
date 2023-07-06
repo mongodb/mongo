@@ -11,10 +11,9 @@
  * ]
  */
 
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {getCertificateAndPrivateKey} from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/uuid_util.js");
 
 function makeTestNs(tenantId) {
     return {dbName: tenantId + "_testDb", collName: "testColl"};

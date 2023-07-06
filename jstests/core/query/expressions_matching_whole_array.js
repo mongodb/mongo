@@ -5,9 +5,6 @@
 //     requires_scripting
 // ]
 
-(function() {
-"use strict";
-
 const coll = db.expressions_matching_whole_array;
 coll.drop();
 
@@ -59,4 +56,3 @@ assertMatches({a: []}, {a: {$gt: MinKey}});
 
 assertMatches({a: [1, 2, 3]}, {a: {$lt: MaxKey}});
 assertMatches({a: []}, {a: {$lt: MaxKey}});
-}());

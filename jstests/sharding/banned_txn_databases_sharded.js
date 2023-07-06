@@ -11,11 +11,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
-
 const st = new ShardingTest({shards: 1});
 const mongosSession = st.s.startSession();
 const shardSession = st.shard0.getDB("test").getMongo().startSession();
@@ -59,4 +54,3 @@ assert.commandFailedWithCode(error, ErrorCodes.OperationNotSupportedInTransactio
 
 shardSession.endSession();
 st.stop();
-}());

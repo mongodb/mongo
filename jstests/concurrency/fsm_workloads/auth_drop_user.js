@@ -8,6 +8,8 @@ TestData.runInsideTransaction = false;
  * drops the user from the database.
  * @tags: [incompatible_with_concurrency_simultaneous]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
 export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the username,

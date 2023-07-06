@@ -1,11 +1,8 @@
 /*
  * Test that crud and find operations target the right shards.
  */
-(function() {
-'use strict';
-
-load("jstests/sharding/libs/chunk_bounds_util.js");
-load("jstests/sharding/libs/find_chunks_util.js");
+import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
+import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 let st = new ShardingTest({shards: 3});
 let dbName = "test";
@@ -63,4 +60,3 @@ assert.eq(1, shards[1].getCollection(ns).count({}));
 assert.eq(0, shards[2].getCollection(ns).count({}));
 
 st.stop();
-})();

@@ -1,9 +1,8 @@
 // Test macOS refusing to start up with encrypted PEM file.
 
-load('jstests/ssl/libs/ssl_helpers.js');
-requireSSLProvider('apple', function() {
-    'use strict';
+import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
+requireSSLProvider('apple', function() {
     jsTest.log("Verifying that mongod will fail to start using an encrypted PEM file");
 
     const config = MongoRunner.mongodOptions({

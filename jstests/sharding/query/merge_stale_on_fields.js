@@ -1,9 +1,6 @@
 // Tests that an $merge stage is able to default the "on" fields to the correct value - even if one
 // or more of the involved nodes has a stale cache of the routing information.
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode,
+import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
 
 const st = new ShardingTest({shards: 2, mongos: 2});
 
@@ -18,7 +15,6 @@ assert.commandWorked(source.insert({_id: 'seed'}));
 
 // Test that an $merge through a stale mongos can still use the correct "on" fields and succeed.
 (function testDefaultOnFieldsIsRecent() {
-    const freshMongos = st.s0;
     const staleMongos = st.s1;
     const staleMongosDB = staleMongos.getDB(dbName);
 
@@ -196,4 +192,3 @@ testEpochChangeDuringAgg({
 });
 
 st.stop();
-}());

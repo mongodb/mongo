@@ -1,9 +1,6 @@
 /**
  * Tests whether mongos correctly validates write concerns.
  */
-(function() {
-'use strict';
-
 var st = new ShardingTest({mongos: 1, shards: 1});
 var mongos = st.s0;
 
@@ -27,4 +24,3 @@ assert.commandWorked(
     db.runCommand({delete: "test", deletes: [{q: {_id: 2}, limit: 1}], writeConcern: {}}));
 
 st.stop();
-})();

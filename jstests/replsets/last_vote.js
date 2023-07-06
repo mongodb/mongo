@@ -12,9 +12,7 @@
 //   requires_persistence,
 // ]
 
-(function() {
-"use strict";
-load("jstests/replsets/rslib.js");  // For getLatestOp()
+import {getLatestOp, reconfig} from "jstests/replsets/rslib.js";
 
 var name = "last_vote";
 var rst = new ReplSetTest({
@@ -212,4 +210,3 @@ assertNodeHasLastVote(node0, term + 1, rst.nodes[1]);
 assertCurrentTerm(node0, term + 2);
 
 rst.stopSet();
-})();

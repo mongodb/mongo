@@ -2,9 +2,6 @@
  * Tests DataConsistencyChecker.getDiff() correctly reports mismatched and missing documents.
  * Tests DataConsistencyChecker.getDiffIndexes() correctly reports mismatched and missing indexes.
  */
-(function() {
-"use strict";
-
 class ArrayCursor {
     constructor(arr) {
         this.i = 0;
@@ -159,4 +156,3 @@ assert.eq(diff, {
     indexesMissingOnFirst: [{name: "d_1_e_-1", v: 2, key: {"d": 1, "e": -1}}],
     indexesMissingOnSecond: [{name: "a_1_b_1", v: 2, key: {"a": 1, "b": 1}}],
 });
-})();

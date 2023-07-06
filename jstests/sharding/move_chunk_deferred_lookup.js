@@ -5,12 +5,17 @@
  * @tags: [uses_transactions, uses_prepare_transaction, requires_persistence]
  */
 
-(function() {
-"use strict";
-load('jstests/libs/chunk_manipulation_util.js');
-load("jstests/libs/fail_point_util.js");
-load('jstests/replsets/rslib.js');
-load('jstests/sharding/libs/create_sharded_collection_util.js');
+import {
+    migrateStepNames,
+    moveChunkParallel,
+    moveChunkStepNames,
+    pauseMigrateAtStep,
+    unpauseMigrateAtStep,
+    waitForMoveChunkStep,
+} from "jstests/libs/chunk_manipulation_util.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
+import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const dbName = "test";
 const collName = "user";
@@ -98,4 +103,3 @@ assert.eq(collection.findOne({_id: 4}).x, 501);
 st.stop();
 
 MongoRunner.stopMongod(staticMongod);
-})();

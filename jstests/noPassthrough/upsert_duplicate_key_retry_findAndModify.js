@@ -7,10 +7,7 @@
  * @tags: [requires_replication]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -88,4 +85,3 @@ assert.throws(function() {
 }, []);
 
 rst.stopSet();
-})();

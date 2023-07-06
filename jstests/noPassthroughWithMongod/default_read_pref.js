@@ -1,9 +1,5 @@
 // Tests that the default read preference is 'unset', and that the slaveOk bit is not set
 // on read commands run with an 'unset' read preference.
-(function() {
-
-"use strict";
-
 var mongo = db.getMongo();
 try {
     var commandsRan = [];
@@ -52,4 +48,3 @@ try {
     db._mongo = mongo;
     db._session = new _DummyDriverSession(mongo);
 }
-})();

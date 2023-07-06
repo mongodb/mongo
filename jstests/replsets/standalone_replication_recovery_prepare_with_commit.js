@@ -6,11 +6,10 @@
  * @tags: [requires_persistence, requires_replication,
  * requires_majority_read_concern, uses_transactions, uses_prepare_transaction]
  */
-(function() {
-"use strict";
-load("jstests/replsets/libs/prepare_standalone_replication_recovery.js");
+import {
+    testPrepareRecoverFromOplogAsStandalone
+} from "jstests/replsets/libs/prepare_standalone_replication_recovery.js";
 
 const testName = "standalone_replication_recovery_prepare_with_commit";
 
 testPrepareRecoverFromOplogAsStandalone(testName, /* commitBeforeRecovery */ true);
-})();

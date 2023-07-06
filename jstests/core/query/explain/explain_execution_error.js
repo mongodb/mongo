@@ -6,7 +6,7 @@
 // Test that even when the execution of a query fails, explain reports query
 // planner information.
 
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 var t = db.explain_execution_error;
 t.drop();

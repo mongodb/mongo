@@ -2,9 +2,6 @@
  * Test basic retryable write without errors by checking that the resulting collection after the
  * retry is as expected and it does not create additional oplog entries.
  */
-(function() {
-"use strict";
-
 function checkFindAndModifyResult(expected, toCheck) {
     assert.eq(expected.ok, toCheck.ok);
     assert.eq(expected.value, toCheck.value);
@@ -388,7 +385,7 @@ function runFailpointTests(mainConn, priConn) {
     assert.commandWorked(
         priConn.adminCommand({configureFailPoint: 'onPrimaryTransactionalWrite', mode: 'off'}));
 
-    var writeResult = testDb.runCommand(cmd);
+    writeResult = testDb.runCommand(cmd);
     assert.eq(2, writeResult.nModified);
 
     var collContents = testDb.user.find({}).sort({x: 1}).toArray();
@@ -551,4 +548,3 @@ runFailpointTests(st.s0, st.rs0.getPrimary());
 runMultiTests(st.s0);
 
 st.stop();
-})();

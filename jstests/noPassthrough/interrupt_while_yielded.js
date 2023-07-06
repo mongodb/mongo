@@ -4,9 +4,6 @@
  *   cqf_experimental_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
 const kFailPointName = "setYieldAllLocksHang";
 const kCommandComment = "interruptedWhileYieldedComment";
 
@@ -125,4 +122,3 @@ function sortAndProjectionImmediatelyAfterMatch() {
 runTestWithQuery(sortAndProjectionImmediatelyAfterMatch);
 
 MongoRunner.stopMongod(conn);
-}());

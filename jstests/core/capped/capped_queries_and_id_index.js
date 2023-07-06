@@ -8,8 +8,6 @@
  * ]
  */
 
-(function() {
-"use strict";
 const coll = db.capped9;
 coll.drop();
 
@@ -29,4 +27,3 @@ assert.commandWorked(coll.createIndex({_id: 1}));
 assert.eq(1, coll.find({_id: 1}).itcount());
 assert.commandWorked(coll.update({_id: 1}, {$set: {y: 5}}));
 assert.eq(5, coll.findOne().y);
-}());

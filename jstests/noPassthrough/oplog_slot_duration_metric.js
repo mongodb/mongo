@@ -5,11 +5,8 @@
  * write.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/log.js");
-load("jstests/libs/profiler.js");
+import {findMatchingLogLine} from "jstests/libs/log.js";
+import {profilerHasAtLeastOneMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 const dbName = "testDB";
 const collName = jsTestName();
@@ -62,4 +59,3 @@ profilerHasAtLeastOneMatchingEntryOrThrow({
 });
 
 rst.stopSet();
-}());

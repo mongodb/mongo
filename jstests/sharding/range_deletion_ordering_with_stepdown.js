@@ -6,10 +6,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rangeDeleterBatchSize = 128;
 
@@ -55,16 +52,14 @@ afterDeletionFailpoint.wait();
 // Figure out which range had a batch deleted from it
 let rangeDeletionDocs = st.shard0.getDB("config").getCollection("rangeDeletions").find().toArray();
 assert.eq(rangeDeletionDocs.length, 2);
-let processingDoc, otherDoc;
+let processingDoc;
 if (rangeDeletionDocs[0].numOrphanDocs.valueOf() === numDocs) {
     assert.eq(rangeDeletionDocs[1].numOrphanDocs, numDocs - rangeDeleterBatchSize);
     processingDoc = rangeDeletionDocs[1];
-    otherDoc = rangeDeletionDocs[0];
 } else {
     assert.eq(rangeDeletionDocs[0].numOrphanDocs, numDocs - rangeDeleterBatchSize);
     assert.eq(rangeDeletionDocs[1].numOrphanDocs, numDocs);
     processingDoc = rangeDeletionDocs[0];
-    otherDoc = rangeDeletionDocs[1];
 }
 
 // Reorder the tasks on disk to make it more likely they would be submitted out of order
@@ -103,4 +98,3 @@ rangeDeletionDocs.forEach((doc) => {
 afterDeletionFailpoint.off();
 
 st.stop();
-})();

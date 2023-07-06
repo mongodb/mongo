@@ -7,12 +7,8 @@
  *   not_allowed_with_security_token,uses_transactions, uses_snapshot_read_concern]
  */
 
-(function() {
-"use strict";
-
 // TODO (SERVER-39704): Remove the following load after SERVER-397074 is completed
-// For retryOnceOnTransientOnMongos.
-load('jstests/libs/auto_retry_transaction_in_sharding.js');
+import {retryOnceOnTransientOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = "test";
 const collName = "no_read_or_write_concerns_inside_txn";
@@ -186,4 +182,3 @@ assert.commandWorked(sessionDb.adminCommand({
 }));
 assert.sameMembers(testColl.find().toArray(), [{_id: 6}]);
 session.endSession();
-}());

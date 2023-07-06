@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Transactionally updates a per thread counter in documents written to by the base workload and
  * reads the value of a random, possibly the same, counter to verify it matches the expected value.
@@ -9,15 +7,19 @@
  * @tags: [uses_transactions, assumes_snapshot_transactions]
  */
 
-import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/multi_statement_transaction_simple.js";
-
 // Our concurrency suites don't crash routers, so even in failover suites a router will rarely run
 // out of retries and require a shell level retry, so force retrying writes at least once to get
 // better coverage for the commitTransaction retry bug described in SERVER-48307.
-load('jstests/libs/override_methods/retry_writes_at_least_once.js');
+import "jstests/libs/override_methods/retry_writes_at_least_once.js";
+
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    withTxnAndAutoRetry
+} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/multi_statement_transaction_simple.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.counters = {};

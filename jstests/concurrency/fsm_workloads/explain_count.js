@@ -3,9 +3,10 @@
  *
  * Runs explain() and count() on a collection.
  */
+import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/explain.js";
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 import {planHasStage} from "jstests/libs/analyze_plan.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {

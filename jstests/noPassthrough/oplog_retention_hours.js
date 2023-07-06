@@ -12,9 +12,7 @@
  *
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");
+import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
 const doTest = () => {
     const replSet = new ReplSetTest({
@@ -96,4 +94,3 @@ const didReplSetTruncate = replSet => {
 };
 
 doTest();
-})();

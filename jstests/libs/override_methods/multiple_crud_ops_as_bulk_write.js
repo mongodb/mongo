@@ -2,12 +2,8 @@
  * Overrides the runCommand method to convert specified CRUD ops into bulkWrite commands.
  * Converts the bulkWrite responses into the original CRUD response.
  */
-(function() {
-'use strict';
-
-// load util functions
-load("jstests/libs/crud_ops_to_bulk_write_lib.js");
-load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
+import {BulkWriteUtils} from "jstests/libs/crud_ops_to_bulk_write_lib.js";
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 let normalCluster = connect(TestData.normalCluster).getMongo();
 let bulkWriteCluster = connect(TestData.bulkWriteCluster).getMongo();
@@ -137,4 +133,3 @@ function runCommandSingleOpBulkWriteOverride(
 OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/multiple_crud_ops_as_bulk_write.js");
 OverrideHelpers.overrideRunCommand(runCommandSingleOpBulkWriteOverride);
-})();

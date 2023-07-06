@@ -2,9 +2,6 @@
 // code 'CappedPositionLost'.
 //
 // @tags: [requires_capped]
-(function() {
-"use strict";
-
 const coll = db.captrunc_cursor_invalidation;
 coll.drop();
 
@@ -34,4 +31,3 @@ assert.commandFailedWithCode(db.runCommand({getMore: cursorId, collection: coll.
 // The cursor has now been destroyed, so another getMore should fail with 'CursorNotFound'.
 assert.commandFailedWithCode(db.runCommand({getMore: cursorId, collection: coll.getName()}),
                              ErrorCodes.CursorNotFound);
-}());

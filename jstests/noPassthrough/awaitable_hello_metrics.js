@@ -2,10 +2,8 @@
  * Tests the server status metrics of awaitable hello/isMaster.
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 function runAwaitCmd(cmd, maxAwaitTimeMS) {
     const res = assert.commandWorked(db.runCommand({[cmd]: 1}));
@@ -92,4 +90,3 @@ runTest(st.s.getDB("admin"), "hello", failPoint);
 runTest(st.s.getDB("admin"), "isMaster", failPoint);
 runTest(st.s.getDB("admin"), "ismaster", failPoint);
 st.stop();
-})();

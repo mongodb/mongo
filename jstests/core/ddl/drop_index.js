@@ -1,9 +1,7 @@
 // Cannot implicitly shard accessed collections because of extra shard key index in sharded
 // collection.
 // @tags: [assumes_no_implicit_index_creation]
-(function() {
-'use strict';
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const t = db.drop_index;
 t.drop();
@@ -74,4 +72,3 @@ assertIndexes(['a_1', 'c_1', 'd_1', 'e_1'], 'recreating {a: 1}');
 // Drop single index with dropIndexes().
 assert.commandWorked(t.dropIndexes(['c_1']));
 assertIndexes(['a_1', 'd_1', 'e_1'], 'dropping {c: 1}');
-}());

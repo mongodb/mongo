@@ -14,9 +14,7 @@
 //
 // @tags: [requires_sharding]
 
-load("jstests/libs/fail_point_util.js");
-(function() {
-"use strict";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const testName = "socket_disconnect_kills";
 
@@ -256,4 +254,3 @@ const numThatShouldCloseEarly = 9;
         afterServerStatusMetrics.operation.killedDueToClientDisconnect);
     st.stop();
 }
-})();

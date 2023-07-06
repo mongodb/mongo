@@ -4,9 +4,6 @@
  *
  * @tags: [requires_sharding]
  */
-(function() {
-"use strict";
-
 Random.setRandomSeed();
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
@@ -110,4 +107,3 @@ assert.eq(3, res.length, tojson(res));
 assert.eq(res[2], {_id: "2018-08-15T06", ticks: ticksSum, avgTemp: tempSum / samplesPerHour});
 
 st.stop();
-}());

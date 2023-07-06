@@ -5,7 +5,7 @@
  *   requires_fcv_52,
  * ]
  */
-load("jstests/aggregation/extras/utils.js");  // For arrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();

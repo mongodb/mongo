@@ -9,11 +9,7 @@
  * 4. Disable the failpoint, and issue a succesful setFeatureCompatibilityVersion
  *    to finish upgrading/downgrading.
  */
-
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 function runTest(downgradeVersion) {
     const downgradeFCV = binVersionToFCV(downgradeVersion);
@@ -61,4 +57,3 @@ function runTest(downgradeVersion) {
 
 runTest('last-lts');
 runTest('last-continuous');
-}());

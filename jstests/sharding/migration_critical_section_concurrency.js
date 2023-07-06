@@ -1,12 +1,15 @@
 // This test ensures that if one collection is its migration critical section, this won't stall
 // operations for other sharded or unsharded collections
 
-load('jstests/libs/chunk_manipulation_util.js');
+import {
+    moveChunkParallel,
+    moveChunkStepNames,
+    pauseMoveChunkAtStep,
+    unpauseMoveChunkAtStep,
+    waitForMoveChunkStep,
+} from "jstests/libs/chunk_manipulation_util.js";
 
-(function() {
-'use strict';
-
-var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+var staticMongod = MongoRunner.runMongod({});
 
 var st = new ShardingTest({mongos: 1, shards: 2});
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));
@@ -65,4 +68,3 @@ joinMoveChunk();
 
 st.stop();
 MongoRunner.stopMongod(staticMongod);
-})();

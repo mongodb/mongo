@@ -8,10 +8,7 @@
  *   cannot_create_unique_index_when_using_hashed_shard_key,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const source = db.unique_key_validation_source;
 const target = db.unique_key_validation_target;
@@ -163,4 +160,3 @@ assert.eq(target.find().toArray(), [{_id: 0, address: {street: "1633 Broadway"}}
 
     assert.eq(target.find().toArray(), [obj]);
 });
-}());

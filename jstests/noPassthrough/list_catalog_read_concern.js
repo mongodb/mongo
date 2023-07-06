@@ -6,10 +6,10 @@
  *     requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/write_concern_util.js');
+import {
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries
+} from "jstests/libs/write_concern_util.js";
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
@@ -70,4 +70,3 @@ assert.eq(entries.find((entry) => entry.name === view.getName()).viewOn, coll1.g
 restartReplicationOnSecondaries(rst);
 
 rst.stopSet();
-})();

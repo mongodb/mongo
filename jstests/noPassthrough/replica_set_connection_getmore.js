@@ -5,8 +5,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
 var rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
@@ -34,4 +32,3 @@ var cursor = coll.find().readPref("secondary").batchSize(2);
 assert.eq(5, cursor.itcount(), "failed to read the documents from the secondary");
 
 rst.stopSet();
-})();

@@ -2,8 +2,8 @@
  * Utilities for checking whether SBE is enabled.
  */
 
-load("jstests/libs/discover_topology.js");  // For findNonConfigNodes.
-load("jstests/libs/fixture_helpers.js");    // For 'isMongos'
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 /**
  * Returns whether or not SBE is enabled for the given connection. Assumes that for repl sets and

@@ -1,11 +1,8 @@
 /**
  * Tests that collMod does not conflict with a database MODE_IX lock.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/wait_for_command.js");
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
 const collName = "collMod_no_conflicts";
 const viewName = "testView";
@@ -39,4 +36,3 @@ assert.eq(res[0].options.pipeline, collModPipeline);
 // Interrupt the sleep command.
 assert.commandWorked(testDB.getSiblingDB("admin").killOp(sleepID));
 sleepCommand();
-})();

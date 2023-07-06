@@ -2,8 +2,6 @@
  * Verify the TTL index behavior after restart.
  * @tags: [requires_persistence]
  */
-(function() {
-'use strict';
 let oldConn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
 let db = oldConn.getDB('test');
 
@@ -47,4 +45,3 @@ assert.soon(function() {
 }, 'TTL index on x didn\'t delete');
 
 MongoRunner.stopMongod(newConn);
-})();

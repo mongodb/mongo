@@ -5,10 +5,7 @@
  * @tags: [requires_replication]
  */
 
-(function() {
-'use strict';
-
-load("jstests/replsets/rslib.js");
+import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
 // Start up a PSA set with the secondary having 'votes: 0' and 'priority: 0'.
 const rst = new ReplSetTest({
@@ -128,4 +125,3 @@ config.version += 1;
 runReconfigForPSASet(1, config, false /* shouldSucceed */);
 
 rst.stopSet();
-})();

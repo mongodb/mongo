@@ -12,9 +12,6 @@
  *
  */
 
-(function() {
-'use strict';
-
 var st = new ShardingTest({shards: 1, mongos: 1});
 var mongos = st.s;
 var db = mongos.getDB("test");
@@ -70,4 +67,3 @@ runInsertScenarios((obj, ec) => {
 }, res => res.writeConcernError.code, "Injected writeConcernError");
 
 st.stop();
-})();

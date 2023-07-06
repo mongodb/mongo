@@ -1,12 +1,7 @@
 // Perform the upgrade/downgrade procedure by first setting the featureCompatibilityVersion and
 // then switching the binary.
-(function() {
-"use strict";
-
-load("jstests/replsets/rslib.js");
-load("jstests/libs/index_catalog_helpers.js");
-load("jstests/libs/check_uuids.js");
-load("jstests/libs/check_unique_indexes.js");
+import {checkUniqueIndexFormatVersion} from "jstests/libs/check_unique_indexes.js";
+import {checkCollectionUUIDs} from "jstests/libs/check_uuids.js";
 
 const latestBinary = "latest";
 
@@ -370,4 +365,3 @@ replicaSetTest({shardsvr: ""}, 'last-lts');
 // Do tests for replica sets started with --configsvr.
 replicaSetTest({configsvr: ""}, 'last-continuous');
 replicaSetTest({configsvr: ""}, 'last-lts');
-})();

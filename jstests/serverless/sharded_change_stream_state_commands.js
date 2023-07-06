@@ -3,9 +3,6 @@
 // @tags: [
 //   requires_fcv_63,
 // ]
-(function() {
-"use strict";
-
 const shardingTest = new ShardingTest({
     shards: 2,
     other: {configOptions: {setParameter: {featureFlagServerlessChangeStreams: true}}}
@@ -21,4 +18,3 @@ assert.commandFailedWithCode(configPrimary.getDB("admin").runCommand({getChangeS
                              ErrorCodes.CommandNotSupported);
 
 shardingTest.stop();
-}());

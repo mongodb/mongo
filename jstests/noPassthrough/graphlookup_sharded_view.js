@@ -1,9 +1,6 @@
 // Test that sharded $graphLookup can resolve sharded views correctly.
 // @tags: [requires_sharding, requires_fcv_51]
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const sharded = new ShardingTest({
     mongos: 1,
@@ -331,4 +328,3 @@ testGraphLookupView({
 });
 
 sharded.stop();
-}());

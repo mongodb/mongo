@@ -5,11 +5,9 @@
  *
  * @tags: [does_not_support_stepdowns, multiversion_incompatible]
  */
-(function() {
-"use strict";
-load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');
-load("jstests/sharding/libs/sharded_index_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
@@ -20,7 +18,7 @@ const primary = rst.getPrimary();
 const nodes = rst.nodes;
 if (primary !== nodes[0]) {
     st.stop();
-    return;  // For simplicity.
+    quit();
 }
 
 const config = rst.getReplSetConfigFromNode();
@@ -63,4 +61,3 @@ let res = ShardedIndexUtil.getPerShardIndexes(st.s.getCollection("config.system.
 jsTestLog(`Aggregate run on Mongos ${tojson(res)}`);
 
 st.stop();
-}());

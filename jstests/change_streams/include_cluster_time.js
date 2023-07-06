@@ -4,11 +4,8 @@
 // the oplog entry. When operations get bundled into a transaction, their operationTime is instead
 // based on the commit oplog entry, which would cause this test to fail.
 // @tags: [change_stream_does_not_expect_txns]
-(function() {
-"use strict";
-
-load("jstests/libs/change_stream_util.js");        // For assertInvalidateOp.
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
+import {assertInvalidateOp} from "jstests/libs/change_stream_util.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 // Drop and recreate the collections to be used in this set of tests.
 const coll = assertDropAndRecreateCollection(db, "include_cluster_time");
@@ -57,4 +54,3 @@ assert.lte(next.clusterTime, dropClusterTime);
 assertInvalidateOp({cursor: changeStream, opType: "drop"});
 
 changeStream.close();
-}());

@@ -3,9 +3,6 @@
 //   assumes_read_concern_local,
 // ]
 
-(function() {
-'use strict';
-
 const t = db.index_check7;
 t.drop();
 
@@ -33,4 +30,3 @@ explainResult = t.find({x: {$gt: 59}}).explain(true);
 assert.eq(40,
           explainResult.executionStats.totalKeysExamined,
           'explain x>59 with indexes {x : 1} and {x: -1}: ' + tojson(explainResult));
-})();

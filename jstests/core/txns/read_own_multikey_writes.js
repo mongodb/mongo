@@ -1,8 +1,5 @@
 // Tests that multikey updates made inside a transaction are visible to that transaction's reads.
 // @tags: [assumes_unsharded_collection, uses_transactions]
-(function() {
-"use strict";
-
 const dbName = 'test';
 const collName = 'testReadOwnMultikeyWrites';
 // Use majority write concern to clear the drop-pending that can cause lock conflicts with
@@ -33,4 +30,3 @@ assert.eq(1,
               .find({}, {_id: 0, a: 1})
               .sort({a: 1})
               .itcount());
-})();

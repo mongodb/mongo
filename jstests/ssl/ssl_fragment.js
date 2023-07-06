@@ -1,9 +1,6 @@
 /**
  * Test that a large request and response works correctly.
  */
-(function() {
-'use strict';
-
 function runTest(conn) {
     // SSL packets have a max size of ~16 kb so to test packet fragmentation support, create a
     // string larger then 16kb.
@@ -54,4 +51,3 @@ const st = new ShardingTest({
 
 runTest(st.s0);
 st.stop();
-})();

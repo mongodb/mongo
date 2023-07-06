@@ -4,12 +4,15 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction, uses_multi_shard_transaction]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/write_concern_util.js");
-load("jstests/sharding/libs/sharded_transactions_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {
+    checkWriteConcernTimedOut,
+    restartReplicationOnSecondaries,
+    stopReplicationOnSecondaries,
+} from "jstests/libs/write_concern_util.js";
+import {
+    enableCoordinateCommitReturnImmediatelyAfterPersistingDecision
+} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 // The test modifies config.transactions, which must be done outside of a session.
 TestData.disableImplicitSessions = true;
@@ -580,4 +583,3 @@ assert.commandWorked(sendCommitViaRecoveryMongos(lsid, txnNumber, recoveryToken)
 })();
 
 st.stop();
-})();

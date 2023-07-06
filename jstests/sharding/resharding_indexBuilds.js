@@ -6,13 +6,10 @@
  *   uses_atclustertime,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/discover_topology.js");
-load("jstests/sharding/libs/resharding_test_fixture.js");
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 const reshardingTest = new ReshardingTest({numDonors: 1});
 reshardingTest.setup();
@@ -35,7 +32,6 @@ const recipientShardNames = reshardingTest.recipientShardNames;
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const donor_host = topology.shards[donorShardNames[0]].primary;
 const donor0 = new Mongo(donor_host);
-const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
 // Create an inProgress index build.
 const createIndexThread = new Thread(function(host) {
@@ -60,4 +56,3 @@ createIndexThread.join();
 assert.commandWorked(createIndexThread.returnData());
 
 reshardingTest.teardown();
-})();

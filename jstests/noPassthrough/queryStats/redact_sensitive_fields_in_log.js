@@ -3,10 +3,7 @@
  * @tags: [featureFlagQueryStatsFindCommand]
  */
 
-(function() {
-'use strict';
-
-load('jstests/libs/query_stats_utils.js');  // For getQueryStatsFindCmd
+import {getQueryStatsFindCmd} from "jstests/libs/query_stats_utils.js";
 
 const checkLogForHmacKey = function(conn) {
     const coll = conn.getCollection("test.foo");
@@ -57,4 +54,3 @@ const testMongoS = function() {
 
 testMongoD();
 testMongoS();
-})();

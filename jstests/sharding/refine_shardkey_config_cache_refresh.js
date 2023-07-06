@@ -8,9 +8,6 @@
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-'use strict';
-
 let st = new ShardingTest({shards: 1});
 
 let testDB = st.s.getDB('test');
@@ -30,7 +27,6 @@ let priConn = st.rs0.getPrimary();
 assert.commandWorked(
     priConn.adminCommand({_flushRoutingTableCacheUpdates: 'test.user', syncFromConfig: true}));
 
-let collEntry = st.config.collections.findOne({_id: 'test.user'});
 let chunksCollName = "cache.chunks.test.user";
 let chunkCache = priConn.getDB('config').getCollection(chunksCollName);
 let preRefineChunks = chunkCache.find().toArray();
@@ -64,4 +60,3 @@ let collDoc = collCache.findOne({_id: 'test.user'});
 assert.eq(false, collDoc.refreshing);
 
 st.stop();
-}());

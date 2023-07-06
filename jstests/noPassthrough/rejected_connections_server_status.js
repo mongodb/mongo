@@ -5,9 +5,6 @@
  * maxConns), serverStatus labels subsequent connection attempts as rejected connections.
  */
 
-(function() {
-'use strict';
-
 // This value must be equivalent to the value specified in the config yaml file.
 const configuredMaxConns = 5;
 
@@ -62,4 +59,3 @@ for (var i = 0; i < configuredMaxConns * 2; i++) {
 }
 
 MongoRunner.stopMongod(conn);
-})();

@@ -3,14 +3,14 @@
 /**
  * Returns the latency histograms for the given collection.
  */
-function getHistogramStats(coll) {
+export function getHistogramStats(coll) {
     return coll.latencyStats().next().latencyStats;
 }
 
 /**
  * Returns the differences in read, write, and command counts between two histograms.
  */
-function diffHistogram(thisHistogram, lastHistogram) {
+export function diffHistogram(thisHistogram, lastHistogram) {
     return {
         reads: thisHistogram.reads.ops - lastHistogram.reads.ops,
         writes: thisHistogram.writes.ops - lastHistogram.writes.ops,
@@ -22,7 +22,7 @@ function diffHistogram(thisHistogram, lastHistogram) {
  * Asserts that the difference of histogram stats on collection coll since the lastHistogram was
  * recorded is equal to the readDiff, writeDiff, and commandDiff values. Returns the new histogram.
  */
-function assertHistogramDiffEq(coll, lastHistogram, readDiff, writeDiff, commandDiff) {
+export function assertHistogramDiffEq(coll, lastHistogram, readDiff, writeDiff, commandDiff) {
     let thisHistogram = getHistogramStats(coll);
     let diff = diffHistogram(thisHistogram, lastHistogram);
     // Running the $collStats aggregation itself will increment read stats by one.
@@ -35,7 +35,7 @@ function assertHistogramDiffEq(coll, lastHistogram, readDiff, writeDiff, command
 /**
  * Asserts that top contains stats for this collection and returns the recorded stats.
  */
-function getTop(coll) {
+export function getTop(coll) {
     let collName = coll.getFullName();
     let res = coll.getDB().adminCommand("top");
     if (!res.ok) {
@@ -50,7 +50,7 @@ function getTop(coll) {
 /**
  * Returns the difference of the time and count for a given key of two sets of top stats.
  */
-function diffTop(key, thisTop, lastTop) {
+export function diffTop(key, thisTop, lastTop) {
     return {
         time: thisTop[key].time - lastTop[key].time,
         count: thisTop[key].count - lastTop[key].count
@@ -61,7 +61,7 @@ function diffTop(key, thisTop, lastTop) {
  * Asserts that the count difference of top stats of the key on collection coll since lastTop was
  * recorded is equal to expectedCountDiff. Returns the new top stats.
  */
-function assertTopDiffEq(coll, lastTop, key, expectedCountDiff) {
+export function assertTopDiffEq(coll, lastTop, key, expectedCountDiff) {
     let thisTop = getTop(coll);
     let diff = diffTop(key, thisTop, lastTop);
     assert.gte(diff.count, 0, "non-decreasing count");

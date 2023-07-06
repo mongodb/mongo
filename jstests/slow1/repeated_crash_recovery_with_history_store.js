@@ -4,13 +4,10 @@
  *
  * @tags: [multiversion_incompatible, requires_persistence, requires_replication]
  */
-(function() {
-"use strict";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
-load("jstests/libs/parallel_shell_helpers.js");  // For funWithArgs
-
-function workload(iteration) {
-    load("jstests/libs/parallelTester.js");  // For Thread().
+async function workload(iteration) {
+    const {Thread} = await import("jstests/libs/parallelTester.js");
 
     const nthreads = 50;
     let threads = [];
@@ -100,4 +97,3 @@ for (let i = 0; i < 10; i++) {
 }
 
 rst.stopSet();
-})();

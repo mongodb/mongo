@@ -1,5 +1,3 @@
-(function() {
-'use strict';
 // Create a temporary host file that creates two aliases for localhost that are in the
 // splithorizon certificate.
 // The aliases are 'splithorizon1' and 'splithorizon2'
@@ -14,7 +12,7 @@ try {
     jsTestLog(
         `Failed the check for HOSTALIASES support using env, we are probably on a non-GNU platform. Skipping this test.`);
     removeFile(hostsFile);
-    return;
+    quit();
 }
 
 if (rc != 0) {
@@ -22,11 +20,11 @@ if (rc != 0) {
 
     // Check glibc version to figure out of HOSTALIASES will work as expected
     clearRawMongoProgramOutput();
-    var rc = runProgram("getconf", "GNU_LIBC_VERSION");
+    rc = runProgram("getconf", "GNU_LIBC_VERSION");
     if (rc != 0) {
         jsTestLog(
             `Failed the check for GLIBC version, we are probably on a non-GNU platform. Skipping this test.`);
-        return;
+        quit();
     }
 
     // Output is of the format: 'glibc x.yz'
@@ -38,11 +36,11 @@ if (rc != 0) {
     var fields = output.split(" ");
     var glibc_version = parseFloat(fields[2]);
 
-    var rc = runProgram("cat", "/etc/os-release");
+    rc = runProgram("cat", "/etc/os-release");
     if (rc != 0) {
         jsTestLog(
             `Failed the check for /etc/os-release, we are probably not on a *nix. Skipping this test.`);
-        return;
+        quit();
     }
 
     var osRelease = rawMongoProgramOutput();
@@ -57,12 +55,12 @@ if (rc != 0) {
         jsTestLog(
             `HOSTALIASES does not seem to work as expected on this system. GLIBC
                 version is ${glibc_version}, skipping this test.`);
-        return;
+        quit();
     } else if (suzeMatch) {
         jsTestLog(
             `HOSTALIASES does not seem to work as expected but we detected SLES. GLIBC
                 version is ${glibc_version}, skipping this test.`);
-        return;
+        quit();
     }
 
     assert(false,
@@ -176,7 +174,7 @@ config.members[1].horizons.other_horizon_name = node1horizonMissingHostname;
 assert.adminCommandWorkedAllowingNetworkError(replTest.getPrimary(), {replSetReconfig: config});
 
 // Using 'splithorizon2' should now return the new horizon
-var horizonMissingURL =
+horizonMissingURL =
     `mongodb://${node0horizonMissingHostname}/admin?replicaSet=${replTest.name}&ssl=true`;
 jsTestLog(`URL with horizon: ${horizonMissingURL}`);
 assert.eq(checkExpectedHorizon(horizonMissingURL, 0, node0horizonMissingHostname),
@@ -233,4 +231,3 @@ assert.commandFailed(replTest.getPrimary().adminCommand({replSetReconfig: config
 
 replTest.stopSet();
 removeFile(hostsFile);
-})();

@@ -134,8 +134,9 @@ export const assertForDbCheckErrors = (node,
             if (errs.hasNext()) {
                 const errMsg = "dbCheck found inconsistency on " + node.host;
                 jsTestLog(errMsg + ". Errors/Warnings: ");
+                let err;
                 for (let count = 0; errs.hasNext() && count < 20; count++) {
-                    let err = errs.next();
+                    err = errs.next();
                     errorsFound.push(err);
                     jsTestLog(tojson(err));
                 }

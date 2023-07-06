@@ -5,6 +5,8 @@
  *   requires_sharding,
  * ]
  */
+import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+
 const dbPrefix = jsTestName() + '_DB_';
 const dbCount = 2;
 const collPrefix = 'sharded_coll_';

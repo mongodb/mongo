@@ -14,20 +14,15 @@
  *     assumes_unsharded_collection
  * ]
  */
-(function() {
-
-load("jstests/libs/auto_retry_transaction_in_sharding.js");  // For withTxnAndAutoRetryOnMongos.
-load("jstests/libs/change_stream_util.js");                  // For ChangeStreamTest.
-load("jstests/libs/fixture_helpers.js");                     // For FixtureHelpers.isMongos.
-load('jstests/libs/collection_drop_recreate.js');            // 'assertDropCollection'.
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const dbName = jsTestName() + "_db0";
 const collName = jsTestName() + '_1';
 const otherCollName = jsTestName() + "_2";
-const coll = db.getSiblingDB(dbName)[jsTestName()];
 
 const otherDBName = jsTestName() + "_3";
-const otherDB = db.getSiblingDB(otherDBName);
 const otherDBCollName = "someColl";
 
 const session = db.getMongo().startSession();
@@ -129,4 +124,3 @@ changeStream = cst.startWatchingChanges({pipeline, collection: 1});
 cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges});
 
 cst.cleanUp();
-})();

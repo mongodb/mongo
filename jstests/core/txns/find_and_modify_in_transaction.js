@@ -2,9 +2,6 @@
 // The test runs commands that are not allowed with security token: endSession.
 // @tags: [
 //   not_allowed_with_security_token,assumes_unsharded_collection, uses_transactions]
-(function() {
-"use strict";
-
 const dbName = "test";
 const collName = "find_and_modify_in_transaction";
 const testDB = db.getSiblingDB(dbName);
@@ -150,4 +147,3 @@ assert.sameMembers(docs, [newdoc]);
 // Commit the transaction.
 assert.commandWorked(session.commitTransaction_forTesting());
 session.endSession();
-}());

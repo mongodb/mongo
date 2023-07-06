@@ -2,7 +2,7 @@
  * Utilities for testing TTL collections.
  */
 
-load("jstests/libs/fixture_helpers.js");
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export const TTLUtil = class {
     /**

@@ -6,9 +6,6 @@
  *   does_not_support_stepdowns
  * ]
  */
-(function() {
-"use strict";
-
 var mydb = db.getSiblingDB("list_collections_nameonly");
 var res;
 var collObj;
@@ -37,4 +34,3 @@ assert.eq('bar', collObj.name);
 assert.eq('view', collObj.type);
 assert(!collObj.hasOwnProperty("options"), tojson(collObj));
 assert(!collObj.hasOwnProperty("info"), tojson(collObj));
-}());

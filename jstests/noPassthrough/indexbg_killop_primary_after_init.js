@@ -3,18 +3,15 @@
  * on the client connection operation when the IndexBuildsCoordinator is enabled.
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load('jstests/noPassthrough/libs/index_build.js');
+import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({
     nodes: [
         {},
     ],
 });
-const nodes = rst.startSet();
+rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
@@ -81,4 +78,3 @@ assert.eq(0, ops.length, 'incorrect number of commitIndexBuild oplog entries: ' 
 assert.isnull(primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
 
 rst.stopSet();
-})();

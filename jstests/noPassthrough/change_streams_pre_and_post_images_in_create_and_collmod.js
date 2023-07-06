@@ -7,15 +7,10 @@
  * requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/collection_options.js");  // For assertCollectionOptionIsEnabled,
-                                             // assertCollectionOptionIsAbsent.
-load(
-    "jstests/libs/change_stream_util.js");  // For
-                                            // assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
-                                            // assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent.
+import {
+    assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent,
+    assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
+} from "jstests/libs/change_stream_util.js";
 
 const rsTest = new ReplSetTest({name: jsTestName(), nodes: 1});
 rsTest.startSet();
@@ -94,4 +89,3 @@ assert.commandFailedWithCode(
     ErrorCodes.InvalidOptions);
 
 rsTest.stopSet();
-}());

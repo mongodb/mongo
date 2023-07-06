@@ -2,7 +2,6 @@
  * Derived from test cases at https://github.com/mongodb/specifications
  */
 
-(function() {
 var data = [
     {
         "description": "[basx066] strings without E cannot generate E in result",
@@ -578,4 +577,3 @@ data.forEach(function(testCase) {
         assert.eq(output, `NumberDecimal("${testCase.input}")`);
     }
 });
-}());

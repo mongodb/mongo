@@ -4,10 +4,7 @@
  * @tags: [uses_transactions]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -76,4 +73,3 @@ jsTestLog("Checking that the transaction never succeeded");
 assert.eq(1, primaryColl.find().toArray().length);
 
 rst.stopSet();
-})();

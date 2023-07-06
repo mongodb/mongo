@@ -21,8 +21,12 @@ t.save({a: 0, b: []});
 
 // Repeatedly rename jstests_updatef to jstests_updatef_ and back.  This will
 // invalidate the jstests_updatef_actual NamespaceDetailsTransient object.
-let s = startParallelShell(
-    "for( i=0; i < 100; ++i ) { db.jstests_updatef.renameCollection( 'jstests_updatef_' ); db.jstests_updatef_.renameCollection( 'jstests_updatef' ); }");
+let s = startParallelShell(function() {
+    for (let i = 0; i < 100; ++i) {
+        db.jstests_updatef.renameCollection('jstests_updatef_');
+        db.jstests_updatef_.renameCollection('jstests_updatef');
+    }
+});
 
 for (let i = 0; i < 20; ++i) {
     t.update({a: 0}, {$push: {b: i}}, false, true);

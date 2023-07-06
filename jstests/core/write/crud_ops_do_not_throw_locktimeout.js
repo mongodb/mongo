@@ -9,11 +9,8 @@
  *   no_selinux,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");
-load('jstests/libs/parallel_shell_helpers.js');
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -88,4 +85,3 @@ assert.commandWorked(db.adminCommand({configureFailPoint: failpoint, mode: "off"
 awaitBlockingDDL();
 
 assert.sameMembers(coll.find().toArray(), [doc]);
-})();

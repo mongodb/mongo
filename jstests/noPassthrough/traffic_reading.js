@@ -1,5 +1,4 @@
 // tests for the traffic_recording commands.
-(function() {
 // Variables for this test
 const recordingDir = MongoRunner.toRealDir("$dataDir/traffic_recording/");
 const recordingFile = "recording.txt";
@@ -80,4 +79,3 @@ assert.eq(opTypes['delete'], 1);
 assert.eq(opTypes['update'], 1);
 assert.eq(opTypes['aggregate'], 1);
 assert.eq(opTypes['stopRecordingTraffic'], 1);
-})();

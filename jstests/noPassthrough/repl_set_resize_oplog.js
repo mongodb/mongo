@@ -5,9 +5,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 let replSet = new ReplSetTest({nodes: 2, oplogSize: 50});
 replSet.startSet();
 replSet.initiate();
@@ -58,4 +55,3 @@ assert.commandWorked(
 assert.eq(primary.getDB('local').oplog.rs.stats().maxSize, 1 * PB);
 
 replSet.stopSet();
-})();

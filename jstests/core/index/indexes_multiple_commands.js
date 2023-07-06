@@ -6,9 +6,6 @@
 
 // Test that commands behave correctly under the presence of multiple indexes with the same key
 // pattern.
-(function() {
-'use strict';
-
 var coll = db.indexes_multiple_commands;
 
 /**
@@ -142,4 +139,3 @@ assert.eq(coll.find({a: "a"}).collation({locale: "en_US", strength: 2}).hint("sb
 // match.
 assertIndexesCreated(() => coll.createIndex({b: 1}, {collation: {locale: "fr"}}));
 assert.eq(coll.find({a: "a"}).collation({locale: "en_US"}).hint({b: 1}).itcount(), 1);
-})();

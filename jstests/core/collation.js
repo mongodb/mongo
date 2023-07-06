@@ -25,14 +25,10 @@ import {
     isIxscan,
     planHasStage
 } from "jstests/libs/analyze_plan.js";
-
-load("jstests/libs/index_catalog_helpers.js");
-// For isWiredTiger.
-load("jstests/concurrency/fsm_workload_helpers/server_types.js");
-// For isReplSet
-load("jstests/libs/fixture_helpers.js");
-// For areAllCollectionsClustered.
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 let testDb = db.getSiblingDB("collation_js");
 var coll = testDb.collation;

@@ -15,10 +15,9 @@
  *   uses_full_validation,
  * ]
  */
-load("jstests/libs/fail_point_util.js");
-import {getPlanStages, aggPlanHasStage, planHasStage} from "jstests/libs/analyze_plan.js";
+import {documentEq, resultsEq} from "jstests/aggregation/extras/utils.js";
+import {aggPlanHasStage, getPlanStages, planHasStage} from "jstests/libs/analyze_plan.js";
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
-load("jstests/aggregation/extras/utils.js");  // For "resultsEq."
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     quit();

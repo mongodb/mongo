@@ -1,6 +1,6 @@
 // Helper for generating random geo data, used in time-series tests.
 
-function randomLongLat() {
+export function randomLongLat() {
     // Sample points uniformly on a sphere in two steps:
     // 1. Sample uniformly from a unit ball (the volume within a sphere).
     // 2. Project onto a sphere.

@@ -5,8 +5,6 @@
  * ]
  */
 
-(function() {
-
 function makeShutdownByCrashFn(crashHow) {
     return function(conn) {
         var admin = conn.getDB("admin");
@@ -68,12 +66,12 @@ function runAllTests(launcher) {
 
 if (_isWindows()) {
     print("SKIPPING TEST ON WINDOWS");
-    return;
+    quit();
 }
 
 if (_isAddressSanitizerActive()) {
     print("SKIPPING TEST ON ADDRESS SANITIZER BUILD");
-    return;
+    quit();
 }
 
 (function testMongod() {
@@ -104,5 +102,4 @@ if (_isAddressSanitizerActive()) {
 
     runAllTests(mongosLauncher);
     st.stop();
-}());
 }());

@@ -1,9 +1,4 @@
-//
-// Tests to validate that correct read concern is used to load clusterTime signing keys from
-// admin.system.keys on upgrade.
-//
-
-load('jstests/multiVersion/libs/multi_rs.js');
+import "jstests/multiVersion/libs/multi_rs.js";
 
 var oldVersion = "last-lts";
 

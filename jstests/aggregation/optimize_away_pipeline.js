@@ -14,16 +14,16 @@
 //   requires_pipeline_optimization,
 //   requires_profiling,
 // ]
-load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isWiredTiger.
+import {isWiredTiger} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {
-    getPlanStages,
-    getAggPlanStage,
     aggPlanHasStage,
-    planHasStage,
+    getAggPlanStage,
+    getPlanStages,
     isAggregationPlan,
     isQueryPlan,
+    planHasStage,
 } from "jstests/libs/analyze_plan.js";
-load("jstests/libs/fixture_helpers.js");  // For 'isMongos' and 'isSharded'.
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const groupPushdownEnabled = checkSBEEnabled(db);
@@ -150,8 +150,6 @@ function testGetMore({command = null, expectedResult = null} = {}) {
 function assertPipelineIfGroupPushdown(assertPushdownEnabled, assertPushdownDisabled) {
     return groupPushdownEnabled ? assertPushdownEnabled() : assertPushdownDisabled();
 }
-
-let explainOutput;
 
 // Basic pipelines.
 

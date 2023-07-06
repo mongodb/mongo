@@ -5,9 +5,6 @@
  *   uses_change_streams,
  * ]
  */
-(function() {
-"use strict";
-
 // Start a new sharded cluster and obtain references to the test DB and collection.
 const st = new ShardingTest({
     shards: 1,
@@ -46,4 +43,3 @@ for (let event of expectedEvents) {
 }
 
 st.stop();
-})();

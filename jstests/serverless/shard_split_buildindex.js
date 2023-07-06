@@ -12,10 +12,10 @@
  * ]
  */
 
+import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
-
-load("jstests/libs/fail_point_util.js");
 
 const shardSplitTest = new ShardSplitTest({quickGarbageCollection: true});
 shardSplitTest.addRecipientNodes();

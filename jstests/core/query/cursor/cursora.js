@@ -8,9 +8,6 @@
 //   uses_parallel_shell,
 // ]
 
-(function() {
-"use strict";
-
 const t = db.cursora;
 
 function run(n) {
@@ -53,4 +50,3 @@ function run(n) {
 
 run(1500);
 run(5000);
-})();

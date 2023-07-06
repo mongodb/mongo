@@ -4,10 +4,7 @@
  *
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const dbName = "kill_ttl_on_stepdown";
 
@@ -64,4 +61,3 @@ assert.soon(() => {
 }, "TTLMonitor was not running after stepdown");
 
 rst.stopSet();
-}());

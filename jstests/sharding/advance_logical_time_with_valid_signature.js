@@ -2,9 +2,6 @@
  * Tests that the mongo shell can use a cluster time with a valid signature to advance a server's
  * cluster time.
  */
-(function() {
-"use strict";
-
 // Setup 2 mongos processes with mongobridge.
 let st = new ShardingTest({shards: 1, mongos: 2, useBridge: true});
 
@@ -41,4 +38,3 @@ assert.eq(lt,
               ", received: " + tojson(res.$clusterTime));
 
 st.stop();
-})();

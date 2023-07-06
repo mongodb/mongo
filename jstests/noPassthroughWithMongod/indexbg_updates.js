@@ -3,8 +3,6 @@
 //
 // Variation of index_multi.js
 
-(function() {
-"use strict";
 Random.setRandomSeed();
 
 var coll = db.getSiblingDB("indexbg_updates").coll;
@@ -57,4 +55,3 @@ backgroundIndexBuildShell();
 
 var explain = coll.find().hint({"field0": 1}).explain();
 assert("queryPlanner" in explain, tojson(explain));
-}());

@@ -7,10 +7,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/write_concern_util.js");
+import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -75,4 +72,3 @@ const outPipeline = [{$group: {_id: "$_id", sum: {$sum: "$a"}}}, {$out: outColl.
 testWriteConcern(outPipeline, "out_on_secondary_write_concern");
 
 replTest.stopSet();
-})();

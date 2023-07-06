@@ -1,11 +1,7 @@
 /**
  * Verify the KMS support handles a buggy Key Store
  */
-
-load('jstests/ssl/libs/ssl_helpers.js');
-
-(function() {
-"use strict";
+import {CA_CERT, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 const x509_options = {
     sslMode: "requireSSL",
@@ -57,7 +53,7 @@ testFaults((keyId, shell) => {
 
     const str = "mongo";
     assert.throws(() => {
-        const encStr = shell.getClientEncryption().encrypt(keyId, str);
+        shell.getClientEncryption().encrypt(keyId, str);
     });
 });
 
@@ -67,7 +63,7 @@ testFaults((keyId, shell) => {
 
     const str = "mongo";
     assert.throws(() => {
-        const encStr = shell.getClientEncryption().encrypt(keyId, str);
+        shell.getClientEncryption().encrypt(keyId, str);
     });
 });
 
@@ -77,9 +73,8 @@ testFaults((keyId, shell) => {
 
     const str = "mongo";
     assert.throws(() => {
-        const encStr = shell.getClientEncryption().encrypt(keyId, str);
+        shell.getClientEncryption().encrypt(keyId, str);
     });
 });
 
 MongoRunner.stopMongod(conn);
-}());

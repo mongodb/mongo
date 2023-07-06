@@ -30,8 +30,6 @@ function runTestWithAuth(conn, allowsRename, verifyFunction) {
     const srcEncryptedErrmsg = "Cannot rename an encrypted collection";
     const tgtEncryptedErrmsg = "Cannot rename to an existing encrypted collection";
 
-    const adminDB = conn.getDB("admin");
-
     assert.commandWorked(
         dbSrc.createCollection("encrypted", {encryptedFields: sampleEncryptedFields}));
     assert.commandWorked(dbSrc.createCollection("unencrypted"));

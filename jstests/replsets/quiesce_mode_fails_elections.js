@@ -1,11 +1,7 @@
 /**
  * Test that once a node enters quiesce mode, any concurrent or new elections cannot succeed.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallel_shell_helpers.js");
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const rst = new ReplSetTest({
     name: jsTestName(),
@@ -60,4 +56,3 @@ jsTestLog("Unblock the secondary from quiesce mode");
 quiesceModeFailPoint.off();
 
 rst.stopSet();
-})();

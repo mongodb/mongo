@@ -4,10 +4,7 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-(function() {
-'use strict';
-
-load('jstests/libs/profiler.js');  // For various profiler helpers.
+import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({
     shards: 3,
@@ -157,4 +154,3 @@ csAfterAddShard.close();
 
 st.stop();
 rs3.stopSet();
-})();

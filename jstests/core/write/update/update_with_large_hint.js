@@ -2,9 +2,6 @@
 // @tags: [
 //   requires_sharding,
 // ]
-(function() {
-"use strict";
-
 const coll = db.update_with_large_hint;
 coll.drop();
 
@@ -33,4 +30,3 @@ assert.commandFailedWithCode(coll.runCommand("delete", {
     deletes: [{q: {_id: 0}, limit: 1, hint: {[longHint]: 1}}],
 }),
                              ErrorCodes.BadValue);
-}());

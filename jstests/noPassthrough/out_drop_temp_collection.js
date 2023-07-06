@@ -10,12 +10,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");    // For waitForCurOpByFailPointNoNS.
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
-load("jstests/noPassthrough/libs/index_build.js");
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 function runTest(st, testDb, portNum) {
     const failpointName = "outWaitAfterTempCollectionCreation";
@@ -67,4 +63,3 @@ MongoRunner.stopMongod(conn);
 const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
 runTest(st, st.s.getDB("out_drop_temp"), st.s.port);
 st.stop();
-})();

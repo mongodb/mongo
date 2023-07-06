@@ -1,15 +1,13 @@
-'use strict';
-
 // The tojson() function that is commonly used to build up assertion messages doesn't support the
 // Symbol type, so we just use unique string values instead.
-var Topology = {
+export var Topology = {
     kStandalone: 'stand-alone',
     kRouter: 'mongos router',
     kReplicaSet: 'replica set',
     kShardedCluster: 'sharded cluster',
 };
 
-var DiscoverTopology = (function() {
+export var DiscoverTopology = (function() {
     const kDefaultConnectFn = (host) => new Mongo(host);
 
     function getDataMemberConnectionStrings(conn) {

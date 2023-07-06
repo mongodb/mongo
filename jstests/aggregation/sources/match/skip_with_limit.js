@@ -3,9 +3,6 @@
  * and $limits. There are a number of optimizations and special checks the server implements -
  * especially in a sharded cluster - which we intend to stress with this test.
  */
-(function() {
-"use strict";
-
 const coll = db.skip_with_limit;
 coll.drop();
 
@@ -147,4 +144,3 @@ assert.eq(coll.aggregate([{$skip: 0}]).itcount(), 20);
 
 // Verifies that command fails executing when $limit argument is zero.
 assertAggregateCommandFailed([{$limit: 0}], 15958);
-}());
