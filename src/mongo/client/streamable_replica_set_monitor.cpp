@@ -422,12 +422,12 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_enqueueOutsta
     query->start = _executor->now();
 
     // Add the query to the list of outstanding queries.
-    auto queryIter = _outstandingQueries.insert(_outstandingQueries.end(), query);
+    _outstandingQueries.insert(_outstandingQueries.end(), query);
 
     // After a deadline or when the input cancellation token is canceled, cancel this query. If the
     // query completes first, the deadlineCancelSource will be used to cancel this task.
     _executor->sleepUntil(deadline, query->deadlineCancelSource.token())
-        .getAsync([this, query, queryIter, self = shared_from_this(), cancelToken](Status status) {
+        .getAsync([this, query, self = shared_from_this(), cancelToken](Status status) {
             // If the deadline was reached or cancellation occurred on the input cancellation token,
             // mark the query as canceled. Otherwise, the deadlineCancelSource must have been
             // canceled due to the query completing successfully.
@@ -447,7 +447,7 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_enqueueOutsta
                     // been cleared) before erasing.
                     if (!_isDropped.load()) {
                         invariant(_outstandingQueries.size() > 0);
-                        _eraseQueryFromOutstandingQueries(lk, queryIter);
+                        _eraseQueryFromOutstandingQueries(lk, query);
                     }
                 }
             }
@@ -805,9 +805,14 @@ void StreamableReplicaSetMonitor::_failOutstandingWithStatus(WithLock, Status st
 }
 
 std::list<StreamableReplicaSetMonitor::HostQueryPtr>::iterator
-StreamableReplicaSetMonitor::_eraseQueryFromOutstandingQueries(
+StreamableReplicaSetMonitor::_eraseQueryIterFromOutstandingQueries(
     WithLock, std::list<HostQueryPtr>::iterator iter) {
     return _outstandingQueries.erase(iter);
+}
+
+void StreamableReplicaSetMonitor::_eraseQueryFromOutstandingQueries(WithLock,
+                                                                    const HostQueryPtr& query) {
+    std::erase_if(_outstandingQueries, [&query](const HostQueryPtr& _q) { return _q == query; });
 }
 
 void StreamableReplicaSetMonitor::_processOutstanding(
@@ -843,7 +848,7 @@ void StreamableReplicaSetMonitor::_processOutstanding(
                                 "readPref"_attr = readPrefToStringFull(query->criteria),
                                 "duration"_attr = Milliseconds(latency));
 
-                    it = _eraseQueryFromOutstandingQueries(lock, it);
+                    it = _eraseQueryIterFromOutstandingQueries(lock, it);
                 } else {
                     // The query was canceled, so skip to the next entry without erasing it.
                     ++it;

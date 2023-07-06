@@ -246,8 +246,11 @@ private:
         const Date_t& deadline);
 
     // Removes the query pointed to by iter and returns an iterator to the next item in the list.
-    std::list<HostQueryPtr>::iterator _eraseQueryFromOutstandingQueries(
+    std::list<HostQueryPtr>::iterator _eraseQueryIterFromOutstandingQueries(
         WithLock, std::list<HostQueryPtr>::iterator iter);
+
+    // Removes the given query from the list, if it is there.
+    void _eraseQueryFromOutstandingQueries(WithLock, const HostQueryPtr& query);
 
     std::vector<HostAndPort> _extractHosts(
         const std::vector<sdam::ServerDescriptionPtr>& serverDescriptions);
