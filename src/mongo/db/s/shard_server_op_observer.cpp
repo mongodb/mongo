@@ -642,6 +642,17 @@ void ShardServerOpObserver::onReplicationRollback(OperationContext* opCtx,
         rbInfo.rollbackNamespaces.end()) {
         RecoverableCriticalSectionService::get(opCtx)->recoverRecoverableCriticalSections(opCtx);
     }
+
+    // If writes to config.cache.collections or config.cache.* have been rolled back, interrupt the
+    // SSCCL to ensure secondary waits for replication do not use incorrect opTimes.
+    if (std::any_of(rbInfo.rollbackNamespaces.begin(),
+                    rbInfo.rollbackNamespaces.end(),
+                    [](const NamespaceString& nss) {
+                        return nss == NamespaceString::kShardConfigCollectionsNamespace ||
+                            nss.isConfigDotCacheDotChunks();
+                    })) {
+        CatalogCacheLoader::get(opCtx).onReplicationRollback();
+    }
 }
 
 
