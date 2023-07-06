@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,11 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/db/auth/authz_session_external_state_mock.h"
+#pragma once
 
-#include <memory>
-#include <string>
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_factory.h"
+#include "mongo/db/service_context.h"
 
-#include "mongo/base/shim.h"
+namespace mongo {
 
-namespace mongo {}  // namespace mongo
+/**
+ * Factory class for generating the correct authorization manager for the
+ * process. The create function returns the correct authorization manager
+ * based on the arguments provided.
+ */
+
+class AuthorizationManagerFactoryMock : public AuthorizationManagerFactory {
+
+public:
+    std::unique_ptr<AuthorizationManager> createRouter(ServiceContext* service) override;
+    std::unique_ptr<AuthorizationManager> createShard(ServiceContext* service) override;
+};
+
+
+}  // namespace mongo

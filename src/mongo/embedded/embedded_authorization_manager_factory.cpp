@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,11 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/platform/basic.h"
 
-#include <memory>
-#include <string>
+#include "mongo/db/auth/authorization_manager_factory.h"
+#include "mongo/embedded/embedded_auth_manager.cpp"
 
-#include "mongo/base/shim.h"
+namespace mongo {
 
-namespace mongo {}  // namespace mongo
+namespace embedded {
+
+class AuthorizationManagerFactoryEmbedded : public AuthorizationManagerFactory {
+
+    std::unique_ptr<mongo::AuthorizationManager> createRouter(ServiceContext* service) override {
+        return std::make_unique<embedded::AuthorizationManager>();
+    }
+
+    std::unique_ptr<mongo::AuthorizationManager> createShard(ServiceContext* service) override {
+        return std::make_unique<embedded::AuthorizationManager>();
+    }
+};
+
+}  // namespace embedded
+
+namespace {
+
+MONGO_INITIALIZER(RegisterGlobalAuthzManagerFactoryEmbedded)(InitializerContext* initializer) {
+    globalAuthzManagerFactory = std::make_unique<embedded::AuthorizationManagerFactoryEmbedded>();
+}
+
+}  // namespace
+
+}  // namespace mongo

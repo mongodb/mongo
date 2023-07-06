@@ -436,7 +436,6 @@ env.Library(
 env.Library(
     target='mongos_initializers',
     source=[
-        'cluster_cursor_stats.cpp',
         'router_transactions_server_status.cpp',
         's_sharding_server_status.cpp',
     ],
@@ -444,7 +443,7 @@ env.Library(
         # NOTE: If you need to add a static or mongo initializer to mongos startup,
         # please add that library here, as a private library dependency.
         '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/db/auth/authmongos',
+        '$BUILD_DIR/mongo/db/auth/authserver',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/commands/server_status_servers',
         '$BUILD_DIR/mongo/db/dbdirectclient',
@@ -515,7 +514,7 @@ env.Library(
         # mongos_initializers.
         '$BUILD_DIR/mongo/client/remote_command_targeter',
         '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/db/auth/authmongos',
+        '$BUILD_DIR/mongo/db/auth/authserver',
         '$BUILD_DIR/mongo/db/change_stream_options_manager',
         '$BUILD_DIR/mongo/db/change_streams_cluster_parameter',
         '$BUILD_DIR/mongo/db/commands/rwc_defaults_commands',

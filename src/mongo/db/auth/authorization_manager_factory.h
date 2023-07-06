@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,11 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/db/auth/authz_session_external_state_mock.h"
+#pragma once
 
-#include <memory>
-#include <string>
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/service_context.h"
 
-#include "mongo/base/shim.h"
+namespace mongo {
 
-namespace mongo {}  // namespace mongo
+/**
+ * Factory class for generating the correct authorization manager for the
+ * process. createRouter creates an authorization manager that connects to
+ * config servers to get authorization information, and createShard creates
+ * an authorization manager that may search locally for authorization
+ * information unless the user is registered to $external.
+ */
+
+class AuthorizationManagerFactory {
+
+public:
+    virtual ~AuthorizationManagerFactory() = default;
+
+    virtual std::unique_ptr<AuthorizationManager> createRouter(ServiceContext* service) = 0;
+    virtual std::unique_ptr<AuthorizationManager> createShard(ServiceContext* service) = 0;
+};
+
+extern std::unique_ptr<AuthorizationManagerFactory> globalAuthzManagerFactory;
+
+}  // namespace mongo

@@ -123,7 +123,7 @@ env.Program(
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/client/replica_set_monitor_protocol_test_util',
-        '$BUILD_DIR/mongo/db/auth/authmongod',
+        '$BUILD_DIR/mongo/db/auth/authserver',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',

@@ -67,13 +67,6 @@
 namespace mongo {
 namespace {
 
-std::unique_ptr<AuthzManagerExternalState> authzManagerExternalStateCreateImpl() {
-    return std::make_unique<AuthzManagerExternalStateMock>();
-}
-
-auto authzManagerExternalStateCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
-    AuthzManagerExternalState::create, authzManagerExternalStateCreateImpl);
-
 void addRoleNameToObjectElement(mutablebson::Element object, const RoleName& role) {
     fassert(17175, object.appendString(AuthorizationManager::ROLE_NAME_FIELD_NAME, role.getRole()));
     fassert(17176, object.appendString(AuthorizationManager::ROLE_DB_FIELD_NAME, role.getDB()));
@@ -103,6 +96,7 @@ void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privileges
         }
     }
 }
+
 }  // namespace
 
 AuthzManagerExternalStateMock::AuthzManagerExternalStateMock() : _authzManager(nullptr) {}

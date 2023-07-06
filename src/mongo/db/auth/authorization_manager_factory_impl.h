@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,44 +27,18 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
+#pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_factory.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
 
 namespace mongo {
-namespace {
 
-long long ll(auto v) {
-    return static_cast<long long>(v);
-}
-
-//
-// ServerStatus metric cursor counts.
-//
-
-class ClusterCursorStats final : public ServerStatusMetric {
+class AuthorizationManagerFactoryImpl : public AuthorizationManagerFactory {
 public:
-    void appendTo(BSONObjBuilder& b, StringData leafName) const override {
-        auto grid = Grid::get(getGlobalServiceContext());
-        BSONObjBuilder cursorBob(b.subobjStart(leafName));
-        cursorBob.append("timedOut", ll(grid->getCursorManager()->cursorsTimedOut()));
-        auto stats = grid->getCursorManager()->stats();
-        BSONObjBuilder{cursorBob.subobjStart("open")}
-            .append("multiTarget", ll(stats.cursorsMultiTarget))
-            .append("singleTarget", ll(stats.cursorsSingleTarget))
-            .append("queuedData", ll(stats.cursorsQueuedData))
-            .append("pinned", ll(stats.cursorsPinned))
-            .append("total", ll(stats.cursorsMultiTarget + stats.cursorsSingleTarget));
-    }
+    std::unique_ptr<AuthorizationManager> createRouter(ServiceContext* service) override;
+    std::unique_ptr<AuthorizationManager> createShard(ServiceContext* service) override;
 };
 
-ClusterCursorStats& clusterCursorStats =
-    addMetricToTree("cursor", std::make_unique<ClusterCursorStats>());
-
-}  // namespace
 }  // namespace mongo

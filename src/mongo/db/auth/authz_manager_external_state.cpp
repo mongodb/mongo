@@ -42,29 +42,6 @@
 #include "mongo/util/assert_util_core.h"
 
 namespace mongo {
-namespace {
-using UniqueExternalState = AuthzManagerExternalState::UniqueExternalState;
-using ShimFn = AuthzManagerExternalState::ShimFn;
-std::vector<ShimFn> shimFunctions;
-}  // namespace
-
-UniqueExternalState AuthzManagerExternalState::create() {
-    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(AuthzManagerExternalState::create);
-
-    UniqueExternalState externalState = w();
-    for (const auto& shim : shimFunctions) {
-        externalState = shim(std::move(externalState));
-    }
-    return externalState;
-}
-
-void AuthzManagerExternalState::prependShim(ShimFn&& shim) {
-    shimFunctions.insert(shimFunctions.begin(), std::move(shim));
-}
-
-void AuthzManagerExternalState::appendShim(ShimFn&& shim) {
-    shimFunctions.push_back(std::move(shim));
-}
 
 AuthzManagerExternalState::AuthzManagerExternalState() = default;
 AuthzManagerExternalState::~AuthzManagerExternalState() = default;

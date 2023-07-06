@@ -45,6 +45,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/cursor_server_params.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -65,39 +66,25 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 
-static CounterMetric cursorStatsOpen{"cursor.open.total"};
-static CounterMetric cursorStatsOpenPinned{"cursor.open.pinned"};
-static CounterMetric cursorStatsOpenNoTimeout{"cursor.open.noTimeout"};
-static CounterMetric cursorStatsTimedOut{"cursor.timedOut"};
-static CounterMetric cursorStatsTotalOpened{"cursor.totalOpened"};
-static CounterMetric cursorStatsMoreThanOneBatch{"cursor.moreThanOneBatch"};
-
-static CounterMetric cursorStatsLifespanLessThan1Second{"cursor.lifespan.lessThan1Second"};
-static CounterMetric cursorStatsLifespanLessThan5Seconds{"cursor.lifespan.lessThan5Seconds"};
-static CounterMetric cursorStatsLifespanLessThan15Seconds{"cursor.lifespan.lessThan15Seconds"};
-static CounterMetric cursorStatsLifespanLessThan30Seconds{"cursor.lifespan.lessThan30Seconds"};
-static CounterMetric cursorStatsLifespanLessThan1Minute{"cursor.lifespan.lessThan1Minute"};
-static CounterMetric cursorStatsLifespanLessThan10Minutes{"cursor.lifespan.lessThan10Minutes"};
-static CounterMetric cursorStatsLifespanGreaterThanOrEqual10Minutes{
-    "cursor.lifespan.greaterThanOrEqual10Minutes"};
-
 void incrementCursorLifespanMetric(Date_t birth, Date_t death) {
     auto elapsed = death - birth;
 
+    auto& cursorStats = CursorStats::getInstance();
+
     if (elapsed < Seconds(1)) {
-        cursorStatsLifespanLessThan1Second.increment();
+        cursorStats.cursorStatsLifespanLessThan1Second.increment();
     } else if (elapsed < Seconds(5)) {
-        cursorStatsLifespanLessThan5Seconds.increment();
+        cursorStats.cursorStatsLifespanLessThan5Seconds.increment();
     } else if (elapsed < Seconds(15)) {
-        cursorStatsLifespanLessThan15Seconds.increment();
+        cursorStats.cursorStatsLifespanLessThan15Seconds.increment();
     } else if (elapsed < Seconds(30)) {
-        cursorStatsLifespanLessThan30Seconds.increment();
+        cursorStats.cursorStatsLifespanLessThan30Seconds.increment();
     } else if (elapsed < Minutes(1)) {
-        cursorStatsLifespanLessThan1Minute.increment();
+        cursorStats.cursorStatsLifespanLessThan1Minute.increment();
     } else if (elapsed < Minutes(10)) {
-        cursorStatsLifespanLessThan10Minutes.increment();
+        cursorStats.cursorStatsLifespanLessThan10Minutes.increment();
     } else {
-        cursorStatsLifespanGreaterThanOrEqual10Minutes.increment();
+        cursorStats.cursorStatsLifespanGreaterThanOrEqual10Minutes.increment();
     }
 }
 
@@ -137,13 +124,13 @@ ClientCursor::ClientCursor(ClientCursorParams params,
     invariant(_exec);
     invariant(_operationUsingCursor);
 
-    cursorStatsOpen.increment();
-    cursorStatsTotalOpened.increment();
+    cursorStats.cursorStatsOpen.increment();
+    cursorStats.cursorStatsTotalOpened.increment();
 
     if (isNoTimeout()) {
         // cursors normally timeout after an inactivity period to prevent excess memory use
         // setting this prevents timeout of the cursor in question.
-        cursorStatsOpenNoTimeout.increment();
+        cursorStats.cursorStatsOpenNoTimeout.increment();
     }
 }
 
@@ -176,13 +163,13 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
         incrementCursorLifespanMetric(_createdDate, *now);
     }
 
-    cursorStatsOpen.decrement();
+    cursorStats.cursorStatsOpen.decrement();
     if (isNoTimeout()) {
-        cursorStatsOpenNoTimeout.decrement();
+        cursorStats.cursorStatsOpenNoTimeout.decrement();
     }
 
     if (_metrics.nBatches && *_metrics.nBatches > 1) {
-        cursorStatsMoreThanOneBatch.increment();
+        cursorStats.cursorStatsMoreThanOneBatch.increment();
     }
 
     _exec->dispose(opCtx);
@@ -255,7 +242,7 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
     // either by being released back to the cursor manager or by being deleted. A cursor may be
     // transferred to another pin object via move construction or move assignment, but in this case
     // it is still considered pinned.
-    cursorStatsOpenPinned.increment();
+    CursorStats::getInstance().cursorStatsOpenPinned.increment();
 }
 
 ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
@@ -328,7 +315,7 @@ void ClientCursorPin::release() {
     // Unpin the cursor. This must be done by calling into the cursor manager, since the cursor
     // manager must acquire the appropriate mutex in order to safely perform the unpin operation.
     _cursorManager->unpin(_opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter>(_cursor));
-    cursorStatsOpenPinned.decrement();
+    CursorStats::getInstance().cursorStatsOpenPinned.decrement();
 
     _cursor = nullptr;
 }
@@ -342,7 +329,7 @@ void ClientCursorPin::deleteUnderlying() {
     _cursor = nullptr;
     _cursorManager->deregisterAndDestroyCursor(_opCtx, std::move(ownedCursor));
 
-    cursorStatsOpenPinned.decrement();
+    CursorStats::getInstance().cursorStatsOpenPinned.decrement();
     _shouldSaveRecoveryUnit = false;
 }
 
@@ -392,7 +379,7 @@ public:
                 const ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();
                 auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
                 try {
-                    cursorStatsTimedOut.increment(
+                    CursorStats::getInstance().cursorStatsTimedOut.increment(
                         CursorManager::get(opCtx.get())->timeoutCursors(opCtx.get(), now));
                 } catch (const DBException& e) {
                     LOGV2_WARNING(
@@ -409,15 +396,6 @@ public:
 };
 
 auto getClientCursorMonitor = ServiceContext::declareDecoration<ClientCursorMonitor>();
-
-void _appendCursorStats(BSONObjBuilder& b) {
-    b.append("note", "deprecated, use server status metrics");
-    b.appendNumber("clientCursors_size", cursorStatsOpen.get());
-    b.appendNumber("totalOpen", cursorStatsOpen.get());
-    b.appendNumber("pinned", cursorStatsOpenPinned.get());
-    b.appendNumber("totalNoTimeout", cursorStatsOpenNoTimeout.get());
-    b.appendNumber("timedOut", cursorStatsTimedOut.get());
-}
 }  // namespace
 
 void startClientCursorMonitor() {

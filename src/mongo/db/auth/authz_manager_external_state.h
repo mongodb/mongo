@@ -68,13 +68,6 @@ class AuthzManagerExternalState {
     AuthzManagerExternalState& operator=(const AuthzManagerExternalState&) = delete;
 
 public:
-    using UniqueExternalState = std::unique_ptr<AuthzManagerExternalState>;
-    static UniqueExternalState create();
-
-    using ShimFn = std::function<UniqueExternalState(UniqueExternalState)>;
-    static void prependShim(ShimFn&& shim);
-    static void appendShim(ShimFn&& shim);
-
     virtual ~AuthzManagerExternalState();
 
     /**

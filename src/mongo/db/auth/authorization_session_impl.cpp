@@ -96,16 +96,6 @@ namespace dps = ::mongo::dotted_path_support;
 using std::vector;
 namespace {
 
-std::unique_ptr<AuthorizationSession> authorizationSessionCreateImpl(
-    AuthorizationManager* authzManager) {
-    return std::make_unique<AuthorizationSessionImpl>(
-        AuthzSessionExternalState::create(authzManager),
-        AuthorizationSessionImpl::InstallMockForTestingOrAuthImpl{});
-}
-
-auto authorizationSessionCreateRegistration =
-    MONGO_WEAK_FUNCTION_REGISTRATION(AuthorizationSession::create, authorizationSessionCreateImpl);
-
 constexpr StringData SYSTEM_BUCKETS_PREFIX = "system.buckets."_sd;
 
 bool checkContracts() {

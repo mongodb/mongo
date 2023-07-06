@@ -46,7 +46,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
-#include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -210,15 +209,6 @@ bool appliesToAuthzData(StringData op, const NamespaceString& nss, const BSONObj
             return true;
     }
 }
-
-std::unique_ptr<AuthorizationManager> authorizationManagerCreateImpl(
-    ServiceContext* serviceContext) {
-    return std::make_unique<AuthorizationManagerImpl>(serviceContext,
-                                                      AuthzManagerExternalState::create());
-}
-
-auto authorizationManagerCreateRegistration =
-    MONGO_WEAK_FUNCTION_REGISTRATION(AuthorizationManager::create, authorizationManagerCreateImpl);
 
 MONGO_FAIL_POINT_DEFINE(waitForUserCacheInvalidation);
 void handleWaitForUserCacheInvalidation(OperationContext* opCtx, const UserHandle& user) {

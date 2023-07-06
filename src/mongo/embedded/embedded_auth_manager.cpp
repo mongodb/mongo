@@ -50,6 +50,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/embedded/embedded_auth_session.cpp"
 #include "mongo/embedded/not_implemented.h"
 #include "mongo/util/assert_util.h"
 
@@ -58,8 +59,8 @@ namespace embedded {
 namespace {
 class AuthorizationManager : public mongo::AuthorizationManager {
 public:
-    std::unique_ptr<AuthorizationSession> makeAuthorizationSession() override {
-        return AuthorizationSession::create(this);
+    std::unique_ptr<mongo::AuthorizationSession> makeAuthorizationSession() override {
+        return std::make_unique<embedded::AuthorizationSession>(this);
     }
 
     void setShouldValidateAuthSchemaOnStartup(const bool check) override {
@@ -183,16 +184,5 @@ private:
 
 }  // namespace
 }  // namespace embedded
-
-namespace {
-
-std::unique_ptr<AuthorizationManager> authorizationManagerCreateImpl(ServiceContext*) {
-    return std::make_unique<embedded::AuthorizationManager>();
-}
-
-auto authorizationManagerCreateRegistration =
-    MONGO_WEAK_FUNCTION_REGISTRATION(AuthorizationManager::create, authorizationManagerCreateImpl);
-
-}  // namespace
 
 }  // namespace mongo
