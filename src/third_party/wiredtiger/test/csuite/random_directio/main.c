@@ -73,6 +73,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 
+static pid_t child_pid = 0;
 static char home[1024]; /* Program working dir */
 
 static const char *const uri_main = "table:main";
@@ -888,6 +889,21 @@ kill_child(pid_t pid)
 }
 
 /*
+ * die --
+ *     Called when testutil_assert or testutil_check fails to clean up a child process if it exists.
+ */
+static void
+die(void)
+{
+    pid_t pid;
+
+    pid = child_pid;
+    child_pid = 0;
+    if (pid != 0)
+        kill_child(pid);
+}
+
+/*
  * check_db --
  *     Make a copy of the database and verify its contents.
  */
@@ -1111,6 +1127,11 @@ handler(int sig)
     int status, termsig;
 
     WT_UNUSED(sig);
+
+    /* Check if child has been killed by die(), if so, no need to wait. */
+    if (child_pid == 0)
+        return;
+
     testutil_assert_errno((pid = waitpid(-1, &status, WNOHANG | WUNTRACED)) != -1);
     if (pid == 0)
         return; /* Nothing to wait for. */
@@ -1167,6 +1188,7 @@ main(int argc, char *argv[])
     bool populate_only, preserve, rand_th, rand_time, verify_only;
 
     (void)testutil_set_progname(argv);
+    custom_die = die; /* Set our own abort handler */
 
     datasize = DEFAULT_DATA_SIZE;
     nth = MIN_TH;
@@ -1341,6 +1363,7 @@ main(int argc, char *argv[])
         }
 
         /* parent */
+        child_pid = pid;
         /*
          * Sleep for the configured amount of time before killing the child.
          */
@@ -1370,6 +1393,7 @@ main(int argc, char *argv[])
         testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
         testutil_assert_errno(kill(pid, SIGKILL) == 0);
         testutil_assert_errno(waitpid(pid, &status, 0) != -1);
+        child_pid = 0;
     }
     if (verify_only && !check_db(nth, datasize, 0, false, flags)) {
         printf("FAIL\n");
