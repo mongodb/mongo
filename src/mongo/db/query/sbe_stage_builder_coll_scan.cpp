@@ -218,7 +218,7 @@ std::unique_ptr<sbe::PlanStage> buildResumeFromRecordIdSubtree(
                     "CollectionScan died due to failure to restore tailable cursor position."};
         }
         return {ErrorCodes::ErrorCodes::KeyNotFound,
-                str::stream() << "Failed to resume collection scan the recordId from which we are "
+                str::stream() << "Failed to resume collection scan: the recordId from which we are "
                                  "attempting to resume no longer exists in the collection: "
                               << csn->resumeAfterRecordId};
     }();

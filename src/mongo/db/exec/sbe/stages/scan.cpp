@@ -496,6 +496,15 @@ PlanState ScanStage::getNext() {
         } else {
             _firstGetNext = false;
             if (_seekRecordIdAccessor) {  // fetch or scan resume
+                if (_seekRecordId.isNull()) {
+                    // Attempting to resume from a null record ID gives a null '_seekRecordId'.
+                    uasserted(ErrorCodes::KeyNotFound,
+                              str::stream()
+                                  << "Failed to resume collection scan: the recordId from "
+                                     "which we are attempting to resume no longer exists in "
+                                     "the collection: "
+                                  << _seekRecordId);
+                }
                 doSeekExact = true;
                 nextRecord = _cursor->seekExact(_seekRecordId);
             } else if (_minRecordIdAccessor && _forward) {

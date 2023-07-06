@@ -22,9 +22,6 @@ assertDropCollection(db, nonClusteredName);
 db.createCollection(clusteredName, {clusteredIndex: {key: {_id: 1}, unique: true}});
 db.createCollection(nonClusteredName);
 
-// TODO: SERVER-78103 remove check.
-const isSBEEnabled = checkSBEEnabled(db);
-
 // Insert some documents.
 const docs = [{_id: 1, a: 1}, {_id: 2, a: 2}, {_id: 3, a: 3}];
 assert.commandWorked(clustered.insertMany(docs));
@@ -81,8 +78,6 @@ function testResumeAfter(validateFunction) {
         errorCode: ErrorCodes.KeyNotFound
     });
 
-    // TODO SERVER-78103: Added test for $recordId:null
-
     // Confirm $_resumeAfter will fail for normal collections if it is of type BinData.
     validateFunction({
         collName: nonClusteredName,
@@ -98,7 +93,9 @@ function testResumeAfter(validateFunction) {
         errorCode: ErrorCodes.KeyNotFound
     });
 
-    if (isSBEEnabled) {
+    if (checkSBEEnabled(db)) {
+        // This case really means that 'forceClassicEngine' has not been set. It does not mean any
+        // SBE-specific feature flags are turned on.
         validateFunction({
             collName: nonClusteredName,
             resumeAfterSpec: {'$recordId': null},

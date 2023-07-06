@@ -228,9 +228,9 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                         uasserted(ErrorCodes::KeyNotFound,
                                   str::stream()
                                       << "Failed to resume collection scan: the recordId from "
-                                         "which we are "
-                                      << "attempting to resume no longer exists in the collection. "
-                                      << "recordId: " << recordIdToSeek);
+                                         "which we are attempting to resume no longer exists in "
+                                         "the collection: "
+                                      << recordIdToSeek);
                     }
                 }
             }
