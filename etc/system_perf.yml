@@ -1940,7 +1940,7 @@ buildvariants:
       atlas_setup: M60-repl-azure
       use_custom_build_azure: true
       compile_variant: -rhel70
-      infrastructure_provisioning: workload_client
+      infrastructure_provisioning: workload_client_intel.2023-04
       infrastructure_provisioning_release: 2022-11
       workload_setup: 2022-11
       platform: linux
