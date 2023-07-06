@@ -81,7 +81,6 @@ struct Notification {
 class ServiceExecutorSynchronousBm : public benchmark::Fixture {
 public:
     void firstSetup() {
-        setGlobalServiceContext(ServiceContext::make());
         auto service = ServiceContext::make();
         sc = service.get();
         setGlobalServiceContext(std::move(service));

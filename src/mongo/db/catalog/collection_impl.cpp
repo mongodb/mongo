@@ -994,7 +994,7 @@ void CollectionImpl::registerCappedInserts(OperationContext* opCtx,
     // we never get here while holding an uninterruptible, read-ticketed lock. That would indicate
     // that we are operating with the wrong global lock semantics, and either hold too weak a lock
     // (e.g. IS) or that we upgraded in a way we shouldn't (e.g. IS -> IX).
-    invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->hasReadTicket() ||
+    invariant(!opCtx->lockState()->hasReadTicket() ||
               !opCtx->lockState()->uninterruptibleLocksRequested());
 
     auto* uncommitted =

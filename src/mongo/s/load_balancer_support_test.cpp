@@ -35,7 +35,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/load_balancer_support.h"
@@ -56,10 +55,7 @@ using namespace unittest::match;
 
 class LoadBalancerSupportTest : public ServiceContextTest {
 public:
-    LoadBalancerSupportTest() {
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
-    }
+    LoadBalancerSupportTest() = default;
 
     using ServiceContextTest::ServiceContextTest;
 

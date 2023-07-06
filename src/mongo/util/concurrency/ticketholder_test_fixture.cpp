@@ -35,7 +35,6 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/util/assert_util.h"
@@ -45,8 +44,6 @@ namespace mongo {
 
 void TicketHolderTestFixture::setUp() {
     ServiceContextTest::setUp();
-
-    getServiceContext()->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     _client = getServiceContext()->makeClient("test");
     _opCtx = _client->makeOperationContext();
 }

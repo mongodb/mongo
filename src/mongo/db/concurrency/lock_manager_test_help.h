@@ -34,19 +34,6 @@
 
 namespace mongo {
 
-class LockerForTests : public LockerImpl {
-public:
-    explicit LockerForTests(OperationContext* opCtx, LockMode globalLockMode)
-        : LockerImpl(opCtx->getServiceContext()) {
-        lockGlobal(opCtx, globalLockMode);
-    }
-
-    ~LockerForTests() {
-        unlockGlobal();
-    }
-};
-
-
 class TrackingLockGrantNotification : public LockGrantNotification {
 public:
     TrackingLockGrantNotification() : numNotifies(0), lastResult(LOCK_INVALID) {}

@@ -35,7 +35,6 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/bson/json.h"
-#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/ops/update_request.h"
@@ -109,20 +108,14 @@ protected:
 };
 
 class ProduceUpsertDocumentTest : public ServiceContextTest {
-public:
-    void setUp() override {
-        ServiceContextTest::setUp();
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
-        _opCtx = makeOperationContext();
-    }
+protected:
+    ProduceUpsertDocumentTest() = default;
 
     OperationContext* getOpCtx() const {
         return _opCtx.get();
     }
 
-protected:
-    ServiceContext::UniqueOperationContext _opCtx;
+    ServiceContext::UniqueOperationContext _opCtx{makeOperationContext()};
 };
 
 TEST_F(WriteWithoutShardKeyUtilTest, WriteQueryContainingFullShardKeyCanTargetSingleDocument) {

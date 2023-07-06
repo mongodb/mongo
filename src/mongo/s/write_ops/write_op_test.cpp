@@ -43,7 +43,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/record_id.h"
@@ -168,8 +167,6 @@ protected:
     }
 
     WriteOpTest() {
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
     }

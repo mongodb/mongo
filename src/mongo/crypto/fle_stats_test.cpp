@@ -33,7 +33,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/fle_stats.h"
-#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/idl_parser.h"
@@ -53,8 +52,6 @@ namespace {
 class FLEStatsTest : public ServiceContextTest {
 public:
     FLEStatsTest() {
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
         opCtxPtr = makeOperationContext();
         opCtx = opCtxPtr.get();
     }

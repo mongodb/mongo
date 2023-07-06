@@ -6055,7 +6055,7 @@ Status ReplicationCoordinatorImpl::updateTerm(OperationContext* opCtx, long long
     }
 
     // Check we haven't acquired any lock, because potential stepdown needs global lock.
-    dassert(!opCtx->lockState()->isLocked() || opCtx->lockState()->isNoop());
+    invariant(!opCtx->lockState()->isLocked());
 
     // If the term is already up to date, we can skip the update and the mutex acquisition.
     if (!_needToUpdateTerm(term))

@@ -150,7 +150,7 @@ void WiredTigerOplogManager::triggerOplogVisibilityUpdate() {
 
 void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     const WiredTigerRecordStore* oplogRecordStore, OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
     // In order to reliably detect rollback situations, we need to fetch the latestVisibleTimestamp
     // prior to querying the end of the oplog.

@@ -46,7 +46,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
-#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_cache.h"
@@ -70,8 +69,6 @@ const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test
 class ClusterCursorManagerTest : public ServiceContextTest {
 protected:
     ClusterCursorManagerTest() {
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
         _opCtx = makeOperationContext();
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
     }

@@ -460,7 +460,7 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp(
     }
 
     // Ensure a transaction is opened. Storage engine operations require the global lock.
-    invariant(opCtx->lockState()->isNoop() || opCtx->lockState()->isLocked());
+    invariant(opCtx->lockState()->isLocked());
     getSession();
 
     switch (_timestampReadSource) {

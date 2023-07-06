@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/namespace_string.h"
@@ -51,6 +50,7 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+namespace {
 
 class LockStatsTest : public ServiceContextTest {};
 
@@ -62,7 +62,9 @@ TEST_F(LockStatsTest, NoWait) {
     resetGlobalLockStats();
 
     auto opCtx = makeOperationContext();
-    LockerForTests locker(opCtx.get(), MODE_IX);
+    LockerImpl locker(getServiceContext());
+    locker.lockGlobal(opCtx.get(), MODE_IX);
+    ON_BLOCK_EXIT([&] { locker.unlockGlobal(); });
     locker.lock(resId, MODE_X);
     locker.unlock(resId);
 
@@ -83,12 +85,16 @@ TEST_F(LockStatsTest, Wait) {
     resetGlobalLockStats();
 
     auto opCtx = makeOperationContext();
-    LockerForTests locker(opCtx.get(), MODE_IX);
+    LockerImpl locker(getServiceContext());
+    locker.lockGlobal(opCtx.get(), MODE_IX);
+    ON_BLOCK_EXIT([&] { locker.unlockGlobal(); });
     locker.lock(resId, MODE_X);
 
     {
         // This will block
-        LockerForTests lockerConflict(opCtx.get(), MODE_IX);
+        LockerImpl lockerConflict(getServiceContext());
+        lockerConflict.lockGlobal(opCtx.get(), MODE_IX);
+        ON_BLOCK_EXIT([&] { lockerConflict.unlockGlobal(); });
         ASSERT_EQUALS(LOCK_WAITING, lockerConflict.lockBeginForTest(opCtx.get(), resId, MODE_S));
 
         // Sleep 1 millisecond so the wait time passes
@@ -119,7 +125,9 @@ TEST_F(LockStatsTest, Reporting) {
     resetGlobalLockStats();
 
     auto opCtx = makeOperationContext();
-    LockerForTests locker(opCtx.get(), MODE_IX);
+    LockerImpl locker(getServiceContext());
+    locker.lockGlobal(opCtx.get(), MODE_IX);
+    ON_BLOCK_EXIT([&] { locker.unlockGlobal(); });
     locker.lock(resId, MODE_X);
     locker.unlock(resId);
 
@@ -139,11 +147,15 @@ TEST_F(LockStatsTest, Subtraction) {
     resetGlobalLockStats();
 
     auto opCtx = makeOperationContext();
-    LockerForTests locker(opCtx.get(), MODE_IX);
+    LockerImpl locker(getServiceContext());
+    locker.lockGlobal(opCtx.get(), MODE_IX);
+    ON_BLOCK_EXIT([&] { locker.unlockGlobal(); });
     locker.lock(resId, MODE_X);
 
     {
-        LockerForTests lockerConflict(opCtx.get(), MODE_IX);
+        LockerImpl lockerConflict(getServiceContext());
+        lockerConflict.lockGlobal(opCtx.get(), MODE_IX);
+        ON_BLOCK_EXIT([&] { lockerConflict.unlockGlobal(); });
         ASSERT_THROWS_CODE(
             lockerConflict.lock(opCtx.get(), resId, MODE_S, Date_t::now() + Milliseconds(5)),
             AssertionException,
@@ -157,7 +169,9 @@ TEST_F(LockStatsTest, Subtraction) {
     ASSERT_GREATER_THAN(stats.get(resId, MODE_S).combinedWaitTimeMicros, 0);
 
     {
-        LockerForTests lockerConflict(opCtx.get(), MODE_IX);
+        LockerImpl lockerConflict(getServiceContext());
+        lockerConflict.lockGlobal(opCtx.get(), MODE_IX);
+        ON_BLOCK_EXIT([&] { lockerConflict.unlockGlobal(); });
         ASSERT_THROWS_CODE(
             lockerConflict.lock(opCtx.get(), resId, MODE_S, Date_t::now() + Milliseconds(5)),
             AssertionException,
@@ -256,4 +270,5 @@ TEST_F(LockStatsTest, ServerStatus) {
                       .getIntField("w"));
 }
 
+}  // namespace
 }  // namespace mongo

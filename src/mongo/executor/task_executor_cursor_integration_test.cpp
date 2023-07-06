@@ -44,10 +44,10 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -74,11 +74,9 @@ namespace mongo {
 namespace executor {
 namespace {
 
-class TaskExecutorCursorFixture : public mongo::unittest::Test {
+class TaskExecutorCursorFixture : public ServiceContextTest {
 public:
-    TaskExecutorCursorFixture() {
-        _serviceCtx->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-    }
+    TaskExecutorCursorFixture() = default;
 
     void setUp() override {
         _ni = makeNetworkInterface("TaskExecutorCursorTest");

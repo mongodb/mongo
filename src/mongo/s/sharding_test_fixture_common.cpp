@@ -39,7 +39,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"
@@ -58,7 +57,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-
 namespace mongo {
 
 using executor::NetworkTestEnv;
@@ -66,10 +64,6 @@ using executor::RemoteCommandRequest;
 using unittest::assertGet;
 
 ShardingTestFixtureCommon::ShardingTestFixtureCommon() : _tempDir("sharding_test_fixture_common") {
-    auto service = getServiceContext();
-    service->registerClientObserver(
-        std::make_unique<LockerNoopClientObserverWithReplacementPolicy>());
-
     storageGlobalParams.dbpath = _tempDir.path();
 }
 

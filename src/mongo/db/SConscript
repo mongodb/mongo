@@ -2126,23 +2126,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='vector_clock_test_fixture',
-    source=[
-        'vector_clock_test_fixture.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
-        's/sharding_mongod_test_fixture',
-        'signed_logical_time',
-        'vector_clock',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/op_observer/oplog_writer_impl',
-    ],
-)
-
 # This library is the base class for tests which require the presence of ServiceContext. However it
 # does not perform any default initialisation of the relevant services, such as lockers and
 # transaction resources, so any test which directly references it must perform its own
@@ -2692,6 +2675,7 @@ if wiredtiger:
             'update_index_data_test.cpp',
             'vector_clock_mongod_test.cpp',
             'vector_clock_test.cpp',
+            'vector_clock_test_fixture.cpp',
             'wire_version_test.cpp',
             'write_concern_options_test.cpp',
         ],
@@ -2738,6 +2722,7 @@ if wiredtiger:
             'mirror_maestro',
             'mongohasher',
             'multitenancy',
+            'op_observer/oplog_writer_impl',
             'operation_time_tracker',
             'ops/write_ops',
             'pipeline/change_stream_expired_pre_image_remover',
@@ -2758,14 +2743,12 @@ if wiredtiger:
             's/shard_server_test_fixture',
             'server_base',
             'server_options_servers',
-            'service_context_d_test_fixture',
             'service_liaison_mock',
             'session/logical_session_cache_impl',
             'session/logical_session_id_helpers',
             'session/session_catalog_mongod',
             'session/sessions_collection',
             'session/sessions_collection_mock',
-            'shard_role',
             'signed_logical_time',
             'snapshot_window_options',
             'startup_warnings_mongod',
@@ -2774,7 +2757,7 @@ if wiredtiger:
             'ttl_collection_cache',
             'ttl_d',
             'update_index_data',
-            'vector_clock_test_fixture',
+            'vector_clock',
             'write_concern_options',
         ],
     )

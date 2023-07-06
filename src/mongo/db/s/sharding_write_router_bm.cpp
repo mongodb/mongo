@@ -49,7 +49,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -227,7 +226,6 @@ void BM_InsertGetDestinedRecipient(benchmark::State& state) {
 
     auto serviceContext = ServiceContext::make();
     const auto client = serviceContext->makeClient("test");
-    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     const auto opCtx = client->makeOperationContext();
 
     setupCatalogCacheMock(opCtx.get(), true /* withShardedColl */);
@@ -246,7 +244,6 @@ void BM_UpdateGetDestinedRecipient(benchmark::State& state) {
 
     auto serviceContext = ServiceContext::make();
     const auto client = serviceContext->makeClient("test");
-    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     const auto opCtx = client->makeOperationContext();
 
     setupCatalogCacheMock(opCtx.get(), true /* withShardedColl */);
@@ -264,7 +261,6 @@ void BM_UnshardedDestinedRecipient(benchmark::State& state) {
 
     auto serviceContext = ServiceContext::make();
     const auto client = serviceContext->makeClient("test");
-    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     const auto opCtx = client->makeOperationContext();
 
     CollectionShardingStateFactory::set(

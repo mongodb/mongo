@@ -45,7 +45,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -56,14 +55,6 @@
 
 namespace mongo {
 namespace {
-
-const ServiceContext::ConstructorActionRegisterer clientObserverRegisterer{
-    "CollectionCatalogBenchmarkClientObserver",
-    [](ServiceContext* service) {
-        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
-    },
-    [](ServiceContext* serviceContext) {
-    }};
 
 ServiceContext* setupServiceContext() {
     auto serviceContext = ServiceContext::make();

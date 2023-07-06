@@ -39,7 +39,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/platform/atomic_word.h"
@@ -62,10 +61,7 @@ namespace {
 
 class MongosTopoCoordTest : public ServiceContextTest {
 public:
-    MongosTopoCoordTest() {
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
-    }
+    MongosTopoCoordTest() = default;
 
     virtual void setUp() {
         _topo = std::make_unique<MongosTopologyCoordinator>();

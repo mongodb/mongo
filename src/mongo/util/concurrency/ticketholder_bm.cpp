@@ -33,7 +33,6 @@
 #include <memory>
 #include <ratio>
 
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
@@ -102,7 +101,6 @@ void BM_acquireAndRelease(benchmark::State& state) {
             numRemainingToMerge = state.threads;
             serviceContext = ServiceContext::make();
             serviceContext->setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-            serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
             ticketHolder = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(
                 state.threads, serviceContext.get());
             isReady = true;

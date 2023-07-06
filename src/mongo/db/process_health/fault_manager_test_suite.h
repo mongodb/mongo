@@ -26,11 +26,11 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #pragma once
 
 #include <memory>
 
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/process_health/health_observer_mock.h"
 #include "mongo/db/process_health/health_observer_registration.h"
@@ -144,8 +144,6 @@ public:
             _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
             _svcCtx->setPreciseClockSource(std::make_unique<ClockSourceMock>());
             _svcCtx->setTickSource(std::make_unique<TickSourceMock<Milliseconds>>());
-            _svcCtx->registerClientObserver(
-                std::make_unique<LockerNoopClientObserverWithReplacementPolicy>());
             advanceTime(Seconds(100));
         }
     }

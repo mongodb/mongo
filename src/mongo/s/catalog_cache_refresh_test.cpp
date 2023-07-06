@@ -206,9 +206,12 @@ TEST_F(CatalogCacheRefreshTest, NoLoadIfShardNotMarkedStaleInOperationContext) {
     ASSERT_EQ(2, cri.cm.numChunks());
 }
 
-DEATH_TEST_F(CatalogCacheRefreshTest, ShouldFailToRefreshWhenLocksAreHeld, "Invariant") {
+DEATH_TEST_REGEX_F(CatalogCacheRefreshTest,
+                   ShouldFailToRefreshWhenLocksAreHeld,
+                   "Tripwire assertion.*7032314") {
     Lock::GlobalLock globalLock(operationContext(), MODE_X);
-    scheduleRoutingInfoUnforcedRefresh(kNss);
+    auto future = scheduleRoutingInfoUnforcedRefresh(kNss);
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, 7032314);
 }
 
 TEST_F(CatalogCacheRefreshTest, DatabaseNotFound) {

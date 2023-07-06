@@ -158,6 +158,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/auth/saslauth",
         "$BUILD_DIR/mongo/db/query/query_request",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/service_context_non_d",
         "$BUILD_DIR/mongo/db/session/logical_session_id",
         "$BUILD_DIR/mongo/db/shared_request_handling",
         "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",

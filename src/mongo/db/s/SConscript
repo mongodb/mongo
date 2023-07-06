@@ -880,6 +880,7 @@ env.Benchmark(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/mongo/db/service_context_non_d',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/s/sharding_test_fixture_common',
         'sharding_runtime_d',
@@ -897,10 +898,7 @@ env.Benchmark(
         '$BUILD_DIR/mongo/db/read_write_concern_defaults_mock',
         '$BUILD_DIR/mongo/db/repl/wait_for_majority_service',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
-        '$BUILD_DIR/mongo/db/shard_role_api',
-        '$BUILD_DIR/mongo/s/sharding_test_fixture_common',
         'config_server_test_fixture',
         'sharding_catalog_manager',
-        'sharding_runtime_d',
     ],
 )

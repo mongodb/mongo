@@ -59,7 +59,9 @@ namespace mongo {
  * request (transaction).
  *
  * Lock/unlock methods must always be called from a single thread.
+ *
  */
+// TODO (SERVER-26879): Get rid of LockerImpl, devirtualise Locker and make it final
 class Locker {
     Locker(const Locker&) = delete;
     Locker& operator=(const Locker&) = delete;
@@ -71,18 +73,6 @@ public:
     using LockTimeoutCallback = std::function<void()>;
 
     virtual ~Locker() = default;
-
-    /**
-     * Returns true if this is an instance of LockerNoop. Because LockerNoop doesn't implement many
-     * methods, some users may need to check this first to find out what is safe to call. LockerNoop
-     * is only used in unittests and for a brief period at startup, so you can assume you hold the
-     * equivalent of a MODE_X lock when using it.
-     *
-     * TODO get rid of this once we kill LockerNoop.
-     */
-    virtual bool isNoop() const {
-        return false;
-    }
 
     /**
      * State for reporting the number of active and queued reader and writer clients.
@@ -362,8 +352,7 @@ public:
                                boost::optional<SingleThreadedLockStats> lockStatsBase) const = 0;
 
     /**
-     * Returns boost::none if this is an instance of LockerNoop, or a populated LockerInfo
-     * otherwise.
+     * Returns diagnostics information for the locker.
      */
     virtual boost::optional<LockerInfo> getLockerInfo(
         boost::optional<SingleThreadedLockStats> lockStatsBase) const = 0;

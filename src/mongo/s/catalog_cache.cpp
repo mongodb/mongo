@@ -349,7 +349,7 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
             "Do not hold a lock while refreshing the catalog cache. Doing so would potentially "
             "hold the lock during a network call, and can lead to a deadlock as described in "
             "SERVER-37398.",
-            allowLocks || !opCtx->lockState() || !opCtx->lockState()->isLocked());
+            allowLocks || !opCtx->lockState()->isLocked());
 
     try {
         const auto swDbInfo = getDatabase(opCtx, nss.db(), allowLocks);

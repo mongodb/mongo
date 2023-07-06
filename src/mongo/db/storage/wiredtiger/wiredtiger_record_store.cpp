@@ -852,7 +852,7 @@ bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
 }
 
 void WiredTigerRecordStore::doDeleteRecord(OperationContext* opCtx, const RecordId& id) {
-    invariant(opCtx->lockState()->inAWriteUnitOfWork() || opCtx->lockState()->isNoop());
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     // SERVER-48453: Initialize the next record id counter before deleting. This ensures we won't
     // reuse record ids, which can be problematic for the _mdb_catalog.
@@ -1038,7 +1038,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                                              Record* records,
                                              const Timestamp* timestamps,
                                              size_t nRecords) {
-    invariant(opCtx->lockState()->inAWriteUnitOfWork() || opCtx->lockState()->isNoop());
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     int64_t totalLength = 0;
     for (size_t i = 0; i < nRecords; i++)
@@ -1266,7 +1266,7 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
                                              const RecordId& id,
                                              const char* data,
                                              int len) {
-    invariant(opCtx->lockState()->inAWriteUnitOfWork() || opCtx->lockState()->isNoop());
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     WiredTigerCursor curwrap(_uri, _tableId, true, opCtx);
     curwrap.assertInActiveTxn();

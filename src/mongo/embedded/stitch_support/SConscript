@@ -57,11 +57,12 @@ env.AutoInstall(
 if get_option('link-model') != 'dynamic-sdk':
     stitchSupportTestEnv = env.Clone()
     unitTest = stitchSupportTestEnv.CppUnitTest(
-        target="stitch_support_test",
+        target='stitch_support_test',
         source=[
-            "stitch_support_test.cpp",
+            'stitch_support_test.cpp',
         ],
         LIBDEPS=[
+            '$BUILD_DIR/mongo/db/service_context_non_d',
             '$BUILD_DIR/mongo/unittest/unittest',
             'stitch_support',
         ],

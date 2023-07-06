@@ -167,7 +167,9 @@ env.CppUnitTest(
 
 env.CppIntegrationTest(
     target='db_ops_integration_test',
-    source='write_ops_document_stream_integration_test.cpp',
+    source=[
+        'write_ops_document_stream_integration_test.cpp',
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/transport/transport_layer_egress_init',

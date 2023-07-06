@@ -41,7 +41,6 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -61,8 +60,6 @@ namespace {
 class ShardKeyPatternTest : public ServiceContextTest {
 protected:
     ShardKeyPatternTest() {
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
     }

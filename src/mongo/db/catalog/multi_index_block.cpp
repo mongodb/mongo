@@ -503,7 +503,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     const CollectionPtr& collection,
     const boost::optional<RecordId>& resumeAfterRecordId) {
     invariant(!_buildIsCleanedUp);
-    invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
     // UUIDs are not guaranteed during startup because the check happens after indexes are rebuilt.
     if (_collectionUUID) {
@@ -887,7 +887,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
     const IndexAccessMethod::RecordIdHandlerFn& onDuplicateRecord) {
     opCtx->checkForInterrupt();
     invariant(!_buildIsCleanedUp);
-    invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
     // Initial sync adds documents to the sorter using
     // insertSingleDocumentForInitialSyncOrRecovery() instead of delegating to

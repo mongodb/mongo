@@ -109,7 +109,8 @@ private:
  * All instances reference a single global lock manager.
  *
  */
-class LockerImpl : public Locker {
+// TODO (SERVER-26879): Get rid of LockerImpl, devirtualise Locker and make it final
+class LockerImpl final : public Locker {
 public:
     /**
      * Instantiates new locker. Must be given a unique identifier for disambiguation. Lockers

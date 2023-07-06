@@ -77,7 +77,6 @@ namespace {
 // _doTest has empty implementation to honor the abstract class, but it is not used in the benchmark
 // framework.
 class BenchmarkConfigServerTestFixture : public ConfigServerTestFixture {
-
 public:
     BenchmarkConfigServerTestFixture() : ConfigServerTestFixture() {
         ConfigServerTestFixture::setUp();

@@ -59,7 +59,6 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/commands/bulk_write_crud_op.h"
 #include "mongo/db/commands/bulk_write_gen.h"
-#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/service_context.h"
@@ -170,8 +169,6 @@ using namespace bulk_write_exec;
 class BulkWriteOpTest : public ServiceContextTest {
 protected:
     BulkWriteOpTest() {
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
     }

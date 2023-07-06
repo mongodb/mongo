@@ -52,7 +52,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/projection_executor.h"
@@ -152,10 +151,7 @@ ServiceContext* initialize() {
     Status status = mongo::runGlobalInitializers(std::vector<std::string>{});
     uassertStatusOKWithContext(status, "Global initialization failed");
     setGlobalServiceContext(ServiceContext::make());
-    auto serviceContext = getGlobalServiceContext();
-    serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-
-    return serviceContext;
+    return getGlobalServiceContext();
 }
 
 struct ServiceContextDestructor {

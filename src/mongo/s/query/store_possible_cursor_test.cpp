@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/service_context.h"
@@ -57,11 +56,7 @@ const ShardId shardId("testshard");
 
 class StorePossibleCursorTest : public ServiceContextTest {
 protected:
-    StorePossibleCursorTest() : _manager(&_clockSourceMock) {
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
-        _opCtx = makeOperationContext();
-    }
+    StorePossibleCursorTest() : _opCtx(makeOperationContext()), _manager(&_clockSourceMock) {}
 
     OperationContext* opCtx() const {
         return _opCtx.get();
