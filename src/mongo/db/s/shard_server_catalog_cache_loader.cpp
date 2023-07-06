@@ -420,6 +420,13 @@ void ShardServerCatalogCacheLoader::onStepUp() {
     _role = ReplicaSetRole::Primary;
 }
 
+void ShardServerCatalogCacheLoader::onReplicationRollback() {
+    // No need to increment the term since this interruption is only to prevent the secondary
+    // refresh thread from getting stuck or waiting on an incorrect opTime.
+    stdx::lock_guard<Latch> lg(_mutex);
+    _contexts.interrupt(ErrorCodes::Interrupted);
+}
+
 void ShardServerCatalogCacheLoader::shutDown() {
     {
         stdx::lock_guard<Latch> lg(_mutex);

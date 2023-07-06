@@ -104,6 +104,10 @@ void ConfigServerCatalogCacheLoader::onStepUp() {
     MONGO_UNREACHABLE;
 }
 
+void ConfigServerCatalogCacheLoader::onReplicationRollback() {
+    MONGO_UNREACHABLE;
+}
+
 void ConfigServerCatalogCacheLoader::shutDown() {
     _executor->shutdown();
     _executor->join();

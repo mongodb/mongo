@@ -72,6 +72,13 @@ public:
     void shutDown() override;
 
     /**
+     * Interrupts ongoing refreshes to prevent secondaries from waiting for opTimes from wrong terms
+     * in case of rollback. Primaries must step down before going through rollback, so this should
+     * only be run on secondaries.
+     */
+    void onReplicationRollback();
+
+    /**
      * Sets any notifications waiting for this version to arrive and invalidates the catalog cache's
      * chunk metadata for collection 'nss' so that the next caller provokes a refresh.
      */
