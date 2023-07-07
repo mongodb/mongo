@@ -1660,7 +1660,6 @@ struct EqLookupNode : public QuerySolutionNode {
 };
 
 struct SentinelNode : public QuerySolutionNode {
-
     SentinelNode() {}
 
     virtual StageType getType() const {
@@ -1685,5 +1684,38 @@ struct SentinelNode : public QuerySolutionNode {
     }
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
+};
+
+struct SearchNode : public QuerySolutionNode {
+    explicit SearchNode(bool isSearchMeta) : isSearchMeta(isSearchMeta) {}
+
+    StageType getType() const override {
+        return STAGE_SEARCH;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override;
+
+    bool fetched() const {
+        return true;
+    }
+
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return FieldAvailability::kFullyProvided;
+    }
+
+    bool sortedByDiskLoc() const override {
+        return false;
+    }
+
+    const ProvidedSortSet& providedSorts() const final {
+        return kEmptySet;
+    }
+
+    std::unique_ptr<QuerySolutionNode> clone() const final;
+
+    /**
+     * True for $searchMeta, False for $search query.
+     */
+    bool isSearchMeta;
 };
 }  // namespace mongo

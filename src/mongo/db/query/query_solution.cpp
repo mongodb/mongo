@@ -1812,4 +1812,15 @@ void SentinelNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "SENTINEL\n";
 }
+
+std::unique_ptr<QuerySolutionNode> SearchNode::clone() const {
+    return std::make_unique<SearchNode>(isSearchMeta);
+}
+
+void SearchNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
+    *ss << "SEARCH\n";
+    addIndent(ss, indent + 1);
+    *ss << "isSearchMeta = " << isSearchMeta << '\n';
+}
 }  // namespace mongo
