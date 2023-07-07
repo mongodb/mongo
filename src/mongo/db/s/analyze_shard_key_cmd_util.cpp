@@ -77,7 +77,9 @@ constexpr StringData kMostCommonValuesFieldName = "mostCommonValues"_sd;
 constexpr StringData kFrequencyFieldName = "frequency"_sd;
 constexpr StringData kNumOrphanDocsFieldName = "numOrphanDocs"_sd;
 
-const std::string kOrphanDocsWarningMessage = "If \"" +
+const std::string kOrphanDocsWarningMessage =
+    "Due to performance reasons, the analyzeShardKey command does not filter out orphan documents "
+    "when calculating metrics about the characteristics of the shard key. Therefore, if \"" +
     KeyCharacteristicsMetrics::kNumOrphanDocsFieldName + "\" is large relative to \"" +
     KeyCharacteristicsMetrics::kNumDocsTotalFieldName +
     "\", you may want to rerun the command at some other time to get more accurate \"" +
@@ -109,9 +111,6 @@ void validateKeyCharacteristicsMetrics(KeyCharacteristicsMetrics metrics) {
     }
     tassert(
         7826511, msg, metrics.getNumDocsSampled() >= (int64_t)metrics.getMostCommonValues().size());
-    if (auto numOrphanDocs = metrics.getNumOrphanDocs()) {
-        tassert(7826512, msg, metrics.getNumDocsTotal() >= *numOrphanDocs);
-    }
 }
 
 /**
