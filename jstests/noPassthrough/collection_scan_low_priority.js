@@ -2,6 +2,8 @@
  * Tests that unbounded collections scans access the storage engine with low priority.
  *
  * @tags: [
+ *   cqf_incompatible, # TODO SERVER-64007: This test requires plans which yield in order to count
+ *   # low-priority transactions, which CQF cannot generate until this ticket is complete.
  *   requires_wiredtiger,
  * ]
  */
