@@ -189,7 +189,17 @@ public:
             ClusterClientCursorParams params(cursorNss,
                                              APIParameters::get(opCtx),
                                              ReadPreferenceSetting::get(opCtx),
-                                             repl::ReadConcernArgs::get(opCtx));
+                                             repl::ReadConcernArgs::get(opCtx),
+                                             [&] {
+                                                 if (!opCtx->getLogicalSessionId())
+                                                     return OperationSessionInfoFromClient();
+                                                 // TODO (SERVER-77506): This code path does not
+                                                 // clear the setAutocommit field on the presence of
+                                                 // TransactionRouter::get
+                                                 return OperationSessionInfoFromClient(
+                                                     *opCtx->getLogicalSessionId(),
+                                                     opCtx->getTxnNumber());
+                                             }());
 
             long long batchSize = std::numeric_limits<long long>::max();
             if (req.getCursor() && req.getCursor()->getBatchSize()) {
@@ -198,8 +208,6 @@ public:
             }
             params.originatingCommandObj = reqObj.getOwned();
             params.originatingPrivileges = bulk_write_common::getPrivileges(req);
-            params.lsid = opCtx->getLogicalSessionId();
-            params.txnNumber = opCtx->getTxnNumber();
 
             auto queuedDataStage = std::make_unique<RouterStageQueuedData>(opCtx);
             for (auto& replyItem : replyItems) {
