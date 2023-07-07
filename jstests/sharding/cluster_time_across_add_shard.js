@@ -16,6 +16,13 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/multiVersion/libs/multi_rs.js");
 load('jstests/replsets/rslib.js');
 
+if (TestData.configShard && TestData.mongosBinVersion) {
+    jsTest.log("Skipping the test since when running in the config shard suite, this test " +
+               "involves running the transitionFromDedicatedConfigServer command which does not " +
+               "exist in versions prior to 7.0");
+    return;
+}
+
 function createUser(rst) {
     rst.getPrimary().getDB("admin").createUser({user: "root", pwd: "root", roles: ["root"]},
                                                {w: rst.nodes.length});
