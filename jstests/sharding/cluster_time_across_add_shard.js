@@ -2,10 +2,6 @@
  * Test that a shardsvr replica set that has not initialized its shard identity via an
  * addShard command can validate and sign cluster times, and that after its shard identity has
  * been initialized, it is still able to validate cluster times that were signed when it was not a
- * shard. If running in a config shard suite, instead test that a configsvr and shardsvr replica
- * set that has not initialized its shard identity via a transitionFromDedicatedConfigServer
- * command can validate and sign cluster times, and that after its shard identity has been
- * initialized, it is still able to validate cluster times that were signed when it was not a
  * shard.
  */
 
@@ -49,11 +45,6 @@ const rstOpts = {
     nodes: numNodes,
     keyFile
 };
-// TODO (SERVER-75472): Support transition from standalone replica set directly to config shard.
-if (TestData.configShard) {
-    // Used to allow restarting config server as an independent replica set.
-    rstOpts["nodeOptions"] = {setParameter: {skipShardingConfigurationChecks: true}};
-}
 const rst = new ReplSetTest(rstOpts);
 
 rst.startSet();
