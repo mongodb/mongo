@@ -120,11 +120,6 @@ void UncommittedCatalogUpdates::_createCollection(OperationContext* opCtx,
     const auto& nss = coll->ns();
     auto uuid = coll->uuid();
     _entries.push_back({action, coll, nss, uuid});
-
-    // TODO SERVER-77425: When the catalog visibility rollback handler is executing last we don't
-    // need this. We add a dummy rollback handler that captures a reference to the newly created
-    // collection. This ensures that other rollback handlers may access this memory.
-    opCtx->recoveryUnit()->onRollback([coll](OperationContext*) {});
 }
 
 void UncommittedCatalogUpdates::writableCollection(std::shared_ptr<Collection> collection) {

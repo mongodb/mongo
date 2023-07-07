@@ -81,8 +81,9 @@ UpdateResult update(OperationContext* opCtx,
                                            << "Not primary while creating collection "
                                            << nsString.toStringForErrorMsg() << " during upsert"));
             }
-            WriteUnitOfWork wuow(opCtx);
+
             ScopedLocalCatalogWriteFence scopedLocalCatalogWriteFence(opCtx, &coll);
+            WriteUnitOfWork wuow(opCtx);
             auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, coll.nss().dbName());
             auto newCollectionPtr = db->createCollection(opCtx, nsString, CollectionOptions());
             invariant(newCollectionPtr);

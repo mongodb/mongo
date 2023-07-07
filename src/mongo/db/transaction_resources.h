@@ -125,8 +125,7 @@ struct AcquiredCollection {
           collectionDescription(std::move(collectionDescription)),
           ownershipFilter(std::move(ownershipFilter)),
           collectionPtr(std::move(collectionPtr)),
-          invalidated(false),
-          sharedImpl(std::make_shared<SharedImpl>()) {}
+          invalidated(false) {}
 
     AcquiredCollection(AcquisitionPrerequisites prerequisites,
                        std::shared_ptr<Lock::DBLock> dbLock,
@@ -161,14 +160,6 @@ struct AcquiredCollection {
     // Maintains a reference count to how many references there are to this acquisition by the
     // CollectionAcquisition class.
     mutable int64_t refCount = 0;
-
-    // Used by the ScopedLocalCatalogWriteFence to track the lifetime of AcquiredCollection.
-    // ScopedLocalCatalogWriteFence will hold a weak_ptr pointing to 'sharedImpl'. The 'onRollback'
-    // handler it installs will use that weak_ptr to determine if the AcquiredCollection is still
-    // alive.
-    // TODO: (jordist) SERVER-XXXXX Rework this.
-    struct SharedImpl {};
-    std::shared_ptr<SharedImpl> sharedImpl;
 };
 
 struct AcquiredView {

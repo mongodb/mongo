@@ -201,22 +201,6 @@ void RecoveryUnit::_executeRollbackHandlers() {
               (_changes.empty() && _changesForCatalogVisibility.empty() &&
                _changesForTwoPhaseDrop.empty()));
     try {
-        // TODO SERVER-77425: Rollback handlers should execute in the reverse order of commit
-        // handlers. However, the ScopedLocalCatalogWriteFence currently expects the local catalog
-        // to already have been rolled back when it executes its own rollback handler. When this is
-        // fixed we should move the rollback handler for local catalog visibility last.
-        for (Changes::const_reverse_iterator it = _changesForCatalogVisibility.rbegin(),
-                                             end = _changesForCatalogVisibility.rend();
-             it != end;
-             ++it) {
-            Change* change = it->get();
-            LOGV2_DEBUG(5255702,
-                        2,
-                        "Custom rollback",
-                        "changeName"_attr = redact(demangleName(typeid(*change))));
-            change->rollback(_opCtx);
-        }
-
         for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
              it != end;
              ++it) {
@@ -234,6 +218,18 @@ void RecoveryUnit::_executeRollbackHandlers() {
              ++it) {
             Change* change = it->get();
             LOGV2_DEBUG(7789502,
+                        2,
+                        "Custom rollback",
+                        "changeName"_attr = redact(demangleName(typeid(*change))));
+            change->rollback(_opCtx);
+        }
+
+        for (Changes::const_reverse_iterator it = _changesForCatalogVisibility.rbegin(),
+                                             end = _changesForCatalogVisibility.rend();
+             it != end;
+             ++it) {
+            Change* change = it->get();
+            LOGV2_DEBUG(5255702,
                         2,
                         "Custom rollback",
                         "changeName"_attr = redact(demangleName(typeid(*change))));

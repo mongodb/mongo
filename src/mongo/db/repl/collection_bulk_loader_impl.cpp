@@ -102,12 +102,12 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
             "CollectionBulkLoader::init",
             _acquisition.nss(),
             [&secondaryIndexSpecs, this] {
+                CollectionWriter collWriter(_opCtx.get(), &_acquisition);
                 WriteUnitOfWork wuow(_opCtx.get());
                 // All writes in CollectionBulkLoaderImpl should be unreplicated.
                 // The opCtx is accessed indirectly through _secondaryIndexesBlock.
                 UnreplicatedWritesBlock uwb(_opCtx.get());
                 // This enforces the buildIndexes setting in the replica set configuration.
-                CollectionWriter collWriter(_opCtx.get(), &_acquisition);
                 auto indexCatalog =
                     collWriter.getWritableCollection(_opCtx.get())->getIndexCatalog();
                 auto specs = indexCatalog->removeExistingIndexesNoChecks(
@@ -266,8 +266,8 @@ Status CollectionBulkLoaderImpl::commit() {
 
             status =
                 writeConflictRetry(_opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss, [this] {
-                    WriteUnitOfWork wunit(_opCtx.get());
                     CollectionWriter collWriter(_opCtx.get(), &_acquisition);
+                    WriteUnitOfWork wunit(_opCtx.get());
                     auto status = _secondaryIndexesBlock->commit(
                         _opCtx.get(),
                         collWriter.getWritableCollection(_opCtx.get()),
@@ -344,8 +344,8 @@ Status CollectionBulkLoaderImpl::commit() {
             // deleted prior to this.
             status =
                 writeConflictRetry(_opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss, [this] {
-                    WriteUnitOfWork wunit(_opCtx.get());
                     CollectionWriter collWriter(_opCtx.get(), &_acquisition);
+                    WriteUnitOfWork wunit(_opCtx.get());
                     auto status =
                         _idIndexBlock->commit(_opCtx.get(),
                                               collWriter.getWritableCollection(_opCtx.get()),

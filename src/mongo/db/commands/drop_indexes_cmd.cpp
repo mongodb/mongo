@@ -266,8 +266,8 @@ public:
         StatusWith<std::vector<BSONObj>> swIndexesToRebuild(ErrorCodes::UnknownError,
                                                             "Uninitialized");
         writeConflictRetry(opCtx, "dropAllIndexes", toReIndexNss, [&] {
-            WriteUnitOfWork wunit(opCtx);
             CollectionWriter collection(opCtx, &acquisition);
+            WriteUnitOfWork wunit(opCtx);
             collection.getWritableCollection(opCtx)->getIndexCatalog()->dropAllIndexes(
                 opCtx, collection.getWritableCollection(opCtx), true, {});
 
@@ -299,8 +299,8 @@ public:
         uassertStatusOK(indexer->checkConstraints(opCtx, acquisition.getCollectionPtr()));
 
         writeConflictRetry(opCtx, "commitReIndex", toReIndexNss, [&] {
-            WriteUnitOfWork wunit(opCtx);
             CollectionWriter collection(opCtx, &acquisition);
+            WriteUnitOfWork wunit(opCtx);
             uassertStatusOK(indexer->commit(opCtx,
                                             collection.getWritableCollection(opCtx),
                                             MultiIndexBlock::kNoopOnCreateEachFn,

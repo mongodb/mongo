@@ -1822,43 +1822,6 @@ TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceWUOWCommitAfterWriterScope) {
     ASSERT(acquisition.getCollectionPtr()->isTemporary());
 }
 
-TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceWUOWRollbackWithinWriterScope) {
-    auto acquisition = acquireCollection(opCtx(),
-                                         {nssShardedCollection1,
-                                          PlacementConcern{{}, shardVersionShardedCollection1},
-                                          repl::ReadConcernArgs(),
-                                          AcquisitionPrerequisites::kRead},
-                                         MODE_X);
-    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
-
-    {
-        WriteUnitOfWork wuow(opCtx());
-        CollectionWriter localCatalogWriter(opCtx(), &acquisition);
-        localCatalogWriter.getWritableCollection(opCtx())->setIsTemp(opCtx(), true);
-    }
-    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
-}
-
-TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceWUOWRollbackAfterWriterScope) {
-    auto acquisition = acquireCollection(opCtx(),
-                                         {nssShardedCollection1,
-                                          PlacementConcern{{}, shardVersionShardedCollection1},
-                                          repl::ReadConcernArgs(),
-                                          AcquisitionPrerequisites::kRead},
-                                         MODE_X);
-    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
-
-    {
-        WriteUnitOfWork wuow(opCtx());
-        {
-            CollectionWriter localCatalogWriter(opCtx(), &acquisition);
-            localCatalogWriter.getWritableCollection(opCtx())->setIsTemp(opCtx(), true);
-        }
-        ASSERT(acquisition.getCollectionPtr()->isTemporary());
-    }
-    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
-}
-
 TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceOutsideWUOUCommit) {
     auto acquisition = acquireCollection(opCtx(),
                                          {nssShardedCollection1,

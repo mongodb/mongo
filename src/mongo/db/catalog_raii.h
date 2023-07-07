@@ -353,8 +353,8 @@ class ScopedLocalCatalogWriteFence;
  * AutoGetCollection. This class can serve as an adaptor to unify different methods of acquiring a
  * writable collection.
  *
- * It is safe to re-use an instance for multiple WriteUnitOfWorks or to destroy it before the active
- * WriteUnitOfWork finishes.
+ * It is safe to re-use an instance for multiple WriteUnitOfWorks. It is not safe to destroy it
+ * before the active WriteUnitOfWork finishes.
  */
 class CollectionWriter final {
 public:
@@ -362,7 +362,32 @@ public:
     // local DDL land and that the content of the local collection should not be trusted until it
     // goes out of scope.
     //
-    // See the comments on CollectionAcquisition for more details.
+    // On destruction, if `getWritableCollection` been called during the object lifetime, the
+    // `acquisition` will be advanced to reflect the local catalog changes. It is important that
+    // when this destructor is called, the WUOW under which the catalog changes have been performed
+    // has already been commited or rollbacked. If it hasn't and the WUOW later rollbacks, the
+    // acquisition is left in an invalid state and must not be used.
+    //
+    // Example usage pattern:
+    // writeConflictRetry {
+    //     auto coll = acquireCollection(...);
+    //     CollectionWriter collectionWriter(opCtx, &coll);
+    //     WriteUnitOfWork wuow();
+    //     collectionWriter.getWritableCollection().xxxx();
+    //     wouw.commit();
+    // }
+    //
+    // Example usage pattern when the acquisition is held higher up by the caller:
+    // auto coll = acquireCollection(...);
+    // ...
+    // writeConflictRetry {
+    //     // It is important that ~CollectionWriter will be executed after the ~WriteUnitOfWork
+    //     // commits or rollbacks.
+    //     CollectionWriter collectionWriter(opCtx, &coll);
+    //     WriteUnitOfWork wuow();
+    //     collectionWriter.getWritableCollection().xxxx();
+    //     wouw.commit();
+    // }
     //
     // TODO (SERVER-73766): Only this constructor should remain in use
     CollectionWriter(OperationContext* opCtx, CollectionAcquisition* acquisition);

@@ -1145,21 +1145,6 @@ ScopedLocalCatalogWriteFence::ScopedLocalCatalogWriteFence(OperationContext* opC
     // Clear the collectionPtr from the acquisition to indicate that it should not be used until
     // the caller is done with the DDL modifications
     _acquiredCollection->collectionPtr = CollectionPtr();
-
-    // OnCommit, there is nothing to do because the caller is not allowed to use the collection in
-    // the scope of the ScopedLocalCatalogWriteFence and the destructor will take care of updating
-    // the acquisition to point to the latest changed value.
-    std::weak_ptr<shard_role_details::AcquiredCollection::SharedImpl> sharedImplWeakPtr =
-        _acquiredCollection->sharedImpl;
-    opCtx->recoveryUnit()->onRollback(
-        [acquiredCollection = _acquiredCollection,
-         sharedImplWeakPtr = sharedImplWeakPtr](OperationContext* opCtx) mutable {
-            // OnRollback, the acquired collection must be set to reference the previously
-            // established catalog snapshot
-            if (!sharedImplWeakPtr.expired()) {
-                _updateAcquiredLocalCollection(opCtx, acquiredCollection);
-            }
-        });
 }
 
 ScopedLocalCatalogWriteFence::~ScopedLocalCatalogWriteFence() {

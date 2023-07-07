@@ -463,8 +463,9 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, CollectionAcquisitio
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
 
     _sharedImpl->_writableCollectionInitializer = [this, opCtx]() mutable {
-        invariant(!_fence);
-        _fence = std::make_unique<ScopedLocalCatalogWriteFence>(opCtx, _acquisition);
+        if (!_fence) {
+            _fence = std::make_unique<ScopedLocalCatalogWriteFence>(opCtx, _acquisition);
+        }
 
         return CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
             opCtx, _acquisition->nss());
@@ -543,7 +544,6 @@ Collection* CollectionWriter::getWritableCollection(OperationContext* opCtx) {
                 [shared = _sharedImpl](OperationContext* opCtx, boost::optional<Timestamp>) {
                     if (shared->_parent) {
                         shared->_parent->_writableCollection = nullptr;
-                        shared->_parent->_fence.reset();
 
                         // Make the stored collection yieldable again as we now operate with the
                         // same instance as is in the catalog.
@@ -555,7 +555,6 @@ Collection* CollectionWriter::getWritableCollection(OperationContext* opCtx) {
                     OperationContext* opCtx) mutable {
                     if (shared->_parent) {
                         shared->_parent->_writableCollection = nullptr;
-                        shared->_parent->_fence.reset();
 
                         // Restore stored collection to its previous state. The rollback
                         // instance is already yieldable.
