@@ -117,20 +117,24 @@ using ResolvedNamespaceOrViewAcquisitionRequestsMap =
 void validateResolvedCollectionByUUID(OperationContext* opCtx,
                                       CollectionOrViewAcquisitionRequest ar,
                                       const Collection* coll) {
+    invariant(ar.nssOrUUID.isUUID());
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Namespace " << (*ar.dbname).toStringForErrorMsg() << ":" << *ar.uuid
-                          << " not found",
+            str::stream() << "Namespace " << ar.nssOrUUID.dbName().toStringForErrorMsg() << ":"
+                          << ar.nssOrUUID.uuid() << " not found",
             coll);
     auto shardVersion = OperationShardingState::get(opCtx).getShardVersion(coll->ns());
     uassert(ErrorCodes::IncompatibleShardingMetadata,
-            str::stream() << "Collection " << (*ar.dbname).toStringForErrorMsg() << ":" << *ar.uuid
+            str::stream() << "Collection " << ar.nssOrUUID.dbName().toStringForErrorMsg() << ":"
+                          << ar.nssOrUUID.uuid()
                           << " acquired by UUID has a ShardVersion attached.",
             !shardVersion || shardVersion == ShardVersion::UNSHARDED());
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Database name mismatch for " << (*ar.dbname).toStringForErrorMsg()
-                          << ":" << *ar.uuid << ". Expected: " << (*ar.dbname).toStringForErrorMsg()
+            str::stream() << "Database name mismatch for "
+                          << ar.nssOrUUID.dbName().toStringForErrorMsg() << ":"
+                          << ar.nssOrUUID.uuid()
+                          << ". Expected: " << ar.nssOrUUID.dbName().toStringForErrorMsg()
                           << " Actual: " << coll->ns().dbName().toStringForErrorMsg(),
-            coll->ns().dbName() == *ar.dbname);
+            coll->ns().dbName() == ar.nssOrUUID.dbName());
 }
 
 /**
@@ -145,9 +149,9 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
     ResolvedNamespaceOrViewAcquisitionRequestsMap sortedAcquisitionRequests;
 
     for (const auto& ar : acquisitionRequests) {
-        if (ar.nss) {
-            AcquisitionPrerequisites prerequisites(*ar.nss,
-                                                   ar.uuid,
+        if (ar.nssOrUUID.isNamespaceString()) {
+            AcquisitionPrerequisites prerequisites(ar.nssOrUUID.nss(),
+                                                   ar.expectedUUID,
                                                    ar.readConcern,
                                                    ar.placementConcern,
                                                    ar.operationType,
@@ -156,10 +160,10 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
             ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
                 prerequisites, ResolutionType::kNamespace, nullptr, boost::none};
 
-            sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, *ar.nss),
+            sortedAcquisitionRequests.emplace(ResourceId(RESOURCE_COLLECTION, ar.nssOrUUID.nss()),
                                               std::move(resolvedAcquisitionRequest));
-        } else if (ar.dbname) {
-            auto coll = catalog.lookupCollectionByUUID(opCtx, *ar.uuid);
+        } else if (ar.nssOrUUID.isUUID()) {
+            auto coll = catalog.lookupCollectionByUUID(opCtx, ar.nssOrUUID.uuid());
 
             validateResolvedCollectionByUUID(opCtx, ar, coll);
 
@@ -434,27 +438,23 @@ std::vector<NamespaceStringOrUUID> toNamespaceStringOrUUIDs(
     const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
     std::vector<NamespaceStringOrUUID> requests;
     for (const auto& ar : acquisitionRequests) {
-        if (ar.nss) {
-            requests.emplace_back(*ar.nss);
-        } else {
-            requests.emplace_back(*ar.dbname, *ar.uuid);
-        }
+        requests.emplace_back(ar.nssOrUUID);
     }
     return requests;
 }
 
 void validateRequests(const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
     for (const auto& ar : acquisitionRequests) {
-        if (ar.nss) {
+        if (ar.nssOrUUID.isNamespaceString()) {
             uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Namespace " << ar.nss->toStringForErrorMsg()
+                    str::stream() << "Namespace " << ar.nssOrUUID.nss().toStringForErrorMsg()
                                   << "is not a valid collection name",
-                    ar.nss->isValid());
-        } else if (ar.dbname) {
-            invariant(ar.uuid);
+                    ar.nssOrUUID.nss().isValid());
+        } else if (ar.nssOrUUID.isUUID()) {
             uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid db name " << ar.dbname->toStringForErrorMsg(),
-                    NamespaceString::validDBName(*ar.dbname,
+                    str::stream() << "Invalid db name "
+                                  << ar.nssOrUUID.dbName().toStringForErrorMsg(),
+                    NamespaceString::validDBName(ar.nssOrUUID.dbName(),
                                                  NamespaceString::DollarInDbNameBehavior::Allow));
         } else {
             MONGO_UNREACHABLE;
@@ -468,8 +468,8 @@ void checkShardingPlacement(
     for (const auto& ar : acquisitionRequests) {
         // We only have to check placement for collections that come from a router, which
         // will have the namespace set.
-        if (ar.nss) {
-            checkPlacementVersion(opCtx, *ar.nss, ar.placementConcern);
+        if (ar.nssOrUUID.isNamespaceString()) {
+            checkPlacementVersion(opCtx, ar.nssOrUUID.nss(), ar.placementConcern);
         }
     }
 }
@@ -911,21 +911,23 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap generateSortedAcquisitionRequests(
 
     int counter = 0;
     for (const auto& ar : acquisitionRequests) {
-        auto resolvedBy = ar.nss ? ResolutionType::kNamespace : ResolutionType::kUUID;
+        const auto resolvedBy =
+            ar.nssOrUUID.isNamespaceString() ? ResolutionType::kNamespace : ResolutionType::kUUID;
+        auto coll = catalog.establishConsistentCollection(opCtx, ar.nssOrUUID, readTimestamp);
 
-        NamespaceStringOrUUID nssOrUUID = resolvedBy == ResolutionType::kNamespace
-            ? NamespaceStringOrUUID(*ar.nss)
-            : NamespaceStringOrUUID(*ar.dbname, *ar.uuid);
-
-        auto coll = catalog.establishConsistentCollection(opCtx, nssOrUUID, readTimestamp);
-
-        if (resolvedBy == ResolutionType::kUUID) {
+        if (ar.nssOrUUID.isUUID()) {
             validateResolvedCollectionByUUID(opCtx, ar, coll);
         }
 
-        const auto& nss = resolvedBy == ResolutionType::kNamespace ? *ar.nss : coll->ns();
-        AcquisitionPrerequisites prerequisites(
-            nss, ar.uuid, ar.readConcern, ar.placementConcern, ar.operationType, ar.viewMode);
+        const auto& nss = ar.nssOrUUID.isNamespaceString() ? ar.nssOrUUID.nss() : coll->ns();
+        const auto& prerequisiteUUID =
+            ar.nssOrUUID.isUUID() ? ar.nssOrUUID.uuid() : ar.expectedUUID;
+        AcquisitionPrerequisites prerequisites(nss,
+                                               prerequisiteUUID,
+                                               ar.readConcern,
+                                               ar.placementConcern,
+                                               ar.operationType,
+                                               ar.viewMode);
 
         ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
             prerequisites, resolvedBy, nullptr, boost::none, lockFreeReadsResources};
