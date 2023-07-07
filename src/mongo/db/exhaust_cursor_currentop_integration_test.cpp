@@ -78,7 +78,7 @@ public:
             constexpr int numDocs = 3000;
             constexpr int strSize = 16 * 1024;
             for (int i = 0; i < numDocs; i++) {
-                std::string bigString("A", strSize);
+                std::string bigString(strSize, 'A');
                 auto insertCmd =
                     BSON("insert" << testNSS.coll() << "documents"
                                   << BSON_ARRAY(BSON("a" << i << "data" << bigString)));
