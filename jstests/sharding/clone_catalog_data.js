@@ -115,10 +115,12 @@ TestData.skipCheckMetadataConsistency = true;
         var indexes = res.cursor.firstBatch;
         indexes.sort(sortByName);
 
-        // TODO SERVER-74252: once 7.0 becomes LastLTS we can assume that the movePrimary will never
-        // copy indexes of sharded collections.
+        // For each unsharded collection, there should be a total of 3 indexes - one for the _id
+        // field and the other two that we have created. However, in the case of sharded
+        // collections, only the _id index is present. When cloning sharded collections, indexes are
+        // not copied.
         if (shardedColl)
-            assert(indexes.length === 1 || indexes.length === 3);
+            assert(indexes.length === 1);
         else
             assert(indexes.length === 3);
 

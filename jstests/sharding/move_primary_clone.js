@@ -58,10 +58,12 @@ function checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, barUUID, f
         var indexes = res.cursor.firstBatch;
         indexes.sort(sortByName);
 
-        // TODO SERVER-74252: once 7.0 becomes LastLTS we can assume that the movePrimary will never
-        // copy indexes of sharded collections.
+        // For each unsharded collection, there should be a total of 2 indexes - one for the _id
+        // field and the other we have created. However, in the case of sharded collections, only
+        // the _id index is present. When running movePrimary, indexes of sharded collections are
+        // not copied.
         if (sharded)
-            assert(indexes.length == 1 || indexes.length == 2);
+            assert(indexes.length == 1);
         else
             assert(indexes.length == 2);
 
