@@ -187,6 +187,20 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTxnNumberAndTxnUUID) {
     ASSERT_EQ(lsid.getUid(), user->getDigest());
     ASSERT_EQ(*lsid.getTxnNumber(), txnNumber);
     ASSERT_EQ(*lsid.getTxnUUID(), txnUUID);
+
+    // Convert back to LogicalSessionFromClient through OperationSessionInfoFromClient and verify it
+    // matches the original LogicalSessionFromClient and LogicalSessionId.
+    OperationSessionInfoFromClient osiFromClient{lsid, boost::none};
+    auto& req2 = *osiFromClient.getSessionId();
+
+    ASSERT_EQ(req2.getId(), req.getId());
+    ASSERT_EQ(*req2.getTxnNumber(), *req.getTxnNumber());
+    ASSERT_EQ(*req2.getTxnUUID(), *req.getTxnUUID());
+
+    ASSERT_EQ(req2.getId(), lsid.getId());
+    ASSERT_EQ(req2.getUid(), lsid.getUid());
+    ASSERT_EQ(*req2.getTxnNumber(), *lsid.getTxnNumber());
+    ASSERT_EQ(*req2.getTxnUUID(), *lsid.getTxnUUID());
 }
 
 TEST_F(LogicalSessionIdTest, ConstructorFromClientWithoutPassedUidAndWithoutAuthedUser) {

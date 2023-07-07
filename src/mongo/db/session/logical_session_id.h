@@ -206,9 +206,6 @@ public:
     OperationSessionInfoFromClient() = default;
     OperationSessionInfoFromClient(LogicalSessionFromClient lsidFromClient);
 
-    // TODO (SERVER-77506): This constructor performs incomplete conversion from LogicalSessionId to
-    // LogicalSessionFromClient which is what this class expects. The current usages are only in
-    // ClusterClientCursorParams.
     OperationSessionInfoFromClient(LogicalSessionId lsid, boost::optional<TxnNumber> txnNumber);
 
     explicit OperationSessionInfoFromClient(OperationSessionInfoFromClientBase other)
