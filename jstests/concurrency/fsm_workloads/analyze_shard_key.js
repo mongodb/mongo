@@ -971,7 +971,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         const rand = Math.random();
         if (rand < 0.25) {
             cmdObj.sampleRate = Math.random() * 0.5 + 0.5;
-        } else if (rand < 0.25) {
+        } else if (rand < 0.5) {
             cmdObj.sampleSize =
                 NumberLong(Math.floor(Math.random() * 1.5 * this.numInitialDocuments));
         }
@@ -1101,7 +1101,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         } catch (e) {
             if (!this.isAcceptableUpdateError(res) &&
                 !(res.hasOwnProperty("writeErrors") &&
-                  isAcceptableUpdateError(res.writeErrors[0]))) {
+                  this.isAcceptableUpdateError(res.writeErrors[0]))) {
                 throw e;
             }
         }
