@@ -155,12 +155,14 @@ class TestHistoricTaskData(unittest.TestCase):
                 "num_pass": 74,
                 "num_fail": 0,
                 "avg_duration_pass": 23.16216216216216,
+                "max_duration_pass": 27.123,
             },
             {
                 "test_name": "shell_advance_cluster_time:ValidateCollections",
                 "num_pass": 74,
                 "num_fail": 0,
                 "avg_duration_pass": 1.662162162162162,
+                "max_duration_pass": 100.0987,
             },
         ]
         mock_get.return_value = mock_response
@@ -173,12 +175,14 @@ class TestHistoricTaskData(unittest.TestCase):
                 num_pass=74,
                 num_fail=0,
                 avg_duration_pass=23.16216216216216,
+                max_duration_pass=27.123,
             ),
             under_test.HistoricalTestInformation(
                 test_name="shell_advance_cluster_time:ValidateCollections",
                 num_pass=74,
                 num_fail=0,
                 avg_duration_pass=1.662162162162162,
+                max_duration_pass=100.0987,
             ),
         ])
 
