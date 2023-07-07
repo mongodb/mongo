@@ -5,9 +5,9 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   featureFlagTimeseriesUpdatesSupport,
- *   # TODO SERVER-76454 Remove the following two tags.
- *   does_not_support_retryable_writes,
- *   requires_non_retryable_writes,
+ *   # Internal transaction api might not handle stepdowns correctly and time-series retryable
+ *   # updates use internal transaction api.
+ *   does_not_support_stepdowns
  * ]
  */
 

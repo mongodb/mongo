@@ -10,8 +10,9 @@
  *   requires_persistence,
  *   # TODO SERVER-66393 Remove this tag.
  *   featureFlagTimeseriesUpdatesSupport,
- *   # TODO SERVER-73726 Remove this tag.
- *   assumes_unsharded_collection,
+ *   # Internal transaction api might not handle stepdowns correctly and time-series retryable
+ *   # updates use internal transaction api.
+ *   does_not_support_stepdowns
  * ]
  */
 
@@ -24,7 +25,6 @@ import {
     timeFieldName
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 import {getExecutionStages, getPlanStage} from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dateTime = ISODate("2021-07-12T16:00:00Z");
 
@@ -188,106 +188,106 @@ function testUpdateExplain({
     });
 })();
 
-(function testUpsert() {
-    testUpdateExplain({
-        singleUpdateOp: {
-            q: {[metaFieldName]: 100},
-            u: {$set: {[timeFieldName]: dateTime}},
-            multi: true,
-            upsert: true,
-        },
-        expectedUpdateStageName: "TS_MODIFY",
-        expectedOpType: "updateMany",
-        expectedBucketFilter: makeBucketFilter({meta: {$eq: 100}}),
-        expectedResidualFilter: {},
-        expectedNumUpdated: 0,
-        expectedNumMatched: 0,
-        expectedNumUnpacked: 0,
-        expectedNumUpserted: 1,
-    });
-})();
-
-(function testUpsertNoop() {
-    testUpdateExplain({
-        singleUpdateOp: {
-            q: {[metaFieldName]: 1},
-            u: {$set: {f: 10}},
-            multi: true,
-            upsert: true,
-        },
-        expectedUpdateStageName: "TS_MODIFY",
-        expectedOpType: "updateMany",
-        expectedBucketFilter: makeBucketFilter({meta: {$eq: 1}}),
-        expectedResidualFilter: {},
-        expectedNumUpdated: 2,
-        expectedNumMatched: 2,
-        expectedNumUnpacked: 1,
-        expectedNumUpserted: 0,
-    });
-})();
-
-// TODO SERVER-73726 Reevaluate whether this exclusion is needed.
-if (FeatureFlagUtil.isPresentAndEnabled(db, "UpdateOneWithoutShardKey")) {
-    (function testUpdateOneWithEmptyBucketFilter() {
+// Skip upsert tests in sharding as the query has to be on the shard key field.
+if (!db.getMongo().isMongos()) {
+    (function testUpsert() {
         testUpdateExplain({
             singleUpdateOp: {
-                // The non-meta field filter leads to a COLLSCAN below the TS_MODIFY stage and so
-                // 'expectedNumUnpacked' is 2.
-                q: {_id: 3},
-                u: {$set: {[metaFieldName]: 3}},
-                multi: false,
+                q: {[metaFieldName]: 100},
+                u: {$set: {[timeFieldName]: dateTime}},
+                multi: true,
+                upsert: true,
             },
             expectedUpdateStageName: "TS_MODIFY",
-            expectedOpType: "updateOne",
-            expectedBucketFilter: makeBucketFilter({
-                $and: [
-                    {"control.min._id": {$_internalExprLte: 3}},
-                    {"control.max._id": {$_internalExprGte: 3}}
-                ]
-            }),
-            expectedResidualFilter: {_id: {$eq: 3}},
-            expectedNumUpdated: 1,
-            expectedNumUnpacked: 1
+            expectedOpType: "updateMany",
+            expectedBucketFilter: makeBucketFilter({meta: {$eq: 100}}),
+            expectedResidualFilter: {},
+            expectedNumUpdated: 0,
+            expectedNumMatched: 0,
+            expectedNumUnpacked: 0,
+            expectedNumUpserted: 1,
         });
     })();
 
-    (function testUpdateOneWithBucketFilter() {
+    (function testUpsertNoop() {
         testUpdateExplain({
             singleUpdateOp: {
-                // The meta field filter leads to a FETCH/IXSCAN below the TS_MODIFY stage and so
-                // 'expectedNumUnpacked' is exactly 1.
-                q: {[metaFieldName]: 2, _id: {$gte: 1}},
-                u: {$set: {[metaFieldName]: 3}},
-                multi: false,
+                q: {[metaFieldName]: 1},
+                u: {$set: {f: 10}},
+                multi: true,
+                upsert: true,
             },
             expectedUpdateStageName: "TS_MODIFY",
-            expectedOpType: "updateOne",
-            expectedBucketFilter:
-                makeBucketFilter({meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 1}}),
-            expectedResidualFilter: {_id: {$gte: 1}},
-            expectedNumUpdated: 1,
-            expectedNumUnpacked: 1
-        });
-    })();
-
-    (function testUpdateOneWithBucketFilterAndIndexHint() {
-        testUpdateExplain({
-            singleUpdateOp: {
-                // The meta field filter leads to a FETCH/IXSCAN below the TS_MODIFY stage and so
-                // 'expectedNumUnpacked' is exactly 1.
-                q: {[metaFieldName]: 2, _id: {$gte: 1}},
-                u: {$set: {[metaFieldName]: 3}},
-                multi: false,
-                hint: {[metaFieldName]: 1}
-            },
-            expectedUpdateStageName: "TS_MODIFY",
-            expectedOpType: "updateOne",
-            expectedBucketFilter:
-                makeBucketFilter({meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 1}}),
-            expectedResidualFilter: {_id: {$gte: 1}},
-            expectedNumUpdated: 1,
+            expectedOpType: "updateMany",
+            expectedBucketFilter: makeBucketFilter({meta: {$eq: 1}}),
+            expectedResidualFilter: {},
+            expectedNumUpdated: 2,
+            expectedNumMatched: 2,
             expectedNumUnpacked: 1,
-            expectedUsedIndexName: metaFieldName + "_1"
+            expectedNumUpserted: 0,
         });
     })();
 }
+
+(function testUpdateOneWithEmptyBucketFilter() {
+    testUpdateExplain({
+        singleUpdateOp: {
+            // The non-meta field filter leads to a COLLSCAN below the TS_MODIFY stage and so
+            // 'expectedNumUnpacked' is 2.
+            q: {_id: 3},
+            u: {$set: {[metaFieldName]: 3}},
+            multi: false,
+        },
+        expectedUpdateStageName: "TS_MODIFY",
+        expectedOpType: "updateOne",
+        expectedBucketFilter: makeBucketFilter({
+            $and: [
+                {"control.min._id": {$_internalExprLte: 3}},
+                {"control.max._id": {$_internalExprGte: 3}}
+            ]
+        }),
+        expectedResidualFilter: {_id: {$eq: 3}},
+        expectedNumUpdated: 1,
+        expectedNumUnpacked: 1
+    });
+})();
+
+(function testUpdateOneWithBucketFilter() {
+    testUpdateExplain({
+        singleUpdateOp: {
+            // The meta field filter leads to a FETCH/IXSCAN below the TS_MODIFY stage and so
+            // 'expectedNumUnpacked' is exactly 1.
+            q: {[metaFieldName]: 2, _id: {$gte: 1}},
+            u: {$set: {[metaFieldName]: 3}},
+            multi: false,
+        },
+        expectedUpdateStageName: "TS_MODIFY",
+        expectedOpType: "updateOne",
+        expectedBucketFilter:
+            makeBucketFilter({meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 1}}),
+        expectedResidualFilter: {_id: {$gte: 1}},
+        expectedNumUpdated: 1,
+        expectedNumUnpacked: 1
+    });
+})();
+
+(function testUpdateOneWithBucketFilterAndIndexHint() {
+    testUpdateExplain({
+        singleUpdateOp: {
+            // The meta field filter leads to a FETCH/IXSCAN below the TS_MODIFY stage and so
+            // 'expectedNumUnpacked' is exactly 1.
+            q: {[metaFieldName]: 2, _id: {$gte: 1}},
+            u: {$set: {[metaFieldName]: 3}},
+            multi: false,
+            hint: {[metaFieldName]: 1}
+        },
+        expectedUpdateStageName: "TS_MODIFY",
+        expectedOpType: "updateOne",
+        expectedBucketFilter:
+            makeBucketFilter({meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 1}}),
+        expectedResidualFilter: {_id: {$gte: 1}},
+        expectedNumUpdated: 1,
+        expectedNumUnpacked: 1,
+        expectedUsedIndexName: metaFieldName + "_1"
+    });
+})();
