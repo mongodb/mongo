@@ -233,6 +233,8 @@ struct __wt_backup_target {
 };
 typedef TAILQ_HEAD(__wt_backuphash, __wt_backup_target) WT_BACKUPHASH;
 
+extern const WT_NAME_FLAG __wt_stress_types[];
+
 /*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION

@@ -202,17 +202,25 @@ __wt_spin_backoff(uint64_t *yield_count, uint64_t *sleep_usecs)
  *     Optionally add delay to stress code paths.
  */
 static inline void
-__wt_timing_stress(WT_SESSION_IMPL *session, u_int flag, struct timespec *tsp)
+__wt_timing_stress(WT_SESSION_IMPL *session, uint32_t flag)
 {
-    /* Optionally only sleep when a specified configuration flag is set. */
+#ifdef ENABLE_ANTHITHESIS
+    const WT_NAME_FLAG *ft;
+#endif
+
+    /* If the specified flag isn't set, we're done. */
     if (flag != 0 && !FLD_ISSET(S2C(session)->timing_stress_flags, flag))
         return;
 
-    /* If a delay is provided then use that delay otherwise sleep for a random time. */
-    if (tsp != NULL)
-        __wt_sleep((uint64_t)tsp->tv_sec, (uint64_t)tsp->tv_nsec / WT_THOUSAND);
-    else
-        __wt_timing_stress_sleep_random(session);
+#ifdef ENABLE_ANTHITHESIS
+    for (ft = __wt_stress_types; ft->name != NULL; ft++)
+        if (ft->flag == flag) {
+            (void)__wt_msg(session, "ANTITHESIS: %s", ft->name);
+            break;
+        }
+#else
+    __wt_timing_stress_sleep_random(session);
+#endif
 }
 
 /* Maximum stress delay is 1/10 of a second. */

@@ -12,6 +12,46 @@ WT_PROCESS __wt_process;             /* Per-process structure */
 static int __wt_pthread_once_failed; /* If initialization failed */
 
 /*
+ * This is the list of the timing stress configuration names and flags. It is a global structure
+ * instead of declared in the config function so that other functions can use the name/flag
+ * association.
+ */
+const WT_NAME_FLAG __wt_stress_types[] = {
+  /*
+   * Each split race delay is controlled using a different flag to allow more effective race
+   * condition detection, since enabling all delays at once can lead to an overall slowdown to the
+   * point where race conditions aren't encountered.
+   *
+   * Fail points are also defined in this list and will occur randomly when enabled.
+   */
+  {"aggressive_stash_free", WT_TIMING_STRESS_AGGRESSIVE_STASH_FREE},
+  {"aggressive_sweep", WT_TIMING_STRESS_AGGRESSIVE_SWEEP},
+  {"backup_rename", WT_TIMING_STRESS_BACKUP_RENAME},
+  {"checkpoint_evict_page", WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE},
+  {"checkpoint_handle", WT_TIMING_STRESS_CHECKPOINT_HANDLE},
+  {"checkpoint_slow", WT_TIMING_STRESS_CHECKPOINT_SLOW},
+  {"checkpoint_stop", WT_TIMING_STRESS_CHECKPOINT_STOP},
+  {"compact_slow", WT_TIMING_STRESS_COMPACT_SLOW},
+  {"evict_reposition", WT_TIMING_STRESS_EVICT_REPOSITION},
+  {"failpoint_eviction_fail_after_reconciliation",
+    WT_TIMING_STRESS_FAILPOINT_EVICTION_FAIL_AFTER_RECONCILIATION},
+  {"failpoint_history_delete_key_from_ts",
+    WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS},
+  {"history_store_checkpoint_delay", WT_TIMING_STRESS_HS_CHECKPOINT_DELAY},
+  {"history_store_search", WT_TIMING_STRESS_HS_SEARCH},
+  {"history_store_sweep_race", WT_TIMING_STRESS_HS_SWEEP},
+  {"prefix_compare", WT_TIMING_STRESS_PREFIX_COMPARE},
+  {"prepare_checkpoint_delay", WT_TIMING_STRESS_PREPARE_CHECKPOINT_DELAY},
+  {"prepare_resolution_1", WT_TIMING_STRESS_PREPARE_RESOLUTION_1},
+  {"prepare_resolution_2", WT_TIMING_STRESS_PREPARE_RESOLUTION_2},
+  {"sleep_before_read_overflow_onpage", WT_TIMING_STRESS_SLEEP_BEFORE_READ_OVERFLOW_ONPAGE},
+  {"split_1", WT_TIMING_STRESS_SPLIT_1}, {"split_2", WT_TIMING_STRESS_SPLIT_2},
+  {"split_3", WT_TIMING_STRESS_SPLIT_3}, {"split_4", WT_TIMING_STRESS_SPLIT_4},
+  {"split_5", WT_TIMING_STRESS_SPLIT_5}, {"split_6", WT_TIMING_STRESS_SPLIT_6},
+  {"split_7", WT_TIMING_STRESS_SPLIT_7}, {"split_8", WT_TIMING_STRESS_SPLIT_8},
+  {"tiered_flush_finish", WT_TIMING_STRESS_TIERED_FLUSH_FINISH}, {NULL, 0}};
+
+/*
  * __endian_check --
  *     Check the build matches the machine.
  */

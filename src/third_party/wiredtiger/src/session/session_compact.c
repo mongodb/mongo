@@ -259,7 +259,7 @@ __compact_worker(WT_SESSION_IMPL *session)
             if (session->op_handle[i]->compact_skip)
                 continue;
 
-            __wt_timing_stress(session, WT_TIMING_STRESS_COMPACT_SLOW, NULL);
+            __wt_timing_stress(session, WT_TIMING_STRESS_COMPACT_SLOW);
             __wt_verbose_debug2(
               session, WT_VERB_COMPACT, "%s: compact pass %u", session->op_handle[i]->name, loop);
 

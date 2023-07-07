@@ -1264,7 +1264,7 @@ __cell_data_ref(WT_SESSION_IMPL *session, WT_PAGE *page, int page_type,
          * Encourage checkpoint to race with reading the onpage value. If we have an overflow item,
          * it may be removed by checkpoint concurrently.
          */
-        __wt_timing_stress(session, WT_TIMING_STRESS_SLEEP_BEFORE_READ_OVERFLOW_ONPAGE, NULL);
+        __wt_timing_stress(session, WT_TIMING_STRESS_SLEEP_BEFORE_READ_OVERFLOW_ONPAGE);
         WT_RET(__wt_ovfl_read(session, page, unpack, store, &decoded));
         if (decoded)
             return (0);
