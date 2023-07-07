@@ -765,16 +765,6 @@ public:
         storage().makeOwned();
     }
 
-    /**
-     * Creates a new document storage with the BSON object. Setting 'bsonHasMetadata' to true
-     * signals that the BSON object contains metadata fields (the complete list is in
-     * Document::allMetadataFieldNames).
-     */
-    DocumentStorage& newStorageWithBson(const BSONObj& bson, bool bsonHasMetadata) {
-        reset(make_intrusive<DocumentStorage>(bson, bsonHasMetadata, false, 0));
-        return const_cast<DocumentStorage&>(*storagePtr());
-    }
-
 private:
     friend class MutableValue;  // for access to next constructor
     explicit MutableDocument(MutableValue mv) : _storageHolder(nullptr), _storage(mv.getDocPtr()) {}

@@ -421,6 +421,7 @@ void DocumentStorage::reset(const BSONObj& bson, bool bsonHasMetadata) {
 
     // Clean metadata.
     _metadataFields = DocumentMetadataFields{};
+    _metadataFields.setModified(false);
 }
 
 void DocumentStorage::fillCache() const {
@@ -488,7 +489,7 @@ void DocumentStorage::loadLazyMetadata() const {
 
 Document::Document(const BSONObj& bson) {
     MutableDocument md;
-    md.newStorageWithBson(bson, false);
+    md.reset(bson, false);
 
     *this = md.freeze();
 }
@@ -582,7 +583,7 @@ void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
 
 Document Document::fromBsonWithMetaData(const BSONObj& bson) {
     MutableDocument md;
-    md.newStorageWithBson(bson, true);
+    md.reset(bson, true);
 
     return md.freeze();
 }
