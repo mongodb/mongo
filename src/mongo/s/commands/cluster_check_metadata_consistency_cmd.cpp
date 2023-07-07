@@ -180,7 +180,9 @@ public:
             ClusterClientCursorParams params(
                 nss,
                 APIParameters::get(opCtx),
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()),
+                boost::none /* repl::ReadConcernArgs */,
+                OperationSessionInfoFromClient());
 
             // Establish the cursors with a consistent shardVersion across shards.
             params.remotes = establishCursors(

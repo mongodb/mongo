@@ -27,12 +27,9 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
+#include "mongo/s/transaction_router.h"
 
 #include <fmt/format.h>
-
-#include "mongo/s/transaction_router.h"
 
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
@@ -63,7 +60,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
-
 namespace mongo {
 namespace {
 
@@ -77,78 +73,6 @@ const char kCoordinatorField[] = "coordinator";
 const char kReadConcernLevelSnapshotName[] = "snapshot";
 
 const auto getTransactionRouter = Session::declareDecoration<TransactionRouter>();
-
-/**
- * Attaches the given atClusterTime to the readConcern object in the given command object, removing
- * afterClusterTime if present. Assumes the given command object has a readConcern field and has
- * readConcern level snapshot.
- */
-BSONObj appendAtClusterTimeToReadConcern(BSONObj cmdObj, LogicalTime atClusterTime) {
-    dassert(cmdObj.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
-
-    BSONObjBuilder cmdAtClusterTimeBob;
-    for (auto&& elem : cmdObj) {
-        if (elem.fieldNameStringData() == repl::ReadConcernArgs::kReadConcernFieldName) {
-            BSONObjBuilder readConcernBob =
-                cmdAtClusterTimeBob.subobjStart(repl::ReadConcernArgs::kReadConcernFieldName);
-            for (auto&& rcElem : elem.Obj()) {
-                // afterClusterTime cannot be specified with atClusterTime.
-                if (rcElem.fieldNameStringData() !=
-                    repl::ReadConcernArgs::kAfterClusterTimeFieldName) {
-                    readConcernBob.append(rcElem);
-                }
-            }
-
-            dassert(readConcernBob.hasField(repl::ReadConcernArgs::kLevelFieldName) &&
-                    readConcernBob.asTempObj()[repl::ReadConcernArgs::kLevelFieldName].String() ==
-                        kReadConcernLevelSnapshotName);
-
-            readConcernBob.append(repl::ReadConcernArgs::kAtClusterTimeFieldName,
-                                  atClusterTime.asTimestamp());
-        } else {
-            cmdAtClusterTimeBob.append(elem);
-        }
-    }
-
-    return cmdAtClusterTimeBob.obj();
-}
-
-BSONObj appendReadConcernForTxn(BSONObj cmd,
-                                repl::ReadConcernArgs readConcernArgs,
-                                boost::optional<LogicalTime> atClusterTime) {
-    // Check for an existing read concern. The first statement in a transaction may already have
-    // one, in which case its level should always match the level of the transaction's readConcern.
-    if (cmd.hasField(repl::ReadConcernArgs::kReadConcernFieldName)) {
-        repl::ReadConcernArgs existingReadConcernArgs;
-        dassert(existingReadConcernArgs.initialize(cmd));
-        dassert(existingReadConcernArgs.getLevel() == readConcernArgs.getLevel());
-
-        return atClusterTime ? appendAtClusterTimeToReadConcern(std::move(cmd), *atClusterTime)
-                             : cmd;
-    }
-
-    BSONObjBuilder bob(std::move(cmd));
-    readConcernArgs.appendInfo(&bob);
-
-    return atClusterTime ? appendAtClusterTimeToReadConcern(bob.asTempObj(), *atClusterTime)
-                         : bob.obj();
-}
-
-BSONObjBuilder appendFieldsForStartTransaction(BSONObj cmd,
-                                               repl::ReadConcernArgs readConcernArgs,
-                                               boost::optional<LogicalTime> atClusterTime,
-                                               bool doAppendStartTransaction) {
-    // startTransaction: true always requires readConcern, even if it's empty.
-    auto cmdWithReadConcern =
-        appendReadConcernForTxn(std::move(cmd), readConcernArgs, atClusterTime);
-
-    BSONObjBuilder bob(std::move(cmdWithReadConcern));
-    if (doAppendStartTransaction) {
-        bob.append(OperationSessionInfoFromClient::kStartTransactionFieldName, true);
-    }
-
-    return bob;
-}
 
 // Commands that are idempotent in a transaction context and can be blindly retried in the middle of
 // a transaction. Writing aggregates (e.g. with a $out or $merge) is disallowed in a transaction, so
@@ -261,7 +185,7 @@ std::string actionTypeToString(TransactionRouter::TransactionActions action) {
     MONGO_UNREACHABLE;
 }
 
-}  // unnamed namespace
+}  // namespace
 
 TransactionRouter::TransactionRouter() = default;
 
@@ -605,13 +529,8 @@ bool TransactionRouter::AtClusterTime::canChange(StmtId currentStmtId) const {
     return !_stmtIdSelectedAt || *_stmtIdSelectedAt == currentStmtId;
 }
 
-bool TransactionRouter::Router::mustUseAtClusterTime() const {
-    return o().atClusterTime.has_value();
-}
-
-LogicalTime TransactionRouter::Router::getSelectedAtClusterTime() const {
-    invariant(o().atClusterTime);
-    return o().atClusterTime->getTime();
+boost::optional<LogicalTime> TransactionRouter::Router::getSelectedAtClusterTime() const {
+    return o().atClusterTime ? boost::make_optional(o().atClusterTime->getTime()) : boost::none;
 }
 
 const boost::optional<ShardId>& TransactionRouter::Router::getCoordinatorId() const {
@@ -910,10 +829,8 @@ void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx, const S
     invariant(o().participants.empty());
     invariant(!o().coordinatorId);
 
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
-
     // Reset the global snapshot timestamp so the retry will select a new one.
-    o(lk).atClusterTime.reset();
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
     o(lk).atClusterTime.emplace();
 }
 
@@ -1510,11 +1427,10 @@ void TransactionRouter::Router::_resetRouterStateForStartTransaction(
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).apiParameters = APIParameters::get(opCtx);
         o(lk).readConcernArgs = readConcernArgs;
-    }
 
-    if (o().readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        o(lk).atClusterTime.emplace();
+        if (o().readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+            o(lk).atClusterTime.emplace();
+        }
     }
 
     LOGV2_DEBUG(22889,
@@ -1578,7 +1494,8 @@ void TransactionRouter::Router::_logSlowTransaction(OperationContext* opCtx,
 
     attrs.add("parameters", parametersBuilder.obj());
 
-
+    // Since DynamicAttributes (attrs) binds by reference, it is important that the lifetime of this
+    // variable lasts until the LOGV2 call at the end of this function.
     std::string globalReadTimestampTemp;
     if (_atClusterTimeHasBeenSet()) {
         globalReadTimestampTemp = o().atClusterTime->getTime().toString();
@@ -1902,6 +1819,87 @@ void TransactionRouter::MetricsTracker::endTransaction(
         routerTxnMetrics->incrementCommitSuccessful(
             commitType, timingStats.getCommitDuration(tickSource, curTicks));
     }
+}
+
+BSONObj TransactionRouter::appendFieldsForStartTransaction(
+    BSONObj cmdObj,
+    const repl::ReadConcernArgs& readConcernArgs,
+    const boost::optional<LogicalTime>& atClusterTimeForSnapshotReadConcern,
+    bool doAppendStartTransaction) {
+    BSONObjBuilder cmdBob;
+    bool hasReadConcern = false;
+    for (auto&& elem : cmdObj) {
+        if (elem.fieldNameStringData() == repl::ReadConcernArgs::kReadConcernFieldName) {
+            bool hasLevel = false;
+            bool hasAfterClusterTime = false;
+            bool hasAtClusterTime = false;
+
+            BSONObjBuilder readConcernBob =
+                cmdBob.subobjStart(repl::ReadConcernArgs::kReadConcernFieldName);
+            for (auto&& rcElem : elem.Obj()) {
+                if (rcElem.fieldNameStringData() == repl::ReadConcernArgs::kLevelFieldName) {
+                    dassert(readConcernArgs.getLevel() ==
+                                repl::readConcernLevels::fromString(rcElem.checkAndGetStringData()),
+                            "The read concern level changed during processing of the request");
+                    readConcernBob.append(rcElem);
+                    hasLevel = true;
+                } else if (rcElem.fieldNameStringData() ==
+                           repl::ReadConcernArgs::kAfterClusterTimeFieldName) {
+                    dassert(
+                        !readConcernArgs.getArgsAfterClusterTime() ||
+                            rcElem.timestamp() >=
+                                readConcernArgs.getArgsAfterClusterTime()->asTimestamp(),
+                        "The afterClusterTime moved backwards during processing of the request");
+                    if (!atClusterTimeForSnapshotReadConcern)
+                        readConcernBob.append(rcElem);
+                    hasAfterClusterTime = true;
+                } else if (rcElem.fieldNameStringData() ==
+                           repl::ReadConcernArgs::kAtClusterTimeFieldName) {
+                    dassert(atClusterTimeForSnapshotReadConcern);
+                    dassert(rcElem.timestamp() ==
+                            atClusterTimeForSnapshotReadConcern->asTimestamp());
+                    readConcernBob.append(rcElem);
+                    hasAtClusterTime = true;
+                } else {
+                    readConcernBob.append(rcElem);
+                }
+            }
+
+            if (!hasAfterClusterTime && readConcernArgs.getArgsAfterClusterTime()) {
+                readConcernBob.append(repl::ReadConcernArgs::kAfterClusterTimeFieldName,
+                                      readConcernArgs.getArgsAfterClusterTime()->asTimestamp());
+            }
+
+            if (!hasAtClusterTime && atClusterTimeForSnapshotReadConcern) {
+                if (!hasLevel)
+                    readConcernBob.append(repl::ReadConcernArgs::kLevelFieldName, "snapshot");
+                readConcernBob.append(repl::ReadConcernArgs::kAtClusterTimeFieldName,
+                                      atClusterTimeForSnapshotReadConcern->asTimestamp());
+            }
+
+            hasReadConcern = true;
+        } else {
+            cmdBob.append(elem);
+        }
+    }
+
+    if (!hasReadConcern) {
+        if (atClusterTimeForSnapshotReadConcern) {
+            BSONObjBuilder readConcernBob =
+                cmdBob.subobjStart(repl::ReadConcernArgs::kReadConcernFieldName);
+            readConcernBob.append(repl::ReadConcernArgs::kLevelFieldName, "snapshot");
+            readConcernBob.append(repl::ReadConcernArgs::kAtClusterTimeFieldName,
+                                  atClusterTimeForSnapshotReadConcern->asTimestamp());
+        } else {
+            readConcernArgs.appendInfo(&cmdBob);
+        }
+    }
+
+    if (doAppendStartTransaction) {
+        cmdBob.append(OperationSessionInfoFromClient::kStartTransactionFieldName, true);
+    }
+
+    return cmdBob.obj();
 }
 
 }  // namespace mongo
