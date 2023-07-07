@@ -6,8 +6,6 @@ metrics_monitor=
 (
     stat_db_size=
     (
-        # FIXME-WT-8886 - This check has been disabled to remove noisy failures in evergreen and
-        # will be properly corrected in WT-8886.
         runtime=false,
         save=true,
     )
