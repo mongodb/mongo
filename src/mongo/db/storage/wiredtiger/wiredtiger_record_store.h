@@ -250,7 +250,7 @@ public:
         return _tableId;
     }
 
-    std::string ns(OperationContext* opCtx) const final;
+    NamespaceString ns(OperationContext* opCtx) const final;
 
     /*
      * Check the size information for this RecordStore. This function opens a cursor on the

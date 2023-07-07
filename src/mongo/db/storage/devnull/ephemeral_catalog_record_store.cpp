@@ -274,15 +274,18 @@ private:
 // RecordStore
 //
 
-EphemeralForTestRecordStore::EphemeralForTestRecordStore(StringData ns,
+EphemeralForTestRecordStore::EphemeralForTestRecordStore(const NamespaceString& ns,
                                                          boost::optional<UUID> uuid,
                                                          StringData identName,
                                                          std::shared_ptr<void>* dataInOut,
                                                          bool isCapped)
     : RecordStore(uuid, identName, isCapped),
       _isCapped(isCapped),
-      _data(*dataInOut ? static_cast<Data*>(dataInOut->get())
-                       : new Data(ns, NamespaceString::oplog(ns))) {
+      _data(*dataInOut ? static_cast<Data*>(dataInOut->get()) : new Data(ns, ns.isOplog())) {
+    // TODO SERVER-78731 We should remove `ns` in the line above.
+    // NOTE : The static_cast here assumes that `dataInOut`, which is a void pointer, contains a
+    // NamespaceString object. As of now, DevNullKVEngine constructs a EphemeralForTestRecordStore
+    // by passing `_catalogInfo` to this method.
     if (!*dataInOut) {
         dataInOut->reset(_data);  // takes ownership
     }

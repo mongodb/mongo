@@ -339,7 +339,7 @@ public:
     /**
      * Get the namespace this RecordStore is associated with.
      */
-    virtual std::string ns(OperationContext* opCtx) const = 0;
+    virtual NamespaceString ns(OperationContext* opCtx) const = 0;
 
     /**
      * The key format for this RecordStore's RecordIds.
@@ -429,7 +429,7 @@ public:
         RecordData data;
         invariant(findRecord(opCtx, loc, &data),
                   str::stream() << "Didn't find RecordId " << loc << " in record store "
-                                << ns(opCtx));
+                                << ns(opCtx).toStringForErrorMsg());
         return data;
     }
 

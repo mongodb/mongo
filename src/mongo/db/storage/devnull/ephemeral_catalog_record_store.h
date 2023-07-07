@@ -66,7 +66,7 @@ namespace mongo {
  */
 class EphemeralForTestRecordStore : public RecordStore {
 public:
-    explicit EphemeralForTestRecordStore(StringData ns,
+    explicit EphemeralForTestRecordStore(const NamespaceString& ns,
                                          boost::optional<UUID> uuid,
                                          StringData identName,
                                          std::shared_ptr<void>* dataInOut,
@@ -148,7 +148,7 @@ public:
                                   std::vector<RecordId>* out,
                                   size_t nRecords) final{};
 
-    std::string ns(OperationContext* opCtx) const final {
+    NamespaceString ns(OperationContext* opCtx) const final {
         return _data->ns;
     }
 
@@ -197,14 +197,14 @@ private:
 
     // This is the "persistent" data.
     struct Data {
-        Data(StringData nss, bool isOplog)
+        Data(const NamespaceString& nss, bool isOplog)
             : dataSize(0), recordsMutex(), nextId(1), ns(nss), isOplog(isOplog) {}
 
         int64_t dataSize;
         stdx::recursive_mutex recordsMutex;
         Records records;
         int64_t nextId;
-        std::string ns;
+        NamespaceString ns;
         const bool isOplog;
     };
 

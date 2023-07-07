@@ -40,7 +40,7 @@
 namespace mongo {
 // 'ident' is an identifer to WT table and a virtual collection does not have any persistent data
 // in WT. So, we set the "dummy" ident for a virtual collection.
-ExternalRecordStore::ExternalRecordStore(StringData ns,
+ExternalRecordStore::ExternalRecordStore(const NamespaceString& ns,
                                          boost::optional<UUID> uuid,
                                          const VirtualCollectionOptions& vopts)
     : RecordStore(uuid, /*identName=*/"dummy"_sd, /*isCapped=*/false), _vopts(vopts), _ns(ns) {}

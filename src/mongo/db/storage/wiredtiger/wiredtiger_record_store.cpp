@@ -701,12 +701,10 @@ WiredTigerRecordStore::~WiredTigerRecordStore() {
     }
 }
 
-std::string WiredTigerRecordStore::ns(OperationContext* opCtx) const {
+NamespaceString WiredTigerRecordStore::ns(OperationContext* opCtx) const {
     auto nss = namespaceForUUID(opCtx, _uuid);
-    if (!nss)
-        return "";
 
-    return nss->ns().toString();
+    return nss ? *nss : NamespaceString();
 }
 
 void WiredTigerRecordStore::checkSize(OperationContext* opCtx) {
@@ -728,7 +726,8 @@ void WiredTigerRecordStore::checkSize(OperationContext* opCtx) {
                            "Record store was empty; setting count metadata to zero but marking "
                            "record store as needing size adjustment during recovery. ns: "
                            "{isTemp_temp_ns}, ident: {ident}",
-                           "isTemp_temp_ns"_attr = (isTemp() ? "(temp)" : ns(opCtx)),
+                           "isTemp_temp_ns"_attr =
+                               (isTemp() ? "(temp)" : toStringForLogging(ns(opCtx))),
                            "ident"_attr = getIdent());
         sizeRecoveryState(getGlobalServiceContext())
             .markCollectionAsAlwaysNeedsSizeAdjustment(getIdent());
@@ -1278,8 +1277,8 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
 
     invariantWTOK(ret,
                   c->session,
-                  str::stream() << "Namespace: " << ns(opCtx) << "; Key: " << getKey(c)
-                                << "; Read Timestamp: "
+                  str::stream() << "Namespace: " << ns(opCtx).toStringForErrorMsg()
+                                << "; Key: " << getKey(c) << "; Read Timestamp: "
                                 << opCtx->recoveryUnit()
                                        ->getPointInTimeReadTimestamp(opCtx)
                                        .value_or(Timestamp{})
@@ -1781,7 +1780,7 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
         rollbackReason = rollbackReason ? rollbackReason : "undefined";
         throwWriteConflictException(
             fmt::format("Rollback ocurred while performing initial write to '{}'. Reason: '{}'",
-                        ns(opCtx),
+                        ns(opCtx).toStringForErrorMsg(),
                         rollbackReason));
     } else if (ret != WT_NOTFOUND) {
         if (ret == ENOTSUP) {
