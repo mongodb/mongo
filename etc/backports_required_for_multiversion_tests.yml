@@ -918,4 +918,8 @@ last-lts:
     ticket: SERVER-78595
   - test_file: jstests/replsets/config_txns_reaping_interrupt.js
     ticket: SERVER-78187
+  - test_file: jstests/sharding/internal_txns/transaction_api_distributed_from_shard.js
+    ticket: SERVER-78786
+  - test_file: jstests/sharding/internal_txns/transaction_api_test_command_basic.js
+    ticket: SERVER-78786
   suites: null

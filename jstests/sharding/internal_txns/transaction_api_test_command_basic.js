@@ -92,6 +92,50 @@ function runRetryableFindAndModify(connection, commandInfos, lsid, collection) {
     assert.eq(0, retryRes.responses[0].retriedStmtId);
 }
 
+function runTestGetMore(conn, sessionOpts, inTxn) {
+    assert.commandWorked(conn.getCollection(kNs).remove({}, false /* justOne */));
+
+    // Insert initial data.
+    const startVal = -50;
+    const numDocs = 100;
+
+    let bulk = conn.getCollection(kNs).initializeUnorderedBulkOp();
+    for (let i = startVal; i < startVal + numDocs; i++) {
+        bulk.insert({_id: i});
+    }
+    assert.commandWorked(bulk.execute());
+
+    const commands = [
+        // Use a batch size < number of documents so the API must use getMores to exhaust the
+        // cursor.
+        {
+            dbName: kDbName,
+            command: {find: kCollName, batchSize: 17, sort: {_id: 1}},
+            exhaustCursor: true
+        },
+    ];
+
+    let testCmd = Object.merge({testInternalTransactions: 1, commandInfos: commands}, sessionOpts);
+    if (inTxn) {
+        testCmd = Object.merge(testCmd, {startTransaction: true, autocommit: false});
+    }
+
+    const res = assert.commandWorked(conn.adminCommand(testCmd));
+    assert.eq(res.responses.length, 1, tojson(res));
+
+    if (inTxn) {
+        let commitCmd = Object.merge({commitTransaction: 1, autocommit: false}, sessionOpts);
+        conn.adminCommand(commitCmd);
+    }
+
+    // The response from an exhausted cursor is an array of BSON objects, so we don't assert the
+    // command worked.
+    assert.eq(res.responses[0].docs.length, numDocs, tojson(res));
+    for (let i = 0; i < numDocs; ++i) {
+        assert.eq(res.responses[0].docs[i]._id, startVal + i, tojson(res.responses[0].docs[i]));
+    }
+}
+
 // Insert initial data.
 assert.commandWorked(stColl.insert([{_id: 0}]));
 assert.commandWorked(rstColl.insert([{_id: 0}]));
@@ -181,6 +225,18 @@ runRetryableFindAndModify(st.s, commandInfosRetryableFindAndModify(stColl), UUID
 jsTest.log("Testing retryable write targeting a mongod.");
 runRetryableInsert(primary, commandInfosRetryableBatchInsert, UUID(), rstColl);
 runRetryableFindAndModify(primary, commandInfosRetryableFindAndModify(rstColl), UUID(), rstColl);
+
+jsTestLog("Testing getMores on mongos");
+runTestGetMore(st.s, {});
+runTestGetMore(st.s, {lsid: {id: new UUID()}});
+runTestGetMore(st.s, {lsid: {id: new UUID()}, txnNumber: NumberLong(0)});
+runTestGetMore(st.s, {lsid: {id: new UUID()}, txnNumber: NumberLong(0)}, true /* inTxn */);
+
+jsTestLog("Testing getMores on mongod");
+runTestGetMore(primary, {});
+runTestGetMore(primary, {lsid: {id: new UUID()}});
+runTestGetMore(primary, {lsid: {id: new UUID()}, txnNumber: NumberLong(0)});
+runTestGetMore(primary, {lsid: {id: new UUID()}, txnNumber: NumberLong(0)}, true /* inTxn */);
 
 rst.stopSet();
 st.stop();
