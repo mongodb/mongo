@@ -112,7 +112,9 @@ void MigrationChunkClonerSourceOpObserver::assertNoMovePrimaryInProgress(
 
 void MigrationChunkClonerSourceOpObserver::onUnpreparedTransactionCommit(
     OperationContext* opCtx,
+    const std::vector<OplogSlot>& reservedSlots,
     const TransactionOperations& transactionOperations,
+    const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
     OpStateAccumulator* const opAccumulator) {
     // Return early if we are secondary or in some replication state in which we are not
     // appending entries to the oplog.

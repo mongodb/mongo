@@ -225,9 +225,12 @@ public:
                        const NamespaceString& collectionName,
                        const UUID& uuid) final;
     void onTransactionStart(OperationContext* opCtx) final;
-    void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       const TransactionOperations& transactionOperations,
-                                       OpStateAccumulator* opAccumulator = nullptr) final;
+    void onUnpreparedTransactionCommit(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        const TransactionOperations& transactionOperations,
+        const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+        OpStateAccumulator* opAccumulator = nullptr) final;
     void onBatchedWriteStart(OperationContext* opCtx) final;
     void onBatchedWriteCommit(OperationContext* opCtx) final;
     void onBatchedWriteAbort(OperationContext* opCtx) final;

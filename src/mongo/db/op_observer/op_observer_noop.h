@@ -217,9 +217,12 @@ public:
 
     void onTransactionStart(OperationContext* opCtx) override {}
 
-    void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       const TransactionOperations& transactionOperations,
-                                       OpStateAccumulator* opAccumulator = nullptr) override {}
+    void onUnpreparedTransactionCommit(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        const TransactionOperations& transactionOperations,
+        const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+        OpStateAccumulator* opAccumulator = nullptr) override {}
 
     void onBatchedWriteStart(OperationContext* opCtx) override {}
 

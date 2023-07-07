@@ -486,12 +486,21 @@ public:
      * transaction, before the RecoveryUnit onCommit() is called.  It must not be called when no
      * transaction is active.
      *
+     * 'reservedSlots' is a list of oplog slots reserved for the oplog entries in a transaction.
+     *
      * The 'transactionOperations' contains the list of CRUD operations (formerly 'statements') to
      * be applied in this transaction.
+     *
+     * The 'applyOpsOperationAssignment' contains a representation of "applyOps" entries and oplog
+     * slots to be used for writing pre- and post- image oplog entries for a transaction.
      */
-    virtual void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                               const TransactionOperations& transactionOperations,
-                                               OpStateAccumulator* opAccumulator = nullptr) = 0;
+    virtual void onUnpreparedTransactionCommit(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        const TransactionOperations& transactionOperations,
+        const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+        OpStateAccumulator* opAccumulator = nullptr) = 0;
+
     /**
      * The onPreparedTransactionCommit method is called on the commit of a prepared transaction,
      * after the RecoveryUnit onCommit() is called.  It must not be called when no transaction is

@@ -1896,7 +1896,24 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
 
-    opObserver->onUnpreparedTransactionCommit(opCtx, *txnOps);
+    // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
+    // reserve enough entries for all statements in the transaction.
+    std::vector<OplogSlot> reservedSlots;
+    if (!txnOps->isEmpty()) {
+        reservedSlots = LocalOplogInfo::get(opCtx)->getNextOpTimes(
+            opCtx, txnOps->numOperations() + txnOps->getNumberOfPrePostImagesToWrite());
+    }
+
+    // Serialize transaction statements to BSON and determine their assignment to "applyOps"
+    // entries.
+    const auto applyOpsOplogSlotAndOperationAssignment =
+        txnOps->getApplyOpsInfo(reservedSlots,
+                                getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
+                                getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
+                                /*prepare=*/false);
+
+    opObserver->onUnpreparedTransactionCommit(
+        opCtx, reservedSlots, *txnOps, applyOpsOplogSlotAndOperationAssignment);
 
     // Read-only transactions with all read concerns must wait for any data they read to be majority
     // committed. For local read concern this is to match majority read concern. For both local and

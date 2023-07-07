@@ -158,11 +158,13 @@ public:
         transactionPrepared = true;
     };
 
-    void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       const TransactionOperations& transactionOperations,
-                                       OpStateAccumulator* opAccumulator = nullptr) override {
+    void onUnpreparedTransactionCommit(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        const TransactionOperations& transactionOperations,
+        const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+        OpStateAccumulator* opAccumulator = nullptr) override {
         ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-        OpObserverNoop::onUnpreparedTransactionCommit(opCtx, transactionOperations, opAccumulator);
 
         uassert(ErrorCodes::OperationFailed,
                 "onUnpreparedTransactionCommit() failed",

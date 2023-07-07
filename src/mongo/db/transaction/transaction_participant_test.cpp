@@ -180,9 +180,12 @@ public:
     std::function<void()> onTransactionPrepareFn = []() {
     };
 
-    void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       const TransactionOperations& transactionOperations,
-                                       OpStateAccumulator* opAccumulator = nullptr) override;
+    void onUnpreparedTransactionCommit(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        const TransactionOperations& transactionOperations,
+        const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+        OpStateAccumulator* opAccumulator = nullptr) override;
     bool onUnpreparedTransactionCommitThrowsException = false;
     bool unpreparedTransactionCommitted = false;
     std::function<void(const std::vector<repl::ReplOperation>&)> onUnpreparedTransactionCommitFn =
@@ -242,15 +245,20 @@ void OpObserverMock::onTransactionPrepare(
 
 void OpObserverMock::onUnpreparedTransactionCommit(
     OperationContext* opCtx,
+    const std::vector<OplogSlot>& reservedSlots,
     const TransactionOperations& transactionOperations,
+    const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
     OpStateAccumulator* opAccumulator) {
     ASSERT(opCtx->lockState()->inAWriteUnitOfWork());
-
-    OpObserverNoop::onUnpreparedTransactionCommit(opCtx, transactionOperations);
 
     uassert(ErrorCodes::OperationFailed,
             "onUnpreparedTransactionCommit() failed",
             !onUnpreparedTransactionCommitThrowsException);
+
+    ASSERT_EQUALS(transactionOperations.numOperations() +
+                      transactionOperations.getNumberOfPrePostImagesToWrite(),
+                  reservedSlots.size());
+    ASSERT_FALSE(applyOpsOperationAssignment.prepare);
 
     unpreparedTransactionCommitted = true;
     const auto& statements = transactionOperations.getOperationsForOpObserver();

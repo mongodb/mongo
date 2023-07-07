@@ -1723,10 +1723,11 @@ void OpObserverImpl::onTransactionStart(OperationContext* opCtx) {}
 
 void OpObserverImpl::onUnpreparedTransactionCommit(
     OperationContext* opCtx,
+    const std::vector<OplogSlot>& reservedSlots,
     const TransactionOperations& transactionOperations,
+    const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
     OpStateAccumulator* opAccumulator) {
     const auto& statements = transactionOperations.getOperationsForOpObserver();
-    auto numberOfPrePostImagesToWrite = transactionOperations.getNumberOfPrePostImagesToWrite();
 
     invariant(opCtx->getTxnNumber());
 
@@ -1739,10 +1740,8 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
     if (statements.empty())
         return;
 
-    // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
-    // reserve enough entries for all statements in the transaction.
-    auto oplogSlots =
-        _oplogWriter->getNextOpTimes(opCtx, statements.size() + numberOfPrePostImagesToWrite);
+    const auto& oplogSlots = reservedSlots;
+    const auto& applyOpsOplogSlotAndOperationAssignment = applyOpsOperationAssignment;
 
     // Throw TenantMigrationConflict error if the database for the transaction statements is being
     // migrated. We only need check the namespace of the first statement since a transaction's
@@ -1755,13 +1754,6 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         uasserted(51268, "hangAndFailUnpreparedCommitAfterReservingOplogSlot fail point enabled");
     }
 
-    // Serialize transaction statements to BSON and determine their assignment to "applyOps"
-    // entries.
-    const auto applyOpsOplogSlotAndOperationAssignment = transactionOperations.getApplyOpsInfo(
-        oplogSlots,
-        getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
-        getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
-        /*prepare=*/false);
     invariant(!applyOpsOplogSlotAndOperationAssignment.prepare);
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
 
