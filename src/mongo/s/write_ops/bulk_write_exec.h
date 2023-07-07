@@ -110,12 +110,12 @@ public:
      * targeting errors, but if not we should refresh once first.)
      *
      * Returned TargetedWriteBatches are owned by the caller.
-     * If a write without a shard key is detected, return an OK StatusWith that has 'true' as the
-     * value.
+     * If a write without a shard key or a time-series retryable update is detected, return an OK
+     * StatusWith that has the corresponding WriteType as the value.
      */
-    StatusWith<bool> target(const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-                            bool recordTargetErrors,
-                            TargetedBatchMap& targetedBatches);
+    StatusWith<WriteType> target(const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+                                 bool recordTargetErrors,
+                                 TargetedBatchMap& targetedBatches);
 
     /**
      * Fills a BulkWriteCommandRequest from a TargetedWriteBatch for this BulkWriteOp.

@@ -194,7 +194,7 @@ Status performAtomicTimeseriesWrites(OperationContext* opCtx,
  * Assumes the update command is a retryable write and targeted on the time-series view namespace.
  */
 void runTimeseriesRetryableUpdates(OperationContext* opCtx,
-                                   const NamespaceString& ns,
+                                   const NamespaceString& bucketNs,
                                    const write_ops::UpdateCommandRequest& wholeOp,
                                    std::shared_ptr<executor::TaskExecutor> executor,
                                    write_ops_exec::WriteResult* reply);

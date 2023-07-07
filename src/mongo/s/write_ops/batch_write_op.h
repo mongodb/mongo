@@ -93,6 +93,12 @@ struct ShardWCError {
 
 using TargetedBatchMap = std::map<ShardId, std::unique_ptr<TargetedWriteBatch>>;
 
+enum class WriteType {
+    Ordinary,
+    WithoutShardKeyOrId,
+    TimeseriesRetryableUpdate,
+};
+
 /**
  * The BatchWriteOp class manages the lifecycle of a batched write received by mongos.  Each
  * item in a batch is tracked via a WriteOp, and the function of the BatchWriteOp is to
@@ -142,12 +148,12 @@ public:
      * targeting errors, but if not we should refresh once first.)
      *
      * Returned TargetedWriteBatches are owned by the caller.
-     * If a write without a shard key is detected, return an OK StatusWith that has 'true' as the
-     * value.
+     * If a write without a shard key or a time-series retryable update is detected, return an OK
+     * StatusWith that has the corresponding WriteType as the value.
      */
-    StatusWith<bool> targetBatch(const NSTargeter& targeter,
-                                 bool recordTargetErrors,
-                                 TargetedBatchMap* targetedBatches);
+    StatusWith<WriteType> targetBatch(const NSTargeter& targeter,
+                                      bool recordTargetErrors,
+                                      TargetedBatchMap* targetedBatches);
 
     /**
      * Fills a BatchCommandRequest from a TargetedWriteBatch for this BatchWriteOp.
@@ -283,14 +289,14 @@ typedef std::function<const NSTargeter&(const WriteOp& writeOp)> GetTargeterFn;
 typedef std::function<int(const WriteOp& writeOp)> GetWriteSizeFn;
 
 // Helper function to target ready writeOps. See BatchWriteOp::targetBatch for details.
-StatusWith<bool> targetWriteOps(OperationContext* opCtx,
-                                std::vector<WriteOp>& writeOps,
-                                bool ordered,
-                                bool recordTargetErrors,
-                                GetTargeterFn getTargeterFn,
-                                GetWriteSizeFn getWriteSizeFn,
-                                int baseCommandSizeBytes,
-                                TargetedBatchMap& batchMap);
+StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
+                                     std::vector<WriteOp>& writeOps,
+                                     bool ordered,
+                                     bool recordTargetErrors,
+                                     GetTargeterFn getTargeterFn,
+                                     GetWriteSizeFn getWriteSizeFn,
+                                     int baseCommandSizeBytes,
+                                     TargetedBatchMap& batchMap);
 
 /**
  * Returns a new write concern that has the copy of every field from the original

@@ -58,6 +58,13 @@
 namespace mongo::timeseries {
 
 /**
+ * Constructs an update request using a single update statement at position `opIndex`.
+ */
+write_ops::UpdateCommandRequest buildSingleUpdateOp(const write_ops::UpdateCommandRequest& wholeOp,
+                                                    size_t opIndex);
+
+
+/**
  * Asserts the buckets collection exists and has valid time-series options.
  *
  * Assumes already holding a lock on the collection.

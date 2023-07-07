@@ -49,7 +49,7 @@ const metaSubFieldShardKey = {
     splitPoint: {'meta.a': 2},
 };
 
-function runTest({collConfig, updateOp, upsertedDoc, errorCode, inTxn = false}) {
+function runTest({collConfig, updateOp, upsertedDoc, errorCode, updateShardKey = false}) {
     // Prepares a sharded timeseries collection.
     const documents = generateDocsForTestCase(collConfig);
     const coll = prepareShardedCollection({
@@ -66,16 +66,16 @@ function runTest({collConfig, updateOp, upsertedDoc, errorCode, inTxn = false}) 
         return;
     }
     const res = (() => {
-        if (!inTxn) {
+        if (!updateShardKey) {
             return assert.commandWorked(testDB.runCommand(updateCommand));
         }
 
-        // TODO SERVER-78364 Run this as a retryable write instead of inside a transaction.
-        const session = coll.getDB().getMongo().startSession();
+        // Run as a retryable write to modify the shard key value.
+        const session = coll.getDB().getMongo().startSession({retryWrites: true});
         const sessionDb = session.getDatabase(coll.getDB().getName());
-        session.startTransaction();
+        updateCommand["lsid"] = session.getSessionId();
+        updateCommand["txnNumber"] = NumberLong(1);
         const res = assert.commandWorked(sessionDb.runCommand(updateCommand));
-        session.commitTransaction();
 
         return res;
     })();
@@ -304,7 +304,7 @@ function runTest({collConfig, updateOp, upsertedDoc, errorCode, inTxn = false}) 
             upsert: true
         },
         upsertedDoc: {[metaFieldName]: 10, [timeFieldName]: dateTime, f: 15},
-        inTxn: true,
+        updateShardKey: true,
     });
 })();
 

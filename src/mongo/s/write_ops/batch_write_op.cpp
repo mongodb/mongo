@@ -218,14 +218,14 @@ int getEncryptionInformationSize(const BatchedCommandRequest& req) {
 // individual operations to it. This function will ensure that 'baseCommandSizeBytes' plus the
 // result of calling 'getWriteSizeFn' on each write added to a batch will not result in a command
 // over BSONObjMaxUserSize.
-StatusWith<bool> targetWriteOps(OperationContext* opCtx,
-                                std::vector<WriteOp>& writeOps,
-                                bool ordered,
-                                bool recordTargetErrors,
-                                GetTargeterFn getTargeterFn,
-                                GetWriteSizeFn getWriteSizeFn,
-                                int baseCommandSizeBytes,
-                                TargetedBatchMap& batchMap) {
+StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
+                                     std::vector<WriteOp>& writeOps,
+                                     bool ordered,
+                                     bool recordTargetErrors,
+                                     GetTargeterFn getTargeterFn,
+                                     GetWriteSizeFn getWriteSizeFn,
+                                     int baseCommandSizeBytes,
+                                     TargetedBatchMap& batchMap) {
     //
     // Targeting of unordered batches is fairly simple - each remaining write op is targeted,
     // and each of those targeted writes are grouped into a batch for a particular shard
@@ -259,7 +259,7 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
     //  [{ skey : y }, { skey : z }]
     //
 
-    bool isWriteWithoutShardKeyOrId = false;
+    WriteType writeType = WriteType::Ordinary;
 
     std::map<NamespaceString, std::set<const ShardEndpoint*, EndpointComp>> nsEndpointMap;
     std::map<NamespaceString, std::set<ShardId>> nsShardIdMap;
@@ -269,9 +269,10 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
         if (writeOp.getWriteState() != WriteOpState_Ready)
             continue;
 
-        // If we got a write without shard key in the previous iteration, it should be sent in its
-        // own batch.
-        if (isWriteWithoutShardKeyOrId) {
+        // If we got a write without shard key or a time-series retryable update in the previous
+        // iteration, it should be sent in its own batch.
+        if (writeType == WriteType::WithoutShardKeyOrId ||
+            writeType == WriteType::TimeseriesRetryableUpdate) {
             break;
         }
 
@@ -321,7 +322,7 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
                 writeOp.setOpError(targetError);
 
                 if (ordered)
-                    return isWriteWithoutShardKeyOrId;
+                    return writeType;
 
                 continue;
             } else {
@@ -358,6 +359,12 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
             isNewBatchRequiredUnordered(targeter.getNS(), writes, nsShardIdMap, nsEndpointMap)) {
             writeOp.cancelWrites(nullptr);
             break;
+        }
+
+        if (targeter.isShardedTimeSeriesBucketsNamespace() &&
+            writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Update &&
+            opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction() && batchMap.empty()) {
+            writeType = WriteType::TimeseriesRetryableUpdate;
         }
 
         // Check if an updateOne or deleteOne necessitates using the two phase write in the case
@@ -405,7 +412,7 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
                         deleteOneNonTargetedShardedCount.increment(1);
                     }
 
-                    isWriteWithoutShardKeyOrId = true;
+                    writeType = WriteType::WithoutShardKeyOrId;
                 }
             };
         }
@@ -434,7 +441,7 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
             break;
     }
 
-    return isWriteWithoutShardKeyOrId;
+    return writeType;
 }
 
 BSONObj upgradeWriteConcern(const BSONObj& origWriteConcern) {
@@ -467,9 +474,9 @@ BatchWriteOp::BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest&
     }
 }
 
-StatusWith<bool> BatchWriteOp::targetBatch(const NSTargeter& targeter,
-                                           bool recordTargetErrors,
-                                           TargetedBatchMap* targetedBatches) {
+StatusWith<WriteType> BatchWriteOp::targetBatch(const NSTargeter& targeter,
+                                                bool recordTargetErrors,
+                                                TargetedBatchMap* targetedBatches) {
     const bool ordered = _clientRequest.getWriteCommandRequestBase().getOrdered();
 
     auto targetStatus = targetWriteOps(

@@ -476,10 +476,9 @@ public:
                 }
             }
 
-            auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, request());
+            auto [isTimeseries, bucketNs] = timeseries::isTimeseries(opCtx, request());
             OperationSource source =
                 isTimeseries ? OperationSource::kTimeseriesUpdate : OperationSource::kStandard;
-            auto ns = request().getNamespace();
 
             long long nModified = 0;
 
@@ -490,14 +489,13 @@ public:
             write_ops_exec::WriteResult reply;
             // For retryable updates on time-series collections, we needs to run them in
             // transactions to ensure the multiple writes are replicated atomically.
-            if (isTimeseries && !ns.isTimeseriesBucketsCollection() && opCtx->isRetryableWrite() &&
-                !opCtx->inMultiDocumentTransaction()) {
+            if (isTimeseries && opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction()) {
                 auto executor = serverGlobalParams.clusterRole.has(ClusterRole::None)
                     ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
                           opCtx->getServiceContext())
                     : Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
                 write_ops_exec::runTimeseriesRetryableUpdates(
-                    opCtx, ns, request(), executor, &reply);
+                    opCtx, bucketNs, request(), executor, &reply);
             } else {
                 reply = write_ops_exec::performUpdates(opCtx, request(), source);
             }

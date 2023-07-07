@@ -35,7 +35,7 @@ const runTest = function({
     nModified,
     resultDocList,
     includeMeta = true,
-    inTxn = false,
+    retryableWrite = false,
 }) {
     const collName = getCallerName();
     jsTestLog(`Running ${collName}(${tojson(arguments[0])})`);
@@ -45,20 +45,20 @@ const runTest = function({
 
     const updateCommand = {update: collName, updates: [{q: query, u: update, multi: false}]};
     const result = (() => {
-        if (!inTxn) {
+        if (!retryableWrite) {
             return assert.commandWorked(testDB.runCommand(updateCommand));
         }
 
-        // TODO SERVER-78364 Run this as a retryable write instead of inside a transaction.
-        const session = coll.getDB().getMongo().startSession();
+        // Run as a retryable write to modify the shard key value.
+        const session = coll.getDB().getMongo().startSession({retryWrites: true});
         const sessionDb = session.getDatabase(coll.getDB().getName());
-        session.startTransaction();
+        updateCommand["lsid"] = session.getSessionId();
+        updateCommand["txnNumber"] = NumberLong(1);
         const res = assert.commandWorked(sessionDb.runCommand(updateCommand));
-        session.commitTransaction();
 
         return res;
     })();
-    assert.eq(nModified, result.n, tojson(result));
+    assert.eq(nModified, result.nModified, tojson(result));
 
     if (resultDocList) {
         assert.sameMembers(resultDocList,
@@ -130,7 +130,7 @@ const runTest = function({
         update: {$unset: {[metaFieldName]: 1}},
         nModified: 1,
         resultDocList: [{_id: 2, [timeFieldName]: generateTimeValue(2), f: 101}, doc4_b_f103],
-        inTxn: true,
+        retryableWrite: true,
     });
 })();
 
@@ -142,11 +142,11 @@ const runTest = function({
         replacement: true,
         nModified: 1,
         resultDocList: [{_id: 2, [timeFieldName]: generateTimeValue(2), f: 110}, doc4_b_f103],
-        inTxn: true,
+        retryableWrite: true,
     });
 })();
 
-(function testTargetSingleShardUpdateShardKeyByReplacement() {
+(function testTargetSingleShardretryableWriteByReplacement() {
     runTest({
         initialDocList: [doc2_a_f101, doc4_b_f103],
         query: {[metaFieldName]: "B"},
@@ -157,11 +157,11 @@ const runTest = function({
             doc2_a_f101,
             {_id: 4, [metaFieldName]: "C", [timeFieldName]: generateTimeValue(4), f: 110}
         ],
-        inTxn: true,
+        retryableWrite: true,
     });
 })();
 
-(function testTargetSingleShardUpdateShardKeyByReplacementChangeShard() {
+(function testTargetSingleShardretryableWriteByReplacementChangeShard() {
     runTest({
         initialDocList: [doc2_a_f101, doc4_b_f103],
         query: {[metaFieldName]: "B"},
@@ -172,7 +172,7 @@ const runTest = function({
             doc2_a_f101,
             {_id: 4, [metaFieldName]: "A", [timeFieldName]: generateTimeValue(4), f: 110}
         ],
-        inTxn: true,
+        retryableWrite: true,
     });
 })();
 
@@ -182,6 +182,16 @@ const runTest = function({
         query: {f: {$gt: 100}},
         update: {$set: {f: 110}},
         nModified: 1,
+    });
+})();
+
+(function testTwoPhaseRetryableUpdate() {
+    runTest({
+        initialDocList: [doc2_a_f101, doc3_a_f102, doc4_b_f103, doc6_c_f105],
+        query: {f: {$gt: 100}},
+        update: {$set: {f: 110}},
+        nModified: 1,
+        retryableWrite: true,
     });
 })();
 

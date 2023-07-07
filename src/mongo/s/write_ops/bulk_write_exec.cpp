@@ -325,9 +325,9 @@ BulkWriteOp::BulkWriteOp(OperationContext* opCtx, const BulkWriteCommandRequest&
     }
 }
 
-StatusWith<bool> BulkWriteOp::target(const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-                                     bool recordTargetErrors,
-                                     TargetedBatchMap& targetedBatches) {
+StatusWith<WriteType> BulkWriteOp::target(const std::vector<std::unique_ptr<NSTargeter>>& targeters,
+                                          bool recordTargetErrors,
+                                          TargetedBatchMap& targetedBatches) {
     const auto ordered = _clientRequest.getOrdered();
 
     return targetWriteOps(

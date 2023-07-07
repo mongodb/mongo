@@ -1402,7 +1402,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
 }
 
 void runTimeseriesRetryableUpdates(OperationContext* opCtx,
-                                   const NamespaceString& ns,
+                                   const NamespaceString& bucketNs,
                                    const write_ops::UpdateCommandRequest& wholeOp,
                                    std::shared_ptr<executor::TaskExecutor> executor,
                                    write_ops_exec::WriteResult* reply) {
@@ -1414,10 +1414,7 @@ void runTimeseriesRetryableUpdates(OperationContext* opCtx,
     });
     size_t nextOpIndex = 0;
     for (auto&& singleOp : wholeOp.getUpdates()) {
-        write_ops::UpdateCommandRequest singleUpdateOp(wholeOp.getNamespace(), {singleOp});
-        auto commandBase = singleUpdateOp.getWriteCommandRequestBase();
-        commandBase.setOrdered(wholeOp.getOrdered());
-        commandBase.setBypassDocumentValidation(wholeOp.getBypassDocumentValidation());
+        auto singleUpdateOp = timeseries::buildSingleUpdateOp(wholeOp, nextOpIndex);
         const auto stmtId = write_ops::getStmtIdForWriteAt(wholeOp, nextOpIndex++);
 
         auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
@@ -1447,14 +1444,14 @@ void runTimeseriesRetryableUpdates(OperationContext* opCtx,
                 return SemiFuture<void>::makeReady();
             });
         try {
-            // Rethrows the error from the command or the internal transaction api to
-            // handle them accordingly..
+            // Rethrows the error from the command or the internal transaction api to handle them
+            // accordingly.
             uassertStatusOK(swResult);
             uassertStatusOK(swResult.getValue().getEffectiveStatus());
         } catch (const DBException& ex) {
             reply->canContinue = handleError(opCtx,
                                              ex,
-                                             ns,
+                                             bucketNs,
                                              wholeOp.getOrdered(),
                                              singleOp.getMulti(),
                                              singleOp.getSampleId(),
@@ -1523,8 +1520,9 @@ WriteResult performUpdates(OperationContext* opCtx,
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, currentOpIndex);
         if (opCtx->isRetryableWrite()) {
             if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
-                // For user time-series updates, handles the metrics of the command at the caller
-                // since each statement will run as a command through the internal transaction API.
+                // For non-sharded user time-series updates, handles the metrics of the command at
+                // the caller since each statement will run as a command through the internal
+                // transaction API.
                 containsRetry = source != OperationSource::kTimeseriesUpdate ||
                     originalNs.isTimeseriesBucketsCollection();
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();

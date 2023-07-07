@@ -144,7 +144,11 @@ public:
     }
 
     bool isShardedTimeSeriesBucketsNamespace() const override {
-        return false;
+        return _isShardedTimeSeriesBucketsNamespace;
+    }
+
+    void setIsShardedTimeSeriesBucketsNamespace(bool isShardedTimeSeriesBucketsNamespace) {
+        _isShardedTimeSeriesBucketsNamespace = isShardedTimeSeriesBucketsNamespace;
     }
 
 private:
@@ -159,6 +163,8 @@ private:
     NamespaceString _nss;
 
     std::vector<MockRange> _mockRanges;
+
+    bool _isShardedTimeSeriesBucketsNamespace = false;
 };
 
 void assertEndpointsEqual(const ShardEndpoint& endpointA, const ShardEndpoint& endpointB);

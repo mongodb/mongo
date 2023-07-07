@@ -80,6 +80,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -3536,7 +3537,10 @@ void TransactionParticipant::Participant::handleWouldChangeOwningShardError(
         invariant(opCtx->getTxnNumber());
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         _resetRetryableWriteState();
-    } else if (_isInternalSessionForRetryableWrite()) {
+    } else if (_isInternalSessionForRetryableWrite() &&
+               // (Ignore FCV check): The feature flag is fully disabled.
+               feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi
+                   .isEnabledAndIgnoreFCVUnsafe()) {
         // If this was a retryable transaction, add a sentinel noop to the transaction's operations
         // so retries can detect that a WouldChangeOwningShard error was thrown and know to throw
         // IncompleteTransactionHistory.
