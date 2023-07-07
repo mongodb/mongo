@@ -153,6 +153,20 @@ if (isShardSvrRst) {
     configRstPrimary = st.configRS.getPrimary();
 } else {
     // Start a sharded cluster and add the configsvr replica set to it.
+    if (TestData.mongosBinVersion) {
+        // Make sure the configsvr is in the same FCV as the mongos.
+        const fcv = binVersionToFCV(TestData.mongosBinVersion);
+        authutil.asCluster(rst.nodes, keyFile, () => {
+            // Transitioning from last-lts to last-continuous is only allowed when
+            // setFeatureCompatibilityVersion is called with fromConfigServer: true.
+            assert.commandWorked(rst.getPrimary().adminCommand(
+                {setFeatureCompatibilityVersion: fcv, fromConfigServer: true}));
+
+            // Wait for the new FCV to propagate to all configsvr nodes.
+            rst.awaitReplication();
+        });
+    }
+
     mongos = MongoRunner.runMongos({configdb: rst.getURL(), keyFile});
     authutil.asCluster(mongos, keyFile, () => {
         assert.commandWorked(mongos.adminCommand({transitionFromDedicatedConfigServer: 1}));
