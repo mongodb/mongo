@@ -548,7 +548,8 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
                 `population does not match the mock query patterns: ${tojsononeline(sampleSize)}`);
             // The sample population should always match the mock query patterns unless there are
             // retries.
-            assert(TestData.runningWithShardStepdowns || TestData.runningWithBalancer);
+            assert(TestData.runningWithShardStepdowns || TestData.runningWithBalancer ||
+                   TestData.runInsideTransaction);
         }
         return isAcceptable;
     };
@@ -576,7 +577,8 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
                 `population does not match the mock query patterns: ${tojsononeline(sampleSize)}`);
             // The sample population should always match the mock query patterns unless there are
             // retries.
-            assert(TestData.runningWithShardStepdowns || TestData.runningWithBalancer);
+            assert(TestData.runningWithShardStepdowns || TestData.runningWithBalancer ||
+                   TestData.runInsideTransaction);
         }
         return isAcceptable;
     };
