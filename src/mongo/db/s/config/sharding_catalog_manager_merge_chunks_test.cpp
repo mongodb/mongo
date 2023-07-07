@@ -736,8 +736,11 @@ protected:
         potentialBounds.push_back(_keyPattern.globalMax());
 
         std::vector<BSONObj> randomlySelectedBounds;
-        std::ranges::sample(
-            potentialBounds, std::back_inserter(randomlySelectedBounds), numBounds, _random.urbg());
+        std::sample(potentialBounds.begin(),
+                    potentialBounds.end(),
+                    std::back_inserter(randomlySelectedBounds),
+                    numBounds,
+                    _random.urbg());
         return randomlySelectedBounds;
     }
 
