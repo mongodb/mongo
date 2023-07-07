@@ -836,9 +836,6 @@ public:
     friend auto logAttrs(const NamespaceString& nss) {
         return "namespace"_attr = nss;
     }
-    std::string toString() const {
-        return ns().toString();
-    }
 
 private:
     friend NamespaceStringUtil;
@@ -885,6 +882,9 @@ private:
     NamespaceString(boost::optional<TenantId> tenantId, StringData db, StringData collectionName)
         : _data(makeData(tenantId, db, collectionName)) {}
 
+    std::string toString() const {
+        return ns().toString();
+    }
 
     std::string toStringWithTenantId() const {
         if (_hasTenantId()) {
