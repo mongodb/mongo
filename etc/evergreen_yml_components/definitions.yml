@@ -6575,6 +6575,18 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
 
+- <<: *gen_task_template
+  name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
+  tags: ["sharding"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
+  tags: ["sharding"]
+  commands:
+  - func: "generate resmoke tasks"
+
 - <<: *task_template
   name: jsCore_decimal
   tags: ["jscore", "common", "decimal"]

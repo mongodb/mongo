@@ -66,6 +66,7 @@ selector:
   # The test uses a resumeToken from previous calls so FCV change will make the token invalid and fail.
   - jstests/core/resume_query_from_non_existent_record.js
   - jstests/core/resume_query.js
+  - jstests/core/find_with_resume_after_param.js
 
   # TODO (SERVER-78417): Mongod invariant while running bucket_timestamp_rounding.js with new fcv upgrade downgrade suite.
   - jstests/core/timeseries/bucket_timestamp_rounding.js
@@ -98,7 +99,7 @@ executor:
     shell_options:
       eval: >-
         globalThis.testingReplication = true;
-        load("jstests/libs/override_methods/retry_aborted_index_build.js");
+        load("jstests/libs/override_methods/retry_aborted_db_and_index_creation.js");
   hooks:
   - class: CheckReplOplogs
   - class: CheckReplDBHash
