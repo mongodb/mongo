@@ -93,6 +93,7 @@ MAKE_PRINTABLE_ENUM_STRING_ARRAY(LogicalRewriterTypeEnum,
     F(EnforceCollation)           \
     F(EnforceLimitSkip)           \
     F(EnforceDistribution)        \
+    F(EnforceShardFilter)         \
     F(AttemptCoveringQuery)       \
     F(Seek)                       \
     F(PhysicalScan)               \

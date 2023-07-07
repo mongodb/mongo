@@ -58,6 +58,12 @@ using namespace properties;
 static void populateInitialDistributions(const DistributionAndPaths& distributionAndPaths,
                                          const bool isMultiPartition,
                                          DistributionSet& distributions) {
+
+    if (!isMultiPartition) {
+        distributions.insert({DistributionType::Centralized});
+        return;
+    }
+
     switch (distributionAndPaths._type) {
         case DistributionType::Centralized:
             distributions.insert({DistributionType::Centralized});

@@ -64,6 +64,7 @@
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
@@ -157,6 +158,8 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|           type: Centralized\n"
         "|       indexingRequirement: \n"
         "|           Complete, dedupRID\n"
+        "|       removeOrphans: \n"
+        "|           false\n"
         "Root [{p2}]\n"
         "Properties [cost: 0.438321, localCost: 0.00983406, adjustedCE: 10]\n"
         "|   |   Logical:\n"
@@ -181,6 +184,8 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|           type: Centralized\n"
         "|       indexingRequirement: \n"
         "|           Complete, dedupRID\n"
+        "|       removeOrphans: \n"
+        "|           false\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [p2]\n"
@@ -208,6 +213,8 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|           type: Centralized, disableExchanges\n"
         "|       indexingRequirement: \n"
         "|           Complete, dedupRID\n"
+        "|       removeOrphans: \n"
+        "|           false\n"
         "Evaluation [{p2} = Variable [p1]]\n"
         "Properties [cost: 0.428487, localCost: 0, adjustedCE: 100]\n"
         "|   |   Logical:\n"
@@ -229,6 +236,8 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|           type: Centralized, disableExchanges\n"
         "|       indexingRequirement: \n"
         "|           Complete, dedupRID\n"
+        "|       removeOrphans: \n"
+        "|           false\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [p1]\n"
@@ -253,6 +262,8 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|           type: Centralized, disableExchanges\n"
         "|       indexingRequirement: \n"
         "|           Complete, dedupRID\n"
+        "|       removeOrphans: \n"
+        "|           false\n"
         "PhysicalScan [{'<root>': p1}, test]\n",
         phaseManager);
 }
@@ -3256,6 +3267,8 @@ TEST(PhysRewriter, IndexResidualReq) {
         "|           type: Centralized\n"
         "|       indexingRequirement: \n"
         "|           Complete, dedupRID\n"
+        "|       removeOrphans: \n"
+        "|           false\n"
         "Root [{pa}]\n"
         "Properties [cost: 0.176361, localCost: 0.176361, adjustedCE: 330]\n"
         "|   |   Logical:\n"
@@ -3284,6 +3297,8 @@ TEST(PhysRewriter, IndexResidualReq) {
         "|           type: Centralized\n"
         "|       indexingRequirement: \n"
         "|           Index, dedupRID\n"
+        "|       removeOrphans: \n"
+        "|           false\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_2]\n"
@@ -4120,6 +4135,8 @@ TEST(PhysRewriter, CollationLimit) {
         "|           type: Centralized\n"
         "|       indexingRequirement: \n"
         "|           Complete, dedupRID\n"
+        "|       removeOrphans: \n"
+        "|           false\n"
         "Collation [{pa: Ascending}]\n"
         "Properties [cost: 0.428487, localCost: 0.428487, adjustedCE: 1000]\n"
         "|   |   Logical:\n"
@@ -4145,6 +4162,8 @@ TEST(PhysRewriter, CollationLimit) {
         "|           type: Centralized\n"
         "|       indexingRequirement: \n"
         "|           Complete, dedupRID\n"
+        "|       removeOrphans: \n"
+        "|           false\n"
         "PhysicalScan [{'<root>': root, 'a': pa}, c1]\n",
         phaseManager);
 }
@@ -4850,6 +4869,8 @@ TEST(PhysRewriter, EqMemberSargable) {
             "|           type: Centralized\n"
             "|       indexingRequirement: \n"
             "|           Complete, dedupRID\n"
+            "|       removeOrphans: \n"
+            "|           false\n"
             "Root [{root}]\n"
             "Properties [cost: 0.163045, localCost: 0.0180785, adjustedCE: 54.6819]\n"
             "|   |   Logical:\n"
@@ -4875,6 +4896,8 @@ TEST(PhysRewriter, EqMemberSargable) {
             "|           type: Centralized\n"
             "|       indexingRequirement: \n"
             "|           Complete, dedupRID\n"
+            "|       removeOrphans: \n"
+            "|           false\n"
             "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
             "|   |   Const [true]\n"
             "|   Properties [cost: 0.0757996, localCost: 0.0757996, adjustedCE: 54.6819]\n"
@@ -4897,7 +4920,10 @@ TEST(PhysRewriter, EqMemberSargable) {
             "|   |           type: Centralized\n"
             "|   |       indexingRequirement: \n"
             "|   |           Seek, dedupRID\n"
-            "|   |       repetitionEstimate: 54.6819\n"
+            "|   |       repetitionEstimate: \n"
+            "|   |           54.6819\n"
+            "|   |       removeOrphans: \n"
+            "|   |           false\n"
             "|   LimitSkip [limit: 1, skip: 0]\n"
             "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
             "Properties [cost: 0.0691671, localCost: 0.0691671, adjustedCE: 54.6819]\n"
@@ -4924,6 +4950,8 @@ TEST(PhysRewriter, EqMemberSargable) {
             "|           type: Centralized\n"
             "|       indexingRequirement: \n"
             "|           Index, dedupRID\n"
+            "|       removeOrphans: \n"
+            "|           false\n"
             "Unique [{rid_0}]\n"
             "SortedMerge []\n"
             "|   |   |   |   collation: \n"
@@ -5362,7 +5390,10 @@ TEST(PhysRewriter, ExplainMemoDisplayRulesForRejectedPlans) {
         "                    type: Centralized\n"
         "                indexingRequirement: \n"
         "                    Seek, dedupRID\n"
-        "                repetitionEstimate: 31.6228\n"
+        "                repetitionEstimate: \n"
+        "                    31.6228\n"
+        "                removeOrphans: \n"
+        "                    false\n"
         "            cost: 0.0472695, localCost: 0.0472695, adjustedCE: 31.6228, rule: Seek, "
         "node: \n"
         "                LimitSkip [limit: 1, skip: 0]\n"
@@ -5414,6 +5445,8 @@ TEST(PhysRewriter, ExplainMemoDisplayRulesForRejectedPlans) {
         "                    type: Centralized\n"
         "                indexingRequirement: \n"
         "                    Complete, dedupRID\n"
+        "                removeOrphans: \n"
+        "                    false\n"
         "            cost: 0.0847147, localCost: 0.0106248, adjustedCE: 31.6228, rule: "
         "IndexFetch, node: \n"
         "                NestedLoopJoin [joinType: Inner, {rid_0}]\n"
@@ -5458,6 +5491,8 @@ TEST(PhysRewriter, ExplainMemoDisplayRulesForRejectedPlans) {
         "                    type: Centralized\n"
         "                indexingRequirement: \n"
         "                    Complete, dedupRID\n"
+        "                removeOrphans: \n"
+        "                    false\n"
         "            cost: 0.0847147, localCost: 0, adjustedCE: 31.6228, rule: Root, node: \n"
         "                Root [{root}]\n"
         "                    ce: 31.6228\n"
@@ -5497,6 +5532,8 @@ TEST(PhysRewriter, ExplainMemoDisplayRulesForRejectedPlans) {
         "                    type: Centralized\n"
         "                indexingRequirement: \n"
         "                    Index, dedupRID\n"
+        "                removeOrphans: \n"
+        "                    false\n"
         "            cost: 0.0268205, localCost: 0.0268205, adjustedCE: 31.6228, rule: "
         "SargableToIndex, node: \n"
         "                IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, "
@@ -5621,5 +5658,140 @@ TEST(PhysRewriter, ExtractAllPlans) {
         "| minKey], Const [1 | maxKey]]}]\n",
         getExplainForPlan(2));
 }
+
+TEST(PhysRewriter, RemoveOrphansEnforcer) {
+    // Hypothetical MQL which could generate this ABT: {$match: {a: 1}}
+    ABT rootNode = NodeBuilder{}
+                       .root("root")
+                       .filter(_evalf(_get("a", _traverse1(_cmp("Eq", "1"_cint64))), "root"_var))
+                       .finish(_scan("root", "c1"));
+
+    auto prefixId = PrefixId::createForTests();
+
+    auto scanDef =
+        createScanDef(ScanDefOptions{},
+                      IndexDefinitions{},
+                      MultikeynessTrie{},
+                      ConstEval::constFold,
+                      // Sharded on {a: 1, b:1}
+                      DistributionAndPaths{DistributionType::RangePartitioning,
+                                           ABTVector{make<PathGet>("a", make<PathIdentity>()),
+                                                     make<PathGet>("b", make<PathIdentity>())}},
+                      true /*exists*/,
+                      boost::none /*ce*/,
+                      ShardingMetadata{.mayContainOrphans = true});
+
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1", scanDef}}},
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    phaseManager.optimize(optimized);
+
+    // Note new evaluation nodes for fields of the shard key and the filter node to perform the
+    // shard filtering.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{root}]\n"
+        "Filter []\n"
+        "|   FunctionCall [shardFilter]\n"
+        "|   |   Variable [shardKey_1]\n"
+        "|   Variable [shardKey_0]\n"
+        "Evaluation [{shardKey_1}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [b]\n"
+        "|   PathIdentity []\n"
+        "Evaluation [{shardKey_0}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [a]\n"
+        "|   PathIdentity []\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_0]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n",
+        optimized);
+}
+
+TEST(PhysRewriter, RemoveOrphansEnforcerMultipleCollections) {
+    // Hypothetical MQL which could generate this ABT:
+    //   db.c1.aggregate([{$unionWith: {coll: "c2", pipeline: [{$match: {}}]}}])
+    ABT rootNode = NodeBuilder{}
+                       .root("root")
+                       .un(ProjectionNameVector{"root"},
+                           {NodeHolder{NodeBuilder{}.finish(_scan("root", "c2"))}})
+                       .finish(_scan("root", "c1"));
+
+    auto prefixId = PrefixId::createForTests();
+
+    auto scanDef1 =
+        createScanDef(ScanDefOptions{},
+                      IndexDefinitions{},
+                      MultikeynessTrie{},
+                      ConstEval::constFold,
+                      // Sharded on {a: 1}
+                      DistributionAndPaths{DistributionType::RangePartitioning,
+                                           ABTVector{make<PathGet>("a", make<PathIdentity>())}},
+                      true /*exists*/,
+                      boost::none /*ce*/,
+                      ShardingMetadata{.mayContainOrphans = true});
+
+    auto scanDef2 =
+        createScanDef(ScanDefOptions{},
+                      IndexDefinitions{},
+                      MultikeynessTrie{},
+                      ConstEval::constFold,
+                      // Sharded on {b: 1}
+                      DistributionAndPaths{DistributionType::RangePartitioning,
+                                           ABTVector{make<PathGet>("b", make<PathIdentity>())}},
+                      true /*exists*/,
+                      boost::none /*ce*/,
+                      ShardingMetadata{.mayContainOrphans = true});
+
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1", scanDef1}, {"c2", scanDef2}}},
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    phaseManager.optimize(optimized);
+
+    // Note the evaluation node to project the shard key and filter node to perform shard filtering.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{root}]\n"
+        "Union [{root}]\n"
+        "|   Filter []\n"
+        "|   |   FunctionCall [shardFilter]\n"
+        "|   |   Variable [shardKey_1]\n"
+        "|   Evaluation [{shardKey_1}]\n"
+        "|   |   EvalPath []\n"
+        "|   |   |   Variable [root]\n"
+        "|   |   PathGet [b]\n"
+        "|   |   PathIdentity []\n"
+        "|   PhysicalScan [{'<root>': root}, c2]\n"
+        "Filter []\n"
+        "|   FunctionCall [shardFilter]\n"
+        "|   Variable [shardKey_0]\n"
+        "Evaluation [{shardKey_0}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [a]\n"
+        "|   PathIdentity []\n"
+        "PhysicalScan [{'<root>': root}, c1]\n",
+        optimized);
+}
+
 }  // namespace
 }  // namespace mongo::optimizer

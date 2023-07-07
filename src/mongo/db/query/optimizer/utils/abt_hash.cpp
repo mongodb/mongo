@@ -484,6 +484,11 @@ public:
         return computeHashSeq<7>(CEType::Hasher()(prop.getEstimate()));
     }
 
+    size_t operator()(const properties::PhysProperty&,
+                      const properties::RemoveOrphansRequirement& prop) {
+        return computeHashSeq<8>(std::hash<bool>()(prop.mustRemove()));
+    }
+
     static size_t computeHash(const properties::PhysProps& props) {
         PhysPropsHasher visitor;
         size_t result = 17;

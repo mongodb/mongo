@@ -151,6 +151,11 @@ public:
             // TODO: consider rid?
             return;
         }
+        if (getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove()) {
+            // Cannot satisfy remove orphans. The enforcer for a group representing a scan will
+            // produce an alternative which performs shard filtering.
+            return;
+        }
 
         const auto& indexReq = getPropertyConst<IndexingRequirement>(_physProps);
         const IndexReqTarget indexReqTarget = indexReq.getIndexReqTarget();
@@ -433,6 +438,10 @@ public:
     void operator()(const ABT& n, const SargableNode& node) {
         if (hasProperty<LimitSkipRequirement>(_physProps)) {
             // Cannot satisfy limit-skip.
+            return;
+        }
+        if (getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove()) {
+            // TODO SERVER-78507: Implement this implementer.
             return;
         }
 
@@ -797,6 +806,11 @@ public:
     }
 
     void operator()(const ABT& /*n*/, const RIDIntersectNode& node) {
+        if (getPropertyConst<RemoveOrphansRequirement>(_physProps).mustRemove()) {
+            // TODO SERVER-78508: Implement this implementer.
+            return;
+        }
+
         const auto& indexingAvailability = getPropertyConst<IndexingAvailability>(_logicalProps);
         const std::string& scanDefName = indexingAvailability.getScanDefName();
         {

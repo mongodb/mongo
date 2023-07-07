@@ -102,7 +102,8 @@ ScanDefinition createScanDef(ScanDefOptions options,
                              const ConstFoldFn& constFold,
                              DistributionAndPaths distributionAndPaths,
                              const bool exists,
-                             boost::optional<CEType> ce) {
+                             boost::optional<CEType> ce,
+                             ShardingMetadata shardingMetadata) {
 
     // Simplify partial filter requirements using the non-multikey paths.
     for (auto& [indexDefName, indexDef] : indexDefs) {
@@ -125,7 +126,8 @@ ScanDefinition createScanDef(ScanDefOptions options,
             std::move(multikeynessTrie),
             std::move(distributionAndPaths),
             exists,
-            std::move(ce)};
+            std::move(ce),
+            std::move(shardingMetadata)};
 }
 
 }  // namespace mongo::optimizer

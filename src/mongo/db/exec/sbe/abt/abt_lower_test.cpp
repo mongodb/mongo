@@ -167,7 +167,7 @@ protected:
         DistributionAndPaths dnp(DistributionType::Centralized);
         bool exists = true;
         CEType ce{false};
-        return ScanDefinition(opts, indexDefs, trie, dnp, exists, ce);
+        return ScanDefinition(opts, indexDefs, trie, dnp, exists, ce, ShardingMetadata{});
     }
 
     // Does not add the node to the Node map, must be called inside '_node()'.

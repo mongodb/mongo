@@ -2362,11 +2362,22 @@ public:
 
         void operator()(const properties::PhysProperty&,
                         const properties::RepetitionEstimate& prop) {
-            _parent.fieldName("repetitionEstimate").print(prop.getEstimate());
+            ExplainPrinter printer;
+            printer.print(prop.getEstimate());
+            _parent.fieldName("repetitionEstimate").print(printer);
         }
 
         void operator()(const properties::PhysProperty&, const properties::LimitEstimate& prop) {
-            _parent.fieldName("limitEstimate").print(prop.getEstimate());
+            ExplainPrinter printer;
+            printer.print(prop.getEstimate());
+            _parent.fieldName("limitEstimate").print(printer);
+        }
+
+        void operator()(const properties::PhysProperty&,
+                        const properties::RemoveOrphansRequirement& prop) {
+            ExplainPrinter printer;
+            printer.print(prop.mustRemove() ? "true" : "false");
+            _parent.fieldName("removeOrphans").print(printer);
         }
 
     private:

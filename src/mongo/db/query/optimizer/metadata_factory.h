@@ -56,6 +56,7 @@ ScanDefinition createScanDef(ScanDefOptions options,
                              const ConstFoldFn& constFold,
                              DistributionAndPaths distributionAndPaths,
                              bool exists = true,
-                             boost::optional<CEType> ce = boost::none);
+                             boost::optional<CEType> ce = boost::none,
+                             ShardingMetadata shardingMetadata = {});
 
 }  // namespace mongo::optimizer

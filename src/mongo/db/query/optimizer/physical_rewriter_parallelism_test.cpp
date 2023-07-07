@@ -453,6 +453,8 @@ TEST(PhysRewriterParallel, LocalLimitSkip) {
         "|           type: Centralized\n"
         "|       indexingRequirement: \n"
         "|           Complete, dedupRID\n"
+        "|       removeOrphans: \n"
+        "|           false\n"
         "LimitSkip [limit: 20, skip: 10]\n"
         "Properties [cost: 0.00676997, localCost: 0.003001, adjustedCE: 30]\n"
         "|   |   Logical:\n"
@@ -474,7 +476,10 @@ TEST(PhysRewriterParallel, LocalLimitSkip) {
         "|           type: Centralized\n"
         "|       indexingRequirement: \n"
         "|           Complete, dedupRID\n"
-        "|       limitEstimate: 30\n"
+        "|       limitEstimate: \n"
+        "|           30\n"
+        "|       removeOrphans: \n"
+        "|           false\n"
         "Exchange []\n"
         "|   |   distribution: \n"
         "|   |       type: Centralized\n"
@@ -498,7 +503,10 @@ TEST(PhysRewriterParallel, LocalLimitSkip) {
         "|           type: UnknownPartitioning, disableExchanges\n"
         "|       indexingRequirement: \n"
         "|           Complete, dedupRID\n"
-        "|       limitEstimate: 30\n"
+        "|       limitEstimate: \n"
+        "|           30\n"
+        "|       removeOrphans: \n"
+        "|           false\n"
         "PhysicalScan [{'<root>': root}, c1, parallel]\n",
         phaseManager);
 }

@@ -251,6 +251,20 @@ CEType LimitEstimate::getEstimate() const {
     return _estimate;
 }
 
+RemoveOrphansRequirement::RemoveOrphansRequirement(bool mustRemove) : _mustRemove(mustRemove) {}
+
+bool RemoveOrphansRequirement::operator==(const RemoveOrphansRequirement& other) const {
+    return _mustRemove == other._mustRemove;
+}
+
+ProjectionNameSet RemoveOrphansRequirement::getAffectedProjectionNames() const {
+    return {};
+}
+
+bool RemoveOrphansRequirement::mustRemove() const {
+    return _mustRemove;
+}
+
 ProjectionAvailability::ProjectionAvailability(ProjectionNameSet projections)
     : _projections(std::move(projections)) {}
 

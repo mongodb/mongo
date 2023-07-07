@@ -45,6 +45,7 @@ void addEnforcers(GroupIdType groupId,
                   const RIDProjectionsMap& ridProjections,
                   PhysRewriteQueue& queue,
                   const properties::PhysProps& physProps,
-                  const properties::LogicalProps& logicalProps);
+                  const properties::LogicalProps& logicalProps,
+                  PrefixId& prefixId);
 
 }  // namespace mongo::optimizer::cascades

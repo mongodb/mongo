@@ -173,20 +173,23 @@ ScanDefinition::ScanDefinition()
                      {} /*nonMultiKeyPathSet*/,
                      {DistributionType::Centralized},
                      true /*exists*/,
-                     boost::none /*ce*/) {}
+                     boost::none /*ce*/,
+                     {} /*shardingMetadata*/) {}
 
 ScanDefinition::ScanDefinition(ScanDefOptions options,
                                opt::unordered_map<std::string, IndexDefinition> indexDefs,
                                MultikeynessTrie multikeynessTrie,
                                DistributionAndPaths distributionAndPaths,
                                const bool exists,
-                               boost::optional<CEType> ce)
+                               boost::optional<CEType> ce,
+                               ShardingMetadata shardingMetadata)
     : _options(std::move(options)),
       _distributionAndPaths(std::move(distributionAndPaths)),
       _indexDefs(std::move(indexDefs)),
       _multikeynessTrie(std::move(multikeynessTrie)),
       _exists(exists),
-      _ce(std::move(ce)) {}
+      _ce(std::move(ce)),
+      _shardingMetadata(std::move(shardingMetadata)) {}
 
 const ScanDefOptions& ScanDefinition::getOptionsMap() const {
     return _options;
@@ -214,6 +217,10 @@ bool ScanDefinition::exists() const {
 
 const boost::optional<CEType>& ScanDefinition::getCE() const {
     return _ce;
+}
+
+ShardingMetadata ScanDefinition::shardingMetadata() const {
+    return _shardingMetadata;
 }
 
 Metadata::Metadata(opt::unordered_map<std::string, ScanDefinition> scanDefs)
