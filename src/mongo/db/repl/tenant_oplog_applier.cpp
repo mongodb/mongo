@@ -135,8 +135,9 @@ OplogEntryType getOplogEntryType(const OplogEntry& entry) {
 
 TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
                                        const MigrationProtocolEnum& protocol,
+                                       const OpTime& startApplyingAfterOpTime,
+                                       const OpTime& cloneFinishedRecipientOpTime,
                                        boost::optional<std::string> tenantId,
-                                       OpTime startApplyingAfterOpTime,
                                        RandomAccessOplogBuffer* oplogBuffer,
                                        std::shared_ptr<executor::TaskExecutor> executor,
                                        ThreadPool* writerPool,
@@ -145,12 +146,31 @@ TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
                              std::string("TenantOplogApplier_") + migrationUuid.toString()),
       _migrationUuid(migrationUuid),
       _protocol(protocol),
-      _tenantId(tenantId),
       _startApplyingAfterOpTime(startApplyingAfterOpTime),
+      _cloneFinishedRecipientOpTime(cloneFinishedRecipientOpTime),
+      _tenantId(tenantId),
       _oplogBuffer(oplogBuffer),
       _executor(std::move(executor)),
       _writerPool(writerPool),
-      _resumeBatchingTs(resumeBatchingTs) {
+      _resumeBatchingTs(resumeBatchingTs),
+      _options([&] {
+          switch (protocol) {
+              case MigrationProtocolEnum::kMultitenantMigrations:
+                  // Since multi-tenant migration uses logical cloning, the oplog entries will be
+                  // applied on a inconsistent copy of donor data. Hence, using
+                  // OplogApplication::Mode::kInitialSync.
+                  return OplogApplication::Mode::kInitialSync;
+              case MigrationProtocolEnum::kShardMerge:
+                  // Since shard merge  uses backup cursor for database cloning and tenant oplog
+                  // catchup phase is not resumable on failovers, the oplog entries will be applied
+                  // on a consistent copy of donor data. Hence, using
+                  // OplogApplication::Mode::kSecondary.
+                  return OplogApplication::Mode::kSecondary;
+              default:
+                  MONGO_UNREACHABLE;
+          }
+      }()) {
+    invariant(!_cloneFinishedRecipientOpTime.isNull());
     if (_protocol != MigrationProtocolEnum::kShardMerge) {
         invariant(_tenantId);
     } else {
@@ -188,18 +208,6 @@ OpTime TenantOplogApplier::getStartApplyingAfterOpTime() const {
 
 Timestamp TenantOplogApplier::getResumeBatchingTs() const {
     return _resumeBatchingTs;
-}
-
-void TenantOplogApplier::setCloneFinishedRecipientOpTime(OpTime cloneFinishedRecipientOpTime) {
-    LOGV2(7817600,
-          "setting cloneFinishedRecipientOpTime.",
-          "opTime"_attr = _cloneFinishedRecipientOpTime);
-
-    stdx::lock_guard lk(_mutex);
-    invariant(!_isActive_inlock());
-    invariant(!cloneFinishedRecipientOpTime.isNull());
-    invariant(_cloneFinishedRecipientOpTime.isNull());
-    _cloneFinishedRecipientOpTime = cloneFinishedRecipientOpTime;
 }
 
 void TenantOplogApplier::_doStartup_inlock() {
@@ -558,7 +566,6 @@ void TenantOplogApplier::_writeRetryableWriteEntryNoOp(
             txnParticipant);
 
     TxnNumberAndRetryCounter txnNumberAndRetryCounter{txnNumber};
-    invariant(!_cloneFinishedRecipientOpTime.isNull());
     if (txnParticipant.getLastWriteOpTime() > _cloneFinishedRecipientOpTime) {
         // Out-of-order processing within a migration lifetime is not possible,
         // except in recipient failovers. However, merge and tenant migration
@@ -1238,39 +1245,19 @@ Status TenantOplogApplier::_applyOplogBatchPerWorker(std::vector<ApplierOperatio
     // Set this to satisfy low-level locking invariants.
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
-    const bool allowNamespaceNotFoundErrorsOnCrudOps(true);
-    bool isDataConsistent;
-    OplogApplication::Mode mode;
-    switch (_protocol) {
-        case MigrationProtocolEnum::kMultitenantMigrations:
-            // Multi-tenant migration always use oplog application mode 'kInitialSync' and
-            // isDataConsistent 'false', because we're applying oplog entries to a cloned database
-            // the way initial sync does.
-            isDataConsistent = false;
-            mode = OplogApplication::Mode::kInitialSync;
-            break;
-        case MigrationProtocolEnum::kShardMerge:
-            // Since shard merge protocol uses backup cursor for database cloning and tenant oplog
-            // catchup phase is not resumable on failovers, the oplog entries will be applied on a
-            // consistent copy of donor data.
-            isDataConsistent = true;
-            mode = OplogApplication::Mode::kSecondary;
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
     auto status = OplogApplierUtils::applyOplogBatchCommon(
         opCtx.get(),
         ops,
-        mode,
-        allowNamespaceNotFoundErrorsOnCrudOps,
-        isDataConsistent,
+        _options.mode,
+        _options.allowNamespaceNotFoundErrorsOnCrudOps,
+        _options.isDataConsistent,
         [this](OperationContext* opCtx,
                const OplogEntryOrGroupedInserts& opOrInserts,
                OplogApplication::Mode mode,
                const bool isDataConsistent) {
             return _applyOplogEntryOrGroupedInserts(opCtx, opOrInserts, mode, isDataConsistent);
         });
+
     if (!status.isOK()) {
         LOGV2_ERROR(4886008,
                     "Tenant migration writer worker batch application failed",

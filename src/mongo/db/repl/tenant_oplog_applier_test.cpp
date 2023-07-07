@@ -98,6 +98,10 @@ using executor::ThreadPoolExecutorTest;
 
 namespace repl {
 
+namespace {
+const OpTime kDefaultCloneFinishedRecipientOpTime(Timestamp(1, 1), 1);
+}  // namespace
+
 class TenantOplogApplierTestOpObserver : public OplogApplierImplOpObserver {
 public:
     void onInternalOpMessage(OperationContext* opCtx,
@@ -258,8 +262,9 @@ TEST_F(TenantOplogApplierTest, NoOpsForSingleBatch) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -293,8 +298,9 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeBatch) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -337,8 +343,9 @@ TEST_F(TenantOplogApplierTest, NoOpsForMultipleBatches) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -403,8 +410,9 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeTransaction) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -473,8 +481,9 @@ TEST_F(TenantOplogApplierTest, CommitUnpreparedTransaction_DataPartiallyApplied)
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -506,8 +515,9 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_DatabaseMissing) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -538,8 +548,9 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_CollectionMissing) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -577,8 +588,9 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_InsertExisting) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -621,8 +633,9 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_UniqueKey_InsertExisting) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -659,8 +672,9 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_Success) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -723,8 +737,9 @@ TEST_F(TenantOplogApplierTest, ApplyInserts_Grouped) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -763,8 +778,9 @@ TEST_F(TenantOplogApplierTest, ApplyUpdate_MissingDocument) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -802,8 +818,9 @@ TEST_F(TenantOplogApplierTest, ApplyUpdate_Success) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -832,8 +849,9 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DatabaseMissing) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -864,8 +882,9 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_CollectionMissing) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -895,8 +914,9 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DocumentMissing) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -937,8 +957,9 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -974,8 +995,9 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_CollExisting) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1019,8 +1041,9 @@ TEST_F(TenantOplogApplierTest, ApplyRenameCollCommand_CollExisting) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1061,8 +1084,9 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_Success) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1109,8 +1133,9 @@ TEST_F(TenantOplogApplierTest, ApplyCreateIndexesCommand_Success) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1141,8 +1166,9 @@ TEST_F(TenantOplogApplierTest, ApplyStartIndexBuildCommand_Failure) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1177,50 +1203,15 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_WrongNSS) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
     ASSERT_OK(applier->startup());
     auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
     ASSERT_NOT_OK(opAppliedFuture.getNoThrow().getStatus());
-    ASSERT_FALSE(applyCmdCalled);
-    applier->shutdown();
-    _oplogBuffer.shutdown(_opCtx.get());
-    applier->join();
-}
-
-TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_WrongNSS_Merge) {
-    // Should not be able to apply a command in the wrong namespace.
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("noTenantDB", "t");
-    auto op =
-        BSON("op"
-             << "c"
-             << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
-             << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen());
-    bool applyCmdCalled = false;
-    _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
-                                            const CollectionPtr&,
-                                            const NamespaceString& collNss,
-                                            const CollectionOptions&,
-                                            const BSONObj&) {
-        applyCmdCalled = true;
-    };
-    auto entry = OplogEntry(op);
-    pushOps({entry});
-    auto writerPool = makeTenantMigrationWriterPool();
-
-    auto applier = std::make_shared<TenantOplogApplier>(_migrationUuid,
-                                                        MigrationProtocolEnum::kShardMerge,
-                                                        boost::none,
-                                                        OpTime(),
-                                                        &_oplogBuffer,
-                                                        _executor,
-                                                        writerPool.get());
-    ASSERT_OK(applier->startup());
-    auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
-    ASSERT_EQ(opAppliedFuture.getNoThrow().getStatus().code(), ErrorCodes::InvalidTenantId);
     ASSERT_FALSE(applyCmdCalled);
     applier->shutdown();
     _oplogBuffer.shutdown(_opCtx.get());
@@ -1253,8 +1244,9 @@ TEST_F(TenantOplogApplierTest, ApplyDropIndexesCommand_IndexNotFound) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1297,8 +1289,9 @@ TEST_F(TenantOplogApplierTest, ApplyCollModCommand_IndexNotFound) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1342,8 +1335,9 @@ TEST_F(TenantOplogApplierTest, ApplyCollModCommand_CollectionMissing) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1373,46 +1367,15 @@ TEST_F(TenantOplogApplierTest, ApplyCRUD_WrongNSS) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
     ASSERT_OK(applier->startup());
     auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
     ASSERT_NOT_OK(opAppliedFuture.getNoThrow().getStatus());
-    ASSERT_FALSE(onInsertsCalled);
-    applier->shutdown();
-    _oplogBuffer.shutdown(_opCtx.get());
-    applier->join();
-}
-
-TEST_F(TenantOplogApplierTest, ApplyCRUD_WrongNSS_Merge) {
-    auto invalidTenant = TenantId(OID::gen());
-
-    // Should not be able to apply a CRUD operation to a namespace not belonging to us.
-    NamespaceString nss =
-        NamespaceString::createNamespaceString_forTest(invalidTenant, "test", "bar");
-    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
-    auto entry = makeInsertOplogEntry(1, nss, uuid);
-    bool onInsertsCalled = false;
-    _opObserver->onInsertsFn =
-        [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
-            onInsertsCalled = true;
-        };
-    pushOps({entry});
-    auto writerPool = makeTenantMigrationWriterPool();
-
-    auto applier = std::make_shared<TenantOplogApplier>(_migrationUuid,
-                                                        MigrationProtocolEnum::kShardMerge,
-                                                        boost::none,
-                                                        OpTime(),
-                                                        &_oplogBuffer,
-                                                        _executor,
-                                                        writerPool.get());
-    ASSERT_OK(applier->startup());
-    auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
-    ASSERT_EQ(opAppliedFuture.getNoThrow().getStatus().code(), ErrorCodes::InvalidTenantId);
     ASSERT_FALSE(onInsertsCalled);
     applier->shutdown();
     _oplogBuffer.shutdown(_opCtx.get());
@@ -1437,8 +1400,9 @@ TEST_F(TenantOplogApplierTest, ApplyCRUD_WrongUUID) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1460,8 +1424,9 @@ TEST_F(TenantOplogApplierTest, ApplyNoop_Success) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1490,8 +1455,9 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenNoop_Success) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1524,8 +1490,9 @@ TEST_F(TenantOplogApplierTest, ApplyInsertThenResumeTokenNoopInDifferentBatch_Su
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1563,8 +1530,9 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenNoopThenInsertInSameBatch_Success
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1599,8 +1567,9 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenInsertThenNoopSameTimestamp_Succe
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1634,8 +1603,9 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenInsertThenNoop_Success) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());
@@ -1688,8 +1658,9 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_MultiKeyIndex) {
     auto applier =
         std::make_shared<TenantOplogApplier>(_migrationUuid,
                                              MigrationProtocolEnum::kMultitenantMigrations,
-                                             _tenantId,
                                              OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
                                              &_oplogBuffer,
                                              _executor,
                                              writerPool.get());

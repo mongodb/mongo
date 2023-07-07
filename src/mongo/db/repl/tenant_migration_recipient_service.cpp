@@ -2239,14 +2239,14 @@ void TenantMigrationRecipientService::Instance::_startOplogApplier() {
     _tenantOplogApplier = std::make_shared<TenantOplogApplier>(
         _migrationUuid,
         MigrationProtocolEnum::kMultitenantMigrations,
-        _tenantId,
         (!resumeOpTime.isNull()) ? std::max(resumeOpTime, *startApplyingDonorOpTime)
                                  : *startApplyingDonorOpTime,
+        *cloneFinishedRecipientOpTime,
+        _tenantId,
         _donorOplogBuffer.get(),
         **_scopedExecutor,
         _writerPool.get(),
         resumeOpTime.getTimestamp());
-    _tenantOplogApplier->setCloneFinishedRecipientOpTime(*cloneFinishedRecipientOpTime);
 
     LOGV2_DEBUG(4881202,
                 1,

@@ -98,10 +98,32 @@ public:
         OpTime recipientOpTime;
     };
 
+    /**
+     * Used to configure behavior of this TenantOplogApplier.
+     **/
+    struct Options {
+        explicit Options(OplogApplication::Mode inputMode)
+            : mode(inputMode),
+              allowNamespaceNotFoundErrorsOnCrudOps(inputMode !=
+                                                    OplogApplication::Mode::kSecondary),
+              isDataConsistent(inputMode == OplogApplication::Mode::kSecondary) {
+
+            // Safety rail to prevent incorrect values for 'isDataConsistent' &
+            // 'allowNamespaceNotFoundErrorsOnCrudOps' for future oplog application modes.
+            invariant(mode == OplogApplication::Mode::kInitialSync ||
+                      mode == OplogApplication::Mode::kSecondary);
+        }
+
+        const OplogApplication::Mode mode;
+        const bool allowNamespaceNotFoundErrorsOnCrudOps;
+        const bool isDataConsistent;
+    };
+
     TenantOplogApplier(const UUID& migrationUuid,
                        const MigrationProtocolEnum& protocol,
+                       const OpTime& StartApplyingAfterOpTime,
+                       const OpTime& cloneFinishedRecipientOpTime,
                        boost::optional<std::string> tenantId,
-                       OpTime StartApplyingAfterOpTime,
                        RandomAccessOplogBuffer* oplogBuffer,
                        std::shared_ptr<executor::TaskExecutor> executor,
                        ThreadPool* writerPool,
@@ -122,11 +144,6 @@ public:
         stdx::lock_guard lk(_mutex);
         return _numOpsApplied;
     }
-
-    /**
-     * This should only be called once before the applier starts.
-     */
-    void setCloneFinishedRecipientOpTime(OpTime cloneFinishedRecipientOpTime);
 
     /**
      * Returns the optime the applier will start applying from.
@@ -212,21 +229,24 @@ private:
     std::shared_ptr<TenantOplogBatcher> _oplogBatcher;  // (R)
     const UUID _migrationUuid;                          // (R)
     const MigrationProtocolEnum _protocol;              // (R)
+    const OpTime _startApplyingAfterOpTime;             // (R)
+    // All no-op entries written by this migration should have OpTime greater than this
+    // OpTime.
+    const OpTime _cloneFinishedRecipientOpTime;  // (R)
     // For multi-tenant migration protocol, _tenantId is set.
     // But, for shard merge protcol, _tenantId is empty.
-    const boost::optional<std::string> _tenantId;       // (R)
-    const OpTime _startApplyingAfterOpTime;             // (R)
-    RandomAccessOplogBuffer* _oplogBuffer;              // (R)
-    std::shared_ptr<executor::TaskExecutor> _executor;  // (R)
-    // All no-op entries written by this tenant migration should have OpTime greater than this
-    // OpTime.
-    OpTime _cloneFinishedRecipientOpTime = OpTime();  // (R)
+    const boost::optional<std::string> _tenantId;  // (R)
+
+    RandomAccessOplogBuffer* _oplogBuffer;  // (R)
+    std::shared_ptr<executor::TaskExecutor>
+        _executor;  // (R)
+                    // Pool of worker threads for writing ops to the databases.
+    // Not owned by us.
+    ThreadPool* const _writerPool;  // (S)
     // Keeps track of last applied donor and recipient optimes by the tenant oplog applier.
     // This gets updated only on batch boundaries.
     OpTimePair _lastAppliedOpTimesUpToLastBatch;  // (M)
-    // Pool of worker threads for writing ops to the databases.
-    // Not owned by us.
-    ThreadPool* const _writerPool;  // (S)
+
     // The timestamp to resume batching from. A null timestamp indicates that the oplog applier
     // is starting fresh (not a retry), and will start batching from the beginning of the oplog
     // buffer.
@@ -236,6 +256,7 @@ private:
     stdx::unordered_set<UUID, UUID::Hash> _knownGoodUuids;                // (X)
     bool _applyLoopApplyingBatch = false;                                 // (M)
     size_t _numOpsApplied{0};                                             // (M)
+    const Options _options;                                               // (R)
 };
 
 /**
