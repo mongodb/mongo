@@ -10,6 +10,7 @@ const kDataBlockSize = 64 * 1024;
 const kDataBlock = 'x'.repeat(kDataBlockSize);
 const kBSONMaxObjSize = 16 * 1024 * 1024;
 const kNumRows = (kBSONMaxObjSize / kDataBlockSize) + 5;
+const kDBPrefix = 'qwertyuiopasdfghjklzxcvbnm_';
 
 function runTest(conn) {
     const admin = conn.getDB('admin');
@@ -19,17 +20,28 @@ function runTest(conn) {
     // Create more than 16KB of role data.
     // These roles are grouped into a meta-role to avoid calls to `usersInfo` unexpectedly
     // overflowing from duplication of roles/inheritedRoles plus showPrivileges.
+    // bigRole has 100 roles: groupRole_[0..99]
+    // Each groupRole has 100 subordinate builtin roles: read@prefix_XX[0..99]
+    let firstDB = null;
     const userRoles = [];
-    for (let i = 0; i < 10000; ++i) {
-        userRoles.push({db: 'qwertyuiopasdfghjklzxcvbnm_' + i, role: 'read'});
+    for (let i = 0; i < 100; ++i) {
+        const roleRoles = [];
+        for (let j = 0; j < 100; ++j) {
+            const db = kDBPrefix + String((i * 100) + j);
+            if (firstDB === null) {
+                firstDB = db;
+            }
+            roleRoles.push({db: db, role: 'read'});
+        }
+        assert.commandWorked(
+            admin.runCommand({createRole: 'groupRole_' + i, roles: roleRoles, privileges: []}));
+        userRoles.push({db: 'admin', role: 'groupRole_' + i});
     }
     assert.commandWorked(
         admin.runCommand({createRole: 'bigRole', roles: userRoles, privileges: []}));
     assert.commandWorked(admin.runCommand({createUser: 'user', pwd: 'pwd', roles: ['bigRole']}));
-    admin.logout();
 
-    assert(admin.auth('user', 'pwd'));
-    const db = conn.getDB(userRoles[0].db);
+    const db = conn.getDB(firstDB);
 
     // Fill a collection with enough rows to necessitate paging.
     for (let i = 1; i <= kNumRows; ++i) {
@@ -37,6 +49,10 @@ function runTest(conn) {
     }
     // Verify initial write.
     assert.eq(kNumRows, db.myColl.count({}));
+
+    // Switch to user with all the roles.
+    admin.logout();
+    assert(admin.auth('user', 'pwd'));
 
     // Create an aggregation which will batch up to kMaxWriteBatchSize or 16MB
     // (not counting metadata)
