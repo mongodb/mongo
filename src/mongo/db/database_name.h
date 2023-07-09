@@ -177,10 +177,10 @@ public:
     }
 
     /**
-     * Serialize the db name to stirng, always ignoring the tenantId.
-     * This function should only be used when no available serialize context.
+     * Returns a db name string without tenant id.  Only to be used when a tenant id cannot be
+     * tolerated in the serialized output, and should otherwise be avoided whenever possible.
      */
-    std::string serializeWithoutTenantPrefix() const {
+    std::string serializeWithoutTenantPrefix_UNSAFE() const {
         return db().toString();
     }
 

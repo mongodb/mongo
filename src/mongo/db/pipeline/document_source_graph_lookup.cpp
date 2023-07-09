@@ -614,7 +614,8 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
     auto fromValue = (pExpCtx->ns.db() == _from.db())
         ? Value(opts.serializeIdentifier(_from.coll()))
         : Value(Document{
-              {"db", opts.serializeIdentifier(_from.dbName().serializeWithoutTenantPrefix())},
+              {"db",
+               opts.serializeIdentifier(_from.dbName().serializeWithoutTenantPrefix_UNSAFE())},
               {"coll", opts.serializeIdentifier(_from.coll())}});
 
     // Serialize default options.

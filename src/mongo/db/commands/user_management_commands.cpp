@@ -1340,10 +1340,11 @@ DropAllUsersFromDatabaseReply CmdUMCTyped<DropAllUsersFromDatabaseCommand>::Invo
 
     audit::logDropAllUsersFromDatabase(client, dbname);
 
-    auto swNumRemoved = removePrivilegeDocuments(
-        opCtx,
-        BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname.serializeWithoutTenantPrefix()),
-        dbname.tenantId());
+    auto swNumRemoved =
+        removePrivilegeDocuments(opCtx,
+                                 BSON(AuthorizationManager::USER_DB_FIELD_NAME
+                                      << dbname.serializeWithoutTenantPrefix_UNSAFE()),
+                                 dbname.tenantId());
 
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
     authzManager->invalidateUsersFromDB(opCtx, dbname);
@@ -1508,8 +1509,9 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
         if (arg.isAllForAllDBs()) {
             // Leave the pipeline unconstrained, we want to return every user.
         } else if (arg.isAllOnCurrentDB()) {
-            pipeline.push_back(BSON("$match" << BSON(AuthorizationManager::USER_DB_FIELD_NAME
-                                                     << dbname.serializeWithoutTenantPrefix())));
+            pipeline.push_back(
+                BSON("$match" << BSON(AuthorizationManager::USER_DB_FIELD_NAME
+                                      << dbname.serializeWithoutTenantPrefix_UNSAFE())));
         } else {
             invariant(arg.isExact());
             BSONArrayBuilder usersMatchArray;
@@ -2069,8 +2071,8 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
 
     DropAllRolesFromDatabaseReply reply;
     const auto dropRoleOps = [&](UMCTransaction& txn) -> Status {
-        auto roleMatch =
-            BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname.serializeWithoutTenantPrefix());
+        auto roleMatch = BSON(AuthorizationManager::ROLE_DB_FIELD_NAME
+                              << dbname.serializeWithoutTenantPrefix_UNSAFE());
         auto rolesMatch = BSON("roles" << roleMatch);
 
         // Remove these roles from all users
@@ -2085,7 +2087,7 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
 
         // Remove these roles from all other roles
         swCount = txn.update(rolesNSS(dbname.tenantId()),
-                             BSON("roles.db" << dbname.serializeWithoutTenantPrefix()),
+                             BSON("roles.db" << dbname.serializeWithoutTenantPrefix_UNSAFE()),
                              BSON("$pull" << rolesMatch));
         if (!swCount.isOK()) {
             return useDefaultCode(swCount.getStatus(), ErrorCodes::RoleModificationFailed)
