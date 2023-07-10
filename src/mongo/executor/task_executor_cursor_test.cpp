@@ -34,6 +34,7 @@
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -421,55 +422,71 @@ TEST_F(TaskExecutorCursorFixture, LsidIsPassed) {
  * until the current batch is exhausted and 'getNext()' is invoked.
  */
 TEST_F(TaskExecutorCursorFixture, NoPrefetchGetMore) {
-    CursorId cursorId = 1;
-    RemoteCommandRequest rcr(HostAndPort("localhost"),
-                             "test",
-                             BSON("search"
-                                  << "foo"),
-                             opCtx.get());
+    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+        CursorId cursorId = 1;
+        RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                 "test",
+                                 BSON("search"
+                                      << "foo"),
+                                 opCtx.get());
 
-    // Construction of the TaskExecutorCursor enqueues a request in the NetworkInterfaceMock.
-    TaskExecutorCursor tec(&getExecutor(), rcr, [] {
-        TaskExecutorCursor::Options opts;
-        opts.batchSize = 2;
-        opts.preFetchNextBatch = false;
-        return opts;
-    }());
+        // The lambda that will be used to augment the getMore request sent below is passed into
+        // the TEC constructor.
+        auto augmentGetMore = [](BSONObjBuilder& bob) { bob.append("test", 1); };
 
-    // Mock the response for the first batch.
-    scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId);
+        // Construction of the TaskExecutorCursor enqueues a request in the NetworkInterfaceMock.
+        TaskExecutorCursor tec(&getExecutor(), rcr, [&augmentGetMore] {
+            TaskExecutorCursor::Options opts;
+            opts.batchSize = 2;
+            opts.preFetchNextBatch = false;
+            opts.getMoreAugmentationWriter = augmentGetMore;
+            return opts;
+        }());
 
-    // Exhaust the first batch.
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
+        // Mock the response for the first batch.
+        scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId);
 
-    // Assert that the TaskExecutorCursor has not requested a GetMore. This enforces that
-    // 'preFetchNextBatch' works as expected.
-    ASSERT_FALSE(hasReadyRequests());
+        // Exhaust the first batch.
+        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
+        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
 
-    // As soon as 'getNext()' is invoked, the TaskExecutorCursor will try to send a GetMore and
-    // that will block this thread in the NetworkInterfaceMock until there is a scheduled
-    // response. However, we cannot schedule the cursor response on the main thread before we
-    // call 'getNext()' as that will cause the NetworkInterfaceMock to block until there is
-    // request enqueued ('getNext()' is the function which will enqueue such as request).
-    // To avoid this deadlock, we start a new thread which will schedule a response on the
-    // NetworkInterfaceMock.
-    stdx::thread t([this, cursorId] {
-        scheduleSuccessfulCursorResponseNoPrefetchGetMore("nextBatch", 3, 4, 0);
+        // Assert that the TaskExecutorCursor has not requested a GetMore. This enforces that
+        // 'preFetchNextBatch' works as expected.
+        ASSERT_FALSE(hasReadyRequests());
+
+        // As soon as 'getNext()' is invoked, the TaskExecutorCursor will try to send a GetMore and
+        // that will block this thread in the NetworkInterfaceMock until there is a scheduled
+        // response. However, we cannot schedule the cursor response on the main thread before we
+        // call 'getNext()' as that will cause the NetworkInterfaceMock to block until there is
+        // request enqueued ('getNext()' is the function which will enqueue such as request).
+        // To avoid this deadlock, we start a new thread which will schedule a response on the
+        // NetworkInterfaceMock.
+        auto responseSchedulerThread = monitor.spawn([&] {
+            auto recievedGetMoreCmd =
+                scheduleSuccessfulCursorResponseNoPrefetchGetMore("nextBatch", 3, 4, 0);
+
+            // Assert that the command processed for the above response matches with the
+            // lambda to augment the getMore command used during construction of the TEC
+            // above.
+            const auto expectedGetMoreCmd = BSON("getMore" << 1LL << "collection"
+                                                           << "test"
+                                                           << "batchSize" << 2 << "test" << 1);
+            ASSERT_BSONOBJ_EQ(expectedGetMoreCmd, recievedGetMoreCmd);
+        });
+
+        // Schedules the GetMore request and exhausts the cursor.
+        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 3);
+        ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 4);
+
+        // Joining the thread which schedules the cursor response for the GetMore here forces the
+        // destructor of NetworkInterfaceMock::InNetworkGuard to run, which ensures that the
+        // 'NetworkInterfaceMock' stops executing as the network thread. This is required before we
+        // invoke 'hasReadyRequests()' which enters the network again.
+        responseSchedulerThread.join();
+
+        // Assert no GetMore is requested.
+        ASSERT_FALSE(hasReadyRequests());
     });
-
-    // Schedules the GetMore request and exhausts the cursor.
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 3);
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 4);
-
-    // Joining the thread which schedules the cursor response for the GetMore here forces the
-    // destructor of NetworkInterfaceMock::InNetworkGuard to run, which ensures that the
-    // 'NetworkInterfaceMock' stops executing as the network thread. This is required before we
-    // invoke 'hasReadyRequests()' which enters the network again.
-    t.join();
-
-    // Assert no GetMore is requested.
-    ASSERT_FALSE(hasReadyRequests());
 }
 
 }  // namespace

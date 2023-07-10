@@ -136,7 +136,16 @@ void TaskExecutorCursor::_scheduleGetMore(OperationContext* opCtx) {
     // There cannot be an existing in-flight request.
     invariant(!_cbHandle);
     GetMoreRequest getMoreRequest(_ns, _cursorId, _options.batchSize, {}, {}, {});
-    _runRemoteCommand(_createRequest(opCtx, getMoreRequest.toBSON()));
+
+    if (_options.getMoreAugmentationWriter) {
+        // Prefetching must be disabled to use the augmenting functionality.
+        invariant(!_options.preFetchNextBatch);
+        BSONObjBuilder getMoreBob(getMoreRequest.toBSON());
+        _options.getMoreAugmentationWriter(getMoreBob);
+        _runRemoteCommand(_createRequest(opCtx, getMoreBob.obj()));
+    } else {
+        _runRemoteCommand(_createRequest(opCtx, getMoreRequest.toBSON()));
+    }
 }
 
 void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
