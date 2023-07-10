@@ -79,6 +79,7 @@ public:
         kTimeseriesBucketMinTime,
         kTimeseriesBucketMaxTime,
         kSearchSortValues,
+        kVectorSearchDistance,
 
         // New fields must be added before the kNumFields sentinel.
         kNumFields
@@ -341,6 +342,21 @@ public:
         _holder->searchSortValues = vals.getOwned();
     }
 
+    bool hasVectorSearchDistance() const {
+        return _holder && _holder->metaFields.test(MetaType::kVectorSearchDistance);
+    }
+
+    double getVectorSearchDistance() const {
+        tassert(
+            7828400, "vectorSearchDistance must be present in metadata", hasVectorSearchDistance());
+        return _holder->vectorSearchDistance;
+    }
+
+    void setVectorSearchDistance(double vectorSearchDistance) {
+        _setCommon(MetaType::kVectorSearchDistance);
+        _holder->vectorSearchDistance = vectorSearchDistance;
+    }
+
     void serializeForSorter(BufBuilder& buf) const;
 
     bool isModified() const {
@@ -387,6 +403,7 @@ private:
         Date_t timeseriesBucketMinTime;
         Date_t timeseriesBucketMaxTime;
         BSONObj searchSortValues;
+        double vectorSearchDistance{0.0};
     };
 
     // Null until the first setter is called, at which point a MetadataHolder struct is allocated.

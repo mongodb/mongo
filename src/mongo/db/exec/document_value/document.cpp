@@ -101,7 +101,8 @@ const StringDataSet Document::allMetadataFieldNames{Document::metaFieldTextScore
                                                     Document::metaFieldSearchHighlights,
                                                     Document::metaFieldSearchSortValues,
                                                     Document::metaFieldIndexKey,
-                                                    Document::metaFieldSearchScoreDetails};
+                                                    Document::metaFieldSearchScoreDetails,
+                                                    Document::metaFieldVectorSearchDistance};
 
 DocumentStorageIterator::DocumentStorageIterator(DocumentStorage* storage, BSONObjIterator bsonIt)
     : _bsonIt(std::move(bsonIt)),
@@ -479,6 +480,8 @@ void DocumentStorage::loadLazyMetadata() const {
                 _metadataFields.setSearchScoreDetails(elem.Obj());
             } else if (fieldName == Document::metaFieldSearchSortValues) {
                 _metadataFields.setSearchSortValues(elem.Obj());
+            } else if (fieldName == Document::metaFieldVectorSearchDistance) {
+                _metadataFields.setVectorSearchDistance(elem.Double());
             }
         }
     }
@@ -549,6 +552,7 @@ constexpr StringData Document::metaFieldSearchScore;
 constexpr StringData Document::metaFieldSearchHighlights;
 constexpr StringData Document::metaFieldSearchScoreDetails;
 constexpr StringData Document::metaFieldSearchSortValues;
+constexpr StringData Document::metaFieldVectorSearchDistance;
 
 void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
     toBson(builder);
@@ -578,6 +582,9 @@ void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
         builder->append(metaFieldSearchScoreDetails, metadata().getSearchScoreDetails());
     if (metadata().hasSearchSortValues()) {
         builder->append(metaFieldSearchSortValues, metadata().getSearchSortValues());
+    }
+    if (metadata().hasVectorSearchDistance()) {
+        builder->append(metaFieldVectorSearchDistance, metadata().getVectorSearchDistance());
     }
 }
 
