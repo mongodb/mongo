@@ -188,7 +188,7 @@ public:
 
             const auto service = RenameCollectionParticipantService::getService(opCtx);
             const auto id = BSON("_id" << fromNss.ns());
-            const auto optRenameCollectionParticipant =
+            const auto [optRenameCollectionParticipant, _] =
                 RenameParticipantInstance::lookup(opCtx, service, id);
             if (optRenameCollectionParticipant) {
                 uassert(ErrorCodes::CommandFailed,

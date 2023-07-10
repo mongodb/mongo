@@ -163,15 +163,17 @@ public:
          * Same functionality as PrimaryOnlyService::lookupInstance, but returns a pointer of
          * the proper derived class for the Instance.
          */
-        static boost::optional<std::shared_ptr<InstanceType>> lookup(OperationContext* opCtx,
-                                                                     PrimaryOnlyService* service,
-                                                                     const InstanceID& id) {
-            auto instance = service->lookupInstance(opCtx, id);
+        static std::pair<boost::optional<std::shared_ptr<InstanceType>>, bool> lookup(
+            OperationContext* opCtx, PrimaryOnlyService* service, const InstanceID& id) {
+            auto [instance, isPausedOrShutdown] = service->lookupInstance(opCtx, id);
             if (!instance) {
-                return boost::none;
+                return {boost::none, isPausedOrShutdown};
             }
 
-            return checked_pointer_cast<InstanceType>(instance.get());
+            // If there is an active instance, the service must be running.
+            invariant(!isPausedOrShutdown);
+
+            return {checked_pointer_cast<InstanceType>(instance.get()), isPausedOrShutdown};
         }
 
         /**
@@ -317,12 +319,14 @@ protected:
     virtual std::shared_ptr<Instance> constructInstance(BSONObj initialState) = 0;
 
     /**
-     * Given an InstanceId returns the corresponding running Instance object, or boost::none if
-     * there is none. If the service is in State::kRebuilding, will wait (interruptibly on the
-     * opCtx) for the rebuild to complete.
+     * Given an InstanceId returns the corresponding running Instance object (or boost::none if
+     * there is none), as well as a boolean flag indicating whether the service is paused (i.e.
+     * stepped down) or shutdown, in which case all the instances have been released so we will
+     * always return boost::none. If the service state is kRebuilding, we will first wait
+     * (interruptibly on the opCtx) for the rebuild to complete.
      */
-    boost::optional<std::shared_ptr<Instance>> lookupInstance(OperationContext* opCtx,
-                                                              const InstanceID& id);
+    std::pair<boost::optional<std::shared_ptr<Instance>>, bool> lookupInstance(
+        OperationContext* opCtx, const InstanceID& id);
 
     /**
      * Extracts an InstanceID from the _id field of the given 'initialState' object. If an Instance

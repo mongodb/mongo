@@ -213,13 +213,8 @@ public:
 
     std::shared_ptr<ReshardingCoordinator> getCoordinatorIfExists(
         OperationContext* opCtx, repl::PrimaryOnlyService::InstanceID instanceId) {
-        auto coordinatorOpt = ReshardingCoordinator::lookup(opCtx, _service, instanceId);
-        if (!coordinatorOpt) {
-            return nullptr;
-        }
-
-        auto coordinator = *coordinatorOpt;
-        return coordinator ? coordinator : nullptr;
+        auto [coordinatorOpt, _] = ReshardingCoordinator::lookup(opCtx, _service, instanceId);
+        return coordinatorOpt ? *coordinatorOpt : nullptr;
     }
 
     ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx) {

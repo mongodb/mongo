@@ -240,7 +240,7 @@ public:
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(
                         repl::ShardMergeRecipientService::kShardMergeRecipientServiceName);
-            auto instance = repl::ShardMergeRecipientService::Instance::lookup(
+            auto [instance, _] = repl::ShardMergeRecipientService::Instance::lookup(
                 opCtx, recipientService, BSON("_id" << cmd.getMigrationId()));
             uassert(8423340, "Unknown migrationId", instance);
             (*instance)->onMemberImportedFiles(cmd.getFrom(), cmd.getSuccess(), cmd.getReason());

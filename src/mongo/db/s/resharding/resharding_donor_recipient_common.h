@@ -46,7 +46,9 @@ boost::optional<std::shared_ptr<StateMachine>> tryGetReshardingStateMachine(
     auto instanceId = BSON(ReshardingDocument::kReshardingUUIDFieldName << reshardingUUID);
     auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
     auto service = registry->lookupServiceByName(Service::kServiceName);
-    return StateMachine::lookup(opCtx, service, instanceId);
+    auto [instance, _] = StateMachine::lookup(opCtx, service, instanceId);
+
+    return instance;
 }
 
 /**

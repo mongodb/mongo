@@ -989,9 +989,11 @@ TEST_F(ShardSplitDonorServiceTest, ResumeAfterStepdownTest) {
         fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
 
         ASSERT_OK(getStateDocument(opCtx.get(), _uuid).getStatus());
-        auto serviceInstance = ShardSplitDonorService::DonorStateMachine::lookup(
-            opCtx.get(), _service, BSON("_id" << _uuid));
-        ASSERT(serviceInstance);
+        auto [serviceInstance, isPausedOrShutdown] =
+            ShardSplitDonorService::DonorStateMachine::lookup(
+                opCtx.get(), _service, BSON("_id" << _uuid));
+        ASSERT_TRUE(serviceInstance);
+        ASSERT_FALSE(isPausedOrShutdown);
         return *serviceInstance;
     }();
 
@@ -1075,12 +1077,14 @@ TEST_F(ShardSplitRecipientCleanupTest, ShardSplitRecipientCleanup) {
 
         auto splitService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                                 ->lookupServiceByName(ShardSplitDonorService::kServiceName);
-        auto optionalDonor = ShardSplitDonorService::DonorStateMachine::lookup(
-            opCtx.get(), splitService, BSON("_id" << _uuid));
-
-        ASSERT_TRUE(hasActiveSplitForTenants(opCtx.get(), _tenantIds));
+        auto [optionalDonor, isPausedOrShutdown] =
+            ShardSplitDonorService::DonorStateMachine::lookup(
+                opCtx.get(), splitService, BSON("_id" << _uuid));
 
         ASSERT_TRUE(optionalDonor);
+        ASSERT_FALSE(isPausedOrShutdown);
+        ASSERT_TRUE(hasActiveSplitForTenants(opCtx.get(), _tenantIds));
+
         auto serviceInstance = optionalDonor.value();
         ASSERT(serviceInstance.get());
 
@@ -1136,10 +1140,11 @@ TEST_F(ShardSplitAbortedStepUpTest, ShardSplitAbortedStepUp) {
     auto opCtx = makeOperationContext();
     auto splitService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                             ->lookupServiceByName(ShardSplitDonorService::kServiceName);
-    auto optionalDonor = ShardSplitDonorService::DonorStateMachine::lookup(
+    auto [optionalDonor, isPausedOrShutdown] = ShardSplitDonorService::DonorStateMachine::lookup(
         opCtx.get(), splitService, BSON("_id" << _uuid));
 
-    ASSERT(optionalDonor);
+    ASSERT_TRUE(optionalDonor);
+    ASSERT_FALSE(isPausedOrShutdown);
     auto result = optionalDonor->get()->decisionFuture().get();
 
     ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kAborted);

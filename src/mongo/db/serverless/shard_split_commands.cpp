@@ -224,7 +224,7 @@ public:
 
             auto splitService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                                     ->lookupServiceByName(ShardSplitDonorService::kServiceName);
-            auto optionalDonor = ShardSplitDonorService::DonorStateMachine::lookup(
+            auto [optionalDonor, _] = ShardSplitDonorService::DonorStateMachine::lookup(
                 opCtx, splitService, BSON("_id" << cmd.getMigrationId()));
 
             uassert(ErrorCodes::NoSuchTenantMigration,
