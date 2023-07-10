@@ -42,7 +42,8 @@
 #include "mongo/util/bufreader.h"
 namespace mongo::sbe::value {
 
-static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {
+static std::pair<TypeTags, Value> deserializeValue(BufReader& buf,
+                                                   const CollatorInterface* collator) {
     auto tag = static_cast<TypeTags>(buf.read<uint8_t>());
     Value val;
 
@@ -107,7 +108,7 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {
             if (cnt) {
                 arr->reserve(cnt);
                 for (size_t idx = 0; idx < cnt; ++idx) {
-                    auto [tag, val] = deserializeValue(buf);
+                    auto [tag, val] = deserializeValue(buf, collator);
                     arr->push_back(tag, val);
                 }
             }
@@ -116,13 +117,16 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {
             break;
         }
         case TypeTags::ArraySet: {
+            // The first byte is a flag to tell us whether the ArraySet had a collation prior to
+            // serialization.
+            auto collated = buf.read<char>();
+            auto [arrTag, arrVal] = makeNewArraySet(collated ? collator : nullptr);
             auto cnt = buf.read<LittleEndian<size_t>>();
-            auto [arrTag, arrVal] = makeNewArraySet();
             auto arr = getArraySetView(arrVal);
             if (cnt) {
                 arr->reserve(cnt);
                 for (size_t idx = 0; idx < cnt; ++idx) {
-                    auto [tag, val] = deserializeValue(buf);
+                    auto [tag, val] = deserializeValue(buf, collator);
                     arr->push_back(tag, val);
                 }
             }
@@ -138,7 +142,7 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {
                 obj->reserve(cnt);
                 for (size_t idx = 0; idx < cnt; ++idx) {
                     auto fieldName = buf.readCStr();
-                    auto [tag, val] = deserializeValue(buf);
+                    auto [tag, val] = deserializeValue(buf, collator);
                     obj->push_back(fieldName, tag, val);
                 }
             }
@@ -275,6 +279,12 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
         }
         case TypeTags::ArraySet: {
             auto arr = getArraySetView(val);
+            // If an ArraySet has a collation, we serialize a byte which acts as a flag as to
+            // whether the set should be created with a collation upon deserialization. Also, we
+            // assume that the caller which does deserialization will have the context about what
+            // the collation is, and therefore we can save space by not serializing the full
+            // description of the collation.
+            buf.appendChar(arr->getCollator() ? 1 : 0);
             buf.appendNum(arr->size());
             for (auto& kv : arr->values()) {
                 serializeValue(buf, kv.first, kv.second);
@@ -358,7 +368,10 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
     }
 }
 
-static void serializeValueIntoKeyString(KeyString::Builder& buf, TypeTags tag, Value val) {
+static void serializeValueIntoKeyString(KeyString::Builder& buf,
+                                        TypeTags tag,
+                                        Value val,
+                                        const CollatorInterface* collator) {
     switch (tag) {
         case TypeTags::Nothing: {
             buf.appendBool(false);
@@ -425,13 +438,21 @@ static void serializeValueIntoKeyString(KeyString::Builder& buf, TypeTags tag, V
             // Small strings cannot contain null bytes, so it is safe to serialize them as plain
             // C-strings with a null terminator.
             buf.appendBool(true);
-            buf.appendString(getStringView(tag, val));
+            if (collator) {
+                buf.appendString(collator->getComparisonString(getStringView(tag, val)));
+            } else {
+                buf.appendString(getStringView(tag, val));
+            }
             break;
         }
         case TypeTags::StringBig:
         case TypeTags::bsonString: {
             buf.appendBool(true);
-            buf.appendString(getStringOrSymbolView(tag, val));
+            if (collator) {
+                buf.appendString(collator->getComparisonString(getStringOrSymbolView(tag, val)));
+            } else {
+                buf.appendString(getStringOrSymbolView(tag, val));
+            }
             break;
         }
         case TypeTags::bsonSymbol: {
@@ -536,12 +557,13 @@ static void serializeValueIntoKeyString(KeyString::Builder& buf, TypeTags tag, V
 }
 
 template <typename RowType>
-RowType RowBase<RowType>::deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
+RowType RowBase<RowType>::deserializeForSorter(BufReader& buf,
+                                               const SorterDeserializeSettings& settings) {
     auto cnt = buf.read<LittleEndian<size_t>>();
     RowType result{cnt};
 
     for (size_t idx = 0; idx < cnt; ++idx) {
-        auto [tag, val] = deserializeValue(buf);
+        auto [tag, val] = deserializeValue(buf, settings.collator);
         result.reset(idx, true, tag, val);
     }
 
@@ -561,11 +583,12 @@ void RowBase<RowType>::serializeForSorter(BufBuilder& buf) const {
 
 
 template <typename RowType>
-void RowBase<RowType>::serializeIntoKeyString(KeyString::Builder& buf) const {
+void RowBase<RowType>::serializeIntoKeyString(KeyString::Builder& buf,
+                                              const CollatorInterface* collator) const {
     const RowType& self = *static_cast<const RowType*>(this);
     for (size_t idx = 0; idx < self.size(); ++idx) {
         auto [tag, val] = self.getViewOfValue(idx);
-        serializeValueIntoKeyString(buf, tag, val);
+        serializeValueIntoKeyString(buf, tag, val, collator);
     }
 }
 

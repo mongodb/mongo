@@ -674,6 +674,13 @@ server_parameters:
     validator:
         gt: 0
 
+  internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling:
+    description: "If true, the HashAgg stage will perform increased spilling."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
   internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill:
     description: "The max size in bytes that the hash table in a HashLookup stage can be estimated to
     be before we spill to disk."
