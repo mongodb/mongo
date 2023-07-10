@@ -1327,6 +1327,7 @@ struct __wt_update {
      */
     volatile uint8_t prepare_state; /* prepare state */
 
+/* When introducing a new flag, consider adding it to WT_UPDATE_SELECT_FOR_DS. */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_UPDATE_DS 0x01u                       /* Update has been written to the data store. */
 #define WT_UPDATE_HS 0x02u                       /* Update has been written to history store. */
@@ -1338,6 +1339,30 @@ struct __wt_update {
                                                  /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 
+/* There are several cases we should select the update irrespective of visibility to write to the
+ * disk image:
+ *
+ * 1. A previous reconciliation selected this update as writing anything that is older
+ * undoes the previous work.
+ *
+ * 2. The update is restored from the disk image as writing anything that is older undoes
+ * the previous work.
+ *
+ * 3. An earlier reconciliation performed an update-restore eviction and this update was
+ * restored from disk.
+ *
+ * 4. We rolled back a prepared transaction and restored an update from the history store.
+ *
+ * 5. We rolled back a prepared transaction and aim to delete the following update from the
+ * history store.
+ *
+ * These scenarios can happen if the current reconciliation has a limited visibility of
+ * updates compared to one of the previous reconciliations. This is important as it is never
+ * ok to undo the work of the previous reconciliations.
+ */
+#define WT_UPDATE_SELECT_FOR_DS                                                      \
+    WT_UPDATE_DS | WT_UPDATE_PREPARE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_DS | \
+      WT_UPDATE_RESTORED_FROM_HS | WT_UPDATE_TO_DELETE_FROM_HS
     /*
      * Zero or more bytes of value (the payload) immediately follows the WT_UPDATE structure. We use
      * a C99 flexible array member which has the semantics we want.
