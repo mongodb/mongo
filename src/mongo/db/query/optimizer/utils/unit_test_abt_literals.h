@@ -78,7 +78,7 @@ inline T getEnumByName(StringData str, const T1& toStr) {
 }
 
 inline Operations getOpByName(StringData str) {
-    return getEnumByName<Operations>(str, OperationsEnum::toString);
+    return getEnumByName<Operations>(str, OperationsEnumString::arr_);
 }
 
 template <class T>
@@ -313,7 +313,7 @@ inline auto _spoolp(StringData type,
                     ExprHolder filter,
                     NodeHolder child) {
     return NodeHolder{make<SpoolProducerNode>(
-        getEnumByName<SpoolProducerType>(type, SpoolProducerTypeEnum::toString),
+        getEnumByName<SpoolProducerType>(type, SpoolProducerTypeEnumString::arr_),
         spoolId,
         std::move(pns),
         std::move(filter._n),
@@ -322,7 +322,7 @@ inline auto _spoolp(StringData type,
 
 inline auto _spoolc(StringData type, int64_t spoolId, ProjectionNameVector pns) {
     return NodeHolder{make<SpoolConsumerNode>(
-        getEnumByName<SpoolConsumerType>(type, SpoolConsumerTypeEnum::toString),
+        getEnumByName<SpoolConsumerType>(type, SpoolConsumerTypeEnumString::arr_),
         spoolId,
         std::move(pns))};
 }
@@ -511,14 +511,12 @@ public:
     }
 
     std::string transport(const UnaryOp& expr, std::string inResult) {
-        return str::stream() << "_unary(\"" << OperationsEnum::toString[static_cast<int>(expr.op())]
-                             << "\", " << inResult << ")";
+        return str::stream() << "_unary(\"" << toStringData(expr.op()) << "\", " << inResult << ")";
     }
 
     std::string transport(const BinaryOp& expr, std::string leftResult, std::string rightResult) {
-        return str::stream() << "_binary(\""
-                             << OperationsEnum::toString[static_cast<int>(expr.op())] << "\", "
-                             << leftResult << ", " << rightResult << ")";
+        return str::stream() << "_binary(\"" << toStringData(expr.op()) << "\", " << leftResult
+                             << ", " << rightResult << ")";
     }
 
     std::string transport(const EvalPath& expr, std::string pathResult, std::string inputResult) {
@@ -545,8 +543,8 @@ public:
     }
 
     std::string transport(const PathCompare& path, std::string valueResult) {
-        return str::stream() << "_cmp(\"" << OperationsEnum::toString[static_cast<int>(path.op())]
-                             << "\", " << valueResult << ")";
+        return str::stream() << "_cmp(\"" << toStringData(path.op()) << "\", " << valueResult
+                             << ")";
     }
 
     std::string transport(const PathTraverse& path, std::string inResult) {
@@ -597,8 +595,7 @@ public:
 
     std::string transport(const SpoolConsumerNode& node, std::string /*bindResult*/) {
         str::stream os;
-        os << "_spoolc(\"" << SpoolConsumerTypeEnum::toString[static_cast<int>(node.getType())]
-           << "\""
+        os << "_spoolc(\"" << toStringData(node.getType()) << "\""
            << ", " << node.getSpoolId() << ", _varnames(";
         printProjNames(os, node.binder().names());
         os << "))";
@@ -690,8 +687,7 @@ public:
                           std::string /*bindResult*/,
                           std::string /*refsResult*/) {
         str::stream os;
-        os << ".spoolp(\"" << SpoolProducerTypeEnum::toString[static_cast<int>(node.getType())]
-           << "\""
+        os << ".spoolp(\"" << toStringData(node.getType()) << "\""
            << ", " << node.getSpoolId() << ", _varnames(";
         printProjNames(os, node.binder().names());
         return os << "), " << filterResult << ")" << _nodeSeparator << childResult;

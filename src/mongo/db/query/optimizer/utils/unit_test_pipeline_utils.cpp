@@ -123,9 +123,9 @@ ABT translatePipeline(const Metadata& metadata,
 
 void serializeOptPhases(std::ostream& stream, opt::unordered_set<OptPhase> phaseSet) {
     // The order of phases in the golden file must be the same every time the test is run.
-    std::set<std::string> orderedPhases;
+    std::set<StringData> orderedPhases;
     for (const auto& phase : phaseSet) {
-        orderedPhases.insert(OptPhaseEnum::toString[static_cast<int>(phase)]);
+        orderedPhases.insert(toStringData(phase));
     }
 
     stream << "optimization phases: " << std::endl;
@@ -151,8 +151,7 @@ void serializeDistributionAndPaths(std::ostream& stream,
                                    DistributionAndPaths distributionAndPaths,
                                    std::string baseTabs) {
     stream << baseTabs << "distribution and paths: " << std::endl;
-    stream << baseTabs << "\tdistribution type: "
-           << DistributionTypeEnum::toString[static_cast<int>(distributionAndPaths._type)]
+    stream << baseTabs << "\tdistribution type: " << toStringData(distributionAndPaths._type)
            << std::endl;
     stream << baseTabs << "\tdistribution paths: " << std::endl;
     for (const ABT& abt : distributionAndPaths._paths) {
@@ -198,8 +197,7 @@ void serializeMetadata(std::ostream& stream, Metadata metadata) {
                                            "\t\t\t\t\t\t\t",
                                            ExplainGenerator::explainV2(indexCollationEntry._path));
 
-                stream << "\t\t\t\t\t\tcollation op: "
-                       << CollationOpEnum::toString[static_cast<int>(indexCollationEntry._op)]
+                stream << "\t\t\t\t\t\tcollation op: " << toStringData(indexCollationEntry._op)
                        << std::endl;
             }
 

@@ -121,7 +121,7 @@ void OptPhaseManager::runStructuralPhase(C instance, VariableEnvironment& env, A
     for (int iterationCount = 0; instance.optimize(input); iterationCount++) {
         tassert(6808708,
                 str::stream() << "Iteration limit exceeded while running the following phase: "
-                              << OptPhaseEnum::toString[static_cast<int>(phase)] << ".",
+                              << toStringData(phase) << ".",
                 !_debugInfo.exceedsIterationLimit(iterationCount));
     }
 
@@ -146,8 +146,7 @@ void OptPhaseManager::runStructuralPhases(C1 instance1,
         // Iteration limit exceeded.
         tassert(6808700,
                 str::stream() << "Iteration limit exceeded while running the following phases: "
-                              << OptPhaseEnum::toString[static_cast<int>(phase1)] << ", "
-                              << OptPhaseEnum::toString[static_cast<int>(phase2)] << ".",
+                              << toStringData(phase1) << ", " << toStringData(phase2) << ".",
                 !_debugInfo.exceedsIterationLimit(iterationCount));
 
 

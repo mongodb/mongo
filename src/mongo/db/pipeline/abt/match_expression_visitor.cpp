@@ -605,8 +605,8 @@ private:
 
             default:
                 tasserted(7021701,
-                          str::stream() << "Cannot generate comparison for operation: "
-                                        << OperationsEnum::toString[static_cast<int>(op)]);
+                          str::stream()
+                              << "Cannot generate comparison for operation: " << toStringData(op));
         }
 
         if (shouldGeneratePath(expr)) {

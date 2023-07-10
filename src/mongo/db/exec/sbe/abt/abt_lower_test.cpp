@@ -418,8 +418,7 @@ TEST_F(ABTPlanGeneration, LowerExchangeNode) {
 
         runNodeVariation(
             ctx,
-            str::stream() << "Lower exchange node of type "
-                          << DistributionTypeEnum::toString[static_cast<int>(exchangeType)],
+            str::stream() << "Lower exchange node of type " << toStringData(exchangeType),
             _node(make<ExchangeNode>(distReq, std::move(evalNode2)), exchangeNodeProp));
     }
 }
@@ -455,8 +454,7 @@ TEST_F(ABTPlanGeneration, LowerGroupByNode) {
     for (const auto& groupType : groupTypes) {
         runNodeVariation(
             ctx,
-            str::stream() << "GroupByNode one output with type "
-                          << GroupNodeTypeEnum::toString[static_cast<int>(groupType)],
+            str::stream() << "GroupByNode one output with type " << toStringData(groupType),
             _node(make<GroupByNode>(
                 ProjectionNameVector{"key1", "key2"},
                 ProjectionNameVector{"outFunc1"},
@@ -466,8 +464,7 @@ TEST_F(ABTPlanGeneration, LowerGroupByNode) {
 
         runNodeVariation(
             ctx,
-            str::stream() << "GroupByNode multiple outputs with type "
-                          << GroupNodeTypeEnum::toString[static_cast<int>(groupType)],
+            str::stream() << "GroupByNode multiple outputs with type " << toStringData(groupType),
             _node(make<GroupByNode>(
                 ProjectionNameVector{"key1", "key2"},
                 ProjectionNameVector{"outFunc1", "outFunc2"},
@@ -625,7 +622,7 @@ TEST_F(ABTPlanGeneration, LowerMergeJoinNode) {
             "scan1");
         runNodeVariation(ctx,
                          str::stream() << "Lower merge join with one projection (collation="
-                                       << CollationOpEnum::toString[static_cast<int>(op)] << ")",
+                                       << toStringData(op) << ")",
                          _node(make<MergeJoinNode>(ProjectionNameVector{ProjectionName{"proj0"}},
                                                    ProjectionNameVector{ProjectionName{"proj1"}},
                                                    std::vector<CollationOp>{op},
@@ -650,8 +647,7 @@ TEST_F(ABTPlanGeneration, LowerMergeJoinNode) {
             runNodeVariation(
                 ctx,
                 str::stream() << "Lower merge join with two projections (collation="
-                              << CollationOpEnum::toString[static_cast<int>(op1)] << ", "
-                              << CollationOpEnum::toString[static_cast<int>(op2)] << ")",
+                              << toStringData(op1) << ", " << toStringData(op2) << ")",
                 _node(make<MergeJoinNode>(
                     ProjectionNameVector{ProjectionName{"proj0"}, ProjectionName{"proj2"}},
                     ProjectionNameVector{ProjectionName{"proj1"}, ProjectionName{"proj3"}},
@@ -675,7 +671,7 @@ TEST_F(ABTPlanGeneration, LowerMergeJoinNode) {
             {ProjectionName{"proj3"}});
         runNodeVariation(ctx,
                          str::stream() << "Lower merge join with required projection (collation="
-                                       << CollationOpEnum::toString[static_cast<int>(op1)] << ")",
+                                       << toStringData(op1) << ")",
                          _node(make<FilterNode>(makeEquals("proj3", Constant::str("NYC")),
                                                 _node(make<MergeJoinNode>(
                                                     ProjectionNameVector{ProjectionName{"proj0"}},
@@ -716,8 +712,8 @@ TEST_F(ABTPlanGeneration, LowerNestedLoopJoinNode) {
 
         runNodeVariation(
             ctx,
-            str::stream() << "Nested loop join with equality predicate ("
-                          << JoinTypeEnum::toString[static_cast<int>(joinType)] << " join)",
+            str::stream() << "Nested loop join with equality predicate (" << toStringData(joinType)
+                          << " join)",
             _node(make<FilterNode>(makeEquals("proj2", Constant::int32(10024)), std::move(nlj))));
     }
 }
@@ -827,15 +823,13 @@ TEST_F(ABTPlanGeneration, LowerSortedMergeNode) {
         runVariations(properties::CollationRequirement(
                           ProjectionCollationSpec({{ProjectionName{"proj0"}, op}})),
                       op,
-                      str::stream()
-                          << "sorted on `a` " << CollationOpEnum::toString[static_cast<int>(op)]);
+                      str::stream() << "sorted on `a` " << toStringData(op));
         for (auto& op2 : ops) {
             runVariations(properties::CollationRequirement(ProjectionCollationSpec(
                               {{ProjectionName{"proj0"}, op}, {ProjectionName{"proj1"}, op2}})),
                           op,
-                          str::stream()
-                              << "sorted on `a` " << CollationOpEnum::toString[static_cast<int>(op)]
-                              << " and `b` " << CollationOpEnum::toString[static_cast<int>(op2)]);
+                          str::stream() << "sorted on `a` " << toStringData(op) << " and `b` "
+                                        << toStringData(op2));
         }
     }
 }
@@ -859,11 +853,8 @@ TEST_F(ABTPlanGeneration, LowerSpoolNodes) {
                 _node(make<SpoolConsumerNode>(spoolConsumeType, 1, ProjectionNameVector{"proj0"}));
             runNodeVariation(
                 ctx,
-                str::stream() << "Spool in union with "
-                              << SpoolProducerTypeEnum::toString[static_cast<int>(spoolProdType)]
-                              << " producer and "
-                              << SpoolConsumerTypeEnum::toString[static_cast<int>(spoolConsumeType)]
-                              << " consumer",
+                str::stream() << "Spool in union with " << toStringData(spoolProdType)
+                              << " producer and " << toStringData(spoolConsumeType) << " consumer",
                 _node(make<UnionNode>(ProjectionNameVector{"proj0"},
                                       makeSeq(std::move(leftTree), std::move(rightTree)))));
         }

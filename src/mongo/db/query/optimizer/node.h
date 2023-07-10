@@ -51,7 +51,7 @@
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/optimizer/utils/printable_enum.h"
+#include "mongo/db/query/util/named_enum.h"
 #include "mongo/util/assert_util.h"
 
 
@@ -545,8 +545,7 @@ private:
     F(Right)         \
     F(Full)
 
-MAKE_PRINTABLE_ENUM(JoinType, JOIN_TYPE);
-MAKE_PRINTABLE_ENUM_STRING_ARRAY(JoinTypeEnum, JoinType, JOIN_TYPE);
+QUERY_UTIL_NAMED_ENUM_DEFINE(JoinType, JOIN_TYPE);
 #undef JOIN_TYPE
 
 /**
@@ -773,8 +772,7 @@ private:
     F(Local)                     \
     F(Global)
 
-MAKE_PRINTABLE_ENUM(GroupNodeType, GROUPNODETYPE_OPNAMES);
-MAKE_PRINTABLE_ENUM_STRING_ARRAY(GroupNodeTypeEnum, GroupNodeType, GROUPNODETYPE_OPNAMES);
+QUERY_UTIL_NAMED_ENUM_DEFINE(GroupNodeType, GROUPNODETYPE_OPNAMES);
 #undef GROUPNODETYPE_OPNAMES
 
 /**
@@ -923,10 +921,7 @@ private:
     F(Eager)                           \
     F(Lazy)
 
-MAKE_PRINTABLE_ENUM(SpoolProducerType, SPOOL_PRODUCER_TYPE_OPNAMES);
-MAKE_PRINTABLE_ENUM_STRING_ARRAY(SpoolProducerTypeEnum,
-                                 SpoolProducerType,
-                                 SPOOL_PRODUCER_TYPE_OPNAMES);
+QUERY_UTIL_NAMED_ENUM_DEFINE(SpoolProducerType, SPOOL_PRODUCER_TYPE_OPNAMES);
 #undef SPOOL_PRODUCER_TYPE_OPNAMES
 
 /**
@@ -978,10 +973,7 @@ private:
     F(Stack)                           \
     F(Regular)
 
-MAKE_PRINTABLE_ENUM(SpoolConsumerType, SPOOL_CONSUMER_TYPE_OPNAMES);
-MAKE_PRINTABLE_ENUM_STRING_ARRAY(SpoolConsumerTypeEnum,
-                                 SpoolConsumerType,
-                                 SPOOL_CONSUMER_TYPE_OPNAMES);
+QUERY_UTIL_NAMED_ENUM_DEFINE(SpoolConsumerType, SPOOL_CONSUMER_TYPE_OPNAMES);
 #undef SPOOL_CONSUMER_TYPE_OPNAMES
 
 /**

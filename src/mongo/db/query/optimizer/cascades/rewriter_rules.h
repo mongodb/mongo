@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/util/named_enum.h"
 
 namespace mongo::optimizer::cascades {
 
@@ -81,10 +82,7 @@ namespace mongo::optimizer::cascades {
     F(FilterRIDIntersectReorder)                                  \
     F(EvaluationRIDIntersectReorder)
 
-MAKE_PRINTABLE_ENUM(LogicalRewriteType, LOGICALREWRITER_NAMES);
-MAKE_PRINTABLE_ENUM_STRING_ARRAY(LogicalRewriterTypeEnum,
-                                 LogicalRewriterType,
-                                 LOGICALREWRITER_NAMES);
+QUERY_UTIL_NAMED_ENUM_DEFINE(LogicalRewriteType, LOGICALREWRITER_NAMES)
 #undef LOGICALREWRITER_NAMES
 
 #define PHYSICALREWRITER_NAMES(F) \
@@ -120,10 +118,7 @@ MAKE_PRINTABLE_ENUM_STRING_ARRAY(LogicalRewriterTypeEnum,
     F(RIDUnionUnique)             \
     F(IndexFetch)
 
-MAKE_PRINTABLE_ENUM(PhysicalRewriteType, PHYSICALREWRITER_NAMES);
-MAKE_PRINTABLE_ENUM_STRING_ARRAY(PhysicalRewriterTypeEnum,
-                                 PhysicalRewriterType,
-                                 PHYSICALREWRITER_NAMES);
+QUERY_UTIL_NAMED_ENUM_DEFINE(PhysicalRewriteType, PHYSICALREWRITER_NAMES)
 #undef PHYSICALREWRITER_NAMES
 
 }  // namespace mongo::optimizer::cascades

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include <cstddef>
 
 /**
  * Defines an `enum class ENUM_` populated by `LIST_`.
@@ -51,13 +52,17 @@
  *   Its elements are MyColors::red, MyColors::green, and MyColors::blue. We
  *   also define an associated toStringData(MyColors) function which returns
  *   the unqualified value names "red", "green", "blue" as constexpr
- *   StringData.
+ *   StringData. The array of unqualified StringData names is accessible via
+ *   the arr_ field; in the example above, this would be MyColors_EnumString::arr_.
  */
+
 #define QUERY_UTIL_NAMED_ENUM_DEFINE(ENUM_, LIST_)                                   \
+    namespace ENUM_##EnumString {                                                    \
+        constexpr StringData arr_[] = {LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_SD_)}; \
+    }                                                                                \
     enum class ENUM_ { LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_) };                   \
     constexpr StringData toStringData(ENUM_ v_) {                                    \
-        constexpr StringData arr_[] = {LIST_(QUERY_UTIL_NAMED_ENUM_INTERNAL_X_SD_)}; \
-        return arr_[static_cast<size_t>(v_)];                                        \
+        return ENUM_##EnumString::arr_[static_cast<size_t>(v_)];                     \
     }
 #define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_(x) x,
 #define QUERY_UTIL_NAMED_ENUM_INTERNAL_X_SD_(x) #x ""_sd,

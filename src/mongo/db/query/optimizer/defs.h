@@ -42,8 +42,8 @@
 #include <vector>
 
 #include "mongo/db/query/optimizer/containers.h"
-#include "mongo/db/query/optimizer/utils/printable_enum.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/db/query/util/named_enum.h"
 
 
 namespace mongo::optimizer {
@@ -114,8 +114,7 @@ private:
     F(Seek)                     \
     F(Complete)
 
-MAKE_PRINTABLE_ENUM(IndexReqTarget, INDEXREQTARGET_NAMES);
-MAKE_PRINTABLE_ENUM_STRING_ARRAY(IndexReqTargetEnum, IndexReqTarget, INDEXREQTARGET_NAMES);
+QUERY_UTIL_NAMED_ENUM_DEFINE(IndexReqTarget, INDEXREQTARGET_NAMES);
 #undef INDEXREQTARGET_NAMES
 
 #define DISTRIBUTIONTYPE_NAMES(F) \
@@ -126,8 +125,7 @@ MAKE_PRINTABLE_ENUM_STRING_ARRAY(IndexReqTargetEnum, IndexReqTarget, INDEXREQTAR
     F(RangePartitioning)          \
     F(UnknownPartitioning)
 
-MAKE_PRINTABLE_ENUM(DistributionType, DISTRIBUTIONTYPE_NAMES);
-MAKE_PRINTABLE_ENUM_STRING_ARRAY(DistributionTypeEnum, DistributionType, DISTRIBUTIONTYPE_NAMES);
+QUERY_UTIL_NAMED_ENUM_DEFINE(DistributionType, DISTRIBUTIONTYPE_NAMES);
 #undef DISTRIBUTIONTYPE_NAMES
 
 // In case of covering scan, index, or fetch, specify names of bound projections for each field.
@@ -283,8 +281,7 @@ struct CostAndCE {
     F(Descending)              \
     F(Clustered)
 
-MAKE_PRINTABLE_ENUM(CollationOp, COLLATIONOP_OPNAMES);
-MAKE_PRINTABLE_ENUM_STRING_ARRAY(CollationOpEnum, CollationOp, COLLATIONOP_OPNAMES);
+QUERY_UTIL_NAMED_ENUM_DEFINE(CollationOp, COLLATIONOP_OPNAMES);
 #undef COLLATIONOP_OPNAMES
 
 using ProjectionCollationEntry = std::pair<ProjectionName, CollationOp>;

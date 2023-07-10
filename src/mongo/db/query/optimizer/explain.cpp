@@ -185,6 +185,11 @@ public:
         return *this;
     }
 
+    ExplainPrinterImpl& print(const StringData& s) {
+        print(s.empty() ? "<empty>" : s.rawData());
+        return *this;
+    }
+
     template <class TagType>
     ExplainPrinterImpl& print(const StrongStringAlias<TagType>& t) {
         print(t.value().empty() ? "<empty>" : t.value());
@@ -493,9 +498,14 @@ public:
         return *this;
     }
 
+    ExplainPrinterImpl& print(const StringData& s) {
+        printStringInternal(s);
+        return *this;
+    }
+
     template <class TagType>
     ExplainPrinterImpl& print(const StrongStringAlias<TagType>& s) {
-        printStringInternal(s.value().toString());
+        printStringInternal(s.value());
         return *this;
     }
 
@@ -572,7 +582,7 @@ public:
     }
 
 private:
-    ExplainPrinterImpl& printStringInternal(const std::string& s) {
+    ExplainPrinterImpl& printStringInternal(const StringData& s) {
         auto [tag, val] = sbe::value::makeNewString(s);
         addValue(tag, val);
         return *this;
@@ -1097,13 +1107,13 @@ public:
                     } else {
                         local.print(", ");
                     }
-                    local.print(IndexFieldPredTypeEnum::toString[static_cast<int>(type)]);
+                    local.print(toStringData(type));
                 }
             } else if constexpr (version == ExplainVersion::V3) {
                 std::vector<ExplainPrinter> printers;
                 for (const auto type : candidateIndexEntry._predTypes) {
                     ExplainPrinter local1;
-                    local1.print(IndexFieldPredTypeEnum::toString[static_cast<int>(type)]);
+                    local1.print(toStringData(type));
                     printers.push_back(std::move(local1));
                 }
                 local.fieldName("predType").print(printers);
@@ -1513,7 +1523,7 @@ public:
         maybePrintProps(printer, node);
         printer.separator(" [")
             .fieldName("target", ExplainVersion::V3)
-            .print(IndexReqTargetEnum::toString[static_cast<int>(node.getTarget())])
+            .print(toStringData(node.getTarget()))
             .separator("]");
         nodeCEPropsPrint(printer, n, node);
 
@@ -1640,7 +1650,7 @@ public:
         maybePrintProps(printer, node);
         printer.separator(" [")
             .fieldName("joinType")
-            .print(JoinTypeEnum::toString[static_cast<int>(node.getJoinType())])
+            .print(toStringData(node.getJoinType()))
             .separator(", ");
 
         printCorrelatedProjections(printer, node.getCorrelatedProjectionNames());
@@ -1693,7 +1703,7 @@ public:
         maybePrintProps(printer, node);
         printer.separator(" [")
             .fieldName("joinType")
-            .print(JoinTypeEnum::toString[static_cast<int>(node.getJoinType())])
+            .print(toStringData(node.getJoinType()))
             .separator("]");
         nodeCEPropsPrint(printer, n, node);
 
@@ -1729,14 +1739,14 @@ public:
             collationPrinter.print("Collation");
             for (const CollationOp op : node.getCollation()) {
                 ExplainPrinter local;
-                local.print(CollationOpEnum::toString[static_cast<int>(op)]);
+                local.print(toStringData(op));
                 collationPrinter.print(local);
             }
         } else if constexpr (version == ExplainVersion::V3) {
             std::vector<ExplainPrinter> printers;
             for (const CollationOp op : node.getCollation()) {
                 ExplainPrinter local;
-                local.print(CollationOpEnum::toString[static_cast<int>(op)]);
+                local.print(toStringData(op));
                 printers.push_back(std::move(local));
             }
             collationPrinter.print(printers);
@@ -1782,7 +1792,7 @@ public:
         maybePrintProps(printer, node);
         printer.separator(" [")
             .fieldName("joinType")
-            .print(JoinTypeEnum::toString[static_cast<int>(node.getJoinType())])
+            .print(toStringData(node.getJoinType()))
             .separator(", ");
 
         printCorrelatedProjections(printer, node.getCorrelatedProjectionNames());
@@ -1840,8 +1850,7 @@ public:
         printer.separator(" [");
 
         const auto printTypeFn = [&]() {
-            printer.fieldName("type", ExplainVersion::V3)
-                .print(GroupNodeTypeEnum::toString[static_cast<int>(node.getType())]);
+            printer.fieldName("type", ExplainVersion::V3).print(toStringData(node.getType()));
         };
         bool displayGroupings = true;
         if constexpr (version < ExplainVersion::V3) {
@@ -1928,7 +1937,7 @@ public:
                 .print(entry.first)
                 .separator(": ")
                 .fieldName("collationOp", ExplainVersion::V3)
-                .print(CollationOpEnum::toString[static_cast<int>(entry.second)]);
+                .print(toStringData(entry.second));
             propPrinters.push_back(std::move(local));
         }
 
@@ -1973,7 +1982,7 @@ public:
 
         printer.separator(" [")
             .fieldName("type", ExplainVersion::V3)
-            .print(SpoolProducerTypeEnum::toString[static_cast<int>(node.getType())])
+            .print(toStringData(node.getType()))
             .separator(", ")
             .fieldName("id")
             .print(node.getSpoolId());
@@ -2000,7 +2009,7 @@ public:
 
         printer.separator(" [")
             .fieldName("type", ExplainVersion::V3)
-            .print(SpoolConsumerTypeEnum::toString[static_cast<int>(node.getType())])
+            .print(toStringData(node.getType()))
             .separator(", ")
             .fieldName("id")
             .print(node.getSpoolId());
@@ -2032,8 +2041,7 @@ public:
                 } else {
                     printer.separator(", ");
                 }
-                printer.print(projName).separator(": ").print(
-                    CollationOpEnum::toString[static_cast<int>(op)]);
+                printer.print(projName).separator(": ").print(toStringData(op));
             }
             printer.separator("}]");
 
@@ -2140,8 +2148,7 @@ public:
         const auto& distribAndProjections = property.getDistributionAndProjections();
 
         ExplainPrinter typePrinter;
-        typePrinter.fieldName("type").print(
-            DistributionTypeEnum::toString[static_cast<int>(distribAndProjections._type)]);
+        typePrinter.fieldName("type").print(toStringData(distribAndProjections._type));
 
         printBooleanFlag(typePrinter, "disableExchanges", property.getDisableExchanges());
 
@@ -2353,7 +2360,7 @@ public:
             ExplainPrinter printer;
 
             printer.fieldName("target", ExplainVersion::V3)
-                .print(IndexReqTargetEnum::toString[static_cast<int>(prop.getIndexReqTarget())]);
+                .print(toStringData(prop.getIndexReqTarget()));
             printBooleanFlag(printer, "dedupRID", prop.getDedupRID());
 
             // TODO: consider printing satisfied partial indexes.
@@ -2481,7 +2488,7 @@ public:
         ExplainPrinter printer("UnaryOp");
         printer.separator(" [")
             .fieldName("op", ExplainVersion::V3)
-            .print(OperationsEnum::toString[static_cast<int>(expr.op())])
+            .print(toStringData(expr.op()))
             .separator("]")
             .setChildCount(1)
             .fieldName("input", ExplainVersion::V3)
@@ -2496,7 +2503,7 @@ public:
         ExplainPrinter printer("BinaryOp");
         printer.separator(" [")
             .fieldName("op", ExplainVersion::V3)
-            .print(OperationsEnum::toString[static_cast<int>(expr.op())])
+            .print(toStringData(expr.op()))
             .separator("]")
             .setChildCount(2)
             .maybeReverse()
@@ -2662,7 +2669,7 @@ public:
         ExplainPrinter printer("PathCompare");
         printer.separator(" [")
             .fieldName("op", ExplainVersion::V3)
-            .print(OperationsEnum::toString[static_cast<int>(path.op())])
+            .print(toStringData(path.op()))
             .separator("]")
             .setChildCount(1)
             .fieldName("value", ExplainVersion::V3)
@@ -2824,7 +2831,7 @@ public:
             .print(nodeInfo._adjustedCE)
             .separator(", ")
             .fieldName("rule")
-            .print(cascades::PhysicalRewriterTypeEnum::toString[static_cast<int>(nodeInfo._rule)]);
+            .print(cascades::toStringData(nodeInfo._rule));
 
         ExplainGeneratorTransporter<version> subGen(
             _displayProperties, _memoInterface, _nodeMap, nodeInfo._nodeCEMap);
@@ -2851,8 +2858,7 @@ public:
                     ExplainPrinter local;
                     local.fieldName("logicalNodeId").print(i).separator(", ");
                     const auto rule = _memoInterface->getRules(groupId).at(i);
-                    local.fieldName("rule").print(
-                        cascades::LogicalRewriterTypeEnum::toString[static_cast<int>(rule)]);
+                    local.fieldName("rule").print(cascades::toStringData(rule));
 
                     ExplainPrinter nodePrinter = generate(logicalNodes.at(i));
                     local.fieldName("node", ExplainVersion::V3).print(nodePrinter);
