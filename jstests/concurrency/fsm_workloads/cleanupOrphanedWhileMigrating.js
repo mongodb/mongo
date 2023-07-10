@@ -31,15 +31,14 @@ var $config = extendWorkload($config, function($config, $super) {
         const shardNames = Object.keys(connCache.shards);
         const randomIndex = Math.floor(Math.random() * shardNames.length);
 
-        const shard = connCache.shards[shardNames[randomIndex]];
-        const shardPrimary = ChunkHelper.getPrimary(shard);
+        const shardConn = connCache.rsConns.shards[shardNames[randomIndex]];
 
         // Disable balancing so that waiting for orphan cleanup can converge quickly.
         BalancerHelper.disableBalancerForCollection(db, ns);
 
         // Ensure the cleanup of all chunk orphans of the primary shard
         assert.soonNoExcept(() => {
-            assert.commandWorked(shardPrimary.adminCommand({cleanupOrphaned: ns}));
+            assert.commandWorked(shardConn.adminCommand({cleanupOrphaned: ns}));
             return true;
         }, undefined, 10 * 1000, 100);
 
