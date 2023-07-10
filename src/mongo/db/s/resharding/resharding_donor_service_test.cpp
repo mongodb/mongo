@@ -445,8 +445,10 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
                     DonorStateMachine::insertStateDocument(opCtx.get(), doc);
                     return DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
                 } else {
-                    auto maybeDonor = DonorStateMachine::lookup(opCtx.get(), _service, instanceId);
-                    ASSERT_TRUE(bool(maybeDonor));
+                    auto [maybeDonor, isPausedOrShutdown] =
+                        DonorStateMachine::lookup(opCtx.get(), _service, instanceId);
+                    ASSERT_TRUE(maybeDonor);
+                    ASSERT_FALSE(isPausedOrShutdown);
 
                     // Allow the transition to prevState to succeed on this primary-only service
                     // instance.
@@ -507,8 +509,10 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
         }
 
         // Finally complete the operation and ensure its success.
-        auto maybeDonor = DonorStateMachine::lookup(opCtx.get(), _service, instanceId);
-        ASSERT_TRUE(bool(maybeDonor));
+        auto [maybeDonor, isPausedOrShutdown] =
+            DonorStateMachine::lookup(opCtx.get(), _service, instanceId);
+        ASSERT_TRUE(maybeDonor);
+        ASSERT_FALSE(isPausedOrShutdown);
 
         auto donor = *maybeDonor;
         stateTransitionsGuard.unset(DonorStateEnum::kDone);
@@ -638,8 +642,10 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterAbort) {
         donor.reset();
         stepUp(opCtx.get());
 
-        auto maybeDonor = DonorStateMachine::lookup(opCtx.get(), _service, instanceId);
-        ASSERT_TRUE(bool(maybeDonor));
+        auto [maybeDonor, isPausedOrShutdown] =
+            DonorStateMachine::lookup(opCtx.get(), _service, instanceId);
+        ASSERT_TRUE(maybeDonor);
+        ASSERT_FALSE(isPausedOrShutdown);
 
         donor = *maybeDonor;
         doneTransitionGuard.reset();

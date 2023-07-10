@@ -629,8 +629,8 @@ PrimaryOnlyService::getOrCreateInstance(OperationContext* opCtx,
     return {newInstance, true};
 }
 
-boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyService::lookupInstance(
-    OperationContext* opCtx, const InstanceID& id) {
+std::pair<boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>>, bool>
+PrimaryOnlyService::lookupInstance(OperationContext* opCtx, const InstanceID& id) {
     // If this operation is holding any database locks, then it must have opted into getting
     // interrupted at stepdown to prevent deadlocks.
     invariant(!opCtx->lockState()->isLocked() || opCtx->shouldAlwaysInterruptAtStepDownOrUp() ||
@@ -640,7 +640,7 @@ boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyServic
     _waitForStateNotRebuilding(opCtx, lk);
 
     if (_state == State::kShutdown || _state == State::kPaused) {
-        return boost::none;
+        return {boost::none, true};
     }
     if (_state == State::kRebuildFailed) {
         uassertStatusOK(_rebuildStatus);
@@ -650,10 +650,10 @@ boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyServic
 
     auto it = _activeInstances.find(id);
     if (it == _activeInstances.end()) {
-        return boost::none;
+        return {boost::none, false};
     }
 
-    return it->second.getInstance();
+    return {it->second.getInstance(), false};
 }
 
 std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyService::getAllInstances(

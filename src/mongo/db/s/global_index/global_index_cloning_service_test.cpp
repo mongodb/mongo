@@ -516,7 +516,12 @@ TEST_F(GlobalIndexClonerServiceTest, ShouldBeSafeToRetryOnStepDown) {
                 return GlobalIndexStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
             }
 
-            return *GlobalIndexStateMachine::lookup(rawOpCtx, _service, extractInstanceId(doc));
+            auto [cloner, isPausedOrShutdown] =
+                GlobalIndexStateMachine::lookup(rawOpCtx, _service, extractInstanceId(doc));
+            ASSERT_TRUE(cloner);
+            ASSERT_FALSE(isPausedOrShutdown);
+
+            return *cloner;
         })();
 
         if (prevState != GlobalIndexClonerStateEnum::kUnused) {
@@ -545,10 +550,13 @@ TEST_F(GlobalIndexClonerServiceTest, ShouldBeSafeToRetryOnStepDown) {
         prevState = nextState;
     }
 
-    auto cloner = *GlobalIndexStateMachine::lookup(rawOpCtx, _service, extractInstanceId(doc));
+    auto [cloner, isPausedOrShutdown] =
+        GlobalIndexStateMachine::lookup(rawOpCtx, _service, extractInstanceId(doc));
+    ASSERT_TRUE(cloner);
+    ASSERT_FALSE(isPausedOrShutdown);
     stateTransitionsGuard.unset(GlobalIndexClonerStateEnum::kDone);
-    cloner->cleanup();
-    cloner->getCompletionFuture().get();
+    (*cloner)->cleanup();
+    (*cloner)->getCompletionFuture().get();
 
     checkIndexCollection(rawOpCtx);
 }
@@ -658,12 +666,14 @@ TEST_F(GlobalIndexClonerServiceTest, ResumeIdShouldBeRestoredOnStepUp) {
     stepDown();
     stepUp(rawOpCtx);
 
-    auto cloner = *GlobalIndexStateMachine::lookup(rawOpCtx, _service, extractInstanceId(doc));
+    auto [cloner, isPausedOrShutdown] =
+        GlobalIndexStateMachine::lookup(rawOpCtx, _service, extractInstanceId(doc));
     ASSERT_TRUE(cloner);
+    ASSERT_FALSE(isPausedOrShutdown);
 
-    cloner->getReadyToCommitFuture().get();
-    cloner->cleanup();
-    cloner->getCompletionFuture().get();
+    (*cloner)->getReadyToCommitFuture().get();
+    (*cloner)->cleanup();
+    (*cloner)->getCompletionFuture().get();
 
     checkExpectedEntries(rawOpCtx, 1);
 }

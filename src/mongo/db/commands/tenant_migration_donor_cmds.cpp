@@ -237,14 +237,14 @@ public:
             auto donorService =
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(TenantMigrationDonorService::kServiceName);
-            auto optionalDonor = TenantMigrationDonorService::Instance::lookup(
+            auto [optionalDonor, _] = TenantMigrationDonorService::Instance::lookup(
                 opCtx, donorService, BSON("_id" << cmd.getMigrationId()));
             uassert(ErrorCodes::NoSuchTenantMigration,
                     str::stream() << "Could not find tenant migration with id "
                                   << cmd.getMigrationId(),
                     optionalDonor);
 
-            // Retrieve the shared_ptr from boost::optional to improve readability
+            // Retrieve the shared_ptr from boost::optional to improve readability.
             auto donorPtr = optionalDonor.value();
 
             // always ensure we wait for the initial state document to be inserted.
@@ -315,7 +315,7 @@ public:
             auto donorService =
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(TenantMigrationDonorService::kServiceName);
-            auto optionalDonor = TenantMigrationDonorService::Instance::lookup(
+            auto [optionalDonor, _] = TenantMigrationDonorService::Instance::lookup(
                 opCtx, donorService, BSON("_id" << cmd.getMigrationId()));
 
             // If there is NoSuchTenantMigration, perform a noop write and wait for it to be
