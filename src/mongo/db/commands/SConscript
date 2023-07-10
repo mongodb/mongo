@@ -95,6 +95,20 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='query_settings_cmds', source=[
+        "query_settings_cmds.idl",
+        "query_settings_cmds.cpp",
+    ], LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/client/clientdriver_minimal',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/query/query_settings_manager',
+        '$BUILD_DIR/mongo/db/query/query_shape',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+    ])
+
 # Commands available in all mongodb server processes (mongod, mongos, etc.)
 env.Library(
     target='servers',
@@ -149,6 +163,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/ntservice',
         'authentication_commands',
         'core',
+        'query_settings_cmds',
         'test_commands_enabled',
     ],
 )

@@ -78,6 +78,14 @@ BSONObj extractSortShape(const BSONObj& sortSpec,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const SerializationOptions& opts);
 
+/**
+ * Tries to extract the QueryShape out of the 'cmd' represented as a raw BSONObj. In case when the
+ * QueryShape can not be extracted, boost::none is returned.
+ */
+BSONObj extractQueryShape(const BSONObj& cmd,
+                          const SerializationOptions& opts,
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                          const boost::optional<TenantId>& tenantId);
 BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx);

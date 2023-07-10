@@ -39,6 +39,7 @@ const commandsAddedToMongodSinceLastLTS = [
     "rotateCertificates",
     "setChangeStreamState",
     "setClusterParameter",
+    "setQuerySettings",  // TODO (SERVER-73309): Remove once 7.0 becomes last LTS.
     "setUserWriteBlockMode",
     "updateSearchIndex",  // TODO (SERVER-73309): Remove once 7.0 becomes last LTS.
 ];
