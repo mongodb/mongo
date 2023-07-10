@@ -79,12 +79,14 @@ class TransportLayerManager final : public TransportLayer {
     TransportLayerManager& operator=(const TransportLayerManager&) = delete;
 
 public:
+    /**
+     * connect() and the other egress related methods will use the provided egressLayer argument
+     * for egress networking. This pointer must be associated with one of the layers in the provided
+     * list.
+     */
     explicit TransportLayerManager(std::vector<std::unique_ptr<TransportLayer>> tls,
-                                   const WireSpec& wireSpec = WireSpec::instance())
-        : TransportLayer(wireSpec), _tls(std::move(tls)) {}
-
-    explicit TransportLayerManager(const WireSpec& wireSpec = WireSpec::instance())
-        : TransportLayer(wireSpec) {}
+                                   TransportLayer* egressLayer,
+                                   const WireSpec& wireSpec = WireSpec::instance());
 
     StatusWith<std::shared_ptr<Session>> connect(
         HostAndPort peer,
@@ -105,6 +107,10 @@ public:
     void appendStatsForServerStatus(BSONObjBuilder* bob) const override;
     void appendStatsForFTDC(BSONObjBuilder& bob) const override;
 
+    /**
+     * Gets a handle to the reactor assoicated with the transport layer that is configured for
+     * egress networking.
+     */
     ReactorHandle getReactor(WhichReactor which) override;
 
     // TODO This method is not called anymore, but may be useful to add new TransportLayers
@@ -127,11 +133,12 @@ public:
 
     static std::unique_ptr<TransportLayer> makeAndStartDefaultEgressTransportLayer();
 
+    /**
+     * Makes a baton using the transport layer that is configured for egress networking.
+     */
     BatonHandle makeBaton(OperationContext* opCtx) const override {
         stdx::lock_guard<Latch> lk(_tlsMutex);
-        // TODO: figure out what to do about managers with more than one transport layer.
-        invariant(_tls.size() == 1);
-        return _tls[0]->makeBaton(opCtx);
+        return _egressLayer->makeBaton(opCtx);
     }
 
 #ifdef MONGO_CONFIG_SSL
@@ -148,6 +155,7 @@ private:
     mutable Mutex _tlsMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "TransportLayerManager::_tlsMutex");
     std::vector<std::unique_ptr<TransportLayer>> _tls;
+    TransportLayer* const _egressLayer;
 };
 
 }  // namespace transport

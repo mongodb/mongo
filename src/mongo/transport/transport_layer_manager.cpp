@@ -28,6 +28,9 @@
  */
 
 
+#include "mongo/transport/transport_layer_manager.h"
+
+#include <algorithm>
 #include <memory>
 #include <string>
 
@@ -41,7 +44,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -60,12 +62,22 @@ void TransportLayerManager::_foreach(Callable&& cb) const {
     }
 }
 
+TransportLayerManager::TransportLayerManager(std::vector<std::unique_ptr<TransportLayer>> tls,
+                                             TransportLayer* egressLayer,
+                                             const WireSpec& wireSpec)
+    : TransportLayer(wireSpec), _tls(std::move(tls)), _egressLayer(egressLayer) {
+    invariant(_egressLayer);
+    invariant(find_if(_tls.begin(), _tls.end(), [&](auto& tl) {
+                  return tl.get() == _egressLayer;
+              }) != _tls.end());
+}
+
 StatusWith<std::shared_ptr<Session>> TransportLayerManager::connect(
     HostAndPort peer,
     ConnectSSLMode sslMode,
     Milliseconds timeout,
     boost::optional<TransientSSLParams> transientSSLParams) {
-    return _tls.front()->connect(peer, sslMode, timeout, transientSSLParams);
+    return _egressLayer->connect(peer, sslMode, timeout, transientSSLParams);
 }
 
 Future<std::shared_ptr<Session>> TransportLayerManager::asyncConnect(
@@ -75,12 +87,13 @@ Future<std::shared_ptr<Session>> TransportLayerManager::asyncConnect(
     Milliseconds timeout,
     std::shared_ptr<ConnectionMetrics> connectionMetrics,
     std::shared_ptr<const SSLConnectionContext> transientSSLContext) {
-    return _tls.front()->asyncConnect(
+
+    return _egressLayer->asyncConnect(
         peer, sslMode, reactor, timeout, connectionMetrics, transientSSLContext);
 }
 
 ReactorHandle TransportLayerManager::getReactor(WhichReactor which) {
-    return _tls.front()->getReactor(which);
+    return _egressLayer->getReactor(which);
 }
 
 // TODO Right now this and setup() leave TLs started if there's an error. In practice the server
@@ -148,8 +161,9 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
 
     transport::AsioTransportLayer::Options opts(config, loadBalancerPort);
     std::vector<std::unique_ptr<TransportLayer>> retVector;
-    retVector.emplace_back(std::make_unique<transport::AsioTransportLayer>(opts, sep));
-    return std::make_unique<TransportLayerManager>(std::move(retVector));
+    retVector.push_back(std::make_unique<transport::AsioTransportLayer>(opts, sep));
+    auto egress = retVector[0].get();
+    return std::make_unique<TransportLayerManager>(std::move(retVector), egress);
 }
 
 #ifdef MONGO_CONFIG_SSL

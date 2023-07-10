@@ -226,6 +226,7 @@ tlEnv.CppUnitTest(
         'service_executor_test.cpp',
         'max_conns_override_test.cpp',
         'session_workflow_test.cpp',
+        'transport_layer_manager_test.cpp',
         'proxy_protocol_header_parser_test.cpp',
     ],
     LIBDEPS=[
@@ -247,6 +248,7 @@ tlEnv.CppUnitTest(
         'service_executor',
         'transport_layer',
         'transport_layer_common',
+        'transport_layer_manager',
         'transport_layer_mock',
     ],
 )
