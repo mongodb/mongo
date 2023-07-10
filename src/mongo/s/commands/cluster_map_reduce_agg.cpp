@@ -111,10 +111,14 @@ auto makeExpressionContext(OperationContext* opCtx,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     if (parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {
-        auto outNss = NamespaceString{parsedMr.getOutOptions().getDatabaseName()
-                                          ? *parsedMr.getOutOptions().getDatabaseName()
-                                          : parsedMr.getNamespace().db(),
-                                      parsedMr.getOutOptions().getCollectionName()};
+        auto outNss = NamespaceString();
+        if (auto hasOutDB = parsedMr.getOutOptions().getDatabaseName()) {
+            outNss = NamespaceStringUtil::parseNamespaceFromRequest(
+                boost::none, *hasOutDB, parsedMr.getOutOptions().getCollectionName());
+        } else {
+            outNss = NamespaceStringUtil::parseNamespaceFromRequest(
+                parsedMr.getNamespace().dbName(), parsedMr.getOutOptions().getCollectionName());
+        }
         resolvedNamespaces.try_emplace(outNss.coll(), outNss, std::vector<BSONObj>{});
     }
     auto runtimeConstants = Variables::generateRuntimeConstants(opCtx);
@@ -186,8 +190,14 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         IDLParserContext("mapReduce", false /* apiStrict */, dbName.tenantId()), cmd);
     stdx::unordered_set<NamespaceString> involvedNamespaces{parsedMr.getNamespace()};
     auto hasOutDB = parsedMr.getOutOptions().getDatabaseName();
-    auto resolvedOutNss = NamespaceString{hasOutDB ? *hasOutDB : parsedMr.getNamespace().db(),
-                                          parsedMr.getOutOptions().getCollectionName()};
+    auto resolvedOutNss = NamespaceString();
+    if (auto hasOutDB = parsedMr.getOutOptions().getDatabaseName()) {
+        resolvedOutNss = NamespaceStringUtil::parseNamespaceFromRequest(
+            boost::none, *hasOutDB, parsedMr.getOutOptions().getCollectionName());
+    } else {
+        resolvedOutNss = NamespaceStringUtil::parseNamespaceFromRequest(
+            parsedMr.getNamespace().dbName(), parsedMr.getOutOptions().getCollectionName());
+    }
 
     if (_sampler.tick()) {
         LOGV2_WARNING(5725800,

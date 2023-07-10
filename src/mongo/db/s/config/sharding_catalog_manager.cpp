@@ -1498,7 +1498,7 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
                      &earliestClusterTime](const std::vector<BSONObj>& batch,
                                            const boost::optional<BSONObj>& postBatchResumeToken) {
         for (const auto& obj : batch) {
-            const auto nss = NamespaceString(obj["_id"].String());
+            const auto nss = NamespaceStringUtil::deserialize(boost::none, obj["_id"].String());
             const auto timeOfMostRecentDoc = obj["mostRecentTimestamp"].timestamp();
             write_ops::DeleteOpEntry stmt;
 

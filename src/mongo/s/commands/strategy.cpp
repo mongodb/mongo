@@ -599,8 +599,9 @@ void ParseAndRunCommand::_parseCommand() {
     // the command does not define a fully-qualified namespace, set CurOp to the generic command
     // namespace db.$cmd.
     _ns.emplace(NamespaceStringUtil::serialize(_invocation->ns()));
-    auto nss =
-        (request.getDatabase() == *_ns ? NamespaceString(*_ns, "$cmd") : NamespaceString(*_ns));
+    const auto nss = (request.getDatabase() == *_ns
+                          ? NamespaceString::makeCommandNamespace(_invocation->ns().dbName())
+                          : _invocation->ns());
 
     // Fill out all currentOp details.
     CurOp::get(opCtx)->setGenericOpRequestDetails(nss, command, request.body, _opType);

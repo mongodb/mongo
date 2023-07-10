@@ -1610,9 +1610,10 @@ void ShardingCatalogManager::_addShardInTransaction(
                                dbNames.end(),
                                std::back_inserter(placementEntries),
                                [&](const std::string dbName) {
-                                   return NamespacePlacementType(NamespaceString(dbName),
-                                                                 newShard.getTopologyTime(),
-                                                                 {ShardId(newShard.getName())})
+                                   return NamespacePlacementType(
+                                              NamespaceStringUtil::deserialize(boost::none, dbName),
+                                              newShard.getTopologyTime(),
+                                              {ShardId(newShard.getName())})
                                        .toBSON();
                                });
                 write_ops::InsertCommandRequest insertPlacementEntries(

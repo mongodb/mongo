@@ -52,7 +52,8 @@ std::shared_ptr<const ErrorExtraInfo> ShardInvalidatedForTargetingInfo::parse(co
 
 ShardInvalidatedForTargetingInfo ShardInvalidatedForTargetingInfo::parseFromCommandError(
     const BSONObj& obj) {
-    return ShardInvalidatedForTargetingInfo(NamespaceString(obj["nss"].String()));
+    return ShardInvalidatedForTargetingInfo(
+        NamespaceStringUtil::deserialize(boost::none, obj["nss"].String()));
 }
 
 }  // namespace mongo

@@ -303,7 +303,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
                               const BatchedCommandResponse& insertDatabaseEntryResponse) {
                         uassertStatusOK(insertDatabaseEntryResponse.toStatus());
                         NamespacePlacementType placementInfo(
-                            NamespaceString(db.getName()),
+                            NamespaceStringUtil::deserialize(boost::none, db.getName()),
                             db.getVersion().getTimestamp(),
                             std::vector<mongo::ShardId>{db.getPrimary()});
                         write_ops::InsertCommandRequest insertPlacementHistoryOp(

@@ -150,10 +150,11 @@ RecipientShardEntry makeRecipientShard(ShardId shardId,
 }
 
 NamespaceString constructTemporaryReshardingNss(StringData db, const UUID& sourceUuid) {
-    return NamespaceString(db,
-                           fmt::format("{}{}",
-                                       NamespaceString::kTemporaryReshardingCollectionPrefix,
-                                       sourceUuid.toString()));
+    return NamespaceStringUtil::parseNamespaceFromRequest(
+        boost::none,
+        db,
+        fmt::format(
+            "{}{}", NamespaceString::kTemporaryReshardingCollectionPrefix, sourceUuid.toString()));
 }
 
 std::set<ShardId> getRecipientShards(OperationContext* opCtx,

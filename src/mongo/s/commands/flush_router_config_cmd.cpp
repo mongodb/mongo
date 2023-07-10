@@ -120,7 +120,7 @@ public:
                       "db"_attr = ns);
                 catalogCache->purgeDatabase(ns);
             } else {
-                const NamespaceString nss(ns);
+                const auto nss = NamespaceStringUtil::deserialize(boost::none, ns);
                 LOGV2(22763,
                       "Routing metadata flushed for collection {namespace}",
                       "Routing metadata flushed for collection",

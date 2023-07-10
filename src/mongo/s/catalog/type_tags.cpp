@@ -74,7 +74,7 @@ StatusWith<TagsType> TagsType::fromBSON(const BSONObj& source) {
             return status;
         }
 
-        tags._ns = NamespaceString(tagsNs);
+        tags._ns = NamespaceStringUtil::deserialize(boost::none, tagsNs);
     }
 
     {

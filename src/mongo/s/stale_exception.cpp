@@ -65,7 +65,7 @@ std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj)
     uassert(ErrorCodes::NoSuchKey, "The shardId field is missing", !shardId.empty());
 
     return std::make_shared<StaleConfigInfo>(
-        NamespaceString(obj["ns"].String()),
+        NamespaceStringUtil::deserialize(boost::none, obj["ns"].String()),
         ShardVersion::parse(obj["vReceived"]),
         [&] {
             if (auto vWantedElem = obj["vWanted"])
@@ -97,7 +97,7 @@ std::shared_ptr<const ErrorExtraInfo> StaleEpochInfo::parse(const BSONObj& obj) 
 
 
     return std::make_shared<StaleEpochInfo>(
-        NamespaceString(obj["ns"].String()), *received, *wanted);
+        NamespaceStringUtil::deserialize(boost::none, obj["ns"].String()), *received, *wanted);
 }
 
 void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {

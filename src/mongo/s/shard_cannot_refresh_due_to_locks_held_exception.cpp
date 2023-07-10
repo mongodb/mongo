@@ -51,7 +51,8 @@ std::shared_ptr<const ErrorExtraInfo> ShardCannotRefreshDueToLocksHeldInfo::pars
 
 ShardCannotRefreshDueToLocksHeldInfo ShardCannotRefreshDueToLocksHeldInfo::parseFromCommandError(
     const BSONObj& obj) {
-    return ShardCannotRefreshDueToLocksHeldInfo(NamespaceString(obj[kNssFieldName].String()));
+    return ShardCannotRefreshDueToLocksHeldInfo(
+        NamespaceStringUtil::deserialize(boost::none, obj[kNssFieldName].String()));
 }
 
 }  // namespace mongo

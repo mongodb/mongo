@@ -150,7 +150,8 @@ void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext*
     std::string deletedCollection;
     fassert(40479,
             bsonExtractStringField(query, ShardCollectionType::kNssFieldName, &deletedCollection));
-    const NamespaceString deletedNss(deletedCollection);
+    const NamespaceString deletedNss =
+        NamespaceStringUtil::deserialize(boost::none, deletedCollection);
 
     // Need the WUOW to retain the lock for CollectionPlacementVersionLogOpHandler::commit().
     // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
@@ -312,7 +313,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
             fassert(40477,
                     bsonExtractStringField(
                         args.updateArgs->criteria, ShardCollectionType::kNssFieldName, &coll));
-            return NamespaceString(coll);
+            return NamespaceStringUtil::deserialize(boost::none, coll);
         }());
 
         auto enterCriticalSectionFieldNewVal = update_oplog_entry::extractNewValueForField(

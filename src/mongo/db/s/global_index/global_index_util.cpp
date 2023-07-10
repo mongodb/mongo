@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/global_index/global_index_util.h"
+#include "mongo/util/namespace_string_util.h"
 
 #include <fmt/format.h>
 
@@ -37,8 +38,10 @@ namespace mongo {
 namespace global_index {
 
 NamespaceString skipIdNss(const NamespaceString& nss, StringData indexName) {
-    return NamespaceString(nss.db(),
-                           "{}.globalIndex.{}.skipList"_format(nss.coll(), indexName.toString()));
+    return NamespaceStringUtil::parseNamespaceFromRequest(
+        nss.tenantId(),
+        nss.db(),
+        ("{}.globalIndex.{}.skipList"_format(nss.coll(), indexName.toString())));
 }
 
 }  // namespace global_index

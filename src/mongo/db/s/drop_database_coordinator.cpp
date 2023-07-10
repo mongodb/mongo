@@ -159,7 +159,8 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
 
                 const auto currentTime = VectorClock::get(opCtx)->getTime();
                 const auto currentTimestamp = currentTime.clusterTime().asTimestamp();
-                NamespacePlacementType placementInfo(NamespaceString(dbName), currentTimestamp, {});
+                NamespacePlacementType placementInfo(
+                    NamespaceStringUtil::deserialize(boost::none, dbName), currentTimestamp, {});
 
                 write_ops::InsertCommandRequest insertPlacementEntry(
                     NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});
@@ -453,12 +454,12 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         auto recoveryService = ShardingRecoveryService::get(opCtx);
                         recoveryService->acquireRecoverableCriticalSectionBlockWrites(
                             opCtx,
-                            NamespaceString(_dbName),
+                            NamespaceStringUtil::deserialize(boost::none, _dbName),
                             _critSecReason,
                             ShardingCatalogClient::kLocalWriteConcern);
                         recoveryService->promoteRecoverableCriticalSectionToBlockAlsoReads(
                             opCtx,
-                            NamespaceString(_dbName),
+                            NamespaceStringUtil::deserialize(boost::none, _dbName),
                             _critSecReason,
                             ShardingCatalogClient::kLocalWriteConcern);
                     } else {
@@ -534,7 +535,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
                 ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
                     opCtx,
-                    NamespaceString(_dbName),
+                    NamespaceStringUtil::deserialize(boost::none, _dbName),
                     _critSecReason,
                     WriteConcerns::kMajorityWriteConcernNoTimeout,
                     /* throwIfReasonDiffers */ false);

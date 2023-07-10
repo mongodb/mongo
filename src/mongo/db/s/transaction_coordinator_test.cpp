@@ -119,7 +119,8 @@ const StatusWith<BSONObj> kNoSuchTransaction =
               << "No such transaction exists");
 const StatusWith<BSONObj> kOk = BSON("ok" << 1);
 const Timestamp kDummyPrepareTimestamp = Timestamp(1, 1);
-const std::vector<NamespaceString> kDummyAffectedNamespaces = {NamespaceString("test.test")};
+const std::vector<NamespaceString> kDummyAffectedNamespaces = {
+    NamespaceString::createNamespaceString_forTest("test.test")};
 
 StatusWith<BSONObj> makePrepareOkResponse(const Timestamp& timestamp,
                                           const std::vector<NamespaceString>& affectedNamespaces) {
@@ -736,12 +737,14 @@ TEST_F(TransactionCoordinatorDriverTest, SendPrepareToShardsCollectsAffectedName
     assertCommandSentAndRespondWith(
         PrepareTransaction::kCommandName,
         makePrepareOkResponse(timestamp,
-                              {NamespaceString("db1.coll1"), NamespaceString("db2.coll2")}),
+                              {NamespaceString::createNamespaceString_forTest("db1.coll1"),
+                               NamespaceString::createNamespaceString_forTest("db2.coll2")}),
         WriteConcernOptions::Majority);
     assertCommandSentAndRespondWith(
         PrepareTransaction::kCommandName,
         makePrepareOkResponse(timestamp,
-                              {NamespaceString("db1.coll2"), NamespaceString("db2.coll1")}),
+                              {NamespaceString::createNamespaceString_forTest("db1.coll2"),
+                               NamespaceString::createNamespaceString_forTest("db2.coll1")}),
         WriteConcernOptions::Majority);
 
     auto response = future.get();
