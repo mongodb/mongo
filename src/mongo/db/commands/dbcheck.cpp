@@ -225,9 +225,13 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                     "dataConsistencyAndMissingIndexKeysCheck, the secondaryIndex parameter cannot "
                     "be set.",
                     !invocation.getSecondaryIndex());
+            uassert(ErrorCodes::InvalidOptions,
+                    "When validateMode is set to dataConsistency or "
+                    "dataConsistencyAndMissingIndexKeysCheck, the skipLookupForExtraKeys parameter "
+                    "cannot be set.",
+                    !invocation.getSkipLookupForExtraKeys());
         }
     }
-
     NamespaceString nss(
         NamespaceStringUtil::parseNamespaceFromRequest(dbName, invocation.getColl()));
     AutoGetCollectionForRead agc(opCtx, nss);
@@ -550,8 +554,8 @@ private:
             reachedEnd = reachedLast || tooManyDocs || tooManyBytes;
 
             if (docsInCurrentInterval > info.maxRate && info.maxRate > 0) {
-                // If an extremely low max rate has been set (substantially smaller than the batch
-                // size) we might want to sleep for multiple seconds between batches.
+                // If an extremely low max rate has been set (substantially smaller than the
+                // batch size) we might want to sleep for multiple seconds between batches.
                 int64_t timesExceeded = docsInCurrentInterval / info.maxRate;
 
                 stdx::this_thread::sleep_for(timesExceeded * 1s - (Clock::now() - lastStart));
@@ -585,15 +589,15 @@ private:
                                      const BSONKey& first,
                                      int64_t batchDocs,
                                      int64_t batchBytes) {
-        // Each batch will read at the latest no-overlap point, which is the all_durable timestamp
-        // on primaries. We assume that the history window on secondaries is always longer than the
-        // time it takes between starting and replicating a batch on the primary. Otherwise, the
-        // readTimestamp will not be available on a secondary by the time it processes the oplog
-        // entry.
+        // Each batch will read at the latest no-overlap point, which is the all_durable
+        // timestamp on primaries. We assume that the history window on secondaries is always
+        // longer than the time it takes between starting and replicating a batch on the
+        // primary. Otherwise, the readTimestamp will not be available on a secondary by the
+        // time it processes the oplog entry.
         opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
 
-        // dbCheck writes to the oplog, so we need to take an IX lock. We don't need to write to the
-        // collection, however, so we only take an intent lock on it.
+        // dbCheck writes to the oplog, so we need to take an IX lock. We don't need to write to
+        // the collection, however, so we only take an intent lock on it.
         Lock::GlobalLock glob(opCtx, MODE_IX);
 
         // The CollectionCatalog to use for lock-free reads with point-in-time catalog lookups.
@@ -719,7 +723,8 @@ public:
                "              maxCountPerSecond: <max rate in docs/sec>\n"
                "              maxDocsPerBatch: <max number of docs/batch>\n"
                "              maxBytesPerBatch: <try to keep a batch within max bytes/batch>\n"
-               "              maxBatchTimeMillis: <max time processing a batch in milliseconds>\n"
+               "              maxBatchTimeMillis: <max time processing a batch in "
+               "milliseconds>\n"
                "to check a collection.\n"
                "Invoke with {dbCheck: 1} to check all collections in the database.";
     }

@@ -53,9 +53,13 @@ function testInvalidParameter() {
         validateMode: "extraIndexKeysCheck",
     }),
                                  ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        db.runCommand(
+            {dbCheck: colName, validateMode: "extraIndexKeysCheck", skipLookupForExtraKeys: true}),
+        ErrorCodes.InvalidOptions);
 
-    // secondaryIndex field cannot be specified when validateMode is dataConsistency or
-    // dataConsistencyAndMissingIndexKeysCheck.
+    // Neither secondaryIndex nor skipLookupForExtraKeys fields can be specified when validateMode
+    // is dataConsistency or dataConsistencyAndMissingIndexKeysCheck.
     assert.commandFailedWithCode(db.runCommand({
         dbCheck: colName,
         validateMode: "dataConsistency",
@@ -66,6 +70,18 @@ function testInvalidParameter() {
         dbCheck: colName,
         validateMode: "dataConsistencyAndMissingIndexKeysCheck",
         secondaryIndex: "secondaryIndex",
+    }),
+                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(db.runCommand({
+        dbCheck: colName,
+        validateMode: "dataConsistency",
+        skipLookupForExtraKeys: true,
+    }),
+                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(db.runCommand({
+        dbCheck: colName,
+        validateMode: "dataConsistencyAndMissingIndexKeysCheck",
+        skipLookupForExtraKeys: true,
     }),
                                  ErrorCodes.InvalidOptions);
 }
@@ -86,6 +102,13 @@ function testValidParameter() {
     }));
 
     // extraIndexKeysCheck is a supported enum for the validateMode field.
+    assert.commandWorked(db.runCommand({
+        dbCheck: colName,
+        validateMode: "extraIndexKeysCheck",
+        secondaryIndex: "secondaryIndex",
+        skipLookupForExtraKeys: true,
+    }));
+    // skipLookupForExtraKeys is default to false when validateMode is set.
     assert.commandWorked(db.runCommand({
         dbCheck: colName,
         validateMode: "extraIndexKeysCheck",

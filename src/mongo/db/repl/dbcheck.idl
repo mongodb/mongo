@@ -137,6 +137,10 @@ structs:
         description: The name of the index to run extra index keys check on.
         type: string
         optional: true
+      skipLookupForExtraKeys:
+        description: Controls whether or not to run the reverse lookup portion of the extra index keys check.
+        type: safeBool
+        default: false
 
   DbCheckAllInvocation:
     description: "Command object for database-wide form of dbCheck invocation"
