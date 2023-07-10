@@ -186,13 +186,13 @@ public:
     void addUpdateReply(size_t currentOpIdx,
                         int numMatched,
                         int numDocsModified,
-                        const boost::optional<mongo::write_ops::Upserted>& upserted,
+                        const boost::optional<IDLAnyTypeOwned>& upserted,
                         const boost::optional<BSONObj>& value,
                         const boost::optional<int32_t>& stmtId) {
         auto replyItem = BulkWriteReplyItem(currentOpIdx);
         replyItem.setNModified(numDocsModified);
         if (upserted.has_value()) {
-            replyItem.setUpserted(upserted);
+            replyItem.setUpserted(write_ops::Upserted(0, upserted.value()));
             replyItem.setN(1);
         } else {
             replyItem.setN(numMatched);
@@ -207,21 +207,6 @@ public:
         }
 
         _replies.emplace_back(replyItem);
-    }
-
-    void addUpdateReply(size_t currentOpIdx,
-                        int numMatched,
-                        int numDocsModified,
-                        const boost::optional<IDLAnyTypeOwned>& upsertedAnyType,
-                        const boost::optional<BSONObj>& value,
-                        const boost::optional<int32_t>& stmtId) {
-
-        boost::optional<mongo::write_ops::Upserted> upserted;
-        if (upsertedAnyType.has_value()) {
-            upserted = write_ops::Upserted(0, upsertedAnyType.value());
-        }
-
-        addUpdateReply(currentOpIdx, numMatched, numDocsModified, upserted, value, stmtId);
     }
 
     void addUpdateReply(size_t currentOpIdx,
@@ -349,12 +334,9 @@ public:
                        [](const InsertStatement& insert) { return insert.doc; });
 
         write_ops::InsertCommandRequest request(_currentNs.getNs(), documents);
-        request.setDollarTenant(_req.getDollarTenant());
-        request.setExpectPrefix(_req.getExpectPrefix());
         auto& requestBase = request.getWriteCommandRequestBase();
         requestBase.setEncryptionInformation(_currentNs.getEncryptionInformation());
         requestBase.setOrdered(_req.getOrdered());
-        requestBase.setBypassDocumentValidation(_req.getBypassDocumentValidation());
 
         write_ops::InsertCommandReply insertReply;
 
@@ -707,191 +689,6 @@ bool handleInsertOp(OperationContext* opCtx,
     return batch.addToBatch(opCtx, currentOpIdx, stmtId, nsInfo[idx], toInsert);
 }
 
-// Unlike attemptProcessFLEInsert, no fallback to non-FLE path is needed,
-// returning false only indicate an error occurred.
-bool attemptProcessFLEUpdate(OperationContext* opCtx,
-                             const BulkWriteUpdateOp* op,
-                             const BulkWriteCommandRequest& req,
-                             size_t currentOpIdx,
-                             BulkWriteReplies& responses,
-                             const mongo::NamespaceInfoEntry& nsInfoEntry) {
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
-
-    // op->getReturn() should not be set for this code path, see attemptProcessFLEFindAndModify.
-    uassert(ErrorCodes::InvalidOptions,
-            "BulkWrite update with sort is supported only with return.",
-            !op->getReturn() && !op->getSort());
-
-    write_ops::UpdateOpEntry update;
-    update.setQ(op->getFilter());
-    update.setMulti(op->getMulti());
-    update.setC(op->getConstants());
-    update.setU(op->getUpdateMods());
-    update.setHint(op->getHint());
-    if (op->getCollation()) {
-        update.setCollation(op->getCollation().value());
-    }
-    update.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
-    update.setUpsert(op->getUpsert());
-
-    std::vector<write_ops::UpdateOpEntry> updates{update};
-    write_ops::UpdateCommandRequest updateCommand(nsInfoEntry.getNs(), updates);
-    updateCommand.setDollarTenant(req.getDollarTenant());
-    updateCommand.setExpectPrefix(req.getExpectPrefix());
-    updateCommand.setLet(req.getLet());
-    updateCommand.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-
-    updateCommand.getWriteCommandRequestBase().setEncryptionInformation(
-        nsInfoEntry.getEncryptionInformation());
-    updateCommand.getWriteCommandRequestBase().setBypassDocumentValidation(
-        req.getBypassDocumentValidation());
-
-    write_ops::UpdateCommandReply updateReply = processFLEUpdate(opCtx, updateCommand);
-
-    if (updateReply.getWriteErrors()) {
-        const auto& errors = updateReply.getWriteErrors().get();
-        invariant(errors.size() == 1);
-        responses.addUpdateErrorReply(opCtx, currentOpIdx, errors[0].getStatus());
-        return false;
-    } else {
-        boost::optional<int32_t> stmtId;
-        if (updateReply.getRetriedStmtIds()) {
-            const auto& retriedStmtIds = updateReply.getRetriedStmtIds().get();
-            invariant(retriedStmtIds.size() == 1);
-            stmtId = retriedStmtIds[0];
-        }
-
-        boost::optional<mongo::write_ops::Upserted> upserted;
-        if (updateReply.getUpserted()) {
-            const auto& upsertedDocuments = updateReply.getUpserted().get();
-            invariant(upsertedDocuments.size() == 1);
-            upserted = upsertedDocuments[0];
-        }
-
-        responses.addUpdateReply(currentOpIdx,
-                                 updateReply.getN(),
-                                 updateReply.getNModified(),
-                                 upserted,
-                                 /* value */ boost::none,
-                                 stmtId);
-
-        return true;
-    }
-}
-
-// Unlike attemptProcessFLEInsert, no fallback to non-FLE path is needed,
-// returning false only indicate an error occurred.
-bool attemptProcessFLEFindAndModify(OperationContext* opCtx,
-                                    const BulkWriteUpdateOp* op,
-                                    const BulkWriteCommandRequest& req,
-                                    size_t currentOpIdx,
-                                    BulkWriteReplies& responses,
-                                    const mongo::NamespaceInfoEntry& nsInfoEntry) {
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
-
-    uassert(ErrorCodes::InvalidOptions,
-            "BulkWrite update with Queryable Encryption and return does not support constants or "
-            "multi.",
-            !op->getMulti() && !op->getConstants());
-
-    write_ops::FindAndModifyCommandRequest findAndModifyRequest(nsInfoEntry.getNs());
-    findAndModifyRequest.setDollarTenant(req.getDollarTenant());
-    findAndModifyRequest.setExpectPrefix(req.getExpectPrefix());
-    findAndModifyRequest.setBypassDocumentValidation(req.getBypassDocumentValidation());
-    findAndModifyRequest.setQuery(op->getFilter());
-    findAndModifyRequest.setLet(req.getLet());
-    findAndModifyRequest.setFields(op->getReturnFields());
-    findAndModifyRequest.setUpdate(op->getUpdateMods());
-    findAndModifyRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-    findAndModifyRequest.setSort(op->getSort().value_or(BSONObj()));
-    findAndModifyRequest.setHint(op->getHint());
-    if (op->getCollation()) {
-        findAndModifyRequest.setCollation(op->getCollation().value());
-    }
-    findAndModifyRequest.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
-    findAndModifyRequest.setUpsert(op->getUpsert());
-    if (op->getReturn()) {
-        findAndModifyRequest.setNew(op->getReturn().get() != "pre");
-    }
-    findAndModifyRequest.setEncryptionInformation(nsInfoEntry.getEncryptionInformation());
-
-    StatusWith<std::pair<write_ops::FindAndModifyCommandReply, OpMsgRequest>> status =
-        processFLEFindAndModifyHelper(opCtx, findAndModifyRequest);
-    if (!status.isOK()) {
-        responses.addUpdateErrorReply(opCtx, currentOpIdx, status.getStatus());
-        return false;
-    } else {
-        const auto& reply = status.getValue().first;
-        int numDocs = reply.getLastErrorObject().getNumDocs();
-        responses.addUpdateReply(currentOpIdx,
-                                 numDocs,
-                                 numDocs,
-                                 reply.getLastErrorObject().getUpserted(),
-                                 op->getReturn() ? reply.getValue() : boost::none,
-                                 reply.getRetriedStmtId());
-        return true;
-    }
-}
-
-// Unlike attemptProcessFLEInsert, no fallback to non-FLE path is needed,
-// returning false only indicate an error occurred.
-bool attemptProcessFLEDelete(OperationContext* opCtx,
-                             const BulkWriteDeleteOp* op,
-                             const BulkWriteCommandRequest& req,
-                             size_t currentOpIdx,
-                             BulkWriteReplies& responses,
-                             const mongo::NamespaceInfoEntry& nsInfoEntry) {
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
-
-    // TODO SERVER-78678 : It is possible to support delete with return by mapping it to
-    // processFLEFindAndModifyHelper instead and using FindAndModifyCommandRequest.setRemove.
-    uassert(ErrorCodes::InvalidOptions,
-            "BulkWrite delete with Queryable Encryption does not support return or sort.",
-            !op->getReturn() && !op->getReturnFields() && !op->getSort());
-
-    write_ops::DeleteOpEntry deleteEntry;
-    if (op->getCollation()) {
-        deleteEntry.setCollation(op->getCollation());
-    }
-    deleteEntry.setHint(op->getHint());
-    deleteEntry.setMulti(op->getMulti());
-    deleteEntry.setQ(op->getFilter());
-
-    std::vector<write_ops::DeleteOpEntry> deletes{deleteEntry};
-    write_ops::DeleteCommandRequest deleteRequest(nsInfoEntry.getNs(), deletes);
-    deleteRequest.setDollarTenant(req.getDollarTenant());
-    deleteRequest.setExpectPrefix(req.getExpectPrefix());
-    deleteRequest.setLet(req.getLet());
-    deleteRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-    deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(
-        nsInfoEntry.getEncryptionInformation());
-    deleteRequest.getWriteCommandRequestBase().setBypassDocumentValidation(
-        req.getBypassDocumentValidation());
-
-    write_ops::DeleteCommandReply deleteReply = processFLEDelete(opCtx, deleteRequest);
-    if (deleteReply.getWriteErrors()) {
-        const auto& errors = deleteReply.getWriteErrors().get();
-        invariant(errors.size() == 1);
-        auto replyItem = BulkWriteReplyItem(currentOpIdx);
-        responses.addErrorReply(opCtx, replyItem, errors[0].getStatus());
-
-        return false;
-    } else {
-        boost::optional<int32_t> stmtId;
-        if (deleteReply.getRetriedStmtIds()) {
-            const auto& retriedStmtIds = deleteReply.getRetriedStmtIds().get();
-            invariant(retriedStmtIds.size() == 1);
-            stmtId = retriedStmtIds[0];
-        }
-
-        responses.addDeleteReply(currentOpIdx,
-                                 deleteReply.getN(),
-                                 /* value */ boost::none,
-                                 stmtId);
-        return true;
-    }
-}
-
 bool handleUpdateOp(OperationContext* opCtx,
                     CurOp* curOp,
                     const BulkWriteUpdateOp* op,
@@ -920,22 +717,6 @@ bool handleUpdateOp(OperationContext* opCtx,
 
         const NamespaceString& nsString = nsInfo[idx].getNs();
         uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
-
-        if (nsInfo[idx].getEncryptionInformation().has_value()) {
-            // For BulkWrite, re-entry is un-expected.
-            invariant(!nsInfo[idx].getEncryptionInformation()->getCrudProcessed().value_or(false));
-
-            if (!op->getReturn()) {
-                // Map to processFLEUpdate.
-                return attemptProcessFLEUpdate(
-                    opCtx, op, req, currentOpIdx, responses, nsInfo[idx]);
-            } else {
-                // Map to processFLEFindAndModify.
-                return attemptProcessFLEFindAndModify(
-                    opCtx, op, req, currentOpIdx, responses, nsInfo[idx]);
-            }
-        }
-
         OpDebug* opDebug = &curOp->debug();
 
         doTransactionValidationForWrites(opCtx, nsString);
@@ -1073,11 +854,6 @@ bool handleDeleteOp(OperationContext* opCtx,
 
         const NamespaceString& nsString = nsInfo[idx].getNs();
         uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
-
-        if (nsInfo[idx].getEncryptionInformation().has_value()) {
-            return attemptProcessFLEDelete(opCtx, op, req, currentOpIdx, responses, nsInfo[idx]);
-        }
-
         OpDebug* opDebug = &curOp->debug();
 
         doTransactionValidationForWrites(opCtx, nsString);

@@ -432,9 +432,8 @@ write_ops::DeleteCommandReply processFLEDelete(
     return deleteReply;
 }
 
-StatusWith<std::pair<write_ops::FindAndModifyCommandReply, OpMsgRequest>>
-processFLEFindAndModifyHelper(OperationContext* opCtx,
-                              const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
+write_ops::FindAndModifyCommandReply processFLEFindAndModify(
+    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
 
     uassert(6371800,
             "Encrypted index operations are only supported on replica sets",
@@ -444,12 +443,7 @@ processFLEFindAndModifyHelper(OperationContext* opCtx,
     auto reply = processFindAndModifyRequest<write_ops::FindAndModifyCommandReply>(
         opCtx, findAndModifyRequest, &getTransactionWithRetriesForMongoD);
 
-    return reply;
-}
-
-write_ops::FindAndModifyCommandReply processFLEFindAndModify(
-    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
-    return uassertStatusOK(processFLEFindAndModifyHelper(opCtx, findAndModifyRequest)).first;
+    return uassertStatusOK(reply).first;
 }
 
 write_ops::UpdateCommandReply processFLEUpdate(
