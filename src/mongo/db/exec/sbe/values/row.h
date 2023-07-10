@@ -110,7 +110,9 @@ public:
 
 
     // The following methods are used by the sorter only.
-    struct SorterDeserializeSettings {};
+    struct SorterDeserializeSettings {
+        const CollatorInterface* collator{nullptr};
+    };
     static RowType deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&);
     void serializeForSorter(BufBuilder& buf) const;
     int memUsageForSorter() const;

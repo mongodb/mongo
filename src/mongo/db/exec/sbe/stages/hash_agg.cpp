@@ -551,7 +551,12 @@ HashAggStage::SpilledRow HashAggStage::deserializeSpilledRecord(const Record& re
                                                                 BufBuilder& keyBuffer) {
     // Read the values and type bits out of the value part of the record.
     BufReader valReader(record.data.data(), record.data.size());
-    auto val = value::MaterializedRow::deserializeForSorter(valReader, {});
+    CollatorInterface* collator = nullptr;
+    if (_collatorAccessor) {
+        auto [tag, val] = _collatorAccessor->getViewOfValue();
+        collator = value::getCollatorView(val);
+    }
+    auto val = value::MaterializedRow::deserializeForSorter(valReader, {collator});
     auto typeBits =
         key_string::TypeBits::fromBuffer(key_string::Version::kLatestVersion, &valReader);
 
