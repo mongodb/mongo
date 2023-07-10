@@ -468,8 +468,11 @@ public:
     }
 
     // The following methods are used by the sorter only.
-    struct SorterDeserializeSettings {};
-    static MaterializedRow deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&);
+    struct SorterDeserializeSettings {
+        const CollatorInterface* collator{nullptr};
+    };
+    static MaterializedRow deserializeForSorter(BufReader& buf,
+                                                const SorterDeserializeSettings& settings);
     void serializeForSorter(BufBuilder& buf) const;
     int memUsageForSorter() const;
     auto getOwned() const {
@@ -487,13 +490,17 @@ public:
      * If 'numPrefixValsToRead' is provided, then only the given number of values from 'keyString'
      * are decoded into the resulting 'MaterializedRow'. The remaining suffix values in the
      * 'keyString' are ignored.
+     *
+     * If non-null 'collator' is provided during serialization, then any strings in the row are
+     * encoded as ICU collation keys prior to being KeyString-encoded.
      */
     static MaterializedRow deserializeFromKeyString(
         const KeyString::Value& keyString,
         BufBuilder* valueBufferBuilder,
         boost::optional<size_t> numPrefixValsToRead = boost::none);
 
-    void serializeIntoKeyString(KeyString::Builder& builder) const;
+    void serializeIntoKeyString(KeyString::Builder& builder,
+                                const CollatorInterface* collator = nullptr) const;
 
 private:
     static size_t sizeInBytes(size_t count) {

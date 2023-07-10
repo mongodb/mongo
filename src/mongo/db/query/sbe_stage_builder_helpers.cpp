@@ -483,10 +483,12 @@ EvalStage makeHashAgg(EvalStage stage,
         stage.outSlots.push_back(slot);
     }
 
-    // In debug builds, we artificially force frequent spilling. This makes sure that our tests
-    // exercise the spilling algorithm and the associated logic for merging partial aggregates which
-    // otherwise would require large data sizes to exercise.
-    const bool forceIncreasedSpilling = kDebugBuild && allowDiskUse;
+    // In debug builds or when we explicitly set the query knob, we artificially force frequent
+    // spilling. This makes sure that our tests exercise the spilling algorithm and the associated
+    // logic for merging partial aggregates which otherwise would require large data sizes to
+    // exercise.
+    const bool forceIncreasedSpilling = allowDiskUse &&
+        (kDebugBuild || internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling.load());
     stage.stage = sbe::makeS<sbe::HashAggStage>(std::move(stage.stage),
                                                 std::move(gbs),
                                                 std::move(aggs),
