@@ -81,3 +81,9 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions
         default: false
         shouldBeFCVGated: false
+    featureFlagTTLIndexesOnCappedCollections:
+        description: "Enables support for capped collections having a TTL index."
+        cpp_varname: feature_flags::gFeatureFlagTTLIndexesOnCappedCollections
+        default: true
+        version: 7.1
+        shouldBeFCVGated: true

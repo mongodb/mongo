@@ -88,6 +88,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
@@ -270,11 +271,11 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
                     "index"_attr = indexName,
                     "spec"_attr = spec);
             }
-
-            // TTL indexes are not compatible with capped collections.
             // Note that TTL deletion is supported on capped clustered collections via bounded
             // collection scan, which does not use an index.
-            if (!collection->isCapped()) {
+            if (feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
+                    serverGlobalParams.featureCompatibility) ||
+                !collection->isCapped()) {
                 if (opCtx->lockState()->inAWriteUnitOfWork()) {
                     opCtx->recoveryUnit()->onCommit(
                         [svcCtx = opCtx->getServiceContext(),
@@ -515,6 +516,8 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
     // Check whether this is a TTL index being created on a capped collection.
     if (collection && collection->isCapped() &&
         validatedSpec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) &&
+        !feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
         MONGO_likely(!ignoreTTLIndexCappedCollectionCheck.shouldFail())) {
         return {ErrorCodes::CannotCreateIndex, "Cannot create TTL index on a capped collection"};
     }
