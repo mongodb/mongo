@@ -164,11 +164,13 @@ err:
 int
 __wt_tiered_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
 {
+    WT_BUCKET_STORAGE *prev_bstorage;
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
 
     conn = S2C(session);
+    prev_bstorage = conn->bstorage;
 
     if (!reconfig)
         WT_RET(__wt_tiered_bucket_config(session, cfg, &conn->bstorage));
@@ -182,6 +184,12 @@ __wt_tiered_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfi
     __wt_verbose(
       session, WT_VERB_TIERED, "TIERED_CONFIG: prefix %s", conn->bstorage->bucket_prefix);
 
+    /* Check for incompatible configuration options. */
+    if (F_ISSET(conn, WT_CONN_IN_MEMORY))
+        WT_ERR_MSG(session, EINVAL,
+          "the \"in_memory\" connection configuration is not compatible with tiered storage");
+
+    /* Set up the rest of the tiered storage configuration. c*/
     WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.interval", &cval));
     conn->tiered_interval = (uint64_t)cval.val;
 
@@ -197,10 +205,14 @@ __wt_tiered_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfi
     return (0);
 
 err:
-    __wt_free(session, conn->bstorage->auth_token);
-    __wt_free(session, conn->bstorage->bucket);
-    __wt_free(session, conn->bstorage->bucket_prefix);
-    __wt_free(session, conn->bstorage->cache_directory);
-    __wt_free(session, conn->bstorage);
+    /*
+     * Restore the connection's bucket storage to the previous value in the case it changed. If
+     * __wt_tiered_bucket_config() failed, it should have freed its own newly allocated bucket
+     * storage object. If it succeeded, it might have added a new bucket storage, which will be
+     * eventually freed up when the connection closes; there is no harm in keeping it. (We could
+     * remove it, but that would require first adding functionality to remove an individual bucket
+     * storage, which is at the time of this writing not implemented.)
+     */
+    conn->bstorage = prev_bstorage;
     return (ret);
 }
