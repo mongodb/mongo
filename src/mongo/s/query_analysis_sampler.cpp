@@ -63,7 +63,6 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sample_tracker.h"
 #include "mongo/s/query_analysis_sampler.h"
@@ -107,7 +106,8 @@ StatusWith<std::vector<CollectionQueryAnalyzerConfiguration>> executeRefreshComm
     cmd.setNumQueriesExecutedPerSecond(lastAvgCount);
 
     BSONObj resObj;
-    if (isMongos() || serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+    if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
+        serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
         auto swResponse = configShard->runCommandWithFixedRetryAttempts(
             opCtx,
@@ -210,7 +210,8 @@ double QueryAnalysisSampler::QueryStats::_calculateExponentialMovingAverage(
 
 void QueryAnalysisSampler::QueryStats::refreshTotalCount() {
     long long newTotalCount = [&] {
-        if (isMongos() || serverGlobalParams.clusterRole.has(ClusterRole::None)) {
+        if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
+            serverGlobalParams.clusterRole.has(ClusterRole::None)) {
             return globalOpCounters.getUpdate()->load() + globalOpCounters.getDelete()->load() +
                 _lastFindAndModifyQueriesCount + globalOpCounters.getQuery()->load() +
                 _lastAggregateQueriesCount + _lastCountQueriesCount + _lastDistinctQueriesCount;
@@ -434,7 +435,8 @@ boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext
 
     auto& rateLimiter = it->second;
     if (rateLimiter.tryConsume()) {
-        if (isMongos() || serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+        if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
+            serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
             // On a standalone replica set, sample selection is done by the mongod persisting the
             // sample itself. To avoid double counting a sample, the counters will be incremented
             // by the QueryAnalysisWriter when the sample gets added to the buffer.

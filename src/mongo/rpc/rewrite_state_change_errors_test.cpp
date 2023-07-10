@@ -39,7 +39,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/rewrite_state_change_errors.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
 
@@ -55,13 +54,13 @@ public:
     }
 
     void setUp() override {
-        _savedIsMongos = isMongos();
-        setMongos(true);  // whole feature only happens on mongos
+        // Whole feature only happens on mongos.
+        serverGlobalParams.clusterRole = ClusterRole::RouterServer;
         RewriteStateChangeErrors::setEnabled(&*sc, true);
     }
 
     void tearDown() override {
-        setMongos(_savedIsMongos);
+        serverGlobalParams.clusterRole = ClusterRole::None;
     }
 
     /** Run rewrite on `obj` and return what it was remapped to if anything. */
@@ -103,9 +102,6 @@ public:
     ServiceContext::UniqueServiceContext sc;
     ServiceContext::UniqueClient cc;
     ServiceContext::UniqueOperationContext opCtx;
-
-private:
-    bool _savedIsMongos;
 };
 
 // Rewrite Shutdown errors received from proxied commands.

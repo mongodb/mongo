@@ -81,7 +81,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/stale_exception.h"
@@ -404,7 +403,9 @@ private:
 Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* variables) const {
     // TODO SERVER-71519: Add support for handling stale exception from mongos with
     // enableFinerGrainedCatalogCacheRefresh.
-    uassert(6868600, "$_internalOwningShard is currently not supported on mongos", !isMongos());
+    uassert(6868600,
+            "$_internalOwningShard is currently not supported on mongos",
+            !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
 
     Value input = _children[0]->evaluate(root, variables);
     if (input.nullish()) {
@@ -516,8 +517,9 @@ Value ExpressionInternalIndexKey::serialize(SerializationOptions options) const 
 }
 
 Value ExpressionInternalIndexKey::evaluate(const Document& root, Variables* variables) const {
-    uassert(
-        6868510, str::stream() << opName << " is currently not supported on mongos", !isMongos());
+    uassert(6868510,
+            str::stream() << opName << " is currently not supported on mongos",
+            !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
 
     auto docObj = _doc->evaluate(root, variables).getDocument().toBson();
     auto specObj = _spec->evaluate(root, variables).getDocument().toBson();

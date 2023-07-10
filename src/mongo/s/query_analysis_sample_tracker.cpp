@@ -39,7 +39,6 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/server_options.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
@@ -152,11 +151,12 @@ BSONObj QueryAnalysisSampleTracker::CollectionSampleTracker::reportForCurrentOp(
     report.setCollUuid(_collUuid);
     report.setSampledReadsCount(_sampledReadsCount);
     report.setSampledWritesCount(_sampledWritesCount);
-    if (!isMongos()) {
+    if (!serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
         report.setSampledReadsBytes(_sampledReadsBytes);
         report.setSampledWritesBytes(_sampledWritesBytes);
     }
-    if (isMongos() || serverGlobalParams.clusterRole.has(ClusterRole::None)) {
+    if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
+        serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         report.setSamplesPerSecond(_samplesPerSec);
     }
     report.setStartTime(_startTime);
@@ -172,7 +172,7 @@ BSONObj QueryAnalysisSampleTracker::reportForServerStatus() const {
     res.setTotalCollections(static_cast<int64_t>(_sampledNamespaces.size()));
     res.setTotalSampledReadsCount(_totalSampledReadsCount);
     res.setTotalSampledWritesCount(_totalSampledWritesCount);
-    if (!isMongos()) {
+    if (!serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
         res.setTotalSampledReadsBytes(_totalSampledReadsBytes);
         res.setTotalSampledWritesBytes(_totalSampledWritesBytes);
     }

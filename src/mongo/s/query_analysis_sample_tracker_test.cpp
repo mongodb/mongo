@@ -41,7 +41,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/s/sharding_test_fixture_common.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -82,8 +81,10 @@ protected:
 
 void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     const bool supportsSampling =
-        isMongos() || serverGlobalParams.clusterRole.has(ClusterRole::None);
-    const bool supportsPersisting = !isMongos() &&
+        serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
+        serverGlobalParams.clusterRole.has(ClusterRole::None);
+    const bool supportsPersisting =
+        !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) &&
         (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
          serverGlobalParams.clusterRole.has(ClusterRole::None));
 
@@ -408,35 +409,20 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
 }
 
 TEST_F(QueryAnalysisSampleTrackerTest, RefreshConfigIncrementAndReportMongos) {
-    bool originalIsMongos = isMongos();
-    ON_BLOCK_EXIT([&] { setMongos(originalIsMongos); });
+    ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
 
-    setMongos(true);
+    serverGlobalParams.clusterRole = ClusterRole::RouterServer;
     testRefreshConfigIncrementAndReport();
 }
 
 TEST_F(QueryAnalysisSampleTrackerTest, RefreshConfigIncrementAndReportShardSvrMongod) {
-    bool originalIsMongos = isMongos();
-    auto originalRole = serverGlobalParams.clusterRole;
-    ON_BLOCK_EXIT([&] {
-        setMongos(originalIsMongos);
-        serverGlobalParams.clusterRole = originalRole;
-    });
+    ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
 
-    setMongos(false);
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
     testRefreshConfigIncrementAndReport();
 }
 
 TEST_F(QueryAnalysisSampleTrackerTest, RefreshConfigIncrementAndReportReplSetMongod) {
-    bool originalIsMongos = isMongos();
-    auto originalRole = serverGlobalParams.clusterRole;
-    ON_BLOCK_EXIT([&] {
-        setMongos(originalIsMongos);
-        serverGlobalParams.clusterRole = originalRole;
-    });
-
-    setMongos(false);
     serverGlobalParams.clusterRole = ClusterRole::None;
     testRefreshConfigIncrementAndReport();
 }

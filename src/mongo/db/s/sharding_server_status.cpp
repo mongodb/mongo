@@ -56,7 +56,6 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -67,12 +66,14 @@ public:
     ShardingServerStatus() : ServerStatusSection("sharding") {}
 
     bool includeByDefault() const override {
-        return isClusterNode();
+        return serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
+            serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer);
     }
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        if (!isClusterNode())
+        if (!serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
+            !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer))
             return {};
 
         auto const shardingState = ShardingState::get(opCtx);
@@ -124,12 +125,14 @@ public:
     ShardingStatisticsServerStatus() : ServerStatusSection("shardingStatistics") {}
 
     bool includeByDefault() const override {
-        return isClusterNode();
+        return serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
+            serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer);
     }
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        if (!isClusterNode())
+        if (!serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
+            !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer))
             return {};
 
         BSONObjBuilder result;

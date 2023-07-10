@@ -89,7 +89,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/destructor_guard.h"
@@ -115,7 +114,8 @@ void checkNoExternalSortOnMongos(const SortOptions& opts) {
     // This should be checked by consumers, but if it isn't try to fail early.
     uassert(16947,
             "Attempting to use external sort from mongos. This is not allowed.",
-            !(isMongos() && opts.extSortAllowed));
+            !(serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) &&
+              opts.extSortAllowed));
 }
 
 /**
@@ -1419,8 +1419,9 @@ SortedFileWriter<Key, Value>::SortedFileWriter(
       _fileStartOffset(_file->currentOffset()),
       _opts(opts) {
     // This should be checked by consumers, but if we get here don't allow writes.
-    uassert(
-        16946, "Attempting to use external sort from mongos. This is not allowed.", !isMongos());
+    uassert(16946,
+            "Attempting to use external sort from mongos. This is not allowed.",
+            !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
 
     uassert(17148,
             "Attempting to use external sort without setting SortOptions::tempDir",

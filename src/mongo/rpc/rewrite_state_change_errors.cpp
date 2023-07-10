@@ -55,7 +55,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/rpc/rewrite_state_change_errors_server_parameter_gen.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/pcre.h"
@@ -243,7 +242,8 @@ void RewriteStateChangeErrors::onActiveFailCommand(OperationContext* opCtx, cons
 
 boost::optional<BSONObj> RewriteStateChangeErrors::rewrite(BSONObj doc, OperationContext* opCtx) {
     auto sc = opCtx->getServiceContext();
-    if (!isMongos() || (sc && !getEnabled(sc)) || !getEnabled(opCtx))
+    if (!serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
+        (sc && !getEnabled(sc)) || !getEnabled(opCtx))
         return {};
     return rewriteDocument(doc, opCtx);
 }

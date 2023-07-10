@@ -118,7 +118,6 @@
 #include "mongo/s/commands/kill_sessions_remote.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/s/load_balancer_support.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
@@ -1024,7 +1023,7 @@ MONGO_INITIALIZER_GENERAL(setSSLManagerType, (), ("SSLManager"))
 }  // namespace
 
 ExitCode mongos_main(int argc, char* argv[]) {
-    setMongos();
+    serverGlobalParams.clusterRole = ClusterRole::RouterServer;
 
     if (argc < 1)
         return ExitCode::badOptions;

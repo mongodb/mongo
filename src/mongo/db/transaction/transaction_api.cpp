@@ -85,7 +85,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/clock_source.h"
@@ -815,7 +814,8 @@ bool isLocalTransactionFatalResult(const StatusWith<CommitResult>& swResult) {
 // transaction on a mongod. False for remote transactions from a mongod or all transactions from a
 // mongos.
 bool isRunningLocalTransaction(const TransactionClient& txnClient) {
-    return !isMongos() && !txnClient.runsClusterOperations();
+    return !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) &&
+        !txnClient.runsClusterOperations();
 }
 
 Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitResult>& swResult,
@@ -1101,7 +1101,8 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
         uassert(6648101,
                 "Cross-shard internal transactions are not supported when run under a client "
                 "transaction directly on a shard.",
-                !_txnClient->runsClusterOperations() || isMongos());
+                !_txnClient->runsClusterOperations() ||
+                    serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
 
         _setSessionInfo(lg, *clientSession, *clientTxnNumber, boost::none /* startTransaction */);
         _execContext = ExecutionContext::kClientTransaction;

@@ -41,7 +41,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -263,10 +262,9 @@ TEST(ClientMetadataTest, TestNegativeWrongTypes) {
 
 // Negative: document larger than 512 bytes
 TEST(ClientMetadataTest, TestNegativeLargeDocument) {
-    bool savedMongos = isMongos();
-    ScopeGuard unsetMongoS([&] { setMongos(savedMongos); });
+    ScopeGuard unsetRouter([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
 
-    setMongos(true);
+    serverGlobalParams.clusterRole = ClusterRole::RouterServer;
     {
         std::string str(350, 'x');
         ASSERT_DOC_OK(kApplication << BSON(kName << "1") << kDriver

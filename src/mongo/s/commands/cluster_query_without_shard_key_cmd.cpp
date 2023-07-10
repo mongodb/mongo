@@ -94,7 +94,6 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/s/query/cluster_query_result.h"
@@ -333,7 +332,7 @@ public:
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
                     "_clusterQueryWithoutShardKey can only be run on Mongos",
-                    isMongos());
+                    serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
 
             LOGV2(6962300,
                   "Running read phase for a write without a shard key.",

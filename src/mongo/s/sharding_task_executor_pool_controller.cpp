@@ -46,7 +46,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/s/sharding_task_executor_pool_controller.h"
 #include "mongo/util/str.h"
 
@@ -107,7 +106,7 @@ Status ShardingTaskExecutorPoolController::validatePendingTimeout(
 
 Status ShardingTaskExecutorPoolController::onUpdateMatchingStrategy(const std::string& str) {
     if (str == "automatic") {
-        if (isMongos()) {
+        if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
             gParameters.matchingStrategy.store(MatchingStrategy::kMatchPrimaryNode);
         } else {
             gParameters.matchingStrategy.store(MatchingStrategy::kDisabled);

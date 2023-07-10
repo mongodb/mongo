@@ -75,7 +75,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -269,7 +268,7 @@ Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opC
         return Status::OK();
     }
 
-    invariant(isMongos());
+    invariant(serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
     multiversion::FeatureCompatibilityVersion fcv;
     TenantIdMap<stdx::unordered_map<std::string, BSONObj>> clusterParameterDocs;
 

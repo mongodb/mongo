@@ -302,7 +302,7 @@ void preCacheMongosRoutingInfo(OperationContext* opCtx) {
     // mongos, and we'd need to consider the implications of it running on either kind of mongod.
     tassert(71960,
             "Unexpectedly pre caching mongos routing info on shard or config server node",
-            serverGlobalParams.clusterRole.has(ClusterRole::None));
+            serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
 
     auto grid = Grid::get(opCtx);
     auto catalogClient = grid->catalogClient();
@@ -332,7 +332,7 @@ Status preWarmConnectionPool(OperationContext* opCtx) {
     // mongos, and we'd need to consider the implications of it running on either kind of mongod.
     tassert(71961,
             "Unexpectedly pre warming connection pool on shard or config server node",
-            serverGlobalParams.clusterRole.has(ClusterRole::None));
+            serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
 
     std::vector<HostAndPort> allHosts;
     auto const grid = Grid::get(opCtx);

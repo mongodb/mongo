@@ -56,7 +56,6 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/s/sharding_task_executor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -205,7 +204,8 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
                             "host"_attr = target);
             }
 
-            if (isMongos() && args.response.status == ErrorCodes::IncompatibleWithUpgradedServer) {
+            if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) &&
+                args.response.status == ErrorCodes::IncompatibleWithUpgradedServer) {
                 LOGV2_FATAL_NOTRACE(
                     50710,
                     "This mongos server must be upgraded. It is attempting to communicate "

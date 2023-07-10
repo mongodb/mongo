@@ -184,7 +184,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/runtime_constants_idl',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
@@ -362,16 +361,6 @@ env.Library(
 )
 
 env.Library(
-    target='is_mongos',
-    source=[
-        'is_mongos.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/server_base',
-    ],
-)
-
-env.Library(
     target='mongos_hello_response',
     source=[
         'mongos_hello_response.cpp',
@@ -504,7 +493,6 @@ env.Library(
         'commands/sharded_cluster_commands',
         'commands/sharded_cluster_sharding_commands',
         'coreshard',
-        'is_mongos',
         'mongos_server_parameters',
         'mongos_topology_coordinator',
         'query/cluster_cursor_cleanup_job',

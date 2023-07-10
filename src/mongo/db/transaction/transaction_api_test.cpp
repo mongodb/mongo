@@ -69,7 +69,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/database_version.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/future.h"
@@ -453,13 +452,13 @@ protected:
                                                                   _inlineExecutor,
                                                                   std::move(mockClient));
 
-        // The bulk of the API tests are for the non-local transaction cases, so set isMongos=true
-        // by default.
-        setMongos(true);
+        // The bulk of the API tests are for the non-local transaction cases, so set router role by
+        // default.
+        serverGlobalParams.clusterRole = ClusterRole::RouterServer;
     }
 
     void tearDown() override {
-        setMongos(false);
+        serverGlobalParams.clusterRole = ClusterRole::None;
 
         _executor->shutdown();
         _executor->join();
@@ -2415,8 +2414,8 @@ TEST_F(TxnAPITest, CanBeUsedWithinShardedOperationsIfClientSupportsIt) {
 }
 
 TEST_F(TxnAPITest, DoNotAllowCrossShardTransactionsOnShardWhenInClientTransaction) {
-    setMongos(false);
-    ON_BLOCK_EXIT([&] { setMongos(true); });
+    serverGlobalParams.clusterRole = ClusterRole::None;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::RouterServer; });
 
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx()->setTxnNumber(5);
@@ -2428,8 +2427,8 @@ TEST_F(TxnAPITest, DoNotAllowCrossShardTransactionsOnShardWhenInClientTransactio
 }
 
 TEST_F(TxnAPITest, AllowCrossShardTransactionsOnMongosWhenInRetryableWrite) {
-    setMongos(true);
-    ON_BLOCK_EXIT([&] { setMongos(false); });
+    serverGlobalParams.clusterRole = ClusterRole::RouterServer;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
 
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx()->setTxnNumber(5);
@@ -2437,8 +2436,8 @@ TEST_F(TxnAPITest, AllowCrossShardTransactionsOnMongosWhenInRetryableWrite) {
 }
 
 TEST_F(TxnAPITest, AllowCrossShardTransactionsOnMongosWhenInClientTransaction) {
-    setMongos(true);
-    ON_BLOCK_EXIT([&] { setMongos(false); });
+    serverGlobalParams.clusterRole = ClusterRole::RouterServer;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
 
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx()->setTxnNumber(5);
@@ -2447,8 +2446,9 @@ TEST_F(TxnAPITest, AllowCrossShardTransactionsOnMongosWhenInClientTransaction) {
 }
 
 TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionBodyError) {
-    setMongos(false);
-    ON_BLOCK_EXIT([&] { setMongos(true); });
+    serverGlobalParams.clusterRole = ClusterRole::None;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::RouterServer; });
+
     auto runTest = [&](bool expectSuccess, Status status) {
         resetTxnWithRetries();
 
@@ -2497,8 +2497,9 @@ TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionBodyError
 }
 
 TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionCommandError) {
-    setMongos(false);
-    ON_BLOCK_EXIT([&] { setMongos(true); });
+    serverGlobalParams.clusterRole = ClusterRole::None;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::RouterServer; });
+
     auto runTest = [&](bool expectSuccess, Status status) {
         resetTxnWithRetries();
 
@@ -2546,8 +2547,9 @@ TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionCommandEr
 }
 
 TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionWCError) {
-    setMongos(false);
-    ON_BLOCK_EXIT([&] { setMongos(true); });
+    serverGlobalParams.clusterRole = ClusterRole::None;
+    ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::RouterServer; });
+
     auto runTest = [&](bool expectSuccess, Status status) {
         resetTxnWithRetries();
 

@@ -55,7 +55,6 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
-#include "mongo/s/is_mongos.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/stdx/future.h"
@@ -421,8 +420,7 @@ class QueryAnalysisSamplerTest : public ShardingTestFixture {
 public:
     void setUp() override {
         ShardingTestFixture::setUp();
-        _originalIsMongos = isMongos();
-        setMongos(true);
+        serverGlobalParams.clusterRole = ClusterRole::RouterServer;
         setRemote(HostAndPort("ClientHost", 12345));
 
         // Set up the RemoteCommandTargeter for the config shard.
@@ -439,12 +437,10 @@ public:
 
     void tearDown() override {
         ShardingTestFixture::tearDown();
-        setMongos(_originalIsMongos);
         serverGlobalParams.clusterRole = ClusterRole::None;
     }
 
     void setUpRole(std::initializer_list<ClusterRole::Value> roles, bool isReplEnabled = true) {
-        setMongos(false);
         serverGlobalParams.clusterRole = roles;
 
         auto replCoord = [&] {
@@ -528,9 +524,6 @@ protected:
     const UUID collUuid0 = UUID::gen();
     const UUID collUuid1 = UUID::gen();
     const UUID collUuid2 = UUID::gen();
-
-private:
-    bool _originalIsMongos;
 };
 
 TEST_F(QueryAnalysisSamplerTest, CanGetOnShardServer) {
