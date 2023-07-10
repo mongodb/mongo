@@ -144,4 +144,17 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                          std::set<ShardId>* shardIds,
                          shard_key_pattern_query_util::QueryTargetingInfo* info = nullptr);
 
+
+/**
+ * Populates 'shardIds' with the shard ids for a query with given filter and collation. If 'info' is
+ * not null, populates it with the ChunkRanges that the query targets and a description about
+ * whether the query targets a single shard key value, multiple but not all shard key values or all
+ * shard key values.
+ */
+void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
+                                  const BSONObj& collation,
+                                  const ChunkManager& cm,
+                                  std::set<ShardId>* shardIds,
+                                  shard_key_pattern_query_util::QueryTargetingInfo* info = nullptr);
+
 }  // namespace mongo

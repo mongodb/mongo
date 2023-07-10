@@ -60,15 +60,6 @@
 
 namespace mongo {
 
-struct TargeterStats {
-    // Map of chunk shard minKey -> approximate delta. This is used for deciding whether a chunk
-    // might need splitting or not.
-    BSONObjIndexedMap<int> chunkSizeDelta{
-        SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>()};
-};
-
-using StaleShardPlacementVersionMap = std::map<ShardId, ChunkVersion>;
-
 /**
  * NSTargeter based on a CollectionRoutingInfo implementation. Wraps all exception codepaths and
  * returns NamespaceNotFound status on applicable failures.
@@ -163,9 +154,6 @@ public:
      *     { foo : <anything> } => false
      */
     static bool isExactIdQuery(OperationContext* opCtx,
-                               const CanonicalQuery& query,
-                               const ChunkManager& cm);
-    static bool isExactIdQuery(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const BSONObj& query,
                                const BSONObj& collation,
@@ -175,17 +163,32 @@ private:
     CollectionRoutingInfo _init(OperationContext* opCtx, bool refresh);
 
     /**
+     * Returns a CanonicalQuery if parsing succeeds.
+     *
+     * Returns !OK with message if query could not be canonicalized.
+     *
+     * If 'collation' is empty, we use the collection default collation for targeting.
+     */
+    static StatusWith<std::unique_ptr<CanonicalQuery>> _canonicalize(
+        OperationContext* opCtx,
+        boost::intrusive_ptr<mongo::ExpressionContext> expCtx,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const BSONObj& collation,
+        const ChunkManager& cm);
+
+    static bool _isExactIdQuery(const CanonicalQuery& query, const ChunkManager& cm);
+
+    /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.
      *
      * Returns !OK with message if query could not be targeted.
      *
      * If 'collation' is empty, we use the collection default collation for targeting.
      */
-    StatusWith<std::vector<ShardEndpoint>> _targetQuery(
-        boost::intrusive_ptr<ExpressionContext> expCtx,
-        const BSONObj& query,
-        const BSONObj& collation,
-        std::set<ChunkRange>* chunkRanges) const;
+    StatusWith<std::vector<ShardEndpoint>> _targetQuery(const CanonicalQuery& query,
+                                                        const BSONObj& collation,
+                                                        std::set<ChunkRange>* chunkRanges) const;
 
     /**
      * Returns a ShardEndpoint for an exact shard key query.
@@ -202,15 +205,15 @@ private:
     // Full namespace of the collection for this targeter
     NamespaceString _nss;
 
-    // Used to identify the original namespace that the user has requested. Note: this will only be
-    // true if the buckets namespace is sharded.
+    // Used to identify the original namespace that the user has requested. Note: this will only
+    // be true if the buckets namespace is sharded.
     bool _isRequestOnTimeseriesViewNamespace = false;
 
     // Stores last error occurred
     boost::optional<LastErrorType> _lastError;
 
-    // Set to the epoch of the namespace we are targeting. If we ever refresh the catalog cache and
-    // find a new epoch, we immediately throw a StaleEpoch exception.
+    // Set to the epoch of the namespace we are targeting. If we ever refresh the catalog cache
+    // and find a new epoch, we immediately throw a StaleEpoch exception.
     boost::optional<OID> _targetEpoch;
 
     // The latest loaded routing cache entry
