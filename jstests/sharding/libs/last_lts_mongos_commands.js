@@ -42,6 +42,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "rotateCertificates",
     "setAllowMigrations",
     "setClusterParameter",
+    "setQuerySettings",
     "setUserWriteBlockMode",
     "testDeprecation",
     "testDeprecationInVersion2",

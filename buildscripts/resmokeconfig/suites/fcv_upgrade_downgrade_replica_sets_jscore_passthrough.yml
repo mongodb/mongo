@@ -18,6 +18,8 @@ selector:
   # TODO SERVER-52419 Remove this tag.
   - featureFlagBulkWriteCommand
   - featureFlagFLE2CleanupCommand
+  # TODO: SERVER-71537 Remove Feature Flag for PM-412.
+  - featureFlagQuerySettings
   # Transactions are aborted upon fcv upgrade or downgrade.
   - uses_transactions
   # Exclude tests with the latest fcv.
