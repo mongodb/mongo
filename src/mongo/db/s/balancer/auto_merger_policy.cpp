@@ -166,6 +166,11 @@ void AutoMergerPolicy::applyActionResult(OperationContext* opCtx,
     if (status.code() == ErrorCodes::ConflictingOperationInProgress) {
         // Reschedule auto-merge for <shard, nss> because commit overlapped with other chunk ops
         _rescheduledCollectionsToMergePerShard[mergeAction.shardId].push_back(mergeAction.nss);
+    } else if (status.code() == ErrorCodes::KeyPatternShorterThanBound || status.code() == 16634) {
+        LOGV2_WARNING(7805201,
+                      "Auto-merger skipping namespace due to misconfigured zones",
+                      "namespace"_attr = mergeAction.nss,
+                      "error"_attr = redact(status));
     } else {
         // Reset the history window to consider during next round because chunk merges may have
         // been potentially missed due to an unexpected error

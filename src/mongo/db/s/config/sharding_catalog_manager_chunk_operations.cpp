@@ -54,6 +54,7 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -1068,7 +1069,8 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
         // 1. Retrieve the collection entry and the initial version.
         const auto [coll, originalVersion] =
             uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
-        auto& collUuid = coll.getUuid();
+        const auto& collUuid = coll.getUuid();
+        const auto& keyPattern = coll.getKeyPattern();
         auto newVersion = originalVersion;
 
         // 2. Retrieve the list of mergeable chunks belonging to the requested shard/collection.
@@ -1077,6 +1079,8 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
         // - The last migration occurred before the current history window
         const auto oldestTimestampSupportedForHistory =
             getOldestTimestampSupportedForSnapshotHistory(opCtx);
+
+        // TODO SERVER-78701 scan cursor rather than getting the whole vector of chunks
         const auto chunksBelongingToShard =
             uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
                                 opCtx,
@@ -1120,6 +1124,49 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                 rangeOnCurrentShardSince = minValidTimestamp;
             };
 
+            DBDirectClient zonesClient{opCtx};
+            FindCommandRequest zonesFindRequest{TagsType::ConfigNS};
+            zonesFindRequest.setSort(BSON(TagsType::min << 1));
+            zonesFindRequest.setFilter(BSON(TagsType::ns(NamespaceStringUtil::serialize(nss))));
+            zonesFindRequest.setProjection(BSON(TagsType::min << 1 << TagsType::max << 1));
+            const auto zonesCursor{zonesClient.find(std::move(zonesFindRequest))};
+
+            // Initialize bounds lower than any zone [(), Minkey) so that it can be later advanced
+            boost::optional<ChunkRange> currentZone = ChunkRange(BSONObj(), keyPattern.globalMin());
+
+            auto advanceZoneIfNeeded = [&](const BSONObj& advanceZoneUpToThisBound) {
+                // This lambda advances zones taking into account the whole shard key space,
+                // also considering the "no-zone" as a zone itself.
+                //
+                // Example:
+                // - Zones set by the user: [1, 10), [20, 30), [30, 40)
+                // - Real zones: [Minkey, 1), [1, 10), [10, 20), [20, 30), [30, 40), [40, MaxKey)
+                //
+                // Returns a bool indicating whether the zone has changed or not.
+                bool zoneChanged = false;
+                while (currentZone &&
+                       advanceZoneUpToThisBound.woCompare(currentZone->getMin()) > 0 &&
+                       advanceZoneUpToThisBound.woCompare(currentZone->getMax()) > 0) {
+                    zoneChanged = true;
+                    if (zonesCursor->more()) {
+                        const auto nextZone = zonesCursor->peekFirst();
+                        const auto nextZoneMin = keyPattern.extendRangeBound(
+                            nextZone.getObjectField(TagsType::min()), false);
+                        if (nextZoneMin.woCompare(currentZone->getMax()) > 0) {
+                            currentZone = ChunkRange(currentZone->getMax(), nextZoneMin);
+                        } else {
+                            const auto nextZoneMax = keyPattern.extendRangeBound(
+                                nextZone.getObjectField(TagsType::max()), false);
+                            currentZone = ChunkRange(nextZoneMin, nextZoneMax);
+                            zonesCursor->next();  // Advance cursor
+                        }
+                    } else {
+                        currentZone = boost::none;
+                    }
+                }
+                return zoneChanged;
+            };
+
             for (const auto& chunkDoc : chunksBelongingToShard) {
                 const auto& chunkMin = chunkDoc.getObjectField(ChunkType::min());
                 const auto& chunkMax = chunkDoc.getObjectField(ChunkType::max());
@@ -1130,7 +1177,8 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                     return t;
                 }();
 
-                if (rangeMax.woCompare(chunkMin) != 0) {
+                bool zoneChanged = advanceZoneIfNeeded(chunkMax);
+                if (rangeMax.woCompare(chunkMin) != 0 || zoneChanged) {
                     processRange();
                 }
 

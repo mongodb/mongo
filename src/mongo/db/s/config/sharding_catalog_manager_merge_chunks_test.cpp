@@ -43,6 +43,7 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_tags.h"
 
 namespace mongo {
 namespace {
@@ -694,9 +695,27 @@ protected:
         ConfigServerTestFixture::tearDown();
     }
 
-    /* Setup shareded collection randomly spreading chunks across shards */
+    /* Returns `numBounds` random split points sampled from the following list:
+     *  - [MinKey, 0, 1, 2, ..., `_maxNumChunks - 1`, MaxKey]
+     */
+    std::vector<BSONObj> getRandomBoundsOnShardKeySpace(int numBounds) {
+        std::vector<BSONObj> potentialBounds{_keyPattern.globalMin()};
+        for (int i = 0; i < _maxNumChunks; i++) {
+            potentialBounds.push_back(BSON("x" << i));
+        }
+        potentialBounds.push_back(_keyPattern.globalMax());
+
+        std::vector<BSONObj> randomlySelectedBounds;
+        std::sample(potentialBounds.begin(),
+                    potentialBounds.end(),
+                    std::back_inserter(randomlySelectedBounds),
+                    numBounds,
+                    _random.urbg());
+        return randomlySelectedBounds;
+    }
+
+    /* Setup sharded collection randomly spreading chunks across shards */
     void setupCollectionWithRandomRoutingTable() {
-        PseudoRandom random(SecureRandom().nextInt64());
         ChunkVersion collPlacementVersion{{_epoch, _ts}, {1, 0}};
 
         // Generate chunk with the provided parameters and increase current collection placement
@@ -713,33 +732,61 @@ protected:
             // When `onCurrentShardSince` is set to "Timestamp(0, 1)", the chunk is mergeable
             // because the snapshot window passed. When it is set to "max", the chunk is not
             // mergeable because the snapshot window did not pass
-            auto randomValidAfter = random.nextInt64() % 2 ? Timestamp(0, 1) : Timestamp::max();
+            auto randomValidAfter = _random.nextInt64() % 2 ? Timestamp(0, 1) : Timestamp::max();
             chunk.setOnCurrentShardSince(randomValidAfter);
             chunk.setHistory({ChunkHistory{randomValidAfter, shard.getName()}});
 
             // Rarely create a jumbo chunk (not mergeable)
-            chunk.setJumbo(random.nextInt64() % 10 == 0);
+            chunk.setJumbo(_random.nextInt64() % 10 == 0);
             return chunk;
         };
 
-        int numChunks = random.nextInt32(19) + 1;  // minimum 1 chunks, maximum 20 chunks
-        std::vector<ChunkType> chunks;
+        int numChunks =
+            _random.nextInt32(_maxNumChunks) + 1;  // minimum 1 chunks, maximum 20 chunks
 
-        // Loop generating random routing table: [MinKey, 0), [1, 2), [2, 3), ... [x, MaxKey]
-        int nextMin;
-        for (int nextMax = 0; nextMax < numChunks; nextMax++) {
-            auto randomShard = _shards.at(random.nextInt64() % _shards.size());
-            // set min as `MinKey` during first iteration, otherwise next min
-            auto min = nextMax == 0 ? _keyPattern.globalMin() : BSON("x" << nextMin);
-            // set max as `MaxKey` during last iteration, otherwise next max
-            auto max = nextMax == numChunks - 1 ? _keyPattern.globalMax() : BSON("x" << nextMax);
-            auto chunk = generateChunk(randomShard, min, max);
-            nextMin = nextMax;
+        std::vector<BSONObj> chunksBounds = getRandomBoundsOnShardKeySpace(numChunks + 1);
+        {
+            // Make sure the whole shard key space is covered, potentially replacing first/last
+            // bounds
+            std::replace_if(
+                chunksBounds.begin(),
+                chunksBounds.begin() + 1,
+                [&](BSONObj& minBound) { return minBound.woCompare(_keyPattern.globalMin()) != 0; },
+                _keyPattern.globalMin());
+            std::replace_if(
+                chunksBounds.end() - 1,
+                chunksBounds.end(),
+                [&](BSONObj& maxBound) { return maxBound.woCompare(_keyPattern.globalMax()) != 0; },
+                _keyPattern.globalMax());
+        }
+
+        std::vector<ChunkType> chunks;
+        for (size_t i = 0; i < chunksBounds.size() - 1; i++) {
+            auto randomShard = _shards.at(_random.nextInt64() % _shards.size());
+            auto chunk = generateChunk(randomShard, chunksBounds.at(i), chunksBounds.at(i + 1));
             chunks.push_back(chunk);
         }
 
         setupCollection(_nss, _keyPattern, chunks);
     };
+
+    /* Randomly setup minimum 0 zones, maximum 3 zones */
+    void setupRandomZones() {
+        int numZones = _random.nextInt32(4);  // minimum 0 zones, maximum 3 zones
+        if (numZones == 0) {
+            return;
+        }
+
+        // Create random zones on the same portion of shard key space covered by chunks generation
+        std::vector<BSONObj> zonesBounds =
+            getRandomBoundsOnShardKeySpace(numZones * 2);  // 2 bounds per zone
+
+        for (int i = 0; i < numZones; i = i + 2) {
+            const auto zoneRange = ChunkRange(zonesBounds.at(i), zonesBounds.at(i + 1));
+            ShardingCatalogManager::get(operationContext())
+                ->assignKeyRangeToZone(operationContext(), _nss, zoneRange, _zoneName);
+        }
+    }
 
     /* Get routing table for the collection under testing */
     std::vector<ChunkType> getChunks() {
@@ -760,6 +807,62 @@ protected:
         return chunks;
     }
 
+    /*
+     * Return a vector of zones (and no-zones) overlapping with the current chunk (or with the whole
+     * shard key space when min/max not specified)
+     */
+    std::vector<BSONObj> getZones(boost::optional<ChunkRange> chunk = boost::none) {
+        const auto& chunkMinKey =
+            chunk.is_initialized() ? chunk->getMin() : _keyPattern.globalMin();
+        const auto& chunkMaxKey =
+            chunk.is_initialized() ? chunk->getMax() : _keyPattern.globalMax();
+
+        DBDirectClient zonesClient{operationContext()};
+        FindCommandRequest zonesFindRequest{TagsType::ConfigNS};
+        zonesFindRequest.setSort(BSON(TagsType::min << 1));
+
+        const auto onlyZonesOverlappingWithChunkFilter = [&]() {
+            BSONObjBuilder queryBuilder;
+            queryBuilder.append(TagsType::ns(), NamespaceStringUtil::serialize(_nss));
+            BSONArrayBuilder norBuilder(queryBuilder.subarrayStart("$nor"));
+            norBuilder.append(BSON(TagsType::min() << BSON("$gte" << chunkMaxKey)));
+            norBuilder.append(BSON(TagsType::max() << BSON("$lte" << chunkMinKey)));
+            norBuilder.done();
+            return queryBuilder.obj();
+        }();
+
+        zonesFindRequest.setFilter(onlyZonesOverlappingWithChunkFilter);
+        const auto zonesCursor{zonesClient.find(std::move(zonesFindRequest))};
+
+        std::vector<BSONObj> zones;
+        while ((zonesCursor->more())) {
+            zones.push_back(zonesCursor->next());
+        }
+
+        if (chunk.is_initialized() && zones.size() > 0) {
+            // Account for no-zone: two contiguous chunks could be partially overlapping with the
+            // same zone, that does not necessarily means they need to merged.
+            //
+            // Example:
+            // - ZONE: [4, 7)
+            // -- Chunk 0: [3, 5)
+            // -- Chunk 1: [5, 8)
+            //
+            // They will not be merged because the balancer will consider the following (no-)zones:
+            // [MinKey, 4), [4, 7), [7,MaxKey)
+            const auto& zonesMin = zones.front().getObjectField(ChunkType::min());
+            const auto& zonesMax = zones.back().getObjectField(ChunkType::max());
+            if (zonesMin.woCompare(chunkMinKey) > 0) {
+                zones.insert(zones.begin(), BSON("NOZONE" << 1));
+            }
+            if (zonesMax.woCompare(chunkMaxKey) > 0) {
+                zones.insert(zones.end(), BSON("NOZONE" << 1));
+            }
+        }
+
+        return zones;
+    }
+
     void assertConsistentRoutingTableWithNoContiguousMergeableChunksOnTheSameShard(
         std::vector<ChunkType> routingTable) {
         ASSERT_GTE(routingTable.size(), 0);
@@ -774,12 +877,34 @@ protected:
             // Chunks with the following carachteristics are not mergeable:
             // - Jumbo chunks
             // - Chunks with `onCurrentShardSince` higher than "now + snapshot window"
-            // So it is excpected for them to potentially have a contiguous chunk on the same shard.
+            // - Contiguous chunks belonging to the same shard but falling into different zones
+            // So it is expected for them to potentially have a contiguous chunk on the same shard.
             if (!prevChunk.getJumbo() &&
                 !(*(prevChunk.getOnCurrentShardSince()) == Timestamp::max()) &&
                 !currChunk.getJumbo() &&
                 !(*(currChunk.getOnCurrentShardSince()) == Timestamp::max())) {
-                ASSERT_NOT_EQUALS(prevChunk.getShard().compare(currChunk.getShard()), 0);
+                if (prevChunk.getShard().compare(currChunk.getShard()) != 0) {
+                    // Chunks belong to different shards
+                    continue;
+                }
+                // Chunks belong to the same shard, make sure they fall into different zones
+                const auto zonesPrevChunk =
+                    getZones(ChunkRange{prevChunk.getMin(), prevChunk.getMax()});
+                const auto zonesCurrChunk =
+                    getZones(ChunkRange{currChunk.getMin(), currChunk.getMax()});
+                if (zonesPrevChunk.size() == zonesCurrChunk.size()) {
+                    if (std::equal(zonesPrevChunk.begin(),
+                                   zonesPrevChunk.end(),
+                                   zonesCurrChunk.begin(),
+                                   [](const BSONObj& l, const BSONObj& r) {
+                                       return l.woCompare(r) == 0;
+                                   })) {
+                        FAIL(str::stream()
+                             << "Chunks " << prevChunk.toString() << " and " << currChunk.toString()
+                             << " not merged despite belonging to the same shard and falling "
+                                "into the same zone (or both in no zone)");
+                    }
+                }
             }
         }
 
@@ -924,8 +1049,11 @@ protected:
                       originalRoutingTable.size() - mergedRoutingTable.size() + numMerges);
     }
 
+    inline const static std::string _zoneName{"collZoneName"};
+
     inline const static auto _shards =
-        std::vector<ShardType>{ShardType{"shard0", "host0:123"}, ShardType{"shard1", "host1:123"}};
+        std::vector<ShardType>{ShardType{"shard0", "host0:123", {_zoneName}},
+                               ShardType{"shard1", "host1:123", {_zoneName}}};
 
     const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test.coll");
     const UUID _collUuid = UUID::gen();
@@ -934,6 +1062,10 @@ protected:
     const Timestamp _ts = Timestamp(42);
 
     const KeyPattern _keyPattern{BSON("x" << 1)};
+
+    const int _maxNumChunks = 20;
+
+    inline static PseudoRandom _random{SecureRandom().nextInt64()};
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;
 };
@@ -952,6 +1084,7 @@ protected:
  */
 TEST_F(MergeAllChunksOnShardTest, AllMergeableChunksGetSquashed) {
     setupCollectionWithRandomRoutingTable();
+    setupRandomZones();
 
     const auto chunksBeforeMerges = getChunks();
 
@@ -970,7 +1103,7 @@ TEST_F(MergeAllChunksOnShardTest, AllMergeableChunksGetSquashed) {
         assertConsistentChunkVersionsAfterMerges(chunksBeforeMerges, chunksAfterMerges);
         assertChangesWereLoggedAfterMerges(_nss, chunksBeforeMerges, chunksAfterMerges);
     } catch (...) {
-        // Log original and merged routing tables only in case of error
+        // Log zones and original/merged routing tables only in case of error
         LOGV2_INFO(7161200,
                    "CHUNKS BEFORE MERGE",
                    "numberOfChunks"_attr = chunksBeforeMerges.size(),
@@ -979,6 +1112,8 @@ TEST_F(MergeAllChunksOnShardTest, AllMergeableChunksGetSquashed) {
                    "CHUNKS AFTER MERGE",
                    "numberOfChunks"_attr = chunksAfterMerges.size(),
                    "chunks"_attr = chunksAfterMerges);
+        LOGV2_INFO(7805200, "ZONES", "zones"_attr = getZones());
+
         throw;
     }
 }
