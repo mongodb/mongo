@@ -2468,6 +2468,7 @@ env.Library(
         'mirror_maestro',
         'mongod_initializers',
         'mongod_options',
+        'op_observer/change_stream_pre_images_op_observer',
         'op_observer/fallback_op_observer',
         'op_observer/fcv_op_observer',
         'op_observer/op_observer',
