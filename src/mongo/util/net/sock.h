@@ -73,7 +73,9 @@ extern const int portRecvFlags;
 inline void closesocket(int s) {
     close(s);
 }
-const int INVALID_SOCKET = -1;
+#ifndef INVALID_SCOKET
+#define INVALID_SOCKET = -1;
+#endif
 typedef int SOCKET;
 
 #endif  // _WIN32
