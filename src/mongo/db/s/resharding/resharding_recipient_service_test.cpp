@@ -379,9 +379,10 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
                     RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
                     return RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
                 } else {
-                    auto maybeRecipient =
+                    auto [maybeRecipient, isPausedOrShutdown] =
                         RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
-                    ASSERT_TRUE(bool(maybeRecipient));
+                    ASSERT_TRUE(maybeRecipient);
+                    ASSERT_FALSE(isPausedOrShutdown);
 
                     // Allow the transition to prevState to succeed on this primary-only service
                     // instance.
@@ -428,8 +429,10 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
         }
 
         // Finally complete the operation and ensure its success.
-        auto maybeRecipient = RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
-        ASSERT_TRUE(bool(maybeRecipient));
+        auto [maybeRecipient, isPausedOrShutdown] =
+            RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+        ASSERT_TRUE(maybeRecipient);
+        ASSERT_FALSE(isPausedOrShutdown);
 
         auto recipient = *maybeRecipient;
 
@@ -474,8 +477,10 @@ TEST_F(ReshardingRecipientServiceTest, OpCtxKilledWhileRestoringMetrics) {
         stepUp(opCtx.get());
 
         // After the failpoint is disabled, the operation should succeed.
-        auto maybeRecipient = RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
-        ASSERT_TRUE(bool(maybeRecipient));
+        auto [maybeRecipient, isPausedOrShutdown] =
+            RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+        ASSERT_TRUE(maybeRecipient);
+        ASSERT_FALSE(isPausedOrShutdown);
         recipient = *maybeRecipient;
         notifyReshardingCommitting(opCtx.get(), *recipient, doc);
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
@@ -553,8 +558,10 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
             recipient.reset();
             stepUp(opCtx.get());
 
-            auto maybeRecipient = RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
-            ASSERT_TRUE(bool(maybeRecipient));
+            auto [maybeRecipient, isPausedOrShutdown] =
+                RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+            ASSERT_TRUE(maybeRecipient);
+            ASSERT_FALSE(isPausedOrShutdown);
             recipient = *maybeRecipient;
 
             stateTransitionGuard.reset();
@@ -771,9 +778,10 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
                 RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
                 return RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
             } else {
-                auto maybeRecipient =
+                auto [maybeRecipient, isPausedOrShutdown] =
                     RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
-                ASSERT_TRUE(bool(maybeRecipient));
+                ASSERT_TRUE(maybeRecipient);
+                ASSERT_FALSE(isPausedOrShutdown);
 
                 // Allow the transition to prevState to succeed on this primary-only service
                 // instance.

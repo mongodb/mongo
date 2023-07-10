@@ -709,9 +709,10 @@ TEST_F(ShardSplitDonorServiceTest, ResumeAfterStepdownTest) {
 
     // verify that the state document exists
     ASSERT_OK(getStateDocument(opCtx.get(), _uuid).getStatus());
-    auto donor = ShardSplitDonorService::DonorStateMachine::lookup(
+    auto [donor, isPausedOrShutdown] = ShardSplitDonorService::DonorStateMachine::lookup(
         opCtx.get(), _service, BSON("_id" << _uuid));
-    ASSERT(donor);
+    ASSERT_TRUE(donor);
+    ASSERT_FALSE(isPausedOrShutdown);
 
     fp.reset();
 
@@ -791,9 +792,12 @@ TEST_F(ShardSplitRecipientCleanupTest, ShardSplitRecipientCleanup) {
 
         auto splitService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                                 ->lookupServiceByName(ShardSplitDonorService::kServiceName);
-        auto optionalDonor = ShardSplitDonorService::DonorStateMachine::lookup(
-            opCtx.get(), splitService, BSON("_id" << _uuid));
+        auto [optionalDonor, isPausedOrShutdown] =
+            ShardSplitDonorService::DonorStateMachine::lookup(
+                opCtx.get(), splitService, BSON("_id" << _uuid));
 
+        ASSERT_TRUE(optionalDonor);
+        ASSERT_FALSE(isPausedOrShutdown);
         ASSERT_TRUE(hasActiveSplitForTenants(opCtx.get(), _tenantIds));
 
         ASSERT_TRUE(optionalDonor);
@@ -860,13 +864,14 @@ TEST_F(ShardSplitStepUpWithCommitted, StepUpWithkCommitted) {
 
     auto splitService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                             ->lookupServiceByName(ShardSplitDonorService::kServiceName);
-    auto optionalInstance = ShardSplitDonorService::DonorStateMachine::lookup(
+    auto [optionalDonor, isPausedOrShutdown] = ShardSplitDonorService::DonorStateMachine::lookup(
         opCtx.get(), splitService, BSON("_id" << _uuid));
 
-    ASSERT(optionalInstance);
+    ASSERT_TRUE(optionalDonor);
+    ASSERT_FALSE(isPausedOrShutdown);
     _pauseBeforeRecipientCleanupFp.reset();
 
-    auto serviceInstance = optionalInstance->get();
+    auto serviceInstance = optionalDonor->get();
 
 
     auto result = serviceInstance->decisionFuture().get();

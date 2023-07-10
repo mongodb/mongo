@@ -201,7 +201,7 @@ public:
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(repl::TenantMigrationRecipientService::
                                               kTenantMigrationRecipientServiceName);
-            auto instance = repl::TenantMigrationRecipientService::Instance::lookup(
+            auto [instance, _] = repl::TenantMigrationRecipientService::Instance::lookup(
                 opCtx, recipientService, BSON("_id" << cmd.getMigrationId()));
             uassert(8423340, "Unknown migrationId", instance);
             (*instance)->onMemberImportedFiles(cmd.getFrom(), cmd.getSuccess(), cmd.getReason());

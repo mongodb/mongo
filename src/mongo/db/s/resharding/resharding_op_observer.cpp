@@ -48,7 +48,7 @@ std::shared_ptr<ReshardingCoordinatorObserver> getReshardingCoordinatorObserver(
     OperationContext* opCtx, const BSONObj& reshardingId) {
     auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
     auto service = registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName);
-    auto instance =
+    auto [instance, _] =
         ReshardingCoordinatorService::ReshardingCoordinator::lookup(opCtx, service, reshardingId);
 
     iassert(

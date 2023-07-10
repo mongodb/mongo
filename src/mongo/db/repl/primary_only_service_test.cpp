@@ -520,16 +520,21 @@ TEST_F(PrimaryOnlyServiceTest, LookupInstance) {
     ASSERT(instance.get());
     ASSERT_EQ(0, instance->getID());
 
-    auto instance2 = TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)).get();
+    auto [instance2, isPausedOrShutdown2] =
+        TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+    ASSERT_TRUE(instance2);
+    ASSERT_FALSE(isPausedOrShutdown2);
 
-    ASSERT_EQ(instance.get(), instance2.get());
+    ASSERT_EQ(instance.get(), instance2.value().get());
 
     TestServiceHangDuringInitialization.setMode(FailPoint::off);
     instance->getCompletionFuture().get();
 
     // Shouldn't be able to look up instance after it has completed running.
-    auto instance3 = TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
-    ASSERT_FALSE(instance3.is_initialized());
+    auto [instance3, isPausedOrShutdown3] =
+        TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+    ASSERT_FALSE(instance3);
+    ASSERT_FALSE(isPausedOrShutdown3);
 }
 
 TEST_F(PrimaryOnlyServiceTest, LookupInstanceInterruptible) {
@@ -564,9 +569,11 @@ TEST_F(PrimaryOnlyServiceTest, LookupInstanceHoldingISLock) {
         opCtx->setAlwaysInterruptAtStepDownOrUp();
         ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 
-        auto instance2 =
-            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)).get();
-        ASSERT_EQ(instance.get(), instance2.get());
+        auto [instance2, isPausedOrShutdown] =
+            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+        ASSERT_TRUE(instance2);
+        ASSERT_FALSE(isPausedOrShutdown);
+        ASSERT_EQ(instance.get(), instance2.value().get());
     }
 
     TestServiceHangDuringInitialization.setMode(FailPoint::off);
@@ -586,9 +593,11 @@ TEST_F(PrimaryOnlyServiceTest, LookupInstanceHoldingIXLock) {
     {
         Lock::GlobalLock lk(opCtx.get(), MODE_IX);
         ASSERT_FALSE(opCtx->shouldAlwaysInterruptAtStepDownOrUp());
-        auto instance2 =
-            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)).get();
-        ASSERT_EQ(instance.get(), instance2.get());
+        auto [instance2, isPausedOrShutdown] =
+            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+        ASSERT_TRUE(instance2);
+        ASSERT_FALSE(isPausedOrShutdown);
+        ASSERT_EQ(instance.get(), instance2.value().get());
     }
 
     TestServiceHangDuringInitialization.setMode(FailPoint::off);
@@ -631,9 +640,11 @@ TEST_F(PrimaryOnlyServiceTest, LookupInstanceAfterStepDownReturnsNone) {
 
     stepDown();
 
-    auto instance2 = TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+    auto [instance2, isPausedOrShutdown] =
+        TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
 
-    ASSERT_EQ(instance2, boost::none);
+    ASSERT_FALSE(instance2);
+    ASSERT_TRUE(isPausedOrShutdown);
 
     TestServiceHangDuringInitialization.setMode(FailPoint::off);
     ASSERT_EQ(ErrorCodes::Interrupted, instance->getCompletionFuture().getNoThrow());
@@ -654,9 +665,11 @@ TEST_F(PrimaryOnlyServiceTest, LookupInstanceAfterShutDownReturnsNone) {
 
     shutdown();
 
-    auto instance2 = TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+    auto [instance2, isPausedOrShutdown] =
+        TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
 
-    ASSERT_EQ(instance2, boost::none);
+    ASSERT_FALSE(instance2);
+    ASSERT_TRUE(isPausedOrShutdown);
 
     ASSERT_EQ(ErrorCodes::Interrupted, instance->getCompletionFuture().getNoThrow());
 }
@@ -838,8 +851,10 @@ TEST_F(PrimaryOnlyServiceTest, StepDownBeforePersisted) {
 
     auto opCtx = makeOperationContext();
     // Since the Instance never wrote its state document, it shouldn't be recreated on stepUp.
-    auto recreatedInstance = TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
-    ASSERT(!recreatedInstance.is_initialized());
+    auto [recreatedInstance, isPausedOrShutdown] =
+        TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+    ASSERT_FALSE(recreatedInstance);
+    ASSERT_FALSE(isPausedOrShutdown);
 }
 
 TEST_F(PrimaryOnlyServiceTest, RecreateInstanceOnStepUp) {
@@ -865,11 +880,13 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstanceOnStepUp) {
 
     {
         auto opCtx = makeOperationContext();
-        auto recreatedInstance =
-            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)).get();
-        ASSERT_EQ(TestService::State::kOne, recreatedInstance->getInitialState());
+        auto [recreatedInstance, isPausedOrShutdown] =
+            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+        ASSERT_TRUE(recreatedInstance);
+        ASSERT_FALSE(isPausedOrShutdown);
+        ASSERT_EQ(TestService::State::kOne, (*recreatedInstance)->getInitialState());
         TestServiceHangDuringStateTwo.waitForTimesEntered(++stateTwoFPTimesEntered);
-        ASSERT_EQ(TestService::State::kTwo, recreatedInstance->getState());
+        ASSERT_EQ(TestService::State::kTwo, (*recreatedInstance)->getState());
     }
 
     stepDown();
@@ -883,17 +900,19 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstanceOnStepUp) {
 
     {
         auto opCtx = makeOperationContext();
-        auto recreatedInstance =
-            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)).get();
-        ASSERT_EQ(TestService::State::kTwo, recreatedInstance->getInitialState());
-        TestServiceHangDuringStateOne.setMode(FailPoint::off);
-        recreatedInstance->getCompletionFuture().get();
-        ASSERT_EQ(TestService::State::kDone, recreatedInstance->getState());
-
-
-        auto nonExistentInstance =
+        auto [recreatedInstance, isPausedOrShutdown1] =
             TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
-        ASSERT(!nonExistentInstance.is_initialized());
+        ASSERT_TRUE(recreatedInstance);
+        ASSERT_FALSE(isPausedOrShutdown1);
+        ASSERT_EQ(TestService::State::kTwo, (*recreatedInstance)->getInitialState());
+        TestServiceHangDuringStateOne.setMode(FailPoint::off);
+        (*recreatedInstance)->getCompletionFuture().get();
+        ASSERT_EQ(TestService::State::kDone, (*recreatedInstance)->getState());
+
+        auto [nonExistentInstance, isPausedOrShutdown2] =
+            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+        ASSERT_FALSE(nonExistentInstance);
+        ASSERT_FALSE(isPausedOrShutdown2);
     }
 
     stepDown();
@@ -903,9 +922,10 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstanceOnStepUp) {
         auto opCtx = makeOperationContext();
         // No Instance should be recreated since the previous run completed successfully and deleted
         // its state document.
-        auto nonExistentInstance =
+        auto [nonExistentInstance, isPausedOrShutdown] =
             TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
-        ASSERT(!nonExistentInstance.is_initialized());
+        ASSERT_FALSE(nonExistentInstance);
+        ASSERT_FALSE(isPausedOrShutdown);
     }
 }
 
@@ -961,13 +981,16 @@ TEST_F(PrimaryOnlyServiceTest, StepDownBeforeRebuildingInstances) {
     TestServiceHangDuringStateOne.waitForTimesEntered(++stateOneFPTimesEntered);
 
     auto opCtx = makeOperationContext();
-    auto instance = TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)).get();
-    ASSERT_EQ(TestService::State::kOne, instance->getInitialState());
-    ASSERT_EQ(TestService::State::kOne, instance->getState());
+    auto [instance, isPausedOrShutdown] =
+        TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+    ASSERT_TRUE(instance);
+    ASSERT_FALSE(isPausedOrShutdown);
+    ASSERT_EQ(TestService::State::kOne, (*instance)->getInitialState());
+    ASSERT_EQ(TestService::State::kOne, (*instance)->getState());
 
     TestServiceHangDuringStateOne.setMode(FailPoint::off);
 
-    instance->getCompletionFuture().get();
+    (*instance)->getCompletionFuture().get();
 }
 
 TEST_F(PrimaryOnlyServiceTest, RecreateInstancesFails) {
@@ -1011,8 +1034,10 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstancesFails) {
         // After stepping down we are in a consistent state again, but cannot create or lookup
         // instances because we are not primary.
         auto opCtx = makeOperationContext();
-        ASSERT_FALSE(TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0))
-                         .is_initialized());
+        auto [instance, isPausedOrShutdown] =
+            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+        ASSERT_FALSE(instance);
+        ASSERT_TRUE(isPausedOrShutdown);
         ASSERT_THROWS_CODE(TestService::Instance::getOrCreate(
                                opCtx.get(), _service, BSON("_id" << 0 << "state" << 0)),
                            DBException,
@@ -1029,13 +1054,15 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstancesFails) {
     {
         // Instance should be recreated successfully.
         auto opCtx = makeOperationContext();
-        auto instance =
-            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)).get();
-        ASSERT_EQ(TestService::State::kOne, instance->getInitialState());
-        ASSERT_EQ(TestService::State::kOne, instance->getState());
+        auto [instance, isPausedOrShutdown] =
+            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+        ASSERT_TRUE(instance);
+        ASSERT_FALSE(isPausedOrShutdown);
+        ASSERT_EQ(TestService::State::kOne, (*instance)->getInitialState());
+        ASSERT_EQ(TestService::State::kOne, (*instance)->getState());
         TestServiceHangDuringStateOne.setMode(FailPoint::off);
-        instance->getCompletionFuture().get();
-        ASSERT_EQ(TestService::State::kDone, instance->getState());
+        (*instance)->getCompletionFuture().get();
+        ASSERT_EQ(TestService::State::kDone, (*instance)->getState());
     }
 }
 
