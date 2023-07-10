@@ -21,12 +21,14 @@ class HistoricalTestInformation(NamedTuple):
     avg_duration_pass: Average of runtime of test that passed.
     num_pass: Number of times the test has passed.
     num_fail: Number of times the test has failed.
+    max_duration_pass: Maximum runtime of the test when it passed.
     """
 
     test_name: str
     num_pass: int
     num_fail: int
     avg_duration_pass: float
+    max_duration_pass: Optional[float] = None
 
 
 class TestRuntime(NamedTuple):
