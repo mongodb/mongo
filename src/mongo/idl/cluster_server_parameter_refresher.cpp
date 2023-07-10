@@ -104,12 +104,10 @@ std::pair<multiversion::FeatureCompatibilityVersion,
 getFCVAndClusterParametersFromConfigServer() {
     // Use an alternative client region, because we call refreshParameters both from the internal
     // refresher process and from getClusterParameter.
+    // Allow this client to be killable. If interrupted, the exception will be caught and handled in
+    // refreshParameters.
     auto altClient = getGlobalServiceContext()->makeClient("clusterParameterRefreshTransaction");
-    // TODO(SERVER-74660): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*altClient.get());
-        altClient.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
+
     AlternativeClientRegion clientRegion(altClient);
     auto opCtx = cc().makeOperationContext();
     auto as = AuthorizationSession::get(cc());

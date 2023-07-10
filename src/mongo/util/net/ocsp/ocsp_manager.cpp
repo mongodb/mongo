@@ -43,15 +43,14 @@ namespace {
 const auto getOCSPManager = ServiceContext::declareDecoration<std::unique_ptr<OCSPManager>>();
 
 auto makeTaskExecutor() {
+    // This task executor's threads are technically killable. However, since we never create an
+    // operation context in any of the tasks which we run on this executor, we don't have to worry
+    // about handling interrupts.
     ThreadPool::Options tpOptions;
     tpOptions.poolName = "OCSPManagerHTTP";
     tpOptions.maxThreads = 10;
     tpOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
-
-        // TODO(SERVER-74660): Please revisit if this thread could be made killable.
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
     };
     return std::make_unique<ThreadPool>(tpOptions);
 }

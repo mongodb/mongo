@@ -62,18 +62,19 @@ void CertificateExpirationMonitor::start(ServiceContext* service) {
     auto periodicRunner = service->getPeriodicRunner();
     invariant(periodicRunner);
 
+    // The certificate expiration monitor is technically killable, but since it never creates an
+    // operation context, it will never actually be interrupted.
     PeriodicRunner::PeriodicJob job(
         "CertificateExpirationMonitor",
         [this](Client* client) { return run(client); },
         oneDay,
-        // TODO(SERVER-74660): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
+        true /*isKillableByStepdown*/);
 
     _job = std::make_unique<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
     _job->start();
 }
 
-void CertificateExpirationMonitor::run(Client* client) {
+void CertificateExpirationMonitor::run(Client*) {
     const Date_t now = Date_t::now();
     stdx::lock_guard<Mutex> lock(_mutex);
     if (_certExpiration <= now) {

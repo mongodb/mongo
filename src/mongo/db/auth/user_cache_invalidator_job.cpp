@@ -157,12 +157,13 @@ void UserCacheInvalidator::start(ServiceContext* serviceCtx, OperationContext* o
     auto periodicRunner = serviceCtx->getPeriodicRunner();
     invariant(periodicRunner);
 
+    // This job is killable. When interrupted, we will warn, and retry after the configured
+    // interval.
     PeriodicRunner::PeriodicJob job(
         "UserCacheInvalidator",
         [serviceCtx](Client* client) { getUserCacheInvalidator(serviceCtx)->run(); },
         loadInterval(),
-        // TODO(SERVER-74660): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
+        true /*isKillableByStepdown*/);
 
     invalidator->_job =
         std::make_unique<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
@@ -172,7 +173,7 @@ void UserCacheInvalidator::start(ServiceContext* serviceCtx, OperationContext* o
     getUserCacheInvalidator(serviceCtx)->_job->start();
 }
 
-void UserCacheInvalidator::run() {
+void UserCacheInvalidator::run() try {
     auto opCtx = cc().makeOperationContext();
     auto swCurrentGeneration = getCurrentCacheGeneration(opCtx.get());
     if (!swCurrentGeneration.isOK()) {
@@ -222,6 +223,8 @@ void UserCacheInvalidator::run() {
             }
         }
     }
+} catch (const DBException& e) {
+    LOGV2_WARNING(7466000, "Error invalidating user cache", "error"_attr = e.toStatus());
 }
 
 }  // namespace mongo

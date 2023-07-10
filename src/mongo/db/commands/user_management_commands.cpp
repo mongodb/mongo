@@ -783,15 +783,14 @@ public:
           _client{opCtx->getServiceContext()->makeClient(forCommand.toString())},
           _dbName{DatabaseNameUtil::deserialize(tenant, kAdminDB)},
           _sessionInfo{LogicalSessionFromClient(UUID::gen())} {
+        // Note: We allow the client to be killable. We only make an operation context on this
+        // client during runCommand, and that operation context is short-lived. If we get
+        // interrupted during that operation context's life, we will fail the transaction.
+
         _sessionInfo.setTxnNumber(0);
         _sessionInfo.setStartTransaction(true);
         _sessionInfo.setAutocommit(false);
 
-        // TODO(SERVER-74660): Please revisit if this thread could be made killable.
-        {
-            stdx::lock_guard<Client> lk(*_client.get());
-            _client.get()->setSystemOperationUnkillableByStepdown(lk);
-        }
 
         auto as = AuthorizationSession::get(_client.get());
         if (as) {
@@ -2141,8 +2140,7 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
  *   (BooleanFalse) Do not show information about privileges
  *   (BooleanTrue) Attach all privileges inherited from roles to role descriptions
  *   "asUserFragment" Render results as a partial user document as-if a user existed which possessed
- *                    these roles. This format may change over time with changes to the auth
- *                    schema.
+ *                    these roles. This format may change over time with changes to the auth schema.
  */
 CmdUMCTyped<RolesInfoCommand, UMCInfoParams> cmdRolesInfo;
 template <>
