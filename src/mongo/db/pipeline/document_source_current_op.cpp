@@ -35,9 +35,11 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_current_op.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
@@ -155,6 +157,11 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::doGetNext() {
 
         // Add the shard name to the output document.
         doc.addField(kShardFieldName, Value(_shardName));
+
+        if (feature_flags::gClusterFsyncLock.isEnabled(serverGlobalParams.featureCompatibility) &&
+            mongo::lockedForWriting()) {
+            doc.addField(StringData("fsyncLock"), Value(true));
+        }
 
         // For operations on a shard, we change the opid from the raw numeric form to
         // 'shardname:opid'. We also change the fieldname 'client' to 'client_s' to indicate
