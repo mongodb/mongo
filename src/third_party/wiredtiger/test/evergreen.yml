@@ -4079,7 +4079,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} ./run_format_configs.sh
+            ${test_env_vars|} ./run_format_configs.sh ${smp_command|}
 
   - name: static-wt-build-test
     commands:
