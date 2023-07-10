@@ -27,4 +27,9 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     db.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$searchMeta: {}}]}),
     [6047401]);
+
+// Check that $vectorSearch is disabled without enterprise.
+assert.commandFailedWithCode(
+    coll.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$vectorSearch: {}}]}),
+    [6047401]);
 })();
