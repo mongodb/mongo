@@ -415,6 +415,8 @@ last-continuous:
     ticket: SERVER-80203
   - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
     ticket: SERVER-79446
+  - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
+    ticket: SERVER-77506
   suites: null
 last-lts:
   all:
@@ -878,4 +880,6 @@ last-lts:
     ticket: SERVER-80203
   - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
     ticket: SERVER-79446
+  - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
+    ticket: SERVER-77506
   suites: null

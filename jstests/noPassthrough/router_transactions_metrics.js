@@ -222,6 +222,10 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {skey: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 1}, to: st.shard1.shardName}));
 flushRoutersAndRefreshShardMetadata(st, {ns});
 
+// Force the other mongos to talk to the shards to get the latest cluster time and to avoid
+// getting the MigrationConflict error.
+st.s1.getDB(dbName).getCollection(collName).find().itcount();
+
 let expectedStats = new ExpectedTransactionServerStatus();
 
 let nextSkey = 0;

@@ -515,8 +515,22 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
          (!indexFeatureFlag || receivedIndexVersion == wantedIndexVersion)) ||
         (isPlacementVersionIgnored &&
          (!wantedPlacementVersion.isSet() || !indexFeatureFlag ||
-          receivedIndexVersion == wantedIndexVersion)))
+          receivedIndexVersion == wantedIndexVersion))) {
+        const auto timeOfLastIncomingChunkMigration = currentMetadata.getShardMaxValidAfter();
+        const auto& placementConflictTime = receivedShardVersion.placementConflictTime();
+        if (placementConflictTime &&
+            placementConflictTime->asTimestamp() < timeOfLastIncomingChunkMigration) {
+            uasserted(ErrorCodes::MigrationConflict,
+                      str::stream() << "Collection " << _nss.toStringForErrorMsg()
+                                    << " has undergone a catalog change operation at time "
+                                    << timeOfLastIncomingChunkMigration
+                                    << " and no longer satisfies the "
+                                       "requirements for the current transaction which requires "
+                                    << placementConflictTime->asTimestamp()
+                                    << ". Transaction will be aborted.");
+        }
         return optCurrentMetadata;
+    }
 
     StaleConfigInfo sci(
         _nss, receivedShardVersion, wantedShardVersion, ShardingState::get(opCtx)->shardId());

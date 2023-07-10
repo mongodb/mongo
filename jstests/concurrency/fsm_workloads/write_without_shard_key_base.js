@@ -156,6 +156,7 @@ var $config = extendWorkload($config, function($config, $super) {
             ErrorCodes.IllegalOperation,
             ErrorCodes.LockTimeout,
             ErrorCodes.IncompleteTransactionHistory,
+            ErrorCodes.MigrationConflict,
             ErrorCodes.NoSuchTransaction,
             ErrorCodes.StaleConfig,
         ];

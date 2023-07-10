@@ -119,12 +119,5 @@ let testNoopWrite = (fromDbName, fromColl, toRS, toDbName, toColl, propagationPr
 
 testNoopWrite("test0", "coll0", st.rs1, "test1", "coll1", PropagationPreferenceOptions.kShard);
 
-//
-// Test noop write. Read from the config server's primary.
-//
-
-testNoopWrite(
-    "test0", "coll2", st.configRS, "test1", "coll3", PropagationPreferenceOptions.kConfig);
-
 st.stop();
 }());
