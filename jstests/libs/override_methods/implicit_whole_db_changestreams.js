@@ -68,7 +68,8 @@ const ChangeStreamPassthroughHelpers = {
                 $or: [
                     {"ns.db": db.getName(), "ns.coll": collName},
                     {"to.db": db.getName(), "to.coll": collName},
-                    {operationType: "invalidate"}
+                    {operationType: "endOfTransaction"},
+                    {operationType: "invalidate"},
                 ]
             }
         };

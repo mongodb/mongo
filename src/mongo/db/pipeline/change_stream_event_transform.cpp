@@ -68,6 +68,16 @@ constexpr auto checkValueType = &DocumentSourceChangeStream::checkValueType;
 constexpr auto checkValueTypeOrMissing = &DocumentSourceChangeStream::checkValueTypeOrMissing;
 constexpr auto resolveResumeToken = &change_stream::resolveResumeTokenFromSpec;
 
+const StringDataSet kOpsWithoutUUID = {
+    DocumentSourceChangeStream::kInvalidateOpType,
+    DocumentSourceChangeStream::kDropDatabaseOpType,
+    DocumentSourceChangeStream::kEndOfTransactionOpType,
+};
+
+const StringDataSet kOpsWithoutNs = {
+    DocumentSourceChangeStream::kEndOfTransactionOpType,
+};
+
 Document copyDocExceptFields(const Document& source, const std::set<StringData>& fieldNames) {
     MutableDocument doc(source);
     for (auto fieldName : fieldNames) {
@@ -102,6 +112,22 @@ void setResumeTokenForEvent(const ResumeTokenData& resumeTokenData, MutableDocum
 NamespaceString createNamespaceStringFromOplogEntry(Value tid, StringData ns) {
     auto tenantId = tid.missing() ? boost::none : boost::optional<TenantId>{tid.getOid()};
     return NamespaceStringUtil::deserialize(tenantId, ns);
+}
+
+void addTransactionIdFieldsIfPresent(const Document& input, MutableDocument& output) {
+    // The lsid and txnNumber may be missing if this is a batched write.
+    auto lsid = input[DocumentSourceChangeStream::kLsidField];
+    checkValueTypeOrMissing(lsid, DocumentSourceChangeStream::kLsidField, BSONType::Object);
+    auto txnNumber = input[DocumentSourceChangeStream::kTxnNumberField];
+    checkValueTypeOrMissing(
+        txnNumber, DocumentSourceChangeStream::kTxnNumberField, BSONType::NumberLong);
+    // We are careful here not to overwrite existing lsid or txnNumber fields with MISSING.
+    if (!txnNumber.missing()) {
+        output.addField(DocumentSourceChangeStream::kTxnNumberField, txnNumber);
+    }
+    if (!lsid.missing()) {
+        output.addField(DocumentSourceChangeStream::kLsidField, lsid);
+    }
 }
 
 }  // namespace
@@ -397,6 +423,13 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 break;
             }
 
+            if (!o2Field["endOfTransaction"].missing()) {
+                operationType = DocumentSourceChangeStream::kEndOfTransactionOpType;
+                operationDescription = Value{copyDocExceptFields(o2Field, {"endOfTransaction"_sd})};
+                addTransactionIdFieldsIfPresent(o2Field, doc);
+                break;
+            }
+
             // We should never see an unknown noop entry.
             MONGO_UNREACHABLE_TASSERT(5052201);
         }
@@ -405,11 +438,10 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
         }
     }
 
-    // UUID should always be present except for invalidate and dropDatabase entries.
-    if (operationType != DocumentSourceChangeStream::kInvalidateOpType &&
-        operationType != DocumentSourceChangeStream::kDropDatabaseOpType) {
-        invariant(!uuid.missing(), "Saw a CRUD op without a UUID");
-    }
+    // UUID should always be present except for a known set of types.
+    tassert(7826901,
+            "Saw a CRUD op without a UUID",
+            !uuid.missing() || kOpsWithoutUUID.contains(operationType));
 
     // Extract the 'txnOpIndex' and 'applyOpsIndex' fields. These will be missing unless we are
     // unwinding a transaction.
@@ -419,14 +451,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
 
     // Add some additional fields only relevant to transactions.
     if (!txnOpIndex.missing()) {
-        // The lsid and txnNumber may be missing if this is a batched write.
-        auto lsid = input[DocumentSourceChangeStream::kLsidField];
-        checkValueTypeOrMissing(lsid, DocumentSourceChangeStream::kLsidField, BSONType::Object);
-        auto txnNumber = input[DocumentSourceChangeStream::kTxnNumberField];
-        checkValueTypeOrMissing(
-            txnNumber, DocumentSourceChangeStream::kTxnNumberField, BSONType::NumberLong);
-        doc.addField(DocumentSourceChangeStream::kTxnNumberField, txnNumber);
-        doc.addField(DocumentSourceChangeStream::kLsidField, lsid);
+        addTransactionIdFieldsIfPresent(input, doc);
     }
 
     // Generate the resume token. Note that only 'ts' is always guaranteed to be present.
@@ -468,8 +493,10 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
         doc.addField(DocumentSourceChangeStream::kPreImageIdField, Value(preImageId.toBSON()));
     }
 
-    // Add the 'ns' field to the change stream document, based on the final value of 'nss'.
-    doc.addField(DocumentSourceChangeStream::kNamespaceField, makeChangeStreamNsField(nss));
+    // If needed, add the 'ns' field to the change stream document, based on the final value of nss.
+    if (!kOpsWithoutNs.contains(operationType)) {
+        doc.addField(DocumentSourceChangeStream::kNamespaceField, makeChangeStreamNsField(nss));
+    }
 
     // The event may have a documentKey OR an operationDescription, but not both. We already
     // validated this while creating the resume token.

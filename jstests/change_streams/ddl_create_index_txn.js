@@ -43,7 +43,11 @@ assertDropCollection(sessionDB, otherCollName);
 assertDropCollection(sessionOtherDB, otherDBCollName);
 
 let csOptions = {showExpandedEvents: true};
-const pipeline = [{$changeStream: csOptions}, {$project: {"lsid.uid": 0}}];
+const pipeline = [
+    {$changeStream: csOptions},
+    {$project: {"lsid.uid": 0}},
+    {$match: {operationType: {$ne: "endOfTransaction"}}},
+];
 
 let cst = new ChangeStreamTest(sessionDB);
 let changeStream = cst.startWatchingChanges({pipeline, collection: collName});

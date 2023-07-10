@@ -272,6 +272,7 @@ public:
     static constexpr StringData kRefineCollectionShardKeyOpType = "refineCollectionShardKey"_sd;
     static constexpr StringData kReshardCollectionOpType = "reshardCollection"_sd;
     static constexpr StringData kModifyOpType = "modify"_sd;
+    static constexpr StringData kEndOfTransactionOpType = "endOfTransaction"_sd;
 
     // Default regex for collections match which prohibits system collections.
     static constexpr StringData kRegexAllCollections = R"((?!(\$|system\.)))"_sd;

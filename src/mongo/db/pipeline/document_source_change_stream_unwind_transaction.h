@@ -78,7 +78,7 @@ public:
     static constexpr StringData kStageName = "$_internalChangeStreamUnwindTransaction"_sd;
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamUnwindTransaction> create(
-        const boost::intrusive_ptr<ExpressionContext>&);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamUnwindTransaction> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
@@ -109,7 +109,7 @@ protected:
 
 private:
     DocumentSourceChangeStreamUnwindTransaction(
-        const BSONObj& filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Resets the transaction entry filter saved in the '_filter' and '_expression' fields.
@@ -144,8 +144,7 @@ private:
         TransactionOpIterator(const TransactionOpIterator&) = delete;
         TransactionOpIterator& operator=(const TransactionOpIterator&) = delete;
 
-        TransactionOpIterator(OperationContext* opCtx,
-                              std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
+        TransactionOpIterator(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const Document& input,
                               const MatchExpression* expression);
 
@@ -199,9 +198,9 @@ private:
         repl::OplogEntry _lookUpOplogEntryByOpTime(OperationContext* opCtx,
                                                    repl::OpTime lookupTime) const;
 
-        // Helper for getNextTransactionOp(). Checks the namespace of the given document to see if
-        // it should be returned in the change stream.
-        bool _isDocumentRelevant(const Document& d) const;
+        // Helper for getNextTransactionOp(). Performs assertions on the document inside
+        // applyOps.
+        void _assertExpectedTransactionEventFormat(const Document& d) const;
 
         // Traverse backwards through the oplog by starting at the entry at 'firstOpTime' and
         // following "prevOpTime" links until reaching the terminal "prevOpTime" value, and push the
@@ -214,7 +213,15 @@ private:
 
         // Adds more transaction related information to the document containing unwinded
         // transaction.
-        Document _addRequiredTransactionFields(const Document& doc);
+        Document _addRequiredTransactionFields(const Document& doc) const;
+
+        // For unprepared transactions, generates an artificial endOfTransaction oplog entry once
+        // all events in the transaction have been exhausted.
+        boost::optional<Document> _createEndOfTransactionIfNeeded();
+
+        // Records all namespaces affected by the transaction. Used in generating an artificial
+        // endOfTransaction oplog entry.
+        void _addAffectedNamespaces(const Document& op);
 
         // This stack contains the timestamps for all oplog entries in this transaction that have
         // yet to be processed by the iterator. Each time the TransactionOpIterator finishes
@@ -258,6 +265,17 @@ private:
 
         // Only return entries matching this expression.
         const MatchExpression* _expression;
+        std::unique_ptr<MatchExpression> _endOfTransactionExpression;
+
+        // If lsid and txnNumber are present and the transaction is not prepared, we need to create
+        // fake endOfTransaction oplog entry
+        bool _needEndOfTransaction;
+
+        // Set of affected namespaces. Only needed if we need endOfTransaction.
+        absl::flat_hash_set<std::string> _affectedNamespaces;
+
+        // Set to true after iterator have returned endOfTransaction
+        bool _endOfTransactionReturned = false;
     };
 
     // All transaction entries are filtered through this expression. This extra filtering step is

@@ -25,7 +25,8 @@ ChangeStreamPassthroughHelpers.nsMatchFilter = function(db, collName) {
         // Add a clause to detect if the collection being watched is the target of a
         // renameCollection command, since that is expected to return a "rename" entry.
         {"to.db": db.getName(), "to.coll": (isSingleCollectionStream ? collName : {$exists: true})},
-        {operationType: "invalidate"}
+        {operationType: "endOfTransaction"},
+        {operationType: "invalidate"},
     ];
 
     if (!isSingleCollectionStream) {

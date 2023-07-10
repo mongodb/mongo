@@ -411,12 +411,15 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
             !(spec.getResumeAfter() && resumeToken->fromInvalidate));
 
     // If we are resuming a single-collection stream, the resume token should always contain a
-    // UUID unless the token is a high water mark.
+    // UUID unless the token is from endOfTransaction event or a high water mark.
     uassert(ErrorCodes::InvalidResumeToken,
             "Attempted to resume a single-collection stream, but the resume token does not "
             "include a UUID",
             !resumeToken || resumeToken->uuid || !expCtx->isSingleNamespaceAggregation() ||
-                ResumeToken::isHighWaterMarkToken(*resumeToken));
+                ResumeToken::isHighWaterMarkToken(*resumeToken) ||
+                Value::compare(resumeToken->eventIdentifier["operationType"],
+                               Value("endOfTransaction"_sd),
+                               nullptr) == 0);
 }
 
 }  // namespace mongo

@@ -26,10 +26,14 @@ db.getSiblingDB(jsTestName()).dropDatabase();
 db.getSiblingDB(jsTestName()).createCollection("coll");
 
 let cursor = cst.startWatchingChanges({
-    pipeline: [{
-        $changeStream:
-            {allChangesForCluster: true, showExpandedEvents: true, showSystemEvents: true}
-    }],
+    pipeline: [
+        {
+            $changeStream:
+                {allChangesForCluster: true, showExpandedEvents: true, showSystemEvents: true}
+        },
+        {$project: {"lsid.uid": 0}},
+        {$match: {operationType: {$ne: "endOfTransaction"}}},
+    ],
     collection: 1
 });
 const globalIndexUUID = UUID();
@@ -86,6 +90,8 @@ cst.assertNoChange(cursor);
 
 // Validate behaviour of change streams events for regular operations is preserved when used
 // together with global indexes.
+let lsid = {};
+let txnNumber = -1;
 {
     const session = db.getMongo().startSession();
     session.startTransaction();
@@ -93,17 +99,19 @@ cst.assertNoChange(cursor);
         {"_shardsvrInsertGlobalIndexKey": globalIndexUUID, key: {a: 1}, docKey: {sk: 1, _id: 1}}));
     assert.commandWorked(session.getDatabase(jsTestName()).coll.insert({_id: 1, a: 123}));
     session.commitTransaction();
+    lsid = session.getSessionId();
+    txnNumber = session.getTxnNumber_forTesting();
     session.endSession();
 }
 // getNextChanges will timeout if no change is found.
-const nextChange = cst.getNextChanges(cursor, 1)[0];
+const nextChanges = cst.getNextChanges(cursor, 1);
 const expectedInsert = {
     operationType: "insert",
     fullDocument: {_id: 1, a: 123},
     ns: {db: jsTestName(), coll: "coll"},
     documentKey: {_id: 1}
 };
-assertChangeStreamEventEq(nextChange, expectedInsert);
+assertChangeStreamEventEq(nextChanges[0], expectedInsert);
 
 // _shardsvrDropGlobalIndex should not generate a change stream.
 assert.commandWorked(adminDB.runCommand({_shardsvrDropGlobalIndex: globalIndexUUID}));

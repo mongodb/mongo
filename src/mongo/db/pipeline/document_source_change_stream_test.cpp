@@ -2448,7 +2448,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
     vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid, kShowExpandedEventsSpec);
 
     // The create operation should be skipped.
-    ASSERT_EQ(results.size(), 2u);
+    ASSERT_EQ(results.size(), 3u);
 
     // Check that the first document is correct.
     auto nextDoc = results[0];
@@ -2458,6 +2458,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
     ASSERT_VALUE_EQ(nextDoc[DSChangeStream::kOperationDescriptionField],
                     Value(Document{{"idIndex", idIndexDef}}));
     ASSERT_EQ(nextDoc["lsid"].getDocument().toBson().woCompare(lsid.toBSON()), 0);
+    ASSERT_EQ(ResumeToken::parse(nextDoc["_id"].getDocument()).getData().txnOpIndex, 0);
 
     // Check the second document.
     nextDoc = results[1];
@@ -2467,8 +2468,20 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["x"].getString(), "hallo");
     ASSERT_EQ(nextDoc["lsid"].getDocument().toBson().woCompare(lsid.toBSON()), 0);
+    ASSERT_EQ(ResumeToken::parse(nextDoc["_id"].getDocument()).getData().txnOpIndex, 1);
 
-    // The third document is skipped.
+    // The third document in applyOps is skipped, so the third document of the result is
+    // endOfTransaction.
+    nextDoc = results[2];
+    ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
+              DSChangeStream::kEndOfTransactionOpType);
+    ASSERT_EQ(nextDoc["txnNumber"].getLong(), 0LL);
+    ASSERT_EQ(nextDoc["lsid"].getDocument().toBson().woCompare(lsid.toBSON()), 0);
+    auto operationDescription = nextDoc[DSChangeStream::kOperationDescriptionField];
+    ASSERT_EQ(operationDescription["txnNumber"].getLong(), 0LL);
+    ASSERT_EQ(operationDescription["lsid"].getDocument().toBson().woCompare(lsid.toBSON()), 0);
+    // Third document (with txnOpIndex == 2) is skipped, so EOT should have txnOpIndex == 3.
+    ASSERT_EQ(ResumeToken::parse(nextDoc["_id"].getDocument()).getData().txnOpIndex, 3);
 }
 
 TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
@@ -2684,7 +2697,7 @@ TEST_F(ChangeStreamStageTest, DSCSUnwindTransactionStageSerialization) {
 
     auto filter = BSON("ns" << BSON("$regex"
                                     << "^db\\.coll$"));
-    DocumentSourceChangeStreamUnwindTransactionSpec spec(filter);
+    DocumentSourceChangeStreamUnwindTransactionSpec spec{std::move(filter)};
     auto stageSpecAsBSON = BSON("" << spec.toBSON());
 
     validateDocumentSourceStageSerialization<DocumentSourceChangeStreamUnwindTransaction>(
