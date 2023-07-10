@@ -216,6 +216,67 @@ std::string actionTypeToString(TransactionRouter::TransactionActions action) {
     MONGO_UNREACHABLE;
 }
 
+/**
+ * Sets the given logical time as the atClusterTime for the transaction to be the greater of
+ * the given time and the user's afterClusterTime, if one was provided.
+ */
+void setAtClusterTime(const LogicalSessionId& lsid,
+                      const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+                      StmtId latestStmtId,
+                      TransactionRouter::AtClusterTime* atClusterTime,
+                      const boost::optional<LogicalTime>& afterClusterTime,
+                      const LogicalTime& candidateTime) {
+    // If the user passed afterClusterTime, the chosen time must be greater than or equal to it.
+    if (afterClusterTime && *afterClusterTime > candidateTime) {
+        atClusterTime->setTime(*afterClusterTime, latestStmtId);
+        return;
+    }
+
+    LOGV2_DEBUG(22888,
+                2,
+                "Setting global snapshot timestamp for transaction",
+                "sessionId"_attr = lsid,
+                "txnNumber"_attr = txnNumberAndRetryCounter.getTxnNumber(),
+                "txnRetryCounter"_attr = txnNumberAndRetryCounter.getTxnRetryCounter(),
+                "globalSnapshotTimestamp"_attr = candidateTime,
+                "latestStmtId"_attr = latestStmtId);
+
+    atClusterTime->setTime(candidateTime, latestStmtId);
+}
+
+struct StrippedFields {
+public:
+    boost::optional<repl::ReadConcernArgs> readConcern;
+    boost::optional<ShardVersion> shardVersion;
+};
+
+/**
+ * Returns the readConcern setting from the cmdObj. If a BSONObjBuilder is provided, it will
+ * append the original fields from the cmdObj except for the readConcern field.
+ */
+StrippedFields stripReadConcernAndShardVersion(const BSONObj& cmdObj,
+                                               BSONObjBuilder* cmdWithoutReadConcernBuilder) {
+    BSONObjBuilder strippedCmdBuilder;
+    StrippedFields strippedFields;
+
+    for (auto&& elem : cmdObj) {
+        if (elem.fieldNameStringData() == repl::ReadConcernArgs::kReadConcernFieldName) {
+            strippedFields.readConcern =
+                repl::ReadConcernArgs::fromBSONThrows(elem.embeddedObject());
+            continue;
+        } else if (elem.fieldNameStringData() == ShardVersion::kShardVersionField) {
+            strippedFields.shardVersion = ShardVersion::parse(elem);
+            continue;
+        }
+
+        if (cmdWithoutReadConcernBuilder) {
+            cmdWithoutReadConcernBuilder->append(elem);
+        }
+    }
+
+    return strippedFields;
+}
+
 }  // namespace
 
 TransactionRouter::TransactionRouter() = default;
@@ -307,7 +368,8 @@ void TransactionRouter::Observer::_reportTransactionState(OperationContext* opCt
     }
 
     if (_atClusterTimeHasBeenSet()) {
-        builder->append("globalReadTimestamp", o().atClusterTime->getTime().asTimestamp());
+        builder->append("globalReadTimestamp",
+                        o().atClusterTimeForSnapshotReadConcern->getTime().asTimestamp());
     }
 
     const auto& timingStats = o().metricsTracker->getTimingStats();
@@ -365,7 +427,8 @@ void TransactionRouter::Observer::_reportTransactionState(OperationContext* opCt
 }
 
 bool TransactionRouter::Observer::_atClusterTimeHasBeenSet() const {
-    return o().atClusterTime.has_value() && o().atClusterTime->timeHasBeenSet();
+    return o().atClusterTimeForSnapshotReadConcern &&
+        o().atClusterTimeForSnapshotReadConcern->timeHasBeenSet();
 }
 
 const LogicalSessionId& TransactionRouter::Observer::_sessionId() const {
@@ -411,11 +474,14 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     }
 
     BSONObjBuilder newCmd = mustStartTransaction
-        ? appendFieldsForStartTransaction(std::move(cmd),
-                                          sharedOptions.readConcernArgs,
-                                          sharedOptions.atClusterTime,
-                                          !hasStartTxn)
-        : BSONObjBuilder(std::move(cmd));
+        ? appendFieldsForStartTransaction(
+              std::move(cmd),
+              sharedOptions.readConcernArgs,
+              sharedOptions.atClusterTimeForSnapshotReadConcern,
+              sharedOptions.placementConflictTimeForNonSnapshotReadConcern,
+              !hasStartTxn)
+        : appendFieldsForContinueTransaction(
+              std::move(cmd), sharedOptions.placementConflictTimeForNonSnapshotReadConcern);
 
     if (isCoordinator) {
         newCmd.append(kCoordinatorField, true);
@@ -441,6 +507,23 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     }
 
     return newCmd.obj();
+}
+
+BSONObj TransactionRouter::appendFieldsForContinueTransaction(
+    BSONObj cmdObj,
+    const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern) {
+    BSONObjBuilder cmdBob;
+    const auto strippedFields = stripReadConcernAndShardVersion(cmdObj, &cmdBob);
+
+    if (auto shardVersion = strippedFields.shardVersion) {
+        if (placementConflictTimeForNonSnapshotReadConcern) {
+            shardVersion->setPlacementConflictTime(*placementConflictTimeForNonSnapshotReadConcern);
+        }
+
+        shardVersion->serialize(ShardVersion::kShardVersionField, &cmdBob);
+    }
+
+    return cmdBob.obj();
 }
 
 void TransactionRouter::Router::processParticipantResponse(OperationContext* opCtx,
@@ -561,7 +644,9 @@ bool TransactionRouter::AtClusterTime::canChange(StmtId currentStmtId) const {
 }
 
 boost::optional<LogicalTime> TransactionRouter::Router::getSelectedAtClusterTime() const {
-    return o().atClusterTime ? boost::make_optional(o().atClusterTime->getTime()) : boost::none;
+    return o().atClusterTimeForSnapshotReadConcern
+        ? boost::make_optional(o().atClusterTimeForSnapshotReadConcern->getTime())
+        : boost::none;
 }
 
 const boost::optional<ShardId>& TransactionRouter::Router::getCoordinatorId() const {
@@ -608,20 +693,19 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
     return txnPart.attachTxnFieldsIfNeeded(cmdObj, true);
 }
 
-void TransactionRouter::Router::_verifyParticipantAtClusterTime(const Participant& participant) {
-    const auto& participantAtClusterTime = participant.sharedOptions.atClusterTime;
-    invariant(participantAtClusterTime);
-    invariant(*participantAtClusterTime == o().atClusterTime->getTime());
-}
-
 const TransactionRouter::Participant* TransactionRouter::Router::getParticipant(
     const ShardId& shard) {
     const auto iter = o().participants.find(shard.toString());
     if (iter == o().participants.end())
         return nullptr;
 
-    if (o().atClusterTime) {
-        _verifyParticipantAtClusterTime(iter->second);
+    if (auto& participantAtClusterTime =
+            iter->second.sharedOptions.atClusterTimeForSnapshotReadConcern) {
+        invariant(*participantAtClusterTime == o().atClusterTimeForSnapshotReadConcern->getTime());
+    } else if (auto& participantPlacementConflictTime =
+                   iter->second.sharedOptions.placementConflictTimeForNonSnapshotReadConcern) {
+        invariant(*participantPlacementConflictTime ==
+                  o().placementConflictTimeForNonSnapshotReadConcern->getTime());
     }
 
     return &iter->second;
@@ -630,20 +714,27 @@ const TransactionRouter::Participant* TransactionRouter::Router::getParticipant(
 TransactionRouter::Participant& TransactionRouter::Router::_createParticipant(
     OperationContext* opCtx, const ShardId& shard) {
 
+    auto& os = o();
+
     // The first participant is chosen as the coordinator.
-    auto isFirstParticipant = o().participants.empty();
+    auto isFirstParticipant = os.participants.empty();
     if (isFirstParticipant) {
-        invariant(!o().coordinatorId);
+        invariant(!os.coordinatorId);
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).coordinatorId = shard.toString();
     }
 
     SharedTransactionOptions sharedOptions = {
-        o().txnNumberAndRetryCounter,
-        o().apiParameters,
-        o().readConcernArgs,
-        o().atClusterTime ? boost::optional<LogicalTime>(o().atClusterTime->getTime())
-                          : boost::none,
+        os.txnNumberAndRetryCounter,
+        os.apiParameters,
+        os.readConcernArgs,
+        os.atClusterTimeForSnapshotReadConcern
+            ? boost::optional<LogicalTime>(os.atClusterTimeForSnapshotReadConcern->getTime())
+            : boost::none,
+        os.placementConflictTimeForNonSnapshotReadConcern
+            ? boost::optional<LogicalTime>(
+                  os.placementConflictTimeForNonSnapshotReadConcern->getTime())
+            : boost::none,
         isInternalSessionForRetryableWrite(_sessionId())};
 
     stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -830,7 +921,10 @@ void TransactionRouter::Router::onViewResolutionError(OperationContext* opCtx,
 
 bool TransactionRouter::Router::canContinueOnSnapshotError() const {
     if (MONGO_unlikely(enableStaleVersionAndSnapshotRetriesWithinTransactions.shouldFail())) {
-        return o().atClusterTime && o().atClusterTime->canChange(p().latestStmtId);
+        return (o().atClusterTimeForSnapshotReadConcern &&
+                o().atClusterTimeForSnapshotReadConcern->canChange(p().latestStmtId)) ||
+            (o().placementConflictTimeForNonSnapshotReadConcern &&
+             o().placementConflictTimeForNonSnapshotReadConcern->canChange(p().latestStmtId));
     }
 
     return false;
@@ -851,7 +945,8 @@ void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx, const S
         "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
         "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
         "error"_attr = redact(status),
-        "previousGlobalSnapshotTimestamp"_attr = o().atClusterTime->getTime());
+        "previousGlobalSnapshotTimestamp"_attr =
+            o().atClusterTimeForSnapshotReadConcern->getTime());
 
     // The transaction must be restarted on all participants because a new read timestamp will be
     // selected, so clear all pending participants. Snapshot errors are only retryable on the first
@@ -862,44 +957,34 @@ void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx, const S
 
     // Reset the global snapshot timestamp so the retry will select a new one.
     stdx::lock_guard<Client> lk(*opCtx->getClient());
-    o(lk).atClusterTime.emplace();
+    o(lk).atClusterTimeForSnapshotReadConcern.emplace();
 }
 
 void TransactionRouter::Router::setDefaultAtClusterTime(OperationContext* opCtx) {
-    if (!o().atClusterTime || !o().atClusterTime->canChange(p().latestStmtId)) {
-        return;
-    }
-
     const auto defaultTime = VectorClock::get(opCtx)->getTime();
-    _setAtClusterTime(opCtx,
-                      repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(),
-                      defaultTime.clusterTime());
-}
 
-void TransactionRouter::Router::_setAtClusterTime(
-    OperationContext* opCtx,
-    const boost::optional<LogicalTime>& afterClusterTime,
-    LogicalTime candidateTime) {
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    if (o().atClusterTimeForSnapshotReadConcern) {
+        if (o().atClusterTimeForSnapshotReadConcern->canChange(p().latestStmtId)) {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            setAtClusterTime(_sessionId(),
+                             o(lk).txnNumberAndRetryCounter,
+                             p().latestStmtId,
+                             o(lk).atClusterTimeForSnapshotReadConcern.get_ptr(),
+                             repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(),
+                             defaultTime.clusterTime());
+        }
+    } else if (o().placementConflictTimeForNonSnapshotReadConcern) {
+        if (o().placementConflictTimeForNonSnapshotReadConcern->canChange(p().latestStmtId)) {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
 
-    // If the user passed afterClusterTime, the chosen time must be greater than or equal to it.
-    if (afterClusterTime && *afterClusterTime > candidateTime) {
-        o(lk).atClusterTime->setTime(*afterClusterTime, p().latestStmtId);
-        return;
+            setAtClusterTime(_sessionId(),
+                             o(lk).txnNumberAndRetryCounter,
+                             p().latestStmtId,
+                             o(lk).placementConflictTimeForNonSnapshotReadConcern.get_ptr(),
+                             repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(),
+                             defaultTime.clusterTime());
+        }
     }
-
-    LOGV2_DEBUG(22888,
-                2,
-                "{sessionId}:{txnNumber} Setting global snapshot timestamp to "
-                "{globalSnapshotTimestamp} on statement {latestStmtId}",
-                "Setting global snapshot timestamp for transaction",
-                "sessionId"_attr = _sessionId(),
-                "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
-                "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
-                "globalSnapshotTimestamp"_attr = candidateTime,
-                "latestStmtId"_attr = p().latestStmtId);
-
-    o(lk).atClusterTime->setTime(candidateTime, p().latestStmtId);
 }
 
 void TransactionRouter::Router::_continueTxn(OperationContext* opCtx,
@@ -1470,7 +1555,8 @@ void TransactionRouter::Router::_resetRouterState(
         p().recoveryShardId.reset();
         o(lk).apiParameters = {};
         o(lk).readConcernArgs = {};
-        o(lk).atClusterTime.reset();
+        o(lk).atClusterTimeForSnapshotReadConcern.reset();
+        o(lk).placementConflictTimeForNonSnapshotReadConcern.reset();
         o(lk).abortCause = std::string();
         o(lk).metricsTracker.emplace(opCtx->getServiceContext());
         p().terminationInitiated = false;
@@ -1503,11 +1589,15 @@ void TransactionRouter::Router::_resetRouterStateForStartTransaction(
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        o(lk).apiParameters = APIParameters::get(opCtx);
-        o(lk).readConcernArgs = readConcernArgs;
+        auto& osw = o(lk);
 
-        if (o().readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-            o(lk).atClusterTime.emplace();
+        osw.apiParameters = APIParameters::get(opCtx);
+        osw.readConcernArgs = readConcernArgs;
+
+        if (osw.readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+            osw.atClusterTimeForSnapshotReadConcern.emplace();
+        } else {
+            osw.placementConflictTimeForNonSnapshotReadConcern.emplace();
         }
     }
 
@@ -1576,7 +1666,7 @@ void TransactionRouter::Router::_logSlowTransaction(OperationContext* opCtx,
     // variable lasts until the LOGV2 call at the end of this function.
     std::string globalReadTimestampTemp;
     if (_atClusterTimeHasBeenSet()) {
-        globalReadTimestampTemp = o().atClusterTime->getTime().toString();
+        globalReadTimestampTemp = o().atClusterTimeForSnapshotReadConcern->getTime().toString();
         attrs.add("globalReadTimestamp", globalReadTimestampTemp);
     }
 
@@ -1795,7 +1885,6 @@ Microseconds TransactionRouter::TimingStats::getTimeInactiveMicros(
 TransactionRouter::MetricsTracker::~MetricsTracker() {
     // If there was an in-progress transaction, clean up its stats. This may happen if a transaction
     // is overriden by a higher txnNumber or its session is reaped.
-
     if (hasStarted() && !isTrackingOver()) {
         // A transaction was started but not ended, so clean up the appropriate stats for it.
         auto routerTxnMetrics = RouterTransactionsMetrics::get(_service);
@@ -1899,78 +1988,140 @@ void TransactionRouter::MetricsTracker::endTransaction(
     }
 }
 
-BSONObj TransactionRouter::appendFieldsForStartTransaction(
-    BSONObj cmdObj,
-    const repl::ReadConcernArgs& readConcernArgs,
+repl::ReadConcernArgs TransactionRouter::reconcileReadConcern(
+    const boost::optional<repl::ReadConcernArgs>& cmdLevelReadConcern,
+    const repl::ReadConcernArgs& txnLevelReadConcern,
     const boost::optional<LogicalTime>& atClusterTimeForSnapshotReadConcern,
-    bool doAppendStartTransaction) {
-    BSONObjBuilder cmdBob;
-    bool hasReadConcern = false;
-    for (auto&& elem : cmdObj) {
-        if (elem.fieldNameStringData() == repl::ReadConcernArgs::kReadConcernFieldName) {
-            bool hasLevel = false;
-            bool hasAfterClusterTime = false;
-            bool hasAtClusterTime = false;
+    const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern) {
 
-            BSONObjBuilder readConcernBob =
-                cmdBob.subobjStart(repl::ReadConcernArgs::kReadConcernFieldName);
-            for (auto&& rcElem : elem.Obj()) {
-                if (rcElem.fieldNameStringData() == repl::ReadConcernArgs::kLevelFieldName) {
-                    dassert(readConcernArgs.getLevel() ==
-                                repl::readConcernLevels::fromString(rcElem.checkAndGetStringData()),
-                            "The read concern level changed during processing of the request");
-                    readConcernBob.append(rcElem);
-                    hasLevel = true;
-                } else if (rcElem.fieldNameStringData() ==
-                           repl::ReadConcernArgs::kAfterClusterTimeFieldName) {
-                    dassert(
-                        !readConcernArgs.getArgsAfterClusterTime() ||
-                            rcElem.timestamp() >=
-                                readConcernArgs.getArgsAfterClusterTime()->asTimestamp(),
-                        "The afterClusterTime moved backwards during processing of the request");
-                    if (!atClusterTimeForSnapshotReadConcern)
-                        readConcernBob.append(rcElem);
-                    hasAfterClusterTime = true;
-                } else if (rcElem.fieldNameStringData() ==
-                           repl::ReadConcernArgs::kAtClusterTimeFieldName) {
-                    dassert(atClusterTimeForSnapshotReadConcern);
-                    dassert(rcElem.timestamp() ==
-                            atClusterTimeForSnapshotReadConcern->asTimestamp());
-                    readConcernBob.append(rcElem);
-                    hasAtClusterTime = true;
-                } else {
-                    readConcernBob.append(rcElem);
-                }
+    invariant(atClusterTimeForSnapshotReadConcern ||
+              placementConflictTimeForNonSnapshotReadConcern);
+    // Transaction level atClusterTime is not tracked in the readConcern object.
+    invariant(!txnLevelReadConcern.wasAtClusterTimeSelected());
+
+    boost::optional<LogicalTime> afterClusterTime;
+    boost::optional<LogicalTime> atClusterTime;
+    boost::optional<repl::ReadConcernLevel> readConcernLevel;
+
+    // Note: getLevel returns 'local' even not set so we need to check explicitly.
+    if (txnLevelReadConcern.hasLevel()) {
+        readConcernLevel = txnLevelReadConcern.getLevel();
+    }
+
+    if (atClusterTimeForSnapshotReadConcern) {
+        invariant(txnLevelReadConcern.hasLevel());
+        invariant(txnLevelReadConcern.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
+
+        readConcernLevel = repl::ReadConcernLevel::kSnapshotReadConcern;
+        atClusterTime = *atClusterTimeForSnapshotReadConcern;
+    } else if (placementConflictTimeForNonSnapshotReadConcern) {
+        if (auto txnLevelAfterClusterTime = txnLevelReadConcern.getArgsAfterClusterTime()) {
+            // We should have already chosen the higher time when setDefaultAtClusterTime was
+            // called.
+            tassert(
+                7750604,
+                str::stream() << "placement conflict time chosen: "
+                              << placementConflictTimeForNonSnapshotReadConcern->asTimestamp()
+                              << " is lower than the afterClusterTime chosen for the transaction: "
+                              << txnLevelAfterClusterTime->asTimestamp(),
+                *placementConflictTimeForNonSnapshotReadConcern >= *txnLevelAfterClusterTime);
+        }
+
+        afterClusterTime = *placementConflictTimeForNonSnapshotReadConcern;
+    }
+
+    if (cmdLevelReadConcern) {
+        uassert(7750600,
+                str::stream() << "read concern level of the transaction changed from "
+                              << repl::readConcernLevels::toString(txnLevelReadConcern.getLevel())
+                              << " to "
+                              << repl::readConcernLevels::toString(cmdLevelReadConcern->getLevel()),
+                txnLevelReadConcern.getLevel() == cmdLevelReadConcern->getLevel());
+
+        if (cmdLevelReadConcern->hasLevel()) {
+            readConcernLevel = cmdLevelReadConcern->getLevel();
+        }
+
+        if (auto cmdLevelAfterClusterTime = cmdLevelReadConcern->getArgsAfterClusterTime()) {
+            if (txnLevelReadConcern.getArgsAfterClusterTime()) {
+                uassert(7750601,
+                        str::stream()
+                            << "afterClusterTime of the transaction moved backwards from "
+                            << txnLevelReadConcern.getArgsAfterClusterTime()->asTimestamp()
+                            << " to " << cmdLevelAfterClusterTime->asTimestamp(),
+                        cmdLevelAfterClusterTime->asTimestamp() >=
+                            txnLevelReadConcern.getArgsAfterClusterTime()->asTimestamp());
             }
 
-            if (!hasAfterClusterTime && readConcernArgs.getArgsAfterClusterTime()) {
-                readConcernBob.append(repl::ReadConcernArgs::kAfterClusterTimeFieldName,
-                                      readConcernArgs.getArgsAfterClusterTime()->asTimestamp());
-            }
+            if (atClusterTimeForSnapshotReadConcern) {
+                // atClusterTime takes precedent over afterClusterTime since specifying both is
+                // illegal. Do nothing here since we have already set atClusterTime earlier.
+                invariant(atClusterTime);
+            } else if (placementConflictTimeForNonSnapshotReadConcern) {
+                invariant(afterClusterTime);  // We already set this earlier.
 
-            if (!hasAtClusterTime && atClusterTimeForSnapshotReadConcern) {
-                if (!hasLevel)
-                    readConcernBob.append(repl::ReadConcernArgs::kLevelFieldName, "snapshot");
-                readConcernBob.append(repl::ReadConcernArgs::kAtClusterTimeFieldName,
-                                      atClusterTimeForSnapshotReadConcern->asTimestamp());
+                // We should have already chosen the higher time when setDefaultAtClusterTime was
+                // called.
+                tassert(7750605,
+                        str::stream()
+                            << "after cluster time chosen: " << afterClusterTime->asTimestamp()
+                            << " is lower than the command level afterClusterTime: "
+                            << cmdLevelAfterClusterTime->asTimestamp(),
+                        *afterClusterTime >= *cmdLevelAfterClusterTime);
             }
+        } else if (auto cmdLevelAtClusterTime = cmdLevelReadConcern->getArgsAtClusterTime()) {
+            uassert(7750602,
+                    str::stream() << "request specified atClusterTime but the transaction didn't "
+                                     "originally have one",
+                    atClusterTimeForSnapshotReadConcern);
 
-            hasReadConcern = true;
-        } else {
-            cmdBob.append(elem);
+            uassert(7750603,
+                    str::stream() << "atClusterTime of the request: "
+                                  << cmdLevelAtClusterTime->asTimestamp()
+                                  << " is different from time selected by the transaction: "
+                                  << atClusterTimeForSnapshotReadConcern->asTimestamp(),
+                    cmdLevelAtClusterTime->asTimestamp() ==
+                        atClusterTimeForSnapshotReadConcern->asTimestamp());
+
+            invariant(atClusterTime);  // We already set this earlier.
         }
     }
 
-    if (!hasReadConcern) {
-        if (atClusterTimeForSnapshotReadConcern) {
-            BSONObjBuilder readConcernBob =
-                cmdBob.subobjStart(repl::ReadConcernArgs::kReadConcernFieldName);
-            readConcernBob.append(repl::ReadConcernArgs::kLevelFieldName, "snapshot");
-            readConcernBob.append(repl::ReadConcernArgs::kAtClusterTimeFieldName,
-                                  atClusterTimeForSnapshotReadConcern->asTimestamp());
-        } else {
-            readConcernArgs.appendInfo(&cmdBob);
+    repl::ReadConcernArgs finalReadConcern(afterClusterTime, readConcernLevel);
+    if (atClusterTime) {
+        finalReadConcern.setArgsAtClusterTimeForSnapshot(atClusterTime->asTimestamp());
+    }
+
+    return finalReadConcern;
+}
+
+BSONObj TransactionRouter::appendFieldsForStartTransaction(
+    BSONObj cmdObj,
+    const repl::ReadConcernArgs& txnLevelReadConcern,
+    const boost::optional<LogicalTime>& atClusterTimeForSnapshotReadConcern,
+    const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern,
+    bool doAppendStartTransaction) {
+    BSONObjBuilder cmdBob;
+
+    const auto strippedFields = stripReadConcernAndShardVersion(cmdObj, &cmdBob);
+    const auto finalReadConcern =
+        reconcileReadConcern(strippedFields.readConcern,
+                             txnLevelReadConcern,
+                             atClusterTimeForSnapshotReadConcern,
+                             placementConflictTimeForNonSnapshotReadConcern);
+
+    if (finalReadConcern.isSpecified()) {
+        finalReadConcern.appendInfo(&cmdBob);
+    }
+
+    ShardVersion finalShardVersion;
+
+    if (auto shardVersion = strippedFields.shardVersion) {
+        if (placementConflictTimeForNonSnapshotReadConcern) {
+            shardVersion->setPlacementConflictTime(*placementConflictTimeForNonSnapshotReadConcern);
         }
+
+        shardVersion->serialize(ShardVersion::kShardVersionField, &cmdBob);
     }
 
     if (doAppendStartTransaction) {

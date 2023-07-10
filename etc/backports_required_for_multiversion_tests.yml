@@ -437,6 +437,8 @@ last-continuous:
     ticket: SERVER-78855
   - test_file: jstests/sharding/reset_placement_history_snapshot_read.js
     ticket: SERVER-79357
+  - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
+    ticket: SERVER-77506
   suites: null
 
 last-lts:
@@ -967,4 +969,6 @@ last-lts:
     ticket: SERVER-61475
   - test_file: jstests/change_streams/oplog_rewrite/change_stream_nor_rewrite.js
     ticket: SERVER-78650
+  - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
+    ticket: SERVER-77506
   suites: null

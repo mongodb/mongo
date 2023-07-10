@@ -46,7 +46,7 @@ ShardVersion ShardVersionFactory::make(
                           << chunkManager.getUUID() << " and index version has uuid "
                           << collectionIndexes->uuid(),
             !collectionIndexes || chunkManager.uuidMatches(collectionIndexes->uuid()));
-    return ShardVersion(chunkManager.getVersion(), collectionIndexes);
+    return ShardVersion(chunkManager.getVersion(), collectionIndexes, boost::none);
 }
 
 ShardVersion ShardVersionFactory::make(
@@ -59,7 +59,7 @@ ShardVersion ShardVersionFactory::make(
                           << chunkManager.getUUID() << " and index version has uuid "
                           << collectionIndexes->uuid(),
             !collectionIndexes || chunkManager.uuidMatches(collectionIndexes->uuid()));
-    return ShardVersion(chunkManager.getVersion(shardId), collectionIndexes);
+    return ShardVersion(chunkManager.getVersion(shardId), collectionIndexes, boost::none);
 }
 
 ShardVersion ShardVersionFactory::make(
@@ -69,7 +69,7 @@ ShardVersion ShardVersionFactory::make(
                           << cm.getUUID() << " and index version has uuid "
                           << collectionIndexes->uuid(),
             !collectionIndexes || !cm.isSharded() || cm.uuidMatches(collectionIndexes->uuid()));
-    return ShardVersion(cm.getShardPlacementVersion(), collectionIndexes);
+    return ShardVersion(cm.getShardPlacementVersion(), collectionIndexes, boost::none);
 }
 
 
@@ -78,6 +78,6 @@ ShardVersion ShardVersionFactory::make(
 // collection indexes come from the same collection.
 ShardVersion ShardVersionFactory::make(
     const ChunkVersion& chunkVersion, const boost::optional<CollectionIndexes>& collectionIndexes) {
-    return ShardVersion(chunkVersion, collectionIndexes);
+    return ShardVersion(chunkVersion, collectionIndexes, boost::none);
 }
 }  // namespace mongo

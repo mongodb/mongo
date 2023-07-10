@@ -42,6 +42,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/index_version.h"
 
@@ -67,7 +68,8 @@ public:
 
     static ShardVersion UNSHARDED() {
         return ShardVersion(ChunkVersion::UNSHARDED(),
-                            boost::optional<CollectionIndexes>(boost::none));
+                            boost::optional<CollectionIndexes>(boost::none),
+                            boost::none);
     }
 
     static bool isPlacementVersionIgnored(const ShardVersion& version) {
@@ -82,8 +84,16 @@ public:
         return _indexVersion;
     }
 
+    boost::optional<LogicalTime> placementConflictTime() const {
+        return _placementConflictTime;
+    }
+
     void setPlacementVersionIgnored() {
         _chunkVersion = ChunkVersion::IGNORED();
+    }
+
+    void setPlacementConflictTime(LogicalTime conflictTime) {
+        _placementConflictTime.emplace(std::move(conflictTime));
     }
 
     bool operator==(const ShardVersion& otherVersion) const {
@@ -104,18 +114,25 @@ public:
 
 private:
     ShardVersion(const ChunkVersion& chunkVersion,
-                 const boost::optional<CollectionIndexes>& collectionIndexes)
-        : _chunkVersion(chunkVersion),
-          _indexVersion(collectionIndexes ? boost::make_optional(collectionIndexes->indexVersion())
-                                          : boost::none) {}
+                 const boost::optional<CollectionIndexes>& collectionIndexes,
+                 const boost::optional<LogicalTime>& placementConflictTime)
+        : ShardVersion(chunkVersion,
+                       collectionIndexes ? boost::make_optional(collectionIndexes->indexVersion())
+                                         : boost::none,
+                       placementConflictTime) {}
 
-    ShardVersion(ChunkVersion chunkVersion, boost::optional<Timestamp> indexVersionTimestamp)
-        : _chunkVersion(chunkVersion), _indexVersion(indexVersionTimestamp) {}
+    ShardVersion(ChunkVersion chunkVersion,
+                 boost::optional<Timestamp> indexVersionTimestamp,
+                 const boost::optional<LogicalTime>& placementConflictTime)
+        : _chunkVersion(chunkVersion),
+          _indexVersion(indexVersionTimestamp),
+          _placementConflictTime(placementConflictTime) {}
 
     friend class ShardVersionFactory;
 
     ChunkVersion _chunkVersion;
     boost::optional<Timestamp> _indexVersion;
+    boost::optional<LogicalTime> _placementConflictTime;
 };
 
 inline std::ostream& operator<<(std::ostream& s, const ShardVersion& v) {
