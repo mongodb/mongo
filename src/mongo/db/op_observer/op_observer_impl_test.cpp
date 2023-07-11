@@ -2672,12 +2672,14 @@ protected:
 };
 
 TEST_F(OnUpdateOutputsTest, TestNonTransactionFundamentalOnUpdateOutputs) {
-    // Create a registry that only registers the Impl. It can be challenging to call methods on
-    // the Impl directly. It falls into cases where `ReservedTimes` is expected to be
+    // Create a registry that registers the OpObserverImpl and ChangeStreamPreImagesOpObserver.
+    // Both OpObservers work together to ensure that pre-images for change streams are written
+    // to the side collection. It falls into cases where `ReservedTimes` is expected to be
     // instantiated. Due to strong encapsulation, we use the registry that managers the
     // `ReservedTimes` on our behalf.
     OpObserverRegistry opObserver;
     opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+    opObserver.addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
 
     for (std::size_t testIdx = 0; testIdx < _cases.size(); ++testIdx) {
         const auto& testCase = _cases[testIdx];

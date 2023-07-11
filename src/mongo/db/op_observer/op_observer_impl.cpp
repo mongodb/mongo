@@ -1021,31 +1021,6 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
         sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
         onWriteOpCompleted(opCtx, args.updateArgs->stmtIds, sessionTxnRecord);
-
-        // Write a pre-image to the change streams pre-images collection when following conditions
-        // are met:
-        // 1. The collection has 'changeStreamPreAndPostImages' enabled.
-        // 2. The node wrote the oplog entry for the corresponding operation.
-        // 3. The request to write the pre-image does not come from chunk-migrate event, i.e. source
-        //    of the request is not 'fromMigrate'. The 'fromMigrate' events are filtered out by
-        //    change streams and storing them in pre-image collection is redundant.
-        // 4. a request to update is not on a temporary resharding collection. This update request
-        //    does not result in change streams events. Recording pre-images from temporary
-        //    resharing collection could result in incorrect pre-image getting recorded due to the
-        //    temporary resharding collection not being consistent until writes are blocked (initial
-        //    sync mode application).
-        if (args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection &&
-            !opTime.writeOpTime.isNull() &&
-            args.updateArgs->source != OperationSource::kFromMigrate &&
-            !args.coll->ns().isTemporaryReshardingCollection()) {
-            const auto& preImageDoc = args.updateArgs->preImageDoc;
-            invariant(!preImageDoc.isEmpty(), str::stream() << "PreImage must be set");
-
-            ChangeStreamPreImageId id(args.coll->uuid(), opTime.writeOpTime.getTimestamp(), 0);
-            ChangeStreamPreImage preImage(id, opTime.wallClockTime, preImageDoc);
-
-            writeChangeStreamPreImageEntry(opCtx, args.coll->ns().tenantId(), preImage);
-        }
     }
 
     if (opAccumulator) {

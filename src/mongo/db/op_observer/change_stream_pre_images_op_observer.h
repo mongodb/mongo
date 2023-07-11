@@ -47,6 +47,10 @@ public:
     ChangeStreamPreImagesOpObserver() = default;
     ~ChangeStreamPreImagesOpObserver() = default;
 
+    void onUpdate(OperationContext* opCtx,
+                  const OplogUpdateEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) final;
+
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,
