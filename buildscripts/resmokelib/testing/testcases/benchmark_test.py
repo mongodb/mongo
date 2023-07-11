@@ -33,12 +33,6 @@ class BenchmarkTestCase(interface.ProcessTestCase):
                 "Please use --benchmarkMinTimeSecs to increase the runtime of a single benchmark "
                 "configuration.")
 
-        if _config.JOBS > 1:
-            raise ValueError(
-                "--jobs=%d cannot be used for benchmark tests. Parallel jobs affect CPU cache access "
-                "patterns and cause additional context switching, which lead to inaccurate benchmark "
-                "results. Please use --jobs=1" % _config.JOBS)
-
     def configure(self, fixture, *args, **kwargs):
         """Configure BenchmarkTestCase."""
         interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
