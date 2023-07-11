@@ -546,13 +546,11 @@ void scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
                                                   ops[i].getOpTime().getTerm()});
             }
 
-            // TODO SERVER-67168 the 'nsOrUUID' is used only to log the debug message when retrying
-            // inserts on the oplog and change collections. The 'writeConflictRetry' assumes
-            // operations are done on a single namespace. But the method
-            // '_insertDocumentsToOplogAndChangeCollections' can perform inserts on the oplog and
-            // multiple change collections, ie. several namespaces. As such 'writeConflictRetry'
-            // will not log the correct namespace when retrying. Refactor this code to log the
-            // correct namespace in the log message.
+            // The 'nsOrUUID' is used only to log the debug message when retrying inserts on the
+            // oplog and change collections. The 'writeConflictRetry' assumes operations are done on
+            // a single namespace. But the method '_insertDocumentsToOplogAndChangeCollections' can
+            // perform inserts on the oplog and multiple change collections, ie. several namespaces.
+            // As such 'writeConflictRetry' will not log the correct namespace when retrying.
             NamespaceStringOrUUID nsOrUUID = !skipWritesToOplog
                 ? NamespaceString::kRsOplogNamespace
                 : NamespaceString::makeChangeCollectionNSS(boost::none /* tenantId */);
