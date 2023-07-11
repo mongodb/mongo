@@ -105,12 +105,6 @@ namespace sbe {
  */
 class HashAggStage final : public PlanStage {
 public:
-    struct AggExprPair {
-        std::unique_ptr<EExpression> init;
-        std::unique_ptr<EExpression> acc;
-    };
-    using AggExprVector = std::vector<std::pair<value::SlotId, AggExprPair>>;
-
     HashAggStage(std::unique_ptr<PlanStage> input,
                  value::SlotVector gbs,
                  AggExprVector aggs,
@@ -332,40 +326,5 @@ private:
     // run is complete, this pointer is reset to nullptr.
     TrialRunTracker* _tracker{nullptr};
 };
-
-namespace detail {
-// base case
-template <typename R>
-inline void makeAggExprVectorHelper(R& result,
-                                    value::SlotId slot,
-                                    std::unique_ptr<EExpression> initExpr,
-                                    std::unique_ptr<EExpression> accExpr) {
-    result.push_back(
-        std::make_pair(slot, HashAggStage::AggExprPair{std::move(initExpr), std::move(accExpr)}));
-}
-
-// recursive case
-template <typename R, typename... Ts>
-inline void makeAggExprVectorHelper(R& result,
-                                    value::SlotId slot,
-                                    std::unique_ptr<EExpression> initExpr,
-                                    std::unique_ptr<EExpression> accExpr,
-                                    Ts&&... rest) {
-    result.push_back(
-        std::make_pair(slot, HashAggStage::AggExprPair{std::move(initExpr), std::move(accExpr)}));
-    makeAggExprVectorHelper(result, std::forward<Ts>(rest)...);
-}
-}  // namespace detail
-
-template <typename... Ts>
-auto makeAggExprVector(Ts&&... pack) {
-    HashAggStage::AggExprVector v;
-    if constexpr (sizeof...(pack) > 0) {
-        v.reserve(sizeof...(Ts) / 3);
-        detail::makeAggExprVectorHelper(v, std::forward<Ts>(pack)...);
-    }
-    return v;
-}
-
 }  // namespace sbe
 }  // namespace mongo

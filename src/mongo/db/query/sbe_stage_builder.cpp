@@ -2539,7 +2539,7 @@ sbe::value::SlotVector generateAccumulator(
     const AccumulationStatement& accStmt,
     const PlanStageSlots& outputs,
     sbe::value::SlotIdGenerator* slotIdGenerator,
-    sbe::HashAggStage::AggExprVector& aggSlotExprs,
+    sbe::AggExprVector& aggSlotExprs,
     boost::optional<sbe::value::SlotId> initializerRootSlot) {
     auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
     auto collatorSlot = state.env->getSlotIfExists("collator"_sd);
@@ -2632,8 +2632,7 @@ sbe::value::SlotVector generateAccumulator(
         auto slot = slotIdGenerator->generate();
         aggSlots.push_back(slot);
         aggSlotExprs.push_back(std::make_pair(
-            slot,
-            sbe::HashAggStage::AggExprPair{std::move(accInitExprs[i]), std::move(accExprs[i])}));
+            slot, sbe::AggExprPair{std::move(accInitExprs[i]), std::move(accExprs[i])}));
     }
 
     return aggSlots;
@@ -3002,7 +3001,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Translates accumulators which are executed inside the group stage and gets slots for
     // accumulators.
     stage_builder::EvalStage currentStage = std::move(groupByEvalStage);
-    sbe::HashAggStage::AggExprVector aggSlotExprs;
+    sbe::AggExprVector aggSlotExprs;
     std::vector<sbe::value::SlotVector> aggSlotsVec;
     // Since partial accumulator state may be spilled to disk and then merged, we must construct not
     // only the basic agg expressions for each accumulator, but also agg expressions that are used

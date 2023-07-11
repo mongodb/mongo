@@ -747,7 +747,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const GroupByNode& n,
     tassert(6624227, "refs expected", refsAgg);
     auto& exprs = refsAgg->nodes();
 
-    sbe::HashAggStage::AggExprVector aggs;
+    sbe::AggExprVector aggs;
     aggs.reserve(exprs.size());
 
     for (size_t idx = 0; idx < exprs.size(); ++idx) {
@@ -757,7 +757,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const GroupByNode& n,
         mapProjToSlot(slotMap, names[idx], slot);
         // TODO: We need to update the nullptr to pass in the initializer expression for certain
         // accumulators.
-        aggs.push_back({slot, sbe::HashAggStage::AggExprPair{nullptr, std::move(expr)}});
+        aggs.push_back({slot, sbe::AggExprPair{nullptr, std::move(expr)}});
     }
 
     boost::optional<sbe::value::SlotId> collatorSlot = _namedSlots.getSlotIfExists("collator"_sd);

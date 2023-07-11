@@ -102,7 +102,7 @@ inline size_t estimate(const StringData& str) {
     return 0;
 }
 
-inline size_t estimate(const HashAggStage::AggExprPair& expr) {
+inline size_t estimate(const AggExprPair& expr) {
     size_t size = 0;
     if (expr.init) {
         size += expr.init->estimateSize();

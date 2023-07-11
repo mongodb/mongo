@@ -138,6 +138,13 @@ protected:
 
 using SlotExprPairVector = std::vector<std::pair<value::SlotId, std::unique_ptr<EExpression>>>;
 
+struct AggExprPair {
+    std::unique_ptr<EExpression> init;
+    std::unique_ptr<EExpression> acc;
+};
+
+using AggExprVector = std::vector<std::pair<value::SlotId, AggExprPair>>;
+
 template <typename T, typename... Args>
 inline std::unique_ptr<EExpression> makeE(Args&&... args) {
     return std::make_unique<T>(std::forward<Args>(args)...);
@@ -179,6 +186,38 @@ inline void makeSlotExprPairHelper(R& result,
     }
     makeSlotExprPairHelper(result, std::forward<Ts>(rest)...);
 }
+
+// base case
+template <typename R>
+inline void makeAggExprPairHelper(R& result,
+                                  value::SlotId slot,
+                                  std::unique_ptr<EExpression> initExpr,
+                                  std::unique_ptr<EExpression> accExpr) {
+    if constexpr (std::is_same_v<R, value::SlotMap<AggExprPair>>) {
+        result.emplace(slot, AggExprPair{std::move(initExpr), std::move(accExpr)});
+    } else {
+        static_assert(std::is_same_v<R, AggExprVector>);
+        result.push_back(
+            std::make_pair(slot, AggExprPair{std::move(initExpr), std::move(accExpr)}));
+    }
+}
+
+// recursive case
+template <typename R, typename... Ts>
+inline void makeAggExprPairHelper(R& result,
+                                  value::SlotId slot,
+                                  std::unique_ptr<EExpression> initExpr,
+                                  std::unique_ptr<EExpression> accExpr,
+                                  Ts&&... rest) {
+    if constexpr (std::is_same_v<R, value::SlotMap<AggExprPair>>) {
+        result.emplace(slot, AggExprPair{std::move(initExpr), std::move(accExpr)});
+    } else {
+        static_assert(std::is_same_v<R, AggExprVector>);
+        result.push_back(
+            std::make_pair(slot, AggExprPair{std::move(initExpr), std::move(accExpr)}));
+    }
+    makeAggExprPairHelper(result, std::forward<Ts>(rest)...);
+}
 }  // namespace detail
 
 template <typename... Ts>
@@ -205,6 +244,26 @@ auto makeSlotExprPairVec(Ts&&... pack) {
     if constexpr (sizeof...(pack) > 0) {
         v.reserve(sizeof...(Ts) / 2);
         detail::makeSlotExprPairHelper(v, std::forward<Ts>(pack)...);
+    }
+    return v;
+}
+
+template <typename... Ts>
+auto makeAggExprVector(Ts&&... pack) {
+    AggExprVector v;
+    if constexpr (sizeof...(pack) > 0) {
+        v.reserve(sizeof...(Ts) / 3);
+        detail::makeAggExprPairHelper(v, std::forward<Ts>(pack)...);
+    }
+    return v;
+}
+
+template <typename... Ts>
+auto makeAggExprSlotMap(Ts&&... pack) {
+    value::SlotMap<AggExprPair> v;
+    if constexpr (sizeof...(pack) > 0) {
+        v.reserve(sizeof...(Ts) / 3);
+        detail::makeAggExprPairHelper(v, std::forward<Ts>(pack)...);
     }
     return v;
 }
