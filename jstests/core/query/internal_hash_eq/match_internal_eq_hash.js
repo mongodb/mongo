@@ -4,6 +4,7 @@
  *   # explain doesn't support read concern
  *   assumes_read_concern_unchanged,
  *   requires_fcv_70,
+ *   skip_for_query_stats, # TODO SERVER-78860 reenable test in query_stats_passthrough
  * ]
  */
 import {isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";

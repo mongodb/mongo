@@ -3,6 +3,8 @@
  *
  * @tags: [
  *   assumes_unsharded_collection,
+ *   # TODO SERVER-78861 reenable test in query_stats_passthrough
+ *   skip_for_query_stats,
  * ]
  */
 load("jstests/aggregation/extras/utils.js");  // For arrayEq().

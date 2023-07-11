@@ -16,6 +16,8 @@
  *   cqf_incompatible,
  *   # Uses $where operation.
  *   requires_scripting,
+ *   # TODO SERVER-78861 reenable test in query_stats_passthrough
+ *   skip_for_query_stats,
  * ]
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";

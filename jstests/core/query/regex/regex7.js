@@ -1,3 +1,4 @@
+// @tags: [ skip_for_query_stats ] # TODO SERVER-78861 reenable test in query_stats_passthrough
 let t = db.regex_matches_self;
 t.drop();
 
