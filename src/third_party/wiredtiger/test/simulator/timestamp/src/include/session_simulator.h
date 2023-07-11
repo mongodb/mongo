@@ -28,8 +28,9 @@
 
 #pragma once
 
-#include <string>
+#include <cstdint>
 #include <map>
+#include <string>
 
 class session_simulator {
     /* Methods */

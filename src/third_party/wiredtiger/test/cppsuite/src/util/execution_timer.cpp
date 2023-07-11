@@ -26,6 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <cstdint>
+
 #include "execution_timer.h"
 
 #include "src/component/metrics_writer.h"

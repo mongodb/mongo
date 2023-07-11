@@ -75,7 +75,7 @@ get_time(char *time_buf, size_t buf_size)
 
 /* Used to print out traces for debugging purpose. */
 void
-logger::log_msg(int64_t trace_type, const std::string &str)
+logger::log_msg(int64_t trace_type, std::string_view str)
 {
     if (logger::trace_level >= trace_type) {
         testutil_assert(
