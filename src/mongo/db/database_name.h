@@ -354,6 +354,10 @@ private:
     std::string _data{'\0'};
 };
 
+inline std::string stringifyForAssert(const DatabaseName& dbName) {
+    return toStringForLogging(dbName);
+}
+
 // The `constexpr` definitions for `DatabaseName::ConstantProxy` static data members are below. See
 // `constexpr` definitions for the `NamespaceString::ConstantProxy` static data members of NSS in
 // namespace_string.h for more details.
