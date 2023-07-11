@@ -3093,26 +3093,35 @@ public:
         if (expr->hasCharactersExpr())  // 'chars' is not null
             ++numProvidedArgs;
         _context->ensureArity(numProvidedArgs);
+        auto isCharsProvided = numProvidedArgs == 2;
 
         auto inputName = makeLocalVariableName(_context->state.frameId(), 0);
         auto charsName = makeLocalVariableName(_context->state.frameId(), 0);
 
-        auto charsString =
-            numProvidedArgs == 2 ? _context->popABTExpr() : optimizer::Constant::null();
+        auto charsString = isCharsProvided ? _context->popABTExpr() : optimizer::Constant::null();
         auto inputString = _context->popABTExpr();
         auto trimBuiltinName = expr->getTrimTypeString();
 
-        auto checkCharsNotNullString = makeNot(optimizer::make<optimizer::BinaryOp>(
-            optimizer::Operations::Or,
-            generateABTNullOrMissing(charsName),
-            makeABTFunction("isString"_sd, makeVariable(charsName))));
+        auto checkCharsNullish = isCharsProvided ? generateABTNullOrMissing(charsName)
+                                                 : optimizer::Constant::boolean(false);
+
+        auto checkCharsNotString = isCharsProvided
+            ? makeNot(makeABTFunction("isString"_sd, makeVariable(charsName)))
+            : optimizer::Constant::boolean(false);
+
 
         /*
            Trim Functionality (invariant that 'input' has been provided, otherwise would've failed
            at parse time)
 
-           if ('input' is not a string) {
+           if ('input' is nullish) {
+                -> return null
+           }
+           else if ('input' is not a string) {
                 ->  fail with error code 5156302
+           }
+           else if ('chars' is provided and nullish) {
+                -> return null
            }
            else if ('chars' is provided but is not a string) {
                 ->  fail with error code 5156303
@@ -3123,11 +3132,13 @@ public:
            }
         */
         auto trimFunc = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullOrMissing(inputName), optimizer::Constant::null()},
             ABTCaseValuePair{
                 makeNot(makeABTFunction("isString"_sd, makeVariable(inputName))),
                 makeABTFail(ErrorCodes::Error{5156302},
                             "$" + trimBuiltinName + " input expression must be a string")},
-            ABTCaseValuePair{std::move(checkCharsNotNullString),
+            ABTCaseValuePair{std::move(checkCharsNullish), optimizer::Constant::null()},
+            ABTCaseValuePair{std::move(checkCharsNotString),
                              makeABTFail(ErrorCodes::Error{5156303},
                                          "$" + trimBuiltinName +
                                              " chars expression must be a string if provided")},

@@ -3624,9 +3624,7 @@ public:
                    boost::intrusive_ptr<Expression> charactersToTrim)
         : Expression(expCtx, {std::move(input), std::move(charactersToTrim)}),
           _trimType(trimType),
-          _name(name.toString()) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
-    }
+          _name(name.toString()) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     boost::intrusive_ptr<Expression> optimize() final;
@@ -3645,7 +3643,7 @@ public:
 
     /* Returns "trim"/"ltrim"/"rtrim" based on the expression name without the $ sign. */
     std::string getTrimTypeString() const {
-        return _name.substr(1, _name.size());
+        return _name.substr(1);
     }
 
     bool hasCharactersExpr() const {
