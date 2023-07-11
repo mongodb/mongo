@@ -331,6 +331,8 @@ CONFIG configuration_list[] = {
 
 {"transaction.implicit", "implicit, without timestamps, transactions (percentage)", 0, 0, 100, 100}
 
+{"transaction.operation_timeout_ms", "requested limit on the time taken to complete operations in this transaction", 0, 0, 0, UINT_MAX}
+
 {"transaction.timestamps", "all transactions (or none), have timestamps", C_BOOL, 80, 0, 0}
 
 {"wiredtiger.config", "wiredtiger_open API configuration string", C_IGNORE | C_STRING, 0, 0, 0}

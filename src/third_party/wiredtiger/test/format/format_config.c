@@ -1537,6 +1537,11 @@ config_transaction(void)
     if (!GV(TRANSACTION_TIMESTAMPS))
         config_off(NULL, "ops.prepare");
 
+    /* Set a default transaction timeout limit if one is not specified. */
+    if (!config_explicit(NULL, "transaction.operation_timeout_ms"))
+        config_single(NULL, "transaction.operation_timeout_ms=2000", false);
+
+    g.operation_timeout_ms = GV(TRANSACTION_OPERATION_TIMEOUT_MS);
     g.transaction_timestamps_config = GV(TRANSACTION_TIMESTAMPS) != 0;
 }
 

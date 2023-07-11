@@ -267,6 +267,8 @@ typedef struct {
     uint64_t stop_timestamp;             /* If non-zero, stop when stable reaches this */
     uint64_t timestamp_copy;             /* A copy of the timestamp, for safety checks */
 
+    uint32_t operation_timeout_ms; /* Requested limit to complete operations in transaction */
+
     /*
      * Lock to prevent the stable timestamp from moving during the commit of prepared transactions.
      * Otherwise, it may panic if the stable timestamp is moved to greater than or equal to the

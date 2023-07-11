@@ -320,7 +320,6 @@ create_database(const char *home, WT_CONNECTION **connp)
       "MB"
       ",checkpoint_sync=false"
       ",error_prefix=\"%s\""
-      ",operation_timeout_ms=2000"
       ",statistics=(%s)",
       GV(CACHE), progname, GVS(STATISTICS_MODE));
 

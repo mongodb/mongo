@@ -261,7 +261,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_begin_transaction[] = {
     "\"snapshot\"]",
     NULL, 0},
   {"name", "string", NULL, NULL, NULL, 0}, {"no_timestamp", "boolean", NULL, NULL, NULL, 0},
-  {"operation_timeout_ms", "int", NULL, "min=1", NULL, 0},
+  {"operation_timeout_ms", "int", NULL, "min=0", NULL, 0},
   {"priority", "int", NULL, "min=-100,max=100", NULL, 0},
   {"read_timestamp", "string", NULL, NULL, NULL, 0},
   {"roundup_timestamps", "category", NULL, NULL,
@@ -283,7 +283,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_checkpoint[] = {
 static const WT_CONFIG_CHECK confchk_WT_SESSION_commit_transaction[] = {
   {"commit_timestamp", "string", NULL, NULL, NULL, 0},
   {"durable_timestamp", "string", NULL, NULL, NULL, 0},
-  {"operation_timeout_ms", "int", NULL, "min=1", NULL, 0},
+  {"operation_timeout_ms", "int", NULL, "min=0", NULL, 0},
   {"sync", "string", NULL, "choices=[\"off\",\"on\"]", NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_compact[] = {
@@ -459,7 +459,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_reconfigure[] = {
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_rollback_transaction[] = {
-  {"operation_timeout_ms", "int", NULL, "min=1", NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
+  {"operation_timeout_ms", "int", NULL, "min=0", NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_salvage[] = {
   {"force", "boolean", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
