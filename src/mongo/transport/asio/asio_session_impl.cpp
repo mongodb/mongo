@@ -109,7 +109,7 @@ CommonAsioSession::CommonAsioSession(
     GenericSocket socket,
     bool isIngressSession,
     Endpoint endpoint,
-    std::shared_ptr<const SSLConnectionContext> transientSSLContext) try
+    std::shared_ptr<const SSLConnectionContext> transientSSLContext)
     : _socket(std::move(socket)), _tl(tl), _isIngressSession(isIngressSession) {
     auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
     auto sev = logv2::LogSeverity::Debug(3);
@@ -150,10 +150,6 @@ CommonAsioSession::CommonAsioSession(
         LOGV2(5271001, "Initializing the AsioSession with transient SSL context", attrs);
     }
 #endif
-} catch (const DBException&) {
-    throw;
-} catch (const asio::system_error&) {
-    throw;
 }
 
 void CommonAsioSession::end() {
