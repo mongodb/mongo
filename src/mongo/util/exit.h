@@ -68,13 +68,15 @@ bool globalInShutdownDeprecated();
  */
 ExitCode waitForShutdown();
 
+using ShutdownTask = unique_function<void(const ShutdownTaskArgs& shutdownArgs)>;
+
 /**
  * Registers a new shutdown task to be called when shutdown or
  * shutdownNoTerminate is called. If this function is invoked after
  * shutdown or shutdownNoTerminate has been called, std::terminate is
  * called.
  */
-void registerShutdownTask(unique_function<void(const ShutdownTaskArgs& shutdownArgs)>);
+void registerShutdownTask(ShutdownTask);
 
 /**
  * Helper for registering shutdown tasks, converts void lambda to shutdown lambda form.
@@ -92,6 +94,7 @@ inline void registerShutdownTask(unique_function<void()> task) {
  */
 MONGO_COMPILER_NORETURN void shutdown(ExitCode code, const ShutdownTaskArgs& shutdownArgs = {});
 
+#if defined(_WIN32)
 /**
  * Toggles the shutdown flag to 'true' and runs the registered
  * shutdown tasks. It is safe to call this function from multiple
@@ -100,6 +103,7 @@ MONGO_COMPILER_NORETURN void shutdown(ExitCode code, const ShutdownTaskArgs& shu
  * from a shutdown task.
  */
 void shutdownNoTerminate(const ShutdownTaskArgs& shutdownArgs = {});
+#endif
 
 /** An alias for 'shutdown'. */
 MONGO_COMPILER_NORETURN inline void exitCleanly(ExitCode code) {

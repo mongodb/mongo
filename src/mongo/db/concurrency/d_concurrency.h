@@ -86,23 +86,16 @@ public:
                      ResourceId rid,
                      LockMode mode,
                      Date_t deadline = Date_t::max())
-            : _opCtx(opCtx), _locker(_opCtx->lockState()), _rid(rid) {
+            : _opCtx(opCtx), _rid(rid) {
+            invariant(opCtx);
             _lock(mode, deadline);
-        }
-
-        // TODO (SERVER-69461): Do not any new usages of this constructor and get rid of it
-        ResourceLock(Locker* locker, ResourceId rid, LockMode mode)
-            : _opCtx(nullptr), _locker(locker), _rid(rid) {
-            _lock(mode);
         }
 
         ResourceLock(ResourceLock&& otherLock)
             : _opCtx(otherLock._opCtx),
-              _locker(otherLock._locker),
               _rid(std::move(otherLock._rid)),
               _result(otherLock._result) {
             otherLock._opCtx = nullptr;
-            otherLock._locker = nullptr;
             otherLock._result = LOCK_INVALID;
         }
 
@@ -126,9 +119,6 @@ public:
         }
 
         OperationContext* _opCtx;
-
-        // TODO (SERVER-69461): Get rid of this field when the Locker-only constructor is removed.
-        Locker* _locker;
 
         ResourceId _rid;
 

@@ -141,7 +141,7 @@ DatabaseShardingState::ScopedExclusiveDatabaseShardingState DatabaseShardingStat
     // First lock the RESOURCE_MUTEX associated to this dbName to guarantee stability of the
     // DatabaseShardingState pointer. After that, it is safe to get and store the
     // DatabaseShadingState*, as long as the RESOURCE_MUTEX is kept locked.
-    Lock::ResourceLock lock(opCtx->lockState(), dssAndLock->dssMutex.getRid(), MODE_X);
+    Lock::ResourceLock lock(opCtx, dssAndLock->dssMutex.getRid(), MODE_X);
 
     return ScopedExclusiveDatabaseShardingState(std::move(lock), dssAndLock->dss.get());
 }
@@ -155,7 +155,7 @@ DatabaseShardingState::ScopedSharedDatabaseShardingState DatabaseShardingState::
     // First lock the RESOURCE_MUTEX associated to this dbName to guarantee stability of the
     // DatabaseShardingState pointer. After that, it is safe to get and store the
     // DatabaseShadingState*, as long as the RESOURCE_MUTEX is kept locked.
-    Lock::ResourceLock lock(opCtx->lockState(), dssAndLock->dssMutex.getRid(), MODE_IS);
+    Lock::ResourceLock lock(opCtx, dssAndLock->dssMutex.getRid(), MODE_IS);
 
     return ScopedSharedDatabaseShardingState(std::move(lock), dssAndLock->dss.get());
 }
