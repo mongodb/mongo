@@ -140,6 +140,7 @@ std::vector<ChunkType> genChunkVector(const UUID& uuid,
     const auto numChunks = splitPoints.size() - 1;
     invariant(numChunks == versions.size());
 
+    Timestamp oldestValidAfter{Date_t::now() - Seconds{1000}};
     std::vector<ChunkType> chunks;
     chunks.reserve(numChunks);
     auto minKey = splitPoints.front();
@@ -149,7 +150,10 @@ std::vector<ChunkType> genChunkVector(const UUID& uuid,
         const auto version = versions.at(i);
         ChunkType chunk{uuid, ChunkRange{minKey, maxKey}, version, shard};
         chunk.setHistory(
-            genChunkHistory(shard, Timestamp{Date_t::now()}, numShards, 10 /* maxLenght */));
+            genChunkHistory(shard,
+                            oldestValidAfter + version.majorVersion() * 10 + version.minorVersion(),
+                            numShards,
+                            10 /* maxLenght */));
         chunks.emplace_back(std::move(chunk));
         minKey = std::move(maxKey);
     }
@@ -222,11 +226,17 @@ std::vector<ChunkType> genRandomChunkVector(const UUID& uuid,
 
 BSONObj calculateIntermediateShardKey(const BSONObj& leftKey,
                                       const BSONObj& rightKey,
-                                      double minKeyProb) {
+                                      double minKeyProb,
+                                      double maxKeyProb) {
     invariant(0 <= minKeyProb && minKeyProb <= 1, "minKeyProb out of range [0, 1]");
+    invariant(0 <= maxKeyProb && maxKeyProb <= 1, "maxKeyProb out of range [0, 1]");
 
     if (_random.nextInt32(100) < minKeyProb * 100) {
         return leftKey;
+    }
+
+    if (_random.nextInt32(100) < maxKeyProb * 100) {
+        return rightKey;
     }
 
     const auto isMinKey = leftKey.woCompare(kShardKeyPattern.globalMin()) == 0;
@@ -303,11 +313,13 @@ void performRandomChunkOperations(std::vector<ChunkType>* chunksPtr, size_t numO
         const ChunkRange leftRange{chunkToSplit.getMin(), splitKey};
         ChunkType leftChunk{
             chunkToSplit.getCollectionUUID(), leftRange, collVersion, chunkToSplit.getShard()};
+        leftChunk.setHistory(chunkToSplit.getHistory());
 
         collVersion.incMinor();
         const ChunkRange rightRange{splitKey, chunkToSplit.getMax()};
         ChunkType rightChunk{
             chunkToSplit.getCollectionUUID(), rightRange, collVersion, chunkToSplit.getShard()};
+        rightChunk.setHistory(chunkToSplit.getHistory());
 
         auto it = chunks.erase(chunkToSplitIt);
         it = chunks.insert(it, std::move(rightChunk));
@@ -332,6 +344,7 @@ void performRandomChunkOperations(std::vector<ChunkType>* chunksPtr, size_t numO
         const ChunkRange mergedRange{firstChunk.getMin(), std::prev(lastChunkIt)->getMax()};
         ChunkType mergedChunk{
             firstChunk.getCollectionUUID(), mergedRange, collVersion, firstChunk.getShard()};
+        mergedChunk.setHistory({ChunkHistory{Timestamp{Date_t::now()}, firstChunk.getShard()}});
 
         auto it = chunks.erase(firstChunkIt, lastChunkIt);
         it = chunks.insert(it, mergedChunk);
