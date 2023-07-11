@@ -867,7 +867,6 @@ void SnapshotAttempt::openStorageSnapshot() {
         establishCappedSnapshotIfNeeded(_opCtx, *_catalogBeforeSnapshot, nssOrUUID);
     }
 
-    // TODO SERVER-77381 call preallocateSnapshotForOplogRead() when reading from the oplog.
     if (!_opCtx->recoveryUnit()->isActive()) {
         _opCtx->recoveryUnit()->preallocateSnapshot();
         _openedSnapshot = true;
