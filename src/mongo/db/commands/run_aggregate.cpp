@@ -1143,7 +1143,7 @@ Status runAggregate(OperationContext* opCtx,
                     expCtx,
                     pipelineInvolvedNamespaces,
                     nss,
-                    ctx ? boost::make_optional(ctx->getCollectionType()) : boost::none);
+                    ctx ? ctx->getCollectionType() : query_shape::CollectionType::Unknown);
             });
         }
 
