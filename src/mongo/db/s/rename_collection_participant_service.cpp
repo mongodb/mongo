@@ -32,6 +32,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -115,6 +116,15 @@ void renameOrDropTarget(OperationContext* opCtx,
         dropCollectionLocally(opCtx, toNss, options.markFromMigrate);
         deleteRangeDeletionTasksForRename(opCtx, fromNss, toNss);
     }
+}
+
+void clearFilteringMetadataOnNss(OperationContext* opCtx, const NamespaceString& nss) {
+    // Set the placement version to UNKNOWN to force a future operation to refresh the metadata
+    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
+        ->clearFilteringMetadata(opCtx);
 }
 
 }  // namespace
@@ -386,6 +396,9 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
             [this, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
+
+                clearFilteringMetadataOnNss(opCtx, fromNss());
+                clearFilteringMetadataOnNss(opCtx, toNss());
 
                 // Release source/target critical sections
                 // Note: Use 'throwIfReasonDiffers=false' on the destination collection because as
