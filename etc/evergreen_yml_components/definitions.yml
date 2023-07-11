@@ -7095,23 +7095,6 @@ tasks:
       docker_username: ${dockerhub_username}
       docker_password: ${dockerhub_password}
 
-- name: test_packages_release
-  tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
-  commands:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - *f_expansions_write
-  - *kill_processes
-  - *cleanup_environment
-  - *set_up_venv
-  - func: "run release package test"
-    vars:
-      docker_username: ${dockerhub_username}
-      docker_password: ${dockerhub_password}
-
 - name: package
   tags: []
   depends_on:

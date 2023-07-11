@@ -2286,9 +2286,6 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: test_packages_release
-    distros:
-    - ubuntu2204-large
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2447,9 +2444,6 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: test_packages
-    distros:
-    - ubuntu2204-arm64-large
-  - name: test_packages_release
     distros:
     - ubuntu2204-arm64-large
   - name: .publish
