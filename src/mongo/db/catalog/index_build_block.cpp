@@ -54,7 +54,6 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/ident.h"
@@ -279,12 +278,10 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
                   "commitTimestamp"_attr = commitTime);
 
             // Add the index to the TTLCollectionCache upon successfully committing the index build.
-            // Note that TTL deletion is supported on capped clustered collections via bounded
-            // collection scan, which does not use an index.
-            if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) &&
-                (feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
-                     serverGlobalParams.featureCompatibility) ||
-                 !coll->isCapped())) {
+            // TTL indexes are not compatible with capped collections.  Note that TTL deletion is
+            // supported on capped clustered collections via bounded collection scan, which does not
+            // use an index.
+            if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) && !coll->isCapped()) {
                 auto validateStatus = index_key_validate::validateExpireAfterSeconds(
                     spec[IndexDescriptor::kExpireAfterSecondsFieldName],
                     index_key_validate::ValidateExpireAfterSecondsMode::kSecondaryTTLIndex);
