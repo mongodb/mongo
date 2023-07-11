@@ -25,15 +25,6 @@ function tojsonMaybeTruncate(jsonObj) {
 }
 
 /**
- * Returns true if feature flag 'featureFlagChangeStreamsRewrite' is enabled, false otherwise.
- */
-function isChangeStreamsRewriteEnabled(db) {
-    const getParam = db.adminCommand({getParameter: 1, featureFlagChangeStreamsRewrite: 1});
-    return getParam.hasOwnProperty("featureFlagChangeStreamsRewrite") &&
-        getParam.featureFlagChangeStreamsRewrite.value;
-}
-
-/**
  * Helper function used internally by ChangeStreamTest. If no passthrough is active, it is exactly
  * the same as calling db.runCommand. If a passthrough is active and has defined a function
  * 'changeStreamPassthroughAwareRunCommand', then this method will be overridden to allow individual

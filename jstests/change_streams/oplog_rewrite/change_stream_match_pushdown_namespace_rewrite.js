@@ -1,7 +1,6 @@
 // Test that a pipeline of the form [{$changeStream: {}}, {$match: ...}] can rewrite the 'namespace'
 // and apply it to oplog-format documents in order to filter out results as early as possible.
 // @tags: [
-//   featureFlagChangeStreamsRewrite,
 //   requires_fcv_63,
 //   requires_pipeline_optimization,
 //   requires_sharding,

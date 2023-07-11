@@ -2,7 +2,6 @@
 // 'operationType' and apply it to oplog-format documents in order to filter out results as early as
 // possible.
 // @tags: [
-//   featureFlagChangeStreamsRewrite,
 //   requires_fcv_51,
 //   requires_pipeline_optimization,
 //   requires_sharding,

@@ -2,7 +2,6 @@
  * Tests that change streams correctly handle rewrites of null, existence and equality checks, for
  * both existent and non-existent fields and subfields.
  * @tags: [
- *   featureFlagChangeStreamsRewrite,
  *   requires_fcv_51,
  *   requires_pipeline_optimization,
  *   uses_change_streams

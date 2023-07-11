@@ -560,11 +560,6 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamUnwindTransaction:
 
     auto nextChangeStreamStageItr = std::next(itr);
 
-    // (Ignore FCV check): This feature flag doesn't have upgrade/downgrade concern.
-    if (!feature_flags::gFeatureFlagChangeStreamsRewrite.isEnabledAndIgnoreFCVUnsafe()) {
-        return nextChangeStreamStageItr;
-    }
-
     // The additional filtering added by this optimization may incorrectly filter out events if it
     // runs with the non-simple collation.
     if (pExpCtx->getCollator()) {

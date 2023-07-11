@@ -30,13 +30,6 @@ global:
   cpp_namespace: "mongo::feature_flags"
 
 feature_flags:
-    featureFlagChangeStreamsRewrite:
-      description: "Feature flag for enabling change streams oplog rewrites"
-      cpp_varname: gFeatureFlagChangeStreamsRewrite
-      default: true
-      version: 5.1
-      shouldBeFCVGated: true
-
     featureFlagCommonQueryFramework:
       description: "Feature flag for allowing use of Cascades-based query optimizer"
       cpp_varname: gFeatureFlagCommonQueryFramework

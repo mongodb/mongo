@@ -3,7 +3,6 @@
 // and make it part of the oplog cursor's filter in order to filter out results as early as
 // possible.
 // @tags: [
-//   featureFlagChangeStreamsRewrite,
 //   requires_fcv_61,
 //   requires_pipeline_optimization,
 //   requires_sharding,

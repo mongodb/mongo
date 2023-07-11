@@ -2,7 +2,6 @@
 // involving the 'documentKey' field can push down the $match and rewrite the $match and make it
 // part of the oplog cursor's filter in order to filter out results as early as possible.
 // @tags: [
-//   featureFlagChangeStreamsRewrite,
 //   requires_fcv_51,
 //   requires_pipeline_optimization,
 //   requires_sharding,
