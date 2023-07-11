@@ -46,6 +46,12 @@ class ChangeStreamPreImagesOpObserver final : public OpObserverNoop {
 public:
     ChangeStreamPreImagesOpObserver() = default;
     ~ChangeStreamPreImagesOpObserver() = default;
+
+    void onDelete(OperationContext* opCtx,
+                  const CollectionPtr& coll,
+                  StmtId stmtId,
+                  const OplogDeleteEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) final;
 };
 
 }  // namespace mongo

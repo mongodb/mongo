@@ -29,4 +29,74 @@
 
 #include "mongo/db/op_observer/change_stream_pre_images_op_observer.h"
 
-namespace mongo {}
+#include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/pipeline/change_stream_preimage_gen.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
+
+namespace mongo {
+
+namespace {
+
+/**
+ * Inserts the document into the pre-images collection. The document is inserted into the
+ * tenant's pre-images collection if the 'tenantId' is specified.
+ */
+void writeChangeStreamPreImageEntry(
+    OperationContext* opCtx,
+    // Skip the pre-image insert if we are in the middle of a tenant migration. Pre-image inserts
+    // for writes during the oplog catchup phase are handled in the oplog application code.
+    boost::optional<TenantId> tenantId,
+    const ChangeStreamPreImage& preImage) {
+    if (repl::tenantMigrationInfo(opCtx)) {
+        return;
+    }
+
+    ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(opCtx, tenantId, preImage);
+}
+
+}  // namespace
+
+void ChangeStreamPreImagesOpObserver::onDelete(OperationContext* opCtx,
+                                               const CollectionPtr& coll,
+                                               StmtId stmtId,
+                                               const OplogDeleteEntryArgs& args,
+                                               OpStateAccumulator* opAccumulator) {
+    if (!opAccumulator) {
+        return;
+    }
+
+    // Write a pre-image to the change streams pre-images collection when following conditions
+    // are met:
+    // 1. The collection has 'changeStreamPreAndPostImages' enabled.
+    // 2. The node wrote the oplog entry for the corresponding operation.
+    // 3. The request to write the pre-image does not come from chunk-migrate event, i.e. source
+    //    of the request is not 'fromMigrate'. The 'fromMigrate' events are filtered out by
+    //    change streams and storing them in pre-image collection is redundant.
+    // 4. a request to delete is not on a temporary resharding collection. This delete request
+    //    does not result in change streams events. Recording pre-images from temporary
+    //    resharing collection could result in incorrect pre-image getting recorded due to the
+    //    temporary resharding collection not being consistent until writes are blocked (initial
+    //    sync mode application).
+    const auto& opTimeBundle = opAccumulator->opTime;
+    const auto& nss = coll->ns();
+    if (args.changeStreamPreAndPostImagesEnabledForCollection &&
+        !opTimeBundle.writeOpTime.isNull() && !args.fromMigrate &&
+        !nss.isTemporaryReshardingCollection()) {
+        const auto& preImageDoc = args.deletedDoc;
+        const auto uuid = coll->uuid();
+        invariant(
+            !preImageDoc->isEmpty(),
+            fmt::format("Deleted document must be set when writing to change streams pre-images "
+                        "collection for update on collection {} (UUID: {}) with optime {}",
+                        nss.toStringForErrorMsg(),
+                        uuid.toString(),
+                        opTimeBundle.writeOpTime.toString()));
+
+        ChangeStreamPreImageId id(uuid, opTimeBundle.writeOpTime.getTimestamp(), 0);
+        ChangeStreamPreImage preImage(id, opTimeBundle.wallClockTime, *preImageDoc);
+
+        writeChangeStreamPreImageEntry(opCtx, nss.tenantId(), preImage);
+    }
+}
+
+}  // namespace mongo

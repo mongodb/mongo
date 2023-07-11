@@ -1169,28 +1169,6 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
         sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
         onWriteOpCompleted(opCtx, std::vector<StmtId>{stmtId}, sessionTxnRecord);
-
-        // Write a pre-image to the change streams pre-images collection when following conditions
-        // are met:
-        // 1. The collection has 'changeStreamPreAndPostImages' enabled.
-        // 2. The node wrote the oplog entry for the corresponding operation.
-        // 3. The request to write the pre-image does not come from chunk-migrate event, i.e. source
-        //    of the request is not 'fromMigrate'. The 'fromMigrate' events are filtered out by
-        //    change streams and storing them in pre-image collection is redundant.
-        // 4. a request to delete is not on a temporary resharding collection. This delete request
-        //    does not result in change streams events. Recording pre-images from temporary
-        //    resharing collection could result in incorrect pre-image getting recorded due to the
-        //    temporary resharding collection not being consistent until writes are blocked (initial
-        //    sync mode application).
-        if (args.changeStreamPreAndPostImagesEnabledForCollection && !opTime.writeOpTime.isNull() &&
-            !args.fromMigrate && !nss.isTemporaryReshardingCollection()) {
-            invariant(!args.deletedDoc->isEmpty(), str::stream() << "Deleted document must be set");
-
-            ChangeStreamPreImageId id(uuid, opTime.writeOpTime.getTimestamp(), 0);
-            ChangeStreamPreImage preImage(id, opTime.wallClockTime, *args.deletedDoc);
-
-            writeChangeStreamPreImageEntry(opCtx, nss.tenantId(), preImage);
-        }
     }
 }
 
