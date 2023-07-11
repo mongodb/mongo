@@ -408,7 +408,6 @@ const allCommands = {
     setShardVersion: {skip: isNotAUserDataRead},
     setChangeStreamState: {skip: isNotAUserDataRead},
     setClusterParameter: {skip: isNotAUserDataRead},
-    setQuerySettings: {skip: isPrimaryOnly},
     setUserWriteBlockMode: {skip: isPrimaryOnly},
     shardingState: {skip: isNotAUserDataRead},
     shutdown: {skip: isNotAUserDataRead},

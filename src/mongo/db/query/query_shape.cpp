@@ -39,13 +39,11 @@
 #include <vector>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_command_gen.h"
@@ -230,31 +228,6 @@ void appendNamespaceShape(BSONObjBuilder& bob,
     }
     bob.append("db", opts.serializeIdentifier(nss.db()));
     bob.append("coll", opts.serializeIdentifier(nss.coll()));
-}
-
-BSONObj extractQueryShape(const BSONObj& cmd,
-                          const SerializationOptions& opts,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          const boost::optional<TenantId>& tenantId) {
-    if (cmd.firstElementFieldName() == "find"_sd) {
-        auto findCommandRequest = std::make_unique<FindCommandRequest>(FindCommandRequest::parse(
-            IDLParserContext("findCommandRequest", false /* apiStrict */, tenantId), cmd));
-        auto parsedFindCommand =
-            uassertStatusOK(parsed_find_command::parse(expCtx, std::move(findCommandRequest)));
-        return extractQueryShape(*parsedFindCommand, SerializationOptions(), expCtx);
-    } else if (cmd.firstElementFieldName() == "aggregate"_sd) {
-        auto aggregateCommandRequest = AggregateCommandRequest::parse(
-            IDLParserContext("aggregateCommandRequest", false /* apiStrict */, tenantId), cmd);
-        auto pipeline = Pipeline::parse(aggregateCommandRequest.getPipeline(), expCtx);
-        auto ns = aggregateCommandRequest.getNamespace();
-        return extractQueryShape(std::move(aggregateCommandRequest),
-                                 std::move(*pipeline),
-                                 SerializationOptions(),
-                                 expCtx,
-                                 ns);
-    } else {
-        uasserted(7746402, str::stream() << "QueryShape can not be computed for command: " << cmd);
-    }
 }
 
 BSONObj extractQueryShape(const ParsedFindCommand& findRequest,

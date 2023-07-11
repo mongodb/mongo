@@ -1468,17 +1468,6 @@ const allCommands = {
         doesNotRunOnStandalone: true,
         command: {setClusterParameter: {testIntClusterParameter: {intData: 2022}}}
     },
-    setQuerySettings: {
-        skip: commandIsDisabledOnLastLTS,
-        // TODO: SERVER-71537 Remove Feature Flag for PM-412.
-        checkFeatureFlag: "QuerySettings",
-        isAdminCommand: true,
-        doesNotRunOnStandalone: true,
-        command: {
-            setQuerySettings: {find: collName, $db: dbName, filter: {a: 1}},
-            settings: {indexHints: {allowedIndexes: ["a_1"]}}
-        }
-    },
     setUserWriteBlockMode: {
         command: {setUserWriteBlockMode: 1, global: true},
         teardown: function(conn) {

@@ -35,7 +35,6 @@
 #include <boost/move/utility_core.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/shim.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -60,22 +59,6 @@
 namespace mongo {
 namespace {
 
-void setClusterParameterImpl(OperationContext* opCtx, const SetClusterParameter& request) {
-    ConfigsvrSetClusterParameter configsvrSetClusterParameter(request.getCommandParameter());
-    configsvrSetClusterParameter.setDbName(request.getDbName());
-
-    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-
-    const auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        DatabaseName::kAdmin.toString(),
-        configsvrSetClusterParameter.toBSON({}),
-        Shard::RetryPolicy::kIdempotent));
-
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse)));
-}
-
 class SetClusterParameterCmd final : public TypedCommand<SetClusterParameterCmd> {
 public:
     using Request = SetClusterParameter;
@@ -97,7 +80,20 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            setClusterParameterImpl(opCtx, request());
+            ConfigsvrSetClusterParameter configsvrSetClusterParameter(
+                request().getCommandParameter());
+            configsvrSetClusterParameter.setDbName(ns().dbName());
+
+            const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+            const auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                DatabaseName::kAdmin.toString(),
+                configsvrSetClusterParameter.toBSON({}),
+                Shard::RetryPolicy::kIdempotent));
+
+            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse)));
         }
 
     private:
@@ -119,9 +115,6 @@ public:
         }
     };
 } setClusterParameterCmd;
-
-auto setClusterParameterRegistration =
-    MONGO_WEAK_FUNCTION_REGISTRATION(setClusterParameter, setClusterParameterImpl);
 
 }  // namespace
 }  // namespace mongo

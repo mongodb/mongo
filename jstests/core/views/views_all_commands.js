@@ -678,7 +678,6 @@ let viewsCommandTests = {
     setShardVersion: {skip: isUnrelated},
     setChangeStreamState: {skip: isUnrelated},
     setClusterParameter: {skip: isUnrelated},
-    setQuerySettings: {skip: isUnrelated},
     setUserWriteBlockMode: {skip: isUnrelated},
     shardCollection: {
         command: {shardCollection: "test.view", key: {_id: 1}},
