@@ -45,6 +45,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -56,6 +57,7 @@
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/range_deletion_util.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
@@ -75,7 +77,6 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
@@ -145,6 +146,15 @@ void renameOrDropTarget(OperationContext* opCtx,
         dropCollectionLocally(opCtx, toNss, options.markFromMigrate);
         deleteRangeDeletionTasksForRename(opCtx, fromNss, toNss);
     }
+}
+
+void clearFilteringMetadataOnNss(OperationContext* opCtx, const NamespaceString& nss) {
+    // Set the placement version to UNKNOWN to force a future operation to refresh the metadata
+    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
+        ->clearFilteringMetadata(opCtx);
 }
 
 }  // namespace
@@ -421,6 +431,9 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
             [this, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
+
+                clearFilteringMetadataOnNss(opCtx, fromNss());
+                clearFilteringMetadataOnNss(opCtx, toNss());
 
                 // Release source/target critical sections
                 // Note: Use 'throwIfReasonDiffers=false' on the destination collection because as
