@@ -242,6 +242,9 @@ selector:
   # test doesn't pass reliably when there is continuous stepdown on the config server.
   - jstests/sharding/analyze_shard_key/sample_rates_sharded.js
 
+  # Test runs commands on a config shard and does not expect config shard failover.
+  - jstests/sharding/clone_catalog_data.js
+
   exclude_with_any_tags:
   - does_not_support_stepdowns
 
