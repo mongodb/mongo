@@ -831,7 +831,8 @@ Status runAggregate(OperationContext* opCtx,
         boost::optional<AutoStatsTracker> statsTracker;
 
         // If this is a change stream, perform special checks and change the execution namespace.
-        if (liteParsedPipeline.hasChangeStream()) {
+        const auto hasChangeStream = liteParsedPipeline.hasChangeStream();
+        if (hasChangeStream) {
             uassert(4928900,
                     str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
                                   << " is not supported for a change stream",
@@ -943,6 +944,13 @@ Status runAggregate(OperationContext* opCtx,
             if (coll->getRequiresTimeseriesExtendedRangeSupport())
                 expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
         });
+
+        // A pipeline with $changeStreamSplitLargeEvent requires the use of resume token format v2,
+        // since the 'fragmentNum' field only exists in this version and later.
+        if (hasChangeStream && liteParsedPipeline.endsWithChangeStreamSplitLargeEvent()) {
+            expCtx->changeStreamTokenVersion = 2;
+            expCtx->ignoreTokenVersionOnResume = true;
+        }
 
         expCtx->startExpressionCounters();
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);

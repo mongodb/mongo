@@ -224,6 +224,7 @@ protected:
                     // entry into the oplog. This is like a stripped-down DSCSTransform stage.
                     MutableDocument mutableDoc{_ws.get(id)->doc.value()};
                     mutableDoc["_id"] = nextResult.getDocument()["_id"];
+                    mutableDoc.metadata().setSortKey(nextResult.getDocument()["_id"], true);
                     return mutableDoc.freeze();
                 }
                 case PlanStage::NEED_TIME:
@@ -479,8 +480,12 @@ TEST_F(CheckResumeTokenTest, ShouldFailIfTokenHasWrongNamespace) {
     Timestamp resumeTimestamp(100, 1);
 
     auto resumeTokenUUID = UUID::gen();
-    auto checkResumeToken = createDSEnsureResumeTokenPresent(resumeTimestamp, "1", resumeTokenUUID);
     auto otherUUID = UUID::gen();
+    ASSERT_NE(resumeTokenUUID, otherUUID);
+    if (resumeTokenUUID > otherUUID) {
+        std::swap(resumeTokenUUID, otherUUID);
+    }
+    auto checkResumeToken = createDSEnsureResumeTokenPresent(resumeTimestamp, "1", resumeTokenUUID);
     addOplogEntryOnTestNS(resumeTimestamp, "1", otherUUID);
     ASSERT_THROWS_CODE(
         checkResumeToken->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);

@@ -171,6 +171,13 @@ public:
     }
 
     /**
+     * Returns true if this is a $changeStreamSplitLargeEvent stage.
+     */
+    virtual bool isChangeStreamSplitLargeEvent() const {
+        return false;
+    }
+
+    /**
      * Returns true if this is a $documents stage.
      */
     virtual bool isDocuments() const {

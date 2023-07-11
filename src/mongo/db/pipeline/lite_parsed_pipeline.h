@@ -139,6 +139,13 @@ public:
     }
 
     /**
+     * Returns true if the pipeline ends with a $changeStreamSplitLargeEvent stage.
+     */
+    bool endsWithChangeStreamSplitLargeEvent() const {
+        return !_stageSpecs.empty() && _stageSpecs.back()->isChangeStreamSplitLargeEvent();
+    }
+
+    /**
      * Returns false if the pipeline has any stages which cannot be passed through to the shards.
      */
     bool allowedToPassthroughFromMongos() const {

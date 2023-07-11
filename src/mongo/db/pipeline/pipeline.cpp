@@ -40,6 +40,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_merge.h"
@@ -105,14 +106,32 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
 
         // If the first stage is a $changeStream stage, then all stages in the pipeline must be
         // either $changeStream stages or allowlisted as being able to run in a change stream.
-        if (firstStageConstraints.isChangeStreamStage()) {
-            for (auto&& source : sources) {
-                uassert(ErrorCodes::IllegalOperation,
-                        str::stream() << source->getSourceName()
-                                      << " is not permitted in a $changeStream pipeline",
-                        source->constraints().isAllowedInChangeStream());
+        const bool isChangeStream = firstStageConstraints.isChangeStreamStage();
+        // Record whether any of the stages in the pipeline is a $changeStreamSplitLargeEvent.
+        bool hasChangeStreamSplitLargeEventStage = false;
+        for (auto&& source : sources) {
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << source->getSourceName()
+                                  << " is not permitted in a $changeStream pipeline",
+                    !(isChangeStream && !source->constraints().isAllowedInChangeStream()));
+            // Check whether any stages must only be run in a change stream pipeline.
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << source->getSourceName()
+                                  << " can only be used in a $changeStream pipeline",
+                    !(source->constraints().requiresChangeStream() && !isChangeStream));
+            // Check whether this is a change stream split stage.
+            if ("$changeStreamSplitLargeEvent"_sd == source->getSourceName()) {
+                hasChangeStreamSplitLargeEventStage = true;
             }
         }
+        auto expCtx = pipeline.getContext();
+        auto spec = isChangeStream ? expCtx->changeStreamSpec : boost::none;
+        auto hasSplitEventResumeToken = spec &&
+            change_stream::resolveResumeTokenFromSpec(expCtx, *spec).fragmentNum.has_value();
+        uassert(ErrorCodes::ChangeStreamFatalError,
+                "To resume from a split event, the $changeStream pipeline must include a "
+                "$changeStreamSplitLargeEvent stage",
+                !(hasSplitEventResumeToken && !hasChangeStreamSplitLargeEventStage));
     }
 
     // Verify that usage of $searchMeta and $search is legal.

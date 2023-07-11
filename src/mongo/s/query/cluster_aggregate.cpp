@@ -376,6 +376,13 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                        resolveInvolvedNamespaces(involvedNamespaces),
                                        hasChangeStream);
 
+        // A pipeline with $changeStreamSplitLargeEvent requires the use of resume token format v2,
+        // since the 'fragmentNum' field only exists in this version and later.
+        if (hasChangeStream && liteParsedPipeline.endsWithChangeStreamSplitLargeEvent()) {
+            expCtx->changeStreamTokenVersion = 2;
+            expCtx->ignoreTokenVersionOnResume = true;
+        }
+
         // Parse and optimize the full pipeline.
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
 

@@ -64,6 +64,10 @@ DocumentSourceChangeStreamTransform::createFromBson(
             rawSpec.type() == BSONType::Object);
     auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
                                                       rawSpec.Obj());
+
+    // Set the change stream spec on the expression context.
+    expCtx->changeStreamSpec = spec;
+
     return new DocumentSourceChangeStreamTransform(expCtx, std::move(spec));
 }
 
