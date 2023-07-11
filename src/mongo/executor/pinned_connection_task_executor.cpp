@@ -304,6 +304,21 @@ void PinnedConnectionTaskExecutor::_doNetworking(stdx::unique_lock<Latch>&& lk) 
         .getAsync([req, this, self = shared_from_this()](StatusWith<RemoteCommandResponse> result) {
             stdx::unique_lock<Latch> lk{_mutex};
             _inProgressRequest.reset();
+            // If we used the _stream, update it accordingly.
+            if (req.second->startedNetworking) {
+                if (auto status = result.getStatus(); status.isOK()) {
+                    _stream->indicateUsed();
+                    _stream->indicateSuccess();
+                } else {
+                    // We didn't get a response from the remote.
+                    // We assume the stream is broken and therefore can do no more work. Notify the
+                    // stream of the failure, destroy it, and shutdown.
+                    _stream->indicateFailure(status);
+                    _stream.reset();
+                    _shutdown(lk);
+                }
+            }
+            // Now run the completion callback for the command.
             if (auto& state = req.second->state;
                 MONGO_unlikely(state == CallbackState::State::kCanceled)) {
                 CallbackState::runCallbackCanceled(lk, req, this);
@@ -321,19 +336,6 @@ void PinnedConnectionTaskExecutor::_doNetworking(stdx::unique_lock<Latch>&& lk) 
                     target = _stream->getClient()->remote();
                 }
                 CallbackState::runCallbackFinished(lk, req, this, result, target);
-            }
-            // If we used the _stream, update it accordingly.
-            if (req.second->startedNetworking) {
-                if (auto status = result.getStatus(); status.isOK()) {
-                    _stream->indicateUsed();
-                    _stream->indicateSuccess();
-                } else {
-                    // We didn't get a response from the remote.
-                    // We assume the stream is broken and therefore can do no more work. Notify the
-                    // stream of the failure, and shutdown.
-                    _stream->indicateFailure(status);
-                    _shutdown(lk);
-                }
             }
             // If we weren't able to acquire a stream, shut-down.
             if (!_stream) {
