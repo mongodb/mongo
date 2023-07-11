@@ -99,6 +99,47 @@ Status rebuildIndexesForNamespace(OperationContext* opCtx,
 }
 
 namespace {
+
+/**
+ * Re-opening the database can throw an InvalidIndexSpecificationOption error. This can occur if the
+ * index option was previously valid, but a node tries to upgrade to a version where the option is
+ * invalid. We should remove all invalid options in all index specifications of the database and
+ * retry so the database is successfully re-opened for the rest of the repair sequence.
+ */
+void openDbAndRepairIndexSpec(OperationContext* opCtx, const DatabaseName& dbName) {
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+
+    try {
+        databaseHolder->openDb(opCtx, dbName);
+        return;
+    } catch (const ExceptionFor<ErrorCodes::InvalidIndexSpecificationOption>&) {
+        // Fix any invalid index options for this database.
+        auto colls = CollectionCatalog::get(opCtx)->getAllCollectionNamesFromDb(opCtx, dbName);
+
+        for (const auto& nss : colls) {
+            auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
+                opCtx, nss);
+
+            writeConflictRetry(opCtx, "repairInvalidIndexOptions", nss, [&] {
+                WriteUnitOfWork wuow(opCtx);
+
+                std::vector<std::string> indexesWithInvalidOptions =
+                    coll->repairInvalidIndexOptions(opCtx);
+
+                for (const auto& indexWithInvalidOptions : indexesWithInvalidOptions) {
+                    LOGV2_WARNING(7610902,
+                                  "Removed invalid options from index",
+                                  "indexWithInvalidOptions"_attr = redact(indexWithInvalidOptions));
+                }
+                wuow.commit();
+            });
+        }
+
+        // The rest of the --repair sequence requires an open database.
+        databaseHolder->openDb(opCtx, dbName);
+    }
+}
+
 Status dropUnfinishedIndexes(OperationContext* opCtx, Collection* collection) {
     std::vector<std::string> indexNames;
     collection->getAllIndexes(&indexNames);
@@ -164,8 +205,8 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const Data
     auto databaseHolder = DatabaseHolder::get(opCtx);
     databaseHolder->close(opCtx, dbName);
 
-    // Reopening db is necessary for repairCollections.
-    databaseHolder->openDb(opCtx, dbName);
+    // Sucessfully re-opening the db is necessary for repairCollections.
+    openDbAndRepairIndexSpec(opCtx, dbName);
 
     auto status = repairCollections(opCtx, engine, dbName);
     if (!status.isOK()) {
@@ -232,7 +273,7 @@ Status repairCollection(OperationContext* opCtx,
         return status;
     }
 
-    // Run collection validation to avoid unecessarily rebuilding indexes on valid collections
+    // Run collection validation to avoid unnecessarily rebuilding indexes on valid collections
     // with consistent indexes. Initialize the collection prior to validation.
     collection->init(opCtx);
 

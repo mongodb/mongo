@@ -283,6 +283,13 @@ void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx,
 }
 
 void CollectionQueryInfo::init(OperationContext* opCtx, const CollectionPtr& coll) {
+    // Skip registering the index in a --repair, as the server will terminate after
+    // the repair operation completes.
+    if (storageGlobalParams.repair) {
+        LOGV2_DEBUG(7610901, 1, "In a repair, skipping registering indexes");
+        return;
+    }
+
     auto ii =
         coll->getIndexCatalog()->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
     while (ii->more()) {

@@ -617,6 +617,14 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
 
     Status status = _isSpecOk(opCtx, CollectionPtr(collection), descriptor.infoObj());
     if (!status.isOK()) {
+        // If running inside a --repair operation, throw an error so the operation can attempt to
+        // remove any invalid options from the index specification. Any other types of invalid index
+        // specifications, e.g. not specifying a name for the index, will crash the server.
+        if (storageGlobalParams.repair &&
+            status.code() == ErrorCodes::InvalidIndexSpecificationOption) {
+            uasserted(ErrorCodes::InvalidIndexSpecificationOption, status.reason());
+        }
+
         LOGV2_FATAL(28782,
                     "Found an invalid index",
                     "descriptor"_attr = descriptor.infoObj(),
