@@ -907,8 +907,10 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
                         ActionType::setUserWriteBlockMode));
 
         uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "Cannot rename time-series buckets collection {" << source.ns()
-                              << "} to a non-time-series buckets namespace {" << target.ns() << "}",
+                str::stream() << "Cannot rename time-series buckets collection {"
+                              << source.toStringForErrorMsg()
+                              << "} to a non-time-series buckets namespace {"
+                              << target.toStringForErrorMsg() << "}",
                 target.isTimeseriesBucketsCollection());
     }
 }

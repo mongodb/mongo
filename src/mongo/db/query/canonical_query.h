@@ -145,9 +145,6 @@ public:
         invariant(_findCommand->getNamespaceOrUUID().isNamespaceString());
         return _findCommand->getNamespaceOrUUID().nss();
     }
-    StringData ns() const {
-        return nss().ns();
-    }
 
     //
     // Accessors for the query

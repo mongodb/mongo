@@ -177,7 +177,7 @@ struct CommandHelpers {
      */
     // TODO SERVER-68423: Remove this method once all call sites have been updated to pass
     // DatabaseName.
-    static std::string parseNsFromCommand(StringData dbname, const BSONObj& cmdObj);
+    static NamespaceString parseNsFromCommand(StringData dbname, const BSONObj& cmdObj);
 
     /**
      * Return the namespace for the command. If the first field in 'cmdObj' is of type

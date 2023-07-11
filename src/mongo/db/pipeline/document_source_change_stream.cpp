@@ -162,7 +162,7 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
     switch (type) {
         case ChangeStreamType::kSingleCollection:
             // Match the target namespace exactly.
-            return "^" + regexEscapeNsForChangeStream(nss.ns()) + "$";
+            return "^" + regexEscapeNsForChangeStream(NamespaceStringUtil::serialize(nss)) + "$";
         case ChangeStreamType::kSingleDatabase:
             // Match all namespaces that start with db name, followed by ".", then NOT followed by
             // '$' or 'system.' unless 'showSystemEvents' is set.
@@ -219,7 +219,9 @@ std::string DocumentSourceChangeStream::getCmdNsRegexForChangeStream(
         case ChangeStreamType::kSingleCollection:
         case ChangeStreamType::kSingleDatabase:
             // Match the target database command namespace exactly.
-            return "^" + regexEscapeNsForChangeStream(nss.getCommandNS().ns()) + "$";
+            return "^" +
+                regexEscapeNsForChangeStream(NamespaceStringUtil::serialize(nss.getCommandNS())) +
+                "$";
         case ChangeStreamType::kAllChangesForCluster:
             // Match all command namespaces on any database.
             return kRegexAllDBs + "\\." + kRegexCmdColl;

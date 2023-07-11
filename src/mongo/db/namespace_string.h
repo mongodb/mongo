@@ -438,11 +438,6 @@ public:
         return StringData{_data.data() + offset, _data.size() - offset};
     }
 
-    StringData ns() const {
-        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
-        return StringData{_data.data() + offset, _data.size() - offset};
-    }
-
     StringData ns_forTest() const {
         return ns();
     }
@@ -457,8 +452,13 @@ public:
     }
 
     /**
-     * Returns a namespace string without tenant id.  Only to be used when a tenant id cannot be
-     * tolerated in the serialized output, and should otherwise be avoided whenever possible.
+     * Returns a namespace string without tenant id.
+     * Please use the NamespaceStringUtil::serialize class instead to apply the proper serialization
+     * behavior.
+     * Only to be used when a tenant id cannot be tolerated in the serialized output, and should
+     * otherwise be avoided whenever possible.
+     *
+     * MUST only be used for very specific cases.
      */
     std::string serializeWithoutTenantPrefix_UNSAFE() const {
         return toString();
@@ -892,6 +892,15 @@ private:
         }
 
         return ns().toString();
+    }
+
+    /**
+     * Please refer to NamespaceStringUtil::serialize method or use ns_forTest to satisfy any unit
+     * test needing access to ns().
+     */
+    StringData ns() const {
+        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
+        return StringData{_data.data() + offset, _data.size() - offset};
     }
 
     static constexpr size_t kDataOffset = sizeof(uint8_t);

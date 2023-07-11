@@ -195,7 +195,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(
     ss << "verbose=[write_timestamp],";
 
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
-              ->getTableCreateConfig(collectionNamespace.ns());
+              ->getTableCreateConfig(NamespaceStringUtil::serializeForCatalog(collectionNamespace));
     ss << sysIndexConfig << ",";
     ss << collIndexConfig << ",";
 

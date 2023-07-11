@@ -335,7 +335,7 @@ void TenantDatabaseCloner::postStage() {
         _stats.collectionStats.reserve(_collections.size());
         for (const auto& coll : _collections) {
             _stats.collectionStats.emplace_back();
-            _stats.collectionStats.back().ns = coll.first.ns().toString();
+            _stats.collectionStats.back().ns = NamespaceStringUtil::serialize(coll.first);
         }
     }
     for (const auto& coll : _collections) {

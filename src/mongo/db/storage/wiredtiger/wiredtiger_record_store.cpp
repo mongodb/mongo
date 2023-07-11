@@ -560,7 +560,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     ss << ",";
 
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
-              ->getTableCreateConfig(nss.ns());
+              ->getTableCreateConfig(NamespaceStringUtil::serializeForCatalog(nss));
 
     ss << extraStrings << ",";
 

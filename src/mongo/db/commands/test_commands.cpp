@@ -185,7 +185,8 @@ public:
         const NamespaceString fullNs = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
         if (!fullNs.isValid()) {
             uasserted(ErrorCodes::InvalidNamespace,
-                      str::stream() << "collection name " << fullNs.ns() << " is not valid");
+                      str::stream()
+                          << "collection name " << fullNs.toStringForErrorMsg() << " is not valid");
         }
 
         int n = cmdObj.getIntField("n");
@@ -199,7 +200,8 @@ public:
         AutoGetCollection collection(opCtx, fullNs, MODE_X);
         if (!collection) {
             uasserted(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "collection " << fullNs.ns() << " does not exist");
+                      str::stream()
+                          << "collection " << fullNs.toStringForErrorMsg() << " does not exist");
         }
 
         if (!collection->isCapped()) {

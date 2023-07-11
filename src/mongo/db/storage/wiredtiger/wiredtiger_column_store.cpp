@@ -87,7 +87,7 @@ StatusWith<std::string> WiredTigerColumnStore::generateCreateString(
 
     sb << "dictionary=128,";
     sb << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
-              ->getTableCreateConfig(collectionNamespace.ns());
+              ->getTableCreateConfig(NamespaceStringUtil::serializeForCatalog(collectionNamespace));
 
     sb << "block_compressor="
        << desc.compressor().value_or(WiredTigerGlobalOptions::kDefaultColumnStoreIndexCompressor)

@@ -848,7 +848,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
         }
     }
 
-    const bool isMissingRequiredField = from.ns().empty() || as.empty() || !startWith ||
+    const bool isMissingRequiredField = from.isEmpty() || as.empty() || !startWith ||
         connectFromField.empty() || connectToField.empty();
 
     uassert(40105,

@@ -649,7 +649,7 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
 
         const NamespaceString nss(dBName, params.collectionName);
 
-        clonedColls->insert(nss.ns().toString());
+        clonedColls->insert(NamespaceStringUtil::serialize(nss));
 
         LOGV2_DEBUG(20421, 1, "\t\t cloning", logAttrs(nss), "host"_attr = masterHost);
 

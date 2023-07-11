@@ -1693,9 +1693,9 @@ void syncFixUp(OperationContext* opCtx,
                                 "Rollback cannot write document to archive file",
                                 logAttrs(*nss),
                                 "error"_attr = redact(status));
-                            throw RSFatalException(str::stream()
-                                                   << "Rollback cannot write document in namespace "
-                                                   << nss->ns() << " to archive file.");
+                            throw RSFatalException(
+                                str::stream() << "Rollback cannot write document in namespace "
+                                              << nss->toStringForErrorMsg() << " to archive file.");
                         }
                     } else {
                         LOGV2_ERROR(

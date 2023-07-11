@@ -370,7 +370,8 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                                            const std::shared_ptr<executor::TaskExecutor>& executor,
                                            const OperationSessionInfo& osi) {
 
-    std::string logMsg = str::stream() << fromNss.ns() << " to " << toNss.ns();
+    std::string logMsg = str::stream()
+        << toStringForLogging(fromNss) << " to " << toStringForLogging(toNss);
     if (optFromCollType) {
         // Case sharded FROM collection
         auto fromUUID = optFromCollType->getUuid();

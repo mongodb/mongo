@@ -480,7 +480,7 @@ private:
     }
 
     bool _isDifferentFromSavedNamespace(const NamespaceInfoEntry& newNs) const {
-        if (newNs.getNs().ns().compare(_currentNs.getNs().ns()) == 0) {
+        if (newNs.getNs() == _currentNs.getNs()) {
             return newNs.getCollectionUUID() != _currentNs.getCollectionUUID();
         }
         return true;

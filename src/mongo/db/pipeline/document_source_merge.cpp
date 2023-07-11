@@ -404,7 +404,8 @@ DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(const BSONElemen
             // from the NamespaceString semantics which treats it as a database name. So, if the
             // target namespace collection is empty, we'll use the default database name as a target
             // database, and the provided namespace value as a collection name.
-            targetNss = NamespaceStringUtil::parseNamespaceFromRequest(defaultDb, targetNss.ns());
+            targetNss = NamespaceStringUtil::parseNamespaceFromRequest(
+                defaultDb, targetNss.serializeWithoutTenantPrefix_UNSAFE());
         } else if (targetNss.dbName().db().empty()) {
             // Use the default database name if it wasn't specified explicilty.
             targetNss = NamespaceStringUtil::parseNamespaceFromRequest(defaultDb, targetNss.coll());

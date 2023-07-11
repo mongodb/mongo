@@ -229,9 +229,11 @@ std::unique_ptr<MatchExpression> buildInvalidationFilter(
     if (streamType == DocumentSourceChangeStream::ChangeStreamType::kSingleCollection) {
         // A single-collection stream is invalidated by drop and rename events.
         invalidatingCommands.append(BSON("o.drop" << nss.coll()));
-        invalidatingCommands.append(BSON("o.renameCollection" << nss.ns()));
         invalidatingCommands.append(
-            BSON("o.renameCollection" << BSON("$exists" << true) << "o.to" << nss.ns()));
+            BSON("o.renameCollection" << NamespaceStringUtil::serialize(nss)));
+        invalidatingCommands.append(BSON("o.renameCollection"
+                                         << BSON("$exists" << true) << "o.to"
+                                         << NamespaceStringUtil::serialize(nss)));
     } else {
         // For a whole-db streams, only 'dropDatabase' will cause an invalidation event.
         invalidatingCommands.append(BSON("o.dropDatabase" << BSON("$exists" << true)));
@@ -240,8 +242,8 @@ std::unique_ptr<MatchExpression> buildInvalidationFilter(
     // Match only against the target db's command namespace.
     auto invalidatingFilter = BSON("op"
                                    << "c"
-                                   << "ns" << nss.getCommandNS().ns() << "$or"
-                                   << invalidatingCommands.arr());
+                                   << "ns" << NamespaceStringUtil::serialize(nss.getCommandNS())
+                                   << "$or" << invalidatingCommands.arr());
     return MatchExpressionParser::parseAndNormalize(invalidatingFilter, expCtx);
 }  // namespace change_stream_filter
 

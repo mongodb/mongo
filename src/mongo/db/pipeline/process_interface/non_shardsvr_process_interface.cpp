@@ -157,7 +157,7 @@ Status NonShardServerProcessInterface::insertTimeseries(
 
         checkWriteErrors(insertReply.getWriteCommandReplyBase());
     } catch (DBException& ex) {
-        ex.addContext(str::stream() << "time-series insert failed: " << ns.ns());
+        ex.addContext(str::stream() << "time-series insert failed: " << ns.toStringForErrorMsg());
         throw;
     }
     return Status::OK();

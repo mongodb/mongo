@@ -301,7 +301,7 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
 
         tassert(7663403,
                 str::stream() << "SerializationContext on the expCtx should not be empty, with ns: "
-                              << expCtx->ns.ns(),
+                              << expCtx->ns.toStringForErrorMsg(),
                 expCtx->serializationCtxt != SerializationContext::stateDefault());
 
         // reportState is used to generate a command reply
@@ -1193,8 +1193,7 @@ void OpDebug::append(OperationContext* opCtx,
 
     b.append("op", logicalOpToString(logicalOp));
 
-    NamespaceString nss = NamespaceString(curop.getNS());
-    b.append("ns", nss.ns());
+    b.append("ns", curop.getNS());
 
     appendAsObjOrString(
         "command", appendCommentField(opCtx, curop.opDescription()), appendMaxElementSize, &b);
@@ -1434,9 +1433,7 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     addIfNeeded("op", [](auto field, auto args, auto& b) {
         b.append(field, logicalOpToString(args.op.logicalOp));
     });
-    addIfNeeded("ns", [](auto field, auto args, auto& b) {
-        b.append(field, NamespaceString(args.curop.getNS()).ns());
-    });
+    addIfNeeded("ns", [](auto field, auto args, auto& b) { b.append(field, args.curop.getNS()); });
 
     addIfNeeded("command", [](auto field, auto args, auto& b) {
         appendAsObjOrString(field,
@@ -1789,7 +1786,7 @@ static void appendResolvedViewsInfoImpl(
         const std::vector<BSONObj>& pipeline = kv.second.second;
 
         BSONObjBuilder aView;
-        aView.append("viewNamespace", viewNss.ns());
+        aView.append("viewNamespace", NamespaceStringUtil::serialize(viewNss));
 
         BSONArrayBuilder dependenciesArr(aView.subarrayStart("dependencyChain"));
         for (const auto& nss : dependencies) {

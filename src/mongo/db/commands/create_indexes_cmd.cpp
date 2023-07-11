@@ -428,7 +428,8 @@ void runCreateIndexesOnNewCollection(OperationContext* opCtx,
         if (createStatus == ErrorCodes::NamespaceExists) {
             throwWriteConflictException(
                 str::stream() << "Failed to create indexes on new collection: namespace "_sd
-                              << ns.ns() << " exists. Status: "_sd << createStatus.toString());
+                              << ns.toStringForErrorMsg() << " exists. Status: "_sd
+                              << createStatus.toString());
         }
 
         uassertStatusOK(createStatus);

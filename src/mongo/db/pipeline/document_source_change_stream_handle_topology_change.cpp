@@ -236,7 +236,7 @@ BSONObj DocumentSourceChangeStreamHandleTopologyChange::createUpdatedCommandForN
 
     tassert(7663502,
             str::stream() << "SerializationContext on the expCtx should not be empty, with ns: "
-                          << pExpCtx->ns.ns(),
+                          << pExpCtx->ns.toStringForErrorMsg(),
             pExpCtx->serializationCtxt != SerializationContext::stateDefault());
 
     // Create the 'AggregateCommandRequest' object which will help in creating the parsed pipeline.

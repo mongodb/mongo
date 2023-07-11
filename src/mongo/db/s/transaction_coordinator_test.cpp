@@ -126,7 +126,7 @@ StatusWith<BSONObj> makePrepareOkResponse(const Timestamp& timestamp,
                                           const std::vector<NamespaceString>& affectedNamespaces) {
     BSONArrayBuilder namespaces;
     for (const auto& nss : affectedNamespaces) {
-        namespaces << nss.ns();
+        namespaces << nss.ns_forTest();
     }
     return BSON("ok" << 1 << "prepareTimestamp" << timestamp << "affectedNamespaces"
                      << namespaces.arr());
@@ -145,7 +145,7 @@ static StringSet toStringSet(const NamespaceStringContainer& namespaces) {
     StringSet set;
     set.reserve(namespaces.size());
     for (const auto& nss : namespaces) {
-        set.emplace(nss.ns());
+        set.emplace(nss.ns_forTest());
     }
     return set;
 }

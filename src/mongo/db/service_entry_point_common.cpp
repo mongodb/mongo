@@ -604,7 +604,7 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
 void appendAdditionalParticipants(OperationContext* opCtx,
                                   BSONObjBuilder* commandBodyFieldsBob,
                                   const std::string& commandName,
-                                  StringData ns) {
+                                  const NamespaceString& nss) {
     // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns.
     if (gFeatureFlagAdditionalParticipants.isEnabledAndIgnoreFCVUnsafe()) {
         std::vector<BSONElement> shardIdsFromFpData;
@@ -613,8 +613,8 @@ void appendAdditionalParticipants(OperationContext* opCtx,
                     if (data.hasField("cmdName") && data.hasField("ns") &&
                         data.hasField("shardId")) {
                         shardIdsFromFpData = data.getField("shardId").Array();
-                        return ((data.getStringField("cmdName") == commandName) &&
-                                (data.getStringField("ns") == ns));
+                        const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns");
+                        return ((data.getStringField("cmdName") == commandName) && (fpNss == nss));
                     }
                     return false;
                 }))) {
@@ -1339,8 +1339,7 @@ void RunCommandImpl::_epilogue() {
                                             _isInternalClient(),
                                             _ecd->getLastOpBeforeRun(),
                                             _ecd->getLastOpAfterRun());
-        appendAdditionalParticipants(
-            opCtx, &body, command->getName(), _ecd->getInvocation()->ns().ns());
+        appendAdditionalParticipants(opCtx, &body, command->getName(), _ecd->getInvocation()->ns());
     }
 
     auto commandBodyBob = replyBuilder->getBodyBuilder();
@@ -2053,7 +2052,7 @@ void ExecCommandDatabase::_handleFailure(Status status) {
                                         getLastOpBeforeRun(),
                                         getLastOpAfterRun());
     appendAdditionalParticipants(
-        opCtx, &_extraFieldsBuilder, command->getName(), _execContext->nsString().ns());
+        opCtx, &_extraFieldsBuilder, command->getName(), _execContext->nsString());
 
     BSONObjBuilder metadataBob;
     behaviors.appendReplyMetadata(opCtx, request, &metadataBob);

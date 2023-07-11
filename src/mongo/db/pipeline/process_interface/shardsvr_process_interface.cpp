@@ -357,7 +357,7 @@ void ShardServerProcessInterface::createIndexesOnEmptyCollection(
     sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), ns.db());
     router.route(
         opCtx,
-        "copying index for empty collection {}"_format(ns.ns()),
+        "copying index for empty collection {}"_format(NamespaceStringUtil::serialize(ns)),
         [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
             BSONObjBuilder cmdBuilder;
             cmdBuilder.append("createIndexes", ns.coll());

@@ -100,7 +100,8 @@ void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
             MONGO_UNREACHABLE;
     }
 
-    cmdBuilder.append(opName, nss.ns());
+    const auto nssStr = NamespaceStringUtil::serialize(nss);
+    cmdBuilder.append(opName, nssStr);
     cmdBuilder.appendElements(cmd);
 
     BSONObj fullCmd = cmdBuilder.obj();
@@ -110,7 +111,7 @@ void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
     oplogEntry.setNss(nss);
     oplogEntry.setUuid(uuid);
     oplogEntry.setTid(nss.tenantId());
-    oplogEntry.setObject(BSON("msg" << BSON(opName << nss.ns())));
+    oplogEntry.setObject(BSON("msg" << BSON(opName << nssStr)));
     oplogEntry.setObject2(fullCmd);
     oplogEntry.setOpTime(repl::OpTime());
     oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());

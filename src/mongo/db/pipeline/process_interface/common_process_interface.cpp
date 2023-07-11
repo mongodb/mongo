@@ -142,7 +142,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
                 tassert(7663401,
                         str::stream()
                             << "SerializationContext on the expCtx should not be empty, with ns: "
-                            << ns->ns(),
+                            << ns->toStringForErrorMsg(),
                         expCtx->serializationCtxt != SerializationContext::stateDefault());
                 cursorObj.append("ns",
                                  NamespaceStringUtil::serialize(*ns, expCtx->serializationCtxt));

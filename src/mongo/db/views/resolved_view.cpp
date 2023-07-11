@@ -124,7 +124,7 @@ ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
 
 void ResolvedView::serialize(BSONObjBuilder* builder) const {
     BSONObjBuilder subObj(builder->subobjStart("resolvedView"));
-    subObj.append("ns", _namespace.ns());
+    subObj.append("ns", NamespaceStringUtil::serialize(_namespace));
     subObj.append("pipeline", _pipeline);
     if (_timeseriesOptions) {
         BSONObjBuilder tsObj(builder->subobjStart(kTimeseriesOptions));

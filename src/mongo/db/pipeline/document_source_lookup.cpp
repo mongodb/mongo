@@ -1326,7 +1326,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
         }
     }
 
-    if (fromNs.ns().empty()) {
+    if (fromNs.isEmpty()) {
         validateLookupCollectionlessPipeline(pipeline);
         fromNs = NamespaceString::makeCollectionlessAggregateNSS(pExpCtx->ns.dbName());
     }

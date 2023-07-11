@@ -693,8 +693,7 @@ void TenantOplogApplier::_writeTransactionEntryNoOp(OperationContext* opCtx,
     // necessary.
     if (_protocol != MigrationProtocolEnum::kShardMerge) {
         noopEntry.setObject(
-            BSON("applyOps" << BSON_ARRAY(BSON(OplogEntry::kNssFieldName
-                                               << NamespaceString(*_tenantId + "_", "").ns()))));
+            BSON("applyOps" << BSON_ARRAY(BSON(OplogEntry::kNssFieldName << *_tenantId + "_"))));
     }
 
     // Use the same wallclock time as the noop entry.

@@ -422,10 +422,10 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(
 
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.
-    StringMap<IndexNameObjs> nsToIndexNameObjMap;
+    stdx::unordered_map<NamespaceString, IndexNameObjs> nsToIndexNameObjMap;
     auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& idxIdentifier : reconcileResult.indexesToRebuild) {
-        NamespaceString collNss = idxIdentifier.nss;
+        const NamespaceString collNss = idxIdentifier.nss;
         const std::string& indexName = idxIdentifier.indexName;
         auto swIndexSpecs =
             getIndexNameObjs(catalog->lookupCollectionByNamespace(opCtx, collNss),
@@ -441,13 +441,13 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(
         invariant(indexesToRebuild.first.size() == 1 && indexesToRebuild.second.size() == 1,
                   str::stream() << "Num Index Names: " << indexesToRebuild.first.size()
                                 << " Num Index Objects: " << indexesToRebuild.second.size());
-        auto& ino = nsToIndexNameObjMap[collNss.ns()];
+        auto& ino = nsToIndexNameObjMap[collNss];
         ino.first.emplace_back(std::move(indexesToRebuild.first.back()));
         ino.second.emplace_back(std::move(indexesToRebuild.second.back()));
     }
 
     for (const auto& entry : nsToIndexNameObjMap) {
-        NamespaceString collNss(entry.first);
+        const auto collNss = entry.first;
 
         auto collection = catalog->lookupCollectionByNamespace(opCtx, collNss);
         for (const auto& indexName : entry.second.first) {

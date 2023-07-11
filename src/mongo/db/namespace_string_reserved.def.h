@@ -279,3 +279,6 @@ NSS_CONSTANT(kConfigMongosNamespace, DatabaseName::kConfig, "mongos"_sd)
 NSS_CONSTANT(kDefaultOplogTruncateAfterPointNamespace,
              DatabaseName::kLocal,
              "replset.oplogTruncateAfterPoint"_sd)
+
+// Namespace used for the local oplog dollar main namespace.
+NSS_CONSTANT(kLocalOplogDollarMain, DatabaseName::kLocal, "oplog.$main"_sd)
