@@ -972,8 +972,9 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         if (rand < 0.25) {
             cmdObj.sampleRate = Math.random() * 0.5 + 0.5;
         } else if (rand < 0.5) {
-            cmdObj.sampleSize =
-                NumberLong(Math.floor(Math.random() * 1.5 * this.numInitialDocuments));
+            cmdObj.sampleSize = NumberLong(
+                AnalyzeShardKeyUtil.getRandInteger(Math.floor(0.5 * this.numInitialDocuments),
+                                                   Math.floor(1.5 * this.numInitialDocuments)));
         }
         const isSampling =
             cmdObj.hasOwnProperty("sampleRate") || cmdObj.hasOwnProperty("sampleSize");
