@@ -334,22 +334,6 @@ export function aggPlanHasStage(root, stage) {
 }
 
 /**
- * Given the root stage of agg explain's JSON representation of a query plan ('root'), returns
- * the pipeline stage names included in the plan in order of execution. The resulting array includes
- * only first-level stages (does not include stages within $group, $lookup, $union etc).
- */
-function getStageSequence(root) {
-    let stageSequence = [];
-    if (root.hasOwnProperty("stages")) {
-        for (let j = 0; j < root.stages.length; j++) {
-            let stageName = Object.keys(root.stages[j]);
-            stageSequence.push(stageName);
-        }
-    }
-    return stageSequence;
-}
-
-/**
  * Given the root stage of explain's BSON representation of a query plan ('root'),
  * returns true if the plan has a stage called 'stage'.
  *

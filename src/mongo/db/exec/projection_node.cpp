@@ -259,8 +259,7 @@ void ProjectionNode::reportProjectedPaths(OrderedPathSet* projectedPaths) const 
 }
 
 void ProjectionNode::reportComputedPaths(OrderedPathSet* computedPaths,
-                                         StringMap<std::string>* renamedPaths,
-                                         StringMap<std::string>* complexRenamedPaths) const {
+                                         StringMap<std::string>* renamedPaths) const {
     for (auto&& computedPair : _expressions) {
         // The expression's path is the concatenation of the path to this node, plus the field name
         // associated with the expression.
@@ -271,15 +270,9 @@ void ProjectionNode::reportComputedPaths(OrderedPathSet* computedPaths,
         for (auto&& rename : exprComputedPaths.renames) {
             (*renamedPaths)[rename.first] = rename.second;
         }
-
-        if (complexRenamedPaths) {
-            for (auto&& complexRename : exprComputedPaths.complexRenames) {
-                (*complexRenamedPaths)[complexRename.first] = complexRename.second;
-            }
-        }
     }
     for (auto&& childPair : _children) {
-        childPair.second->reportComputedPaths(computedPaths, renamedPaths, complexRenamedPaths);
+        childPair.second->reportComputedPaths(computedPaths, renamedPaths);
     }
 }
 

@@ -139,14 +139,10 @@ public:
      *
      * Computed paths that are identified as the result of a simple rename are instead filled out in
      * 'renamedPaths'. Each entry in 'renamedPaths' maps from the path's new name to its old name
-     * prior to application of this projection. 'complexRenamedPaths' is an optional parameter that
-     * acts exactly as the 'renamedPaths' map and includes renames whose old name includes dotted
-     * paths (Note: the dotted path renames are constrained to length 3). The paths that are
-     * included in 'complexRenamedPaths' are also included in 'computedPaths'.
+     * prior to application of this projection.
      */
     void reportComputedPaths(OrderedPathSet* computedPaths,
-                             StringMap<std::string>* renamedPaths,
-                             StringMap<std::string>* complexRenamedPaths = nullptr) const;
+                             StringMap<std::string>* renamedPaths) const;
 
     const std::string& getPath() const {
         return _pathToNode;
