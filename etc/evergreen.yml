@@ -76,6 +76,7 @@ variables:
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
 
+# THIS WAS COPIED TO misc_release.yml - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THAT FILE.
 - &amazon_linux2_arm64_compile_variant_dependency
   depends_on:
   - name: archive_dist_test_debug
@@ -125,6 +126,7 @@ variables:
   num_scons_link_jobs_available: 0.99
   compile_variant: *linux_x86_dynamic_compile_variant_name
 
+# THIS WAS COPIED TO misc_release.yml - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THAT FILE.
 - &linux_arm64_generic_expansions
   multiversion_platform: amazon2
   multiversion_edition: enterprise
