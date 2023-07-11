@@ -44,6 +44,10 @@
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/util/destructor_guard.h"
 
+#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/pipeline/semantic_analysis.h"
+
 namespace mongo {
 
 constexpr StringData DocumentSourceGroup::kStageName;
@@ -79,6 +83,88 @@ DocumentSourceGroup::DocumentSourceGroup(const boost::intrusive_ptr<ExpressionCo
 boost::intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return createFromBsonWithMaxMemoryUsage(std::move(elem), expCtx, boost::none);
+}
+
+Pipeline::SourceContainer::iterator DocumentSourceGroup::doOptimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
+
+    if (pushDotRenamedMatch(itr, container)) {
+        return itr;
+    }
+
+    return std::next(itr);
+}
+
+bool DocumentSourceGroup::pushDotRenamedMatch(Pipeline::SourceContainer::iterator itr,
+                                              Pipeline::SourceContainer* container) {
+    if (std::next(itr) == container->end() || std::next(std::next(itr)) == container->end()) {
+        return false;
+    }
+
+    // Keep separate iterators for each stage (projection, match).
+    auto prospectiveProjectionItr = std::next(itr);
+    auto prospectiveProjection =
+        dynamic_cast<DocumentSourceSingleDocumentTransformation*>(prospectiveProjectionItr->get());
+
+    auto prospectiveMatchItr = std::next(std::next(itr));
+    auto prospectiveMatch = dynamic_cast<DocumentSourceMatch*>(prospectiveMatchItr->get());
+
+    if (!prospectiveProjection || !prospectiveMatch) {
+        return false;
+    }
+
+    stdx::unordered_set<std::string> groupingFields;
+    StringMap<std::string> relevantRenames;
+
+    auto itsGroup = dynamic_cast<DocumentSourceGroup*>(itr->get());
+
+    auto idFields = itsGroup->getIdFields();
+    for (auto& idFieldsItr : idFields) {
+        groupingFields.insert(idFieldsItr.first);
+    }
+
+    GetModPathsReturn paths = prospectiveProjection->getModifiedPaths();
+
+    for (const auto& thisComplexRename : paths.complexRenames) {
+
+        // Check if the dotted renaming is done on a grouping field.
+        // This ensures that the top level is flat i.e., no arrays.
+        if (groupingFields.find(thisComplexRename.second) != groupingFields.end()) {
+            relevantRenames.insert(std::pair<std::string, std::string>(thisComplexRename.first,
+                                                                       thisComplexRename.second));
+        }
+    }
+
+    // Perform all changes on a copy of the match source.
+    boost::intrusive_ptr<DocumentSource> currentMatchCopyDocument =
+        prospectiveMatch->clone(prospectiveMatch->getContext());
+
+    auto currentMatchCopyDocumentMatch =
+        dynamic_cast<DocumentSourceMatch*>(currentMatchCopyDocument.get());
+
+    paths.renames = std::move(relevantRenames);
+
+    // Translate predicate statements based on the projection renames.
+    auto matchSplitForProject = currentMatchCopyDocumentMatch->splitMatchByModifiedFields(
+        currentMatchCopyDocumentMatch, paths);
+
+    if (matchSplitForProject.first) {
+        // Perform the swap of the projection and the match stages.
+        container->erase(prospectiveMatchItr);
+        container->insert(prospectiveProjectionItr, std::move(matchSplitForProject.first));
+
+        if (matchSplitForProject.second) {
+            // If there is a portion of the match stage predicate that is conflicting with the
+            // projection, re-insert it below the projection stage.
+            container->insert(std::next(prospectiveProjectionItr),
+                              std::move(matchSplitForProject.second));
+        }
+
+        return true;
+    }
+
+    return false;
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBsonWithMaxMemoryUsage(

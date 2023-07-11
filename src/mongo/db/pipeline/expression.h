@@ -184,8 +184,13 @@ public:
         OrderedPathSet paths;
 
         // Mappings from the old name of a path before applying this expression, to the new one
-        // after applying this expression.
+        // after applying this expression. This map includes solely simple field renaming
+        // expression.
         StringMap<std::string> renames;
+
+        // Mappings from the old name of a path before applying this expression. This map includes
+        // expressions which have dotted notation on the right side.
+        StringMap<std::string> complexRenames;
     };
 
     virtual ~Expression(){};

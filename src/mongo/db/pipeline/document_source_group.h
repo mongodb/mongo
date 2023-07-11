@@ -67,12 +67,38 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<size_t> maxMemoryUsageBytes);
 
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) override;
+
 protected:
     GetNextResult doGetNext() final;
 
     bool isSpecFieldReserved(StringData) final {
         return false;
     }
+
+    /**
+     * This optimization pushes a filter over a renamed grouping field
+     * before the group to improve performance.
+     *
+     * Specifically:
+     * $group { _id: {c: $x}, c: {aggregation}},
+     * $project { newVar: $_id.c }
+     * $match { newVar: "value"}
+     * ->
+     * $match { x: "value"}
+     * $group { _id: {c: $x}, c: {aggregation}},
+     * $project { newVar: $_id.c }
+     *
+     * Note: This optimization will not push over multiple grouping stages
+     * or multiple rename stages. Only the last set of group, project, match
+     * is taken into account. Furthermore, the optimization addresses specifically
+     * the defined sequence of operations to ensure the semantics of filters over arrays. Renaming
+     * dotted paths which include arrays change the evaluation of the filter statement and may lead
+     * to erroneous results.
+     */
+    bool pushDotRenamedMatch(Pipeline::SourceContainer::iterator itr,
+                             Pipeline::SourceContainer* container);
 
 private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& expCtx,

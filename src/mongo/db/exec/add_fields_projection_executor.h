@@ -118,10 +118,12 @@ public:
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
         OrderedPathSet computedPaths;
         StringMap<std::string> renamedPaths;
-        _root->reportComputedPaths(&computedPaths, &renamedPaths);
+        StringMap<std::string> complexRenamedPaths;
+        _root->reportComputedPaths(&computedPaths, &renamedPaths, &complexRenamedPaths);
         return {DocumentSource::GetModPathsReturn::Type::kFiniteSet,
                 std::move(computedPaths),
-                std::move(renamedPaths)};
+                std::move(renamedPaths),
+                std::move(complexRenamedPaths)};
     }
 
     /**

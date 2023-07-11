@@ -2634,6 +2634,14 @@ Expression::ComputedPaths ExpressionFieldPath::getComputedPaths(const std::strin
     if (_variable == renamingVar && _fieldPath.getPathLength() == 2u) {
         outputPaths.renames[exprFieldPath] = _fieldPath.tail().fullPath();
     } else {
+        // Add dotted renames also to complex renames, to be used prospectively in optimizations
+        // (e.g., pushDotRenamedMatch).
+        // We only include dotted rename paths of length 3, as current optimization are constrained
+        // to accepting only such paths to avoid semantic errors from array flattening.
+        if (_variable == renamingVar && _fieldPath.getPathLength() == 3u) {
+            outputPaths.complexRenames[exprFieldPath] = _fieldPath.tail().fullPath();
+        }
+
         outputPaths.paths.insert(exprFieldPath);
     }
 

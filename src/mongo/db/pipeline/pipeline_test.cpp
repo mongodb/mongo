@@ -2249,6 +2249,96 @@ TEST(PipelineOptimizationTest, NorCanSplitAcrossProjectWithRename) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+TEST(PipelineOptimizationTest, MatchCanMoveAcrossDottedRenameOnGrouping) {
+    std::string inputPipeline =
+        "[{$group: { _id: { c: '$d' }, c: { $sum: {$const: 1} } } },"
+        "{$project: { m: '$_id.c' } },"
+        "{$match: { m: {$eq: 2} } }]";
+    std::string outputPipeline =
+        "[{$match: { d: {$eq: 2} } },"
+        "{$group: { _id: { c: '$d' }, c: { $sum: {$const: 1} } } },"
+        "{$project: { _id: true, m: '$_id.c' } }]";
+    assertPipelineOptimizesTo(inputPipeline, outputPipeline);
+}
+
+TEST(PipelineOptimizationTest, MatchCanMoveAcrossDottedRenameOnGroupingMixedPredicates) {
+    std::string inputPipeline =
+        "[{$group: { _id: { c: '$d' }, c: { $sum: { $const: 1} } } },"
+        "{$project: { m: '$_id.c' } },"
+        "{$match: { $and: [ {m: {$eq: 2} }, {_id: {$eq: 3} } ] } }]";
+    std::string outputPipeline =
+        "[{$group: { _id: { c: '$d' }, c: { $sum: { $const: 1} } } },"
+        "{$match: { $and: [ {'_id.c': {$eq: 2} }, {_id: {$eq: 3} } ] } },"
+        "{$project: { _id: true, m: '$_id.c' } } ]";
+
+    assertPipelineOptimizesTo(inputPipeline, outputPipeline);
+}
+
+TEST(PipelineOptimizationTest, AvoidPushingMatchOverGroupWithLongDottedRename) {
+    std::string inputPipeline =
+        "[{$group: {_id: {a: {b: '$a'}}}},"
+        "{$project: {renamed: '$_id.a.b'}},"
+        "{$match: {renamed: {$eq: 5}}}]";
+    std::string outputPipeline =
+        "[{$group: {_id: {a: {b: '$a'}}}},"
+        "{$project: {_id: true, renamed: '$_id.a.b'}},"
+        "{$match: {renamed: {$eq: 5 }}}]";
+    assertPipelineOptimizesTo(inputPipeline, outputPipeline);
+}
+
+TEST(PipelineOptimizationTest, MatchCanMoveAcrossDottedRenameOnNestedGrouping) {
+    std::string inputPipeline =
+        "[{$group: { _id: { c: '$d', s: '$k' }, c: { $sum: {$const: 1} } } },"
+        "{$project: { m: '$_id.c' } },"
+        "{$match: { m: {$eq: 2} } }]";
+    std::string outputPipeline =
+        "[{$match: { d: {$eq: 2} } },"
+        "{$group: { _id: { c: '$d', s: '$k' }, c: { $sum: {$const: 1} } } },"
+        "{$project: { _id: true, m: '$_id.c' } }]";
+    assertPipelineOptimizesTo(inputPipeline, outputPipeline);
+}
+
+TEST(PipelineOptimizationTest, MatchLeavingSecondAfterPushingOverProjection) {
+    std::string inputPipeline =
+        "[{$group: { _id: { c: '$d' }, c: { '$sum': {$const: 1} } } },"
+        "{$project: { m1: '$_id.c' } },"
+        "{$match: { m1: {$eq: 2}, k: {$eq: 5} } }]";
+
+    std::string outputPipeline =
+        "[{$match: { d: {$eq: 2} } },"
+        "{$group: { _id: { c: '$d' }, c: { '$sum': {$const: 1} } } },"
+        "{$project: { _id: true, m1: '$_id.c' } },"
+        "{$match: { k: {$eq: 5} } }]";
+    assertPipelineOptimizesTo(inputPipeline, outputPipeline);
+}
+
+TEST(PipelineOptimizationTest, PushingOverProjectionWithTail) {
+    std::string inputPipeline =
+        "[{$group: { _id: { c: '$d' }, c: { '$sum': {$const: 1} } } },"
+        "{$project: { m1: '$_id.c' } },"
+        "{$match: { m1: {$eq: 2}, k: {$eq: 5} } },"
+        "{$project: { m2: '$_id' } } ]";
+
+    std::string outputPipeline =
+        "[{$match: { d: {$eq: 2} } },"
+        "{$group: { _id: { c: '$d' }, c: { '$sum': {$const: 1} } } },"
+        "{$project: { _id: true, m1: '$_id.c' } },"
+        "{$match: { k: {$eq: 5} } },"
+        "{$project: { _id: true, m2: '$_id' } }]";
+    assertPipelineOptimizesTo(inputPipeline, outputPipeline);
+}
+
+TEST(PipelineOptimizationTest, PushingDottedMatchOverGrouping) {
+    std::string inputPipeline =
+        "[{$group: {_id: {a: '$l', b: '$b'}}},"
+        "{$match: {'_id.a': 5}}]";
+
+    std::string outputPipeline =
+        "[{ $match: { l: { $eq: 5 } } },"
+        "{ $group: { _id: { a: '$l', b: '$b' } } }]";
+    assertPipelineOptimizesTo(inputPipeline, outputPipeline);
+}
+
 TEST(PipelineOptimizationTest, MatchCanMoveAcrossSeveralRenames) {
     string inputPipe =
         "[{$project: {c: '$d', _id: false}},"
