@@ -43,7 +43,11 @@ const expectedAnalyzeShardKeyErrCodes = [
 const analyzeShardKeyTestCases = [
     {operationType: "rename", expectedErrCodes: expectedAnalyzeShardKeyErrCodes},
     {operationType: "drop", expectedErrCodes: expectedAnalyzeShardKeyErrCodes},
-    {operationType: "recreate", expectedErrCodes: expectedAnalyzeShardKeyErrCodes},
+    {
+        operationType: "recreate",
+        expectedErrCodes:
+            [ErrorCodes.CollectionUUIDMismatch].concat(expectedAnalyzeShardKeyErrCodes)
+    },
     {operationType: "makeEmpty", expectedErrCodes: expectedAnalyzeShardKeyErrCodes}
 ];
 // Test DDL operations after each step below.
