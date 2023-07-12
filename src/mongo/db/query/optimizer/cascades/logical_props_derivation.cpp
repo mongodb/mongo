@@ -301,7 +301,9 @@ public:
 
     LogicalProps transport(const RIDUnionNode& node,
                            LogicalProps /*leftChildResult*/,
-                           LogicalProps /*rightChildResult*/) {
+                           LogicalProps /*rightChildResult*/,
+                           LogicalProps /*bindResult*/,
+                           LogicalProps /*refsResult*/) {
         // Properties for the group should already be derived via the underlying Filter or
         // Evaluation logical nodes.
         uasserted(7016302, "Should not be necessary to derive properties for RIDUnionNode");

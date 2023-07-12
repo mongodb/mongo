@@ -240,7 +240,9 @@ public:
                           const RIDUnionNode& node,
                           const VariableEnvironment& env,
                           GroupIdType leftChild,
-                          GroupIdType rightChild) {
+                          GroupIdType rightChild,
+                          GroupIdType /*binder*/,
+                          GroupIdType /*refs*/) {
         return addNodes(n, node, env, leftChild, rightChild);
     }
 

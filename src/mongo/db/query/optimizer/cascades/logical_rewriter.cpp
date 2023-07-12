@@ -1743,11 +1743,13 @@ struct ExploreConvert<SargableNode> {
                                      scanDelegator)
                 : scanDelegator;
 
-            ABT newRoot = disjunctive
-                ? make<RIDUnionNode>(
-                      scanProjectionName, std::move(leftChild), std::move(rightChild))
-                : make<RIDIntersectNode>(
-                      scanProjectionName, std::move(leftChild), std::move(rightChild));
+            ABT newRoot = disjunctive ? make<RIDUnionNode>(scanProjectionName,
+                                                           ProjectionNameVector{scanProjectionName},
+                                                           std::move(leftChild),
+                                                           std::move(rightChild))
+                                      : make<RIDIntersectNode>(scanProjectionName,
+                                                               std::move(leftChild),
+                                                               std::move(rightChild));
 
             const auto& result = ctx.addNode(newRoot, false /*substitute*/);
             for (const MemoLogicalNodeId nodeId : result.second) {

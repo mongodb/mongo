@@ -747,7 +747,8 @@ TEST(Optimizer, ExplainRIDUnion) {
                          make<Variable>("root")),
         make<ScanNode>("root", "c1"));
 
-    ABT unionNode = make<RIDUnionNode>("root", filterNode, make<ScanNode>("root", "c1"));
+    ABT unionNode = make<RIDUnionNode>(
+        "root", ProjectionNameVector{"root"}, filterNode, make<ScanNode>("root", "c1"));
 
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(unionNode));

@@ -510,25 +510,70 @@ struct Collector {
         return result;
     }
 
+    // Handle the collected info for UnionNode and RIDUnionNode, as both of them have their own
+    // binders and references.
+    CollectedInfo handleUnionCollectedInfo(ABT::reference_type nodeRef,
+                                           std::vector<CollectedInfo> childResults,
+                                           CollectedInfo bindResult,
+                                           CollectedInfo refsResult,
+                                           const ExpressionBinder& binder) {
+        CollectedInfo result{};
+
+        refsResult.assertEmptyDefs();
+
+        const auto& names = binder.names();
+
+        // Merge children but disregard any defined projections.
+        // Note that refsResult follows the structure as built by buildUnionTypeReferences, meaning
+        // it contains a free variable for each name for each child of the union and no other info.
+        size_t counter = 0;
+        for (auto& u : childResults) {
+            // Manually copy and resolve references of specific child. We do this manually
+            // because each Variable must be resolved by the appropriate child's definition.
+            for (const auto& name : names) {
+                tassert(7858802,
+                        str::stream() << "Union projection does not exist:  " << name,
+                        u.defs.count(name) != 0);
+                u.useMap.emplace(&refsResult.freeVars[name][counter].get(), u.defs[name]);
+            }
+            u.defs.clear();
+            result.merge(std::move(u));
+            ++counter;
+        }
+
+        result.mergeNoDefs(std::move(bindResult));
+
+        // Propagate union projections. Note that these are the only defs propagated, since we clear
+        // the child defs before merging above.
+        const auto& defs = binder.exprs();
+        for (size_t idx = 0; idx < names.size(); ++idx) {
+            result.defs[names[idx]] = Definition{nodeRef, defs[idx].ref()};
+        }
+
+        return result;
+    }
+
     CollectedInfo transport(const ABT& n,
                             const RIDUnionNode& node,
                             CollectedInfo leftChildResult,
-                            CollectedInfo rightChildResult) {
-        CollectedInfo result{};
+                            CollectedInfo rightChildResult,
+                            CollectedInfo bindResult,
+                            CollectedInfo refsResult) {
+        std::vector<CollectedInfo> childResults{std::move(leftChildResult),
+                                                std::move(rightChildResult)};
 
-        // For simplicity, don't provide any projections. In principle we could preserve any
-        // projections that are common to both the left and right children, but for now we don't
-        // need this because we don't support covered index union plans.
-        //
-        // The only projection we preserve is the scanDef projection name.
+        CollectedInfo result = handleUnionCollectedInfo(n.ref(),
+                                                        std::move(childResults),
+                                                        std::move(bindResult),
+                                                        std::move(refsResult),
+                                                        node.binder());
+
+        // We should always preserve the scanDef projection name.
         const auto& scanProjName = node.getScanProjectionName();
-        auto preservedDef = std::move(leftChildResult.defs.at(scanProjName));
-        rightChildResult.defs.clear();
-        leftChildResult.defs.clear();
-        leftChildResult.defs.emplace(scanProjName, std::move(preservedDef));
-
-        result.merge(std::move(leftChildResult));
-        result.merge<false /*resolveFreeVarsWithOther*/>(std::move(rightChildResult));
+        tassert(7858800,
+                str::stream() << "The scanDef projection name has to be preserved: "
+                              << scanProjName,
+                result.defs.contains(scanProjName));
 
         result.nodeDefs[&node] = result.defs;
 
@@ -675,38 +720,11 @@ struct Collector {
                             std::vector<CollectedInfo> childResults,
                             CollectedInfo bindResult,
                             CollectedInfo refsResult) {
-        CollectedInfo result{};
-
-        const auto& names = unionNode.binder().names();
-
-        refsResult.assertEmptyDefs();
-
-        // Merge children but disregard any defined projections.
-        // Note that refsResult follows the structure as built by buildUnionTypeReferences, meaning
-        // it contains a free variable for each name for each child of the union and no other info.
-        size_t counter = 0;
-        for (auto& u : childResults) {
-            // Manually copy and resolve references of specific child. We do this manually because
-            // each Variable must be resolved by the appropriate child's definition.
-            for (const auto& name : names) {
-                tassert(6624031,
-                        str::stream() << "Union projection does not exist:  " << name,
-                        u.defs.count(name) != 0);
-                u.useMap.emplace(&refsResult.freeVars[name][counter].get(), u.defs[name]);
-            }
-            u.defs.clear();
-            result.merge(std::move(u));
-            ++counter;
-        }
-
-        result.mergeNoDefs(std::move(bindResult));
-
-        // Propagate union projections. Note that these are the only defs propagated, since we clear
-        // the child defs before merging above.
-        const auto& defs = unionNode.binder().exprs();
-        for (size_t idx = 0; idx < names.size(); ++idx) {
-            result.defs[names[idx]] = Definition{n.ref(), defs[idx].ref()};
-        }
+        CollectedInfo result = handleUnionCollectedInfo(n.ref(),
+                                                        std::move(childResults),
+                                                        std::move(bindResult),
+                                                        std::move(refsResult),
+                                                        unionNode.binder());
 
         result.nodeDefs[&unionNode] = result.defs;
 

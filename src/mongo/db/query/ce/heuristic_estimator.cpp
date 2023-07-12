@@ -272,7 +272,9 @@ public:
 
     CEType transport(const RIDUnionNode& node,
                      CEType /*leftChildResult*/,
-                     CEType /*rightChildResult*/) {
+                     CEType /*rightChildResult*/,
+                     CEType /*bindResult*/,
+                     CEType /*refsResult*/) {
         // CE for the group should already be derived via the underlying Filter or Evaluation
         // logical nodes.
         uasserted(7016301, "Should not be necessary to derive CE for RIDUnionNode");

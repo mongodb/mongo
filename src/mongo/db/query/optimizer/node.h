@@ -441,11 +441,14 @@ private:
  * RID union node.
  * This is a logical node representing index-index unioning. Used for index OR-ing.
  */
-class RIDUnionNode final : public ABTOpFixedArity<2>, public ExclusivelyLogicalNode {
-    using Base = ABTOpFixedArity<2>;
+class RIDUnionNode final : public ABTOpFixedArity<4>, public ExclusivelyLogicalNode {
+    using Base = ABTOpFixedArity<4>;
 
 public:
-    RIDUnionNode(ProjectionName scanProjectionName, ABT leftChild, ABT rightChild);
+    RIDUnionNode(ProjectionName scanProjectionName,
+                 ProjectionNameVector unionProjectionNames,
+                 ABT leftChild,
+                 ABT rightChild);
 
     bool operator==(const RIDUnionNode& other) const;
 
@@ -454,6 +457,8 @@ public:
 
     const ABT& getRightChild() const;
     ABT& getRightChild();
+
+    const ExpressionBinder& binder() const;
 
     const ProjectionName& getScanProjectionName() const;
 

@@ -1623,7 +1623,9 @@ public:
     ExplainPrinter transport(const ABT& n,
                              const RIDUnionNode& node,
                              ExplainPrinter leftChildResult,
-                             ExplainPrinter rightChildResult) {
+                             ExplainPrinter rightChildResult,
+                             ExplainPrinter bindResult,
+                             ExplainPrinter /*refsResult*/) {
         ExplainPrinter printer("RIDUnion");
         maybePrintProps(printer, node);
         printer.separator(" [")
@@ -1632,7 +1634,9 @@ public:
 
         printer.separator("]");
         nodeCEPropsPrint(printer, n, node);
-        printer.setChildCount(2)
+        printer.setChildCount(3)
+            .fieldName("bindings", ExplainVersion::V3)
+            .print(bindResult)
             .maybeReverse()
             .fieldName("leftChild", ExplainVersion::V3)
             .print(leftChildResult)

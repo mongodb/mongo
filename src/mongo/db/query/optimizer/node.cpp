@@ -351,9 +351,38 @@ const ProjectionName& RIDIntersectNode::getScanProjectionName() const {
     return _scanProjectionName;
 }
 
-RIDUnionNode::RIDUnionNode(ProjectionName scanProjectionName, ABT leftChild, ABT rightChild)
-    : Base(std::move(leftChild), std::move(rightChild)),
+/**
+ * A helper that builds References object of UnionNode or SortedMergeNode for reference tracking
+ * purposes.
+ *
+ * Example: union outputs 3 projections: A,B,C and it has 4 children. Then the References object is
+ * a vector of variables A,B,C,A,B,C,A,B,C,A,B,C. One group of variables per child.
+ */
+static ABT buildUnionTypeReferences(const ProjectionNameVector& names, const size_t numOfChildren) {
+    ABTVector variables;
+    for (size_t outerIdx = 0; outerIdx < numOfChildren; ++outerIdx) {
+        for (size_t idx = 0; idx < names.size(); ++idx) {
+            variables.emplace_back(make<Variable>(names[idx]));
+        }
+    }
+
+    return make<References>(std::move(variables));
+}
+
+RIDUnionNode::RIDUnionNode(ProjectionName scanProjectionName,
+                           ProjectionNameVector unionProjectionNames,
+                           ABT leftChild,
+                           ABT rightChild)
+    : Base(std::move(leftChild),
+           std::move(rightChild),
+           buildSimpleBinder(unionProjectionNames),
+           buildUnionTypeReferences(unionProjectionNames, 2)),
       _scanProjectionName(std::move(scanProjectionName)) {
+    tassert(7858803,
+            "Scan projection must exist in the RIDUnionNode projection list",
+            std::find(unionProjectionNames.cbegin(),
+                      unionProjectionNames.cend(),
+                      _scanProjectionName) != unionProjectionNames.cend());
     assertNodeSort(getLeftChild());
     assertNodeSort(getRightChild());
 }
@@ -372,6 +401,12 @@ const ABT& RIDUnionNode::getRightChild() const {
 
 ABT& RIDUnionNode::getRightChild() {
     return get<1>();
+}
+
+const ExpressionBinder& RIDUnionNode::binder() const {
+    const ABT& result = get<2>();
+    tassert(7858801, "Invalid binder type", result.is<ExpressionBinder>());
+    return *result.cast<ExpressionBinder>();
 }
 
 bool RIDUnionNode::operator==(const RIDUnionNode& other) const {
@@ -720,24 +755,6 @@ ABT& NestedLoopJoinNode::getRightChild() {
 
 const ABT& NestedLoopJoinNode::getFilter() const {
     return get<2>();
-}
-
-/**
- * A helper that builds References object of UnionNode or SortedMergeNode for reference tracking
- * purposes.
- *
- * Example: union outputs 3 projections: A,B,C and it has 4 children. Then the References object is
- * a vector of variables A,B,C,A,B,C,A,B,C,A,B,C. One group of variables per child.
- */
-static ABT buildUnionTypeReferences(const ProjectionNameVector& names, const size_t numOfChildren) {
-    ABTVector variables;
-    for (size_t outerIdx = 0; outerIdx < numOfChildren; ++outerIdx) {
-        for (size_t idx = 0; idx < names.size(); ++idx) {
-            variables.emplace_back(make<Variable>(names[idx]));
-        }
-    }
-
-    return make<References>(std::move(variables));
 }
 
 // Helper function to get the projection names from a CollationRequirement as a vector instead of a
