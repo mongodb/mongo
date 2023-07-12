@@ -1023,15 +1023,6 @@ public:
     }
 
     /**
-     * Returns database name as a string.
-     *
-     * TODO SERVER-66887 remove this function for better clarity once call sites have been changed
-     */
-    std::string dbname() const {
-        return dbName().db().toString();
-    }
-
-    /**
      * Returns the database name.
      */
     DatabaseName dbName() const {

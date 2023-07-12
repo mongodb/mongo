@@ -55,8 +55,7 @@ std::unique_ptr<FindCommandRequest> FindKeyGenerator::reparse(OperationContext* 
     BSONObjBuilder cmdBuilder;
     NamespaceStringOrUUID nss = query_shape::parseNamespaceShape(_parseableQueryShape["cmdNs"]);
     nss.serialize(&cmdBuilder, FindCommandRequest::kCommandName);
-    cmdBuilder.append("$db", nss.dbname());
-
+    cmdBuilder.append("$db", DatabaseNameUtil::serialize(nss.dbName()));
 
     for (BSONElement e : _parseableQueryShape) {
         if (e.fieldNameStringData() == "cmdNs" || e.fieldNameStringData() == "command") {
