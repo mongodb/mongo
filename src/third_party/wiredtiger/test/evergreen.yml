@@ -1990,17 +1990,6 @@ tasks:
           test_args: cmake_build/test/csuite/schema_abort/test_schema_abort
           test_binary: schema_abort
 
-  - name: csuite-tiered-abort-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite smoke test"
-        vars:
-          test_args: cmake_build/test/csuite/tiered_abort/test_tiered_abort
-          test_binary: tiered_abort
-
   - name: csuite-timestamp-abort-test
     tags: ["pull_request"]
     depends_on:

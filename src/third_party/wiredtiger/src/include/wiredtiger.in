@@ -886,30 +886,6 @@ struct __wt_session {
      */
     int __F(reconfigure)(WT_SESSION *session, const char *config);
 
-#ifndef DOXYGEN
-    /*!
-     * Initiate a single operation to manage tiered storage.
-     *
-     * @param session the session handle
-     * @configstart{WT_SESSION.flush_tier, see dist/api_data.py}
-     * @config{force, force sharing of all data., a boolean flag; default \c false.}
-     * @config{lock_wait, wait for locks\, if \c lock_wait=false\, fail if any required locks are
-     * not available immediately., a boolean flag; default \c true.}
-     * @config{sync, wait for all objects to be flushed to the shared storage to the level
-     * specified.  The \c off setting does not wait for any objects to be written to the tiered
-     * storage system but returns immediately after generating the objects and work units for an
-     * internal thread.  The \c on setting causes the caller to wait until all work queued for this
-     * call to be completely processed before returning., a string\, chosen from the following
-     * options: \c "off"\, \c "on"; default \c on.}
-     * @config{timeout, maximum amount of time to allow for waiting for previous flushing of
-     * objects\, in seconds.  The actual amount of time spent waiting may exceed the configured
-     * value.  A value of zero disables the timeout., an integer; default \c 0.}
-     * @configend
-     * @errors
-     */
-    int __F(flush_tier)(WT_SESSION *session, const char *config);
-#endif
-
     /*!
      * Return information about an error as a string.
      *
