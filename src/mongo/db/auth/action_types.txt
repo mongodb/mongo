@@ -54,6 +54,7 @@
 "flushRouterConfig",
 "forceUUID",
 "fsync",
+"fsyncUnlock",
 "getDatabaseVersion",
 "getDefaultRWConcern",
 "getCmdLineOpts",
