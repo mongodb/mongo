@@ -137,7 +137,7 @@ struct DefaultClonerImpl::BatchHandler {
         };
 
         boost::optional<Lock::DBLock> dbLock;
-        // TODO SERVER-63111 Once the Cloner holds a DatabaseName obj, use _dbName directly
+        // No tenant id required as the db cloner is only used for moving primary dbs in sharding.
         DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, _dbName);
         dbLock.emplace(opCtx, dbName, MODE_X);
         uassert(ErrorCodes::NotWritablePrimary,
@@ -187,8 +187,8 @@ struct DefaultClonerImpl::BatchHandler {
 
                 CurOp::get(opCtx)->yielded();
 
-                // TODO SERVER-63111 Once the cloner takes in a DatabaseName obj, use _dbName
-                // directly
+                // No tenant id required as the db cloner is only used for moving primary dbs in
+                // sharding.
                 DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, _dbName);
                 dbLock.emplace(opCtx, dbName, MODE_X);
 
@@ -542,7 +542,7 @@ StatusWith<std::vector<BSONObj>> DefaultClonerImpl::getListOfCollections(
         }
     }
     // Gather the list of collections to clone
-    // TODO SERVER-63111 Once the cloner takes in a DatabaseName obj, use dBName directly
+    // No tenant id required as the db cloner is only used for moving primary dbs in sharding.
     std::list<BSONObj> initialCollections =
         getConn()->getCollectionInfos(DatabaseNameUtil::deserialize(boost::none, dBName),
                                       ListCollectionsFilter::makeTypeCollectionFilter());
@@ -597,7 +597,7 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
     }
 
     {
-        // TODO SERVER-63111 Once the cloner takes in a DatabaseName obj, use dBName directly
+        // No tenant id required as the db cloner is only used for moving primary dbs in sharding.
         DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, dBName);
         Lock::DBLock dbXLock(opCtx, dbName, MODE_X);
         uassert(ErrorCodes::NotWritablePrimary,
