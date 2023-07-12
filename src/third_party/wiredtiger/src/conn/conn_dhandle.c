@@ -841,7 +841,7 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, bool final)
     WT_ASSERT(session, dhandle != conn->cache->walk_tree);
 
     /* Check if the handle was reacquired by a session while we waited. */
-    if (!final && (dhandle->session_inuse != 0 || dhandle->session_ref != 0))
+    if (!final && (dhandle->session_inuse != 0 || dhandle->references != 0))
         return (__wt_set_return(session, EBUSY));
 
     WT_CONN_DHANDLE_REMOVE(conn, dhandle, bucket);
@@ -1028,7 +1028,8 @@ __wt_verbose_dump_handles(WT_SESSION_IMPL *session)
         WT_RET(__wt_msg(session, "Name: %s", dhandle->name));
         if (dhandle->checkpoint != NULL)
             WT_RET(__wt_msg(session, "Checkpoint: %s", dhandle->checkpoint));
-        WT_RET(__wt_msg(session, "  Sessions referencing handle: %" PRIu32, dhandle->session_ref));
+        WT_RET(__wt_msg(
+          session, "  Handle session and tiered work references: %" PRIu32, dhandle->references));
         WT_RET(__wt_msg(session, "  Sessions using handle: %" PRId32, dhandle->session_inuse));
         WT_RET(__wt_msg(session, "  Exclusive references to handle: %" PRIu32, dhandle->excl_ref));
         if (dhandle->excl_ref != 0)

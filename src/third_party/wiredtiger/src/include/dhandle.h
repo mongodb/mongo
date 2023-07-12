@@ -38,9 +38,9 @@
 /* The metadata cursor's data handle. */
 #define WT_SESSION_META_DHANDLE(s) (((WT_CURSOR_BTREE *)((s)->meta_cursor))->dhandle)
 
-#define WT_DHANDLE_ACQUIRE(dhandle) (void)__wt_atomic_add32(&(dhandle)->session_ref, 1)
+#define WT_DHANDLE_ACQUIRE(dhandle) (void)__wt_atomic_add32(&(dhandle)->references, 1)
 
-#define WT_DHANDLE_RELEASE(dhandle) (void)__wt_atomic_sub32(&(dhandle)->session_ref, 1)
+#define WT_DHANDLE_RELEASE(dhandle) (void)__wt_atomic_sub32(&(dhandle)->references, 1)
 
 #define WT_DHANDLE_NEXT(session, dhandle, head, field)                                     \
     do {                                                                                   \
@@ -90,11 +90,11 @@ struct __wt_data_handle {
     const char *orig_meta_base; /* Copy of the base metadata configuration */
 #endif
     /*
-     * Sessions holding a connection's data handle will have a non-zero reference count; sessions
-     * using a connection's data handle will have a non-zero in-use count. Instances of cached
-     * cursors referencing the data handle appear in session_cache_ref.
+     * Sessions holding a connection's data handle and queued tiered storage work units will hold
+     * references; sessions using a connection's data handle will have a non-zero in-use count.
+     * Instances of cached cursors referencing the data handle appear in session_cache_ref.
      */
-    uint32_t session_ref;          /* Sessions referencing this handle */
+    uint32_t references;           /* References to this handle */
     int32_t session_inuse;         /* Sessions using this handle */
     uint32_t excl_ref;             /* Refs of handle by excl_session */
     uint64_t timeofdeath;          /* Use count went to 0 */

@@ -296,7 +296,7 @@ in the cursor for future use.  Thus, caching a cursor (what happens within the t
 (e.g. \c __curfile_cache) is relatively quick:
 
 - Free storage that we don't want held (for example, storage used by the cursor's key and value).
-- Get a *weak* reference to the data handle (increment \c dhandle->session_ref).
+- Get a *weak* reference to the data handle (increment \c dhandle->references).
 - Release the *strong* reference to the data handle (decrement \c dhandle->session_inuse).
 - Determine the hash bucket needed (using the hash value in the cursor).
 - Move the cursor from the session's open list to the list in the hash bucket.
@@ -327,7 +327,7 @@ call \c reopen on the cursor.  This is what happens within the call to the type-
 - Lock the dhandle.
 - If the dhandle is no longer open, release it and mark the reopen to fail (but continue).
 - Get a "strong" reference to the data handle (increment \c dhandle->session_inuse).
-- Release the "weak" reference to the data handle (decrement \c dhandle->session_ref).
+- Release the "weak" reference to the data handle (decrement \c dhandle->references).
 - Increment statistics and the connection's open cursor count.
 - Move the handle from the hash bucket to the session's open list (the hash value was previously saved in the cursor)
 - Clear the cache cursor flag.

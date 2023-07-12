@@ -33,7 +33,7 @@ the dhandle in the session's dhandle cache.
 @section dhandle_data_handle_reference_counts Data Handle Reference Counts
 
 There are two relevant reference counters in the dhandle structure,
-\c session_ref and \c session_inuse. \c session_ref counts the number of
+\c references and \c session_inuse. \c references counts the number of
 session dhandle cache lists that contain this dhandle. \c session_inuse
 is a count of the number of cursors opened and operating on this dhandle.
 Both these counters are incremented by the session as the cursor is opened on
@@ -61,7 +61,7 @@ handle marked dead and remove it from the session's dhandle cache list.
 
 The sweep server then checks for any sessions that are referencing this
 dhandle. If a dhandle stays referenced by at least one session
-(\c session_ref count > 0), the dhandle cannot be removed from the
+(\c references count > 0), the dhandle cannot be removed from the
 global list. If the dhandle is not referenced by any session, the sweep
 server removes the dhandle from the global dhandle list and frees any
 remaining resources associated with it. The removal of the dhandle from
@@ -80,6 +80,6 @@ Each time a session accesses a dhandle, it checks if enough time has
 elapsed to do a session cache sweep for that session. As it walks the
 session dhandle cache list, it notices if any dhandle on its list has
 been marked dead (idle for too long). If it has, the session removes
-that dhandle from its list and decrements the session_ref count.
+that dhandle from its list and decrements the references count.
 
 */

@@ -36,7 +36,7 @@ __wt_tiered_work_free(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry)
     WT_CONNECTION_IMPL *conn;
 
     conn = S2C(session);
-    (void)__wt_atomic_subi32(&entry->tiered->iface.session_inuse, 1);
+    WT_DHANDLE_RELEASE((WT_DATA_HANDLE *)&entry->tiered->iface);
     __tiered_flush_state(session, entry->type, false);
     /* If all work is done signal any waiting thread waiting for sync. */
     if (WT_FLUSH_STATE_DONE(conn->flush_state))
@@ -114,9 +114,11 @@ __tiered_push_new_work(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry)
 {
     /*
      * Bump the in use count lock on the dhandle, this is kept until the work unit is freed. This
-     * prevents the an otherwise idle dhandle from being swept and freed.
+     * prevents an otherwise idle dhandle from being swept and freed. We do not need to hold the
+     * dhandle list lock here because our session currently holds a reference to the tiered entry
+     * when pushing this work and the handle cannot be swept out from under us.
      */
-    (void)__wt_atomic_addi32(&entry->tiered->iface.session_inuse, 1);
+    WT_DHANDLE_ACQUIRE((WT_DATA_HANDLE *)&entry->tiered->iface);
     __tiered_push_work_internal(session, entry);
     return;
 }

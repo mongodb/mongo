@@ -299,11 +299,9 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
     }
 
     /*
-     * FIXME: WT-11176 This comment won't be valid when that ticket work is done. If everything is
-     * successful, remove any tiered work associated with this tiered handle. The dhandle has been
-     * released so the tiered pointer is stale but queued work still refers to it. The worker should
-     * never see the stale value because we've been holding the lock the entire time it has been
-     * stale.
+     * If everything is successful, remove any tiered work associated with this tiered handle. The
+     * dhandle has been released here but queued work may still refer to it. The queued work unit
+     * has its own reference to it and we're holding the lock so it isn't yet stale.
      */
     __wt_verbose(session, WT_VERB_TIERED, "DROP_TIERED: remove work for %p", (void *)tiered);
     __wt_tiered_remove_work(session, tiered, true);

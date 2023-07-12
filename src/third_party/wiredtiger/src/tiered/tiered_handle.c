@@ -853,7 +853,11 @@ __wt_tiered_close(WT_SESSION_IMPL *session, WT_TIERED *tiered, bool final)
 {
     __wt_verbose(session, WT_VERB_TIERED, "TIERED_CLOSE: tiered %p called final %d", (void *)tiered,
       (int) final);
-    __tiered_cleanup(session, tiered, final);
+    /*
+     * We are only closing the handle so only clean up the tiers. We don't yet want to free the
+     * entire structure. That will happen when we discard it.
+     */
+    __tiered_cleanup_tiers(session, tiered, final);
 
     return (__wt_btree_close(session));
 }
@@ -867,17 +871,6 @@ __wt_tiered_discard(WT_SESSION_IMPL *session, WT_TIERED *tiered, bool final)
 {
     __wt_verbose(session, WT_VERB_TIERED, "TIERED_DISCARD: tiered %p called final %d",
       (void *)tiered, (int) final);
-#if 0
-    /*
-     * FIXME: WT-11176 We need to also remove any work associated with the tiered table we are
-     * discarding. Currently the work units contain a pointer to the tiered structure (the dhandle
-     * structure) and that pointer is about to be freed. That leaves a stale pointer. But right now
-     * removing the work units can result in a deadlock. The real solution is to get rid of the
-     * tiered structure in the work unit and save the URI instead and then use session_get_dhandle
-     * to acquire it if it still exists.
-     */
-    __wt_tiered_remove_work(session, tiered, false);
-#endif
     __tiered_cleanup(session, tiered, final);
     return (__wt_btree_discard(session));
 }
