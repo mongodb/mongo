@@ -88,6 +88,7 @@ sbeEnv.Library(
         'stages/makeobj.cpp',
         'stages/merge_join.cpp',
         'stages/project.cpp',
+        'stages/search_cursor.cpp',
         'stages/sort.cpp',
         'stages/sorted_merge.cpp',
         'stages/spool.cpp',
