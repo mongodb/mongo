@@ -613,8 +613,6 @@ thread_ckpt_run(void *arg)
     __wt_epoch(NULL, &start);
     for (i = 1;; ++i) {
         sleep_time = __wt_random(&td->extra_rnd) % MAX_CKPT_INVL;
-        flush_tier = false;
-        testutil_tiered_sleep(opts, session, sleep_time, &flush_tier);
         if (use_ts) {
             ts = get_all_committed_ts();
             /*
@@ -634,8 +632,11 @@ thread_ckpt_run(void *arg)
             }
         }
 
-        /* Set the configurations. Set use_timestamps regardless of whether timestamps are in use.
-         */
+        /* Determine if we're flushing once we know we're actually doing the checkpoint. */
+        flush_tier = false;
+        testutil_tiered_sleep(opts, session, sleep_time, &flush_tier);
+
+        /* Set the configuration based on whether we're flushing. */
         testutil_check(session->checkpoint(session, flush_tier ? ckpt_flush_config : ckpt_config));
 
         /*
