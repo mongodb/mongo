@@ -400,7 +400,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             }
 
             if (!o2Field["migrateChunkToNewShard"].missing()) {
-                operationType = change_stream_legacy::getNewShardDetectedOpName(_expCtx);
+                operationType = DocumentSourceChangeStream::kNewShardDetectedOpType;
                 operationDescription =
                     Value(copyDocExceptFields(o2Field, {"migrateChunkToNewShard"_sd}));
                 break;

@@ -81,6 +81,4 @@ void populateInternalOperationFilter(const boost::intrusive_ptr<ExpressionContex
  */
 Document convertFromLegacyOplogFormat(const Document& legacyO2Entry, const NamespaceString& nss);
 
-StringData getNewShardDetectedOpName(const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
 }  // namespace mongo::change_stream_legacy

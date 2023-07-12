@@ -77,15 +77,5 @@ Document convertFromLegacyOplogFormat(const Document& o2Entry, const NamespaceSt
     doc.addField(type.getString(), Value(NamespaceStringUtil::serialize(nss)));
     return doc.freeze();
 }
-
-// TODO SERVER-66138: This function can be removed after we branch for 7.0.
-StringData getNewShardDetectedOpName(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    // The op name on 6.0 and older versions.
-    const StringData kNewShardDetectedOpTypeLegacyName = "kNewShardDetected"_sd;
-    return (expCtx->changeStreamTokenVersion == ResumeTokenData::kDefaultTokenVersion)
-        ? DocumentSourceChangeStream::kNewShardDetectedOpType
-        : kNewShardDetectedOpTypeLegacyName;
-}
-
 }  // namespace change_stream_legacy
 }  // namespace mongo

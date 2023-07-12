@@ -86,7 +86,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckTopologyChange::doG
     // Throw the 'ChangeStreamTopologyChangeInfo' exception, wrapping the topology change event
     // along with its metadata. This will bypass the remainder of the pipeline and will be passed
     // directly up to mongoS.
-    if (eventOpType == change_stream_legacy::getNewShardDetectedOpName(pExpCtx)) {
+    if (eventOpType == DocumentSourceChangeStream::kNewShardDetectedOpType) {
         uasserted(ChangeStreamTopologyChangeInfo(eventDoc.toBsonWithMetaData()),
                   "Collection migrated to new shard");
     }
