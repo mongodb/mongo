@@ -11,17 +11,14 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {executeReshardCollection} from "jstests/concurrency/fsm_libs/reshard_collection_util.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/internal_transactions_sharded.js";
 load('jstests/libs/fail_point_util.js');
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
-    // reshardingMinimumOperationDurationMillis is set to 30 seconds when there are stepdowns.
-    // So in order to limit the overall time for the test, we limit the number of resharding
-    // operations to maxReshardingExecutions.
-    const maxReshardingExecutions = TestData.runningWithShardStepdowns ? 4 : $config.iterations;
-
     const customShardKeyFieldName = "customShardKey";
     $config.data.shardKeys = [];
     $config.data.currentShardKeyIndex = -1;
@@ -63,59 +60,17 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         this.shardKeys.push({[this.defaultShardKeyField]: 1});
         this.shardKeys.push({[customShardKeyFieldName]: 1});
         this.currentShardKeyIndex = 0;
+        this._allowSameKeyResharding =
+            FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'ReshardingImprovements');
     };
 
     $config.states.reshardCollection = function reshardCollection(db, collName, connCache) {
-        const collection = db.getCollection(collName);
-        const ns = collection.getFullName();
+        executeReshardCollection(this, db, collName, connCache, false /*sameKeyResharding*/);
+    };
 
-        if (this.tid === 0 && (this.reshardingCount <= maxReshardingExecutions)) {
-            const newShardKeyIndex = (this.currentShardKeyIndex + 1) % this.shardKeys.length;
-            const newShardKey = this.shardKeys[newShardKeyIndex];
-            const reshardCollectionCmdObj = {
-                reshardCollection: ns,
-                key: newShardKey,
-            };
-
-            print(`Started resharding collection ${ns}: ${tojson({newShardKey})}`);
-            if (TestData.runningWithShardStepdowns) {
-                assert.soon(function() {
-                    var res = db.adminCommand(reshardCollectionCmdObj);
-                    if (res.ok) {
-                        return true;
-                    }
-                    assert(res.hasOwnProperty("code"));
-
-                    // Race to retry.
-                    if (res.code === ErrorCodes.ReshardCollectionInProgress) {
-                        return false;
-                    }
-                    // Unexpected error.
-                    doassert(`Failed with unexpected ${tojson(res)}`);
-                }, "Reshard command failed", 10 * 1000);
-            } else {
-                assert.commandWorked(db.adminCommand(reshardCollectionCmdObj));
-            }
-            print(`Finished resharding collection ${ns}: ${tojson({newShardKey})}`);
-
-            // If resharding fails with SnapshotUnavailable, then this will be incorrect. But
-            // its fine since reshardCollection will succeed if the new shard key matches the
-            // existing one.
-            this.currentShardKeyIndex = newShardKeyIndex;
-            this.reshardingCount += 1;
-
-            db.printShardingStatus();
-
-            connCache.mongos.forEach(mongos => {
-                if (this.generateRandomBool()) {
-                    // Without explicitly refreshing mongoses, retries of retryable write statements
-                    // would always be routed to the donor shards. Non-deterministically refreshing
-                    // enables us to have test coverage for retrying against both the donor and
-                    // recipient shards.
-                    assert.commandWorked(mongos.adminCommand({flushRouterConfig: 1}));
-                }
-            });
-        }
+    $config.states.reshardCollectionSameKey = function reshardCollectionSameKey(
+        db, collName, connCache) {
+        executeReshardCollection(this, db, collName, connCache, this._allowSameKeyResharding);
     };
 
     $config.transitions = {
@@ -132,8 +87,16 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             internalTransactionForFindAndModify: 0.2,
             verifyDocuments: 0.2
         },
+        reshardCollectionSameKey: {
+            internalTransactionForInsert: 0.2,
+            internalTransactionForUpdate: 0.2,
+            internalTransactionForDelete: 0.2,
+            internalTransactionForFindAndModify: 0.2,
+            verifyDocuments: 0.2
+        },
         internalTransactionForInsert: {
-            reshardCollection: 0.2,
+            reshardCollection: 0.1,
+            reshardCollectionSameKey: 0.1,
             internalTransactionForInsert: 0.15,
             internalTransactionForUpdate: 0.15,
             internalTransactionForDelete: 0.15,
@@ -141,7 +104,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             verifyDocuments: 0.2
         },
         internalTransactionForUpdate: {
-            reshardCollection: 0.2,
+            reshardCollection: 0.1,
+            reshardCollectionSameKey: 0.1,
             internalTransactionForInsert: 0.15,
             internalTransactionForUpdate: 0.15,
             internalTransactionForDelete: 0.15,
@@ -149,7 +113,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             verifyDocuments: 0.2
         },
         internalTransactionForDelete: {
-            reshardCollection: 0.2,
+            reshardCollection: 0.1,
+            reshardCollectionSameKey: 0.1,
             internalTransactionForInsert: 0.15,
             internalTransactionForUpdate: 0.15,
             internalTransactionForDelete: 0.15,
@@ -157,7 +122,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             verifyDocuments: 0.2
         },
         internalTransactionForFindAndModify: {
-            reshardCollection: 0.2,
+            reshardCollection: 0.1,
+            reshardCollectionSameKey: 0.1,
             internalTransactionForInsert: 0.15,
             internalTransactionForUpdate: 0.15,
             internalTransactionForDelete: 0.15,
@@ -165,7 +131,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             verifyDocuments: 0.2
         },
         verifyDocuments: {
-            reshardCollection: 0.2,
+            reshardCollection: 0.1,
+            reshardCollectionSameKey: 0.1,
             internalTransactionForInsert: 0.2,
             internalTransactionForUpdate: 0.2,
             internalTransactionForDelete: 0.2,
