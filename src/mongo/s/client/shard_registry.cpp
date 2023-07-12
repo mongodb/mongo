@@ -47,7 +47,6 @@
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/locker.h"

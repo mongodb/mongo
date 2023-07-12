@@ -65,7 +65,6 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands.h"

@@ -53,7 +53,6 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"

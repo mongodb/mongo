@@ -4,7 +4,6 @@
  * @tags: [
  *   requires_persistence,
  *   requires_fcv_70,
- *   featureFlagTransitionToCatalogShard,
  * ]
  */
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";

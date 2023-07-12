@@ -49,7 +49,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"

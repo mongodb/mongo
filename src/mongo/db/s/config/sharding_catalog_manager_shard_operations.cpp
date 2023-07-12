@@ -67,7 +67,6 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
