@@ -5,6 +5,7 @@
  *   requires_fcv_71,
  *   requires_majority_read_concern,
  *   requires_snapshot_read,
+ *   featureFlagEndOfTransactionChangeEvent,
  *   assumes_against_mongod_not_mongos,
  *   # TODO SERVER-78273 Remove the tag after support for prepared transactions
  * ]

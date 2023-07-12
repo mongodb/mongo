@@ -101,6 +101,7 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/txn_retry_counter_too_old_info.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -1698,6 +1699,8 @@ TEST_F(TxnParticipantTest, CorrectlyStashAPIParameters) {
 }
 
 TEST_F(TxnParticipantTest, PrepareReturnsAListOfAffectedNamespaces) {
+    RAIIServerParameterControllerForTest controller("featureFlagEndOfTransactionChangeEvent", true);
+
     const std::vector<NamespaceString> kNamespaces = {
         NamespaceString::createNamespaceString_forTest("TestDB1", "TestColl1"),
         NamespaceString::createNamespaceString_forTest("TestDB1", "TestColl2"),

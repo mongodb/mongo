@@ -91,11 +91,13 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -2416,9 +2418,10 @@ TEST_F(ChangeStreamStageTest, TransformApplyOps) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
+    // Enable the endOfTransaction feature flag so this test produces an EOT change event.
+    RAIIServerParameterControllerForTest controller("featureFlagEndOfTransactionChangeEvent", true);
     // Doesn't use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
-
     Document idIndexDef = Document{{"v", 2}, {"key", D{{"_id", 1}}}};
     Document applyOpsDoc{
         {"applyOps",
@@ -2443,8 +2446,10 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
     LogicalSessionFromClient lsid = testLsid();
     vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid, kShowExpandedEventsSpec);
 
+    size_t expectedSize = 3;
+
     // The create operation should be skipped.
-    ASSERT_EQ(results.size(), 3u);
+    ASSERT_EQ(results.size(), expectedSize);
 
     // Check that the first document is correct.
     auto nextDoc = results[0];

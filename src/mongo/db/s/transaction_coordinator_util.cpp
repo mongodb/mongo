@@ -65,6 +65,8 @@
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/s/transaction_coordinator_util.h"
 #include "mongo/db/s/transaction_coordinator_worker_curop_repository.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
@@ -429,7 +431,9 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
                 doc.setId(sessionInfo);
                 doc.setParticipants(std::move(participantList));
                 doc.setDecision(decision);
-                if (decision.getDecision() == CommitDecision::kCommit) {
+                if (decision.getDecision() == CommitDecision::kCommit &&
+                    feature_flags::gFeatureFlagEndOfTransactionChangeEvent.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
                     doc.setAffectedNamespaces(std::move(affectedNamespaces));
                 }
                 return doc.toBSON();

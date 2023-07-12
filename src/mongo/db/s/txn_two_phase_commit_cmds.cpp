@@ -62,6 +62,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/s/transaction_coordinator_structures.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -221,7 +222,10 @@ public:
                                 std::vector<NamespaceString> affectedNamespaces) {
             Response response;
             response.setPrepareTimestamp(std::move(prepareTimestamp));
-            response.setAffectedNamespaces(std::move(affectedNamespaces));
+            if (feature_flags::gFeatureFlagEndOfTransactionChangeEvent.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                response.setAffectedNamespaces(std::move(affectedNamespaces));
+            }
             return response;
         }
 

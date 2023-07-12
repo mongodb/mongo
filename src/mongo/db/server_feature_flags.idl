@@ -81,3 +81,8 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions
         default: false
         shouldBeFCVGated: false
+    featureFlagEndOfTransactionChangeEvent:
+        description: "Feature flag to enable endOfTransaction oplog entry and change stream event"
+        cpp_varname: feature_flags::gFeatureFlagEndOfTransactionChangeEvent
+        default: false
+        shouldBeFCVGated: true

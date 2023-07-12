@@ -58,6 +58,8 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
@@ -327,7 +329,9 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::TransactionO
 
     // We need endOfTransaction only for unprepared transactions: so this must be an applyOps with
     // set lsid and txnNumber.
-    _needEndOfTransaction = !applyOps.missing() && _lsid.has_value() && _txnNumber.has_value();
+    _needEndOfTransaction = feature_flags::gFeatureFlagEndOfTransactionChangeEvent.isEnabled(
+                                serverGlobalParams.featureCompatibility) &&
+        !applyOps.missing() && _lsid.has_value() && _txnNumber.has_value();
 
     if (BSONType::Object ==
         input[repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName].getType()) {

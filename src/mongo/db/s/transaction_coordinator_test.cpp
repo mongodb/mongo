@@ -72,6 +72,7 @@
 #include "mongo/db/s/transaction_coordinator_structures.h"
 #include "mongo/db/s/transaction_coordinator_test_fixture.h"
 #include "mongo/db/s/transaction_coordinator_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -83,6 +84,7 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -816,52 +818,6 @@ protected:
         assertDocumentMatches(allCoordinatorDocs[0], lsid, txnNumberAndRetryCounter, participants);
     }
 
-    void persistDecisionExpectSuccess(
-        OperationContext* opCtx,
-        LogicalSessionId lsid,
-        TxnNumberAndRetryCounter txnNumberAndRetryCounter,
-        const std::vector<ShardId>& participants,
-        const boost::optional<Timestamp>& commitTimestamp,
-        const boost::optional<std::vector<NamespaceString>>& affectedNamespaces) {
-        txn::persistDecision(
-            *_aws,
-            lsid,
-            txnNumberAndRetryCounter,
-            participants,
-            [&] {
-                txn::CoordinatorCommitDecision decision;
-                if (commitTimestamp) {
-                    decision.setDecision(txn::CommitDecision::kCommit);
-                    decision.setCommitTimestamp(commitTimestamp);
-                } else {
-                    decision.setDecision(txn::CommitDecision::kAbort);
-                    decision.setAbortStatus(
-                        Status(ErrorCodes::NoSuchTransaction, "Test abort status"));
-                }
-                return decision;
-            }(),
-            kDummyAffectedNamespaces)
-            .get();
-
-        auto allCoordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
-        ASSERT_EQUALS(allCoordinatorDocs.size(), size_t(1));
-        if (commitTimestamp) {
-            assertDocumentMatches(allCoordinatorDocs[0],
-                                  lsid,
-                                  txnNumberAndRetryCounter,
-                                  participants,
-                                  txn::CommitDecision::kCommit,
-                                  *commitTimestamp,
-                                  affectedNamespaces);
-        } else {
-            assertDocumentMatches(allCoordinatorDocs[0],
-                                  lsid,
-                                  txnNumberAndRetryCounter,
-                                  participants,
-                                  txn::CommitDecision::kAbort);
-        }
-    }
-
     void deleteCoordinatorDocExpectSuccess(OperationContext* opCtx,
                                            LogicalSessionId lsid,
                                            TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
@@ -951,36 +907,6 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest, PersistParticipantListForMul
 }
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
-       PersistAbortDecisionWhenDocumentExistsWithoutDecisionSucceeds) {
-    persistParticipantListExpectSuccess(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
-    persistDecisionExpectSuccess(operationContext(),
-                                 _lsid,
-                                 _txnNumberAndRetryCounter,
-                                 _participants,
-                                 boost::none,
-                                 boost::none /* abort */);
-}
-
-TEST_F(TransactionCoordinatorDriverPersistenceTest,
-       PersistAbortDecisionWhenDocumentExistsWithSameDecisionSucceeds) {
-    persistParticipantListExpectSuccess(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
-    persistDecisionExpectSuccess(operationContext(),
-                                 _lsid,
-                                 _txnNumberAndRetryCounter,
-                                 _participants,
-                                 boost::none,
-                                 boost::none /* abort */);
-    persistDecisionExpectSuccess(operationContext(),
-                                 _lsid,
-                                 _txnNumberAndRetryCounter,
-                                 _participants,
-                                 boost::none,
-                                 boost::none /* abort */);
-}
-
-TEST_F(TransactionCoordinatorDriverPersistenceTest,
        PersistCommitDecisionWhenNoDocumentForTransactionExistsCanBeInterruptedAndReturnsError) {
     Future<repl::OpTime> future;
 
@@ -1003,36 +929,6 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 
     ASSERT_THROWS_CODE(
         future.get(), AssertionException, ErrorCodes::TransactionCoordinatorSteppingDown);
-}
-
-TEST_F(TransactionCoordinatorDriverPersistenceTest,
-       PersistCommitDecisionWhenDocumentExistsWithoutDecisionSucceeds) {
-    persistParticipantListExpectSuccess(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
-    persistDecisionExpectSuccess(operationContext(),
-                                 _lsid,
-                                 _txnNumberAndRetryCounter,
-                                 _participants,
-                                 _commitTimestamp,
-                                 kDummyAffectedNamespaces /* commit */);
-}
-
-TEST_F(TransactionCoordinatorDriverPersistenceTest,
-       PersistCommitDecisionWhenDocumentExistsWithSameDecisionSucceeds) {
-    persistParticipantListExpectSuccess(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
-    persistDecisionExpectSuccess(operationContext(),
-                                 _lsid,
-                                 _txnNumberAndRetryCounter,
-                                 _participants,
-                                 _commitTimestamp,
-                                 kDummyAffectedNamespaces /* commit */);
-    persistDecisionExpectSuccess(operationContext(),
-                                 _lsid,
-                                 _txnNumberAndRetryCounter,
-                                 _participants,
-                                 _commitTimestamp,
-                                 kDummyAffectedNamespaces /* commit */);
 }
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest, DeleteCoordinatorDocWhenNoDocumentExistsFails) {
@@ -1075,32 +971,6 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
     ASSERT_THROWS_CODE(txn::deleteCoordinatorDoc(*_aws, _lsid, _txnNumberAndRetryCounter).get(),
                        AssertionException,
                        51027);
-}
-
-TEST_F(TransactionCoordinatorDriverPersistenceTest,
-       DeleteCoordinatorDocWhenDocumentExistsWithAbortDecisionSucceeds) {
-    persistParticipantListExpectSuccess(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
-    persistDecisionExpectSuccess(operationContext(),
-                                 _lsid,
-                                 _txnNumberAndRetryCounter,
-                                 _participants,
-                                 boost::none,
-                                 boost::none /* abort */);
-    deleteCoordinatorDocExpectSuccess(operationContext(), _lsid, _txnNumberAndRetryCounter);
-}
-
-TEST_F(TransactionCoordinatorDriverPersistenceTest,
-       DeleteCoordinatorDocWhenDocumentExistsWithCommitDecisionSucceeds) {
-    persistParticipantListExpectSuccess(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
-    persistDecisionExpectSuccess(operationContext(),
-                                 _lsid,
-                                 _txnNumberAndRetryCounter,
-                                 _participants,
-                                 _commitTimestamp,
-                                 kDummyAffectedNamespaces /* commit */);
-    deleteCoordinatorDocExpectSuccess(operationContext(), _lsid, _txnNumberAndRetryCounter);
 }
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
@@ -1175,6 +1045,195 @@ TEST_F(
     ASSERT_EQUALS(allCoordinatorDocs.size(), size_t(1));
     assertDocumentMatches(allCoordinatorDocs[0], _lsid, txnNumberAndRetryCounter2, _participants);
 }
+
+class TransactionCoordinatorDecisionPersistenceTest
+    : public TransactionCoordinatorDriverPersistenceTest {
+protected:
+    void persistDecisionExpectSuccess(
+        OperationContext* opCtx,
+        LogicalSessionId lsid,
+        TxnNumberAndRetryCounter txnNumberAndRetryCounter,
+        const std::vector<ShardId>& participants,
+        const boost::optional<Timestamp>& commitTimestamp,
+        const boost::optional<std::vector<NamespaceString>>& affectedNamespaces) {
+        txn::persistDecision(
+            *_aws,
+            lsid,
+            txnNumberAndRetryCounter,
+            participants,
+            [&] {
+                txn::CoordinatorCommitDecision decision;
+                if (commitTimestamp) {
+                    decision.setDecision(txn::CommitDecision::kCommit);
+                    decision.setCommitTimestamp(commitTimestamp);
+                } else {
+                    decision.setDecision(txn::CommitDecision::kAbort);
+                    decision.setAbortStatus(
+                        Status(ErrorCodes::NoSuchTransaction, "Test abort status"));
+                }
+                return decision;
+            }(),
+            kDummyAffectedNamespaces)
+            .get();
+
+        auto allCoordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
+        ASSERT_EQUALS(allCoordinatorDocs.size(), size_t(1));
+        if (commitTimestamp) {
+            bool useAffectedNamespaces = feature_flags::gFeatureFlagEndOfTransactionChangeEvent
+                                             .isEnabledAndIgnoreFCVUnsafe();
+            assertDocumentMatches(allCoordinatorDocs[0],
+                                  lsid,
+                                  txnNumberAndRetryCounter,
+                                  participants,
+                                  txn::CommitDecision::kCommit,
+                                  *commitTimestamp,
+                                  useAffectedNamespaces ? affectedNamespaces : boost::none);
+        } else {
+            assertDocumentMatches(allCoordinatorDocs[0],
+                                  lsid,
+                                  txnNumberAndRetryCounter,
+                                  participants,
+                                  txn::CommitDecision::kAbort);
+        }
+    }
+
+    void persistAbortDecisionWhenDocumentExistsWithoutDecisionSucceeds() {
+        persistParticipantListExpectSuccess(
+            operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
+        persistDecisionExpectSuccess(operationContext(),
+                                     _lsid,
+                                     _txnNumberAndRetryCounter,
+                                     _participants,
+                                     boost::none,
+                                     boost::none /* abort */);
+    }
+
+    void persistAbortDecisionWhenDocumentExistsWithSameDecisionSucceeds() {
+        persistParticipantListExpectSuccess(
+            operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
+        persistDecisionExpectSuccess(operationContext(),
+                                     _lsid,
+                                     _txnNumberAndRetryCounter,
+                                     _participants,
+                                     boost::none,
+                                     boost::none /* abort */);
+        persistDecisionExpectSuccess(operationContext(),
+                                     _lsid,
+                                     _txnNumberAndRetryCounter,
+                                     _participants,
+                                     boost::none,
+                                     boost::none /* abort */);
+    }
+
+    void persistCommitDecisionWhenDocumentExistsWithoutDecisionSucceeds() {
+        persistParticipantListExpectSuccess(
+            operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
+        persistDecisionExpectSuccess(operationContext(),
+                                     _lsid,
+                                     _txnNumberAndRetryCounter,
+                                     _participants,
+                                     _commitTimestamp,
+                                     kDummyAffectedNamespaces /* commit */);
+    }
+
+    void persistCommitDecisionWhenDocumentExistsWithSameDecisionSucceeds() {
+        persistParticipantListExpectSuccess(
+            operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
+        persistDecisionExpectSuccess(operationContext(),
+                                     _lsid,
+                                     _txnNumberAndRetryCounter,
+                                     _participants,
+                                     _commitTimestamp,
+                                     kDummyAffectedNamespaces /* commit */);
+        persistDecisionExpectSuccess(operationContext(),
+                                     _lsid,
+                                     _txnNumberAndRetryCounter,
+                                     _participants,
+                                     _commitTimestamp,
+                                     kDummyAffectedNamespaces /* commit */);
+    }
+
+    void deleteCoordinatorDocWhenDocumentExistsWithAbortDecisionSucceeds() {
+        persistParticipantListExpectSuccess(
+            operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
+        persistDecisionExpectSuccess(operationContext(),
+                                     _lsid,
+                                     _txnNumberAndRetryCounter,
+                                     _participants,
+                                     boost::none,
+                                     boost::none /* abort */);
+        deleteCoordinatorDocExpectSuccess(operationContext(), _lsid, _txnNumberAndRetryCounter);
+    }
+
+    void deleteCoordinatorDocWhenDocumentExistsWithCommitDecisionSucceeds() {
+        persistParticipantListExpectSuccess(
+            operationContext(), _lsid, _txnNumberAndRetryCounter, _participants);
+        persistDecisionExpectSuccess(operationContext(),
+                                     _lsid,
+                                     _txnNumberAndRetryCounter,
+                                     _participants,
+                                     _commitTimestamp,
+                                     kDummyAffectedNamespaces /* commit */);
+        deleteCoordinatorDocExpectSuccess(operationContext(), _lsid, _txnNumberAndRetryCounter);
+    }
+};
+
+#define TEST_TRANSACTION_COORDINATOR_DECISION_PERSISTENCE(Fixture)                      \
+    TEST_F(Fixture, PersistAbortDecisionWhenDocumentExistsWithoutDecisionSucceeds) {    \
+        persistAbortDecisionWhenDocumentExistsWithoutDecisionSucceeds();                \
+    }                                                                                   \
+    TEST_F(Fixture, PersistAbortDecisionWhenDocumentExistsWithSameDecisionSucceeds) {   \
+        persistAbortDecisionWhenDocumentExistsWithSameDecisionSucceeds();               \
+    }                                                                                   \
+    TEST_F(Fixture, PersistCommitDecisionWhenDocumentExistsWithoutDecisionSucceeds) {   \
+        persistCommitDecisionWhenDocumentExistsWithoutDecisionSucceeds();               \
+    }                                                                                   \
+    TEST_F(Fixture, PersistCommitDecisionWhenDocumentExistsWithSameDecisionSucceeds) {  \
+        persistCommitDecisionWhenDocumentExistsWithSameDecisionSucceeds();              \
+    }                                                                                   \
+    TEST_F(Fixture, DeleteCoordinatorDocWhenDocumentExistsWithAbortDecisionSucceeds) {  \
+        deleteCoordinatorDocWhenDocumentExistsWithAbortDecisionSucceeds();              \
+    }                                                                                   \
+    TEST_F(Fixture, DeleteCoordinatorDocWhenDocumentExistsWithCommitDecisionSucceeds) { \
+        deleteCoordinatorDocWhenDocumentExistsWithCommitDecisionSucceeds();             \
+    }
+
+class TransactionCoordinatorDecisionPersistenceTestWithEOTChangeEventTrue
+    : public TransactionCoordinatorDecisionPersistenceTest {
+public:
+    void setUp() {
+        _controller.emplace("featureFlagEndOfTransactionChangeEvent", true);
+        TransactionCoordinatorDecisionPersistenceTest::setUp();
+    }
+    void tearDown() {
+        TransactionCoordinatorDecisionPersistenceTest::tearDown();
+        _controller.reset();
+    }
+
+private:
+    boost::optional<RAIIServerParameterControllerForTest> _controller;
+};
+
+class TransactionCoordinatorDecisionPersistenceTestWithEOTChangeEventFalse
+    : public TransactionCoordinatorDecisionPersistenceTest {
+public:
+    void setUp() {
+        _controller.emplace("featureFlagEndOfTransactionChangeEvent", false);
+        TransactionCoordinatorDecisionPersistenceTest::setUp();
+    }
+    void tearDown() {
+        TransactionCoordinatorDecisionPersistenceTest::tearDown();
+        _controller.reset();
+    }
+
+private:
+    boost::optional<RAIIServerParameterControllerForTest> _controller;
+};
+
+TEST_TRANSACTION_COORDINATOR_DECISION_PERSISTENCE(
+    TransactionCoordinatorDecisionPersistenceTestWithEOTChangeEventTrue);
+TEST_TRANSACTION_COORDINATOR_DECISION_PERSISTENCE(
+    TransactionCoordinatorDecisionPersistenceTestWithEOTChangeEventFalse);
 
 using TransactionCoordinatorTest = TransactionCoordinatorTestBase;
 
