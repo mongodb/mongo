@@ -61,14 +61,16 @@ namespace mongo::transport::grpc {
 template <class Base>
 class MockServerStreamBase : public Base {
 public:
-    static constexpr Milliseconds kTimeout = Milliseconds(100);
-
     virtual void setUp() override {
         Base::setUp();
 
         MockStubTestFixtures fixtures;
         _fixtures = fixtures.makeStreamTestFixtures(
-            Base::getServiceContext()->getFastClockSource()->now() + kTimeout, _clientMetadata);
+            Base::getServiceContext()->getFastClockSource()->now() + getTimeout(), _clientMetadata);
+    }
+
+    virtual Milliseconds getTimeout() const {
+        return Milliseconds(5000);
     }
 
     MockServerStream& getServerStream() {
@@ -135,6 +137,13 @@ private:
 };
 
 class MockServerStreamTest : public MockServerStreamBase<ServiceContextTest> {};
+
+class MockServerStreamTestShortTimeout : public MockServerStreamTest {
+public:
+    Milliseconds getTimeout() const override {
+        return Milliseconds(100);
+    }
+};
 
 class MockServerStreamTestWithMockedClockSource
     : public MockServerStreamBase<ServiceContextWithClockSourceMockTest> {};
@@ -215,7 +224,7 @@ TEST_F(MockServerStreamTest, CannotRetrieveMetadataBeforeSent) {
 }
 
 TEST_F(MockServerStreamTestWithMockedClockSource, DeadlineIsEnforced) {
-    clockSource().advance(kTimeout * 2);
+    clockSource().advance(getTimeout() * 2);
     ASSERT_TRUE(getServerContext().isCancelled());
     ASSERT_FALSE(getServerStream().read());
     ASSERT_FALSE(getServerStream().write(makeUniqueMessage().sharedBuffer()));
@@ -255,11 +264,11 @@ TEST_F(MockServerStreamTest, MetadataAvailableAfterTryCancel) {
     ASSERT_TRUE(getClientContext().getServerInitialMetadata());
 }
 
-TEST_F(MockServerStreamTest, InitialServerReadTimesOut) {
+TEST_F(MockServerStreamTestShortTimeout, InitialServerReadTimesOut) {
     ASSERT_FALSE(getServerStream().read());
 }
 
-TEST_F(MockServerStreamTest, InitialClientReadTimesOut) {
+TEST_F(MockServerStreamTestShortTimeout, InitialClientReadTimesOut) {
     ASSERT_FALSE(getClientStream().read());
 }
 
@@ -304,7 +313,7 @@ TEST_F(MockServerStreamTestWithMockedClockSource, DeadlineExceededInterruptsFini
     // finish() won't return until server end hangs up too.
     ASSERT_FALSE(pf.future.isReady());
 
-    clockSource().advance(kTimeout * 2);
+    clockSource().advance(getTimeout() * 2);
     ASSERT_EQ(pf.future.get().error_code(), ::grpc::StatusCode::DEADLINE_EXCEEDED);
 }
 }  // namespace mongo::transport::grpc
