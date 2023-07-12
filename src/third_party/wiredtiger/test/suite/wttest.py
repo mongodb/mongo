@@ -348,6 +348,8 @@ class WiredTigerTestCase(unittest.TestCase):
         if seedw != 0 and seedz != 0:
             WiredTigerTestCase._randomseed = True
             WiredTigerTestCase._seeds = [seedw, seedz]
+        # We don't have a lot of output, but we want to see it right away.
+        sys.stdout.reconfigure(line_buffering=True)
         WiredTigerTestCase._globalSetup = True
 
     @staticmethod
@@ -676,6 +678,8 @@ class WiredTigerTestCase(unittest.TestCase):
         os.chdir(self.testdir)
         with open('testname.txt', 'w+') as namefile:
             namefile.write(str(self) + '\n')
+        if WiredTigerTestCase._verbose >= 2:
+            print("[pid:{}]: {}: starting".format(os.getpid(), str(self)))
         self.fdSetUp()
         self._threadLocal.currentTestCase = self
         self.ignoreTearDownLogs = False
@@ -823,8 +827,8 @@ class WiredTigerTestCase(unittest.TestCase):
         if elapsed > 0.001 and WiredTigerTestCase._verbose >= 2:
             print("[pid:{}]: {}: {:.2f} seconds".format(os.getpid(), str(self), elapsed))
         if teardown_failed:
-            self.fail(f'Teardown failed with message: {teardown_msg}')
-        if (not passed) and (not self.skipped):
+            self.fail(f'Teardown of {self} failed with message: {teardown_msg}')
+        if (not passed or teardown_failed) and (not self.skipped):
             print("[pid:{}]: ERROR in {}".format(os.getpid(), str(self)))
             self.pr('FAIL')
             self.pr('preserving directory ' + self.testdir)
@@ -849,6 +853,9 @@ class WiredTigerTestCase(unittest.TestCase):
             shutil.copy(bkp_cursor.get_key(), backup_dir)
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         bkp_cursor.close()
+
+    def runningHook(self, name):
+        return name in WiredTigerTestCase.hook_names
 
     # Set a Python breakpoint.  When this function is called,
     # the python debugger will be called as described here:
@@ -1000,7 +1007,25 @@ class WiredTigerTestCase(unittest.TestCase):
     def timestamp_str(self, t):
         return '%x' % t
 
+    # Some tests do table drops as a means to perform some test repeatedly in a loop.
+    # These tests require that a name be completely removed before the next iteration
+    # can begin.  However, tiered storage does not always provide a way to remove or
+    # rename objects that have been stored to the cloud, as doing that is not the normal
+    # part of a workflow (at this writing, GC is not yet implemented). Most storage sources
+    # return ENOTSUP when asked to remove a cloud object, so we really don't have a way to
+    # clear out the name space, and so we skip these tests under tiered storage.
+    #
+    # Note: as part of PM-3389, we may end up with unique names for every cloud object.
+    # If so, we could remove this restriction.
+    def requireDropRemovesNameConflict(self):
+        if self.runningHook('tiered'):
+            self.skipTest('Test requires removal from cloud storage, which is not yet permitted')
+
     def dropUntilSuccess(self, session, uri, config=None):
+        # Most test cases consider a drop, and especially a 'drop until success',
+        # to completely remove a file's artifacts, so that the name can be reused.
+        # Require this behavior.
+        self.requireDropRemovesNameConflict()
         while True:
             try:
                 session.drop(uri, config)

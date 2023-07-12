@@ -47,6 +47,7 @@ class test_truncate11(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(format_values)
 
+    @wttest.skip_for_hook("tiered", "test depends on regular checkpoints running")
     def test_truncate11(self):
         # Create a large table with lots of pages.
         uri = "table:test_truncate11"
