@@ -61,6 +61,8 @@ env.Library(
         'cluster_fle2_compact_cmd.cpp',
         'cluster_fle2_get_count_info_cmd.cpp',
         'cluster_fsync_cmd.cpp',
+        'cluster_fsync_unlock_cmd.cpp',
+        'cluster_fsync_unlock_cmd.idl',
         'cluster_ftdc_commands.cpp',
         'cluster_get_cluster_parameter_cmd.cpp',
         'cluster_get_shard_version_cmd.cpp',

@@ -103,6 +103,7 @@ enums:
            flushRouterConfig :  "flushRouterConfig"
            forceUUID :  "forceUUID"
            fsync :  "fsync"
+           fsyncUnlock: "fsyncUnlock"
            getClusterParameter: "getClusterParameter"
            getDatabaseVersion :  "getDatabaseVersion"
            getDefaultRWConcern :  "getDefaultRWConcern"
