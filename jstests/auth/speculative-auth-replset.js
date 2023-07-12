@@ -101,7 +101,7 @@ Object.keys(initialMechStats).forEach(function(mech) {
 
 {
     // Capture new statistics, and assert that they're consistent.
-    const newMechStats = getMechStats(admin);
+    let newMechStats = getMechStats(admin);
     printjson(newMechStats);
 
     // Speculative and cluster statistics should be incremented by intracluster auth.
@@ -110,19 +110,36 @@ Object.keys(initialMechStats).forEach(function(mech) {
     assert.gt(newMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful,
               initialMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful);
 
-    // Speculative and cluster auth counts should align with the authentication events in the server
-    // log
-    const logCounts = countAuthInLog(admin);
+    // Speculative and cluster auth counts should align with the authentication
+    // events in the server log.
+    let logCounts = countAuthInLog(admin);
 
     assert.eq(logCounts.speculative,
               newMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful -
                   initialMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful);
 
-    assert.eq(logCounts.cluster, newMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful);
-
     assert.gt(logCounts.speculativeCluster,
               0,
               "Expected to observe at least one speculative cluster authentication attempt");
+
+    // Retry cluster count a few times since random intracluster auth may surprise us.
+    const kClusterCountNumRetries = 5;
+    const kClusterCountRetryIntervalMS = 5 * 1000;
+    assert.retry(function() {
+        const logCount = logCounts.cluster;
+        const mechStatCount = newMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful;
+        if (logCount == mechStatCount) {
+            return true;
+        }
+
+        // Cluster count does not match.
+        // Possible that a background cluster-auth happened between getMechStats and countAuthInLog.
+        // Repoll values for a retry.
+        jsTest.log('Cluster counts mismatched: ' + logCount + ' != ' + mechStatCount);
+        newMechStats = getMechStats(admin);
+        logCounts = countAuthInLog(admin);
+        return false;
+    }, "Cluster counts never stabilized", kClusterCountNumRetries, kClusterCountRetryIntervalMS);
 }
 
 admin.logout();
