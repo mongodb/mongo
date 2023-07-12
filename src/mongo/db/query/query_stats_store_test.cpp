@@ -47,7 +47,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/basic_types_gen.h"
-#include "mongo/db/collection_type.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -85,7 +84,7 @@ std::size_t hash(const BSONObj& obj) {
 
 class QueryStatsStoreTest : public ServiceContextTest {
 public:
-    static constexpr auto collectionType = query_shape::CollectionType::Collection;
+    boost::optional<StringData> collectionType = boost::make_optional("collection"_sd);
     BSONObj makeQueryStatsKeyFindRequest(const FindCommandRequest& fcr,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          bool applyHmac) {

@@ -93,43 +93,44 @@ BSONObj FindKeyGenerator::generate(
 
 void FindKeyGenerator::appendCommandSpecificComponents(BSONObjBuilder& bob,
                                                        const SerializationOptions& opts) const {
-    if (_hasField.readConcern) {
+    if (auto optObj = _readConcern) {
         // Read concern should not be considered a literal.
         // afterClusterTime is distinct for every operation with causal consistency enabled. We
         // normalize it in order not to blow out the telemetry store cache.
-        if (_readConcern["afterClusterTime"]) {
+        if (optObj.get()["afterClusterTime"]) {
             BSONObjBuilder subObj = bob.subobjStart(FindCommandRequest::kReadConcernFieldName);
 
-            if (auto levelElem = _readConcern["level"]) {
+            if (auto levelElem = optObj.get()["level"]) {
                 subObj.append(levelElem);
             }
-            opts.appendLiteral(&subObj, "afterClusterTime", _readConcern["afterClusterTime"]);
+            opts.appendLiteral(&subObj, "afterClusterTime", optObj.get()["afterClusterTime"]);
             subObj.doneFast();
         } else {
-            bob.append(FindCommandRequest::kReadConcernFieldName, _readConcern);
+            bob.append(FindCommandRequest::kReadConcernFieldName, optObj.get());
         }
     }
 
-    if (_hasField.allowPartialResults) {
-        bob.append(FindCommandRequest::kAllowPartialResultsFieldName, _allowPartialResults);
+    if (_allowPartialResults.has_value()) {
+        bob.append(FindCommandRequest::kAllowPartialResultsFieldName,
+                   _allowPartialResults.value_or(false));
     }
 
     // Fields for literal redaction. Adds batchSize, maxTimeMS, and noCursorTimeOut.
 
-    if (_noCursorTimeout) {
+    if (auto noCursorTimeout = _noCursorTimeout) {
         // Capture whether noCursorTimeout was specified in the query, do not distinguish between
         // true or false.
         opts.appendLiteral(
-            &bob, FindCommandRequest::kNoCursorTimeoutFieldName, _hasField.noCursorTimeout);
+            &bob, FindCommandRequest::kNoCursorTimeoutFieldName, noCursorTimeout.has_value());
     }
 
-    if (_hasField.maxTimeMS) {
-        opts.appendLiteral(&bob, FindCommandRequest::kMaxTimeMSFieldName, _maxTimeMS);
+    if (auto maxTimeMs = _maxTimeMS) {
+        opts.appendLiteral(&bob, FindCommandRequest::kMaxTimeMSFieldName, *maxTimeMs);
     }
 
-    if (_hasField.batchSize) {
+    if (auto batchSize = _batchSize) {
         opts.appendLiteral(
-            &bob, FindCommandRequest::kBatchSizeFieldName, static_cast<long long>(_batchSize));
+            &bob, FindCommandRequest::kBatchSizeFieldName, static_cast<long long>(*batchSize));
     }
 }
 }  // namespace mongo::query_stats

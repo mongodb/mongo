@@ -1135,15 +1135,17 @@ const NamespaceString& AutoGetCollectionForReadCommandMaybeLockFree::getNss() co
     }
 }
 
-query_shape::CollectionType AutoGetCollectionForReadCommandMaybeLockFree::getCollectionType()
-    const {
+StringData AutoGetCollectionForReadCommandMaybeLockFree::getCollectionType() const {
     if (auto&& view = getView()) {
-        return view->timeseries() ? query_shape::CollectionType::Timeseries
-                                  : query_shape::CollectionType::View;
+        if (view->timeseries())
+            return "timeseries"_sd;
+        return "view"_sd;
     }
     auto&& collection = getCollection();
-    return collection ? query_shape::CollectionType::Collection
-                      : query_shape::CollectionType::Nonexistent;
+    if (!collection) {
+        return "nonExistent"_sd;
+    }
+    return "collection"_sd;
 }
 
 
