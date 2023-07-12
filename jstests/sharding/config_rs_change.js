@@ -10,8 +10,8 @@ configRS.initiate(replConfig);
 
 // Ensure the featureCompatibilityVersion is lastLTSFCV so that the mongos can connect if its
 // binary version is lastLTS.
-assert.commandWorked(
-    configRS.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+assert.commandWorked(configRS.getPrimary().adminCommand(
+    {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
 // Build a seed list for the config servers to pass to mongos that uses "localhost" for the
 // hostnames even though the replica set config uses the hostname.

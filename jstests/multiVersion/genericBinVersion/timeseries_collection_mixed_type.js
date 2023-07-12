@@ -62,7 +62,16 @@ function runTest(docs, query, results, path, bounds) {
 
         // Set the fcv if needed.
         if (fcv) {
-            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: fcv}));
+            const res = db.adminCommand({"setFeatureCompatibilityVersion": fcv});
+            if (!res.ok && res.code === 7369100) {
+                // We failed due to requiring 'confirm: true' on the command. This will only
+                // occur on 7.0+ nodes that have 'enableTestCommands' set to false. Retry the
+                // setFCV command with 'confirm: true'.
+                assert.commandWorked(
+                    db.adminCommand({"setFeatureCompatibilityVersion": fcv, confirm: true}));
+            } else {
+                assert.commandWorked(res);
+            }
             rst.awaitReplication();
         }
 

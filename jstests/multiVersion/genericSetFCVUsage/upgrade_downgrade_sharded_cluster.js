@@ -133,7 +133,8 @@ for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     checkClusterAfterBinaryUpgrade();
 
     jsTest.log('Upgrading FCV to ' + latestFCV);
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     checkClusterAfterFCVUpgrade(latestFCV);
 
@@ -141,7 +142,8 @@ for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     // Setting and testing cluster using old binaries in old FCV mode
 
     jsTest.log('Downgrading FCV to ' + oldVersion);
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: oldVersion}));
+    assert.commandWorked(
+        st.s.adminCommand({setFeatureCompatibilityVersion: oldVersion, confirm: true}));
 
     checkClusterAfterFCVDowngrade();
 

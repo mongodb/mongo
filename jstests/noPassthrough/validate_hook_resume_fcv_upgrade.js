@@ -129,7 +129,8 @@ function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {
     let attempts = 0;
     assert.soon(
         function() {
-            let res = setFCVConn.adminCommand({setFeatureCompatibilityVersion: targetVersion});
+            let res = setFCVConn.adminCommand(
+                {setFeatureCompatibilityVersion: targetVersion, confirm: true});
 
             if (res.ok === 1) {
                 assert.commandWorked(res);
@@ -155,8 +156,8 @@ function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {
                              true /*isCleaningServerMetadata*/);
                     // If the setFCV command was interrupted while in the isCleaningServerMetadata
                     // state, we must complete the FCV downgrade successfully.
-                    assert.commandWorked(
-                        conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+                    assert.commandWorked(conn.adminCommand(
+                        {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
                 } else {
                     checkFCV(conn.getDB("admin"), lastLTSFCV, targetVersion);
@@ -171,7 +172,8 @@ function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {
             // interrupted.
             assert.commandWorked(conn.adminCommand({
                 setFeatureCompatibilityVersion: targetVersion === lastLTSFCV ? latestFCV
-                                                                             : lastLTSFCV
+                                                                             : lastLTSFCV,
+                confirm: true,
             }));
         },
         "failed to get featureCompatibilityVersion document into a partially downgraded" +
@@ -191,7 +193,8 @@ function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {
 
 (function testStandaloneInLastLTSFCV() {
     testStandalone(conn => {
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+        assert.commandWorked(
+            conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
         checkFCV(conn.getDB("admin"), lastLTSFCV);
     }, {expectedAtTeardownFCV: lastLTSFCV, expectedSetLastLTSFCV: 1, expectedSetLatestFCV: 1});
 })();
@@ -204,7 +207,8 @@ function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {
 
 (function testStandaloneWithInterruptedFCVUpgrade() {
     testStandalone(conn => {
-        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+        assert.commandWorked(
+            conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
         forceInterruptedUpgradeOrDowngrade(conn, latestFCV);
     }, {expectedAtTeardownFCV: lastLTSFCV, expectedSetLastLTSFCV: 1, expectedSetLatestFCV: 1});
 })();

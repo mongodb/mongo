@@ -160,7 +160,7 @@ if (isShardSvrRst) {
             // Transitioning from last-lts to last-continuous is only allowed when
             // setFeatureCompatibilityVersion is called with fromConfigServer: true.
             assert.commandWorked(rst.getPrimary().adminCommand(
-                {setFeatureCompatibilityVersion: fcv, fromConfigServer: true}));
+                {setFeatureCompatibilityVersion: fcv, confirm: true, fromConfigServer: true}));
 
             // Wait for the new FCV to propagate to all configsvr nodes.
             rst.awaitReplication();

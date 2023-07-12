@@ -78,8 +78,8 @@ const failAfterReachingTransitioningState =
 const awaitSetFcv = startParallelShell(
     funWithArgs(function(collName) {
         // Should fail due to failAfterReachingTransitioningState.
-        assert.commandFailedWithCode(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
-                                     7555200);
+        assert.commandFailedWithCode(
+            db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}), 7555200);
     }, primaryColl.getName()), primary.port);
 
 hangAfterBlockingIndexBuildsForFcvDowngrade.wait();

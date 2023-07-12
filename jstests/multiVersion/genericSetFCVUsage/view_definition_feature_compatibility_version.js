@@ -54,7 +54,8 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
     }
 
     // Explicitly set feature compatibility version to the latest version.
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     // Test that we are able to create a new view with any of the new features.
     testCases.forEach(
@@ -78,8 +79,8 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
     assert.commandWorked(testDB.createView("emptyView", "coll", []));
 
     // Set the feature compatibility version to the last version.
-    assert.commandWorked(
-        testDB.adminCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion)}));
+    assert.commandWorked(testDB.adminCommand(
+        {setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}));
 
     // Read against an existing view using new query features should not fail.
     testCases.forEach((pipe, i) => {
@@ -155,7 +156,8 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
     });
 
     // Set the feature compatibility version back to the latest version.
-    assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     testCases.forEach(function(pipe, i) {
         assert.commandWorked(testDB.runCommand({find: "firstView" + i}),
@@ -178,8 +180,8 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
 
     // Set the feature compatibility version to the last version and then restart with
     // internalValidateFeaturesAsPrimary=false.
-    assert.commandWorked(
-        testDB.adminCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion)}));
+    assert.commandWorked(testDB.adminCommand(
+        {setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}));
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod({
         dbpath: dbpath,

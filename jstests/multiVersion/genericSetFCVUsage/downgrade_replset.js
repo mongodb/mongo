@@ -30,7 +30,8 @@ function runDowngradeTest(downgradeVersion) {
     // the replica set in order to ensure that all nodes can be successfully downgraded. This
     // effectively allows us to emulate upgrading to the latest version with existing data files and
     // then trying to downgrade the FCV.
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
+    assert.commandWorked(
+        primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
     rst.awaitReplication();
 
     jsTest.log("Inserting documents into collection.");

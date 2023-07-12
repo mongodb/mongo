@@ -120,7 +120,8 @@ function runTest(downgradeFCV) {
         testCommandWithShardMerge(cmd);
     });
 
-    assert.commandWorked(adminDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
+    assert.commandWorked(
+        adminDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
     // Now that FCV is downgraded, shard merge is automatically disabled.
     cmds.forEach((cmd) => {
         if (MongoRunner.compareBinVersions(downgradeFCV, "5.2") >= 0) {

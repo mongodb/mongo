@@ -29,7 +29,8 @@ const downgradeFCV = lastContinuousFCV;
 const hangWhileDowngradingFp = configureFailPoint(donorPrimary, "hangWhileDowngrading");
 const downgradeThread = new Thread((host, downgradeFCV) => {
     const db = new Mongo(host);
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
 }, donorPrimary.host, downgradeFCV);
 
 downgradeThread.start();
@@ -44,7 +45,8 @@ jsTestLog("Assert shard splits are aborted when upgrading.");
 const hangWhileUpgradingFp = configureFailPoint(donorPrimary, "hangWhileUpgrading");
 const upgradeThread = new Thread((host) => {
     const db = new Mongo(host);
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 }, donorPrimary.host);
 
 upgradeThread.start();

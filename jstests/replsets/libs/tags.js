@@ -39,8 +39,10 @@ var TagsTest = function(options) {
         // upgrading some of our nodes to the latest version while performing write operations under
         // different network partition scenarios.
         if (options.setFeatureCompatibilityVersion) {
-            assert.commandWorked(replTest.getPrimary().adminCommand(
-                {setFeatureCompatibilityVersion: options.setFeatureCompatibilityVersion}));
+            assert.commandWorked(replTest.getPrimary().adminCommand({
+                setFeatureCompatibilityVersion: options.setFeatureCompatibilityVersion,
+                confirm: true
+            }));
         }
 
         for (let i = 1; i < nodes.length; ++i) {

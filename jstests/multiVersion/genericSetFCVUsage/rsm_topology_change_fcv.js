@@ -36,12 +36,14 @@ function runTest(downgradeFCV) {
 
     jsTest.log("Downgrade FCV and verify that the RSM on the mongos detects the topology change");
     assert.commandWorked(st.s.adminCommand({clearLog: 'global'}));
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
+    assert.commandWorked(
+        st.s.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
     checkLog.contains(st.s, downgradeRegex);
 
     jsTest.log("Upgrade FCV and verify that the RSM on the mongos detects the topology change");
     assert.commandWorked(st.s.adminCommand({clearLog: 'global'}));
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     checkLog.contains(st.s, latestRegex);
 
     st.stop();

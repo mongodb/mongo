@@ -1684,7 +1684,7 @@ var ShardingTest = function ShardingTest(params) {
             const fcv = binVersionToFCV(clusterVersionInfo.oldestBinVersion);
             function setFeatureCompatibilityVersion() {
                 assert.commandWorked(csrsPrimary.adminCommand(
-                    {setFeatureCompatibilityVersion: fcv, fromConfigServer: true}));
+                    {setFeatureCompatibilityVersion: fcv, confirm: true, fromConfigServer: true}));
 
                 // Wait for the new featureCompatibilityVersion to propagate to all nodes in the
                 // CSRS to ensure that older versions of mongos can successfully connect.

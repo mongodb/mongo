@@ -50,7 +50,8 @@ var priConn = replShard.getPrimary();
 // In order to work around this, in the mixed version suite, be pessimistic and always set this
 // node to the 'last-lts' FCV
 if (jsTestOptions().shardMixedBinVersions) {
-    assert.commandWorked(priConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(
+        priConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     replShard.awaitReplication();
 }
 

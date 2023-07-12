@@ -75,7 +75,8 @@ removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfig
 assert.eq("completed", removeRes.state, tojson(removeRes));
 
 const downgradeFCV = binVersionToFCV('last-lts');
-assert.commandWorked(st.s0.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
+assert.commandWorked(
+    st.s0.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
 
 // Connect directly to the config to simulate a stale mongos that thinks config server is
 // still a shard
@@ -111,7 +112,8 @@ assert.eq(0, timestampCmp(version.metadata.shardVersion, Timestamp(0, 0)), tojso
 // Should be able to do secondary reads on the config server after transitioning back.
 
 const upgradeFCV = binVersionToFCV('latest');
-assert.commandWorked(st.s0.adminCommand({setFeatureCompatibilityVersion: upgradeFCV}));
+assert.commandWorked(
+    st.s0.adminCommand({setFeatureCompatibilityVersion: upgradeFCV, confirm: true}));
 
 // Need to drop the database before it can become a shard again.
 assert.commandWorked(st.configRS.getPrimary().getDB('sharded').dropDatabase());

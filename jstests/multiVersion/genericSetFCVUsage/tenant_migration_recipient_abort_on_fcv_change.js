@@ -51,11 +51,12 @@ hangWhileMigratingDonorFP.wait();
 hangWhileMigratingRecipientFP.wait();
 
 // Initiate a downgrade and let it complete.
-assert.commandWorked(
-    recipientPrimary.adminCommand({setFeatureCompatibilityVersion: lastContinuousFCV}));
+assert.commandWorked(recipientPrimary.adminCommand(
+    {setFeatureCompatibilityVersion: lastContinuousFCV, confirm: true}));
 
 // Upgrade again and finish the test.
-assert.commandWorked(recipientPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+assert.commandWorked(
+    recipientPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
 hangWhileMigratingDonorFP.off();
 hangWhileMigratingRecipientFP.off();

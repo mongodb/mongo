@@ -23,7 +23,7 @@ const split = test.createSplitOperation(tenantIds);
 const commitThread = split.commitAsync();
 pauseAfterBlockingFp.wait();
 assert.commandWorked(
-    donorPrimary.adminCommand({setFeatureCompatibilityVersion: lastContinuousFCV}));
+    donorPrimary.adminCommand({setFeatureCompatibilityVersion: lastContinuousFCV, confirm: true}));
 pauseAfterBlockingFp.off();
 assert.commandFailedWithCode(commitThread.returnData(), ErrorCodes.TenantMigrationAborted);
 
@@ -42,7 +42,8 @@ if (lastContinuousFCV == "6.2") {
     const secondSplit = test.createSplitOperation(tenantIds);
     const commitThread = secondSplit.commitAsync();
     pauseAfterBlockingFp.wait();
-    assert.commandWorked(donorPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        donorPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     pauseAfterBlockingFp.off();
     assert.commandFailedWithCode(commitThread.returnData(), ErrorCodes.TenantMigrationAborted);
     secondSplit.forget();

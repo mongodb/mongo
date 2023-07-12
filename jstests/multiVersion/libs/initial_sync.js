@@ -28,7 +28,8 @@ var multversionInitialSyncTest = function(
     // Set 'featureCompatibilityVersion' if given.
     if (fcv) {
         jsTestLog("Setting FCV to '" + fcv + "' on the primary.");
-        assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: fcv}));
+        assert.commandWorked(
+            primary.adminCommand({setFeatureCompatibilityVersion: fcv, confirm: true}));
         rst.awaitReplication();
     }
 

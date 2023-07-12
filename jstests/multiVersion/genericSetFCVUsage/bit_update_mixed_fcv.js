@@ -18,7 +18,7 @@ const primary = rst.getPrimary();
 const testDB = primary.getDB(jsTestName());
 const coll = testDB.test;
 
-testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV});
+testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true});
 
 assert.commandWorked(coll.insert({_id: 0, arr: [0]}));
 

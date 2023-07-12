@@ -1743,7 +1743,8 @@ let runAllCommands = function(command, test, conn, fixture) {
 };
 
 let runTest = function(conn, adminDB, fixture) {
-    assert.commandFailed(conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailed(
+        conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     jsTestLog("Running all commands in the downgradingToLastLTS FCV");
     // First check that the map contains all available commands.
@@ -1769,7 +1770,8 @@ let runTest = function(conn, adminDB, fixture) {
         runAllCommands(command, test, conn, fixture);
     }
 
-    assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        conn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     jsTestLog("Running all commands after upgrading back to the latest FCV");
     commandsList = AllCommandsTest.checkCommandCoverage(conn, allCommands);

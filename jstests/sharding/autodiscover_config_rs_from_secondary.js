@@ -22,7 +22,7 @@ rst.initiate(conf);
 // node to the 'last-lts' FCV
 if (jsTestOptions().shardMixedBinVersions) {
     assert.commandWorked(
-        rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+        rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     rst.awaitReplication();
 }
 

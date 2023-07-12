@@ -5,9 +5,6 @@
 (function() {
 "use strict";
 
-TestData.setParameters = TestData.setParameters || {};
-TestData.setParameters.requireConfirmInSetFcv = true;
-
 let dbpath = MongoRunner.dataPath + "feature_compatibility_version_confirm";
 resetDbpath(dbpath);
 
@@ -44,8 +41,7 @@ function runStandaloneTest(downgradeVersion) {
     jsTestLog("Running standalone downgrade test");
 
     // Spin up a standalone with latest FCV.
-    const conn = MongoRunner.runMongod(
-        {dbpath: dbpath, binVersion: latest, setParameter: {requireConfirmInSetFcv: true}});
+    const conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
     assert.neq(null, conn, "mongod was unable to start up");
     const adminDB = conn.getDB("admin");
     runTest(adminDB, downgradeVersion);
@@ -57,10 +53,7 @@ function runReplicaSetTest(downgradeVersion) {
     jsTestLog("Running replica set downgrade test");
 
     // Spin up a replica set with latest FCV.
-    const rst = new ReplSetTest({
-        nodes: 3,
-        nodeOptions: {binVersion: latest, setParameter: {requireConfirmInSetFcv: true}}
-    });
+    const rst = new ReplSetTest({nodes: 3, nodeOptions: {binVersion: latest}});
     rst.startSet();
     rst.initiateWithHighElectionTimeout();
 
@@ -75,8 +68,7 @@ function runShardingTest(downgradeVersion) {
     jsTestLog("Running sharded cluster downgrade test");
 
     // Spin up a sharded cluster with latest FCV.
-    const st =
-        new ShardingTest({shards: 2, rsOptions: {setParameter: {requireConfirmInSetFcv: true}}});
+    const st = new ShardingTest({shards: 2});
     const conn = st.s;
     const adminDB = conn.getDB("admin");
     const configSvrPrimaryConn = st.configRS.getPrimary().getDB("admin");
@@ -95,6 +87,4 @@ if (lastLTSFCV != lastContinuousFCV) {
     runReplicaSetTest('last-continuous');
     runShardingTest('last-continuous');
 }
-
-TestData.setParameters.requireConfirmInSetFcv = false;
 })();

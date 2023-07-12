@@ -723,16 +723,6 @@ MongoRunner.mongodOptions = function(opts = {}) {
         } else {
             opts.setParameter["disableTransitionFromLatestToLastContinuous"] = false;
         }
-
-        // TODO (SERVER-74398): Remove special handling of 'confirm: true' once we no longer run
-        // suites with v6.X. We disable this check by default now so that we can pass suites
-        // without individually handling each multiversion test running on old binaries.
-        if (jsTestOptions().setParameters && jsTestOptions().setParameters.requireConfirmInSetFcv) {
-            opts.setParameter["requireConfirmInSetFcv"] =
-                jsTestOptions().setParameters.requireConfirmInSetFcv;
-        } else {
-            opts.setParameter["requireConfirmInSetFcv"] = false;
-        }
     }
 
     _removeSetParameterIfBeforeVersion(opts, "writePeriodicNoops", "3.3.12");
@@ -750,7 +740,6 @@ MongoRunner.mongodOptions = function(opts = {}) {
         opts, "internalQueryDisableExclusionProjectionFastPath", "6.2.0");
     _removeSetParameterIfBeforeVersion(
         opts, "disableTransitionFromLatestToLastContinuous", "7.0.0");
-    _removeSetParameterIfBeforeVersion(opts, "requireConfirmInSetFcv", "7.0.0");
 
     if (!opts.logFile && opts.useLogFiles) {
         opts.logFile = opts.dbpath + "/mongod.log";

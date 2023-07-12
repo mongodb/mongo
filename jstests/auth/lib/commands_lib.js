@@ -6475,7 +6475,7 @@ export const authCommandsLib = {
         },
         {
           testname: "setFeatureCompatibilityVersion",
-          command: {setFeatureCompatibilityVersion: latestFCV},
+          command: {setFeatureCompatibilityVersion: latestFCV, confirm: true},
           testcases: [
               {
                 runOnDb: adminDbName,

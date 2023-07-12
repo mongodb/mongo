@@ -1451,21 +1451,8 @@ var ReplSetTest = function ReplSetTest(opts) {
                 // When latest is not equal to last-continuous, the transition to last-continuous is
                 // not allowed. Setting fromConfigServer allows us to bypass this restriction and
                 // test last-continuous.
-                const res = this.getPrimary().adminCommand(
-                    {setFeatureCompatibilityVersion: fcv, fromConfigServer: true});
-                // TODO (SERVER-74398): Remove the retry with 'confirm: true' once 7.0 is last LTS.
-                if (!res.ok && res.code === 7369100) {
-                    // We failed due to requiring 'confirm: true' on the command. This will only
-                    // occur on 7.0+ nodes that have 'enableTestCommands' set to false. Retry the
-                    // setFCV command with 'confirm: true'.
-                    assert.commandWorked(this.getPrimary().adminCommand({
-                        setFeatureCompatibilityVersion: fcv,
-                        confirm: true,
-                        fromConfigServer: true
-                    }));
-                } else {
-                    assert.commandWorked(res);
-                }
+                assert.commandWorked(this.getPrimary().adminCommand(
+                    {setFeatureCompatibilityVersion: fcv, fromConfigServer: true, confirm: true}));
                 checkFCV(this.getPrimary().getDB("admin"), fcv);
 
                 // The server has a practice of adding a reconfig as part of upgrade/downgrade logic
@@ -1632,17 +1619,8 @@ var ReplSetTest = function ReplSetTest(opts) {
             asCluster(this, this.nodes, () => {
                 let fcv = jsTest.options().replSetFeatureCompatibilityVersion;
                 print("Setting feature compatibility version for replica set to '" + fcv + "'");
-                const res = this.getPrimary().adminCommand({setFeatureCompatibilityVersion: fcv});
-                // TODO (SERVER-74398): Remove the retry with 'confirm: true' once 7.0 is last LTS.
-                if (!res.ok && res.code === 7369100) {
-                    // We failed due to requiring 'confirm: true' on the command. This will only
-                    // occur on 7.0+ nodes that have 'enableTestCommands' set to false. Retry the
-                    // setFCV command with 'confirm: true'.
-                    assert.commandWorked(this.getPrimary().adminCommand(
-                        {setFeatureCompatibilityVersion: fcv, confirm: true}));
-                } else {
-                    assert.commandWorked(res);
-                }
+                assert.commandWorked(this.getPrimary().adminCommand(
+                    {setFeatureCompatibilityVersion: fcv, confirm: true}));
 
                 // Wait for the new 'featureCompatibilityVersion' to propagate to all nodes in the
                 // replica set. The 'setFeatureCompatibilityVersion' command only waits for
@@ -3126,12 +3104,6 @@ var ReplSetTest = function ReplSetTest(opts) {
             // downgrading from latest to last continuous.
             options.setParameter.disableTransitionFromLatestToLastContinuous =
                 options.setParameter.disableTransitionFromLatestToLastContinuous || false;
-
-            // TODO (SERVER-74398): Remove special handling of 'confirm: true' once we no longer run
-            // suites with v6.X. We disable this check by default now so that we can pass suites
-            // without individually handling each multiversion test running on old binaries.
-            options.setParameter.requireConfirmInSetFcv =
-                options.setParameter.requireConfirmInSetFcv || false;
         }
 
         if (tojson(options) != tojson({}))

@@ -57,7 +57,8 @@ function runTxn(mongosHost, dbName, collName) {
 function runSetFCV(primaryHost) {
     const primaryConn = new Mongo(primaryHost);
     jsTest.log("Starting a setFCV command on " + primaryHost);
-    assert.commandWorked(primaryConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(
+        primaryConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     jsTest.log("Completed the setFCV command");
 }
 

@@ -29,7 +29,8 @@ coll.drop();
 tColl.drop();
 
 // set up a source collection and a time-series target collection.
-assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+assert.commandWorked(
+    testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 assert.commandWorked(coll.insert({t: ISODate(), m: 1}));
 assert.commandWorked(testDB.createCollection(tColl.getName(), {timeseries: {timeField: "t"}}));
 assert.commandWorked(tColl.insert({t: ISODate(), m: 1}));
@@ -71,7 +72,8 @@ assert.throwsWithCode(() => coll.aggregate(replacePipeline), 7406100);
 
 // upgrade the FCV version
 jsTestLog('upgrading the FCV version.');
-assert.commandWorked(mongosConn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+assert.commandWorked(
+    mongosConn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 // assert aggregate with 'timeseries' succeeds.
 assert.doesNotThrow(() => coll.aggregate(pipeline));
 let resultColl = mongosConn.getDB(dbName)["out_time"];

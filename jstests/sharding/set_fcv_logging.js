@@ -93,7 +93,8 @@ function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
     jsTest.log("Case 1.1. Logs should show that downgrade has only reached 'called' stage.");
     assert.commandWorked(
         conn.adminCommand({configureFailPoint: 'failBeforeTransitioning', mode: "alwaysOn"}));
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailed(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     assertLogs(SetFCVStatus.called, "downgrade", serverType, numShardServers);
     assert.commandWorked(
         conn.adminCommand({configureFailPoint: 'failBeforeTransitioning', mode: "off"}));
@@ -103,14 +104,16 @@ function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
     jsTest.log("Case 1.2. Logs should show that downgrade has only reached 'downgrading' stage.");
     assert.commandWorked(
         conn.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandFailed(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     assertLogs(SetFCVStatus.transitioning, "downgrade", serverType, numShardServers);
     assert.commandWorked(conn.adminCommand({configureFailPoint: 'failDowngrading', mode: "off"}));
 
     // 1.3. Test that setFCV (downgrade) succeeds:
     // should have all three logs 6744300 (called), 6744301 (transitioning), 6744302 (successful).
     jsTest.log("Case 1.3. Logs should show that downgrade has reached 'downgraded' stage.");
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     assertLogs(SetFCVStatus.successful, "downgrade", serverType, numShardServers);
 
     /* 2. Testing logging for upgrade */
@@ -120,7 +123,8 @@ function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
     jsTest.log("Case 2.1. Logs should show that upgrade has only reached 'called' stage.");
     assert.commandWorked(
         conn.adminCommand({configureFailPoint: 'failBeforeTransitioning', mode: "alwaysOn"}));
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandFailed(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     assertLogs(SetFCVStatus.called, "upgrade", serverType, numShardServers);
     assert.commandWorked(
         conn.adminCommand({configureFailPoint: 'failBeforeTransitioning', mode: "off"}));
@@ -130,20 +134,23 @@ function assertLogsWithFailpoints(conn, adminDB, serverType, numShardServers) {
     jsTest.log("Case 2.2. Logs should show that upgrade has only reached 'upgrading' stage.");
     assert.commandWorked(
         conn.adminCommand({configureFailPoint: 'failUpgrading', mode: "alwaysOn"}));
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandFailed(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     assertLogs(SetFCVStatus.transitioning, "upgrade", serverType, numShardServers);
     assert.commandWorked(conn.adminCommand({configureFailPoint: 'failUpgrading', mode: "off"}));
 
     // 2.3. Test that setFCV (upgrade) succeeds:
     // should have all three logs 6744300 (called), 6744301 (transitioning), 6744302 (successful).
     jsTest.log("Case 2.3. Logs should show that upgrade has reached 'upgraded' stage.");
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     assertLogs(SetFCVStatus.successful, "upgrade", serverType, numShardServers);
 
     // 2.4. Shouldn't log anything because we have already upgraded to latestFCV.
     jsTest.log(
         "Case 2.4. Logs should not contain fcv upgrade because it is already in upgraded state.");
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     // Ensure none of the logs have been output.
     assertLogs(
         0 /* status: no fcv change */, "upgrade", 0 /* serverType */, 0 /* numShardServers */);

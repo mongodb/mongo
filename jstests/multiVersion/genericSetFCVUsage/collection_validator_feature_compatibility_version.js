@@ -66,7 +66,8 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
     let adminDB = conn.getDB("admin");
 
     // Explicitly set the feature compatibility version to the latest version.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     testCases.forEach(function(test, i) {
         // Create a collection with a validator using new query features.
@@ -98,8 +99,8 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
     });
 
     // Set the feature compatibility version to the last version.
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion)}));
+    assert.commandWorked(adminDB.runCommand(
+        {setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}));
 
     testCases.forEach(
         function(test, i) {
@@ -197,7 +198,8 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
     testDB = conn.getDB(testName);
 
     // Set the feature compatibility version back to the latest version.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     testCases.forEach(function(test, i) {
         const coll = testDB["coll2" + i];
@@ -217,8 +219,8 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
 
     // Set the feature compatibility version to the last version and then restart with
     // internalValidateFeaturesAsPrimary=false.
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion)}));
+    assert.commandWorked(adminDB.runCommand(
+        {setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}));
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod({
         dbpath: dbpath,
