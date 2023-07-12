@@ -668,11 +668,13 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         opCtx, fromNss, toNss, _doc.getDropTarget(), executor);
 
                     {
-                        AutoGetCollection coll{opCtx,
-                                               toNss,
-                                               MODE_IS,
-                                               AutoGetCollection::Options{}.expectedUUID(
-                                                   _doc.getExpectedTargetUUID())};
+                        AutoGetCollection coll{
+                            opCtx,
+                            toNss,
+                            MODE_IS,
+                            AutoGetCollection::Options{}
+                                .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
+                                .expectedUUID(_doc.getExpectedTargetUUID())};
                         uassert(ErrorCodes::IllegalOperation,
                                 "Cannot rename to an existing encrypted collection",
                                 !coll || !coll->getCollectionOptions().encryptedFieldConfig ||
