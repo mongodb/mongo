@@ -5790,7 +5790,7 @@ buildvariants:
     compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars:
       PATH=/opt/mongodbtoolchain/v4/bin:$PATH
-      MSAN_OPTIONS="abort_on_error=1:disable_coredump=0:verbosity=3"
+      MSAN_OPTIONS="abort_on_error=1:disable_coredump=0:print_stacktrace=1"
       MSAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
       LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
       WT_TOPDIR=$(git rev-parse --show-toplevel)

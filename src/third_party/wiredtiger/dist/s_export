@@ -28,8 +28,6 @@ check()
     # Functions beginning with __ut are intentionally exposed to support unit testing when
     # Wiredtiger is compiled with HAVE_UNITTEST=1.
     egrep -v '^__ut' |
-    # MSan injected symbol present when origin tracking is enabled.
-    egrep -v '^__msan_track_origins' |
     egrep -v '^__wt') |
     sort |
     uniq -u |
