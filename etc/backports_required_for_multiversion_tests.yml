@@ -20,6 +20,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/core/timeseries/timeseries_field_parsed_as_bson.js
+    ticket: SERVER-77654
   - test_file: jstests/replsets/replSetGetStatus_member_wall_times.js
     ticket: SERVER-54909
   - test_file: jstests/sharding/database_versioning_all_commands.js

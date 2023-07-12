@@ -130,6 +130,108 @@ Status _createView(OperationContext* opCtx,
     });
 }
 
+BSONObj _generateTimeseriesValidator(StringData timeField) {
+    // '$jsonSchema' : {
+    //     bsonType: 'object',
+    //     required: ['_id', 'control', 'data'],
+    //     properties: {
+    //         _id: {bsonType: 'objectId'},
+    //         control: {
+    //             bsonType: 'object',
+    //             required: ['version', 'min', 'max'],
+    //             properties: {
+    //                 version: {bsonType: 'number'},
+    //                 min: {
+    //                     bsonType: 'object',
+    //                     required: ['%s'],
+    //                     properties: {'%s': {bsonType: 'date'}}
+    //                 },
+    //                 max: {
+    //                     bsonType: 'object',
+    //                     required: ['%s'],
+    //                     properties: {'%s': {bsonType: 'date'}}
+    //                 },
+    //                 closed: {bsonType: 'bool'},
+    //             },
+    //         },
+    //         data: {bsonType: 'object'},
+    //         meta: {}
+    //     },
+    //     additionalProperties: false
+    //   }
+    BSONObjBuilder validator;
+    BSONObjBuilder schema(validator.subobjStart("$jsonSchema"));
+    schema.append("bsonType", "object");
+    schema.append("required",
+                  BSON_ARRAY("_id"
+                             << "control"
+                             << "data"));
+    {
+        BSONObjBuilder properties(schema.subobjStart("properties"));
+        {
+            BSONObjBuilder _id(properties.subobjStart("_id"));
+            _id.append("bsonType", "objectId");
+            _id.done();
+        }
+        {
+            BSONObjBuilder control(properties.subobjStart("control"));
+            control.append("bsonType", "object");
+            control.append("required",
+                           BSON_ARRAY("version"
+                                      << "min"
+                                      << "max"));
+            {
+                BSONObjBuilder innerProperties(control.subobjStart("properties"));
+                {
+                    BSONObjBuilder version(innerProperties.subobjStart("version"));
+                    version.append("bsonType", "number");
+                    version.done();
+                }
+                {
+                    BSONObjBuilder min(innerProperties.subobjStart("min"));
+                    min.append("bsonType", "object");
+                    min.append("required", BSON_ARRAY(timeField));
+                    BSONObjBuilder minProperties(min.subobjStart("properties"));
+                    BSONObjBuilder timeFieldObj(minProperties.subobjStart(timeField));
+                    timeFieldObj.append("bsonType", "date");
+                    timeFieldObj.done();
+                    minProperties.done();
+                    min.done();
+                }
+
+                {
+                    BSONObjBuilder max(innerProperties.subobjStart("max"));
+                    max.append("bsonType", "object");
+                    max.append("required", BSON_ARRAY(timeField));
+                    BSONObjBuilder maxProperties(max.subobjStart("properties"));
+                    BSONObjBuilder timeFieldObj(maxProperties.subobjStart(timeField));
+                    timeFieldObj.append("bsonType", "date");
+                    timeFieldObj.done();
+                    maxProperties.done();
+                    max.done();
+                }
+                {
+                    BSONObjBuilder closed(innerProperties.subobjStart("closed"));
+                    closed.append("bsonType", "bool");
+                    closed.done();
+                }
+                innerProperties.done();
+            }
+            control.done();
+        }
+        {
+            BSONObjBuilder data(properties.subobjStart("data"));
+            data.append("bsonType", "object");
+            data.done();
+        }
+        properties.append("meta", BSONObj{});
+        properties.done();
+    }
+    schema.append("additionalProperties", false);
+    schema.done();
+    return validator.obj();
+}
+
 Status _createTimeseries(OperationContext* opCtx,
                          const NamespaceString& ns,
                          const CollectionOptions& optionsArg) {
@@ -154,46 +256,13 @@ Status _createTimeseries(OperationContext* opCtx,
                 maxSpanSeconds == options.timeseries->getBucketMaxSpanSeconds());
     options.timeseries->setBucketMaxSpanSeconds(maxSpanSeconds);
 
+
     // Set the validator option to a JSON schema enforcing constraints on bucket documents.
     // This validation is only structural to prevent accidental corruption by users and
     // cannot cover all constraints. Leave the validationLevel and validationAction to their
     // strict/error defaults.
     auto timeField = options.timeseries->getTimeField();
-    auto validatorObj = fromjson(fmt::sprintf(R"(
-{
-'$jsonSchema' : {
-    bsonType: 'object',
-    required: ['_id', 'control', 'data'],
-    properties: {
-        _id: {bsonType: 'objectId'},
-        control: {
-            bsonType: 'object',
-            required: ['version', 'min', 'max'],
-            properties: {
-                version: {bsonType: 'number'},
-                min: {
-                    bsonType: 'object',
-                    required: ['%s'],
-                    properties: {'%s': {bsonType: 'date'}}
-                },
-                max: {
-                    bsonType: 'object',
-                    required: ['%s'],
-                    properties: {'%s': {bsonType: 'date'}}
-                },
-                closed: {bsonType: 'bool'}
-            }
-        },
-        data: {bsonType: 'object'},
-        meta: {}
-    },
-    additionalProperties: false
-}
-})",
-                                              timeField,
-                                              timeField,
-                                              timeField,
-                                              timeField));
+    auto validatorObj = _generateTimeseriesValidator(timeField);
 
     bool existingBucketCollectionIsCompatible = false;
 
