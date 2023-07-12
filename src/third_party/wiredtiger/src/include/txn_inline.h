@@ -963,7 +963,11 @@ __wt_upd_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value, u_int modify_type
         upd->size = WT_STORE_SIZE(value->size);
         memcpy(upd->data, value->data, value->size);
     }
-    upd->type = (uint8_t)modify_type;
+    /*
+     * This field is const but we need to set it once at allocation time, to do so temporarily cast
+     * as a non-const.
+     */
+    *(uint8_t *)&upd->type = (uint8_t)modify_type;
 
     *updp = upd;
     if (sizep != NULL)
@@ -992,7 +996,7 @@ __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, 
 {
     WT_VISIBLE_TYPE upd_visible;
     uint64_t prepare_txnid;
-    uint8_t prepare_state, type;
+    uint8_t prepare_state;
 
     prepare_txnid = WT_TXN_NONE;
 
@@ -1003,9 +1007,8 @@ __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, 
     __wt_upd_value_clear(cbt->upd_value);
 
     for (; upd != NULL; upd = upd->next) {
-        WT_ORDERED_READ(type, upd->type);
         /* Skip reserved place-holders, they're never visible. */
-        if (type == WT_UPDATE_RESERVE)
+        if (upd->type == WT_UPDATE_RESERVE)
             continue;
 
         WT_ORDERED_READ(prepare_state, upd->prepare_state);
@@ -1045,7 +1048,7 @@ __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, 
          * the time window already has a stop time set then we must have seen a tombstone prior to
          * ours in the update list, and therefore don't need to do this again.
          */
-        if (type == WT_UPDATE_TOMBSTONE && F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) &&
+        if (upd->type == WT_UPDATE_TOMBSTONE && F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) &&
           !WT_TIME_WINDOW_HAS_STOP(&cbt->upd_value->tw)) {
             cbt->upd_value->tw.durable_stop_ts = upd->durable_ts;
             cbt->upd_value->tw.stop_ts = upd->start_ts;
@@ -1074,7 +1077,7 @@ __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, 
          * history store instead of on-disk value.
          */
         if (upd->txnid != WT_TXN_ABORTED && restored_updp != NULL &&
-          F_ISSET(upd, WT_UPDATE_RESTORED_FROM_HS) && type == WT_UPDATE_STANDARD) {
+          F_ISSET(upd, WT_UPDATE_RESTORED_FROM_HS) && upd->type == WT_UPDATE_STANDARD) {
             WT_ASSERT(session, *restored_updp == NULL);
             *restored_updp = upd;
         }
