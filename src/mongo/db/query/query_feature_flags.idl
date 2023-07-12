@@ -100,3 +100,9 @@ feature_flags:
       cpp_varname: gFeatureFlagSearchInSbe
       default: false
       shouldBeFCVGated: true
+
+    featureFlagTimeSeriesInSbe:
+      description: "Feature flag to enable queries against time-series collections to execute in SBE"
+      cpp_varname: gFeatureFlagTimeSeriesInSbe
+      default: false
+      shouldBeFCVGated: true
