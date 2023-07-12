@@ -12,6 +12,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "appendOplogNote",
     "cleanupReshardCollection",
     "commitReshardCollection",
+    "fsyncUnlock",
     "reshardCollection",
     "rotateCertificates",
     "setAllowMigrations",

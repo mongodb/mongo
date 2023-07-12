@@ -56,6 +56,8 @@ env.Library(
         'cluster_find_and_modify_cmd.cpp',
         'cluster_find_cmd.cpp',
         'cluster_fsync_cmd.cpp',
+        'cluster_fsync_unlock_cmd.cpp',
+        'cluster_fsync_unlock_cmd.idl',
         'cluster_ftdc_commands.cpp',
         'cluster_get_last_error_cmd.cpp',
         'cluster_get_shard_version_cmd.cpp',
