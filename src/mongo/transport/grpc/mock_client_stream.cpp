@@ -68,6 +68,8 @@ bool MockClientStream::write(ConstSharedBuffer msg) {
 }
 
 ::grpc::Status MockClientStream::finish() {
+    _pipe.closeWriting();
+
     // We use a busy wait here because there is no easy way to wait until all the messages in the
     // pipe have been read.
     while (!_pipe.isConsumed() && !_rpcCancellationState->isDeadlineExceeded()) {

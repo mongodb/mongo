@@ -44,6 +44,8 @@ namespace mongo::transport::grpc {
 
 class MockRPC {
 public:
+    enum class MethodName { UnauthenticatedCommandStream, AuthenticatedCommandStream };
+
     /**
      * Close the stream and send the final return status of the RPC to the client. This is the
      * mocked equivalent of returning a status from an RPC handler.
@@ -67,7 +69,7 @@ public:
         serverStream->cancel(std::move(status));
     }
 
-    StringData methodName;
+    MethodName methodName;
     std::unique_ptr<MockServerStream> serverStream;
     std::unique_ptr<MockServerContext> serverCtx;
 };
@@ -99,27 +101,44 @@ public:
      *
      * The provided handler is expected to throw assertion exceptions, hence the use of
      * ThreadAssertionMonitor to spawn threads here.
+     *
+     * The provided WireVersionProvider will be used to determine the cluster's maxWireVersion
+     * server-side. To test functionality related to the wire version gossiping, a
+     * MockWireVersionProvider can be used instead of the regular WireVersionProvider.
      */
     void start(unittest::ThreadAssertionMonitor& monitor,
-               std::function<::grpc::Status(MockRPC&)> handler) {
-        _listenerThread = monitor.spawn([&, handler = std::move(handler)] {
-            std::vector<stdx::thread> rpcHandlers;
-            while (auto rpc = acceptRPC()) {
-                rpcHandlers.push_back(monitor.spawn([rpc = std::move(*rpc), handler]() mutable {
-                    try {
-                        auto status = handler(rpc);
-                        rpc.sendReturnStatus(std::move(status));
-                    } catch (DBException& e) {
-                        rpc.sendReturnStatus(
-                            ::grpc::Status(::grpc::StatusCode::UNKNOWN, e.toString()));
-                    }
-                }));
-            }
+               CommandService::RPCHandler handler,
+               std::shared_ptr<WireVersionProvider> wvProvider) {
+        _listenerThread =
+            monitor.spawn([&, handler = std::move(handler), wvProvider = std::move(wvProvider)] {
+                CommandService svc(nullptr, handler, std::move(wvProvider));
+                std::vector<stdx::thread> rpcHandlers;
+                while (auto rpc = acceptRPC()) {
+                    rpcHandlers.push_back(monitor.spawn([rpc = std::move(*rpc), &svc]() mutable {
+                        try {
+                            ::grpc::Status status;
+                            switch (rpc.methodName) {
+                                case MockRPC::MethodName::UnauthenticatedCommandStream:
+                                    status = svc._handleStream(*rpc.serverCtx, *rpc.serverStream);
+                                    break;
+                                case MockRPC::MethodName::AuthenticatedCommandStream:
+                                    status = svc._handleAuthenticatedStream(*rpc.serverCtx,
+                                                                            *rpc.serverStream);
+                                    break;
+                            }
+                            rpc.sendReturnStatus(std::move(status));
+                        } catch (DBException& e) {
+                            rpc.sendReturnStatus(
+                                ::grpc::Status(::grpc::StatusCode::UNKNOWN, e.toString()));
+                        }
+                    }));
+                }
+                svc.shutdown();
 
-            for (auto& thread : rpcHandlers) {
-                thread.join();
-            }
-        });
+                for (auto& thread : rpcHandlers) {
+                    thread.join();
+                }
+            });
     }
 
     /**
@@ -169,15 +188,15 @@ public:
     ~MockStub() {}
 
     std::shared_ptr<MockClientStream> unauthenticatedCommandStream(MockClientContext* ctx) {
-        return _makeStream(CommandService::kUnauthenticatedCommandStreamMethodName, ctx);
+        return _makeStream(MockRPC::MethodName::UnauthenticatedCommandStream, ctx);
     }
 
     std::shared_ptr<MockClientStream> authenticatedCommandStream(MockClientContext* ctx) {
-        return _makeStream(CommandService::kAuthenticatedCommandStreamMethodName, ctx);
+        return _makeStream(MockRPC::MethodName::AuthenticatedCommandStream, ctx);
     }
 
 private:
-    std::shared_ptr<MockClientStream> _makeStream(const StringData methodName,
+    std::shared_ptr<MockClientStream> _makeStream(MockRPC::MethodName methodName,
                                                   MockClientContext* ctx) {
         MetadataView clientMetadata;
         for (auto& kvp : ctx->_metadata) {

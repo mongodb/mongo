@@ -31,56 +31,78 @@
 
 #include "mongo/transport/grpc/client_context.h"
 
-#include "mongo/transport/grpc/mock_client_stream.h"
+#include <string>
+
+#include <grpcpp/grpcpp.h>
+
+#include "mongo/transport/grpc/metadata.h"
 
 namespace mongo::transport::grpc {
 
-class MockClientContext : public ClientContext {
+class GRPCClientContext : public ClientContext {
 public:
-    MockClientContext() : _deadline{Date_t::max()}, _stream{nullptr} {}
+    GRPCClientContext() = default;
+
+    ~GRPCClientContext() = default;
 
     void addMetadataEntry(const std::string& key, const std::string& value) override {
-        invariant(!_stream);
-        _metadata.insert({key, value});
-    };
+        _ctx.AddMetadata(key, value);
+    }
 
+    // Because gRPC's GetServerInitialMetadata returns a reference to a map of gRPC reference types,
+    // there's no easy way for us to return a map of our wrapper types without constructing such a
+    // map ourselves. We construct one in each call here rather than doing it once and caching it to
+    // avoid the need for locking or for making this method not thread-safe. This method only needs
+    // to be invoked a single time anyways, so the perf concern is minimal.
+    //
+    // Note that the map cannot be created in the constructor, since the RPC might not have begun at
+    // that point.
     MetadataView getServerInitialMetadata() const override {
-        invariant(_stream);
-        invariant(_stream->_serverInitialMetadata.isReady());
-
         MetadataView mv;
-        for (auto& kvp : _stream->_serverInitialMetadata.get()) {
-            mv.insert({kvp.first, kvp.second});
+        for (auto& kvp : _ctx.GetServerInitialMetadata()) {
+            mv.insert({StringData{kvp.first.data(), kvp.first.length()},
+                       StringData{kvp.second.data(), kvp.second.length()}});
         }
         return mv;
     }
 
     Date_t getDeadline() const override {
-        return _deadline;
+        return Date_t{_ctx.deadline()};
     }
 
     void setDeadline(Date_t deadline) override {
-        invariant(!_stream);
-        _deadline = deadline;
+        _ctx.set_deadline(deadline.toSystemTimePoint());
     }
 
+    // Similar to getServerInitialMetadata(), we parse the URI in each invocation of this method to
+    // not violate const here or require any locking. This too should only need to be called once,
+    // so again the performance impact should be negligible.
     HostAndPort getRemote() const override {
-        invariant(_stream);
-        return _stream->_remote;
+        return _parseURI(_ctx.peer());
     }
 
     void tryCancel() override {
-        invariant(_stream);
-        _stream->_cancel();
+        _ctx.TryCancel();
+    }
+
+    ::grpc::ClientContext* getGRPCClientContext() {
+        return &_ctx;
     }
 
 private:
-    friend class MockStub;
-    friend struct MockStreamTestFixtures;
+    /**
+     * Parses a gRPC-formatted URI to a HostAndPort, throwing an exception on
+     * failure. See: https://grpc.github.io/grpc/cpp/md_doc_naming.html
+     */
+    static HostAndPort _parseURI(const std::string& uri) {
+        StringData sd{uri};
+        if (auto firstColon = sd.find(':'); firstColon != std::string::npos) {
+            sd = sd.substr(firstColon + 1);
+        }
+        return HostAndPort::parseThrowing(sd);
+    }
 
-    Date_t _deadline;
-    MetadataContainer _metadata;
-    MockClientStream* _stream;
+    ::grpc::ClientContext _ctx;
 };
 
 }  // namespace mongo::transport::grpc

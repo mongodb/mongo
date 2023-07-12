@@ -59,7 +59,7 @@ public:
      * This must only be called after the first message has been received on the ClientStream
      * created from the RPC that this context is associated with.
      */
-    virtual boost::optional<const MetadataContainer&> getServerInitialMetadata() const = 0;
+    virtual MetadataView getServerInitialMetadata() const = 0;
 
     /**
      * Set the deadline for the RPC to be executed using this context.
@@ -70,6 +70,10 @@ public:
 
     virtual Date_t getDeadline() const = 0;
 
+    /**
+     * Get the address of the remote server.
+     * This must only be called after the RPC associated with this context has been invoked.
+     */
     virtual HostAndPort getRemote() const = 0;
 
     /**

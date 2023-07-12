@@ -36,14 +36,45 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo::transport::grpc::util {
+namespace constants {
+/**
+ * Placeholder wire version constant corresponding to the first wire version that supports using
+ * gRPC.
+ * TODO SERVER-78614: Move this to the WireVersion enum closer to the initial release containing
+ * gRPC support.
+ */
+static constexpr auto kMinimumWireVersion = 22;
+
+static constexpr auto kAuthenticatedCommandStreamMethodName =
+    "/mongodb.CommandService/AuthenticatedCommandStream";
+static constexpr auto kUnauthenticatedCommandStreamMethodName =
+    "/mongodb.CommandService/UnauthenticatedCommandStream";
+
+// Server-provided metadata keys.
+// This is defined as a std::string instead of StringData to avoid having to copy it when passing to
+// gRPC APIs that expect a const std::string&.
+extern const std::string kClusterMaxWireVersionKey;
+
+// Client-provided metadata keys.
+static constexpr StringData kAuthenticationTokenKey = "authorization"_sd;
+static constexpr StringData kClientIdKey = "mongodb-clientid"_sd;
+static constexpr StringData kClientMetadataKey = "mongodb-client"_sd;
+static constexpr StringData kWireVersionKey = "mongodb-wireversion"_sd;
+}  // namespace constants
 
 /**
  * Parse a PEM-encoded file that contains a single certificate and its associated private key
  * into a PemKeyCertPair.
  */
 ::grpc::SslServerCredentialsOptions::PemKeyCertPair parsePEMKeyFile(StringData filePath);
+
+/**
+ * Converts a Mongo URI into a gRPC formatted string.
+ */
+std::string formatHostAndPortForGRPC(const HostAndPort& address);
 
 /**
  * Converts a gRPC status code into its corresponding MongoDB error code.

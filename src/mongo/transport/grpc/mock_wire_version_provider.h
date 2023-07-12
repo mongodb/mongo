@@ -29,32 +29,28 @@
 
 #pragma once
 
-#include "mongo/db/wire_version.h"
+#include "mongo/transport/grpc/util.h"
+#include "mongo/transport/grpc/wire_version_provider.h"
 
 namespace mongo::transport::grpc {
 
-class WireVersionProvider {
+/**
+ * A WireVersionProvider whose clusterMaxWireVersion can be manually set to arbitrary values.
+ */
+class MockWireVersionProvider : public WireVersionProvider {
 public:
-    WireVersionProvider() = default;
-    virtual ~WireVersionProvider() = default;
-    WireVersionProvider(const WireVersionProvider&) = delete;
-    WireVersionProvider& operator=(const WireVersionProvider&) = delete;
+    MockWireVersionProvider() = default;
 
-    /**
-     * Gets this server's understanding of the minimum maxWireVersion value for all servers in the
-     * cluster. This is used to gossip the wire version gRPC clients should use when constructing
-     * commands, as per the MongoDB gRPC Protocol.
-     *
-     * If this server is a mongos, "all servers in the cluster" refers to all the mongoses in the
-     * sharded cluster. If this server is a mongod, "all servers in the cluster" refers to that
-     * mongod alone, since gRPC clients only support direct connections to mongods and do not
-     * support communicating with entire replica sets.
-     *
-     * Currently, this method just returns this server's maxWireVersion, since the current version
-     * is the only server version that supports gRPC. In the future, the provider will be augmented
-     * to account for the other servers in the cluster.
-     */
-    virtual int getClusterMaxWireVersion() const;
+    int getClusterMaxWireVersion() const override {
+        return _clusterMaxWireVersion.load();
+    }
+
+    void setClusterMaxWireVersion(int newVersion) {
+        _clusterMaxWireVersion.store(newVersion);
+    }
+
+private:
+    AtomicWord<int> _clusterMaxWireVersion{util::constants::kMinimumWireVersion};
 };
 
 }  // namespace mongo::transport::grpc

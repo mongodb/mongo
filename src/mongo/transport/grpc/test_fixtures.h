@@ -45,6 +45,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/grpc/bidirectional_pipe.h"
 #include "mongo/transport/grpc/metadata.h"
+#include "mongo/transport/grpc/mock_client.h"
 #include "mongo/transport/grpc/mock_client_context.h"
 #include "mongo/transport/grpc/mock_client_stream.h"
 #include "mongo/transport/grpc/mock_server_context.h"
@@ -68,7 +69,21 @@ namespace mongo::transport::grpc {
 inline Message makeUniqueMessage() {
     OpMsg msg;
     msg.body = BSON("id" << UUID::gen().toBSON());
-    return msg.serialize();
+    auto out = msg.serialize();
+    out.header().setId(nextMessageId());
+    out.header().setResponseToMsgId(0);
+    return out;
+}
+
+inline BSONObj makeClientMetadataDocument() {
+    static constexpr auto kDriverName = "myDriver";
+    static constexpr auto kDriverVersion = "0.1.2";
+    static constexpr auto kAppName = "MyAppName";
+
+    BSONObjBuilder bob;
+    uassertStatusOK(ClientMetadata::serialize(kDriverName, kDriverVersion, kAppName, &bob));
+    auto metadataDoc = bob.obj();
+    return metadataDoc.getObjectField(kMetadataDocumentName).getOwned();
 }
 
 struct MockStreamTestFixtures {
@@ -152,26 +167,23 @@ public:
     static constexpr auto kClientSelfSignedCertificateKeyFile =
         "jstests/libs/client-self-signed.pem";
     static constexpr auto kCAFile = "jstests/libs/ca.pem";
+    static constexpr auto kMockedClientAddr = "client-def:123";
 
     class Stub {
     public:
         using ReadMessageType = SharedBuffer;
         using WriteMessageType = ConstSharedBuffer;
         using ClientStream = ::grpc::ClientReaderWriter<WriteMessageType, ReadMessageType>;
-
-        struct Options {
-            boost::optional<std::string> tlsCertificateKeyFile;
-            boost::optional<std::string> tlsCAFile;
-        };
+        using Options = GRPCClient::Options;
 
         Stub(const std::shared_ptr<::grpc::ChannelInterface>& channel)
             : _channel(channel),
               _unauthenticatedCommandStreamMethod(
-                  CommandService::kUnauthenticatedCommandStreamMethodName,
+                  util::constants::kUnauthenticatedCommandStreamMethodName,
                   ::grpc::internal::RpcMethod::BIDI_STREAMING,
                   channel),
               _authenticatedCommandStreamMethod(
-                  CommandService::kAuthenticatedCommandStreamMethodName,
+                  util::constants::kAuthenticatedCommandStreamMethodName,
                   ::grpc::internal::RpcMethod::BIDI_STREAMING,
                   channel) {}
 
@@ -200,6 +212,10 @@ public:
         ::grpc::internal::RpcMethod _authenticatedCommandStreamMethod;
     };
 
+    static HostAndPort defaultServerAddress() {
+        return HostAndPort(kBindAddress, kBindPort);
+    }
+
     static Server::Options makeServerOptions() {
         Server::Options options;
         options.addresses = std::vector<std::string>{kBindAddress};
@@ -212,42 +228,130 @@ public:
         return options;
     }
 
-    static Server makeServer(CommandService::RPCHandler handler, Server::Options options) {
+    static GRPCClient::Options makeClientOptions() {
+        GRPCClient::Options options;
+        options.tlsCAFile = kCAFile;
+        options.tlsCertificateKeyFile = kClientCertificateKeyFile;
+        return options;
+    }
+
+    static std::unique_ptr<Server> makeServer(CommandService::RPCHandler handler,
+                                              Server::Options options) {
         std::vector<std::unique_ptr<Service>> services;
         services.push_back(std::make_unique<CommandService>(
             /* GRPCTransportLayer */ nullptr,
             std::move(handler),
             std::make_shared<WireVersionProvider>()));
 
-        return Server{std::move(services), std::move(options)};
+        return std::make_unique<Server>(std::move(services), std::move(options));
     }
 
     /**
-     * Starts up a gRPC server with a CommandService registered that uses the provided handler for
-     * both RPC methods. Executes the clientThreadBody in a separate thread and then waits for it to
-     * exit before shutting down the server.
-     *
-     * The IngressSession passed to the provided RPC handler is automatically ended after the
-     * handler is returned.
+     * This is just a variant of runWithServers() that consumes a single set of options.
      */
     static void runWithServer(
         CommandService::RPCHandler callback,
         std::function<void(Server&, unittest::ThreadAssertionMonitor&)> clientThreadBody,
         Server::Options options = makeServerOptions()) {
+        runWithServers(
+            {std::move(options)},
+            [cb = std::move(callback)](auto, auto session) { cb(std::move(session)); },
+            [client = std::move(clientThreadBody)](auto& servers, auto& monitor) {
+                client(*servers[0], monitor);
+            });
+    }
+
+    /**
+     * Starts up gRPC servers (one per set of options provided) with CommandServices registered that
+     * use the provided handler for both RPC methods. Executes the clientThreadBody in a separate
+     * thread and then waits for it to exit before shutting down the servers.
+     *
+     * The addresses of the server is passed to the RPC handler in addition to the IngressSession.
+     * The IngressSession passed to the provided RPC handler is automatically ended after the
+     * handler is returned.
+     */
+    static void runWithServers(
+        std::vector<Server::Options> serverOptions,
+        std::function<void(const Server::Options&, std::shared_ptr<IngressSession>)> rpcHandler,
+        std::function<void(std::vector<std::unique_ptr<Server>>&,
+                           unittest::ThreadAssertionMonitor&)> clientThreadBody) {
         unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {
-            auto handler = [callback](auto session) {
-                ON_BLOCK_EXIT([&] { session->end(); });
-                callback(session);
-            };
-            auto server = makeServer(std::move(handler), std::move(options));
-            server.start();
+            std::vector<std::unique_ptr<Server>> servers;
 
-            auto clientThread = monitor.spawn([&] { clientThreadBody(server, monitor); });
-
-            clientThread.join();
-            if (server.isRunning()) {
-                server.shutdown();
+            for (auto& options : serverOptions) {
+                std::vector<HostAndPort> addresses;
+                for (auto& address : options.addresses) {
+                    addresses.push_back(HostAndPort(address, options.port));
+                }
+                auto handler = [rpcHandler, &options](auto session) {
+                    ON_BLOCK_EXIT([&] { session->end(); });
+                    rpcHandler(options, session);
+                };
+                auto server = makeServer(handler, options);
+                server->start();
+                servers.push_back(std::move(server));
             }
+            ON_BLOCK_EXIT([&servers] {
+                for (auto& server : servers) {
+                    if (server->isRunning()) {
+                        server->shutdown();
+                    }
+                }
+            });
+
+            auto clientThread = monitor.spawn([&] { clientThreadBody(servers, monitor); });
+            clientThread.join();
+        });
+    }
+
+    /**
+     * Starts up mocked gRPC servers (one per address provided) with CommandServices registered that
+     * use the provided handler for both RPC methods. Executes the clientThreadBody in a separate
+     * thread and then waits for it to exit before shutting down the servers.
+     *
+     * The address of the server is passed to the RPC handler in addition to the IngressSession. The
+     * IngressSession passed to the provided RPC handler is automatically ended after the handler is
+     * returned.
+     */
+    static void runWithMockServers(
+        std::vector<HostAndPort> addresses,
+        std::function<void(HostAndPort, std::shared_ptr<IngressSession>)> rpcHandler,
+        std::function<void(MockClient&, unittest::ThreadAssertionMonitor&)> clientThreadBody,
+        boost::optional<const BSONObj&> md = boost::none,
+        std::shared_ptr<WireVersionProvider> wvProvider = std::make_shared<WireVersionProvider>()) {
+
+        unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {
+            std::vector<std::unique_ptr<MockServer>> servers;
+            stdx::unordered_map<HostAndPort, MockRPCQueue::Producer> addrMap;
+
+            for (auto& address : addresses) {
+                MockRPCQueue::Pipe pipe;
+                addrMap.insert({address, std::move(pipe.producer)});
+                auto server = std::make_unique<MockServer>(std::move(pipe.consumer));
+                server->start(
+                    monitor,
+                    [address, rpcHandler](std::shared_ptr<IngressSession> session) {
+                        ON_BLOCK_EXIT([&]() { session->end(); });
+                        rpcHandler(address, session);
+                    },
+                    wvProvider);
+                servers.push_back(std::move(server));
+            }
+            ON_BLOCK_EXIT([&servers] {
+                for (auto& server : servers) {
+                    server->shutdown();
+                }
+            });
+
+            auto resolver = [&addrMap](const HostAndPort& addr) {
+                auto entry = addrMap.find(addr);
+                invariant(entry != addrMap.end());
+                return entry->second;
+            };
+
+            auto client =
+                std::make_shared<MockClient>(nullptr, HostAndPort(kMockedClientAddr), resolver, md);
+            clientThreadBody(*client, monitor);
         });
     }
 
@@ -282,27 +386,20 @@ public:
      */
     static void addRequiredClientMetadata(::grpc::ClientContext& ctx) {
         ctx.AddMetadata(
-            CommandService::kWireVersionKey.toString(),
+            util::constants::kWireVersionKey.toString(),
             std::to_string(WireSpec::instance().get()->incomingExternalClient.maxWireVersion));
-        ctx.AddMetadata(CommandService::kAuthenticationTokenKey.toString(), "my-token");
+        ctx.AddMetadata(util::constants::kAuthenticationTokenKey.toString(), "my-token");
     }
 
     static void addClientMetadataDocument(::grpc::ClientContext& ctx) {
-        static constexpr auto kDriverName = "myDriver";
-        static constexpr auto kDriverVersion = "0.1.2";
-        static constexpr auto kAppName = "MyAppName";
-
-        BSONObjBuilder bob;
-        ASSERT_OK(ClientMetadata::serialize(kDriverName, kDriverVersion, kAppName, &bob));
-        auto metadataDoc = bob.obj();
-        auto clientDoc = metadataDoc.getObjectField(kMetadataDocumentName);
-        ctx.AddMetadata(CommandService::kClientMetadataKey.toString(),
+        auto clientDoc = makeClientMetadataDocument();
+        ctx.AddMetadata(util::constants::kClientMetadataKey.toString(),
                         base64::encode(clientDoc.objdata(), clientDoc.objsize()));
     }
 
     static void addAllClientMetadata(::grpc::ClientContext& ctx) {
         addRequiredClientMetadata(ctx);
-        ctx.AddMetadata(CommandService::kClientIdKey.toString(), UUID::gen().toString());
+        ctx.AddMetadata(util::constants::kClientIdKey.toString(), UUID::gen().toString());
         addClientMetadataDocument(ctx);
     }
 };

@@ -39,6 +39,7 @@
 #include "mongo/transport/grpc/client_cache.h"
 #include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
+#include "mongo/transport/grpc/serialization.h"
 #include "mongo/transport/grpc/wire_version_provider.h"
 
 namespace mongo::transport::grpc {
@@ -75,22 +76,6 @@ public:
     using InSessionPtr = std::shared_ptr<IngressSession>;
     using RPCHandler = std::function<void(InSessionPtr)>;
 
-    static constexpr const char* kAuthenticatedCommandStreamMethodName =
-        "/mongodb.CommandService/AuthenticatedCommandStream";
-    static constexpr const char* kUnauthenticatedCommandStreamMethodName =
-        "/mongodb.CommandService/UnauthenticatedCommandStream";
-
-    // Client-provided metadata keys.
-    static constexpr StringData kAuthenticationTokenKey = "authorization"_sd;
-    static constexpr StringData kClientIdKey = "mongodb-clientid"_sd;
-    static constexpr StringData kClientMetadataKey = "mongodb-client"_sd;
-    static constexpr StringData kWireVersionKey = "mongodb-wireversion"_sd;
-
-    // Server-provided metadata keys.
-    // This is defined as a std::string instead of StringData to avoid having to copy it when
-    // passing to gRPC APIs that expect a const std::string&.
-    static const std::string kClusterMaxWireVersionKey;
-
     /**
      * The provided callback is used to handle streams created from both methods. The status
      * returned from the callback will be communicated to the client. The callback MUST terminate
@@ -114,7 +99,11 @@ public:
     void shutdown() override;
 
 private:
-    ::grpc::Status _handleStream(ServerContext& serverCtx, ServerStream& stream);
+    friend class MockServer;
+
+    ::grpc::Status _handleStream(ServerContext& serverCtx,
+                                 ServerStream& stream,
+                                 boost::optional<std::string> authToken = boost::none);
 
     ::grpc::Status _handleAuthenticatedStream(ServerContext& serverCtx, ServerStream& stream);
 
@@ -129,64 +118,3 @@ private:
     bool _shutdown = false;
 };
 }  // namespace mongo::transport::grpc
-
-namespace grpc {
-
-template <>
-class SerializationTraits<mongo::ConstSharedBuffer, void> {
-public:
-    static Status Serialize(const mongo::ConstSharedBuffer& source,
-                            ByteBuffer* buffer,
-                            bool* own_buffer) {
-        // Make a shallow copy of the input buffer to increment its reference count and ensure the
-        // data stays alive for at least as long as the slice referencing it does.
-        auto copy = std::make_unique<mongo::ConstSharedBuffer>(source);
-        ::grpc::Slice slice{(void*)source.get(), source.capacity(), Destroy, copy.release()};
-        ::grpc::ByteBuffer tmp{&slice, /* n_slices */ 1};
-        buffer->Swap(&tmp);
-        *own_buffer = true;
-        return ::grpc::Status::OK;
-    }
-
-private:
-    static void Destroy(void* data) {
-        std::unique_ptr<mongo::ConstSharedBuffer> buf{static_cast<mongo::ConstSharedBuffer*>(data)};
-    }
-};
-
-/**
- * (De)serialization implementations required to use SharedBuffer with streams provided by gRPC.
- * See: https://grpc.github.io/grpc/cpp/classgrpc_1_1_serialization_traits.html
- */
-template <>
-class SerializationTraits<mongo::SharedBuffer> {
-public:
-    static Status Deserialize(ByteBuffer* byte_buffer, mongo::SharedBuffer* dest) {
-        Slice singleSlice;
-        if (byte_buffer->TrySingleSlice(&singleSlice).ok()) {
-            dest->realloc(singleSlice.size());
-            std::memcpy(dest->get(), singleSlice.begin(), singleSlice.size());
-            return ::grpc::Status::OK;
-        }
-
-        std::vector<Slice> slices;
-        auto status = byte_buffer->Dump(&slices);
-
-        if (!status.ok()) {
-            return status;
-        }
-
-        size_t total =
-            std::accumulate(slices.begin(), slices.end(), 0, [](size_t runningTotal, Slice& slice) {
-                return runningTotal + slice.size();
-            });
-        dest->realloc(total);
-        size_t index = 0;
-        for (auto& s : slices) {
-            std::memcpy(dest->get() + index, s.begin(), s.size());
-            index += s.size();
-        }
-        return ::grpc::Status::OK;
-    }
-};
-}  // namespace grpc

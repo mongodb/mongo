@@ -90,13 +90,8 @@ void Server::start() {
     auto credentials = _makeServerCredentials(_options);
 
     for (auto& address : _options.addresses) {
-        std::string fullAddress;
-        if (!isUnixDomainSocket(address)) {
-            fullAddress = fmt::format("{}:{}", address, _options.port);
-        } else {
-            fullAddress = fmt::format("unix://{}", address);
-        }
-        builder.AddListeningPort(fullAddress, credentials);
+        builder.AddListeningPort(
+            util::formatHostAndPortForGRPC(HostAndPort(address, _options.port)), credentials);
     }
     for (auto& service : _services) {
         builder.RegisterService(service.get());

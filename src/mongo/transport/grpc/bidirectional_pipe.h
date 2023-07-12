@@ -101,6 +101,15 @@ public:
         }
 
         /**
+         * Close only the writing portion of this end of the pipe. This will cause any reads on
+         * the other end to fail once all the previously sent messages have been read. Messages can
+         * still be read from this end.
+         */
+        void closeWriting() {
+            _sendHalf.close();
+        }
+
+        /**
          * Returns true when at least one of the following conditions is met:
          *  - This end of the pipe is closed.
          *  - The other end of the pipe is closed and there are no more messages to be read.

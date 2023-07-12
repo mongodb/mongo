@@ -172,7 +172,7 @@ TEST_F(ServerTest, InvalidServerCertificateOptions) {
 
     auto runInvalidCertTest = [&](Server::Options options) {
         auto server = CommandServiceTestFixtures::makeServer({}, options);
-        ASSERT_THROWS(server.start(), DBException);
+        ASSERT_THROWS(server->start(), DBException);
     };
 
     {

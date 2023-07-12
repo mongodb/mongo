@@ -32,12 +32,16 @@
 #include "mongo/transport/grpc/util.h"
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_util.h"
 #include "mongo/util/testing_proctor.h"
 
 using namespace fmt::literals;
 
 namespace mongo::transport::grpc::util {
+namespace constants {
+const std::string kClusterMaxWireVersionKey = "mongodb-maxwireversion";
+}  // namespace constants
 
 ::grpc::SslServerCredentialsOptions::PemKeyCertPair parsePEMKeyFile(StringData filePath) {
 
@@ -48,6 +52,14 @@ namespace mongo::transport::grpc::util {
     certPair.private_key = certificateKeyFileContents;
 
     return certPair;
+}
+
+std::string formatHostAndPortForGRPC(const HostAndPort& address) {
+    if (isUnixDomainSocket(address.host())) {
+        return fmt::format("unix://{}", address.host());
+    } else {
+        return fmt::format("{}:{}", address.host(), address.port());
+    }
 }
 
 ErrorCodes::Error statusToErrorCode(::grpc::StatusCode statusCode) {

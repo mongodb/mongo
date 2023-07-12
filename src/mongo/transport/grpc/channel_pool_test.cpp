@@ -57,7 +57,7 @@ public:
         _pool = std::make_shared<PoolType>(
             _clockSource.get(),
             [this](ConnectSSLMode mode) { return _resolveSSLMode(mode); },
-            [this](HostAndPort& remote, bool useSSL) { return _makeChannel(remote, useSSL); },
+            [this](const HostAndPort& remote, bool useSSL) { return _makeChannel(remote, useSSL); },
             [this](DummyChannel& channel) { return _makeStub(channel); });
     }
 
@@ -87,7 +87,7 @@ private:
         return mode == ConnectSSLMode::kEnableSSL;
     }
 
-    DummyChannel _makeChannel(HostAndPort&, bool) {
+    DummyChannel _makeChannel(const HostAndPort&, bool) {
         blockBeforeCreatingNewChannel.pauseWhileSet();
         return {};
     }

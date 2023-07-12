@@ -67,13 +67,16 @@ public:
             return std::make_unique<IngressSession>(nullptr,
                                                     _streamFixtures->rpc->serverCtx.get(),
                                                     _streamFixtures->rpc->serverStream.get(),
-                                                    std::move(clientId));
+                                                    std::move(clientId),
+                                                    /* auth token */ boost::none,
+                                                    /* client metadata */ boost::none);
         } else {
             static_assert(std::is_same<SessionType, EgressSession>::value == true);
             return std::make_unique<EgressSession>(nullptr,
                                                    _streamFixtures->clientCtx,
                                                    _streamFixtures->clientStream,
-                                                   std::move(clientId));
+                                                   std::move(clientId),
+                                                   /* shared state */ nullptr);
         }
     }
 
@@ -96,6 +99,36 @@ public:
 
     auto& fixtures() const {
         return *_streamFixtures;
+    }
+
+    /**
+     * Tests that the effects of cancellation are properly reported both locally and remotely.
+     * The provided lambda should return a pair of the two sessions: the first being the session
+     * that will be cancelled.
+     */
+    void runCancellationTest(
+        std::function<std::pair<GRPCSession&, GRPCSession&>(IngressSession&, EgressSession&)>
+            whichSession) {
+        auto ingressSession = makeSession<IngressSession>();
+        auto egressSession = makeSession<EgressSession>();
+        auto cancellationReason = Status(ErrorCodes::ShutdownInProgress, "shutdown error");
+
+        ASSERT_TRUE(ingressSession->isConnected());
+        ASSERT_TRUE(egressSession->isConnected());
+
+        auto [sessionToCancel, other] = whichSession(*ingressSession, *egressSession);
+        sessionToCancel.cancel(cancellationReason);
+        ASSERT_EQ(sessionToCancel.terminationStatus(), cancellationReason);
+
+        ASSERT_FALSE(ingressSession->isConnected());
+        ASSERT_NOT_OK(ingressSession->terminationStatus());
+        ASSERT_TRUE(fixtures().rpc->serverCtx->isCancelled());
+
+        ASSERT_NOT_OK(egressSession->finish());
+        ASSERT_TRUE(egressSession->terminationStatus());
+        ASSERT_FALSE(egressSession->isConnected());
+
+        ASSERT_TRUE(ErrorCodes::isCancellationError(*other.terminationStatus()));
     }
 
 private:
@@ -156,12 +189,16 @@ TEST_F(GRPCSessionTest, GetRemote) {
     });
 }
 
-TEST_F(GRPCSessionTest, IsConnected) {
-    auto session = makeSession<IngressSession>();
-    ASSERT_TRUE(session->isConnected());
-    session->cancel("shutdown error");
-    ASSERT_FALSE(session->isConnected());
-    ASSERT_TRUE(fixtures().rpc->serverCtx->isCancelled());
+TEST_F(GRPCSessionTest, CancelIngress) {
+    runCancellationTest([](IngressSession& ingress, EgressSession& egress) {
+        return std::pair<GRPCSession&, GRPCSession&>(ingress, egress);
+    });
+}
+
+TEST_F(GRPCSessionTest, CancelEgress) {
+    runCancellationTest([](IngressSession& ingress, EgressSession& egress) {
+        return std::pair<GRPCSession&, GRPCSession&>(egress, ingress);
+    });
 }
 
 TEST_F(GRPCSessionTest, End) {
@@ -175,13 +212,12 @@ TEST_F(GRPCSessionTest, End) {
 }
 
 TEST_F(GRPCSessionTest, CancelWithReason) {
-    constexpr StringData kExpectedReason = "Some error condition"_sd;
+    Status kExpectedReason = Status(ErrorCodes::ShutdownInProgress, "Some error condition");
     runWithBoth([&](auto& rpc, auto& session) {
         session.cancel(kExpectedReason);
         ASSERT_FALSE(session.isConnected());
         ASSERT_TRUE(session.terminationStatus());
-        ASSERT_TRUE(ErrorCodes::isCancellationError(*session.terminationStatus()));
-        ASSERT_EQ(session.terminationStatus()->reason(), kExpectedReason);
+        ASSERT_EQ(session.terminationStatus(), kExpectedReason);
         ASSERT_EQ(session.sourceMessage().getStatus(), ErrorCodes::StreamTerminated);
         ASSERT_EQ(session.sinkMessage(makeUniqueMessage()), ErrorCodes::StreamTerminated);
         ASSERT_TRUE(rpc.serverCtx->isCancelled());
@@ -189,30 +225,26 @@ TEST_F(GRPCSessionTest, CancelWithReason) {
 }
 
 TEST_F(GRPCSessionTest, TerminationStatusIsNotOverridden) {
-    constexpr StringData kExpectedReason = "first reason"_sd;
+    Status kExpectedReason = Status(ErrorCodes::ShutdownInProgress, "Some error condition");
     runWithBoth([&](auto&, auto& session) {
         session.cancel(kExpectedReason);
 
         // Cancelling the session again should have no effect on the reason.
-        session.cancel("second reason");
-        ASSERT_TRUE(ErrorCodes::isCancellationError(*session.terminationStatus()));
-        ASSERT_EQ(session.terminationStatus()->reason(), kExpectedReason);
+        session.cancel(Status(ErrorCodes::CallbackCanceled, "second reason"));
+        ASSERT_EQ(session.terminationStatus(), kExpectedReason);
 
         // Ending the session again should have no effect either.
         session.end();
-        ASSERT_TRUE(ErrorCodes::isCancellationError(*session.terminationStatus()));
-        ASSERT_EQ(session.terminationStatus()->reason(), kExpectedReason);
+        ASSERT_EQ(session.terminationStatus(), kExpectedReason);
 
         if (auto egressSession = dynamic_cast<EgressSession*>(&session)) {
             // EgressSession::finish() should report the proper status.
             auto finishStatus = egressSession->finish();
-            ASSERT_TRUE(ErrorCodes::isCancellationError(finishStatus));
-            ASSERT_EQ(finishStatus.reason(), kExpectedReason);
+            ASSERT_EQ(finishStatus, kExpectedReason);
         } else if (auto ingressSession = dynamic_cast<IngressSession*>(&session)) {
             // Recording the status should not overwrite the prior cancellation status.
             ingressSession->terminate(Status::OK());
-            ASSERT_TRUE(ErrorCodes::isCancellationError(*session.terminationStatus()));
-            ASSERT_EQ(session.terminationStatus()->reason(), kExpectedReason);
+            ASSERT_EQ(session.terminationStatus(), kExpectedReason);
         }
     });
 }
@@ -285,9 +317,11 @@ TEST_F(GRPCSessionTest, FinishError) {
 TEST_F(GRPCSessionTest, FinishCancelled) {
     auto ingressSession = makeSession<IngressSession>();
     auto egressSession = makeSession<EgressSession>();
-    ingressSession->cancel("some reason");
+    auto cancellationReason = Status(ErrorCodes::ShutdownInProgress, "some reason");
+    ingressSession->cancel(cancellationReason);
     auto finishStatus = egressSession->finish();
     ASSERT_TRUE(ErrorCodes::isCancellationError(finishStatus));
+    ASSERT_EQ(ingressSession->terminationStatus(), cancellationReason);
 }
 
 }  // namespace

@@ -58,7 +58,7 @@ template <class Channel, class Stub>
 class ChannelPool : public std::enable_shared_from_this<ChannelPool<Channel, Stub>> {
 public:
     using SSLModeResolver = unique_function<bool(ConnectSSLMode)>;
-    using ChannelFactory = unique_function<Channel(HostAndPort&, bool)>;
+    using ChannelFactory = unique_function<Channel(const HostAndPort&, bool)>;
     using StubFactory = unique_function<Stub(Channel&)>;
 
     /**
@@ -173,7 +173,8 @@ public:
                 return state;
             }
         }();
-        return std::make_unique<StubHandle>(std::move(cs), _stubFactory(cs->channel()));
+        auto stub = _stubFactory(cs->channel());
+        return std::make_unique<StubHandle>(std::move(cs), std::move(stub));
     }
 
     /**

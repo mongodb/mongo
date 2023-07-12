@@ -29,32 +29,37 @@
 
 #pragma once
 
-#include "mongo/db/wire_version.h"
+#include <grpcpp/support/sync_stream.h>
+
+#include "mongo/transport/grpc/client_stream.h"
 
 namespace mongo::transport::grpc {
 
-class WireVersionProvider {
+class GRPCClientStream : public ClientStream {
 public:
-    WireVersionProvider() = default;
-    virtual ~WireVersionProvider() = default;
-    WireVersionProvider(const WireVersionProvider&) = delete;
-    WireVersionProvider& operator=(const WireVersionProvider&) = delete;
+    explicit GRPCClientStream(::grpc::ClientReaderWriter<ConstSharedBuffer, SharedBuffer>* stream)
+        : _stream{stream} {}
 
-    /**
-     * Gets this server's understanding of the minimum maxWireVersion value for all servers in the
-     * cluster. This is used to gossip the wire version gRPC clients should use when constructing
-     * commands, as per the MongoDB gRPC Protocol.
-     *
-     * If this server is a mongos, "all servers in the cluster" refers to all the mongoses in the
-     * sharded cluster. If this server is a mongod, "all servers in the cluster" refers to that
-     * mongod alone, since gRPC clients only support direct connections to mongods and do not
-     * support communicating with entire replica sets.
-     *
-     * Currently, this method just returns this server's maxWireVersion, since the current version
-     * is the only server version that supports gRPC. In the future, the provider will be augmented
-     * to account for the other servers in the cluster.
-     */
-    virtual int getClusterMaxWireVersion() const;
+    ~GRPCClientStream() = default;
+
+    boost::optional<SharedBuffer> read() override {
+        SharedBuffer msg;
+        if (_stream->Read(&msg)) {
+            return std::move(msg);
+        } else {
+            return boost::none;
+        }
+    };
+
+    bool write(ConstSharedBuffer msg) override {
+        return _stream->Write(msg);
+    }
+
+    ::grpc::Status finish() override {
+        return _stream->Finish();
+    }
+
+private:
+    ::grpc::ClientReaderWriter<ConstSharedBuffer, SharedBuffer>* _stream;
 };
-
 }  // namespace mongo::transport::grpc

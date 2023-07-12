@@ -35,6 +35,7 @@
 #include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/net/ssl_options.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -48,6 +49,8 @@ class GRPCTransportLayerTest : public ServiceContextWithClockSourceMockTest {
 public:
     void setUp() override {
         ServiceContextWithClockSourceMockTest::setUp();
+        sslGlobalParams.sslCAFile = "jstests/libs/ca.pem";
+        sslGlobalParams.sslPEMKeyFile = "jstests/libs/server.pem";
         _tl = std::make_unique<GRPCTransportLayer>(getServiceContext(), WireSpec::instance());
     }
 
@@ -152,7 +155,7 @@ TEST_F(IdleChannelPrunerTest, StartsWithTransportLayer) {
     ASSERT_OK(transportLayer().start());
     ASSERT_EQ(getPeriodicRunnerMock()->jobs.size(), 1);
     auto& prunerJob = getPeriodicRunnerMock()->jobs[0];
-    ASSERT_EQ(prunerJob->getPeriod(), GRPCTransportLayer::kDefaultChannelTimeout);
+    ASSERT_EQ(prunerJob->getPeriod(), Client::kDefaultChannelTimeout);
     ASSERT_TRUE(prunerJob->isStarted());
 }
 

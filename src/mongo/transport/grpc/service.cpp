@@ -31,6 +31,7 @@
 
 #include <charconv>
 #include <cstring>
+#include <fmt/format.h>
 #include <functional>
 #include <numeric>
 
@@ -48,6 +49,8 @@
 #include "mongo/transport/grpc/grpc_server_context.h"
 #include "mongo/transport/grpc/grpc_server_stream.h"
 #include "mongo/transport/grpc/metadata.h"
+#include "mongo/transport/grpc/util.h"
+#include "mongo/util/base64.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer.h"
 
@@ -57,16 +60,18 @@ namespace mongo::transport::grpc {
 
 namespace {
 
-const Status kShutdownTerminationStatus{ErrorCodes::ShutdownInProgress,
-                                        "gRPC server is shutting down"};
+inline Status makeShutdownTerminationStatus() {
+    return Status(ErrorCodes::ShutdownInProgress, "gRPC server is shutting down");
+}
 
 ::grpc::Status parseWireVersion(const MetadataView& clientMetadata, int& wireVersionOut) {
-    auto clientWireVersionEntry = clientMetadata.find(CommandService::kWireVersionKey);
+    auto clientWireVersionEntry = clientMetadata.find(util::constants::kWireVersionKey);
     if (clientWireVersionEntry == clientMetadata.end()) {
         return ::grpc::Status(
             ::grpc::StatusCode::FAILED_PRECONDITION,
-            "Clients must specify the server wire version they are targeting in the \"{}\" metadata entry"_format(
-                CommandService::kWireVersionKey));
+            fmt::format("Clients must specify the server wire version they are targeting in "
+                        "the \"{}\" metadata entry",
+                        util::constants::kWireVersionKey));
     }
     if (auto parseResult = std::from_chars(clientWireVersionEntry->second.begin(),
                                            clientWireVersionEntry->second.end(),
@@ -74,7 +79,7 @@ const Status kShutdownTerminationStatus{ErrorCodes::ShutdownInProgress,
         parseResult.ec != std::errc{}) {
         return ::grpc::Status(
             ::grpc::StatusCode::INVALID_ARGUMENT,
-            "Invalid wire version: \"{}\""_format(clientWireVersionEntry->second));
+            fmt::format("Invalid wire version: \"{}\"", clientWireVersionEntry->second));
     }
 
     return ::grpc::Status::OK;
@@ -89,15 +94,17 @@ const Status kShutdownTerminationStatus{ErrorCodes::ShutdownInProgress,
     if (clientWireVersion > clusterMaxWireVersion) {
         return ::grpc::Status(
             ::grpc::StatusCode::FAILED_PRECONDITION,
-            "Provided wire version ({}) exceeds cluster's max wire version ({})"_format(
-                clientWireVersion, clusterMaxWireVersion));
+            fmt::format("Provided wire version ({}) exceeds cluster's max wire version ({})",
+                        clientWireVersion,
+                        clusterMaxWireVersion));
     } else if (auto serverMinWireVersion =
                    WireSpec::instance().get()->incomingExternalClient.minWireVersion;
                clientWireVersion < serverMinWireVersion) {
-        return ::grpc::Status(
-            ::grpc::StatusCode::FAILED_PRECONDITION,
-            "Provided wire version ({}) is less than this server's minimum accepted wire version ({})"_format(
-                clientWireVersion, serverMinWireVersion));
+        return ::grpc::Status(::grpc::StatusCode::FAILED_PRECONDITION,
+                              fmt::format("Provided wire version ({}) is less than this server's "
+                                          "minimum accepted wire version ({})",
+                                          clientWireVersion,
+                                          serverMinWireVersion));
     }
 
     return ::grpc::Status::OK;
@@ -105,10 +112,10 @@ const Status kShutdownTerminationStatus{ErrorCodes::ShutdownInProgress,
 
 ::grpc::Status verifyReservedMetadata(const MetadataView& clientMetadata) {
     static const StringDataSet kRecognizedClientMetadataKeys{
-        CommandService::kAuthenticationTokenKey,
-        CommandService::kClientIdKey,
-        CommandService::kClientMetadataKey,
-        CommandService::kWireVersionKey};
+        util::constants::kAuthenticationTokenKey,
+        util::constants::kClientIdKey,
+        util::constants::kClientMetadataKey,
+        util::constants::kWireVersionKey};
     static constexpr StringData kReservedMetadataKeyPrefix = "mongodb"_sd;
 
     for (const auto& entry : clientMetadata) {
@@ -116,7 +123,7 @@ const Status kShutdownTerminationStatus{ErrorCodes::ShutdownInProgress,
         if (key.startsWith(kReservedMetadataKeyPrefix) &&
             !kRecognizedClientMetadataKeys.contains(key)) {
             return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
-                                  "Unrecognized reserved metadata key: \"{}\""_format(key));
+                                  fmt::format("Unrecognized reserved metadata key: \"{}\"", key));
         }
     }
     return ::grpc::Status::OK;
@@ -124,14 +131,15 @@ const Status kShutdownTerminationStatus{ErrorCodes::ShutdownInProgress,
 
 ::grpc::Status extractClientId(const MetadataView& clientMetadata,
                                boost::optional<UUID>& clientId) {
-    if (auto clientIdEntry = clientMetadata.find(CommandService::kClientIdKey);
+    if (auto clientIdEntry = clientMetadata.find(util::constants::kClientIdKey);
         clientIdEntry != clientMetadata.end()) {
         auto clientIdStatus = UUID::parse(clientIdEntry->second);
         if (!clientIdStatus.isOK()) {
             return ::grpc::Status(
                 ::grpc::StatusCode::INVALID_ARGUMENT,
-                "The provided client ID (\"{}\") is not a valid UUID: {}"_format(
-                    clientIdEntry->second, clientIdStatus.getStatus().toString()));
+                fmt::format("The provided client ID (\"{}\") is not a valid UUID: {}",
+                            clientIdEntry->second,
+                            clientIdStatus.getStatus().toString()));
         }
         clientId = std::move(clientIdStatus.getValue());
     }
@@ -143,33 +151,25 @@ const Status kShutdownTerminationStatus{ErrorCodes::ShutdownInProgress,
  * If a clientId was specified by the remote, log at INFO level. Otherwise, log at DEBUG level.
  * If the document is not valid BSON, log at WARNING level.
  */
-void logClientMetadataDocument(const MetadataView& clientMetadata, const IngressSession& session) {
-    auto clientMetadataEntry = clientMetadata.find(CommandService::kClientMetadataKey);
-    if (clientMetadataEntry == clientMetadata.end()) {
-        return;
-    }
-
+void logClientMetadataDocument(const IngressSession& session) {
     try {
-        fmt::memory_buffer buffer{};
-        base64::decode(buffer, clientMetadataEntry->second);
-        BSONObj metadataDocument{buffer.data()};
-        auto metadata = ClientMetadata{metadataDocument};
-
-        if (session.clientId()) {
-            LOGV2_INFO(7401301,
-                       "Received client metadata for gRPC stream",
-                       "remote"_attr = session.remote(),
-                       "remoteClientId"_attr = session.clientIdStr(),
-                       "streamId"_attr = session.id(),
-                       "doc"_attr = metadataDocument);
-        } else {
-            LOGV2_DEBUG(7401302,
-                        2,
-                        "Received client metadata for gRPC stream",
-                        "remote"_attr = session.remote(),
-                        "remoteClientId"_attr = session.clientIdStr(),
-                        "streamId"_attr = session.id(),
-                        "doc"_attr = metadataDocument);
+        if (auto metadata = session.getClientMetadata()) {
+            if (session.clientId()) {
+                LOGV2_INFO(7401301,
+                           "Received client metadata for gRPC stream",
+                           "remote"_attr = session.remote(),
+                           "remoteClientId"_attr = session.clientIdStr(),
+                           "streamId"_attr = session.id(),
+                           "doc"_attr = metadata->getDocument());
+            } else {
+                LOGV2_DEBUG(7401302,
+                            2,
+                            "Received client metadata for gRPC stream",
+                            "remote"_attr = session.remote(),
+                            "remoteClientId"_attr = session.clientIdStr(),
+                            "streamId"_attr = session.id(),
+                            "doc"_attr = metadata->getDocument());
+            }
         }
     } catch (const DBException& e) {
         LOGV2_WARNING(7401303,
@@ -200,8 +200,6 @@ auto makeRpcServiceMethod(CommandService* service, const char* name, HandlerType
 
 }  // namespace
 
-const std::string CommandService::kClusterMaxWireVersionKey = "mongodb-maxwireversion";
-
 CommandService::CommandService(GRPCTransportLayer* tl,
                                RPCHandler callback,
                                std::shared_ptr<WireVersionProvider> wvProvider)
@@ -212,22 +210,24 @@ CommandService::CommandService(GRPCTransportLayer* tl,
 
     AddMethod(makeRpcServiceMethod(
         this,
-        kUnauthenticatedCommandStreamMethodName,
+        util::constants::kUnauthenticatedCommandStreamMethodName,
         [](CommandService* service, GRPCServerContext& ctx, GRPCServerStream& stream) {
-            return service->_handleStream(ctx, stream);
+            return service->_handleStream(ctx, stream, boost::none);
         }));
 
     AddMethod(makeRpcServiceMethod(
         this,
-        kAuthenticatedCommandStreamMethodName,
+        util::constants::kAuthenticatedCommandStreamMethodName,
         [](CommandService* service, GRPCServerContext& ctx, GRPCServerStream& stream) {
             return service->_handleAuthenticatedStream(ctx, stream);
         }));
 }
 
-::grpc::Status CommandService::_handleStream(ServerContext& serverCtx, ServerStream& stream) {
+::grpc::Status CommandService::_handleStream(ServerContext& serverCtx,
+                                             ServerStream& stream,
+                                             boost::optional<std::string> authToken) {
     auto clusterMaxWireVersion = _wvProvider->getClusterMaxWireVersion();
-    serverCtx.addInitialMetadataEntry(kClusterMaxWireVersionKey,
+    serverCtx.addInitialMetadataEntry(util::constants::kClusterMaxWireVersionKey,
                                       std::to_string(_wvProvider->getClusterMaxWireVersion()));
 
     auto clientMetadata = serverCtx.getClientMetadata();
@@ -243,13 +243,20 @@ CommandService::CommandService(GRPCTransportLayer* tl,
         return result;
     }
 
-    auto session = std::make_shared<IngressSession>(_tl, &serverCtx, &stream, clientId);
+    boost::optional<StringData> base64EncodedClientMetadata;
+    if (auto clientMetadataEntry = clientMetadata.find(util::constants::kClientMetadataKey);
+        clientMetadataEntry != clientMetadata.end()) {
+        base64EncodedClientMetadata = clientMetadataEntry->second;
+    }
+
+    auto session = std::make_shared<IngressSession>(
+        _tl, &serverCtx, &stream, clientId, authToken, base64EncodedClientMetadata);
     std::list<InSessionPtr>::iterator it;
     {
         stdx::lock_guard lk{_mutex};
 
         if (_shutdown) {
-            session->terminate(kShutdownTerminationStatus);
+            session->terminate(makeShutdownTerminationStatus());
             return util::convertStatus(*session->terminationStatus());
         }
         it = _sessions.insert(_sessions.begin(), session);
@@ -263,7 +270,7 @@ CommandService::CommandService(GRPCTransportLayer* tl,
     });
 
     if (!clientId || _clientCache->add(*clientId) == ClientCache::AddResult::kCreated) {
-        logClientMetadataDocument(clientMetadata, *session);
+        logClientMetadataDocument(*session);
     }
 
     _callback(session);
@@ -274,33 +281,35 @@ CommandService::CommandService(GRPCTransportLayer* tl,
 
 ::grpc::Status CommandService::_handleAuthenticatedStream(ServerContext& serverCtx,
                                                           ServerStream& stream) {
-    if (auto meta = serverCtx.getClientMetadata();
-        meta.find(kAuthenticationTokenKey) == meta.end()) {
+    auto meta = serverCtx.getClientMetadata();
+    auto authTokenEntry = meta.find(util::constants::kAuthenticationTokenKey);
+    if (MONGO_unlikely(authTokenEntry == meta.end())) {
         return ::grpc::Status{
             ::grpc::StatusCode::UNAUTHENTICATED,
-            "{} RPCs must contain an authentication token in the \"{}\" metadata entry"_format(
-                kAuthenticatedCommandStreamMethodName, kAuthenticationTokenKey)};
+            fmt::format("{} RPCs must contain an authentication token in the \"{}\" metadata entry",
+                        util::constants::kAuthenticatedCommandStreamMethodName,
+                        util::constants::kAuthenticationTokenKey)};
     }
-
-    return _handleStream(serverCtx, stream);
+    return _handleStream(serverCtx, stream, authTokenEntry->second.toString());
 }
 
 void CommandService::shutdown() {
     stdx::unique_lock lk{_mutex};
 
-    invariant(!_shutdown, "Cannot shut down {} gRPC service once it's stopped"_format(name()));
+    invariant(!_shutdown,
+              fmt::format("Cannot shut down {} gRPC service once it's stopped", name()));
     _shutdown = true;
 
     auto nSessionsTerminated = _sessions.size();
     for (auto& session : _sessions) {
-        session->cancel(kShutdownTerminationStatus.reason());
+        session->cancel(makeShutdownTerminationStatus());
     }
 
     _shutdownCV.wait(lk, [&]() { return _sessions.empty(); });
 
     LOGV2_DEBUG(7401308,
                 1,
-                "MongoDB gRPC service shutdown complete",
+                "CommandService shutdown complete",
                 "terminatedSessionsCount"_attr = nSessionsTerminated);
 }
 

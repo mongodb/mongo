@@ -34,11 +34,10 @@
 
 #include "mongo/config.h"
 #include "mongo/db/service_context.h"
-#include "mongo/transport/grpc/channel_pool.h"
+#include "mongo/transport/grpc/client.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/periodic_runner.h"
 
 namespace mongo::transport::grpc {
 
@@ -51,12 +50,6 @@ namespace mongo::transport::grpc {
  */
 class GRPCTransportLayer : public TransportLayer {
 public:
-    constexpr static auto kDefaultChannelTimeout = Minutes{30};
-
-    // TODO SERVER-74016: replace the empty structs with proper types.
-    using ChannelType = struct {};
-    using StubType = struct {};
-
     GRPCTransportLayer(ServiceContext* svcCtx, const WireSpec& wireSpec);
 
     Status start() override;
@@ -108,10 +101,8 @@ public:
 #endif
 
 private:
-    using ChannelPoolType = ChannelPool<ChannelType, StubType>;
+    std::unique_ptr<Client> _client;
     ServiceContext* const _svcCtx;
-    std::shared_ptr<ChannelPoolType> _channelPool;
-    boost::optional<PeriodicRunner::JobAnchor> _idleChannelPruner;
 };
 
 }  // namespace mongo::transport::grpc

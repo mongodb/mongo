@@ -27,54 +27,32 @@
  *    it in the license file.
  */
 
+#include <memory>
+
 #include "mongo/transport/grpc/grpc_transport_layer.h"
+
+#include "mongo/transport/grpc/client.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/ssl_options.h"
 
 namespace mongo::transport::grpc {
 
 GRPCTransportLayer::GRPCTransportLayer(ServiceContext* svcCtx, const WireSpec& wireSpec)
-    : TransportLayer(wireSpec), _svcCtx(svcCtx) {
-    auto sslModeResolver = [this](ConnectSSLMode sslMode) {
-        // TODO SERVER-74020: use `sslMode` and the settings to decide if we should use SSL.
-        return false;
-    };
-
-    auto channelFactory = [this](HostAndPort& remote, bool useSSL) {
-        // TODO SERVER-74020: use the gRPC client to create a new channel to `remote`.
-        return ChannelType{};
-    };
-
-    auto stubFactory = [this](ChannelType& channel) {
-        // TODO SERVER-74020: use `channel` to create a new gRPC stub.
-        return StubType{};
-    };
-
-    // The pool calls into `ClockSource` to record the last usage of gRPC channels. Since the pool
-    // is not concerned with sub-minute durations and this call happens as part of destroying gRPC
-    // stubs (i.e., on threads running user operations), it is important to use `FastClockSource` to
-    // minimize the performance implications of recording time on user operations.
-    _channelPool = std::make_shared<ChannelPoolType>(_svcCtx->getFastClockSource(),
-                                                     std::move(sslModeResolver),
-                                                     std::move(channelFactory),
-                                                     std::move(stubFactory));
-}
+    : TransportLayer(wireSpec), _svcCtx(svcCtx) {}
 
 Status GRPCTransportLayer::start() try {
-    // Periodically call into the channel pool to drop idle channels. A periodic task runs to drop
-    // all channels that have been idle for `kDefaultChannelTimeout`.
-    PeriodicRunner::PeriodicJob prunerJob(
-        "GRPCIdleChannelPrunerJob",
-        [pool = _channelPool](Client*) {
-            pool->dropIdleChannels(GRPCTransportLayer::kDefaultChannelTimeout);
-        },
-        kDefaultChannelTimeout,
-        // TODO(SERVER-74659): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
-    invariant(!_idleChannelPruner);
-    _idleChannelPruner.emplace(_svcCtx->getPeriodicRunner()->makeJob(std::move(prunerJob)));
-    _idleChannelPruner->start();
-
-    // TODO SERVER-74020: start the Server and Client services.
-
+    invariant(!_client);
+    // TODO SERVER-74020: start the Server.
+    GRPCClient::Options clientOptions;
+    if (!sslGlobalParams.sslCAFile.empty()) {
+        clientOptions.tlsCAFile = sslGlobalParams.sslCAFile;
+    }
+    if (!sslGlobalParams.sslPEMKeyFile.empty()) {
+        clientOptions.tlsCertificateKeyFile = sslGlobalParams.sslPEMKeyFile;
+    }
+    _client = std::make_unique<GRPCClient>(
+        this, /* client metadata */ boost::none, std::move(clientOptions));
+    _client->start(_svcCtx);
     return Status::OK();
 } catch (const DBException& ex) {
     return ex.toStatus();
@@ -82,10 +60,7 @@ Status GRPCTransportLayer::start() try {
 
 void GRPCTransportLayer::shutdown() {
     // TODO SERVER-74020: shutdown the Server and Client services.
-
-    if (_idleChannelPruner) {
-        _idleChannelPruner->stop();
-    }
+    _client->shutdown();
 }
 
 }  // namespace mongo::transport::grpc

@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include <charconv>
 #include <memory>
+#include <string>
 
 #include <boost/optional.hpp>
 
@@ -38,6 +40,7 @@
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/transport/grpc/client_context.h"
 #include "mongo/transport/grpc/client_stream.h"
 #include "mongo/transport/grpc/server_context.h"
@@ -45,6 +48,7 @@
 #include "mongo/transport/grpc/util.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/base64.h"
 #include "mongo/util/future.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/synchronized_value.h"
@@ -62,7 +66,10 @@ public:
     explicit GRPCSession(TransportLayer* tl, HostAndPort remote, boost::optional<UUID> clientId)
         : _tl(tl), _remote(std::move(remote)), _clientId(std::move(clientId)) {}
 
-    virtual ~GRPCSession() = default;
+    virtual ~GRPCSession() {
+        if (_cleanupCallback)
+            (*_cleanupCallback)(*this);
+    }
 
     /**
      * Returns the unique identifier used for the underlying gRPC stream.
@@ -83,11 +90,14 @@ public:
      * will fail with an error.
      *
      * If this session is already terminated, this has no effect.
+     *
+     * The provided reason MUST be a cancellation error.
      */
-    void cancel(StringData reason) {
+    void cancel(Status reason) {
+        invariant(ErrorCodes::isCancellationError(reason));
         // Need to update terminationStatus before cancelling so that when the RPC caller/handler is
         // interrupted, it will be guaranteed to have access to the reason for cancellation.
-        if (_setTerminationStatus({ErrorCodes::CallbackCanceled, std::move(reason)})) {
+        if (_setTerminationStatus(std::move(reason))) {
             _tryCancel();
         }
     }
@@ -145,10 +155,11 @@ public:
 
     /**
      * The following inspects the logical state of the underlying stream: the session is considered
-     * not connected when the user has terminated the session (either with or without an error).
+     * not connected when the user has terminated the session (either with or without an error) or
+     * if the RPC had been cancelled (either remotely/externally or locally).
      */
     bool isConnected() final {
-        return !_terminationStatus->has_value();
+        return !_terminationStatus->has_value() && !_isCancelled();
     }
 
     /**
@@ -161,6 +172,14 @@ public:
 
     std::string clientIdStr() const {
         return _clientId ? _clientId->toString() : "N/A";
+    }
+
+    /**
+     * Runs the provided callback when destroying the session.
+     * Not synchronized, thus not safe to call once the session is visible to other threads.
+     */
+    void setCleanupCallback(std::function<void(const GRPCSession&)> callback) {
+        _cleanupCallback.emplace(std::move(callback));
     }
 
     /**
@@ -237,6 +256,7 @@ private:
     const HostAndPort _remote;
     const boost::optional<UUID> _clientId;
 
+    boost::optional<std::function<void(const GRPCSession&)>> _cleanupCallback;
     synchronized_value<boost::optional<Status>> _terminationStatus;
 };
 
@@ -252,8 +272,14 @@ public:
     IngressSession(TransportLayer* tl,
                    ServerContext* ctx,
                    ServerStream* stream,
-                   boost::optional<UUID> clientId)
-        : GRPCSession(tl, ctx->getRemote(), std::move(clientId)), _ctx(ctx), _stream(stream) {
+                   boost::optional<UUID> clientId,
+                   boost::optional<std::string> authToken,
+                   boost::optional<StringData> encodedClientMetadata)
+        : GRPCSession(tl, ctx->getRemote(), std::move(clientId)),
+          _ctx(ctx),
+          _stream(stream),
+          _authToken(std::move(authToken)),
+          _encodedClientMetadata(std::move(encodedClientMetadata)) {
         LOGV2_DEBUG(7401101,
                     2,
                     "Constructed a new gRPC ingress session",
@@ -286,6 +312,42 @@ public:
         _setTerminationStatus(std::move(status));
     }
 
+    /**
+     * The client-provided authentication token, if any.
+     *
+     * This will only return a value if the underlying stream was created via
+     * AuthenticatedCommandStream. Any authentication token provided by the client to
+     * UnauthenticatedCommandStream will be ignored.
+     */
+    const boost::optional<std::string>& authToken() const {
+        return _authToken;
+    }
+
+    /**
+     * Retrieve the ClientMetadata, if any.
+     * The first time this method is called, the metadata document will be decoded and parsed, which
+     * can be expensive. It will be cached for future invocations.
+     *
+     * Throws an exception if the client provided improperly formatted metadata.
+     */
+    boost::optional<const ClientMetadata&> getClientMetadata() const {
+        if (!_encodedClientMetadata) {
+            return boost::none;
+        }
+
+        auto decoded = _decodedClientMetadata.synchronize();
+
+        if (decoded->has_value()) {
+            return **decoded;
+        }
+
+        fmt::memory_buffer buffer{};
+        base64::decode(buffer, *_encodedClientMetadata);
+        BSONObj metadataDocument(buffer.data());
+        decoded->emplace(std::move(metadataDocument));
+        return **decoded;
+    }
+
 private:
     void _tryCancel() override {
         _ctx->tryCancel();
@@ -307,6 +369,10 @@ private:
     // accessed after the stream has been terminated.
     ServerContext* const _ctx;
     ServerStream* const _stream;
+
+    boost::optional<std::string> _authToken;
+    boost::optional<StringData> _encodedClientMetadata;
+    mutable synchronized_value<boost::optional<ClientMetadata>> _decodedClientMetadata;
 };
 
 /**
@@ -314,13 +380,24 @@ private:
  */
 class EgressSession final : public GRPCSession {
 public:
+    /**
+     * Holds the state shared between multiple instances of egress session.
+     * This state is currently limited to the cluster's maxWireVersion.
+     * No alignment is needed as the shared state is not expected to be modified frequently.
+     */
+    struct SharedState {
+        AtomicWord<int> clusterMaxWireVersion;
+    };
+
     EgressSession(TransportLayer* tl,
                   std::shared_ptr<ClientContext> ctx,
                   std::shared_ptr<ClientStream> stream,
-                  boost::optional<UUID> clientId)
+                  boost::optional<UUID> clientId,
+                  std::shared_ptr<SharedState> sharedState)
         : GRPCSession(tl, ctx->getRemote(), std::move(clientId)),
           _ctx(std::move(ctx)),
-          _stream(std::move(stream)) {
+          _stream(std::move(stream)),
+          _sharedState(std::move(sharedState)) {
         LOGV2_DEBUG(7401401,
                     2,
                     "Constructed a new gRPC egress session",
@@ -369,16 +446,63 @@ private:
         return false;
     }
 
+    void _updateWireVersion() {
+        // The cluster's wire version is communicated via the initial metadata, so only need to
+        // check it after reading the first message.
+        if (_checkedWireVersion.load() || _checkedWireVersion.swap(true)) {
+            return;
+        }
+
+        auto metadata = _ctx->getServerInitialMetadata();
+
+        auto log = [](auto error) {
+            LOGV2_WARNING(
+                7401602, "Failed to parse cluster's maxWireVersion", "error"_attr = error);
+        };
+
+        auto clusterWireVersionEntry = metadata.find(util::constants::kClusterMaxWireVersionKey);
+        if (MONGO_unlikely(clusterWireVersionEntry == metadata.end())) {
+            log(fmt::format("cannot find metadata field: {}",
+                            util::constants::kClusterMaxWireVersionKey));
+            return;
+        }
+
+        int wireVersion = 0;
+        if (std::from_chars(clusterWireVersionEntry->second.begin(),
+                            clusterWireVersionEntry->second.end(),
+                            wireVersion)
+                .ec != std::errc{}) {
+
+            log(fmt::format("invalid cluster maxWireVersion value: \"{}\"",
+                            clusterWireVersionEntry->second));
+            return;
+        }
+
+        // The following tries to avoid modifying the cache-line that holds the
+        // `clusterMaxWireVersion` when possible. Considering this code-path runs once for each
+        // outgoing stream, and the cluster maxWireVersion is not expected to change frequently,
+        // this avoids unnecessary cache evictions and is considered a performance optimization.
+        if (_sharedState->clusterMaxWireVersion.load() != wireVersion) {
+            _sharedState->clusterMaxWireVersion.store(wireVersion);
+        }
+    }
+
     boost::optional<SharedBuffer> _readFromStream() override {
-        return _stream->read();
+        if (auto msg = _stream->read()) {
+            _updateWireVersion();
+            return msg;
+        }
+        return boost::none;
     }
 
     bool _writeToStream(ConstSharedBuffer msg) override {
         return _stream->write(msg);
     }
 
+    AtomicWord<bool> _checkedWireVersion;
     const std::shared_ptr<ClientContext> _ctx;
     const std::shared_ptr<ClientStream> _stream;
+    std::shared_ptr<SharedState> _sharedState;
 };
 
 }  // namespace mongo::transport::grpc
