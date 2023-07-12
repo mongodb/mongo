@@ -232,6 +232,16 @@ protected:
     void _unlock(
         Locker* locker, StringData ns, const ResourceId& resId, StringData reason, LockMode mode);
 
+    // Stores how many holders either are trying to acquire or are holding a specific resource at
+    // that moment.
+    stdx::unordered_map<ResourceId, int32_t> _numHoldersPerResource;
+
+    /*
+     * Register/Unregister a resourceName into the ResourceCatalog for debuggability purposes.
+     */
+    void _registerResourceName(WithLock lk, ResourceId resId, StringData resName);
+    void _unregisterResourceNameIfNoLongerNeeded(WithLock lk, ResourceId resId, StringData resName);
+
     friend class ShardingDDLCoordinatorService;
     friend class ShardingDDLCoordinator;
     friend class ShardingDDLCoordinatorServiceTest;

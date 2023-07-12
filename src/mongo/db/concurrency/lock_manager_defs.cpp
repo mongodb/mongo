@@ -53,7 +53,8 @@ std::string ResourceId::toString() const {
     StringBuilder ss;
     ss << "{" << _fullHash << ": " << resourceTypeName(getType()) << ", " << getHashId();
     if (getType() == RESOURCE_DATABASE || getType() == RESOURCE_COLLECTION ||
-        getType() == RESOURCE_MUTEX) {
+        getType() == RESOURCE_MUTEX || getType() == RESOURCE_DDL_DATABASE ||
+        getType() == RESOURCE_DDL_COLLECTION) {
         if (auto resourceName = ResourceCatalog::get().name(*this)) {
             ss << ", " << *resourceName;
         }

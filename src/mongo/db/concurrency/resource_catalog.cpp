@@ -63,6 +63,11 @@ void ResourceCatalog::add(ResourceId id, const DatabaseName& dbName) {
     _add(id, DatabaseNameUtil::serializeForCatalog(dbName));
 }
 
+void ResourceCatalog::add(ResourceId id, DDLResourceName resourceName) {
+    invariant(id.getType() == RESOURCE_DDL_DATABASE || id.getType() == RESOURCE_DDL_COLLECTION);
+    _add(id, StringData(resourceName).toString());
+}
+
 void ResourceCatalog::_add(ResourceId id, std::string name) {
     stdx::lock_guard<Latch> lk{_mutex};
     _resources[id].insert(std::move(name));
@@ -76,6 +81,11 @@ void ResourceCatalog::remove(ResourceId id, const NamespaceString& ns) {
 void ResourceCatalog::remove(ResourceId id, const DatabaseName& dbName) {
     invariant(id.getType() == RESOURCE_DATABASE);
     _remove(id, DatabaseNameUtil::serializeForCatalog(dbName));
+}
+
+void ResourceCatalog::remove(ResourceId id, DDLResourceName resourceName) {
+    invariant(id.getType() == RESOURCE_DDL_DATABASE || id.getType() == RESOURCE_DDL_COLLECTION);
+    _remove(id, StringData(resourceName).toString());
 }
 
 ResourceId ResourceCatalog::newResourceIdForMutex(std::string resourceLabel) {
@@ -107,20 +117,27 @@ void ResourceCatalog::clear() {
 }
 
 boost::optional<std::string> ResourceCatalog::name(ResourceId id) const {
-    if (id.getType() == RESOURCE_DATABASE || id.getType() == RESOURCE_COLLECTION) {
-        stdx::lock_guard<Latch> lk{_mutex};
+    const auto& resType = id.getType();
+    switch (resType) {
+        case RESOURCE_DATABASE:
+        case RESOURCE_COLLECTION:
+        case RESOURCE_DDL_DATABASE:
+        case RESOURCE_DDL_COLLECTION: {
+            stdx::lock_guard<Latch> lk{_mutex};
 
-        auto it = _resources.find(id);
-        return it == _resources.end() || it->second.size() > 1
-            ? boost::none
-            : boost::make_optional(*it->second.begin());
-    } else if (id.getType() == RESOURCE_MUTEX) {
-        stdx::lock_guard<Latch> lk{_mutexResourceIdLabelsMutex};
-
-        return _mutexResourceIdLabels.at(id.getHashId());
+            auto it = _resources.find(id);
+            return it == _resources.end() || it->second.size() > 1
+                ? boost::none
+                : boost::make_optional(*it->second.begin());
+        }
+        case RESOURCE_MUTEX: {
+            stdx::lock_guard<Latch> lk{_mutexResourceIdLabelsMutex};
+            return _mutexResourceIdLabels.at(id.getHashId());
+        }
+        default:
+            return boost::none;
     }
-
-    return boost::none;
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo

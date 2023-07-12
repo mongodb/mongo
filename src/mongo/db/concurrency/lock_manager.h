@@ -173,6 +173,11 @@ public:
     void getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClientMap,
                          BSONObjBuilder* result);
 
+    /**
+     * Returns a vector of those locks granted for the given resource.
+     */
+    std::vector<LogDegugInfo> getLockInfoFromResourceHolders(ResourceId resId);
+
 private:
     // The lockheads need access to the partitions
     friend struct LockHead;

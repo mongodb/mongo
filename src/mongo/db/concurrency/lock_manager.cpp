@@ -895,6 +895,23 @@ void LockManager::getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClien
     _buildLocksArray(lockToClientMap, false, this, &lockInfoArr);
 }
 
+std::vector<LogDegugInfo> LockManager::getLockInfoFromResourceHolders(ResourceId resId) {
+    std::vector<LogDegugInfo> locksInfo;
+    for (size_t i = 0; i < _numLockBuckets; ++i) {
+        LockBucket& bucket = _lockBuckets[i];
+        stdx::lock_guard<SimpleMutex> scopedLock{bucket.mutex};
+        const auto it = bucket.data.find(resId);
+        if (it == bucket.data.end()) {
+            continue;
+        }
+        LockHead* lock = it->second;
+        for (auto iter = lock->grantedList._front; iter != nullptr; iter = iter->next) {
+            locksInfo.emplace_back(iter->mode, iter->locker->getDebugInfo());
+        }
+    }
+    return locksInfo;
+}
+
 void LockManager::_buildLocksArray(const std::map<LockerId, BSONObj>& lockToClientMap,
                                    bool forLogging,
                                    LockManager* mutableThis,

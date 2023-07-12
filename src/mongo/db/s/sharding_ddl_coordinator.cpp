@@ -135,7 +135,7 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
                               "DDL lock acquisition attempt failed",
                               "coordinatorId"_attr = _coordId,
                               "resource"_attr = toStringForLogging(resource),
-                              "mode"_attr = lockMode,
+                              "mode"_attr = modeName(lockMode),
                               "error"_attr = redact(status));
             }
             // Sharding DDL operations are not rollbackable so in case we recovered a coordinator

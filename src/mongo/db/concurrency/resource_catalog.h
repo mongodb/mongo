@@ -33,6 +33,7 @@
 #include <vector>
 
 #include <boost/optional/optional.hpp>
+#include <boost/serialization/strong_typedef.hpp>
 
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
@@ -43,15 +44,19 @@
 
 namespace mongo {
 
+BOOST_STRONG_TYPEDEF(StringData, DDLResourceName);
+
 class ResourceCatalog {
 public:
     static ResourceCatalog& get();
 
     void add(ResourceId id, const NamespaceString& ns);
     void add(ResourceId id, const DatabaseName& dbName);
+    void add(ResourceId id, DDLResourceName resourceName);
 
     void remove(ResourceId id, const NamespaceString& ns);
     void remove(ResourceId id, const DatabaseName& dbName);
+    void remove(ResourceId id, DDLResourceName resourceName);
 
     ResourceId newResourceIdForMutex(std::string resourceLabel);
 

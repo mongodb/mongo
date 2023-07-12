@@ -486,6 +486,11 @@ public:
     virtual bool hasLockPending() const = 0;
 
     /**
+     * Returns a vector with the lock information from the given resource lock holders.
+     */
+    virtual std::vector<LogDegugInfo> getLockInfoFromResourceHolders(ResourceId resId) = 0;
+
+    /**
      * If set to false, this opts out of conflicting with replication's use of the
      * ParallelBatchWriterMode lock. Code that opts-out must be ok with seeing an inconsistent view
      * of data because within a batch, secondaries apply operations in a different order than on the

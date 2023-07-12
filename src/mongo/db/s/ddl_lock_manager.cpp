@@ -38,8 +38,10 @@
 #include <absl/meta/type_traits.h>
 #include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -112,24 +114,51 @@ void DDLLockManager::_lock(OperationContext* opCtx,
 
     if (feature_flags::gMultipleGranularityDDLLocking.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        lock.unlock();
 
         tassert(7742100,
                 "None hierarchy lock (Global/DB/Coll) must be hold when acquiring a DDL lock",
                 !locker->isLocked());
 
+        _registerResourceName(lock, resId, ns);
+        lock.unlock();
+
+        ScopeGuard unregisterResourceExitGuard([&] {
+            stdx::unique_lock<Latch> lock(_mutex);
+            _unregisterResourceNameIfNoLongerNeeded(lock, resId, ns);
+        });
+
+        if (locker->getDebugInfo().empty()) {
+            locker->setDebugInfo(reason.toString());
+        }
+
         try {
             locker->lock(opCtx, resId, mode, deadline);
-        } catch (const ExceptionFor<ErrorCodes::LockTimeout>& e) {
+        } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
             using namespace fmt::literals;
-            uasserted(ErrorCodes::LockBusy,
-                      "Failed to acquire DDL lock for '{}' in mode {} after {}. {}"_format(
-                          ns, modeName(mode), waitingTime.elapsed().toString(), e.what()));
+
+            std::vector<std::string> lockHoldersArr;
+            const auto& lockHolders = locker->getLockInfoFromResourceHolders(resId);
+            for (const auto& lock : lockHolders) {
+                lockHoldersArr.emplace_back(
+                    BSON("operation" << lock.debugInfo << "lock mode" << modeName(lock.mode))
+                        .toString());
+            }
+
+            uasserted(
+                ErrorCodes::LockBusy,
+                "Failed to acquire DDL lock for '{}' in mode {} after {} that is currently locked by '{}'"_format(
+                    ns,
+                    modeName(mode),
+                    duration_cast<Milliseconds>(waitingTime.elapsed()).toString(),
+                    lockHoldersArr));
+
         } catch (DBException& e) {
             e.addContext("Failed to acquire DDL lock for '{}' in mode {} after {}"_format(
-                ns, modeName(mode), waitingTime.elapsed().toString()));
+                ns, modeName(mode), duration_cast<Milliseconds>(waitingTime.elapsed()).toString()));
             throw;
         }
+
+        unregisterResourceExitGuard.dismiss();
 
     } else {
         invariant(mode == MODE_X, "DDL lock modes other than exclusive are not supported yet");
@@ -150,7 +179,10 @@ void DDLLockManager::_lock(OperationContext* opCtx,
                 uasserted(
                     ErrorCodes::LockBusy,
                     "Failed to acquire DDL lock for namespace '{}' in mode {} after {} that is currently locked with reason '{}'"_format(
-                        ns, modeName(mode), waitingTime.elapsed().toString(), nsLock->reason));
+                        ns,
+                        modeName(mode),
+                        duration_cast<Milliseconds>(waitingTime.elapsed()).toString(),
+                        nsLock->reason));
             }
             guard.dismiss();
             nsLock->reason = reason.toString();
@@ -173,6 +205,9 @@ void DDLLockManager::_unlock(
         dassert(locker);
         locker->unlock(resId);
 
+        stdx::unique_lock<Latch> lock(_mutex);
+        _unregisterResourceNameIfNoLongerNeeded(lock, resId, ns);
+
     } else {
         stdx::unique_lock<Latch> lock(_mutex);
         auto iter = _inProgressMap.find(ns);
@@ -191,6 +226,23 @@ void DDLLockManager::_unlock(
           "resource"_attr = ns,
           "reason"_attr = reason,
           "mode"_attr = modeName(mode));
+}
+
+void DDLLockManager::_registerResourceName(WithLock lk, ResourceId resId, StringData resName) {
+    const auto currentNumHolders = _numHoldersPerResource[resId]++;
+    if (currentNumHolders == 0) {
+        ResourceCatalog::get().add(resId, DDLResourceName(resName));
+    }
+}
+
+void DDLLockManager::_unregisterResourceNameIfNoLongerNeeded(WithLock lk,
+                                                             ResourceId resId,
+                                                             StringData resName) {
+    const auto currentNumHolders = --_numHoldersPerResource[resId];
+    if (currentNumHolders <= 0) {
+        _numHoldersPerResource.erase(resId);
+        ResourceCatalog::get().remove(resId, DDLResourceName(resName));
+    }
 }
 
 DDLLockManager::ScopedDatabaseDDLLock::ScopedDatabaseDDLLock(OperationContext* opCtx,

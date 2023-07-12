@@ -555,6 +555,18 @@ struct LockRequest {
 };
 
 /**
+ * Type used to fetch lock info from the LockManager for debugging purposes.
+ * Note that using a struct to fetch internal LockManager information is preferable than a BSONObj
+ * to minimize the time the LockManager mutexes are hold.
+ */
+struct LogDegugInfo {
+    LogDegugInfo(LockMode mode, const std::string& debugInfo) : mode(mode), debugInfo(debugInfo) {}
+
+    LockMode mode;
+    std::string debugInfo;
+};
+
+/**
  * Returns a human readable status name for the specified LockRequest status.
  */
 const char* lockRequestStatusName(LockRequest::Status status);
