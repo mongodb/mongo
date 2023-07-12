@@ -986,9 +986,6 @@ TEST_F(IdempotencyTest, CollModCommandMultitenantWrongTenant) {
     ASSERT_FALSE(applyCmdCalled);
 }
 
-// TODO SERVER-70295: Ensure the collMod gFeatureFlagRequireTenantID=false tests work
-
-
 /**
  * Test only subclass of OplogApplierImpl that does not apply oplog entries, but tracks ops.
  */
