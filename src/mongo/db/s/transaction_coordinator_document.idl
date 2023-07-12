@@ -74,7 +74,7 @@ structs:
 
     TransactionCoordinatorDocument:
         description: "A document used for majority confirming the coordinator's state changes"
-        strict: true
+        strict: false
         fields:
             _id:
                 type: OperationSessionInfo
