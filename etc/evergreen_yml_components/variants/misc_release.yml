@@ -2657,8 +2657,7 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .misc_js
-    # TODO(SERVER-78135): remove !.cursor_sweeps.
-  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.cursor_sweeps
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
@@ -2712,8 +2711,7 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .misc_js
-    # TODO(SERVER-78135): remove !.cursor_sweeps.
-  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.cursor_sweeps
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
