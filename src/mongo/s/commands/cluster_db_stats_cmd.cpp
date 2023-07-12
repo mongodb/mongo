@@ -59,9 +59,10 @@
 namespace mongo {
 namespace {
 
-void aggregateResults(int scale,
+void aggregateResults(const DBStatsCommand& cmd,
                       const std::vector<AsyncRequestsSender::Response>& responses,
                       BSONObjBuilder& output) {
+    int scale = cmd.getScale();
     long long collections = 0;
     long long views = 0;
     long long objects = 0;
@@ -73,6 +74,9 @@ void aggregateResults(int scale,
     double indexSize = 0;
     double fsUsedSize = 0;
     double fsTotalSize = 0;
+    double freeStorageSize = 0;
+    double totalFreeStorageSize = 0;
+    double indexFreeStorageSize = 0;
 
     for (const auto& response : responses) {
         invariant(response.swResponse.getStatus().isOK());
@@ -90,20 +94,34 @@ void aggregateResults(int scale,
         indexSize += resp.getIndexSize();
         fsUsedSize += resp.getFsUsedSize().get_value_or(0);
         fsTotalSize += resp.getFsTotalSize().get_value_or(0);
+        freeStorageSize += resp.getFreeStorageSize().get_value_or(0);
+        totalFreeStorageSize += resp.getTotalFreeStorageSize().get_value_or(0);
+        indexFreeStorageSize += resp.getIndexFreeStorageSize().get_value_or(0);
     }
 
     output.appendNumber("collections", collections);
     output.appendNumber("views", views);
     output.appendNumber("objects", objects);
 
+    bool freeStorage = cmd.getFreeStorage();
+
     // avgObjSize on mongod is not scaled based on the argument to db.stats(), so we use
     // unscaledDataSize here for consistency.  See SERVER-7347.
     output.appendNumber("avgObjSize", objects == 0 ? 0 : unscaledDataSize / double(objects));
     output.appendNumber("dataSize", dataSize);
     output.appendNumber("storageSize", storageSize);
-    output.appendNumber("totalSize", totalSize);
+    if (freeStorage) {
+        output.appendNumber("freeStorageSize", freeStorageSize);
+    }
     output.appendNumber("indexes", indexes);
     output.appendNumber("indexSize", indexSize);
+    if (freeStorage) {
+        output.appendNumber("indexFreeStorageSize", indexFreeStorageSize);
+    }
+    output.appendNumber("totalSize", totalSize);
+    if (freeStorage) {
+        output.appendNumber("totalFreeStorageSize", totalFreeStorageSize);
+    }
     output.appendNumber("scaleFactor", scale);
     output.appendNumber("fsUsedSize", fsUsedSize);
     output.appendNumber("fsTotalSize", fsTotalSize);
@@ -162,7 +180,7 @@ public:
         }
 
         output.append("db", DatabaseNameUtil::serialize(dbName));
-        aggregateResults(cmd.getScale(), shardResponses, output);
+        aggregateResults(cmd, shardResponses, output);
         return true;
     }
 

@@ -95,6 +95,11 @@ const tests = [
                 command: {dbStats: 1, scale: 1024, freeStorage: 0},
                 expectFail: false,
             },
+            {
+                shortDescription: "Runs dbStats with freeStorage=1.",
+                command: {dbStats: 1, scale: 1024, freeStorage: 1},
+                expectFail: false,
+            },
         ]
     },
     {
