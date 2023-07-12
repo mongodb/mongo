@@ -244,7 +244,7 @@ public:
         OperationContext* opCtx,
         const TransactionOperations& transactionOperations,
         const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
-        Date_t wallClockTime) final;
+        Date_t wallClockTime) final {}
 
     void onTransactionPrepare(
         OperationContext* opCtx,

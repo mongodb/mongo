@@ -56,6 +56,69 @@ void writeChangeStreamPreImageEntry(
     ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(opCtx, tenantId, preImage);
 }
 
+/**
+ * Writes pre-images for update/replace/delete operations packed into a single "applyOps" entry to
+ * the change stream pre-images collection if required. The operations are defined by sequence
+ * ['stmtBegin', 'stmtEnd'). 'applyOpsTimestamp' and 'operationTime' are the timestamp and the wall
+ * clock time, respectively, of the "applyOps" entry. A pre-image is recorded for an operation only
+ * if pre-images are enabled for the collection the operation is issued on.
+ */
+void writeChangeStreamPreImagesForApplyOpsEntries(
+    OperationContext* opCtx,
+    std::vector<repl::ReplOperation>::const_iterator stmtBegin,
+    std::vector<repl::ReplOperation>::const_iterator stmtEnd,
+    Timestamp applyOpsTimestamp,
+    Date_t operationTime) {
+    int64_t applyOpsIndex{0};
+    for (auto stmtIterator = stmtBegin; stmtIterator != stmtEnd; ++stmtIterator) {
+        auto& operation = *stmtIterator;
+        if (operation.isChangeStreamPreImageRecordedInPreImagesCollection() &&
+            !operation.getNss().isTemporaryReshardingCollection()) {
+            invariant(operation.getUuid());
+            invariant(!operation.getPreImage().isEmpty());
+
+            writeChangeStreamPreImageEntry(
+                opCtx,
+                operation.getTid(),
+                ChangeStreamPreImage{
+                    ChangeStreamPreImageId{*operation.getUuid(), applyOpsTimestamp, applyOpsIndex},
+                    operationTime,
+                    operation.getPreImage()});
+        }
+        ++applyOpsIndex;
+    }
+}
+
+/**
+ * Writes change stream pre-images for transaction 'operations'. The 'applyOpsOperationAssignment'
+ * contains a representation of "applyOps" entries to be written for the transaction. The
+ * 'operationTime' is wall clock time of the operations used for the pre-image documents.
+ */
+void writeChangeStreamPreImagesForTransaction(
+    OperationContext* opCtx,
+    const std::vector<repl::ReplOperation>& operations,
+    const OpObserver::ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+    Date_t operationTime) {
+    // This function must be called from an outer WriteUnitOfWork in order to be rolled back upon
+    // reaching the exception.
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+
+    auto applyOpsEntriesIt = applyOpsOperationAssignment.applyOpsEntries.begin();
+    for (auto operationIter = operations.begin(); operationIter != operations.end();) {
+        tassert(7831000,
+                "Unexpected end of applyOps entries vector",
+                applyOpsEntriesIt != applyOpsOperationAssignment.applyOpsEntries.end());
+        const auto& applyOpsEntry = *applyOpsEntriesIt++;
+        const auto operationSequenceEnd = operationIter + applyOpsEntry.operations.size();
+        writeChangeStreamPreImagesForApplyOpsEntries(opCtx,
+                                                     operationIter,
+                                                     operationSequenceEnd,
+                                                     applyOpsEntry.oplogSlot.getTimestamp(),
+                                                     operationTime);
+        operationIter = operationSequenceEnd;
+    }
+}
+
 }  // namespace
 
 void ChangeStreamPreImagesOpObserver::onUpdate(OperationContext* opCtx,
@@ -140,6 +203,16 @@ void ChangeStreamPreImagesOpObserver::onDelete(OperationContext* opCtx,
 
         writeChangeStreamPreImageEntry(opCtx, nss.tenantId(), preImage);
     }
+}
+
+void ChangeStreamPreImagesOpObserver::preTransactionPrepare(
+    OperationContext* opCtx,
+    const TransactionOperations& transactionOperations,
+    const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+    Date_t wallClockTime) {
+    const auto& statements = transactionOperations.getOperationsForOpObserver();
+    writeChangeStreamPreImagesForTransaction(
+        opCtx, statements, applyOpsOperationAssignment, wallClockTime);
 }
 
 }  // namespace mongo

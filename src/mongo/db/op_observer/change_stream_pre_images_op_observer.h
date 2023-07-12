@@ -56,6 +56,12 @@ public:
                   StmtId stmtId,
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) final;
+
+    void preTransactionPrepare(
+        OperationContext* opCtx,
+        const TransactionOperations& transactionOperations,
+        const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+        Date_t wallClockTime) final;
 };
 
 }  // namespace mongo

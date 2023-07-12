@@ -1920,16 +1920,6 @@ void OpObserverImpl::onPreparedTransactionCommit(
         opCtx, &oplogEntry, DurableTxnStateEnum::kCommitted, _oplogWriter.get());
 }
 
-void OpObserverImpl::preTransactionPrepare(
-    OperationContext* opCtx,
-    const TransactionOperations& transactionOperations,
-    const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
-    Date_t wallClockTime) {
-    const auto& statements = transactionOperations.getOperationsForOpObserver();
-    writeChangeStreamPreImagesForTransaction(
-        opCtx, statements, applyOpsOperationAssignment, wallClockTime);
-}
-
 void OpObserverImpl::onTransactionPrepare(
     OperationContext* opCtx,
     const std::vector<OplogSlot>& reservedSlots,
