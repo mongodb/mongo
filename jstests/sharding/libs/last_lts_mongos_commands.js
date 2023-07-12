@@ -31,6 +31,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "cpuload",
     "createSearchIndexes",
     "dropSearchIndex",
+    "fsyncUnlock",
     "getClusterParameter",
     "getQueryableEncryptionCountInfo",
     "listSearchIndexes",
