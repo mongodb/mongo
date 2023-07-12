@@ -20,6 +20,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "configureCollectionBalancing",
     "createSearchIndexes",
     "dropSearchIndex",
+    "fsyncUnlock",
     "getClusterParameter",
     "listSearchIndexes",
     "moveRange",
