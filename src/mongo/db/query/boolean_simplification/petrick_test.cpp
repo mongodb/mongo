@@ -41,7 +41,7 @@ namespace mongo::boolean_simplification {
  * (https://en.wikipedia.org/w/index.php?title=Petrick%27s_method&oldid=1142937196) and can be found
  * in a number of publications as well.
  */
-TEST(PetrictTest, ClaassicExample) {
+TEST(PetrickTest, ClaassicExample) {
     std::vector<std::vector<uint32_t>> data{
         {0, 1},
         {0, 3},
@@ -63,7 +63,7 @@ TEST(PetrictTest, ClaassicExample) {
     ASSERT_EQ(expectedResult, result);
 }
 
-TEST(PetrictTest, OneCoverage) {
+TEST(PetrickTest, OneCoverage) {
     std::vector<std::vector<uint32_t>> data{
         {1, 2, 3},
         {3, 4},
@@ -78,7 +78,7 @@ TEST(PetrictTest, OneCoverage) {
     ASSERT_EQ(expectedResult, result);
 }
 
-TEST(PetrictTest, TwoCoverages) {
+TEST(PetrickTest, TwoCoverages) {
     std::vector<std::vector<uint32_t>> data{
         {0, 1, 2},
         {2, 3},
@@ -94,7 +94,7 @@ TEST(PetrictTest, TwoCoverages) {
     ASSERT_EQ(expectedResult, result);
 }
 
-TEST(PetrictTest, NoSimplifications) {
+TEST(PetrickTest, NoSimplifications) {
     std::vector<std::vector<uint32_t>> data{
         {0},
         {1},
@@ -110,7 +110,46 @@ TEST(PetrictTest, NoSimplifications) {
     ASSERT_EQ(expectedResult, result);
 }
 
-TEST(PetrictTest, OneMinterm) {
+TEST(PetrickTest, ManyEssentialsWithSimplifications) {
+    std::vector<std::vector<uint32_t>> data{
+        {0, 1, 2},
+        {2, 3},
+        {0, 3},
+        {4},
+        {5},
+        {6},
+    };
+
+    std::vector<std::vector<uint32_t>> expectedResult{
+        {0, 1, 3, 4, 5},
+        {0, 2, 3, 4, 5},
+    };
+
+    const auto result = petricksMethod(data);
+    ASSERT_EQ(expectedResult, result);
+}
+
+TEST(PetrickTest, ReorderingMultipleEssentialsWithSimplifications) {
+    std::vector<std::vector<uint32_t>> data{
+        {0},
+        {1, 2, 3},
+        {3, 6},
+        {3, 4, 5},
+        {1, 3, 4},
+        {4, 6},
+        {3, 4},
+    };
+
+    std::vector<std::vector<uint32_t>> expectedResult{
+        {0, 1, 2, 3},
+        {0, 1, 3, 5},
+    };
+
+    const auto result = petricksMethod(data);
+    ASSERT_EQ(expectedResult, result);
+}
+
+TEST(PetrickTest, OneMinterm) {
     std::vector<std::vector<uint32_t>> data{
         {0},
     };
@@ -123,7 +162,7 @@ TEST(PetrictTest, OneMinterm) {
     ASSERT_EQ(expectedResult, result);
 }
 
-TEST(PetrictTest, NoMinterms) {
+TEST(PetrickTest, NoMinterms) {
     std::vector<std::vector<uint32_t>> data{};
 
     std::vector<std::vector<uint32_t>> expectedResult{};

@@ -84,6 +84,12 @@ PrimeImplicant operator|(const PrimeImplicant& lhs, const PrimeImplicant& rhs) {
  */
 class ImplicantSum {
 public:
+    ImplicantSum() {}
+
+    ImplicantSum(PrimeImplicant implicant) {
+        _implicants.push_back(implicant);
+    }
+
     void appendNewImplicant(size_t numberOfBits, size_t implicantIndex) {
         _implicants.emplace_back(numberOfBits, implicantIndex);
     }
@@ -150,6 +156,14 @@ public:
         _implicants.swap(other._implicants);
     }
 
+    size_t size() const {
+        return _implicants.size();
+    }
+
+    PrimeImplicant front() const {
+        return _implicants.front();
+    }
+
     /**
      * Expands a bitset representation of each prime implicant into a vector of minterm indexes and
      * returns the resulting vector.
@@ -184,6 +198,32 @@ public:
     }
 
     std::vector<std::vector<uint32_t>> getMinimalCoverages() {
+        // Simplifies the table by combining essential implicants. This saves on allocations inside
+        // ImplicantSum.product()
+        std::vector<PrimeImplicant> essentialImplicants{};
+        auto implicantIter = _table.begin();
+        while (implicantIter != _table.end()) {
+            // If an ImplicantSum only has one PrimeImplicant, it is essential, and is removed from
+            // the table and combined with the other essential implicants.
+            if (implicantIter->size() == 1) {
+                essentialImplicants.push_back(implicantIter->front());
+                implicantIter = _table.erase(implicantIter);
+            } else {
+                ++implicantIter;
+            }
+        }
+
+        if (!essentialImplicants.empty()) {
+            PrimeImplicant combinedImplicant{essentialImplicants.back()};
+            essentialImplicants.pop_back();
+            for (const auto& implicant : essentialImplicants) {
+                combinedImplicant = combinedImplicant | implicant;
+            }
+            // Add the combined essential implicant to the table as a new row.
+            ImplicantSum combinedImplicantSum{combinedImplicant};
+            _table.push_back(combinedImplicantSum);
+        }
+
         while (_table.size() > 1) {
             const size_t size = _table.size();
             auto productResult = _table[size - 1].product(_table[size - 2]);
