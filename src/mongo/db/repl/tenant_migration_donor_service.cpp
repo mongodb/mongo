@@ -625,7 +625,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
         .until([&](StatusWith<repl::OpTime> swOpTime) {
             if (swOpTime.getStatus().code() == ErrorCodes::ConflictingServerlessOperation) {
                 LOGV2(6531508,
-                      "Tenant migration completed due to serverless lock error",
+                      "Tenant migration failed to start due to serverless lock error",
                       "id"_attr = _migrationUuid,
                       "status"_attr = swOpTime.getStatus());
                 uassertStatusOK(swOpTime);
@@ -1109,6 +1109,12 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             stdx::lock_guard<Latch> lg(_mutex);
 
             setPromiseFromStatusIfNotReady(lg, _forgetMigrationDurablePromise, status);
+
+            // If a ConflictingServerlessOperation was thrown, ensure a valid _abortReason exists.
+            if (!_abortReason &&
+                isNotDurableAndServerlessConflict(lg, _initialDonorStateDurablePromise)) {
+                _abortReason.emplace(_initialDonorStateDurablePromise.getFuture().getNoThrow());
+            }
 
             LOGV2(5006601,
                   "Tenant migration completed",

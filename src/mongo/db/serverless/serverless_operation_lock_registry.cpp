@@ -66,7 +66,11 @@ void ServerlessOperationLockRegistry::acquireLock(
     // Verify there is no serverless operation in progress or it is the same type as the one
     // acquiring the lock.
     uassert(ErrorCodes::ConflictingServerlessOperation,
-            "Conflicting serverless operation in progress",
+            str::stream()
+                << "Conflicting serverless operation in progress. Trying to acquire lock for '"
+                << lockType << "' and operationId '" << operationId
+                << "' but it is already used by '" << *_activeLockType << "' for operations "
+                << printActiveOperations(lg),
             !_activeLockType || _activeLockType.get() == lockType);
     invariant(_activeOperations.find(operationId) == _activeOperations.end(),
               "Cannot acquire the serverless lock twice for the same operationId.");
@@ -229,5 +233,15 @@ ServerlessOperationLockRegistry::getActiveOperationType_forTest() {
     return _activeLockType;
 }
 
+std::string ServerlessOperationLockRegistry::printActiveOperations(WithLock lock) const {
+    StringBuilder sb;
+    sb << "[";
+    for (const auto& uuid : _activeOperations) {
+        sb << uuid << ",";
+    }
+    sb << "]";
+
+    return sb.str();
+}
 
 }  // namespace mongo

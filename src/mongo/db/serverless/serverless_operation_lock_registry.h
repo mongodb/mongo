@@ -91,6 +91,8 @@ public:
     boost::optional<ServerlessOperationLockRegistry::LockType> getActiveOperationType_forTest();
 
 private:
+    std::string printActiveOperations(WithLock lock) const;
+
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ServerlessMutualExclusionRegistry::_mutex");
     boost::optional<LockType> _activeLockType;
     std::set<UUID> _activeOperations;

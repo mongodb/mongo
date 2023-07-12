@@ -1075,7 +1075,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
         .until([&](StatusWith<repl::OpTime> swOpTime) {
             if (swOpTime.getStatus().code() == ErrorCodes::ConflictingServerlessOperation) {
                 LOGV2(6531509,
-                      "Shard split completed due to serverless lock error",
+                      "Shard split failed due to serverless lock error",
                       "id"_attr = _migrationId,
                       "status"_attr = swOpTime.getStatus());
                 stdx::lock_guard<Latch> lg(_mutex);

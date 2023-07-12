@@ -56,9 +56,9 @@ function cannotStartMigrationWhileShardSplitIsInProgress(protocol) {
     assert.commandFailedWithCode(test.startMigration(migrationOpts),
                                  ErrorCodes.ConflictingServerlessOperation);
 
-    const res =
-        test.forgetMigration(migrationOpts.migrationIdString, false /* retryOnRetryableErrors */);
-    jsTestLog(`Result of forget is ${tojson(res)}`);
+    assert.commandFailedWithCode(
+        test.forgetMigration(migrationOpts.migrationIdString, false /* retryOnRetryableErrors */),
+        ErrorCodes.NoSuchTenantMigration);
 
     fp.off();
 
