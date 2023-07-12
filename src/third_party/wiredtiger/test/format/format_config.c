@@ -51,6 +51,7 @@ static void config_mirrors(void);
 static void config_off(TABLE *, const char *);
 static void config_off_all(const char *);
 static void config_pct(TABLE *);
+static void config_run_length(void);
 static void config_statistics(void);
 static void config_tiered_storage(void);
 static void config_transaction(void);
@@ -500,27 +501,8 @@ config_run(void)
     /* Configure the cache last, cache size depends on everything else. */
     config_cache();
 
-    /*
-     * Run-length is configured by a number of operations and a timer.
-     *
-     * If the operation count and the timer are both configured, do nothing. If only the timer is
-     * configured, clear the operations count. If only the operation count is configured, limit the
-     * run to 6 hours. If neither is configured, leave the operations count alone and limit the run
-     * to 30 minutes.
-     *
-     * In other words, if we rolled the dice on everything, do a short run. If we chose a number of
-     * operations but the rest of the configuration means operations take a long time to complete
-     * (for example, a small cache and many worker threads), don't let it run forever.
-     */
-    if (config_explicit(NULL, "runs.timer")) {
-        if (!config_explicit(NULL, "runs.ops"))
-            config_single(NULL, "runs.ops=0", false);
-    } else {
-        if (!config_explicit(NULL, "runs.ops"))
-            config_single(NULL, "runs.timer=30", false);
-        else
-            config_single(NULL, "runs.timer=360", false);
-    }
+    /* Adjust run length if needed. */
+    config_run_length();
 
     config_random_generators_before_run();
 }
@@ -1392,6 +1374,48 @@ config_pct(TABLE *table)
     testutil_assert(TV(OPS_PCT_DELETE) + TV(OPS_PCT_INSERT) + TV(OPS_PCT_MODIFY) +
         TV(OPS_PCT_READ) + TV(OPS_PCT_WRITE) ==
       100);
+}
+
+/*
+ * config_run_length --
+ *     Run length configuration.
+ */
+static void
+config_run_length(void)
+{
+    /*
+     * Run-length is configured by a number of operations and a timer.
+     *
+     * If the operation count and the timer are both configured, do nothing. If only the timer is
+     * configured, clear the operations count. If only the operation count is configured, limit the
+     * run to 6 hours. If neither is configured, leave the operations count alone and limit the run
+     * to 30 minutes.
+     *
+     * In other words, if we rolled the dice on everything, do a short run. If we chose a number of
+     * operations but the rest of the configuration means operations take a long time to complete
+     * (for example, a small cache and many worker threads), don't let it run forever.
+     */
+    if (config_explicit(NULL, "runs.timer")) {
+        if (!config_explicit(NULL, "runs.ops"))
+            config_single(NULL, "runs.ops=0", false);
+    } else {
+        if (!config_explicit(NULL, "runs.ops"))
+            config_single(NULL, "runs.timer=30", false);
+        else
+            config_single(NULL, "runs.timer=360", false);
+    }
+
+    /*
+     * There are combinations that can cause out of disk space issues and here we try to prevent
+     * those. CONFIG.stress causes runs.timer to be considered explicit which limits when we can
+     * override the run length to extreme cases.
+     */
+    if (GV(RUNS_TIMER) > 10 && GV(LOGGING) && !GV(LOGGING_REMOVE) && GV(BACKUP) &&
+      GV(OPS_SALVAGE)) {
+        WARN(
+          "limiting runs.timer=%d as logging=1, backup=1, ops.salvage=1, and logging.remove=0", 10);
+        config_single(NULL, "runs.timer=10", true);
+    }
 }
 
 /*
