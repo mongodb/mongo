@@ -576,6 +576,28 @@ boost::optional<ShardId> targetPotentiallySingleShard(
     return boost::none;
 }
 
+ShardId targetSingleShard(boost::intrusive_ptr<ExpressionContext> expCtx,
+                          const ChunkManager& cm,
+                          const BSONObj& query,
+                          const BSONObj& collation) {
+    std::set<ShardId> shardIds;
+
+    // For now, set bypassIsFieldHashedCheck to be true in order to skip the
+    // isFieldHashedCheck in the special case where _id is hashed and used as the shard
+    // key. This means that we always assume that a findAndModify request using _id is
+    // targetable to a single shard.
+    getShardIdsForQuery(
+        expCtx, getQueryForShardKey(expCtx, cm, query), collation, cm, &shardIds, nullptr, true);
+
+    uassert(ErrorCodes::ShardKeyNotFound,
+            str::stream() << "Query with sharded findAndModify expected to only target one "
+                             "shard, but the query targeted "
+                          << shardIds.size() << " shard(s)",
+            shardIds.size() == 1);
+
+    return *shardIds.begin();
+}
+
 BSONObj makeExplainCmd(OperationContext* opCtx,
                        const BSONObj& cmdObj,
                        ExplainOptions::Verbosity verbosity) {
@@ -627,9 +649,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
                 opCtx, nss, false /* isUpdateOrDelete */, isUpsert, query, collation, let, rc)) {
             shardId = targetPotentiallySingleShard(expCtx, cm, query, collation);
         } else {
-            const BSONObj shardKey = getShardKey(expCtx, cm, query);
-            const auto chunk = cm.findIntersectingChunk(shardKey, collation);
-            shardId = chunk.getShardId();
+            shardId = targetSingleShard(expCtx, cm, query, collation);
         }
     } else {
         shardId = cm.dbPrimary();
@@ -759,16 +779,11 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         } else {
             findAndModifyTargetedShardedCount.increment(1);
 
-            const BSONObj shardKey = getShardKey(expCtx, cm, query);
-            // For now, set bypassIsFieldHashedCheck to be true in order to skip the
-            // isFieldHashedCheck in the special case where _id is hashed and used as the shard
-            // key. This means that we always assume that a findAndModify request using _id is
-            // targetable to a single shard.
-            auto chunk = cm.findIntersectingChunk(shardKey, collation, true);
+            ShardId shardId = targetSingleShard(expCtx, cm, query, collation);
 
             _runCommand(opCtx,
-                        chunk.getShardId(),
-                        cri.getShardVersion(chunk.getShardId()),
+                        shardId,
+                        cri.getShardVersion(shardId),
                         boost::none,
                         nss,
                         applyReadWriteConcern(opCtx, this, cmdObjForShard),

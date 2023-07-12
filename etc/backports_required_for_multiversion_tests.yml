@@ -21,6 +21,10 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/sharding/query/find_and_modify_without_two_phase.js
+    ticket: SERVER-44422
+  - test_file: jstests/sharding/query/delete_without_two_phase.js
+    ticket: SERVER-44422
   - test_file: jstests/core/administrative/check_shard_index.js
     ticket: SERVER-50792
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
@@ -418,6 +422,10 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/sharding/query/find_and_modify_without_two_phase.js
+    ticket: SERVER-44422
+  - test_file: jstests/sharding/query/delete_without_two_phase.js
+    ticket: SERVER-44422
   - test_file: jstests/sharding/database_versioning_all_commands.js
     ticket: SERVER-75911
   - test_file: jstests/core/query/null_query_semantics.js

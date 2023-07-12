@@ -628,18 +628,14 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
         _canonicalize(opCtx, expCtx, _nss, deleteQuery, collation, _cri.cm),
         str::stream() << "Could not parse delete query " << deleteQuery);
 
-    // Sharded collections have the following further requirements for targeting:
-    //
-    // Limit-1 deletes must be targeted exactly by shard key *or* exact _id
-    shardKey = extractShardKeyFromQuery(_cri.cm.getShardKeyPattern(), *cq);
-
-    // Target the shard key or delete query
-    if (!shardKey.isEmpty()) {
-        auto swEndpoint = _targetShardKey(shardKey, collation, chunkRanges);
-        if (swEndpoint.isOK()) {
+    // We first try to target based on the delete's query. It is always valid to forward any delete
+    // to a single shard, so return immediately if we are able to target a single shard.
+    auto endpoints = uassertStatusOK(_targetQuery(*cq, collation, chunkRanges));
+    if (endpoints.size() == 1) {
+        if (!deleteOp.getMulti()) {
             deleteOneTargetedShardedCount.increment(1);
-            return std::vector{std::move(swEndpoint.getValue())};
         }
+        return endpoints;
     }
 
     // We failed to target a single shard.
@@ -661,15 +657,12 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
                 feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
                     serverGlobalParams.featureCompatibility));
 
-    if (chunkRanges) {
-        chunkRanges->clear();
-    }
 
-    if (isExactId) {
+    if (isExactId && !deleteOp.getMulti()) {
         deleteOneTargetedShardedCount.increment(1);
     }
 
-    return uassertStatusOK(_targetQuery(*cq, collation, chunkRanges));
+    return endpoints;
 }
 
 StatusWith<std::unique_ptr<CanonicalQuery>> CollectionRoutingInfoTargeter::_canonicalize(

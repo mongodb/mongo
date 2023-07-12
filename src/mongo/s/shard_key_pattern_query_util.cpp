@@ -450,7 +450,8 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                          const BSONObj& collation,
                          const ChunkManager& cm,
                          std::set<ShardId>* shardIds,
-                         QueryTargetingInfo* info) {
+                         QueryTargetingInfo* info,
+                         bool bypassIsFieldHashedCheck) {
     if (info) {
         tassert(7670301, "Invalid QueryTargetingInfo", info->chunkRanges.empty());
     }
@@ -476,14 +477,15 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures));
 
-    getShardIdsForCanonicalQuery(*cq, collation, cm, shardIds, info);
+    getShardIdsForCanonicalQuery(*cq, collation, cm, shardIds, info, bypassIsFieldHashedCheck);
 }
 
 void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
                                   const BSONObj& collation,
                                   const ChunkManager& cm,
                                   std::set<ShardId>* shardIds,
-                                  QueryTargetingInfo* info) {
+                                  QueryTargetingInfo* info,
+                                  bool bypassIsFieldHashedCheck) {
     if (info) {
         tassert(7670300, "Invalid non-empty 'info->chungRanges'", info->chunkRanges.empty());
     }
@@ -492,7 +494,8 @@ void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
     auto shardKeyToFind = extractShardKeyFromQuery(cm.getShardKeyPattern(), query);
     if (!shardKeyToFind.isEmpty()) {
         try {
-            auto chunk = cm.findIntersectingChunk(shardKeyToFind, collation);
+            auto chunk =
+                cm.findIntersectingChunk(shardKeyToFind, collation, bypassIsFieldHashedCheck);
             shardIds->insert(chunk.getShardId());
             if (info) {
                 info->desc = QueryTargetingInfo::Description::kSingleKey;
