@@ -206,7 +206,8 @@ def main():
     # type: () -> None
     """Execute Main entry point."""
 
-    parser = argparse.ArgumentParser(description='PyLinter frontend.')
+    parser = argparse.ArgumentParser(
+        description='PyLinter frontend; see more details at https://wiki.corp.mongodb.com/x/1vP5BQ')
 
     linters = get_py_linter(None)
 
@@ -253,6 +254,10 @@ def main():
     parser_fix.add_argument("file_names", nargs="*", help="Globs of files to check")
     parser_fix.set_defaults(func=fix_scons_func, linters="scons")
 
+    # No args given? Fall back to usage screen:
+    if len(sys.argv) == 1:
+        parser.print_help()
+        return
     args = parser.parse_args()
 
     # Create a dictionary of linter locations if the user needs to override the location of a
