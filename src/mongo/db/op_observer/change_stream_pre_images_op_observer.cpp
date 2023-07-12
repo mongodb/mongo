@@ -205,6 +205,32 @@ void ChangeStreamPreImagesOpObserver::onDelete(OperationContext* opCtx,
     }
 }
 
+void ChangeStreamPreImagesOpObserver::onUnpreparedTransactionCommit(
+    OperationContext* opCtx,
+    const std::vector<OplogSlot>& reservedSlots,
+    const TransactionOperations& transactionOperations,
+    const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+    OpStateAccumulator* opAccumulator) {
+    if (!opAccumulator) {
+        return;
+    }
+
+    // Return early if the node did not write the oplog entry for the corresponding operation.
+    // This check is slightly redundant given that we don't need to do this for prepared
+    // transactions.
+    const auto& opTimeBundle = opAccumulator->opTime;
+    if (opTimeBundle.writeOpTime.isNull()) {
+        return;
+    }
+
+    // Write change stream pre-images. At this point the pre-images will be written at the
+    // transaction commit timestamp as driven (implicitly) by the last written "applyOps" oplog
+    // entry.
+    const auto& statements = transactionOperations.getOperationsForOpObserver();
+    writeChangeStreamPreImagesForTransaction(
+        opCtx, statements, applyOpsOperationAssignment, opTimeBundle.wallClockTime);
+}
+
 void ChangeStreamPreImagesOpObserver::preTransactionPrepare(
     OperationContext* opCtx,
     const TransactionOperations& transactionOperations,

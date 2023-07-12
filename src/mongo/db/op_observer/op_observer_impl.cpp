@@ -52,7 +52,6 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
@@ -70,7 +69,6 @@
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_result.h"
-#include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
@@ -146,19 +144,6 @@ repl::OpTime logOperation(OperationContext* opCtx,
     auto opTime = oplogWriter->logOp(opCtx, oplogEntry);
     times.push_back(opTime);
     return opTime;
-}
-
-void writeChangeStreamPreImageEntry(
-    OperationContext* opCtx,
-    // Skip the pre-image insert if we are in the middle of a tenant migration. Pre-image inserts
-    // for writes during the oplog catchup phase are handled in the oplog application code.
-    boost::optional<TenantId> tenantId,
-    const ChangeStreamPreImage& preImage) {
-    if (repl::tenantMigrationInfo(opCtx)) {
-        return;
-    }
-
-    ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(opCtx, tenantId, preImage);
 }
 
 /**
@@ -1481,38 +1466,6 @@ void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
 
 namespace {
 
-/**
- * Writes pre-images for update/replace/delete operations packed into a single "applyOps" entry to
- * the change stream pre-images collection if required. The operations are defined by sequence
- * ['stmtBegin', 'stmtEnd'). 'applyOpsTimestamp' and 'operationTime' are the timestamp and the wall
- * clock time, respectively, of the "applyOps" entry. A pre-image is recorded for an operation only
- * if pre-images are enabled for the collection the operation is issued on.
- */
-void writeChangeStreamPreImagesForApplyOpsEntries(
-    OperationContext* opCtx,
-    std::vector<repl::ReplOperation>::const_iterator stmtBegin,
-    std::vector<repl::ReplOperation>::const_iterator stmtEnd,
-    Timestamp applyOpsTimestamp,
-    Date_t operationTime) {
-    int64_t applyOpsIndex{0};
-    for (auto stmtIterator = stmtBegin; stmtIterator != stmtEnd; ++stmtIterator) {
-        auto& operation = *stmtIterator;
-        if (operation.isChangeStreamPreImageRecordedInPreImagesCollection() &&
-            !operation.getNss().isTemporaryReshardingCollection()) {
-            invariant(operation.getUuid());
-            invariant(!operation.getPreImage().isEmpty());
-
-            writeChangeStreamPreImageEntry(
-                opCtx,
-                operation.getTid(),
-                ChangeStreamPreImage{
-                    ChangeStreamPreImageId{*operation.getUuid(), applyOpsTimestamp, applyOpsIndex},
-                    operationTime,
-                    operation.getPreImage()});
-        }
-        ++applyOpsIndex;
-    }
-}
 
 /**
  * Returns maximum number of operations to pack into a single oplog entry,
@@ -1530,36 +1483,6 @@ std::size_t getMaxNumberOfBatchedOperationsInSingleOplogEntry() {
 std::size_t getMaxSizeOfBatchedOperationsInSingleOplogEntryBytes() {
     // IDL validation defined for this startup parameter ensures that we have a positive number.
     return static_cast<std::size_t>(gMaxSizeOfBatchedOperationsInSingleOplogEntryBytes);
-}
-
-/**
- * Writes change stream pre-images for transaction 'operations'. The 'applyOpsOperationAssignment'
- * contains a representation of "applyOps" entries to be written for the transaction. The
- * 'operationTime' is wall clock time of the operations used for the pre-image documents.
- */
-void writeChangeStreamPreImagesForTransaction(
-    OperationContext* opCtx,
-    const std::vector<repl::ReplOperation>& operations,
-    const OpObserver::ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
-    Date_t operationTime) {
-    // This function must be called from an outer WriteUnitOfWork in order to be rolled back upon
-    // reaching the exception.
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
-
-    auto applyOpsEntriesIt = applyOpsOperationAssignment.applyOpsEntries.begin();
-    for (auto operationIter = operations.begin(); operationIter != operations.end();) {
-        tassert(6278507,
-                "Unexpected end of applyOps entries vector",
-                applyOpsEntriesIt != applyOpsOperationAssignment.applyOpsEntries.end());
-        const auto& applyOpsEntry = *applyOpsEntriesIt++;
-        const auto operationSequenceEnd = operationIter + applyOpsEntry.operations.size();
-        writeChangeStreamPreImagesForApplyOpsEntries(opCtx,
-                                                     operationIter,
-                                                     operationSequenceEnd,
-                                                     applyOpsEntry.oplogSlot.getTimestamp(),
-                                                     operationTime);
-        operationIter = operationSequenceEnd;
-    }
 }
 
 // Logs one applyOps entry on a prepared transaction, or an unprepared transaction's commit, or on
@@ -1767,12 +1690,6 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
     if (imageToWrite) {
         writeToImageCollection(opCtx, *opCtx->getLogicalSessionId(), *imageToWrite);
     }
-
-    // Write change stream pre-images. At this point the pre-images will be written at the
-    // transaction commit timestamp as driven (implicitly) by the last written "applyOps" oplog
-    // entry.
-    writeChangeStreamPreImagesForTransaction(
-        opCtx, statements, applyOpsOplogSlotAndOperationAssignment, wallClockTime);
 }
 
 void OpObserverImpl::onBatchedWriteStart(OperationContext* opCtx) {
