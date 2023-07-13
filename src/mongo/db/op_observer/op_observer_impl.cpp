@@ -288,6 +288,14 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     return opTimes;
 }
 
+/**
+ * Writes temporary documents for retryable findAndModify commands to the
+ * side collection (config.image_collection).
+ *
+ * In server version 7.0 and earlier, this behavior used to be configurable
+ * through the server parameter storeFindAndModifyImagesInSideCollection.
+ * See SERVER-59443.
+ */
 void writeToImageCollection(OperationContext* opCtx,
                             const LogicalSessionId& sessionId,
                             const repl::ReplOperation::ImageBundle& imageToWrite) {
