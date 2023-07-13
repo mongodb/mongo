@@ -199,7 +199,7 @@ bool WiredTigerFileVersion::shouldDowngrade(bool hasRecoveryTimestamp) {
         return false;
     }
 
-    if (getGlobalReplSettings().usingReplSets()) {
+    if (getGlobalReplSettings().isReplSet()) {
         // If this process is run with `--replSet`, it must have run any startup replication
         // recovery and downgrading at this point is safe.
         return true;
@@ -1601,7 +1601,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     bool isLogged;
     if (nss.size() == 0) {
         fassert(8423353, ident.startsWith("internal-"));
-        isLogged = !getGlobalReplSettings().usingReplSets() &&
+        isLogged = !getGlobalReplSettings().isReplSet() &&
             !repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
     } else {
         isLogged = WiredTigerUtil::useTableLogging(nss);

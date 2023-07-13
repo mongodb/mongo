@@ -56,8 +56,7 @@ public:
     MapReduceCommand() = default;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext* serviceContext) const override {
-        if (repl::ReplicationCoordinator::get(serviceContext)->getReplicationMode() !=
-            repl::ReplicationCoordinator::modeReplSet) {
+        if (!repl::ReplicationCoordinator::get(serviceContext)->getSettings().isReplSet()) {
             return AllowedOnSecondary::kAlways;
         }
         return AllowedOnSecondary::kOptIn;

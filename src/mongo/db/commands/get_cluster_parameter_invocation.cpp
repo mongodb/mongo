@@ -131,8 +131,7 @@ GetClusterParameterInvocation::Reply GetClusterParameterInvocation::getCachedPar
     const CmdBody& cmdBody = request.getCommandParameter();
 
     auto* repl = repl::ReplicationCoordinator::get(opCtx);
-    bool isStandalone = repl &&
-        repl->getReplicationMode() == repl::ReplicationCoordinator::modeNone &&
+    bool isStandalone = repl && !repl->getSettings().isReplSet() &&
         serverGlobalParams.clusterRole.has(ClusterRole::None);
 
     auto [parameterNames, parameterValues] =

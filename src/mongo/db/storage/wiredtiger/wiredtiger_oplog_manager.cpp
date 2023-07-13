@@ -87,7 +87,7 @@ void WiredTigerOplogManager::startVisibilityThread(OperationContext* opCtx,
                     1,
                     "Initializing the oplog read timestamp (oplog visibility).",
                     "oplogReadTimestamp"_attr = topOfOplogTimestamp);
-    } else if (repl::ReplicationCoordinator::get(opCtx)->isReplEnabled()) {
+    } else if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
         // Avoid setting oplog visibility to 0. That means "everything is visible".
         setOplogReadTimestamp(Timestamp(StorageEngine::kMinimumTimestamp));
     } else {

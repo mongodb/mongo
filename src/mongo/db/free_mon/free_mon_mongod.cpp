@@ -303,8 +303,7 @@ void registerCollectors(FreeMonController* controller) {
 
     // These are collected at registration and as metrics periodically
     //
-    if (repl::ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() !=
-        repl::ReplicationCoordinator::modeNone) {
+    if (repl::ReplicationCoordinator::get(getGlobalServiceContext())->getSettings().isReplSet()) {
         // CmdReplSetGetConfig
         controller->addRegistrationCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
             "replSetGetConfig", "replSetGetConfig", "", BSON("replSetGetConfig" << 1)));
@@ -352,8 +351,9 @@ void startFreeMonitoring(ServiceContext* serviceContext) {
     RegistrationType registrationType = RegistrationType::DoNotRegister;
     if (globalFreeMonParams.freeMonitoringState == EnableCloudStateEnum::kOn) {
         // If replication is enabled, we may need to register on becoming primary
-        if (repl::ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() !=
-            repl::ReplicationCoordinator::modeNone) {
+        if (repl::ReplicationCoordinator::get(getGlobalServiceContext())
+                ->getSettings()
+                .isReplSet()) {
             registrationType = RegistrationType::RegisterAfterOnTransitionToPrimary;
         } else {
             registrationType = RegistrationType::RegisterOnStart;

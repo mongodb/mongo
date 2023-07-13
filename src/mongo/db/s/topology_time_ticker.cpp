@@ -68,7 +68,7 @@ bool inRecoveryMode(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isRSTLLocked());
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->isReplEnabled()) {
+    if (!replCoord->getSettings().isReplSet()) {
         return false;
     }
 

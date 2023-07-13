@@ -164,8 +164,7 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection, bo
     bool isBackgroundIndex = _method == IndexBuildMethod::kHybrid;
     bool isBackgroundSecondaryBuild = false;
     if (auto replCoord = repl::ReplicationCoordinator::get(opCtx)) {
-        isBackgroundSecondaryBuild =
-            replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet &&
+        isBackgroundSecondaryBuild = replCoord->getSettings().isReplSet() &&
             !replCoord->getMemberState().primary() && isBackgroundIndex;
     }
 

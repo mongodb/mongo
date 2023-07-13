@@ -359,7 +359,7 @@ MigrationChunkClonerSource::MigrationChunkClonerSource(OperationContext* opCtx,
       _recipientHost(std::move(recipientHost)),
       _forceJumbo(_args.getForceJumbo() != ForceJumbo::kDoNotForce) {
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
+    if (replCoord->getSettings().isReplSet()) {
         _sessionCatalogSource = std::make_unique<SessionCatalogMigrationSource>(
             opCtx, nss(), ChunkRange(getMin(), getMax()), _shardKeyPattern.getKeyPattern());
     }

@@ -105,7 +105,7 @@ void assertNotStandaloneOrShardServer(OperationContext* opCtx, StringData cmdNam
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     uassert(51300,
             str::stream() << "'" << cmdName << "' is not supported on standalone nodes.",
-            replCoord->isReplEnabled());
+            replCoord->getSettings().isReplSet());
 
     uassert(51301,
             str::stream() << "'" << cmdName << "' is not supported on shard nodes.",

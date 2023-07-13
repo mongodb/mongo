@@ -126,10 +126,6 @@ public:
 
     virtual const ReplSettings& getSettings() const;
 
-    virtual bool isReplEnabled() const;
-
-    virtual Mode getReplicationMode() const;
-
     virtual MemberState getMemberState() const;
 
     virtual bool canAcceptNonLocalWrites() const;

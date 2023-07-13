@@ -302,7 +302,7 @@ void UserWriteBlockModeOpObserver::_checkWriteAllowed(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
     // Evaluate write blocking only on replica set primaries.
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->isReplEnabled() && replCoord->canAcceptWritesFor(opCtx, nss)) {
+    if (replCoord->getSettings().isReplSet() && replCoord->canAcceptWritesFor(opCtx, nss)) {
         GlobalUserWriteBlockState::get(opCtx)->checkUserWritesAllowed(opCtx, nss);
     }
 }

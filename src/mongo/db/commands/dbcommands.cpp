@@ -162,8 +162,7 @@ public:
                           "with --configsvr");
             }
 
-            if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
-                 repl::ReplicationCoordinator::modeNone) &&
+            if ((repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) &&
                 (dbName == DatabaseName::kLocal)) {
                 uasserted(ErrorCodes::IllegalOperation,
                           str::stream() << "Cannot drop '" << dbName.toStringForErrorMsg()
@@ -223,7 +222,7 @@ public:
             if (request().getNamespace().isOplog()) {
                 uassert(5255000,
                         "can't drop live oplog while replicating",
-                        !repl::ReplicationCoordinator::get(opCtx)->isReplEnabled());
+                        !repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
                 auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
                 invariant(storageEngine);
                 // We use the method supportsRecoveryTimestamp() to detect whether we are using

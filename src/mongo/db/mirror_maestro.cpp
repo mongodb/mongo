@@ -321,7 +321,7 @@ Status MirroredReadsServerParameter::setFromString(StringData str,
 void MirrorMaestro::init(ServiceContext* serviceContext) noexcept {
     auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
     invariant(replCoord);
-    if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
+    if (!replCoord->getSettings().isReplSet()) {
         // We only need a maestro if we're in a replica set
         return;
     }

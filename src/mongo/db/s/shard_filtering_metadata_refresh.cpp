@@ -429,7 +429,8 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
 
             if (runRecover) {
                 auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
-                if (!replCoord->isReplEnabled() || replCoord->getMemberState().primary()) {
+                if (!replCoord->getSettings().isReplSet() ||
+                    replCoord->getMemberState().primary()) {
                     migrationutil::recoverMigrationCoordinations(opCtx, nss, cancellationToken);
                 }
             }

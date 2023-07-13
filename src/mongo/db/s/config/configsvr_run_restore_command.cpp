@@ -217,7 +217,7 @@ public:
              BSONObjBuilder& result) override {
         uassert(ErrorCodes::CommandFailed,
                 "This command can only be used in standalone mode",
-                !repl::ReplicationCoordinator::get(opCtx)->getSettings().usingReplSets());
+                !repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
 
         uassert(ErrorCodes::CommandFailed,
                 "This command can only be run during a restore procedure",

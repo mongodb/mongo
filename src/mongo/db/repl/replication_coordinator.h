@@ -189,22 +189,9 @@ public:
      */
     virtual const ReplSettings& getSettings() const = 0;
 
-    enum Mode { modeNone = 0, modeReplSet };
-
-    /**
-     * Returns a value indicating whether this node was configured at start-up to run standalone or
-     * as a member of a replica set.
-     */
-    virtual Mode getReplicationMode() const = 0;
-
-    /**
-     * Returns true if this node is configured to be a member of a replica set.
-     */
-    virtual bool isReplEnabled() const = 0;
-
     /**
      * Returns the current replica set state of this node (PRIMARY, SECONDARY, STARTUP, etc).
-     * It is invalid to call this unless getReplicationMode() == modeReplSet.
+     * It is invalid to call this unless getSettings().isReplSet() returns true.
      */
     virtual MemberState getMemberState() const = 0;
 
@@ -227,7 +214,7 @@ public:
     /**
      * Returns true if this node is in state PRIMARY or SECONDARY.
      *
-     * It is invalid to call this unless getReplicationMode() == modeReplSet.
+     * It is invalid to call this unless getSettings().isReplSet() returns true.
      *
      * This method may be optimized to reduce synchronization overhead compared to
      * reading the current member state with getMemberState().

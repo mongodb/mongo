@@ -171,8 +171,6 @@ public:
 
     virtual const ReplSettings& getSettings() const override;
 
-    virtual Mode getReplicationMode() const override;
-
     virtual MemberState getMemberState() const override;
 
     virtual std::vector<MemberData> getMemberData() const override;
@@ -368,8 +366,6 @@ public:
     virtual WriteConcernOptions getGetLastErrorDefault() override;
 
     virtual Status checkReplEnabledForCommand(BSONObjBuilder* result) override;
-
-    virtual bool isReplEnabled() const override;
 
     virtual HostAndPort chooseNewSyncSource(const OpTime& lastOpTimeFetched) override;
 
@@ -1758,9 +1754,6 @@ private:
 
     // Parsed command line arguments related to replication.
     const ReplSettings _settings;  // (R)
-
-    // Mode of replication specified by _settings.
-    const Mode _replMode;  // (R)
 
     // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
     std::unique_ptr<TopologyCoordinator> _topCoord;  // (M)

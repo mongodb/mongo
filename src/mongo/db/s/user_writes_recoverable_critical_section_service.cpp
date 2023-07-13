@@ -76,7 +76,7 @@ namespace user_writes_recoverable_critical_section_util {
 
 bool inRecoveryMode(OperationContext* opCtx) {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->isReplEnabled()) {
+    if (!replCoord->getSettings().isReplSet()) {
         return false;
     }
 

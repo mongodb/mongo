@@ -204,7 +204,8 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
     }();
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord && replCoord->isReplEnabled() && replCoord->getMemberState().arbiter()) {
+    if (replCoord && replCoord->getSettings().isReplSet() &&
+        replCoord->getMemberState().arbiter()) {
         return Status::OK();
     }
 
@@ -272,7 +273,8 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     }();
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord && replCoord->isReplEnabled() && replCoord->getMemberState().arbiter()) {
+    if (replCoord && replCoord->getSettings().isReplSet() &&
+        replCoord->getMemberState().arbiter()) {
         stdx::lock_guard<Latch> lk(_mutex);
         _activeSessions.clear();
         return;

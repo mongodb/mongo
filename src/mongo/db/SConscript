@@ -455,6 +455,7 @@ env.Library(
         'change_stream_options',
         'change_stream_serverless_helpers',
         'repl/repl_coordinator_interface',
+        'repl/repl_settings',
         'server_base',
         'service_context',
     ],
@@ -470,6 +471,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
         'change_stream_serverless_helpers',
+        'repl/repl_settings',
         'server_base',
     ],
 )
@@ -749,6 +751,7 @@ env.Library(
         'commands',
         'commands/server_status_core',
         'repl/repl_coordinator_interface',
+        'repl/repl_settings',
         'repl/replica_set_messages',
         'repl/topology_version_observer',
         'server_base',
@@ -1057,6 +1060,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'repl/repl_coordinator_interface',
+        'repl/repl_settings',
     ],
 )
 
@@ -1338,6 +1342,7 @@ env.Library(
         'concurrency/lock_manager',
         'repl/repl_coordinator_interface',
         'repl/repl_server_parameters',
+        'repl/repl_settings',
         'shared_request_handling',
         'storage/storage_control',
     ],
@@ -2197,12 +2202,13 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/net/network',
-        'repl/repl_coordinator_interface',
-        'repl/replica_set_messages',
         'server_options_servers',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/processinfo',
+        'repl/repl_coordinator_interface',
+        'repl/repl_settings',
+        'repl/replica_set_messages',
     ],
 )
 

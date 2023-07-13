@@ -92,8 +92,7 @@ public:
 
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << Request::kCommandName << " cannot be run on standalones",
-                    repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
-                        repl::ReplicationCoordinator::modeNone);
+                    repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
 
             // Only one attempt to change write block mode may make progress at once, because the
             // way we enable/disable user index build blocking is not concurrency-safe.

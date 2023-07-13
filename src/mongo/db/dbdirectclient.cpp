@@ -122,7 +122,7 @@ int DBDirectClient::getMaxWireVersion() {
 
 bool DBDirectClient::isReplicaSetMember() const {
     auto const* replCoord = repl::ReplicationCoordinator::get(_opCtx);
-    return replCoord && replCoord->isReplEnabled();
+    return replCoord && replCoord->getSettings().isReplSet();
 }
 
 ConnectionString::ConnectionType DBDirectClient::type() const {

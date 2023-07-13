@@ -218,7 +218,7 @@ void PrimaryOnlyServiceRegistry::onShutdown() {
 void PrimaryOnlyServiceRegistry::onStepUpComplete(OperationContext* opCtx, long long term) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
 
-    if (!replCoord || !replCoord->isReplEnabled()) {
+    if (!replCoord || !replCoord->getSettings().isReplSet()) {
         // Unit tests may not have replication coordinator set up.
         return;
     }

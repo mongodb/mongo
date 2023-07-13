@@ -289,7 +289,7 @@ public:
                           << " and { repair: true } is not supported.");
         }
         repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (repair && replCoord->isReplEnabled()) {
+        if (repair && replCoord->getSettings().isReplSet()) {
             uasserted(ErrorCodes::InvalidOptions,
                       str::stream()
                           << "Running the validate command with { repair: true } can only be"
@@ -373,7 +373,7 @@ public:
                 case CollectionValidation::ValidateMode::kForegroundFullIndexOnly:
                     // Foreground validation may not repair data while running as a replica set node
                     // because we do not have timestamps that are required to perform writes.
-                    if (replCoord->isReplEnabled()) {
+                    if (replCoord->getSettings().isReplSet()) {
                         return CollectionValidation::RepairMode::kNone;
                     }
                     if (repair) {

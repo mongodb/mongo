@@ -231,7 +231,7 @@ bool recoverTenantMigrationDonorAccessBlockers(OperationContext* opCtx,
 bool recoverShardMergeRecipientAccessBlockers(OperationContext* opCtx,
                                               const ShardMergeRecipientDocument& doc) {
     auto replCoord = repl::ReplicationCoordinator::get(getGlobalServiceContext());
-    invariant(replCoord && replCoord->isReplEnabled());
+    invariant(replCoord && replCoord->getSettings().isReplSet());
 
     // If the initial syncing node (both FCBIS and logical initial sync) syncs from a sync source
     // that's in the middle of file copy/import phase of shard merge, it can cause the initial
@@ -712,7 +712,7 @@ void performNoopWrite(OperationContext* opCtx, StringData msg) {
 
 bool inRecoveryMode(OperationContext* opCtx) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->isReplEnabled()) {
+    if (!replCoord->getSettings().isReplSet()) {
         return false;
     }
 

@@ -249,12 +249,11 @@ void validateMaxTimeMS(const boost::optional<std::int64_t>& commandMaxTimeMS,
  * Apply the read concern from the cursor to this operation.
  */
 void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArgs) {
-    const auto replicationMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
+    const auto isReplSet = repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
 
     // Select the appropriate read source. If we are in a transaction with read concern majority,
     // this will already be set to kNoTimestamp, so don't set it again.
-    if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
-        rcArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern &&
+    if (isReplSet && rcArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern &&
         !opCtx->inMultiDocumentTransaction()) {
         switch (rcArgs.getMajorityReadMechanism()) {
             case repl::ReadConcernArgs::MajorityReadMechanism::kMajoritySnapshot: {
@@ -273,8 +272,7 @@ void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArg
         }
     }
 
-    if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
-        rcArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern &&
+    if (isReplSet && rcArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern &&
         !opCtx->inMultiDocumentTransaction()) {
         auto atClusterTime = rcArgs.getArgsAtClusterTime();
         invariant(atClusterTime && *atClusterTime != LogicalTime::kUninitialized);

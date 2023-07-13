@@ -361,7 +361,7 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
     };
 
     auto shouldApplyDefaults = (startTransaction || !opCtx->inMultiDocumentTransaction()) &&
-        repl::ReplicationCoordinator::get(opCtx)->isReplEnabled() &&
+        repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() &&
         !opCtx->getClient()->isInDirectClient();
 
     if (readConcernSupport.defaultReadConcernPermit.isOK() && shouldApplyDefaults) {
@@ -477,8 +477,7 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
  */
 LogicalTime getClientOperationTime(OperationContext* opCtx) {
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    const bool isReplSet =
-        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    const bool isReplSet = replCoord->getSettings().isReplSet();
 
     if (!isReplSet) {
         return LogicalTime();
@@ -498,8 +497,7 @@ LogicalTime getClientOperationTime(OperationContext* opCtx) {
  */
 LogicalTime computeOperationTime(OperationContext* opCtx, LogicalTime startOperationTime) {
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    const bool isReplSet =
-        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    const bool isReplSet = replCoord->getSettings().isReplSet();
     invariant(isReplSet);
 
     auto operationTime = getClientOperationTime(opCtx);
@@ -533,8 +531,7 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
                                    BSONObjBuilder* commandBodyFieldsBob,
                                    BSONObjBuilder* metadataBob,
                                    LogicalTime startTime) {
-    if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
-            repl::ReplicationCoordinator::modeReplSet ||
+    if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() ||
         !VectorClock::get(opCtx)->isEnabled()) {
         return;
     }
@@ -588,8 +585,7 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
     // since we only increment the topologyVersion at shutdown and alert waiting isMaster/hello
     // commands if the server enters quiesce mode.
     const auto shouldAppendTopologyVersion =
-        (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
-         isNotPrimaryError) ||
+        (replCoord->getSettings().isReplSet() && isNotPrimaryError) ||
         (isShutdownError && replCoord->inQuiesceMode());
 
     if (!shouldAppendTopologyVersion) {
@@ -1552,8 +1548,7 @@ void ExecCommandDatabase::_initiateCommand() {
                                                      request,
                                                      command->requiresAuth(),
                                                      command->attachLogicalSessionsToOpCtx(),
-                                                     replCoord->getReplicationMode() ==
-                                                         repl::ReplicationCoordinator::modeReplSet);
+                                                     replCoord->getSettings().isReplSet());
 
     // Start authz contract tracking before we evaluate failpoints
     auto authzSession = AuthorizationSession::get(client);
@@ -1662,8 +1657,7 @@ void ExecCommandDatabase::_initiateCommand() {
             uassert(ErrorCodes::NotWritablePrimary, msg, canRunHere);
         }
 
-        if (!command->maintenanceOk() &&
-            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
+        if (!command->maintenanceOk() && replCoord->getSettings().isReplSet() &&
             !replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbName) &&
             !replCoord->getMemberState().secondary()) {
 

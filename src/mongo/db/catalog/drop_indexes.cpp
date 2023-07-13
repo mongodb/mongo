@@ -122,7 +122,7 @@ Status checkReplState(OperationContext* opCtx,
     }
 
     // Disallow index drops on drop-pending namespaces (system.drop.*) if we are primary.
-    auto isPrimary = replCoord->getSettings().usingReplSets() && canAcceptWrites;
+    auto isPrimary = replCoord->getSettings().isReplSet() && canAcceptWrites;
     const auto& nss = collection->ns();
     if (isPrimary && nss.isDropPendingNamespace()) {
         return Status(ErrorCodes::NamespaceNotFound,

@@ -214,13 +214,9 @@ void populateReply(OperationContext* opCtx,
     {
         // Undocumented repl fields that mongos depends on.
         auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
-        const auto replMode = replCoord->getReplicationMode();
-        if (replMode != repl::ReplicationCoordinator::modeNone) {
+        if (replCoord->getSettings().isReplSet()) {
             replyBase.setOpTime(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp());
-
-            if (replMode == repl::ReplicationCoordinator::modeReplSet) {
-                replyBase.setElectionId(replCoord->getElectionId());
-            }
+            replyBase.setElectionId(replCoord->getElectionId());
         }
     }
 

@@ -103,10 +103,8 @@ public:
 
     const repl::ReplSettings& getSettings() const override;
 
-    Mode getReplicationMode() const override;
     bool getMaintenanceMode() override;
 
-    bool isReplEnabled() const override;
     bool isWritablePrimaryForReportingPurposes() override;
     bool isInPrimaryOrSecondaryState(OperationContext* opCtx) const override;
     bool isInPrimaryOrSecondaryState_UNSAFE() const override;

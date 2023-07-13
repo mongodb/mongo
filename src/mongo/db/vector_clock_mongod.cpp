@@ -109,8 +109,7 @@ private:
         // signing key from the keys collection.
         auto replicationCoordinator = repl::ReplicationCoordinator::get(_service);
         return !replicationCoordinator ||
-            (replicationCoordinator->getReplicationMode() ==
-                 repl::ReplicationCoordinator::modeReplSet &&
+            (replicationCoordinator->getSettings().isReplSet() &&
              // Check repl status without locks to prevent deadlocks. This is a best effort check
              // as the repl state can change right after this check even when inspected under a
              // lock or mutex.

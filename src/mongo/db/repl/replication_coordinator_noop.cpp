@@ -39,8 +39,14 @@
 namespace mongo {
 namespace repl {
 
+ReplSettings makeDefaultReplSettings() {
+    ReplSettings settings;
+    settings.setReplSetString("ReplicationCoordinatorNoOpDefaultSetName");
+    return settings;
+}
+
 ReplicationCoordinatorNoOp::ReplicationCoordinatorNoOp(ServiceContext* service)
-    : _service(service) {}
+    : _service(service), _settings(makeDefaultReplSettings()) {}
 
 void ReplicationCoordinatorNoOp::startup(OperationContext* opCtx,
                                          StorageEngine::LastShutdownState lastShutdownState) {}
@@ -57,14 +63,6 @@ bool ReplicationCoordinatorNoOp::inQuiesceMode() const {
 
 void ReplicationCoordinatorNoOp::shutdown(OperationContext* opCtx) {}
 
-ReplicationCoordinator::Mode ReplicationCoordinatorNoOp::getReplicationMode() const {
-    return modeReplSet;
-}
-
-bool ReplicationCoordinatorNoOp::isReplEnabled() const {
-    return getReplicationMode() == modeReplSet;
-}
-
 MemberState ReplicationCoordinatorNoOp::getMemberState() const {
     return MemberState::RS_PRIMARY;
 }
@@ -74,7 +72,7 @@ OpTime ReplicationCoordinatorNoOp::getMyLastAppliedOpTime() const {
 }
 
 const ReplSettings& ReplicationCoordinatorNoOp::getSettings() const {
-    MONGO_UNREACHABLE;
+    return _settings;
 }
 
 bool ReplicationCoordinatorNoOp::isWritablePrimaryForReportingPurposes() {

@@ -238,8 +238,7 @@ public:
                              const OpMsgRequest& request,
                              BSONObjBuilder* metadataBob) const override {
         auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-        const bool isReplSet =
-            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+        const bool isReplSet = replCoord->getSettings().isReplSet();
 
         if (isReplSet) {
             // Attach our own last opTime.

@@ -592,7 +592,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         exitCleanly(ExitCode::badOptions);
     }
 
-    if (storageGlobalParams.repair && replSettings.usingReplSets()) {
+    if (storageGlobalParams.repair && replSettings.isReplSet()) {
         LOGV2_ERROR(5019200,
                     "Cannot specify both repair and replSet at the same time (remove --replSet to "
                     "be able to --repair)");
@@ -630,7 +630,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     // a concern as the cluster parameter initializer runs automatically.
     auto replCoord = repl::ReplicationCoordinator::get(startupOpCtx.get());
     invariant(replCoord);
-    if (!replCoord->isReplEnabled()) {
+    if (!replCoord->getSettings().isReplSet()) {
         ClusterServerParameterInitializer::synchronizeAllParametersFromDisk(startupOpCtx.get());
     }
 
@@ -763,7 +763,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     try {
         if ((serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
              serverGlobalParams.clusterRole.has(ClusterRole::None)) &&
-            replSettings.usingReplSets()) {
+            replSettings.isReplSet()) {
             ReadWriteConcernDefaults::get(startupOpCtx.get()->getServiceContext())
                 .refreshIfNecessary(startupOpCtx.get());
         }
@@ -792,7 +792,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Cannot use queryableBackupMode in a replica set",
-                !replCoord->isReplEnabled());
+                !replCoord->getSettings().isReplSet());
         replCoord->startup(startupOpCtx.get(), lastShutdownState);
     }
 
@@ -813,7 +813,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             initializeShardingAwarenessIfNeededAndLoadGlobalSettings(startupOpCtx.get());
         }
 
-        if (replSettings.usingReplSets() &&
+        if (replSettings.isReplSet() &&
             (serverGlobalParams.clusterRole.has(ClusterRole::None) ||
              !Grid::get(startupOpCtx.get())->isShardingInitialized())) {
             // If this is a mongod in a standalone replica set or a shardsvr replica set that has
@@ -837,7 +837,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                                       std::make_unique<LogicalTimeValidator>(keyManager));
         }
 
-        if (replSettings.usingReplSets() && serverGlobalParams.clusterRole.has(ClusterRole::None)) {
+        if (replSettings.isReplSet() && serverGlobalParams.clusterRole.has(ClusterRole::None)) {
             ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(serviceContext)->startup();
         }
 
@@ -848,7 +848,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         // prepare a transaction at timestamp earlier than the stableTimestamp. This will result in
         // a WiredTiger invariant. Register the callback after the call to 'startup' to ensure we've
         // finished applying prepared transactions.
-        if (replCoord->isReplEnabled()) {
+        if (replCoord->getSettings().isReplSet()) {
             storageEngine->setOldestActiveTransactionTimestampCallback(
                 TransactionParticipant::getOldestActiveTimestamp);
         }
@@ -878,11 +878,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             startTTLMonitor(serviceContext);
         }
 
-        if (replSettings.usingReplSets() || !gInternalValidateFeaturesAsPrimary) {
+        if (replSettings.isReplSet() || !gInternalValidateFeaturesAsPrimary) {
             serverGlobalParams.validateFeaturesAsPrimary.store(false);
         }
 
-        if (replSettings.usingReplSets()) {
+        if (replSettings.isReplSet()) {
             Lock::GlobalWrite lk(startupOpCtx.get());
             OldClientContext ctx(startupOpCtx.get(), NamespaceString::kRsOplogNamespace);
             tenant_migration_util::createOplogViewForTenantMigrations(startupOpCtx.get(), ctx.db());
@@ -924,8 +924,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     const auto isStandalone =
-        repl::ReplicationCoordinator::get(serviceContext)->getReplicationMode() ==
-        repl::ReplicationCoordinator::modeNone;
+        !repl::ReplicationCoordinator::get(serviceContext)->getSettings().isReplSet();
 
     // Change stream collections can exist, even on a standalone, provided the standalone used to be
     // part of a replica set. Ensure the change stream collections on startup contain consistent
@@ -972,7 +971,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         kind = LogicalSessionCacheServer::kConfigServer;
     } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         kind = LogicalSessionCacheServer::kSharded;
-    } else if (replSettings.usingReplSets()) {
+    } else if (replSettings.isReplSet()) {
         kind = LogicalSessionCacheServer::kReplicaSet;
     }
 
@@ -1290,7 +1289,8 @@ void setUpReplication(ServiceContext* serviceContext) {
         SecureRandom().nextInt64());
     // Only create a ReplicaSetNodeExecutor if sharding is disabled and replication is enabled.
     // Note that sharding sets up its own executors for scheduling work to remote nodes.
-    if (serverGlobalParams.clusterRole.has(ClusterRole::None) && replCoord->isReplEnabled()) {
+    if (serverGlobalParams.clusterRole.has(ClusterRole::None) &&
+        replCoord->getSettings().isReplSet()) {
         ReplicaSetNodeProcessInterface::setReplicaSetNodeExecutor(
             serviceContext, makeReplicaSetNodeExecutor(serviceContext));
 
@@ -1366,7 +1366,7 @@ void setUpObservers(ServiceContext* serviceContext) {
         }
 
         auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
-        if (!gMultitenancySupport && replCoord && replCoord->isReplEnabled()) {
+        if (!gMultitenancySupport && replCoord && replCoord->getSettings().isReplSet()) {
             opObserverRegistry->addObserver(
                 std::make_unique<analyze_shard_key::QueryAnalysisOpObserverRS>());
         }

@@ -157,7 +157,7 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx,
                              LogicalTime clusterTime,
                              const DatabaseName& dbName) {
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    invariant(replCoord->isReplEnabled());
+    invariant(replCoord->getSettings().isReplSet());
 
     auto& writeRequests = getWriteRequestsSynchronizer(opCtx->getClient()->getServiceContext());
 
@@ -342,7 +342,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
     invariant(replCoord);
 
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
-        if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
+        if (!replCoord->getSettings().isReplSet()) {
             // For standalone nodes, Linearizable Read is not supported.
             return {ErrorCodes::NotAReplicaSet,
                     "node needs to be a replica set member to use read concern"};
@@ -360,7 +360,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
     }
 
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-        if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
+        if (!replCoord->getSettings().isReplSet()) {
             return {ErrorCodes::NotAReplicaSet,
                     "node needs to be a replica set member to use readConcern: snapshot"};
         }
@@ -387,7 +387,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
         if (targetClusterTime) {
             std::string readConcernName = afterClusterTime ? "afterClusterTime" : "atClusterTime";
 
-            if (!replCoord->isReplEnabled()) {
+            if (!replCoord->getSettings().isReplSet()) {
                 return {ErrorCodes::IllegalOperation,
                         str::stream() << "Cannot specify " << readConcernName
                                       << " readConcern without replication enabled"};
@@ -430,7 +430,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
             }
         }
 
-        if (replCoord->isReplEnabled() || !afterClusterTime) {
+        if (replCoord->getSettings().isReplSet() || !afterClusterTime) {
             auto status = replCoord->waitUntilOpTimeForRead(opCtx, readConcernArgs);
             if (!status.isOK()) {
                 return status;
@@ -443,8 +443,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
         ru->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                    atClusterTime->asTimestamp());
     } else if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern &&
-               replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet &&
-               !opCtx->inMultiDocumentTransaction()) {
+               replCoord->getSettings().isReplSet() && !opCtx->inMultiDocumentTransaction()) {
         auto opTime = replCoord->getCurrentCommittedSnapshotOpTime();
         uassert(ErrorCodes::SnapshotUnavailable,
                 "No committed OpTime for snapshot read",
@@ -452,7 +451,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
         ru->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, opTime.getTimestamp());
         repl::ReadConcernArgs::get(opCtx).setArgsAtClusterTimeForSnapshot(opTime.getTimestamp());
     } else if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern &&
-               replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet) {
+               replCoord->getSettings().isReplSet()) {
         // This block is not used for kSnapshotReadConcern because snapshots are always speculative;
         // we wait for majority when the transaction commits.
         // It is not used for atClusterTime because waitUntilOpTimeForRead handles waiting for

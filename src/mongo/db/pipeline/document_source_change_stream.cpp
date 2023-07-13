@@ -355,12 +355,9 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
     const intrusive_ptr<ExpressionContext>& expCtx, const DocumentSourceChangeStreamSpec& spec) {
     // We can only run on a replica set, or through mongoS. Confirm that this is the case.
     auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
-    uassert(
-        40573,
-        "The $changeStream stage is only supported on replica sets",
-        expCtx->inMongos ||
-            (replCoord &&
-             replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet));
+    uassert(40573,
+            "The $changeStream stage is only supported on replica sets",
+            expCtx->inMongos || (replCoord && replCoord->getSettings().isReplSet()));
 
     // If 'allChangesForCluster' is true, the stream must be opened on the 'admin' database with
     // {aggregate: 1}.

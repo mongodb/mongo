@@ -736,7 +736,7 @@ void ReplIndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {
 
 bool ReplIndexBuildState::_shouldSkipIndexBuildStateTransitionCheck(OperationContext* opCtx) const {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->isReplEnabled() && protocol == IndexBuildProtocol::kTwoPhase) {
+    if (replCoord->getSettings().isReplSet() && protocol == IndexBuildProtocol::kTwoPhase) {
         if (replCoord->getMemberState() == repl::MemberState::RS_STARTUP2 &&
             !serverGlobalParams.featureCompatibility.isVersionInitialized()) {
             // We're likely at the initial stages of a new logical initial sync attempt, and we

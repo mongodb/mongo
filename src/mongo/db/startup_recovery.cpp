@@ -578,7 +578,8 @@ void setReplSetMemberInStandaloneMode(OperationContext* opCtx, StartupRecoveryMo
         return;
     }
 
-    const bool usingReplication = repl::ReplicationCoordinator::get(opCtx)->isReplEnabled();
+    const bool usingReplication =
+        repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
 
     if (usingReplication) {
         // Not in standalone mode.
@@ -702,7 +703,8 @@ void startupRecovery(OperationContext* opCtx,
     // index builds.
     reconcileCatalogAndRebuildUnfinishedIndexes(opCtx, storageEngine, lastShutdownState);
 
-    const bool usingReplication = repl::ReplicationCoordinator::get(opCtx)->isReplEnabled();
+    const bool usingReplication =
+        repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
 
     // On replica set members we only clear temp collections on DBs other than "local" during
     // promotion to primary. On secondaries, they are only cleared when the oplog tells them to. The
@@ -758,7 +760,8 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
 
     // Create the FCV document for the first time, if necessary. Replica set nodes only initialize
     // the FCV when the replica set is first initiated or by data replication.
-    const bool usingReplication = repl::ReplicationCoordinator::get(opCtx)->isReplEnabled();
+    const bool usingReplication =
+        repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
     if (isWriteableStorageEngine() && !usingReplication) {
         FeatureCompatibilityVersion::setIfCleanStartup(opCtx, repl::StorageInterface::get(opCtx));
     }
@@ -783,7 +786,8 @@ void runStartupRecoveryInMode(OperationContext* opCtx,
 
     invariant(isWriteableStorageEngine());
     invariant(!storageGlobalParams.repair);
-    const bool usingReplication = repl::ReplicationCoordinator::get(opCtx)->isReplEnabled();
+    const bool usingReplication =
+        repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
     invariant(usingReplication);
     invariant(mode == StartupRecoveryMode::kReplicaSetMember ||
               mode == StartupRecoveryMode::kReplicaSetMemberInStandalone);

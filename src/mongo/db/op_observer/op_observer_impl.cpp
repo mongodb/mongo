@@ -343,7 +343,7 @@ bool shouldTimestampIndexBuildSinglePhase(OperationContext* opCtx, const Namespa
 
     // 2. If the node is initial syncing, we do not set a timestamp.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->isReplEnabled() && replCoord->getMemberState().startup2())
+    if (replCoord->getSettings().isReplSet() && replCoord->getMemberState().startup2())
         return false;
 
     // 3. If the index build is on the local database, do not timestamp.
@@ -1706,8 +1706,7 @@ void OpObserverImpl::onBatchedWriteStart(OperationContext* opCtx) {
 }
 
 void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
-    if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
-            repl::ReplicationCoordinator::modeReplSet ||
+    if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() ||
         !opCtx->writesAreReplicated()) {
         return;
     }

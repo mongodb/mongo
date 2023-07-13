@@ -228,7 +228,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
         // dropCollectionEvenIfSystem(). For standalones, `system.views` and the ViewCatalog are
         // dropped/cleared here.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (!replCoord->isReplEnabled() && coll->ns().isSystemDotViews()) {
+        if (!replCoord->getSettings().isReplSet() && coll->ns().isSystemDotViews()) {
             opCtx->getServiceContext()->getOpObserver()->onDropCollection(
                 opCtx,
                 coll->ns(),

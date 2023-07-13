@@ -361,7 +361,7 @@ void MigrationSourceManager::startClone() {
     _cloneAndCommitTimer.reset();
 
     auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
-    auto replEnabled = replCoord->isReplEnabled();
+    auto replEnabled = replCoord->getSettings().isReplSet();
 
     {
         const auto metadata = _getCurrentMetadataAndCheckEpoch();

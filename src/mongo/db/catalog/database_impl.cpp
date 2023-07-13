@@ -766,8 +766,7 @@ Collection* DatabaseImpl::_createCollection(
 
     auto coordinator = repl::ReplicationCoordinator::get(opCtx);
     bool canAcceptWrites =
-        (coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) ||
-        coordinator->canAcceptWritesFor(opCtx, nss);
+        (!coordinator->getSettings().isReplSet()) || coordinator->canAcceptWritesFor(opCtx, nss);
 
     CollectionOptions optionsWithUUID = options;
     bool generatedUUID = false;

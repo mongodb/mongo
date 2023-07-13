@@ -101,7 +101,7 @@ namespace sharding_recovery_util {
 
 bool inRecoveryMode(OperationContext* opCtx) {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->isReplEnabled()) {
+    if (!replCoord->getSettings().isReplSet()) {
         return false;
     }
 

@@ -168,7 +168,7 @@ void killSessionTokens(OperationContext* opCtx,
 
 void disallowDirectWritesUnderSession(OperationContext* opCtx) {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    bool isReplSet = replCoord->getSettings().isReplSet();
     if (isReplSet) {
         uassert(40528,
                 str::stream()

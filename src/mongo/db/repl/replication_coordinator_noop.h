@@ -102,10 +102,8 @@ public:
 
     const ReplSettings& getSettings() const final;
 
-    Mode getReplicationMode() const final;
     bool getMaintenanceMode() final;
 
-    bool isReplEnabled() const final;
     bool isWritablePrimaryForReportingPurposes() final;
     bool isInPrimaryOrSecondaryState(OperationContext* opCtx) const final;
     bool isInPrimaryOrSecondaryState_UNSAFE() const final;
@@ -402,6 +400,7 @@ public:
 
 private:
     ServiceContext* const _service;
+    ReplSettings const _settings;
 };
 
 }  // namespace repl

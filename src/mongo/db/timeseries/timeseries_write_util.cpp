@@ -442,14 +442,12 @@ void getOpTimeAndElectionId(OperationContext* opCtx,
                             boost::optional<repl::OpTime>* opTime,
                             boost::optional<OID>* electionId) {
     auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
-    const auto replMode = replCoord->getReplicationMode();
+    const auto isReplSet = replCoord->getSettings().isReplSet();
 
-    *opTime = replMode != repl::ReplicationCoordinator::modeNone
+    *opTime = isReplSet
         ? boost::make_optional(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp())
         : boost::none;
-    *electionId = replMode == repl::ReplicationCoordinator::modeReplSet
-        ? boost::make_optional(replCoord->getElectionId())
-        : boost::none;
+    *electionId = isReplSet ? boost::make_optional(replCoord->getElectionId()) : boost::none;
 }
 
 write_ops::InsertCommandRequest makeTimeseriesInsertOp(

@@ -65,8 +65,7 @@ bool AuthzSessionExternalStateMongod::shouldIgnoreAuthChecks() const {
 bool AuthzSessionExternalStateMongod::serverIsArbiter() const {
     // Arbiters have access to extra privileges under localhost. See SERVER-5479.
     return (
-        repl::ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() ==
-            repl::ReplicationCoordinator::modeReplSet &&
+        repl::ReplicationCoordinator::get(getGlobalServiceContext())->getSettings().isReplSet() &&
         repl::ReplicationCoordinator::get(getGlobalServiceContext())->getMemberState().arbiter());
 }
 

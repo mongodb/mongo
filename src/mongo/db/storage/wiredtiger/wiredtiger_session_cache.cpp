@@ -274,7 +274,7 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     // incidentally what we want. A "true" stable checkpoint (a stable timestamp was set on the
     // WT_CONNECTION, i.e: replication is on) requires `forceCheckpoint` to be true and journaling
     // to be enabled.
-    if (syncType == Fsync::kCheckpointStableTimestamp && getGlobalReplSettings().usingReplSets()) {
+    if (syncType == Fsync::kCheckpointStableTimestamp && getGlobalReplSettings().isReplSet()) {
         invariant(!isEphemeral());
     }
 

@@ -777,8 +777,7 @@ public:
                    StringData forCommand,
                    const boost::optional<TenantId>& tenant)
         :  // Don't transactionalize on standalone.
-          _isReplSet{repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
-                     repl::ReplicationCoordinator::modeReplSet},
+          _isReplSet{repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()},
           // Subclient used by transaction operations.
           _client{opCtx->getServiceContext()->makeClient(forCommand.toString())},
           _dbName{DatabaseNameUtil::deserialize(tenant, kAdminDB)},

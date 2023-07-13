@@ -150,7 +150,7 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
                                       boost::optional<std::int64_t> maxAwaitTimeMS) {
     TopologyVersion topologyVersion;
     ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
-    if (replCoord->isReplEnabled()) {
+    if (replCoord->getSettings().isReplSet()) {
         const auto& horizonParams = SplitHorizon::getParameters(opCtx->getClient());
 
         boost::optional<Date_t> deadline;
@@ -227,7 +227,7 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        if (!ReplicationCoordinator::get(opCtx)->isReplEnabled()) {
+        if (!ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
             return BSONObj();
         }
 
@@ -283,7 +283,7 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
-        if (!replCoord->isReplEnabled()) {
+        if (!replCoord->getSettings().isReplSet()) {
             return BSONObj();
         }
 

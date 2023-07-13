@@ -51,6 +51,7 @@
 #include "mongo/db/read_write_concern_defaults_gen.h"
 #include "mongo/db/read_write_concern_provenance.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
@@ -118,7 +119,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
             // WriteConcern defaults can only be applied on regular replica set members.  Operations
             // received by shard and config servers should always have WC explicitly specified.
             if (serverGlobalParams.clusterRole.has(ClusterRole::None) &&
-                repl::ReplicationCoordinator::get(opCtx)->isReplEnabled() &&
+                repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() &&
                 (!opCtx->inMultiDocumentTransaction() ||
                  isTransactionCommand(cmdObj.firstElementFieldName())) &&
                 !opCtx->getClient()->isInDirectClient() && !isInternalClient) {
@@ -177,20 +178,19 @@ Status validateWriteConcern(OperationContext* opCtx, const WriteConcernOptions& 
                       "cannot use 'j' option when a host does not have journaling enabled");
     }
 
-    const auto replMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
+    if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
+        if (stdx::holds_alternative<int64_t>(writeConcern.w) &&
+            stdx::get<int64_t>(writeConcern.w) > 1) {
+            return Status(ErrorCodes::BadValue, "cannot use 'w' > 1 when a host is not replicated");
+        }
 
-    if (replMode == repl::ReplicationCoordinator::modeNone &&
-        (stdx::holds_alternative<int64_t>(writeConcern.w) &&
-         stdx::get<int64_t>(writeConcern.w) > 1)) {
-        return Status(ErrorCodes::BadValue, "cannot use 'w' > 1 when a host is not replicated");
-    }
-
-    if (replMode != repl::ReplicationCoordinator::modeReplSet &&
-        writeConcern.hasCustomWriteMode()) {
-        return Status(ErrorCodes::BadValue,
-                      fmt::format("cannot use non-majority 'w' mode \"{}\" when a host is not a "
-                                  "member of a replica set",
-                                  stdx::get<std::string>(writeConcern.w)));
+        if (writeConcern.hasCustomWriteMode()) {
+            return Status(
+                ErrorCodes::BadValue,
+                fmt::format("cannot use non-majority 'w' mode \"{}\" when a host is not a "
+                            "member of a replica set",
+                            stdx::get<std::string>(writeConcern.w)));
+        }
     }
 
     return Status::OK();

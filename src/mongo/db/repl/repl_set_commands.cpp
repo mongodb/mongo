@@ -392,7 +392,7 @@ public:
         }
 
         const auto& settings = ReplicationCoordinator::get(opCtx)->getSettings();
-        if (!settings.usingReplSets()) {
+        if (!settings.isReplSet()) {
             uasserted(ErrorCodes::NoReplicationEnabled,
                       "This node was not started with replication enabled.");
         }
@@ -807,7 +807,7 @@ public:
         Status status = Status(ErrorCodes::InternalError, "status not set in heartbeat code");
         /* we don't call ReplSetCommand::check() here because heartbeat
            checks many things that are pre-initialization. */
-        if (!ReplicationCoordinator::get(opCtx)->isReplEnabled()) {
+        if (!ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
             status = Status(ErrorCodes::NoReplicationEnabled, "not running using replication");
             uassertStatusOK(status);
         }

@@ -830,6 +830,9 @@ env.Library(
         'replication_process',
         'split_prepare_session_manager',
     ],
+    LIBDEPS_PRIVATE=[
+        'repl_settings',
+    ],
 )
 
 env.Library(

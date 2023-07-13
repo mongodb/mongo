@@ -45,8 +45,7 @@ namespace {
 
 bool isStandaloneOrPrimary(OperationContext* opCtx) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    const bool isReplSet =
-        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    const bool isReplSet = replCoord->getSettings().isReplSet();
     return !isReplSet ||
         (repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
          repl::MemberState::RS_PRIMARY);

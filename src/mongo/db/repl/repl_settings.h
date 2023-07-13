@@ -41,7 +41,7 @@ namespace repl {
 class ReplSettings {
 public:
     std::string ourSetName() const;
-    bool usingReplSets() const;
+    bool isReplSet() const;
 
     /**
      * Getters

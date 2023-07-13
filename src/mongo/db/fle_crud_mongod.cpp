@@ -118,9 +118,7 @@ void setMongosFieldsInReply(OperationContext* opCtx, write_ops::WriteCommandRepl
     // current thread so grab it from TLS and change the OpTime on the reply.
     //
     auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
-    const auto replMode = replCoord->getReplicationMode();
-
-    if (replMode != repl::ReplicationCoordinator::modeNone) {
+    if (replCoord->getSettings().isReplSet()) {
         replyBase->setOpTime(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp());
         replyBase->setElectionId(replCoord->getElectionId());
     }
@@ -374,8 +372,7 @@ std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesFo
 
 void startFLECrud(ServiceContext* serviceContext) {
     // FLE crud is only supported on replica sets so no reason to start thread pool on standalones
-    if (repl::ReplicationCoordinator::get(serviceContext)->getReplicationMode() ==
-        repl::ReplicationCoordinator::modeNone) {
+    if (!repl::ReplicationCoordinator::get(serviceContext)->getSettings().isReplSet()) {
         return;
     }
 
@@ -398,10 +395,10 @@ FLEBatchResult processFLEInsert(OperationContext* opCtx,
                                 const write_ops::InsertCommandRequest& insertRequest,
                                 write_ops::InsertCommandReply* insertReply) {
 
-    uassert(6371602,
-            "Encrypted index operations are only supported on replica sets",
-            repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getReplicationMode() ==
-                repl::ReplicationCoordinator::modeReplSet);
+    uassert(
+        6371602,
+        "Encrypted index operations are only supported on replica sets",
+        repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet());
 
     auto [batchResult, insertReplyReturn] =
         processInsert(opCtx, insertRequest, &getTransactionWithRetriesForMongoD);
@@ -420,10 +417,10 @@ FLEBatchResult processFLEInsert(OperationContext* opCtx,
 write_ops::DeleteCommandReply processFLEDelete(
     OperationContext* opCtx, const write_ops::DeleteCommandRequest& deleteRequest) {
 
-    uassert(6371701,
-            "Encrypted index operations are only supported on replica sets",
-            repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getReplicationMode() ==
-                repl::ReplicationCoordinator::modeReplSet);
+    uassert(
+        6371701,
+        "Encrypted index operations are only supported on replica sets",
+        repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet());
 
     auto deleteReply = processDelete(opCtx, deleteRequest, &getTransactionWithRetriesForMongoD);
 
@@ -435,10 +432,10 @@ write_ops::DeleteCommandReply processFLEDelete(
 write_ops::FindAndModifyCommandReply processFLEFindAndModify(
     OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
 
-    uassert(6371800,
-            "Encrypted index operations are only supported on replica sets",
-            repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getReplicationMode() ==
-                repl::ReplicationCoordinator::modeReplSet);
+    uassert(
+        6371800,
+        "Encrypted index operations are only supported on replica sets",
+        repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet());
 
     auto reply = processFindAndModifyRequest<write_ops::FindAndModifyCommandReply>(
         opCtx, findAndModifyRequest, &getTransactionWithRetriesForMongoD);
@@ -449,10 +446,10 @@ write_ops::FindAndModifyCommandReply processFLEFindAndModify(
 write_ops::UpdateCommandReply processFLEUpdate(
     OperationContext* opCtx, const write_ops::UpdateCommandRequest& updateRequest) {
 
-    uassert(6371905,
-            "Encrypted index operations are only supported on replica sets",
-            repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getReplicationMode() ==
-                repl::ReplicationCoordinator::modeReplSet);
+    uassert(
+        6371905,
+        "Encrypted index operations are only supported on replica sets",
+        repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet());
 
     auto updateReply = processUpdate(opCtx, updateRequest, &getTransactionWithRetriesForMongoD);
 

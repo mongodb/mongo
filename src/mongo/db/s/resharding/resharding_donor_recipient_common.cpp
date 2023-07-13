@@ -365,7 +365,7 @@ void processReshardingFieldsForCollection(OperationContext* opCtx,
     // Persist the config time to ensure that in case of stepdown next filtering metadata refresh on
     // the new primary will always fetch the latest information.
     auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->isReplEnabled() || replCoord->getMemberState().primary()) {
+    if (!replCoord->getSettings().isReplSet() || replCoord->getMemberState().primary()) {
         VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
     }
 

@@ -95,8 +95,7 @@ void logProcessDetailsForLogRotate(ServiceContext* serviceContext) {
           "host"_attr = getHostNameCached());
 
     auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
-    if (replCoord != nullptr &&
-        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
+    if (replCoord != nullptr && replCoord->getSettings().isReplSet()) {
         auto rsConfig = replCoord->getConfig();
 
         if (rsConfig.isInitialized()) {

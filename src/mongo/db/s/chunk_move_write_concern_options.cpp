@@ -55,7 +55,7 @@ const WriteConcernOptions kWriteConcernLocal(1,
 
 WriteConcernOptions getDefaultWriteConcernForMigration(OperationContext* opCtx) {
     repl::ReplicationCoordinator* replCoordinator = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoordinator->getReplicationMode() == mongo::repl::ReplicationCoordinator::modeReplSet) {
+    if (replCoordinator->getSettings().isReplSet()) {
         Status status =
             replCoordinator->checkIfWriteConcernCanBeSatisfied(kDefaultWriteConcernForMigration);
         if (status.isOK()) {

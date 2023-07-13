@@ -125,8 +125,7 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     }
 
     const auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);
-    const bool isReplSet =
-        replCoordinator->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    const bool isReplSet = replCoordinator->getSettings().isReplSet();
     // We only want to increment the server TopologyVersion when the minWireVersion has changed.
     // This can happen in the following cases:
     // 1. Setting featureCompatibilityVersion from downgrading to fullyDowngraded.

@@ -83,8 +83,7 @@ void setClusterParameterImpl(OperationContext* opCtx, const SetClusterParameter&
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << SetClusterParameter::kCommandName
                               << " cannot be run on standalones",
-                repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
-                    repl::ReplicationCoordinator::modeNone);
+                repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
     }
 
     // setClusterParameter is serialized against setFeatureCompatibilityVersion.

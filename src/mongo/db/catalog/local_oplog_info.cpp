@@ -98,7 +98,7 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
     long long term = repl::OpTime::kUninitializedTerm;
 
     // Fetch term out of the newOpMutex.
-    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
+    if (replCoord->getSettings().isReplSet()) {
         // Current term. If we're not a replset of pv=1, it remains kOldProtocolVersionTerm.
         term = replCoord->getTerm();
     }

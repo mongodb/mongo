@@ -197,7 +197,7 @@ Status userAllowedWriteNS(OperationContext* opCtx, const NamespaceString& ns) {
 
     if (ns.isSystemDotProfile() || ns.isSystemDotViews() ||
         (ns.isOplog() &&
-         repl::ReplicationCoordinator::get(getGlobalServiceContext())->isReplEnabled())) {
+         repl::ReplicationCoordinator::get(getGlobalServiceContext())->getSettings().isReplSet())) {
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "cannot write to " << ns.toStringForErrorMsg());
     }

@@ -73,7 +73,7 @@ void ReplicationCoordinator::set(ServiceContext* service,
 
 bool ReplicationCoordinator::isOplogDisabledFor(OperationContext* opCtx,
                                                 const NamespaceString& nss) const {
-    if (getReplicationMode() == ReplicationCoordinator::modeNone) {
+    if (!getSettings().isReplSet()) {
         return true;
     }
 

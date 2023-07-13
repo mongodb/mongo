@@ -1110,8 +1110,7 @@ public:
         void setElectionIdandOpTime(OperationContext* opCtx, BulkWriteCommandReply& reply) {
             // Undocumented repl fields that mongos depends on.
             auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
-            const auto replMode = replCoord->getReplicationMode();
-            if (replMode != repl::ReplicationCoordinator::modeNone) {
+            if (replCoord->getSettings().isReplSet()) {
                 reply.setOpTime(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp());
                 reply.setElectionId(replCoord->getElectionId());
             }

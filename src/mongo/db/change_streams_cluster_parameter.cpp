@@ -48,8 +48,7 @@ Status validateChangeStreamsClusterParameter(
     const ChangeStreamsClusterParameterStorage& clusterParameter,
     const boost::optional<TenantId>& tenantId) {
     auto* repl = repl::ReplicationCoordinator::get(getGlobalServiceContext());
-    bool isStandalone = repl &&
-        repl->getReplicationMode() == repl::ReplicationCoordinator::modeNone &&
+    bool isStandalone = repl && !repl->getSettings().isReplSet() &&
         serverGlobalParams.clusterRole.has(ClusterRole::None);
     if (isStandalone) {
         return {ErrorCodes::IllegalOperation,

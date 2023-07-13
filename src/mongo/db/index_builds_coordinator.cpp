@@ -449,7 +449,7 @@ bool isIndexBuildResumable(OperationContext* opCtx,
     // This check may be redundant with the 'applicationMode' check and the replication requirement
     // for two phase index builds.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeNone) {
+    if (!replCoord->getSettings().isReplSet()) {
         return false;
     }
 
@@ -2326,7 +2326,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
     {
         // Disallow index builds on drop-pending namespaces (system.drop.*) if we are primary.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (replCoord->getSettings().usingReplSets() &&
+        if (replCoord->getSettings().isReplSet() &&
             replCoord->canAcceptWritesFor(opCtx, nssOrUuid)) {
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "drop-pending collection: " << nss.toStringForErrorMsg(),
@@ -2435,7 +2435,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
         // Two-phase index builds write a different oplog entry than the default behavior which
         // writes a no-op just to generate an optime.
         onInitFn = [&](std::vector<BSONObj>& specs) {
-            if (!(replCoord->getSettings().usingReplSets() &&
+            if (!(replCoord->getSettings().isReplSet() &&
                   replCoord->canAcceptWritesFor(opCtx, nss))) {
                 // Not primary.
                 return Status::OK();

@@ -77,7 +77,7 @@ void ReplClientInfo::setLastOp(OperationContext* opCtx, const OpTime& ot) {
 
 void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
-    if (replCoord->isReplEnabled() && opCtx->writesAreReplicated()) {
+    if (replCoord->getSettings().isReplSet() && opCtx->writesAreReplicated()) {
         // If a multi-document transaction or regular write actually performs a write op, the
         // lastOp in the client is enough for write concern and there is no need to call
         // setLastOpToSystemLastOpTime.

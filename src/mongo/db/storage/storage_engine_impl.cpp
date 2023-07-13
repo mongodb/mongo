@@ -820,7 +820,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                 // oplog application so we should never see an index with {ready: false} in this
                 // case.
                 invariant(!indexMetaData.isBackgroundSecondaryBuild);
-                invariant(!getGlobalReplSettings().usingReplSets());
+                invariant(!getGlobalReplSettings().isReplSet());
 
                 LOGV2(22256,
                       "Dropping unfinished index",

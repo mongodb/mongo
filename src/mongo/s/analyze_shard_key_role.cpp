@@ -44,7 +44,7 @@ bool isReplEnabled(ServiceContext* serviceContext) {
         return false;
     }
     auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
-    return replCoord && replCoord->isReplEnabled();
+    return replCoord && replCoord->getSettings().isReplSet();
 }
 
 }  // namespace

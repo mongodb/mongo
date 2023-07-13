@@ -138,7 +138,7 @@ public:
             // Standalone nodes do not support transactions at all
             uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
                     "'prepareTransaction' is not supported on standalone nodes.",
-                    replCoord->isReplEnabled());
+                    replCoord->getSettings().isReplSet());
 
             auto txnParticipant = TransactionParticipant::get(opCtx);
             uassert(ErrorCodes::CommandFailed,

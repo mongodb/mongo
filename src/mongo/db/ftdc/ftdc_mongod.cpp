@@ -118,8 +118,7 @@ public:
 
 void registerMongoDCollectors(FTDCController* controller) {
     // These metrics are only collected if replication is enabled
-    if (repl::ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() !=
-        repl::ReplicationCoordinator::modeNone) {
+    if (repl::ReplicationCoordinator::get(getGlobalServiceContext())->getSettings().isReplSet()) {
         // CmdReplSetGetStatus
         controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
             "replSetGetStatus",

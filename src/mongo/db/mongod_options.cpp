@@ -566,7 +566,7 @@ Status storeMongodOptions(const moe::Environment& params) {
         return replSettingsWithStatus.getStatus();
     const repl::ReplSettings& replSettings(replSettingsWithStatus.getValue());
 
-    if (replSettings.usingReplSets()) {
+    if (replSettings.isReplSet()) {
         if ((params.count("security.authorization") &&
              params["security.authorization"].as<std::string>() == "enabled") &&
             !serverGlobalParams.startupClusterAuthMode.x509Only() &&
@@ -649,7 +649,7 @@ Status storeMongodOptions(const moe::Environment& params) {
         // Force to set up the node as a replica set, unless we're a shard and we're using queryable
         // backup mode.
         if ((clusterRoleParam == "configsvr" || !params.count("storage.queryableBackupMode")) &&
-            !replSettings.usingReplSets()) {
+            !replSettings.isReplSet()) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Cannot start a " << clusterRoleParam
                                         << " as a standalone server. Please use the option "

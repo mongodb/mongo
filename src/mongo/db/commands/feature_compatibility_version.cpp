@@ -605,7 +605,8 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
 void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContext* opCtx) {
     Lock::GlobalWrite lk(opCtx);
     const auto replProcess = repl::ReplicationProcess::get(opCtx);
-    const bool usingReplication = repl::ReplicationCoordinator::get(opCtx)->isReplEnabled();
+    const bool usingReplication =
+        repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
 
     // The node did not complete the last initial sync. If the initial sync flag is set and we
     // are part of a replica set, we expect the version to be initialized as part of initial
@@ -684,8 +685,7 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
         // not part of the majority snapshot, the downgraded binary will see the upgrade FCV and
         // fail.)
         const auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);
-        const bool isReplSet = replCoordinator &&
-            replCoordinator->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+        const bool isReplSet = replCoordinator && replCoordinator->getSettings().isReplSet();
         auto neededMajorityTimestamp = [] {
             stdx::lock_guard lk(lastFCVUpdateTimestampMutex);
             return lastFCVUpdateTimestamp;

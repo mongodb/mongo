@@ -854,8 +854,7 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
             str::stream() << "Invalid target namespace: " << target.toStringForErrorMsg(),
             target.isValid());
 
-    if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
-         repl::ReplicationCoordinator::modeNone)) {
+    if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
         uassert(ErrorCodes::IllegalOperation,
                 "can't rename live oplog while replicating",
                 !source.isOplog());
@@ -1017,8 +1016,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
                       str::stream() << "error with target namespace: " << targetStatus.reason());
     }
 
-    if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
-         repl::ReplicationCoordinator::modeNone) &&
+    if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() &&
         targetNss.isOplog()) {
         return Status(ErrorCodes::IllegalOperation,
                       str::stream() << "Cannot rename collection to the oplog");

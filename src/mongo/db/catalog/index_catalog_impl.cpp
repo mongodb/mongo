@@ -429,7 +429,7 @@ Status IndexCatalogImpl::_isNonIDIndexAndNotAllowedToBuild(OperationContext* opC
         return Status::OK();
     }
 
-    if (!getGlobalReplSettings().usingReplSets()) {
+    if (!getGlobalReplSettings().isReplSet()) {
         return Status::OK();
     }
 

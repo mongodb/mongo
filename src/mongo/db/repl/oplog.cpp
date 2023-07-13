@@ -253,8 +253,8 @@ void assertInitialSyncCanContinueDuringShardMerge(OperationContext* opCtx,
     // recovery. (see recoverShardMergeRecipientAccessBlockers() for the detailed comment about the
     // problematic scenario that can cause data loss.)
     if (nss == NamespaceString::kShardMergeRecipientsNamespace) {
-        if (auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            replCoord && replCoord->isReplEnabled() && replCoord->getMemberState().startup2()) {
+        if (auto replCoord = repl::ReplicationCoordinator::get(opCtx); replCoord &&
+            replCoord->getSettings().isReplSet() && replCoord->getMemberState().startup2()) {
             BSONElement idField = op.getObject().getField("_id");
             // If the 'o' field does not have an _id, then 'o2' should have it.
             // Otherwise, the oplog entry is corrupted.
@@ -461,8 +461,7 @@ void logOplogRecords(OperationContext* opCtx,
                      Date_t wallTime,
                      bool isAbortIndexBuild) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
-    if (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
-        !replCoord->canAcceptWritesFor(opCtx, nss)) {
+    if (replCoord->getSettings().isReplSet() && !replCoord->canAcceptWritesFor(opCtx, nss)) {
         str::stream ss;
         ss << "logOp() but can't accept write to collection " << nss.toStringForErrorMsg();
         ss << ": entries: " << records->size() << ": [ ";
@@ -790,8 +789,7 @@ void createOplog(OperationContext* opCtx,
 }
 
 void createOplog(OperationContext* opCtx) {
-    const auto isReplSet = ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
-        ReplicationCoordinator::modeReplSet;
+    const auto isReplSet = ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
     createOplog(opCtx, NamespaceString::kRsOplogNamespace, isReplSet);
 }
 
@@ -1379,8 +1377,7 @@ void OplogApplication::checkOnOplogFailureForRecovery(OperationContext* opCtx,
                                                       const mongo::BSONObj& oplogEntry,
                                                       const std::string& errorMsg) {
     const bool isReplicaSet =
-        repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getReplicationMode() ==
-        repl::ReplicationCoordinator::modeReplSet;
+        repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet();
     // Relax the constraints of oplog application if the node is not a replica set member or the
     // node is in the middle of a backup and restore process.
     if (!isReplicaSet || storageGlobalParams.restore) {
@@ -1566,7 +1563,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
     // Decide whether to timestamp the write with the 'ts' field found in the operation. In general,
     // we do this for secondary oplog application, but there are some exceptions.
     const bool assignOperationTimestamp = [opCtx, haveWrappingWriteUnitOfWork, mode] {
-        const auto replMode = ReplicationCoordinator::get(opCtx)->getReplicationMode();
         if (opCtx->writesAreReplicated()) {
             // We do not assign timestamps on replicated writes since they will get their oplog
             // timestamp once they are logged. The operation may contain a timestamp if it is part
@@ -1577,19 +1573,14 @@ Status applyOperation_inlock(OperationContext* opCtx,
             // WriteUnitOfWork, as they will get the timestamp on that WUOW. Use cases include:
             // Secondary oplog application of prepared transactions.
             return false;
+        } else if (ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
+            // Secondary oplog application not in a WUOW uses the timestamp in the operation
+            // document.
+            return true;
         } else {
-            switch (replMode) {
-                case ReplicationCoordinator::modeReplSet: {
-                    // Secondary oplog application not in a WUOW uses the timestamp in the operation
-                    // document.
-                    return true;
-                }
-                case ReplicationCoordinator::modeNone: {
-                    // Only assign timestamps on standalones during replication recovery when
-                    // started with the 'recoverFromOplogAsStandalone' flag.
-                    return OplogApplication::inRecovering(mode);
-                }
-            }
+            // Only assign timestamps on standalones during replication recovery when
+            // started with the 'recoverFromOplogAsStandalone' flag.
+            return OplogApplication::inRecovering(mode);
         }
         MONGO_UNREACHABLE;
     }();
@@ -2321,7 +2312,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
     }
 
     const bool assignCommandTimestamp = [&] {
-        const auto replMode = ReplicationCoordinator::get(opCtx)->getReplicationMode();
         if (opCtx->writesAreReplicated()) {
             // We do not assign timestamps on replicated writes since they will get their oplog
             // timestamp once they are logged.
@@ -2335,17 +2325,14 @@ Status applyCommand_inlock(OperationContext* opCtx,
             op->getCommandType() == OplogEntry::CommandType::kAbortTransaction)
             return false;
 
-        switch (replMode) {
-            case ReplicationCoordinator::modeReplSet: {
-                // The timestamps in the command oplog entries are always real timestamps from this
-                // oplog and we should timestamp our writes with them.
-                return true;
-            }
-            case ReplicationCoordinator::modeNone: {
-                // Only assign timestamps on standalones during replication recovery when
-                // started with 'recoverFromOplogAsStandalone'.
-                return OplogApplication::inRecovering(mode);
-            }
+        if (ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
+            // The timestamps in the command oplog entries are always real timestamps from this
+            // oplog and we should timestamp our writes with them.
+            return true;
+        } else {
+            // Only assign timestamps on standalones during replication recovery when
+            // started with 'recoverFromOplogAsStandalone'.
+            return OplogApplication::inRecovering(mode);
         }
         MONGO_UNREACHABLE;
     }();

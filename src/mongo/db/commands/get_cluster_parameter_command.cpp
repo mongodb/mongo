@@ -87,8 +87,7 @@ public:
                     serverGlobalParams.featureCompatibility)) {
                 uassert(ErrorCodes::IllegalOperation,
                         str::stream() << Request::kCommandName << " cannot be run on standalones",
-                        repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
-                            repl::ReplicationCoordinator::modeNone);
+                        repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
             }
 
             GetClusterParameterInvocation invocation;

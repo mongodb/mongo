@@ -70,7 +70,7 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "_refreshQueryAnalyzerConfiguration command is not supported on a standalone "
                     "mongod",
-                    repl::ReplicationCoordinator::get(opCtx)->isReplEnabled());
+                    repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
             uassert(ErrorCodes::IllegalOperation,
                     "_refreshQueryAnalyzerConfiguration command is not supported on a multitenant "
                     "replica set",

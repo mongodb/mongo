@@ -1000,7 +1000,7 @@ bool WiredTigerUtil::useTableLogging(const NamespaceString& nss) {
     // We only turn off logging in the case of:
     // 1) Replication is enabled (the typical deployment), or
     // 2) We're running as a standalone with recoverFromOplogAsStandalone=true
-    const bool journalWritesBecauseStandalone = !getGlobalReplSettings().usingReplSets() &&
+    const bool journalWritesBecauseStandalone = !getGlobalReplSettings().isReplSet() &&
         !repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
     if (journalWritesBecauseStandalone) {
         return true;

@@ -501,8 +501,7 @@ void TTLMonitor::_doTTLPass(OperationContext* opCtx) {
 bool TTLMonitor::_doTTLSubPass(
     OperationContext* opCtx, stdx::unordered_map<UUID, long long, UUID::Hash>& collSubpassHistory) {
     // If part of replSet but not in a readable state (e.g. during initial sync), skip.
-    if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
-            repl::ReplicationCoordinator::modeReplSet &&
+    if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() &&
         !repl::ReplicationCoordinator::get(opCtx)->getMemberState().readable())
         return false;
 

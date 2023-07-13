@@ -633,7 +633,7 @@ void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCt
     // be safe we take the RSTL anyway.
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    bool isReplSet = replCoord->getSettings().isReplSet();
     bool isStandaloneOrPrimary =
         !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
     CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
@@ -750,7 +750,7 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
     // Determine primary/secondary/standalone state in order to properly initialize sharding
     // components.
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    bool isReplSet = replCoord->getSettings().isReplSet();
     bool isStandaloneOrPrimary =
         !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
 

@@ -201,7 +201,7 @@ public:
             uassert(ErrorCodes::InvalidOptions,
                     "The '$_internalReadAtClusterTime' option is only supported when replication is"
                     " enabled",
-                    replCoord->isReplEnabled());
+                    replCoord->getSettings().isReplSet());
 
             uassert(ErrorCodes::TypeMismatch,
                     "The '$_internalReadAtClusterTime' option must be a Timestamp",

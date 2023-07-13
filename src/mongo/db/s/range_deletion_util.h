@@ -135,7 +135,7 @@ auto withTemporaryOperationContext(Callable&& callable,
             str::stream()
                 << "Not primary while running range deletion task for collection with UUID "
                 << collectionUUID,
-            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
+            replCoord->getSettings().isReplSet() &&
                 replCoord->canAcceptWritesFor(opCtx,
                                               NamespaceStringOrUUID(dbName, collectionUUID)) &&
                 (!writeToRangeDeletionNamespace ||

@@ -148,7 +148,7 @@ public:
         hangInAppendOplogNote.pauseWhileSet();
 
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (!replCoord->isReplEnabled()) {
+        if (!replCoord->getSettings().isReplSet()) {
             uasserted(ErrorCodes::NoReplicationEnabled,
                       "Must have replication set up to run \"appendOplogNote\"");
         }

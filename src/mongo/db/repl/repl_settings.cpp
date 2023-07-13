@@ -52,7 +52,7 @@ std::string ReplSettings::ourSetName() const {
     return _replSetString.substr(0, sl);
 }
 
-bool ReplSettings::usingReplSets() const {
+bool ReplSettings::isReplSet() const {
     return _isServerless || !_replSetString.empty();
 }
 

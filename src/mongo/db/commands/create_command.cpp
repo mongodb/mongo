@@ -311,8 +311,7 @@ public:
 
                 uassert(6346402,
                         "Encrypted collections are not supported on standalone",
-                        repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
-                            repl::ReplicationCoordinator::Mode::modeReplSet);
+                        repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
 
                 FLEUtil::checkEFCForECC(cmd.getEncryptedFields().get());
             }

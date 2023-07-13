@@ -350,7 +350,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                   logAttrs(dbName),
                   "namespace"_attr = nss);
 
-            if (nss.isDropPendingNamespace() && replCoord->isReplEnabled() &&
+            if (nss.isDropPendingNamespace() && replCoord->getSettings().isReplSet() &&
                 opCtx->writesAreReplicated()) {
                 LOGV2(20339,
                       "dropDatabase {dbName} - found drop-pending collection: {nss}",

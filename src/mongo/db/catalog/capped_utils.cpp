@@ -110,8 +110,7 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
                                     << collectionName.toStringForErrorMsg());
     }
 
-    if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
-         repl::ReplicationCoordinator::modeNone) &&
+    if ((repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) &&
         collectionName.isOplog()) {
         return Status(ErrorCodes::OplogOperationUnsupported,
                       str::stream() << "Cannot truncate a live oplog while replicating: "
