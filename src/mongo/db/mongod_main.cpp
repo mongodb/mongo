@@ -80,6 +80,7 @@
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/change_collection_expired_documents_remover.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_options_manager.h"

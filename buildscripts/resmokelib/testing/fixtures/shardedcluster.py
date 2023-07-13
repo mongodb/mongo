@@ -349,6 +349,7 @@ class ShardedClusterFixture(interface.Fixture):
             del mongod_options["shardsvr"]
             mongod_options["configsvr"] = ""
             replset_config_options["configsvr"] = True
+            mongod_options["set_parameters"]["featureFlagTransitionToCatalogShard"] = "true"
             mongod_options["storageEngine"] = "wiredTiger"
 
             configsvr_options = self.configsvr_options.copy()

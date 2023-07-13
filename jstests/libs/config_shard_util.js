@@ -4,6 +4,13 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const ConfigShardUtil = (function() {
+    function isTransitionEnabledIgnoringFCV(st) {
+        return FeatureFlagUtil.isEnabled(st.configRS.getPrimary(),
+                                         "TransitionToCatalogShard",
+                                         undefined /* user */,
+                                         true /* ignoreFCV */);
+    }
+
     function transitionToDedicatedConfigServer(st, timeout) {
         if (timeout == undefined) {
             timeout = 10 * 60 * 1000;  // 10 minutes
@@ -39,6 +46,7 @@ export const ConfigShardUtil = (function() {
     }
 
     return {
+        isTransitionEnabledIgnoringFCV,
         transitionToDedicatedConfigServer,
         waitForRangeDeletions,
     };

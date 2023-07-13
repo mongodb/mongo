@@ -37,6 +37,7 @@
 
 #include <boost/move/utility_core.hpp>
 
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/feature_flag.h"

@@ -60,6 +60,7 @@
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/uncommitted_multikey.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"  // IWYU pragma: keep
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"

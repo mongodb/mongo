@@ -48,6 +48,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"

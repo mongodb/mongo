@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_70,
+ *   featureFlagTransitionToCatalogShard,
  * ]
  */
 
