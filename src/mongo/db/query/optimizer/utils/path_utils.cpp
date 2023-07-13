@@ -331,4 +331,32 @@ bool pathEndsInTraverse(const optimizer::ABT& path) {
     return optimizer::algebra::transport<false>(path, t);
 }
 
+/**
+ * Checks if all the Traverse elements of an index path have single depth.
+ */
+class PathTraverseSingleDepth {
+public:
+    bool transport(const PathTraverse& node, bool childResult) {
+        return childResult && node.getMaxDepth() == PathTraverse::kSingleLevel;
+    }
+    bool transport(const PathGet& /*node*/, bool childResult) {
+        return childResult;
+    }
+    bool transport(const PathIdentity& /*node*/) {
+        return true;
+    }
+    template <typename T, typename... Ts>
+    bool transport(const T& /*node*/, Ts&&...) {
+        uasserted(6935101, "Index paths only consist of Get, Traverse, and Id nodes.");
+        return false;
+    }
+    bool check(const ABT& path) {
+        return algebra::transport<false>(path, *this);
+    }
+};
+
+bool checkPathTraverseSingleDepth(const ABT& path) {
+    return PathTraverseSingleDepth{}.check(path);
+}
+
 }  // namespace mongo::optimizer

@@ -124,8 +124,9 @@ std::unique_ptr<CardinalityEstimator> makeHeuristicCE() {
     return std::make_unique<ce::HeuristicEstimator>();
 }
 
-std::unique_ptr<CardinalityEstimator> makeHintedCE(ce::PartialSchemaSelHints hints) {
-    return std::make_unique<ce::HintedEstimator>(std::move(hints));
+std::unique_ptr<CardinalityEstimator> makeHintedCE(
+    ce::PartialSchemaSelHints hints, ce::PartialSchemaIntervalSelHints intervalHints) {
+    return std::make_unique<ce::HintedEstimator>(std::move(hints), std::move(intervalHints));
 }
 
 cost_model::CostModelCoefficients getTestCostModel() {
@@ -203,5 +204,22 @@ OptPhaseManager makePhaseManagerRequireRID(OptPhaseManager::PhaseSet phaseSet,
                            true /*supportExplain*/,
                            std::move(debugInfo),
                            std::move(queryHints)};
+}
+
+bool planComparator(const PlanAndProps& e1, const PlanAndProps& e2) {
+    // Sort plans by estimated cost. If costs are equal, sort lexicographically by plan explain.
+    // This allows us to break ties if costs are equal.
+    const auto c1 = e1.getRootAnnotation()._cost;
+    const auto c2 = e2.getRootAnnotation()._cost;
+    if (c1 < c2) {
+        return true;
+    }
+    if (c2 < c1) {
+        return false;
+    }
+
+    const auto explain1 = ExplainGenerator::explainV2(e1._node);
+    const auto explain2 = ExplainGenerator::explainV2(e2._node);
+    return explain1 < explain2;
 }
 }  // namespace mongo::optimizer

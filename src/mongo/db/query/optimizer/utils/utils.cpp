@@ -1374,6 +1374,13 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                 return;
             }
 
+            if (!checkPathTraverseSingleDepth(key._path)) {
+                // All the traverse elements of the key must have single depth.
+                prohibitIndexUsage = true;
+                ctx.returnEarly();
+                return;
+            }
+
             const auto currentTrie = MultikeynessTrie::fromIndexPath(key._path);
             if (!checkCanFuse(indexPathTrie, currentTrie)) {
                 prohibitIndexUsage = true;
@@ -1508,28 +1515,7 @@ boost::optional<ScanParams> computeScanParams(PrefixId& prefixId,
 class PartialSchemaReqMayContainNullTransport {
 public:
     bool transport(const IntervalReqExpr::Atom& node, const ConstFoldFn& constFold) {
-        const auto& interval = node.getExpr();
-
-        const auto foldFn = [&constFold](ABT expr) {
-            constFold(expr);
-            return expr;
-        };
-        if (const auto& lowBound = interval.getLowBound();
-            foldFn(make<BinaryOp>(lowBound.isInclusive() ? Operations::Gt : Operations::Gte,
-                                  lowBound.getBound(),
-                                  Constant::null())) == Constant::boolean(true)) {
-            // Lower bound is strictly larger than null, or equal to null but not inclusive.
-            return false;
-        }
-        if (const auto& highBound = interval.getHighBound();
-            foldFn(make<BinaryOp>(highBound.isInclusive() ? Operations::Lt : Operations::Lte,
-                                  highBound.getBound(),
-                                  Constant::null())) == Constant::boolean(true)) {
-            // Upper bound is strictly smaller than null, or equal to null but not inclusive.
-            return false;
-        }
-
-        return true;
+        return mayContainNull(node, constFold);
     }
 
     bool transport(const IntervalReqExpr::Conjunction& node,

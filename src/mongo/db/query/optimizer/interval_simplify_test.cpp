@@ -1116,5 +1116,89 @@ TEST(IntervalSimplification, IsIntervalEmpty) {
     ASSERT_FALSE(isEmpty({{true, Constant::minKey()}, {true, Constant::maxKey()}}));
 }
 
+TEST(IntervalExcludeNull, FullyOpen) {
+    auto node = _interval(_minusInf(), _plusInf());
+    ASSERT_TRUE(node.cast<IntervalReqExpr::Atom>()->getExpr().isFullyOpen());
+    auto result = splitNull(node, ConstEval::constFold);
+    ASSERT_TRUE(result);
+    ASSERT_TRUE(checkMaybeHasNull(node, ConstEval::constFold));
+    ASSERT_FALSE(checkMaybeHasNull(result->first, ConstEval::constFold));
+    ASSERT_TRUE(checkMaybeHasNull(result->second, ConstEval::constFold));
+    ASSERT_INTERVAL_AUTO("{>Const [null]}\n", result->first);
+    ASSERT_INTERVAL_AUTO("{<=Const [null]}\n", result->second);
+}
+
+TEST(IntervalExcludeNull, RightBounded) {
+    auto node = _interval(_minusInf(), _incl(_cnull()));
+    auto result = splitNull(node, ConstEval::constFold);
+    ASSERT_FALSE(result);
+    ASSERT_TRUE(checkMaybeHasNull(node, ConstEval::constFold));
+}
+
+TEST(IntervalExcludeNull, LeftBounded) {
+    auto node = _interval(_incl(_cnull()), _plusInf());
+    auto result = splitNull(node, ConstEval::constFold);
+    ASSERT_TRUE(result);
+    ASSERT_TRUE(checkMaybeHasNull(node, ConstEval::constFold));
+    ASSERT_FALSE(checkMaybeHasNull(result->first, ConstEval::constFold));
+    ASSERT_TRUE(checkMaybeHasNull(result->second, ConstEval::constFold));
+    ASSERT_INTERVAL_AUTO("{>Const [null]}\n", result->first);
+    ASSERT_INTERVAL_AUTO("{=Const [null]}\n", result->second);
+}
+
+TEST(IntervalExcludeNull, PointNull) {
+    auto node = _interval(_incl(_cnull()), _incl(_cnull()));
+    auto result = splitNull(node, ConstEval::constFold);
+    ASSERT_FALSE(result);
+    ASSERT_TRUE(checkMaybeHasNull(node, ConstEval::constFold));
+}
+
+TEST(IntervalExcludeNull, Var) {
+    auto node = _disj(_conj(_interval(_incl("1"_cint32), _incl("3"_cint32))),
+                      _conj(_interval(_incl(_cnull()), _incl("5"_cint32))),
+                      _conj(_interval(_minusInf(), _incl("v1"_var))),
+                      _conj(_interval(_incl("v2"_var), _incl("v3"_var))),
+                      _conj(_interval(_excl("8"_cint32), _excl("8"_cint32))));
+
+    auto result = splitNull(node, ConstEval::constFold);
+    ASSERT_FALSE(result);
+    ASSERT_TRUE(checkMaybeHasNull(node, ConstEval::constFold));
+}
+
+TEST(IntervalExcludeNull, Complex) {
+    auto node = _disj(_conj(_interval(_incl("1"_cint32), _incl("3"_cint32))),
+                      _conj(_interval(_incl(_cnull()), _incl("5"_cint32))),
+                      _conj(_interval(_minusInf(), _incl("7"_cint32))),
+                      _conj(_interval(_excl("8"_cint32), _excl("8"_cint32))));
+
+    auto result = splitNull(node, ConstEval::constFold);
+    ASSERT_TRUE(result);
+    ASSERT_TRUE(checkMaybeHasNull(node, ConstEval::constFold));
+    ASSERT_FALSE(checkMaybeHasNull(result->first, ConstEval::constFold));
+    ASSERT_TRUE(checkMaybeHasNull(result->second, ConstEval::constFold));
+    ASSERT_INTERVAL_AUTO(
+        "{\n"
+        "    {{[Const [1], Const [3]]}}\n"
+        " U \n"
+        "    {{(Const [null], Const [5]]}}\n"
+        " U \n"
+        "    {{(Const [null], Const [7]]}}\n"
+        " U \n"
+        "    {{(Const [8], Const [8])}}\n"
+        "}\n",
+        result->first);
+    ASSERT_INTERVAL_AUTO(
+        "{\n"
+        "    {{[Const [1], Const [3]]}}\n"
+        " U \n"
+        "    {{=Const [null]}}\n"
+        " U \n"
+        "    {{<=Const [null]}}\n"
+        " U \n"
+        "    {{(Const [8], Const [8])}}\n"
+        "}\n",
+        result->second);
+}
+
 }  // namespace
 }  // namespace mongo::optimizer

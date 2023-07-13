@@ -38,11 +38,20 @@
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/abt_compare.h"
 
 namespace mongo::optimizer::ce {
 
 using PartialSchemaSelHints =
     std::map<PartialSchemaKey, SelectivityType, PartialSchemaKeyComparator::Less>;
+using PartialSchemaInterval = std::pair<PartialSchemaKey, IntervalReqExpr::Node>;
+
+struct PartialSchemaIntervalComparator {
+    bool operator()(const PartialSchemaInterval& k1, const PartialSchemaInterval& k2) const;
+};
+
+using PartialSchemaIntervalSelHints =
+    std::map<PartialSchemaInterval, SelectivityType, PartialSchemaIntervalComparator>;
 
 /**
  * Estimation based on hints. The hints are organized in a PartialSchemaSelHints structure.
@@ -50,7 +59,8 @@ using PartialSchemaSelHints =
  */
 class HintedEstimator : public cascades::CardinalityEstimator {
 public:
-    HintedEstimator(PartialSchemaSelHints hints) : _hints(std::move(hints)) {}
+    HintedEstimator(PartialSchemaSelHints pathHints, PartialSchemaIntervalSelHints intervalHints)
+        : _pathHints(std::move(pathHints)), _intervalHints(std::move(intervalHints)) {}
 
     CEType deriveCE(const Metadata& metadata,
                     const cascades::Memo& memo,
@@ -59,7 +69,9 @@ public:
 
 private:
     // Selectivity hints per PartialSchemaKey.
-    PartialSchemaSelHints _hints;
+    PartialSchemaSelHints _pathHints;
+    // Selectivity hints per PartialSchemaKey and IntervalReqExpr::Node.
+    PartialSchemaIntervalSelHints _intervalHints;
 };
 
 }  // namespace mongo::optimizer::ce

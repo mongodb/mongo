@@ -110,6 +110,11 @@ inline auto operator"" _cdouble(const char* c, size_t len) {
     return ExprHolder{Constant::fromDouble(std::stod({c, len}))};
 }
 
+// Null constant.
+inline auto _cnull() {
+    return ExprHolder{Constant::null()};
+}
+
 // Boolean constant.
 inline auto _cbool(const bool val) {
     return ExprHolder{Constant::boolean(val)};

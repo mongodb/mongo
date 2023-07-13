@@ -2035,8 +2035,8 @@ TEST(PhysRewriter, CoveredScan) {
     ABT optimized = std::move(rootNode);
     phaseManager.optimize(optimized);
     ASSERT_BETWEEN_AUTO(  //
-        3,
-        6,
+        9,
+        15,
         phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Since we do not optimize with fast null handling, we need to split the predicate between the
@@ -5101,7 +5101,7 @@ TEST(PhysRewriter, PerfOnlyPreds1) {
     ABT optimized = rootNode;
     phaseManager.getHints()._disableYieldingTolerantPlans = false;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(15, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN_AUTO(27, 45, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate predicates are repeated on the Seek side. Also demonstrate null handling, and the
     // fact that we apply the predicates on the Seek side in increasing selectivity order.
@@ -5111,16 +5111,16 @@ TEST(PhysRewriter, PerfOnlyPreds1) {
         "|   |   Const [true]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
-        "|   |   |   Variable [evalTemp_3]\n"
+        "|   |   |   Variable [evalTemp_4]\n"
         "|   |   PathCompare [Eq] Const [2]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
         "|   |   |   Variable [pa]\n"
         "|   |   PathCompare [Lt] Const [1]\n"
         "|   LimitSkip [limit: 1, skip: 0]\n"
-        "|   Seek [ridProjection: rid_0, {'a': pa, 'b': evalTemp_3}, c1]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const [2"
-        " | minKey], Const [2 | 1])}]\n",
+        "|   Seek [ridProjection: rid_0, {'a': pa, 'b': evalTemp_4}, c1]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const [2 "
+        "| minKey], Const [2 | 1])}]\n",
         optimized);
 }
 
@@ -5576,20 +5576,7 @@ TEST(PhysRewriter, ExtractAllPlans) {
 
     // Sort plans by estimated cost. If costs are equal, sort lexicographically by plan explain.
     // This allows us to break ties if costs are equal.
-    std::sort(plans.begin(), plans.end(), [](const PlanAndProps& e1, const PlanAndProps& e2) {
-        const auto c1 = e1.getRootAnnotation()._cost;
-        const auto c2 = e2.getRootAnnotation()._cost;
-        if (c1 < c2) {
-            return true;
-        }
-        if (c2 < c1) {
-            return false;
-        }
-
-        const auto explain1 = ExplainGenerator::explainV2(e1._node);
-        const auto explain2 = ExplainGenerator::explainV2(e2._node);
-        return explain1 < explain2;
-    });
+    std::sort(plans.begin(), plans.end(), planComparator);
 
     const auto getExplainForPlan = [&plans](const size_t planId) -> std::string {
         return str::stream() << "Cost: " << plans.at(planId).getRootAnnotation()._cost.toString()
@@ -5657,6 +5644,76 @@ TEST(PhysRewriter, ExtractAllPlans) {
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const [1 "
         "| minKey], Const [1 | maxKey]]}]\n",
         getExplainForPlan(2));
+}
+
+TEST(PhysRewriter, AvoidFetchingNonNullIndexedFields) {
+    // Prepares CE hints such that:
+    // - PathGet "b" Id has default selectivity 0.1.
+    // - PathGet "b" Id has selectivity 0.001 if the interval is {<=Const [null]}.
+    ce::PartialSchemaSelHints hints;
+    hints.emplace(PartialSchemaKey{"p0", _get("b", _id())._n}, SelectivityType{0.1});
+
+    ce::PartialSchemaIntervalSelHints intervalHints;
+    IntervalReqExpr::Node intervals = *IntervalReqExpr::Builder{}
+                                           .pushDisj()
+                                           .pushConj()
+                                           .atom(IntervalRequirement{_minusInf(), _incl(_cnull())})
+                                           .finish();
+    intervalHints.emplace(std::make_pair(PartialSchemaKey{"p0", _get("b", _id())._n}, intervals),
+                          SelectivityType{0.001});
+
+    auto prefixId = PrefixId::createForTests();
+
+    // The MQL generates the following ABT: db.coll.find({a: 10}, {b: 1, _id: 0}).
+    ABT rootNode = NodeBuilder{}
+                       .root("p1")
+                       .eval("p1", _evalp(_keep("b"), "p0"_var))
+                       .filter(_evalf(_get("a", _traverse1(_cmp("Eq", "10"_cint64))), "p0"_var))
+                       .finish(_scan("p0", "c1"));
+    auto phaseManager = makePhaseManager(
+        {
+            OptPhase::MemoSubstitutionPhase,
+            OptPhase::MemoExplorationPhase,
+            OptPhase::MemoImplementationPhase,
+        },
+        prefixId,
+        {{{"c1",
+           createScanDef(
+               {},
+               {{"index1",
+                 IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
+                                 false /*isMultiKey*/}}})}}},
+        makeHintedCE(std::move(hints), std::move(intervalHints)),
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = std::move(rootNode);
+    phaseManager.optimize(optimized);
+
+    // Because the interval {<=Const [null]} for PathGet "b" is highly selective, it is cheaper to
+    // split the SargableNode into two by splitting the interval requirement. When the CE of the
+    // document fetching (right child) is low enough to be negligible, the covered index scan (left
+    // child) is cheaper than a regular index scan + fetch plan.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{p1}]\n"
+        "Evaluation [{p1}]\n"
+        "|   EvalPath []\n"
+        "|   |   Const [{}]\n"
+        "|   PathField [b]\n"
+        "|   PathConstant []\n"
+        "|   Variable [fieldProj_0]\n"
+        "Unique [{rid_0}]\n"
+        "Union [{fieldProj_0, rid_0}]\n"
+        "|   NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   |   Const [true]\n"
+        "|   |   LimitSkip [limit: 1, skip: 0]\n"
+        "|   |   Seek [ridProjection: rid_0, {'b': fieldProj_0}, c1]\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: "
+        "{[Const [10 | minKey], Const [10 | null]]}]\n"
+        "IndexScan [{'<indexKey> 1': fieldProj_0, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
+        "index1, interval: {(Const [10 | null], Const [10 | maxKey]]}]\n",
+        optimized);
 }
 
 TEST(PhysRewriter, RemoveOrphansEnforcer) {

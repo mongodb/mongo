@@ -173,7 +173,8 @@ std::unique_ptr<CardinalityEstimator> makeHeuristicCE();
 /**
  * A factory function to create a hint-based cardinality estimator.
  */
-std::unique_ptr<CardinalityEstimator> makeHintedCE(ce::PartialSchemaSelHints hints);
+std::unique_ptr<CardinalityEstimator> makeHintedCE(
+    ce::PartialSchemaSelHints hints, ce::PartialSchemaIntervalSelHints intervalHints = {});
 
 /**
  * Return default CostModel used in unit tests.
@@ -224,4 +225,8 @@ OptPhaseManager makePhaseManagerRequireRID(OptPhaseManager::PhaseSet phaseSet,
                                            DebugInfo debugInfo,
                                            QueryHints queryHints = {});
 
+/**
+ * Compares plans to allow sorting plans in a deterministic way.
+ */
+bool planComparator(const PlanAndProps& e1, const PlanAndProps& e2);
 }  // namespace mongo::optimizer

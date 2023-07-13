@@ -1057,8 +1057,8 @@ public:
         const IndexingRequirement& requirements = getPropertyConst<IndexingRequirement>(_physProps);
         const bool dedupRID = requirements.getDedupRID();
         const IndexReqTarget indexReqTarget = requirements.getIndexReqTarget();
-        if (indexReqTarget != IndexReqTarget::Index) {
-            // We only allow index target.
+        if (indexReqTarget == IndexReqTarget::Seek) {
+            // We allow target to be either Index or Complete.
             return;
         }
 
@@ -1087,17 +1087,13 @@ public:
             return;
         }
 
-        const auto& required = getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
-        if (required.getVector().size() != 1 || !required.find(ridProjName)) {
-            // For now we can only satisfy requirement for ridProjection.
-            return;
-        }
+        // Require left and right children share the projection names. The RID projection name needs
+        // to be preserved for RID deduplication.
+        auto required = getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
+        required.emplace_back(ridProjName);
 
-        ProjectionNameOrderPreservingSet leftChildProjections;
-        leftChildProjections.emplace_back(ridProjName);
-
-        ProjectionNameOrderPreservingSet rightChildProjections;
-        rightChildProjections.emplace_back(ridProjName);
+        ProjectionNameOrderPreservingSet leftChildProjections = required;
+        ProjectionNameOrderPreservingSet rightChildProjections = required;
 
         if (hasProperty<CollationRequirement>(_physProps)) {
             // For now we cannot satisfy collation requirement.
@@ -1119,10 +1115,12 @@ public:
             {IndexReqTarget::Index,
              false /*dedupRID*/,
              requirements.getSatisfiedPartialIndexesGroupId()});
+        // If 'indexReqTarget' is IndexReqTarget::Complete, the right child might need fetching and
+        // require RID deduplication.
         setPropertyOverwrite<IndexingRequirement>(
             rightPhysProps,
-            {IndexReqTarget::Index,
-             false /*dedupRID*/,
+            {indexReqTarget,
+             indexReqTarget == IndexReqTarget::Complete /*dedupRID*/,
              requirements.getSatisfiedPartialIndexesGroupId()});
 
         setPropertyOverwrite<ProjectionRequirement>(leftPhysProps, std::move(leftChildProjections));

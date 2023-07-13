@@ -137,4 +137,17 @@ bool isSimpleRange(const CompoundIntervalReqExpr::Node& interval);
  */
 bool isIntervalEmpty(const IntervalRequirement& interval, const ConstFoldFn& constFold);
 
+/**
+ * Returns true if the interval may contain nulls.
+ */
+bool mayContainNull(const IntervalReqExpr::Atom& node, const ConstFoldFn& constFold);
+
+/**
+ * Splits the interval into two mutually exclusive intervals to separate out nulls. Returns a pair
+ * of intervals where the first element has nulls excluded by intersecting {>Const [null]}, and the
+ * second element has nulls included by intersecting {<=Const [null]}. Returns boost::none if the
+ * interval contains variable.
+ */
+boost::optional<std::pair<IntervalReqExpr::Node, IntervalReqExpr::Node>> splitNull(
+    const IntervalReqExpr::Node& interval, const ConstFoldFn& constFold);
 }  // namespace mongo::optimizer

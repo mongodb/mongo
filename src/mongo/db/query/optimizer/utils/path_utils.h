@@ -199,4 +199,9 @@ bool checkPathContainsTraverse(const ABT& path);
  */
 bool pathEndsInTraverse(const optimizer::ABT& path);
 
+/**
+ * This helper checks if a path contains valid Traverse elements.
+ */
+bool checkPathTraverseSingleDepth(const ABT& path);
+
 }  // namespace mongo::optimizer
