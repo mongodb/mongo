@@ -85,6 +85,7 @@ executor:
   archive:
     hooks:
       - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config:
     shell_options:
@@ -99,6 +100,7 @@ executor:
         load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
   hooks:
   - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
   - class: CheckOrphansDeleted
   - class: CleanEveryN

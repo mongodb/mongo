@@ -23,6 +23,7 @@ executor:
   archive:
     hooks:
       - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config:
     shell_options:
@@ -40,6 +41,7 @@ executor:
         load('jstests/libs/override_methods/implicit_passthrough_to_shard_changestreams.js');
   hooks:
   - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
   - class: CheckOrphansDeleted
   - class: CleanEveryN

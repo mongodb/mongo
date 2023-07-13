@@ -25,6 +25,7 @@ executor:
   archive:
     hooks:
       - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config:
     shell_options:
@@ -35,6 +36,7 @@ executor:
         load("jstests/libs/override_methods/detect_spawning_own_mongod.js");
   hooks:
   - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
   - class: CheckOrphansDeleted
   - class: CleanEveryN

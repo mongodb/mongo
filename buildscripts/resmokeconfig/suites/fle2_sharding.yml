@@ -13,9 +13,11 @@ executor:
   archive:
     hooks:
       - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
   hooks:
   - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
   - class: CheckOrphansDeleted
   - class: CleanEveryN

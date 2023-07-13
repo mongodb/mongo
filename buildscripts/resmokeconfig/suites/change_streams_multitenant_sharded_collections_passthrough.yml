@@ -33,6 +33,7 @@ executor:
   archive:
     hooks:
       - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config:
     shell_options:
@@ -51,6 +52,7 @@ executor:
   hooks:
   - class: EnableChangeStream
   - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
   - class: CheckOrphansDeleted
   - class: CleanEveryN

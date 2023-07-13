@@ -68,6 +68,7 @@ executor:
   # validating the entire contents of the collection.
   - class: CheckReplOplogs
   - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
   - class: CheckOrphansDeleted
   - class: CleanEveryN

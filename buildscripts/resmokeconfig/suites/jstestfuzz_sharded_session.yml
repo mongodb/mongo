@@ -8,6 +8,7 @@ executor:
   archive:
     hooks:
       - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config:
     shell_options:
@@ -21,6 +22,7 @@ executor:
       global_vars:
         TestData:
           skipValidationOnInvalidViewDefinitions: true
+  - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
     shell_options:
       global_vars:

@@ -25,6 +25,7 @@ executor:
   archive:
     hooks:
       - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config:
     shell_options:
@@ -41,6 +42,7 @@ executor:
         load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
   hooks:
   - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
   - class: CheckOrphansDeleted
   - class: CleanEveryN

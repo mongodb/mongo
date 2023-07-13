@@ -11,6 +11,7 @@ executor:
     hooks:
     - CheckReplDBHash
     - CheckReplOplogs
+    - CheckMetadataConsistencyInBackground
     - ValidateCollections
   config:
     shell_options:
@@ -62,6 +63,7 @@ executor:
   - class: RunChangeStreamsInBackground
   - class: CheckReplOplogs
   - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
     shell_options:
       global_vars:
