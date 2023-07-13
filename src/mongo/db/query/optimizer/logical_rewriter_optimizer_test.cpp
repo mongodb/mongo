@@ -852,6 +852,76 @@ TEST(LogicalRewriter, FilterUnionUnionPushdown) {
         latest);
 }
 
+TEST(LogicalRewriter, FilterPushPastDisjunctiveFilter) {
+    auto prefixId = PrefixId::createForTests();
+    ABT rootNode = NodeBuilder{}
+                       .root("ptest")
+                       .filter(_evalf(_composem(_get("a", _cmp("Eq", "43"_cint64)),
+                                                _get("b", _cmp("Eq", "44"_cint64))),
+                                      "ptest"_var))
+                       .filter(_evalf(_composea(_get("disj_a", _cmp("Eq", "43"_cint64)),
+                                                _get("disj_b", _cmp("Eq", "44"_cint64))),
+                                      "ptest"_var))
+                       .filter(_evalf(_composem(_get("c", _cmp("Eq", "43"_cint64)),
+                                                _get("d", _cmp("Eq", "44"_cint64))),
+                                      "ptest"_var))
+                       .finish(_scan("ptest", "test1"));
+
+    auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
+                                         prefixId,
+                                         {{{"test1", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
+                                         DebugInfo::kDefaultForTests);
+    phaseManager.optimize(rootNode);
+
+    // The SargableDisjunctiveReorder rule will reorder the Sargable nodes such that the node(s)
+    // without disjunctive PSRs are closest to the scan. Without the rule, none of the Sargable
+    // would be reordered, producing a plan where only "c" and "d" projections would be used to
+    // generate index plans.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root [{ptest}]\n"
+        "Sargable [Complete]\n"
+        "|   |   requirements: \n"
+        "|   |       {\n"
+        "|   |           {{ptest, 'PathGet [disj_a] PathIdentity []', {{{=Const [43]}}}}}\n"
+        "|   |        U \n"
+        "|   |           {{ptest, 'PathGet [disj_b] PathIdentity []', {{{=Const [44]}}}}}\n"
+        "|   |       }\n"
+        "|   scanParams: \n"
+        "|       {'disj_a': evalTemp_4, 'disj_b': evalTemp_5}\n"
+        "|           residualReqs: \n"
+        "|               {\n"
+        "|                   {{evalTemp_4, 'PathIdentity []', {{{=Const [43]}}}, entryIndex: 0}}\n"
+        "|                U \n"
+        "|                   {{evalTemp_5, 'PathIdentity []', {{{=Const [44]}}}, entryIndex: 1}}\n"
+        "|               }\n"
+        "Sargable [Complete]\n"
+        "|   |   requirements: \n"
+        "|   |       {{\n"
+        "|   |           {ptest, 'PathGet [a] PathIdentity []', {{{=Const [43]}}}}\n"
+        "|   |        ^ \n"
+        "|   |           {ptest, 'PathGet [b] PathIdentity []', {{{=Const [44]}}}}\n"
+        "|   |        ^ \n"
+        "|   |           {ptest, 'PathGet [c] PathIdentity []', {{{=Const [43]}}}}\n"
+        "|   |        ^ \n"
+        "|   |           {ptest, 'PathGet [d] PathIdentity []', {{{=Const [44]}}}}\n"
+        "|   |       }}\n"
+        "|   scanParams: \n"
+        "|       {'a': evalTemp_11, 'b': evalTemp_12, 'c': evalTemp_13, 'd': evalTemp_14}\n"
+        "|           residualReqs: \n"
+        "|               {{\n"
+        "|                   {evalTemp_11, 'PathIdentity []', {{{=Const [43]}}}, entryIndex: 0}\n"
+        "|                ^ \n"
+        "|                   {evalTemp_12, 'PathIdentity []', {{{=Const [44]}}}, entryIndex: 1}\n"
+        "|                ^ \n"
+        "|                   {evalTemp_13, 'PathIdentity []', {{{=Const [43]}}}, entryIndex: 2}\n"
+        "|                ^ \n"
+        "|                   {evalTemp_14, 'PathIdentity []', {{{=Const [44]}}}, entryIndex: 3}\n"
+        "|               }}\n"
+        "Scan [test1, {ptest}]\n",
+        rootNode);
+}
+
 TEST(LogicalRewriter, UnionPreservesCommonLogicalProps) {
     ABT scanNode1 = make<ScanNode>("ptest1", "test1");
     ABT scanNode2 = make<ScanNode>("ptest2", "test2");

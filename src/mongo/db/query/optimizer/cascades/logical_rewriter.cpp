@@ -93,6 +93,7 @@ LogicalRewriter::RewriteSet LogicalRewriter::_substitutionSet = {
 
     {LogicalRewriteType::SargableFilterReorder, 1},
     {LogicalRewriteType::SargableEvaluationReorder, 1},
+    {LogicalRewriteType::SargableDisjunctiveReorder, 1},
 
     {LogicalRewriteType::FilterValueScanPropagate, 1},
     {LogicalRewriteType::EvaluationValueScanPropagate, 1},
@@ -425,6 +426,23 @@ struct SubstituteReorder<FilterNode, UnionNode> {
         }
 
         ctx.addNode(newParent, true /*substitute*/);
+    }
+};
+
+template <>
+struct SubstituteReorder<SargableNode, SargableNode> {
+    void operator()(ABT::reference_type aboveNode,
+                    ABT::reference_type belowNode,
+                    RewriteContext& ctx) const {
+        auto isSingletonDisjunction = [](const ABT::reference_type& node) {
+            return PSRExpr::isSingletonDisjunction(
+                node.cast<SargableNode>()->getReqMap().getRoot());
+        };
+        // Prefer to keep conjunction-only PSRs closer to the scan, because (at time of writing)
+        // those are the only ones that we merge together.
+        if (isSingletonDisjunction(aboveNode) && !isSingletonDisjunction(belowNode)) {
+            defaultReorder<SargableNode, SargableNode>(aboveNode, belowNode, ctx);
+        }
     }
 };
 
@@ -2116,6 +2134,9 @@ void LogicalRewriter::initializeRewrites() {
     registerRewrite(
         LogicalRewriteType::SargableEvaluationReorder,
         &LogicalRewriter::bindAboveBelow<SargableNode, EvaluationNode, SubstituteReorder>);
+    registerRewrite(
+        LogicalRewriteType::SargableDisjunctiveReorder,
+        &LogicalRewriter::bindAboveBelow<SargableNode, SargableNode, SubstituteReorder>);
 
     registerRewrite(LogicalRewriteType::LimitSkipSubstitute,
                     &LogicalRewriter::bindSingleNode<LimitSkipNode, SubstituteConvert>);

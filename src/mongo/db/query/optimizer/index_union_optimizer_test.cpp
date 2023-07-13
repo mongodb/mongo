@@ -308,11 +308,6 @@ TEST(LogicalRewriter, DisjunctionProjectionConversion) {
         "|   Variable [fieldProj_0]\n"
         "Sargable [Complete]\n"
         "|   |   requirements: \n"
-        "|   |       {{{scan_0, 'PathGet [x] PathIdentity []', fieldProj_0, {{{<fully open>}}}}}}\n"
-        "|   scanParams: \n"
-        "|       {'x': fieldProj_0}\n"
-        "Sargable [Complete]\n"
-        "|   |   requirements: \n"
         "|   |       {\n"
         "|   |           {{scan_0, 'PathGet [a] PathIdentity []', {{{=Const [0]}}}}}\n"
         "|   |        U \n"
@@ -326,6 +321,11 @@ TEST(LogicalRewriter, DisjunctionProjectionConversion) {
         "|                U \n"
         "|                   {{evalTemp_1, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: 1}}\n"
         "|               }\n"
+        "Sargable [Complete]\n"
+        "|   |   requirements: \n"
+        "|   |       {{{scan_0, 'PathGet [x] PathIdentity []', fieldProj_0, {{{<fully open>}}}}}}\n"
+        "|   scanParams: \n"
+        "|       {'x': fieldProj_0}\n"
         "Scan [coll, {scan_0}]\n",
         optimized);
 }
@@ -470,18 +470,13 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
         .pop();
     auto reqs2 = PartialSchemaRequirements(builder.finish().get());
 
-    builder.pushDisj().pushConj().atom({makeKey("g"), req}).pop();
-    auto reqs3 = PartialSchemaRequirements(builder.finish().get());
-
     ABT scanNode = make<ScanNode>("ptest", "test");
     ABT sargableNode1 = make<SargableNode>(
         reqs1, CandidateIndexes(), boost::none, IndexReqTarget::Complete, std::move(scanNode));
     ABT sargableNode2 = make<SargableNode>(
         reqs2, CandidateIndexes(), boost::none, IndexReqTarget::Complete, std::move(sargableNode1));
-    ABT sargableNode3 = make<SargableNode>(
-        reqs3, CandidateIndexes(), boost::none, IndexReqTarget::Complete, std::move(sargableNode2));
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"ptest"}},
-                                  std::move(sargableNode3));
+                                  std::move(sargableNode2));
 
     auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
@@ -521,10 +516,6 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
     // We should get an index union between 'ab' and 'cd'.
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "Root [{ptest}]\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [ptest]\n"
-        "|   PathGet [g] PathCompare [Eq] Const [1]\n"
         "Filter []\n"
         "|   BinaryOp [Or]\n"
         "|   |   EvalFilter []\n"

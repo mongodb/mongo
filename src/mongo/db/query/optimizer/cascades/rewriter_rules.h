@@ -54,6 +54,10 @@ namespace mongo::optimizer::cascades {
                                                                   \
     F(FilterUnionReorder)                                         \
                                                                   \
+    F(SargableFilterReorder)                                      \
+    F(SargableEvaluationReorder)                                  \
+    F(SargableDisjunctiveReorder)                                 \
+                                                                  \
     /* Merging rewrites. */                                       \
     F(CollationMerge)                                             \
     F(LimitSkipMerge)                                             \
@@ -61,9 +65,6 @@ namespace mongo::optimizer::cascades {
                                                                   \
     /* Local-global optimization for GroupBy */                   \
     F(GroupByExplore)                                             \
-                                                                  \
-    F(SargableFilterReorder)                                      \
-    F(SargableEvaluationReorder)                                  \
                                                                   \
     /* Propagate ValueScan nodes*/                                \
     F(FilterValueScanPropagate)                                   \
