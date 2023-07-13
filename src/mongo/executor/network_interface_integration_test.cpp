@@ -528,11 +528,17 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
     auto serviceContext = ServiceContext::make();
     auto client = serviceContext->makeClient("NetworkClient");
     auto opCtx = client->makeOperationContext();
-    opCtx->setDeadlineAfterNowBy(opCtxDeadline, ErrorCodes::ExceededTimeLimit);
+
+    auto stopWatch = serviceContext->getPreciseClockSource()->makeStopWatch();
+    opCtx->setDeadlineByDate(stopWatch.start() + opCtxDeadline, ErrorCodes::ExceededTimeLimit);
 
     auto request = makeTestCommand(requestTimeout, makeSleepCmdObj(), opCtx.get());
 
     auto deferred = runCommand(cb, request);
+    // The time returned in result.elapsed is measured from when the command started, which happens
+    // in runCommand. The delay between setting the deadline on opCtx and starting the command can
+    // be long enough that the assertion about opCtxDeadline fails.
+    auto networkStartCommandDelay = stopWatch.elapsed();
 
     waitForIsMaster();
 
@@ -546,9 +552,10 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
 
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, result.status);
     ASSERT(result.elapsed);
+
     // check that the request timeout uses the smaller of the operation context deadline and
     // the timeout specified in the request constructor.
-    ASSERT_GTE(result.elapsed.value(), opCtxDeadline);
+    ASSERT_GTE(result.elapsed.value() + networkStartCommandDelay, opCtxDeadline);
     ASSERT_LT(result.elapsed.value(), requestTimeout);
     assertNumOps(0u, 1u, 0u, 0u);
 }
@@ -563,10 +570,17 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
     auto serviceContext = ServiceContext::make();
     auto client = serviceContext->makeClient("NetworkClient");
     auto opCtx = client->makeOperationContext();
-    opCtx->setDeadlineAfterNowBy(opCtxDeadline, ErrorCodes::ExceededTimeLimit);
+
+    auto stopWatch = serviceContext->getPreciseClockSource()->makeStopWatch();
+    opCtx->setDeadlineByDate(stopWatch.start() + opCtxDeadline, ErrorCodes::ExceededTimeLimit);
+
     auto request = makeTestCommand(requestTimeout, makeSleepCmdObj(), opCtx.get());
 
     auto deferred = runCommand(cb, request);
+    // The time returned in result.elapsed is measured from when the command started, which happens
+    // in runCommand. The delay between setting the deadline on opCtx and starting the command can
+    // be long enough that the assertion about opCtxDeadline fails.
+    auto networkStartCommandDelay = stopWatch.elapsed();
 
     waitForIsMaster();
 
@@ -580,10 +594,12 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
 
     ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
     ASSERT(result.elapsed);
+
     // check that the request timeout uses the smaller of the operation context deadline and
     // the timeout specified in the request constructor.
     ASSERT_GTE(duration_cast<Milliseconds>(result.elapsed.value()), requestTimeout);
-    ASSERT_LT(duration_cast<Milliseconds>(result.elapsed.value()), opCtxDeadline);
+    ASSERT_LT(duration_cast<Milliseconds>(result.elapsed.value() + networkStartCommandDelay),
+              opCtxDeadline);
 
     assertNumOps(0u, 1u, 0u, 0u);
 }
