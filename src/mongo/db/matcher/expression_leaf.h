@@ -182,7 +182,7 @@ public:
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
     virtual void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                               SerializationOptions opts) const final;
+                                               SerializationOptions opts) const;
 
     virtual bool equivalent(const MatchExpression* other) const;
 

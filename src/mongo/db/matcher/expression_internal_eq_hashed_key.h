@@ -99,6 +99,16 @@ public:
     void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
         visitor->visit(this);
     }
+
+    void appendSerializedRightHandSide(BSONObjBuilder* bob, SerializationOptions opts) const final {
+        if (opts.literalPolicy == LiteralSerializationPolicy::kToRepresentativeParseableValue) {
+            // We need to make sure the value added to bob is of type NumberLong, so it can be
+            // re-parsed successfully.
+            bob->append(name(), (long long)1);
+            return;
+        }
+        opts.appendLiteral(bob, name(), _rhs);
+    }
 };
 
 }  // namespace mongo
