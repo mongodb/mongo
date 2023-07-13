@@ -47,6 +47,31 @@ assert.commandWorked(
 assert.eq(0, unshardedColl.countDocuments({}));
 assert.eq(1, s.getDB('otherDBSamePrimary').foo.countDocuments({}));
 
+jsTest.log("Testing that rename operations involving views are not allowed");
+{
+    assert.commandWorked(db.collForView.insert({_id: 1}));
+    assert.commandWorked(db.createView('view', 'collForView', []));
+
+    unshardedColl.insert({x: 1});
+    let toAView = unshardedColl.renameCollection('view', true /* dropTarget */);
+
+    assert.commandFailedWithCode(
+        toAView,
+        [
+            ErrorCodes.NamespaceExists,
+            ErrorCodes.CommandNotSupportedOnView,  // TODO SERVER-78217 remove this error code
+        ],
+        "renameCollection should fail with NamespaceExists when the target is view");
+
+    let fromAView = db.view.renameCollection('target');
+    assert.commandFailedWithCode(
+        fromAView,
+        [
+            ErrorCodes.CommandNotSupportedOnView,
+        ],
+        "renameCollection should fail with CommandNotSupportedOnView when renaming a view");
+}
+
 // Rename a collection to itself fails, without loosing data
 {
     const sameCollName = 'sameColl';
