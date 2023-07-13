@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/collection_type.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
@@ -429,7 +430,7 @@ public:
         return getCollection();
     }
     const CollectionPtr& getCollection() const;
-    StringData getCollectionType() const;
+    query_shape::CollectionType getCollectionType() const;
     const ViewDefinition* getView() const;
     const NamespaceString& getNss() const;
     bool isAnySecondaryNamespaceAViewOrSharded() const;
