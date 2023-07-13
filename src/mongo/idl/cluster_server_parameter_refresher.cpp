@@ -246,8 +246,15 @@ Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCt
     // No active job; make a new promise and run the job ourselves.
     _refreshPromise = std::make_unique<SharedPromise<void>>();
     lk.unlock();
-    // Run _refreshParameters unlocked to allow new futures to be gotten from our promise.
-    Status status = _refreshParameters(opCtx);
+    Status status = [&]() {
+        try {
+            // Run _refreshParameters unlocked to allow new futures to be gotten from our promise.
+            return _refreshParameters(opCtx);
+        } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>& ex) {
+            return ex.toStatus();
+        }
+    }();
+
     lk.lock();
     // Complete the promise and detach it from the object, allowing a new job to be created the
     // next time refreshParameters is run. Note that the futures of this promise hold references to
