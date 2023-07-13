@@ -80,6 +80,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/s/shard_key_index_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
@@ -302,7 +303,9 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
                         "Please refer to the documentation and use the top-level "
                         "'expireAfterSeconds' option instead"};
             }
-            if (coll->isCapped()) {
+            if (coll->isCapped() &&
+                !feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
                 return {ErrorCodes::InvalidOptions,
                         "TTL indexes are not supported for capped collections."};
             }

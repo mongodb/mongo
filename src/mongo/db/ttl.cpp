@@ -91,6 +91,7 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
@@ -609,10 +610,12 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
         if (!coll.exists() || coll.uuid() != uuid)
             return false;
 
-        // Allow TTL deletion on non-capped collections, and on capped clustered collections.
         const auto& collectionPtr = coll.getCollectionPtr();
-        invariant(!collectionPtr->isCapped() ||
-                  (collectionPtr->isCapped() && collectionPtr->isClustered()));
+        if (!feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
+                serverGlobalParams.featureCompatibility) &&
+            collectionPtr->isCapped() && !collectionPtr->isClustered()) {
+            return false;
+        }
 
         if (MONGO_unlikely(hangTTLMonitorWithLock.shouldFail())) {
             LOGV2(22534,
