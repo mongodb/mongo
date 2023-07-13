@@ -92,3 +92,8 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagEndOfTransactionChangeEvent
         default: false
         shouldBeFCVGated: true
+    featureFlagAllMongodsAreSharded:
+        description: "Feature flag to enable and autobootstrap sharding for all mongods"
+        cpp_varname: gFeatureFlagAllMongodsAreSharded
+        default: false
+        shouldBeFCVGated: true
