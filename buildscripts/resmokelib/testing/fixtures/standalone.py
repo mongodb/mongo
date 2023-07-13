@@ -11,7 +11,7 @@ import yaml
 import pymongo
 import pymongo.errors
 
-from buildscripts.resmokelib.testing.fixtures import interface
+import buildscripts.resmokelib.testing.fixtures.interface as interface
 
 
 class MongoDFixture(interface.Fixture):

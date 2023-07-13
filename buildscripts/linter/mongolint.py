@@ -111,7 +111,9 @@ class Linter:
     def _check_and_strip_comments(self):
         in_multi_line_comment = False
 
-        for linenum, clean_line in enumerate(self.raw_lines):
+        for linenum in range(len(self.raw_lines)):
+            clean_line = self.raw_lines[linenum]
+
             # Users can write NOLINT different ways
             # // NOLINT
             # // Some explanation NOLINT

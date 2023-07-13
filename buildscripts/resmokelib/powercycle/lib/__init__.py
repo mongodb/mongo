@@ -39,7 +39,7 @@ class PowercycleCommand(Subcommand):
     @staticmethod
     def is_windows() -> bool:
         """:return: True if running on Windows."""
-        return sys.platform in ["win32", "cygwin"]
+        return sys.platform == "win32" or sys.platform == "cygwin"
 
     @staticmethod
     def _call(cmd):

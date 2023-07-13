@@ -925,7 +925,7 @@ def _bind_expression(expr, allow_literal_string=True):
     node.export = True
 
     # bool
-    if expr.literal in ["true", "false"]:
+    if (expr.literal == "true") or (expr.literal == "false"):
         node.expr = expr.literal
         return node
 

@@ -13,12 +13,15 @@ variable-rgx=[a-z_][a-z0-9_]{1,50}$
 
 [MESSAGES CONTROL]
 # C0103 - invalid-name - Fix variable names to match convention
+# C0200 - consider-using-enumerate - Prefer enumerate() when you need index and value from an iterable
+# C0201 - consider-iterating-dictionary
 # C0206 - consider-using-dict-items - Need to explicitly specify .keys() or .items() in a dictionary iteration
 # C0207 - use-maxsplit-arg - Use maxsplit arg in split() calls
 # C0209 - consider-using-f-string - Need to convert most format strings (using both % and .format) to f""-style strings
 # C0301 - line-too-long - some of the type annotations are longer then 100 columns
 # C0325 - superfluous-parens - Superfluous parens, easy to fix
 # C0330 - bad-continuation - ignore conflicts produced by yapf formatting
+# C1803 - use-implicit-booleaness-not-comparison
 # C2801 - unnecessary-dunder-call - Prefer a builtin call instead of a dunder method
 # C3001 - unnecessary-lambda-assignment - Prefer def over lambda
 
@@ -33,10 +36,12 @@ variable-rgx=[a-z_][a-z0-9_]{1,50}$
 
 # R0204 - redefined-variable-type
 # R0205 - useless-object-inheritance - See PM-1380
+# R0402 - consider-using-from-import - Use better convention for module import
 # R0801 - duplicate-code - See PM-1380
 # R0903 - too-few-public-methods - pylint does not always know best
 # R1705 - no-else-return - sometimes an unnecessary else helps readability
 # R1710 - inconsistent-return-statements
+# R1714 - consider-using-in - Use 'x in [...]' instead
 # R1720 - no-else-raise - See PM-1380
 # R1728 - consider-using-generator - Use a generator instead of creating an in-memory list
 # R1730 - consider-using-min-builtin - Lots of situations where min() can be used to eliminate an if block
@@ -59,6 +64,7 @@ variable-rgx=[a-z_][a-z0-9_]{1,50}$
 # W0621 - redefined-outer-name - Overriding variable name
 # W0640 - cell-var-from-loop
 # W0719 - broad-exception-raised - Should use a more precise exception than `Exception`
+# W1406 - redundant-u-string-prefix
 # W1505 - deprecated-method - See PM-1380
 # W1514 - unspecified-encoding - Need to add 'encoding="utf-8"' to most open() operations
 # W3101 - missing-timeout - Add an explicit timeout to some sync functions
@@ -70,8 +76,12 @@ disable=
     broad-exception-raised,
     cell-var-from-loop,
     consider-using-dict-items,
+    consider-using-enumerate,
     consider-using-f-string,
+    consider-using-from-import,
     consider-using-generator,
+    consider-using-in,
+    consider-iterating-dictionary,
     consider-using-max-builtin,
     consider-using-min-builtin,
     consider-using-with,
@@ -103,6 +113,7 @@ disable=
     no-name-in-module,
     protected-access,
     raise-missing-from,
+    redundant-u-string-prefix,
     redefined-outer-name,
     subprocess-run-check,
     super-init-not-called,
@@ -129,8 +140,10 @@ disable=
     unused-argument,
     use-dict-literal,
     use-list-literal,
+    use-implicit-booleaness-not-comparison,
     used-before-assignment,
     useless-object-inheritance,
+    useless-suppression,
     wrong-import-order
 enable=useless-suppression
 

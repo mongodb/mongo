@@ -5,7 +5,7 @@ import os.path
 import pymongo
 import pymongo.write_concern
 
-from buildscripts.resmokelib.testing.fixtures import interface
+import buildscripts.resmokelib.testing.fixtures.interface as interface
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 
 

@@ -2,7 +2,7 @@
 
 import os.path
 
-from buildscripts.resmokelib.testing.fixtures import interface
+import buildscripts.resmokelib.testing.fixtures.interface as interface
 from buildscripts.resmokelib.testing.fixtures.fixturelib import with_naive_retry
 
 

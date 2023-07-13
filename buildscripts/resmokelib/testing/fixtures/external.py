@@ -1,6 +1,6 @@
 """External fixture for executing JSTests against."""
 
-from buildscripts.resmokelib.testing.fixtures import interface
+import buildscripts.resmokelib.testing.fixtures.interface as interface
 
 
 class ExternalFixture(interface.Fixture):

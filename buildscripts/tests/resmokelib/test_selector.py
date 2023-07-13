@@ -7,9 +7,11 @@ import unittest
 import collections
 
 import buildscripts.resmokelib.config
-from buildscripts.resmokelib import parser
-from buildscripts.resmokelib import selector
-from buildscripts.resmokelib.utils import globstar
+import buildscripts.resmokelib.parser as parser
+import buildscripts.resmokelib.selector as selector
+import buildscripts.resmokelib.utils.globstar as globstar
+
+# pylint: disable=protected-access
 
 FIXTURE_PREFIX = "buildscripts/tests/selftest_fixtures"
 

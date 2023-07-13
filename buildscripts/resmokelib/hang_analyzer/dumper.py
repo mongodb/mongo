@@ -30,7 +30,7 @@ def get_dumpers(root_logger: logging.Logger, dbg_output: str):
     if sys.platform.startswith("linux"):
         dbg = GDBDumper(root_logger, dbg_output)
         jstack = JstackDumper()
-    elif sys.platform in ["win32", "cygwin"]:
+    elif sys.platform == "win32" or sys.platform == "cygwin":
         dbg = WindowsDumper(root_logger, dbg_output)
         jstack = JstackWindowsDumper()
     elif sys.platform == "darwin":

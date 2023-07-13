@@ -1184,7 +1184,7 @@ class Analyzer:
         # We filter ourself our of the list of components.
         self.black_duck_components = [
             comp for comp in self.black_duck_components
-            if not (comp.name in ["MongoDB", "WiredTiger"])
+            if not (comp.name == "MongoDB" or comp.name == "WiredTiger")
         ]
 
         # Remove duplicate Black Duck components. We only care about the component with highest version number

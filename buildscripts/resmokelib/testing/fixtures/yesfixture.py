@@ -2,7 +2,7 @@
 
 import signal
 
-from buildscripts.resmokelib.testing.fixtures import interface
+import buildscripts.resmokelib.testing.fixtures.interface as interface
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 
 

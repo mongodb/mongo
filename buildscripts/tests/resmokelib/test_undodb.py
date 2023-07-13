@@ -3,7 +3,7 @@ import os
 import unittest
 from mock import MagicMock, Mock, patch, call
 import evergreen
-from buildscripts.resmokelib.undodb import fetch
+import buildscripts.resmokelib.undodb.fetch as fetch
 
 
 class TestFetch(unittest.TestCase):

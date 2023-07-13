@@ -9,7 +9,7 @@ from typing import List
 import pymongo
 import pymongo.errors
 
-from buildscripts.resmokelib.utils import registry
+import buildscripts.resmokelib.utils.registry as registry
 
 _VERSIONS = {}  # type: ignore
 
