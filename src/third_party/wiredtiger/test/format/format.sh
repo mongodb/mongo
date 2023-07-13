@@ -467,10 +467,13 @@ resolve()
 		# give the parent recording binary a chance to complete if we are using it
 		[[ ! -z $live_record_binary ]] && sleep 2
 
-		# Check for Sanitizer failures, have to do this prior to success because both can be reported.
-		grep -E -i 'Sanitizer' $log > /dev/null && {
-			report_failure $dir
-			continue
+		# Process group leader core dump indicates a bug, in contrast to any spurious cores
+		# from killing zombified child processes. This is to guard against spuriously
+		# missing memory sanitizer errors, which has occured historically even when
+		# abort_on_error=1 was passed to MSan.
+		[[ -f "dump_t.${pid}.core" ]] && {
+		    report_failure $dir
+		    continue
 		}
 
 		# Remove successful jobs.
