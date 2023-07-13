@@ -897,4 +897,6 @@ last-lts:
     ticket: SERVER-78786
   - test_file: jstests/sharding/internal_txns/transaction_api_test_command_basic.js
     ticket: SERVER-78786
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_snapshot.js
+    ticket: SERVER-78855
   suites: null
