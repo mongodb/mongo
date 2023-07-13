@@ -75,7 +75,6 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -197,17 +196,6 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
     // Acquire the DDL lock to serialize with other DDL operations. It also makes sure that we are
     // targeting the primary shard for this database.
     static constexpr StringData lockReason{"dropIndexes"_sd};
-
-    // TODO SERVER-77546 remove db ddl lock acquisition on feature flag removal since it
-    // will be implicitly taken in IX mode under the collection ddl lock acquisition
-    boost::optional<DDLLockManager::ScopedDatabaseDDLLock> dbDDLLock;
-    if (!feature_flags::gMultipleGranularityDDLLocking.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        dbDDLLock.emplace(opCtx, ns().dbName(), lockReason, MODE_X, lockTimeout);
-    }
-
-    // Acquire the DDL lock to serialize with other DDL operations. It also makes sure that we are
-    // targeting the primary shard for this database.
     const DDLLockManager::ScopedCollectionDDLLock collDDLLock{
         opCtx, ns(), lockReason, MODE_X, lockTimeout};
 
@@ -225,8 +213,8 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
 
         resolvedNs = ns().makeTimeseriesBucketsNamespace();
 
-        // If it is a timeseries collection, we actually need to acquire the bucket
-        // namespace DDL lock
+        // If it is a timeseries collection, we actually need to acquire the bucket namespace DDL
+        // lock
         timeseriesCollDDLLock.emplace(opCtx, resolvedNs, lockReason, MODE_X, lockTimeout);
     }
 

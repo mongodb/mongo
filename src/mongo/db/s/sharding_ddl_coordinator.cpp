@@ -46,7 +46,6 @@
 #include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -72,7 +71,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_version.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -286,13 +284,7 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireAllLocksAsync(
 
         // Acquiring the database DDL lock
         if (lastDb != lockNss.dbName()) {
-            const auto lockMode = [&] {
-                if (!feature_flags::gMultipleGranularityDDLLocking.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
-                    return MODE_X;
-                }
-                return (isDbOnly ? MODE_X : MODE_IX);
-            }();
+            const auto lockMode = (isDbOnly ? MODE_X : MODE_IX);
             const auto& dbName = lockNss.dbName();
             futureChain =
                 std::move(futureChain)

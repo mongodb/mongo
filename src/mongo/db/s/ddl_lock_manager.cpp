@@ -42,14 +42,12 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/concurrency/resource_catalog.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
@@ -97,98 +95,66 @@ void DDLLockManager::_lock(OperationContext* opCtx,
                            LockMode mode,
                            Date_t deadline,
                            bool waitForRecovery) {
-    stdx::unique_lock<Latch> lock(_mutex);
-
     Timer waitingTime;
 
-    // Wait for primary and DDL recovered state
-    if (!opCtx->waitForConditionOrInterruptUntil(_stateCV, lock, deadline, [&] {
-            return _state == State::kPrimaryAndRecovered || !waitForRecovery;
-        })) {
-        using namespace fmt::literals;
-        uasserted(ErrorCodes::LockTimeout,
-                  "Failed to acquire DDL lock for namespace '{}' in mode {} after {} with reason "
-                  "'{}' while waiting recovery of DDLCoordinatorService"_format(
-                      ns, modeName(mode), waitingTime.elapsed().toString(), reason));
-    }
-
-    if (feature_flags::gMultipleGranularityDDLLocking.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    {
+        stdx::unique_lock<Latch> lock{_mutex};
+        // Wait for primary and DDL recovered state
+        if (!opCtx->waitForConditionOrInterruptUntil(_stateCV, lock, deadline, [&] {
+                return _state == State::kPrimaryAndRecovered || !waitForRecovery;
+            })) {
+            using namespace fmt::literals;
+            uasserted(
+                ErrorCodes::LockTimeout,
+                "Failed to acquire DDL lock for namespace '{}' in mode {} after {} with reason "
+                "'{}' while waiting recovery of DDLCoordinatorService"_format(
+                    ns, modeName(mode), waitingTime.elapsed().toString(), reason));
+        }
 
         tassert(7742100,
                 "None hierarchy lock (Global/DB/Coll) must be hold when acquiring a DDL lock",
                 !locker->isLocked());
 
         _registerResourceName(lock, resId, ns);
-        lock.unlock();
-
-        ScopeGuard unregisterResourceExitGuard([&] {
-            stdx::unique_lock<Latch> lock(_mutex);
-            _unregisterResourceNameIfNoLongerNeeded(lock, resId, ns);
-        });
-
-        if (locker->getDebugInfo().empty()) {
-            locker->setDebugInfo(reason.toString());
-        }
-
-        try {
-            locker->lock(opCtx, resId, mode, deadline);
-        } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
-            using namespace fmt::literals;
-
-            std::vector<std::string> lockHoldersArr;
-            const auto& lockHolders = locker->getLockInfoFromResourceHolders(resId);
-            for (const auto& lock : lockHolders) {
-                lockHoldersArr.emplace_back(
-                    BSON("operation" << lock.debugInfo << "lock mode" << modeName(lock.mode))
-                        .toString());
-            }
-
-            uasserted(
-                ErrorCodes::LockBusy,
-                "Failed to acquire DDL lock for '{}' in mode {} after {} that is currently locked by '{}'"_format(
-                    ns,
-                    modeName(mode),
-                    duration_cast<Milliseconds>(waitingTime.elapsed()).toString(),
-                    lockHoldersArr));
-
-        } catch (DBException& e) {
-            e.addContext("Failed to acquire DDL lock for '{}' in mode {} after {}"_format(
-                ns, modeName(mode), duration_cast<Milliseconds>(waitingTime.elapsed()).toString()));
-            throw;
-        }
-
-        unregisterResourceExitGuard.dismiss();
-
-    } else {
-        invariant(mode == MODE_X, "DDL lock modes other than exclusive are not supported yet");
-
-        auto iter = _inProgressMap.find(ns);
-
-        if (iter == _inProgressMap.end()) {
-            _inProgressMap.try_emplace(ns, std::make_shared<NSLock>(reason));
-        } else {
-            auto nsLock = iter->second;
-            nsLock->numWaiting++;
-            ScopeGuard guard([&] { nsLock->numWaiting--; });
-            if (!opCtx->waitForConditionOrInterruptUntil(
-                    nsLock->cvLocked, lock, deadline, [nsLock]() {
-                        return !nsLock->isInProgress;
-                    })) {
-                using namespace fmt::literals;
-                uasserted(
-                    ErrorCodes::LockBusy,
-                    "Failed to acquire DDL lock for namespace '{}' in mode {} after {} that is currently locked with reason '{}'"_format(
-                        ns,
-                        modeName(mode),
-                        duration_cast<Milliseconds>(waitingTime.elapsed()).toString(),
-                        nsLock->reason));
-            }
-            guard.dismiss();
-            nsLock->reason = reason.toString();
-            nsLock->isInProgress = true;
-        }
     }
+
+    ScopeGuard unregisterResourceExitGuard([&] {
+        stdx::unique_lock<Latch> lock(_mutex);
+        _unregisterResourceNameIfNoLongerNeeded(lock, resId, ns);
+    });
+
+    if (locker->getDebugInfo().empty()) {
+        locker->setDebugInfo(reason.toString());
+    }
+
+    try {
+        locker->lock(opCtx, resId, mode, deadline);
+    } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
+        using namespace fmt::literals;
+
+        std::vector<std::string> lockHoldersArr;
+        const auto& lockHolders = locker->getLockInfoFromResourceHolders(resId);
+        for (const auto& lock : lockHolders) {
+            lockHoldersArr.emplace_back(
+                BSON("operation" << lock.debugInfo << "lock mode" << modeName(lock.mode))
+                    .toString());
+        }
+
+        uasserted(
+            ErrorCodes::LockBusy,
+            "Failed to acquire DDL lock for '{}' in mode {} after {} that is currently locked by '{}'"_format(
+                ns,
+                modeName(mode),
+                duration_cast<Milliseconds>(waitingTime.elapsed()).toString(),
+                lockHoldersArr));
+
+    } catch (DBException& e) {
+        e.addContext("Failed to acquire DDL lock for '{}' in mode {} after {}"_format(
+            ns, modeName(mode), duration_cast<Milliseconds>(waitingTime.elapsed()).toString()));
+        throw;
+    }
+
+    unregisterResourceExitGuard.dismiss();
 
     LOGV2(6855301,
           "Acquired DDL lock",
@@ -199,28 +165,12 @@ void DDLLockManager::_lock(OperationContext* opCtx,
 
 void DDLLockManager::_unlock(
     Locker* locker, StringData ns, const ResourceId& resId, StringData reason, LockMode mode) {
+    dassert(locker);
+    locker->unlock(resId);
 
-    if (feature_flags::gMultipleGranularityDDLLocking.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        dassert(locker);
-        locker->unlock(resId);
+    stdx::unique_lock<Latch> lock(_mutex);
+    _unregisterResourceNameIfNoLongerNeeded(lock, resId, ns);
 
-        stdx::unique_lock<Latch> lock(_mutex);
-        _unregisterResourceNameIfNoLongerNeeded(lock, resId, ns);
-
-    } else {
-        stdx::unique_lock<Latch> lock(_mutex);
-        auto iter = _inProgressMap.find(ns);
-
-        iter->second->numWaiting--;
-        iter->second->reason.clear();
-        iter->second->isInProgress = false;
-        iter->second->cvLocked.notify_one();
-
-        if (iter->second->numWaiting == 0) {
-            _inProgressMap.erase(ns);
-        }
-    }
     LOGV2(6855302,
           "Released DDL lock",
           "resource"_attr = ns,
@@ -269,20 +219,17 @@ DDLLockManager::ScopedCollectionDDLLock::ScopedCollectionDDLLock(OperationContex
                                                                  Milliseconds timeout) {
     const Date_t deadline = Date_t::now() + timeout;
 
-    if (feature_flags::gMultipleGranularityDDLLocking.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        // Acquire implicitly the db DDL lock
-        _dbLock.emplace(opCtx,
-                        opCtx->lockState(),
-                        ns.dbName(),
-                        reason,
-                        isSharedLockMode(mode) ? MODE_IS : MODE_IX,
-                        deadline,
-                        true /*waitForRecovery*/);
+    // Acquire implicitly the db DDL lock
+    _dbLock.emplace(opCtx,
+                    opCtx->lockState(),
+                    ns.dbName(),
+                    reason,
+                    isSharedLockMode(mode) ? MODE_IS : MODE_IX,
+                    deadline,
+                    true /*waitForRecovery*/);
 
-        // Check under the DDL db lock if this is the primary shard for the database
-        DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, ns.dbName());
-    }
+    // Check under the DDL db lock if this is the primary shard for the database
+    DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, ns.dbName());
 
     // Finally, acquire the collection DDL lock
     _collLock.emplace(
