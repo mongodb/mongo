@@ -152,6 +152,7 @@
     }                                                               \
     break;                                                          \
     }                                                               \
+    /* !!!! This is a while(1) loop. !!!! */                        \
     while (1)
 
 /*
@@ -273,6 +274,7 @@
     (ret) = 0;                                                                                   \
     WT_STAT_CONN_DATA_INCR(s, autocommit_readonly_retry);                                        \
     }                                                                                            \
+    /* !!!! This is a while(1) loop. !!!! */                                                     \
     while (1)
 
 #define JOINABLE_CURSOR_CALL_CHECK(cur) \

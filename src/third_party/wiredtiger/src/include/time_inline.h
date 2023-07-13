@@ -199,7 +199,8 @@ __wt_op_timer_fired(WT_SESSION_IMPL *session)
 {
     uint64_t diff, now;
 
-    if (session->operation_start_us == 0 || session->operation_timeout_us == 0)
+    if (!F_ISSET(session->txn, WT_TXN_RUNNING) || session->operation_start_us == 0 ||
+      session->operation_timeout_us == 0)
         return (false);
 
     now = __wt_clock(session);
