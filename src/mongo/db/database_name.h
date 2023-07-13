@@ -230,14 +230,6 @@ public:
                 StringData{other._data.data() + kDataOffset, other._data.size() - kDataOffset});
     }
 
-    friend std::ostream& operator<<(std::ostream& stream, const DatabaseName& tdb) {
-        return stream << tdb.toString();
-    }
-
-    friend StringBuilder& operator<<(StringBuilder& builder, const DatabaseName& tdb) {
-        return builder << tdb.toString();
-    }
-
     int compare(const DatabaseName& other) const {
         if (_hasTenantId() && !other._hasTenantId()) {
             return 1;

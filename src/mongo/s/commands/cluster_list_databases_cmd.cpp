@@ -212,7 +212,8 @@ public:
                     item.setShards(dbShardInfo[sizeEntry.first]->obj());
 
                     uassert(ErrorCodes::BadValue,
-                            str::stream() << "Found negative 'sizeOnDisk' in: " << dbname,
+                            str::stream() << "Found negative 'sizeOnDisk' in: "
+                                          << dbname.toStringForErrorMsg(),
                             size >= 0);
 
                     totalSize += size;

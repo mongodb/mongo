@@ -107,8 +107,8 @@ public:
                 Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOKWithContext(response.commandStatus,
-                                       str::stream()
-                                           << "Database " << dbName << " could not be created");
+                                       str::stream() << "Database " << dbName.toStringForErrorMsg()
+                                                     << " could not be created");
             uassertStatusOK(response.writeConcernStatus);
 
             auto createDbResponse = ConfigsvrCreateDatabaseResponse::parse(
