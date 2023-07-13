@@ -67,9 +67,6 @@ structs:
         cpp_name: nss
         type: namespacestring
         optional: true
-      collectionUUID: 
-        type: uuid
-        optional: true
       timestamp: date
       severity: Severity
       msg: string

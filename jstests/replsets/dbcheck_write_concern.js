@@ -7,9 +7,6 @@
  *   assumes_against_mongod_not_mongos,
  * ]
  */
-
-import {resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
-
 (function() {
 "use strict";
 
@@ -25,6 +22,22 @@ const replSet = new ReplSetTest({
 replSet.startSet();
 replSet.initiate();
 
+function forEachSecondary(f) {
+    for (let secondary of replSet.getSecondaries()) {
+        f(secondary);
+    }
+}
+
+function forEachNode(f) {
+    f(replSet.getPrimary());
+    forEachSecondary(f);
+}
+
+// Clear local.system.healthlog.
+function clearLog() {
+    forEachNode(conn => conn.getDB("local").system.healthlog.drop());
+}
+
 const dbName = "dbCheck-writeConcern";
 const collName = "test";
 const primary = replSet.getPrimary();
@@ -34,12 +47,20 @@ const healthlog = db.getSiblingDB('local').system.healthlog;
 
 // Validate that w:majority behaves normally.
 (function testWMajority() {
+    clearLog();
+    coll.drop();
+
     // Insert 1000 docs and run a few small batches to ensure we wait for write concern between
     // each one.
     const nDocs = 1000;
     const maxDocsPerBatch = 100;
-    resetAndInsert(replSet, db, collName, nDocs);
-    runDbCheck(replSet, db, collName, maxDocsPerBatch);
+    assert.commandWorked(
+        coll.insertMany([...Array(nDocs).keys()].map(x => ({a: x})), {ordered: false}));
+    assert.commandWorked(db.runCommand({
+        dbCheck: coll.getName(),
+        maxDocsPerBatch: maxDocsPerBatch,
+        batchWriteConcern: {w: 'majority'},
+    }));
 
     // Confirm dbCheck logs the expected number of batches.
     assert.soon(function() {
@@ -54,13 +75,20 @@ const healthlog = db.getSiblingDB('local').system.healthlog;
 
 // Validate that w:2 behaves normally.
 (function testW2() {
+    clearLog();
+    coll.drop();
+
     // Insert 1000 docs and run a few small batches to ensure we wait for write concern between
     // each one.
     const nDocs = 1000;
     const maxDocsPerBatch = 100;
-    const writeConcern = {w: 2};
-    resetAndInsert(replSet, db, collName, nDocs);
-    runDbCheck(replSet, db, collName, maxDocsPerBatch, writeConcern);
+    assert.commandWorked(
+        coll.insertMany([...Array(nDocs).keys()].map(x => ({a: x})), {ordered: false}));
+    assert.commandWorked(db.runCommand({
+        dbCheck: coll.getName(),
+        maxDocsPerBatch: maxDocsPerBatch,
+        batchWriteConcern: {w: 2},
+    }));
 
     // Confirm dbCheck logs the expected number of batches.
     assert.soon(function() {
@@ -76,19 +104,27 @@ const healthlog = db.getSiblingDB('local').system.healthlog;
 // Validate that dbCheck completes with w:majority even when the secondary is down and a wtimeout is
 // specified.
 (function testWMajorityUnavailable() {
+    clearLog();
+    coll.drop();
+
     // Insert 1000 docs and run a few small batches to ensure we wait for write concern between
     // each one.
     const nDocs = 1000;
     const maxDocsPerBatch = 100;
-    resetAndInsert(replSet, db, collName, nDocs);
+    assert.commandWorked(
+        coll.insertMany([...Array(nDocs).keys()].map(x => ({a: x})), {ordered: false}));
+    replSet.awaitReplication();
 
     // Stop the secondary and expect that the dbCheck batches still complete on the primary.
     const secondaryConn = replSet.getSecondary();
     const secondaryNodeId = replSet.getNodeId(secondaryConn);
     replSet.stop(secondaryNodeId, {forRestart: true /* preserve dbPath */});
 
-    const writeConcern = {w: 'majority', wtimeout: 10};
-    runDbCheck(replSet, db, collName, maxDocsPerBatch, writeConcern);
+    assert.commandWorked(db.runCommand({
+        dbCheck: coll.getName(),
+        maxDocsPerBatch: maxDocsPerBatch,
+        batchWriteConcern: {w: 'majority', wtimeout: 10},
+    }));
 
     // Confirm dbCheck logs the expected number of batches.
     assert.soon(function() {
@@ -112,19 +148,27 @@ const healthlog = db.getSiblingDB('local').system.healthlog;
 // Validate that an invalid 'w' setting still allows dbCheck to succeed when presented with a
 // wtimeout.
 (function testW3Unavailable() {
+    clearLog();
+    coll.drop();
+
     // Insert 1000 docs and run a few small batches to ensure we wait for write concern between
     // each one.
     const nDocs = 1000;
     const maxDocsPerBatch = 100;
-    resetAndInsert(replSet, db, collName, nDocs);
+    assert.commandWorked(
+        coll.insertMany([...Array(nDocs).keys()].map(x => ({a: x})), {ordered: false}));
+    replSet.awaitReplication();
 
     // Stop the secondary and expect that the dbCheck batches still complete on the primary.
     const secondaryConn = replSet.getSecondary();
     const secondaryNodeId = replSet.getNodeId(secondaryConn);
     replSet.stop(secondaryNodeId, {forRestart: true /* preserve dbPath */});
 
-    const writeConcern = {w: 3, wtimeout: 10};
-    runDbCheck(replSet, db, collName, maxDocsPerBatch, writeConcern);
+    assert.commandWorked(db.runCommand({
+        dbCheck: coll.getName(),
+        maxDocsPerBatch: maxDocsPerBatch,
+        batchWriteConcern: {w: 3, wtimeout: 10},
+    }));
 
     // Confirm dbCheck logs the expected number of batches.
     assert.soon(function() {

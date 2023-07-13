@@ -10,14 +10,6 @@
  * ]
  */
 
-import {
-    awaitDbCheckCompletion,
-    clearHealthLog,
-    dbCheckCompleted,
-    forEachNode,
-    forEachSecondary,
-} from "jstests/replsets/libs/dbcheck_utils.js";
-
 (function() {
 "use strict";
 
@@ -31,8 +23,24 @@ replSet.startSet();
 replSet.initiate();
 replSet.awaitSecondaryNodes();
 
+function forEachSecondary(f) {
+    for (let secondary of replSet.getSecondaries()) {
+        f(secondary);
+    }
+}
+
+function forEachNode(f) {
+    f(replSet.getPrimary());
+    forEachSecondary(f);
+}
+
 let dbName = "dbCheck-test";
 let collName = "dbcheck-collection";
+
+// Clear local.system.healthlog.
+function clearLog() {
+    forEachNode(conn => conn.getDB("local").system.healthlog.drop());
+}
 
 // Name for a collection which takes multiple batches to check and which shouldn't be modified
 // by any of the tests.
@@ -40,6 +48,27 @@ const multiBatchSimpleCollName = "dbcheck-simple-collection";
 const multiBatchSimpleCollSize = 10000;
 replSet.getPrimary().getDB(dbName)[multiBatchSimpleCollName].insertMany(
     [...Array(10000).keys()].map(x => ({_id: x})), {ordered: false});
+
+function dbCheckCompleted(db) {
+    return db.currentOp().inprog.filter(x => x["desc"] == "dbCheck")[0] === undefined;
+}
+
+// Wait for dbCheck to complete (on both primaries and secondaries).  Fails an assertion if
+// dbCheck takes longer than maxMs.
+function awaitDbCheckCompletion(db, collName, maxKey, maxSize, maxCount) {
+    let start = Date.now();
+
+    assert.soon(() => dbCheckCompleted(db), "dbCheck timed out");
+    replSet.awaitSecondaryNodes();
+    replSet.awaitReplication();
+
+    forEachNode(function(node) {
+        const healthlog = node.getDB('local').system.healthlog;
+        assert.soon(function() {
+            return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1);
+        }, "dbCheck command didn't complete");
+    });
+}
 
 // Check that everything in the health log shows a successful and complete check with no found
 // inconsistencies.
@@ -155,18 +184,18 @@ function checkTotalCounts(conn, coll) {
 // First check behavior when everything is consistent.
 function simpleTestConsistent() {
     let primary = replSet.getPrimary();
-    clearHealthLog(replSet);
+    clearLog();
 
     assert.neq(primary, undefined);
     let db = primary.getDB(dbName);
     assert.commandWorked(db.runCommand({"dbCheck": multiBatchSimpleCollName}));
 
-    awaitDbCheckCompletion(replSet, db, multiBatchSimpleCollName);
+    awaitDbCheckCompletion(db, multiBatchSimpleCollName);
 
     checkLogAllConsistent(primary);
     checkTotalCounts(primary, db[multiBatchSimpleCollName]);
 
-    forEachSecondary(replSet, function(secondary) {
+    forEachSecondary(function(secondary) {
         checkLogAllConsistent(secondary);
         checkTotalCounts(secondary, secondary.getDB(dbName)[multiBatchSimpleCollName]);
     });
@@ -174,7 +203,7 @@ function simpleTestConsistent() {
 
 function simpleTestNonSnapshot() {
     let primary = replSet.getPrimary();
-    clearHealthLog(replSet);
+    clearLog();
 
     assert.neq(primary, undefined);
     let db = primary.getDB(dbName);
@@ -188,7 +217,7 @@ function simpleTestNonSnapshot() {
 // Same thing, but now with concurrent updates.
 function concurrentTestConsistent() {
     let primary = replSet.getPrimary();
-    clearHealthLog(replSet);
+    clearLog();
 
     let db = primary.getDB(dbName);
 
@@ -205,12 +234,12 @@ function concurrentTestConsistent() {
         coll.deleteOne({});
     }
 
-    awaitDbCheckCompletion(replSet, db, collName);
+    awaitDbCheckCompletion(db, collName);
 
     checkLogAllConsistent(primary);
     // Omit check for total counts, which might have changed with concurrent updates.
 
-    forEachSecondary(replSet, secondary => checkLogAllConsistent(secondary, true));
+    forEachSecondary(secondary => checkLogAllConsistent(secondary, true));
 }
 
 simpleTestConsistent();
@@ -223,12 +252,12 @@ function testDbCheckParameters() {
     let db = primary.getDB(dbName);
 
     // Clean up for the test.
-    clearHealthLog(replSet);
+    clearLog();
 
     let docSize = bsonsize({_id: 10});
 
     function checkEntryBounds(start, end) {
-        forEachNode(replSet, function(node) {
+        forEachNode(function(node) {
             // These tests only run on debug builds because they rely on dbCheck health-logging
             // all info-level batch results.
             const debugBuild = node.getDB('admin').adminCommand('buildInfo').debug;
@@ -266,12 +295,12 @@ function testDbCheckParameters() {
     assert.commandWorked(
         db.runCommand({dbCheck: multiBatchSimpleCollName, minKey: start, maxKey: end}));
 
-    awaitDbCheckCompletion(replSet, db, multiBatchSimpleCollName, end);
+    awaitDbCheckCompletion(db, multiBatchSimpleCollName, end);
 
     checkEntryBounds(start, end);
 
     // Now, clear the health logs again,
-    clearHealthLog(replSet);
+    clearLog();
 
     let maxCount = 5000;
 
@@ -280,15 +309,15 @@ function testDbCheckParameters() {
         {dbCheck: multiBatchSimpleCollName, minKey: start, maxKey: end, maxCount: maxCount}));
 
     // We expect it to reach the count limit before reaching maxKey.
-    awaitDbCheckCompletion(replSet, db, multiBatchSimpleCollName, undefined, undefined, maxCount);
+    awaitDbCheckCompletion(db, multiBatchSimpleCollName, undefined, undefined, maxCount);
     checkEntryBounds(start, start + maxCount);
 
     // Finally, do the same with a size constraint.
-    clearHealthLog(replSet);
+    clearLog();
     let maxSize = maxCount * docSize;
     assert.commandWorked(db.runCommand(
         {dbCheck: multiBatchSimpleCollName, minKey: start, maxKey: end, maxSize: maxSize}));
-    awaitDbCheckCompletion(replSet, db, multiBatchSimpleCollName, end, maxSize);
+    awaitDbCheckCompletion(db, multiBatchSimpleCollName, end, maxSize);
     checkEntryBounds(start, start + maxCount);
 
     // The remaining tests only run on debug builds because they rely on dbCheck health-logging
@@ -302,7 +331,7 @@ function testDbCheckParameters() {
     const healthlog = db.getSiblingDB('local').system.healthlog;
     {
         // Validate custom maxDocsPerBatch
-        clearHealthLog(replSet);
+        clearLog();
         const maxDocsPerBatch = 100;
         assert.commandWorked(
             db.runCommand({dbCheck: multiBatchSimpleCollName, maxDocsPerBatch: maxDocsPerBatch}));
@@ -322,7 +351,7 @@ function testDbCheckParameters() {
     }
     {
         // Validate custom maxBytesPerBatch
-        clearHealthLog(replSet);
+        clearLog();
         const coll = db.getSiblingDB("maxBytesPerBatch").maxBytesPerBatch;
 
         // Insert nDocs, each of which being slightly larger than 1MB, and then run dbCheck with
@@ -442,7 +471,7 @@ function simpleTestCatchesExtra() {
         const primary = replSet.getPrimary();
         const db = primary.getDB(dbName);
         db[collName].drop();
-        clearHealthLog(replSet);
+        clearLog();
 
         // Create the collection on the primary.
         db.createCollection(collName, {validationLevel: "off"});
@@ -457,7 +486,7 @@ function simpleTestCatchesExtra() {
         const db = primary.getDB(dbName);
 
         assert.commandWorked(db.runCommand({dbCheck: collName}));
-        awaitDbCheckCompletion(replSet, db, collName);
+        awaitDbCheckCompletion(db, collName);
     }
     assert.soon(function() {
         return (replSet.getSecondary()

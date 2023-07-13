@@ -69,13 +69,8 @@ class OpTime;
 
 /**
  * Logs an entry into 'local.system.healthLog'.
- *
- * The parameters nss and collectionUUID are boost::optional because they are not present in
- * DbCheckOplogStartStop health log entries. DbCheckOplogStartStop entries will use boost::none
- * for both nss and collectionUUID.
  */
 std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const boost::optional<NamespaceString>& nss,
-                                                      const boost::optional<UUID>& collectionUUID,
                                                       SeverityEnum severity,
                                                       const std::string& msg,
                                                       OplogEntriesEnum operation,
@@ -86,24 +81,20 @@ std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const boost::optional<Name
  */
 std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(
     const boost::optional<NamespaceString>& nss,
-    const boost::optional<UUID>& collectionUUID,
     const std::string& msg,
     OplogEntriesEnum operation,
     const Status& err,
     const BSONObj& context = BSONObj());
 
-std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
-    const NamespaceString& nss,
-    const boost::optional<UUID>& collectionUUID,
-    const std::string& msg,
-    OplogEntriesEnum operation,
-    const Status& err);
+std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(const NamespaceString& nss,
+                                                             const std::string& msg,
+                                                             OplogEntriesEnum operation,
+                                                             const Status& err);
 /**
  * Get a HealthLogEntry for a dbCheck batch.
  */
 std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     const NamespaceString& nss,
-    const boost::optional<UUID>& collectionUUID,
     int64_t count,
     int64_t bytes,
     const std::string& expectedHash,
