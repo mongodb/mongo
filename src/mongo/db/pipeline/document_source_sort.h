@@ -138,6 +138,14 @@ public:
     bool canRunInParallelBeforeWriteStage(
         const OrderedPathSet& nameOfShardKeyFieldsUponEntryToStage) const final;
 
+    SortExecutor<Document>* getSortExecutor() {
+        return _sortExecutor.get_ptr();
+    }
+
+    SortKeyGenerator* getSortKeyGenerator() {
+        return _sortKeyGen.get_ptr();
+    }
+
     /**
      * Returns the sort key pattern.
      */
