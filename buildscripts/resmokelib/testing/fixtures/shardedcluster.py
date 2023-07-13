@@ -7,8 +7,8 @@ import yaml
 import pymongo
 import pymongo.errors
 
-import buildscripts.resmokelib.testing.fixtures.interface as interface
-import buildscripts.resmokelib.testing.fixtures.external as external
+from buildscripts.resmokelib.testing.fixtures import interface
+from buildscripts.resmokelib.testing.fixtures import external
 
 
 class ShardedClusterFixture(interface.Fixture):

@@ -178,7 +178,7 @@ class SetupMultiversion(Subcommand):
                 " this error, please reach out in #server-testing slack channel.")
             exit(1)
         try:
-            import buildscripts.resmokelib.multiversionconstants as multiversionconstants
+            from buildscripts.resmokelib import multiversionconstants
         except ImportError:
             self.logger.error("Could not import `buildscripts.resmokelib.multiversionconstants`.")
             self.logger.error(

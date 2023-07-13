@@ -82,7 +82,7 @@ def _get_lister():
     """Return _ProcessList object for OS."""
     if sys.platform.startswith("linux"):
         ps = _LinuxProcessList()
-    elif sys.platform == "win32" or sys.platform == "cygwin":
+    elif sys.platform in ["win32", "cygwin"]:
         ps = _WindowsProcessList()
     elif sys.platform == "darwin":
         ps = _DarwinProcessList()

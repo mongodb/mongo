@@ -218,7 +218,7 @@ class BackendServer:
                 if "transitive_edges" in req_body.keys() and req_body["transitive_edges"] is True:
                     for node in selected_nodes:
                         for libdep in dependency_graph[str(node)]:
-                            if str(libdep) in nodes.keys():
+                            if str(libdep) in nodes:
                                 add_link_to_graph_data(node, libdep,
                                                        dependents_graph[libdep][str(node)])
 

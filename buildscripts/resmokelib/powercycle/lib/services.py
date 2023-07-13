@@ -7,7 +7,7 @@ import time
 from buildscripts.resmokelib.powercycle.lib.process_control import ProcessControl
 from buildscripts.resmokelib.powercycle.lib import execute_cmd
 
-_IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
+_IS_WINDOWS = sys.platform in ["win32", "cygwin"]
 
 
 def _try_import(module, name=None):

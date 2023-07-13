@@ -9,7 +9,7 @@ from typing import Dict, List
 import yaml
 
 import buildscripts.resmokelib.utils.filesystem as fs
-import buildscripts.resmokelib.logging.loggers as loggers
+from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib import config as _config, errors, utils
 from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.utils import load_yaml_file
@@ -358,7 +358,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         """Get the mapping object for a given suite name and directory to search for suite mappings."""
         all_matrix_suites = cls.get_all_mappings(suites_dir)
 
-        if suite_name in all_matrix_suites.keys():
+        if suite_name in all_matrix_suites:
             return all_matrix_suites[suite_name]
         return None
 

@@ -159,7 +159,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         for secondary in self.fixture.get_secondaries():
             # Disable the "rsSyncApplyStop" failpoint on the secondary to have it resume applying
             # oplog entries.
-            self._hook._disable_rssyncapplystop(secondary)  # pylint: disable=protected-access
+            self._hook._disable_rssyncapplystop(secondary)
 
             # Wait a little bit for the secondary to start apply oplog entries so that we are more
             # likely to kill the mongod process while it is partway into applying a batch.
@@ -350,8 +350,8 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                     ]))
                 break
             except pymongo.errors.OperationFailure as err:
-                if (err.code != self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE
-                        and err.code != self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
+                if err.code not in (self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
+                                    self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
                     self.logger.exception(
                         "mongod on port %d failed to reach state SECONDARY after %d seconds",
                         secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60)

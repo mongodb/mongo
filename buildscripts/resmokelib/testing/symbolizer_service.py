@@ -56,7 +56,7 @@ class ResmokeSymbolizerConfig(NamedTuple):
 
         :return: True if on Windows
         """
-        return sys.platform == "win32" or sys.platform == "cygwin"
+        return sys.platform in ("win32", "cygwin")
 
     @staticmethod
     def is_macos() -> bool:

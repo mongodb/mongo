@@ -323,12 +323,11 @@ class _InitialSyncThread(threading.Thread):
                 # (potentially) higher config version. We should not receive these codes
                 # indefinitely.
                 # pylint: disable=too-many-boolean-expressions
-                if (err.code != self._NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE
-                        and err.code != self._CURRENT_CONFIG_NOT_COMMITTED_YET
-                        and err.code != self._CONFIGURATION_IN_PROGRESS
-                        and err.code != self._NODE_NOT_FOUND
-                        and err.code != self._INTERRUPTED_DUE_TO_REPL_STATE_CHANGE
-                        and err.code != self._INTERRUPTED_DUE_TO_STORAGE_CHANGE):
+                if err.code not in (self._NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE,
+                                    self._CURRENT_CONFIG_NOT_COMMITTED_YET,
+                                    self._CONFIGURATION_IN_PROGRESS, self._NODE_NOT_FOUND,
+                                    self._INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
+                                    self._INTERRUPTED_DUE_TO_STORAGE_CHANGE):
                     msg = (
                         "Operation failure while adding tag for node on port {} in fixture {}: {}"
                     ).format(sync_node.port, fixture.replset_name, err)
@@ -432,8 +431,8 @@ class _InitialSyncThread(threading.Thread):
                 conn.admin.command(cmd)
                 break
             except pymongo.errors.OperationFailure as err:
-                if (err.code != self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE
-                        and err.code != self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
+                if err.code not in (self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
+                                    self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
                     raise
                 msg = (
                     "Interrupted while waiting for node on port {} in set {} to reach primary state, retrying: {}"

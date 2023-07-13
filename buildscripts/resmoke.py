@@ -9,7 +9,7 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # pylint: disable=wrong-import-position
-import buildscripts.resmokelib.cli as cli
+from buildscripts.resmokelib import cli
 
 
 def entrypoint():

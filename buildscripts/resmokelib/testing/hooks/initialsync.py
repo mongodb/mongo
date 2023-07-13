@@ -89,8 +89,8 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
                     sync_node_conn.admin.command(cmd)
                     break
                 except pymongo.errors.OperationFailure as err:
-                    if (err.code != self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE
-                            and err.code != self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
+                    if err.code not in (self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
+                                        self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
                         raise
                     msg = (
                         "Interrupted while waiting for node to reach secondary state, retrying: {}"
@@ -224,8 +224,8 @@ class IntermediateInitialSyncTestCase(jsfile.DynamicJSTestCase):
                 sync_node_conn.admin.command(cmd)
                 break
             except pymongo.errors.OperationFailure as err:
-                if (err.code != self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE
-                        and err.code != self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
+                if err.code not in (self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
+                                    self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
                     raise
                 msg = ("Interrupted while waiting for node to reach secondary state, retrying: {}"
                        ).format(err)

@@ -892,10 +892,10 @@ class PolyValuePrinter(object):
         # from the _tag member variable.
         poly_type = self.val.type.template_argument(self.tag)
         dynamic_type = "mongo::optimizer::algebra::ControlBlockVTable<" + poly_type.name
-        for i in range(len(self.type_set)):
+        for i, val in enumerate(self.type_set):
             if i < len(self.type_set):
                 dynamic_type += ", "
-            dynamic_type += self.type_namespace + self.type_set[i]
+            dynamic_type += self.type_namespace + val
         dynamic_type += ">::ConcreteType"
         return dynamic_type
 

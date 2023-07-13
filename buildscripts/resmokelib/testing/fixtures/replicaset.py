@@ -9,7 +9,7 @@ import pymongo
 import pymongo.errors
 import pymongo.write_concern
 
-import buildscripts.resmokelib.testing.fixtures.interface as interface
+from buildscripts.resmokelib.testing.fixtures import interface
 
 
 def compare_timestamp(timestamp1, timestamp2):
@@ -240,12 +240,14 @@ class ReplicaSetFixture(interface.ReplFixture):
                 # (potentially) higher config version. We should not receive these codes
                 # indefinitely.
                 # pylint: disable=too-many-boolean-expressions
-                if (err.code != ReplicaSetFixture._NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE
-                        and err.code != ReplicaSetFixture._CURRENT_CONFIG_NOT_COMMITTED_YET
-                        and err.code != ReplicaSetFixture._CONFIGURATION_IN_PROGRESS
-                        and err.code != ReplicaSetFixture._NODE_NOT_FOUND
-                        and err.code != ReplicaSetFixture._INTERRUPTED_DUE_TO_REPL_STATE_CHANGE
-                        and err.code != ReplicaSetFixture._INTERRUPTED_DUE_TO_STORAGE_CHANGE):
+                if err.code not in [
+                        ReplicaSetFixture._NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE,
+                        ReplicaSetFixture._CURRENT_CONFIG_NOT_COMMITTED_YET,
+                        ReplicaSetFixture._CONFIGURATION_IN_PROGRESS,
+                        ReplicaSetFixture._NODE_NOT_FOUND,
+                        ReplicaSetFixture._INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
+                        ReplicaSetFixture._INTERRUPTED_DUE_TO_STORAGE_CHANGE
+                ]:
                     msg = ("Operation failure while setting up the "
                            "replica set fixture: {}").format(err)
                     self.logger.error(msg)
@@ -484,7 +486,7 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         return running
 
-    def get_primary(self, timeout_secs=30):  # pylint: disable=arguments-differ
+    def get_primary(self, timeout_secs=30):
         """Return the primary from a replica set."""
         if not self.all_nodes_electable:
             # The primary is always the first element of the 'nodes' list because all other members
