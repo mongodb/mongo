@@ -1360,6 +1360,18 @@ std::shared_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
     return kEmptyStats;
 }
 
+void mergeExecutionStatsToMainBucketCatalog(BucketCatalog& mainBucketCatalog,
+                                            BucketCatalog& sideBucketCatalog,
+                                            const NamespaceString& viewNs) {
+    auto collStats = [&] {
+        stdx::lock_guard catalogLock{sideBucketCatalog.mutex};
+        invariant(sideBucketCatalog.executionStats.size() == 1);
+        return sideBucketCatalog.executionStats.begin()->second;
+    }();
+    ExecutionStatsController stats = getOrInitializeExecutionStats(mainBucketCatalog, viewNs);
+    addCollectionExecutionStats(stats, *collStats);
+}
+
 Status getTimeseriesBucketClearedError(const NamespaceString& ns, const OID& oid) {
     return {ErrorCodes::TimeseriesBucketCleared,
             str::stream() << "Time-series bucket " << oid << " for namespace "

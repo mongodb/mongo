@@ -221,7 +221,7 @@ void makeWriteRequest(OperationContext* opCtx,
  * Performs modifications atomically for a user command on a time-series collection.
  *
  * Replaces the bucket document for a partial bucket modification and removes the bucket for a full
- * bucket modification. Inserts new bucket documents if provided.
+ * bucket modification. Inserts or updates bucket documents if provided.
  *
  * All the modifications are written and replicated atomically.
  */
@@ -232,6 +232,7 @@ void performAtomicWrites(
     const boost::optional<stdx::variant<write_ops::UpdateCommandRequest,
                                         write_ops::DeleteCommandRequest>>& modificationOp,
     const std::vector<write_ops::InsertCommandRequest>& insertOps,
+    const std::vector<write_ops::UpdateCommandRequest>& updateOps,
     bool fromMigrate,
     StmtId stmtId);
 
@@ -256,6 +257,8 @@ void performAtomicWritesForUpdate(
     const RecordId& recordId,
     const boost::optional<std::vector<BSONObj>>& unchangedMeasurements,
     const std::vector<BSONObj>& modifiedMeasurements,
+    bucket_catalog::BucketCatalog& sideBucketCatalog,
     bool fromMigrate,
-    StmtId stmtId);
+    StmtId stmtId,
+    std::set<OID>* bucketIds);
 }  // namespace mongo::timeseries

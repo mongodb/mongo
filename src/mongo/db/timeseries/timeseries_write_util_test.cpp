@@ -338,6 +338,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
             recordId,
             stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{op},
             {},
+            {},
             /*fromMigrate=*/false,
             /*stmtId=*/kUninitializedStmtId));
     }
@@ -406,6 +407,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
             bucketsColl.getCollection(),
             recordId,
             stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{op},
+            {},
             {},
             /*fromMigrate=*/false,
             /*stmtId=*/kUninitializedStmtId));
@@ -488,6 +490,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDeleteAndInsert) {
             stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{
                 deleteOp},
             {insertOp},
+            {},
             /*fromMigrate=*/false,
             /*stmtId=*/kUninitializedStmtId));
     }
@@ -597,6 +600,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdateAndInserts) {
             stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest>{
                 updateOp},
             {insertOp1, insertOp2},
+            {},
             /*fromMigrate=*/false,
             /*stmtId=*/kUninitializedStmtId));
     }
@@ -731,6 +735,8 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
     {
         std::vector<BSONObj> unchangedMeasurements{
             ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2})")};
+        std::set<OID> bucketIds{};
+        bucket_catalog::BucketCatalog sideBucketCatalog{1};
         ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
             opCtx,
             bucketsColl.getCollection(),
@@ -738,8 +744,11 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
             unchangedMeasurements,
             {::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":10,"b":10})"),
              ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":30,"b":30})")},
+            sideBucketCatalog,
             /*fromMigrate=*/false,
-            /*stmtId=*/kUninitializedStmtId));
+            /*stmtId=*/kUninitializedStmtId,
+            &bucketIds));
+        ASSERT_EQ(bucketIds.size(), 1);
     }
 
     // Checks only one measurement is left in the original bucket and a new document was inserted.
@@ -759,6 +768,96 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
         ASSERT_EQ(0, comparator.compare(doc.value(), replaceDoc));
 
         ASSERT_EQ(2, bucketsColl->numRecords(opCtx));
+    }
+}
+
+TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_util_test", "TrackInsertedBuckets");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx,
+                               ns.dbName(),
+                               BSON("create" << ns.coll() << "timeseries"
+                                             << BSON("timeField"
+                                                     << "time"))));
+
+    // Inserts a bucket document.
+    const BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+    OID bucketId = bucketDoc["_id"].OID();
+    auto recordId = record_id_helpers::keyForOID(bucketId);
+
+    AutoGetCollection bucketsColl(opCtx, ns.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    {
+        WriteUnitOfWork wunit{opCtx};
+        ASSERT_OK(collection_internal::insertDocument(
+            opCtx, *bucketsColl, InsertStatement{bucketDoc}, nullptr));
+        wunit.commit();
+    }
+
+    std::set<OID> bucketIds{};
+    bucket_catalog::BucketCatalog sideBucketCatalog{1};
+
+    // Updates one measurement. One new bucket is created.
+    {
+        std::vector<BSONObj> unchangedMeasurements{
+            ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2})"),
+            ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3})")};
+
+        ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
+            opCtx,
+            bucketsColl.getCollection(),
+            recordId,
+            unchangedMeasurements,
+            {::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":10,"b":10})")},
+            sideBucketCatalog,
+            /*fromMigrate=*/false,
+            /*stmtId=*/kUninitializedStmtId,
+            &bucketIds));
+        ASSERT_EQ(bucketIds.size(), 1);
+    }
+
+    // Updates another measurement. No new bucket should be created.
+    {
+        std::vector<BSONObj> unchangedMeasurements{
+            ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3})")};
+
+        ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
+            opCtx,
+            bucketsColl.getCollection(),
+            recordId,
+            unchangedMeasurements,
+            {::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":20,"b":20})")},
+            sideBucketCatalog,
+            /*fromMigrate=*/false,
+            /*stmtId=*/kUninitializedStmtId,
+            &bucketIds));
+        ASSERT_EQ(bucketIds.size(), 1);
+    }
+
+    // Updates the last measurement with different schema. One more bucket is created.
+    {
+        std::vector<BSONObj> unchangedMeasurements{};
+
+        ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
+            opCtx,
+            bucketsColl.getCollection(),
+            recordId,
+            unchangedMeasurements,
+            {::mongo::fromjson(
+                R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":"30","b":"30"})")},
+            sideBucketCatalog,
+            /*fromMigrate=*/false,
+            /*stmtId=*/kUninitializedStmtId,
+            &bucketIds));
+        ASSERT_EQ(bucketIds.size(), 2);
     }
 }
 

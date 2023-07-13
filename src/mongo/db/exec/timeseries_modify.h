@@ -61,6 +61,7 @@
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -149,6 +150,7 @@ public:
                           BucketUnpacker bucketUnpacker,
                           std::unique_ptr<MatchExpression> residualPredicate,
                           std::unique_ptr<MatchExpression> originalPredicate = nullptr);
+    ~TimeseriesModifyStage();
 
     StageType stageType() const {
         return STAGE_TIMESERIES_MODIFY;
@@ -209,6 +211,13 @@ protected:
 
     // Temporary storage for _getImmutablePaths().
     std::vector<std::unique_ptr<FieldRef>> _immutablePaths;
+
+    // Manages the updated measurements in a separate set of buckets through a side bucket catalog
+    // when performing time-series updates,
+    std::unique_ptr<timeseries::bucket_catalog::BucketCatalog> _sideBucketCatalog = nullptr;
+
+    // OIDs of newly inserted buckets for the updated measurements.
+    std::set<OID> _insertedBucketIds{};
 
 private:
     bool _isMultiWrite() const {

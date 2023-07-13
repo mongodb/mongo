@@ -367,6 +367,13 @@ ExecutionStatsController getOrInitializeExecutionStats(BucketCatalog& catalog,
  */
 std::shared_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
                                                   const NamespaceString& ns);
+/**
+ * Merges the stats of a side bucket catalog into the main one.
+ * Assumes the side bucket catalog has the stats of one collection.
+ */
+void mergeExecutionStatsToMainBucketCatalog(BucketCatalog& mainBucketCatalog,
+                                            BucketCatalog& sideBucketCatalog,
+                                            const NamespaceString& viewNs);
 
 /**
  * Generates a status with code TimeseriesBucketCleared and an appropriate error message.

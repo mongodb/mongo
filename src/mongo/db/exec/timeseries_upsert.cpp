@@ -195,8 +195,10 @@ void TimeseriesUpsertStage::_performInsert(BSONObj newMeasurement) {
                                                  RecordId{},
                                                  boost::none,
                                                  {newMeasurement},
+                                                 *_sideBucketCatalog,
                                                  _params.fromMigrate,
-                                                 _params.stmtId);
+                                                 _params.stmtId,
+                                                 &_insertedBucketIds);
     });
 }
 
