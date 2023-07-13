@@ -10,6 +10,8 @@ if not gdb:
     sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
     from buildscripts.gdb.mongo import get_boost_optional, lookup_type
 
+OPTIMIZER_NS = "mongo::optimizer"
+
 
 def eval_print_fn(val, print_fn):
     """Evaluate a print function, and return the resulting string."""
@@ -28,10 +30,16 @@ class OptimizerTypePrinter(object):
     def __init__(self, val, print_fn_name):
         """Initialize base printer."""
         self.val = val
-        (print_fn_symbol, _) = gdb.lookup_symbol(print_fn_name)
+        print_fn_symbol = gdb.lookup_symbol(print_fn_name)[0]
         if print_fn_symbol is None:
-            raise gdb.GdbError("Could not find pretty print function: " + print_fn_name)
-        self.print_fn = print_fn_symbol.value()
+            # Couldn't find the function, this could be due to a variety of reasons but mostly
+            # likely it is not included and/or optimized out of the executable being debugged
+            # (e.g. there are some explain helpers which are only called from unit tests so won't
+            # be included in a mongod binary).
+            print("Warning: Could not find pretty print function: " + print_fn_name)
+            self.print_fn = None
+        else:
+            self.print_fn = print_fn_symbol.value()
 
     @staticmethod
     def display_hint():
@@ -40,6 +48,8 @@ class OptimizerTypePrinter(object):
 
     def to_string(self):
         """Return string for printing."""
+        if self.print_fn is None:
+            return f"<{self.val.type}>"
         return eval_print_fn(self.val, self.print_fn)
 
 
@@ -891,11 +901,8 @@ class PolyValuePrinter(object):
         # of ControlBlockVTable<T, Ts...>::ConcreteType where T is the template argument derived
         # from the _tag member variable.
         poly_type = self.val.type.template_argument(self.tag)
-        dynamic_type = "mongo::optimizer::algebra::ControlBlockVTable<" + poly_type.name
-        for i in range(len(self.type_set)):
-            if i < len(self.type_set):
-                dynamic_type += ", "
-            dynamic_type += self.type_namespace + self.type_set[i]
+        dynamic_type = f"{OPTIMIZER_NS}::algebra::ControlBlockVTable<{poly_type.name}"
+        dynamic_type += ", ".join(self.type_namespace + "::" + t for t in self.type_set)
         dynamic_type += ">::ConcreteType"
         return dynamic_type
 
@@ -916,7 +923,7 @@ class ABTPrinter(PolyValuePrinter):
     """Pretty-printer for ABT."""
 
     indent_level = 0
-    abt_namespace = "mongo::optimizer::"
+    abt_namespace = OPTIMIZER_NS
 
     # This is the set of known ABT variants that GDB is aware of. When adding to this list, ensure
     # that a corresponding printer class exists with the name MyNewNodePrinter where "MyNewNode"
@@ -985,6 +992,13 @@ class ABTPrinter(PolyValuePrinter):
     ]
 
     @staticmethod
+    def build_abt_type():
+        abt_type = f"{OPTIMIZER_NS}::algebra::PolyValue<"
+        abt_type += ", ".join(OPTIMIZER_NS + "::" + t for t in ABTPrinter.abt_type_set)
+        abt_type += ">"
+        return abt_type
+
+    @staticmethod
     def get_bound_projections(node):
         # Casts the input node to an ExpressionBinder and returns the set of bound projection names.
         pp = PolyValuePrinter(ABTPrinter.abt_type_set, ABTPrinter.abt_namespace, node)
@@ -1048,7 +1062,7 @@ class BoolExprPrinter(PolyValuePrinter):
 
     def __init__(self, val, template_type):
         """Initialize BoolExprPrinter."""
-        namespace = "mongo::optimizer::BoolExpr<" + template_type + ">::"
+        namespace = f"{OPTIMIZER_NS}::BoolExpr<{template_type}>::"
         super().__init__(BoolExprPrinter.type_set, namespace, val)
 
 
@@ -1057,61 +1071,61 @@ class ResidualReqExprPrinter(BoolExprPrinter):
 
     def __init__(self, val):
         """Initialize ResidualReqExprPrinter."""
-        super().__init__(val, "mongo::optimizer::ResidualRequirement")
+        super().__init__(val, f"{OPTIMIZER_NS}::ResidualRequirement")
 
 
 def register_abt_printers(pp):
     """Registers a number of pretty printers related to the CQF optimizer."""
 
     # IntervalRequirement printer.
-    pp.add("Interval", "mongo::optimizer::IntervalRequirement", False, IntervalPrinter)
-    pp.add("CompoundInterval", "mongo::optimizer::CompoundIntervalRequirement", False,
+    pp.add("Interval", f"{OPTIMIZER_NS}::IntervalRequirement", False, IntervalPrinter)
+    pp.add("CompoundInterval", f"{OPTIMIZER_NS}::CompoundIntervalRequirement", False,
            IntervalPrinter)
 
     # IntervalReqExpr::Node printer.
     pp.add(
         "IntervalExpr",
-        ("mongo::optimizer::algebra::PolyValue<" +
-         "mongo::optimizer::BoolExpr<mongo::optimizer::IntervalRequirement>::Atom, " +
-         "mongo::optimizer::BoolExpr<mongo::optimizer::IntervalRequirement>::Conjunction, " +
-         "mongo::optimizer::BoolExpr<mongo::optimizer::IntervalRequirement>::Disjunction>"),
+        (f"{OPTIMIZER_NS}::algebra::PolyValue<" +
+         f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::IntervalRequirement>::Atom, " +
+         f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::IntervalRequirement>::Conjunction, " +
+         f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::IntervalRequirement>::Disjunction>"),
         False,
         IntervalExprPrinter,
     )
 
     # Memo printer.
-    pp.add("Memo", "mongo::optimizer::cascades::Memo", False, MemoPrinter)
+    pp.add("Memo", f"{OPTIMIZER_NS}::cascades::Memo", False, MemoPrinter)
 
     # PartialSchemaRequirements printer.
-    pp.add("PartialSchemaRequirements", "mongo::optimizer::PartialSchemaRequirements", False,
+    pp.add("PartialSchemaRequirements", f"{OPTIMIZER_NS}::PartialSchemaRequirements", False,
            PartialSchemaReqMapPrinter)
 
     # ResidualRequirement printer.
-    pp.add("ResidualRequirement", "mongo::optimizer::ResidualRequirement", False,
+    pp.add("ResidualRequirement", f"{OPTIMIZER_NS}::ResidualRequirement", False,
            ResidualRequirementPrinter)
 
     # CandidateIndexEntry printer.
-    pp.add("CandidateIndexEntry", "mongo::optimizer::CandidateIndexEntry", False,
+    pp.add("CandidateIndexEntry", f"{OPTIMIZER_NS}::CandidateIndexEntry", False,
            CandidateIndexEntryPrinter)
 
     pp.add(
         "ResidualRequirementExpr",
-        ("mongo::optimizer::algebra::PolyValue<" +
-         "mongo::optimizer::BoolExpr<mongo::optimizer::ResidualRequirement>::Atom, " +
-         "mongo::optimizer::BoolExpr<mongo::optimizer::ResidualRequirement>::Conjunction, " +
-         "mongo::optimizer::BoolExpr<mongo::optimizer::ResidualRequirement>::Disjunction>"),
+        (f"{OPTIMIZER_NS}::algebra::PolyValue<" +
+         f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::ResidualRequirement>::Atom, " +
+         f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::ResidualRequirement>::Conjunction, " +
+         f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::ResidualRequirement>::Disjunction>"),
         False,
         ResidualReqExprPrinter,
     )
     for bool_type in BoolExprPrinter.type_set:
         pp.add(bool_type,
-               "mongo::optimizer::BoolExpr<mongo::optimizer::ResidualRequirement>::" + bool_type,
-               False, getattr(sys.modules[__name__], bool_type + "Printer"))
+               f"{OPTIMIZER_NS}::BoolExpr<{OPTIMIZER_NS}::ResidualRequirement>::{bool_type}", False,
+               getattr(sys.modules[__name__], bool_type + "Printer"))
 
     # Utility types within the optimizer.
-    pp.add("StrongStringAlias", "mongo::optimizer::StrongStringAlias", True,
+    pp.add("StrongStringAlias", f"{OPTIMIZER_NS}::StrongStringAlias", True,
            StrongStringAliasPrinter)
-    pp.add("FieldProjectionMap", "mongo::optimizer::FieldProjectionMap", False,
+    pp.add("FieldProjectionMap", f"{OPTIMIZER_NS}::FieldProjectionMap", False,
            FieldProjectionMapPrinter)
 
     # Attempt to dynamically load the ABT type since it has a templated type set that is bound to
@@ -1120,7 +1134,7 @@ def register_abt_printers(pp):
     # stale.
     try:
         # ABT printer.
-        abt_type = lookup_type("mongo::optimizer::ABT").strip_typedefs()
+        abt_type = lookup_type(OPTIMIZER_NS + "::ABT").strip_typedefs()
         pp.add('ABT', abt_type.name, False, ABTPrinter)
 
         abt_ref_type = abt_type.name + "::Reference"
@@ -1128,12 +1142,7 @@ def register_abt_printers(pp):
         pp.add('ABT::Reference', abt_ref_type, False, ABTPrinter)
     except gdb.error:
         # ABT printer.
-        abt_type = "mongo::optimizer::algebra::PolyValue<"
-        for type_name in ABTPrinter.abt_type_set:
-            abt_type += "mongo::optimizer::" + type_name
-            if type_name != "ExpressionBinder":
-                abt_type += ", "
-        abt_type += ">"
+        abt_type = ABTPrinter.build_abt_type()
         pp.add('ABT', abt_type, False, ABTPrinter)
 
         abt_ref_type = abt_type + "::Reference"
@@ -1142,5 +1151,5 @@ def register_abt_printers(pp):
 
     # Add the sub-printers for each of the possible ABT types.
     for abt_type in ABTPrinter.abt_type_set:
-        pp.add(abt_type, "mongo::optimizer::" + abt_type, False,
+        pp.add(abt_type, f"{OPTIMIZER_NS}::{abt_type}", False,
                getattr(sys.modules[__name__], abt_type + "Printer"))

@@ -179,3 +179,5 @@ env.Benchmark(
         'unit_test_utils',
     ],
 )
+
+env.PrettyPrinterTest(target="optimizer_gdb_test.py")

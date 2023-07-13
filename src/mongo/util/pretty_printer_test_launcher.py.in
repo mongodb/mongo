@@ -32,7 +32,7 @@ python_env['PYTHONPATH'] = os.getcwd() + os.pathsep + python_env.get('PYTHONPATH
 proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                       env=python_env)
 
-if verbose:
+if verbose or proc.returncode != 0:
     out = '\n'.join([f'[{os.path.basename(test_script)}] {line}' for line in proc.stdout.split('\n')])
     print(out)
 else:
