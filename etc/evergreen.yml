@@ -1127,9 +1127,8 @@ buildvariants:
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
   - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
-  # TODO (SERVER-78417) reenable after ticket is complete
-  #- name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
-  #- name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
+  - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
+  - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
   - name: jsCore
     distros:
     - rhel80-xlarge

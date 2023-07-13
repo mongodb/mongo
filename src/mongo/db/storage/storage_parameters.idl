@@ -251,4 +251,4 @@ feature_flags:
             updating, or removing data into new, existing, or re-opened buckets.
         cpp_varname: feature_flags::gTimeseriesAlwaysUseCompressedBuckets
         default: false
-        shouldBeFCVGated: true
+        shouldBeFCVGated: false

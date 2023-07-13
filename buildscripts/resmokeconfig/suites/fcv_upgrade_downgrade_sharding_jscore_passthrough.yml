@@ -76,10 +76,6 @@ selector:
   - jstests/core/resume_query.js
   - jstests/core/find_with_resume_after_param.js
 
-  # TODO (SERVER-78417): Mongod invariant while running bucket_timestamp_rounding.js with new fcv upgrade downgrade suite.
-  - jstests/core/timeseries/bucket_timestamp_rounding.js
-  - jstests/core/timeseries/timeseries_explicit_unpack_bucket.js
-
   # Expected failure due to command count being not precise due to potential retry of index build.
   - jstests/core/operation_latency_histogram.js
 
