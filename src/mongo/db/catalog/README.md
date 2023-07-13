@@ -1544,6 +1544,28 @@ that checkpoint's timestamp is known as the
 "Github").
 
 ## Recovery To A Stable Timestamp
+Also known as rollback-to-stable, this is an operation that retains only modifications that are
+considered stable. In other words, we are rolling back to the latest checkpoint.
+
+The first step after the node transitions to the rollback state is to stop any operations that can
+call into the storage engine. This involves killing all user operations, and stopping and waiting
+for active index builds to complete. In addition, we stop internal threads such as the journal
+flusher and checkpointer. This is necessary because `WT_CONNECTION::rollback_to_stable` requires all
+open cursors to be closed or reset, otherwise `EBUSY` will be returned. In the server we retry on
+`EBUSY` until the system quiesces.
+
+Once the system is quiesced, the exclusive global lock is acquired to prevent new operations from
+starting. The in-memory representation of the catalog is cleared and the drop pending state is
+cleared in the ident reaper as drops may be rolled back. At this point
+`WT_CONNECTION::rollback_to_stable` is called. Once we return from this function, the reverse order
+of operations is performed. Such as rebuilding the in-memory representation of the catalog, internal
+threads are restarted, and two-phase index builds are resumed.
+
+See [here](https://source.wiredtiger.com/develop/arch-rts.html) for WiredTiger's architecture guide
+on rollback-to-stable.
+
+See [here](https://github.com/10gen/mongo/blob/5bd1d0880a7519e54678684b3d243f590936c46a/src/mongo/db/repl/README.md#rollback-recover-to-a-timestamp-rtt)
+for more information on what happens in the replication layer during rollback-to-stable.
 
 # File-System Backups
 Backups represent a full copy of the data files at a point-in-time. These copies of the data files
