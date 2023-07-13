@@ -445,6 +445,93 @@ class Operation:
 
         self.stable = self.__extract_simple_timestamp('stable_timestamp', line)
 
+    def __init_hs_tree_final_pass(self, line):
+        self.type = OpType.HS_TREE_FINAL_PASS
+        self.rollback = self.__extract_simple_timestamp('rollback_timestamp', line)
+
+    def __init_hs_truncating(self, line):
+        self.type = OpType.HS_TRUNCATING
+        matches = re.search('truncating history store entries for tree with id=(\d+)', line)
+        self.btree_id = int(matches.group(1))
+
+    def __init_hs_update_remove(self, line):
+        self.type = OpType.HS_UPDATE_REMOVE
+        self.stop = self.__extract_simple_timestamp('stop_timestamp', line)
+        self.stable = self.__extract_simple_timestamp('stable_timestamp', line)
+
+        matches = re.search('time_window=start: \((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+) stop: \((\d+), (\d+)\)/\((\d+), (\d+)\)/(\d+)', line)
+
+        start_start = int(matches.group(1))
+        start_end = int(matches.group(2))
+        self.start = Timestamp(start_start, start_end)
+        durable_start_start = int(matches.group(3))
+        durable_start_end = int(matches.group(4))
+        self.durable_start = Timestamp(durable_start_start, durable_start_end)
+        self.start_txn = int(matches.group(5))
+
+    def __init_insert_list_check(self, line):
+        self.type = OpType.INSERT_LIST_CHECK
+        self.rollback = self.__extract_simple_timestamp('rollback_timestamp', line)
+
+    def __init_insert_list_update_abort(self, line):
+        self.type = OpType.INSERT_LIST_UPDATE_ABORT
+        self.durable = self.__extract_simple_timestamp('durable_timestamp', line)
+
+        matches = re.search('key=(\d+)', line)
+        self.key = int(matches.group(1))
+
+    def __init_ondisk_abort_check(self, line):
+        self.type = OpType.ONDISK_ABORT_CHECK
+        self.rollback = self.__extract_simple_timestamp('rollback_timestamp', line)
+
+        matches = re.search('key=(\d+)', line)
+
+        if matches != None:
+            self.key = int(matches.group(1))
+        else:
+            self.key = None
+
+    def __init_ondisk_kv_fix(self, line):
+        self.type = OpType.ONDISK_KV_FIX
+        self.rollback = self.__extract_simple_timestamp('rollback_timestamp', line)
+
+    def __init_page_delete(self, line):
+        self.type = OpType.PAGE_DELETE
+        self.commit = self.__extract_simple_timestamp('commit_timestamp', line)
+        self.durable = self.__extract_simple_timestamp('durable_timestamp', line)
+        self.rollback = self.__extract_simple_timestamp('rollback_timestamp', line)
+
+        matches = re.search('txnid=(\d+)', line)
+        self.txnid = int(matches.group(1))
+
+    def __init_page_unskipped(self, line):
+        self.type = OpType.PAGE_UNSKIPPED
+        self.addr = self.__extract_pointer('ref', line)
+
+        matches = re.search('reconciled info=(\d+)', line)
+        self.reconcile = int(matches.group(1))
+
+    def __init_stable_update_found(self, line):
+        self.type = OpType.STABLE_UPDATE_FOUND
+
+        matches = re.search('txnid=(\d+)', line)
+        self.txnid = int(matches.group(1))
+
+        self.start = self.__extract_simple_timestamp('stable_timestamp', line)
+        self.durable = self.__extract_simple_timestamp('durable_timestamp', line)
+
+    def __init_tree_object_log(self, line):
+        self.type = OpType.TREE_OBJECT_LOG
+
+        matches = re.search('rollback_txnid=(\d+)', line)
+        self.rollback_txnid= int(matches.group(1))
+
+        self.durable = self.__extract_simple_timestamp('newest_start_durable_timestamp', line)
+
+    def __init_update_chain_verify(self, line):
+        self.type = OpType.UPDATE_CHAIN_VERIFY
+        self.rollback = self.__extract_simple_timestamp('rollback_timestamp', line)
+
     def __init_hs_restore_tombstone(self, line):
         self.type = OpType.HS_RESTORE_TOMBSTONE
         self.file = self.__extract_file(line)

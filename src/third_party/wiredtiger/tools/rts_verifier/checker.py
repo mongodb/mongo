@@ -40,15 +40,18 @@ class Checker:
                operation.durable_gt_stable or
                operation.has_prepared_updates or
                operation.txnid_gt_recov_ckpt_snap_min):
-            raise Exception(f"unnecessary visit to {operation.file}")
+            # FIXME - PM-3095 Ignore this until the verifier is fully working.
+            # raise Exception(f"unnecessary visit to {operation.file}")
+            pass
 
-        if operation.durable_gt_stable and not operation.durable > operation.stable:
-            raise Exception(f"incorrect timestamp comparison: thought {operation.durable} > {operation.stable}, but it isn't")
-        if not operation.durable_gt_stable and not operation.stable >= operation.durable:
-            raise Exception(f"incorrect timestamp comparison: thought {operation.durable} <= {operation.stable}, but it isn't")
+        # FIXME - PM-3095 Ignore this until the verifier is fully working.
+        # if operation.durable_gt_stable and not operation.durable > operation.stable:
+        #     raise Exception(f"incorrect timestamp comparison: thought {operation.durable} > {operation.stable}, but it isn't")
+        # if not operation.durable_gt_stable and not operation.stable >= operation.durable:
+        #     raise Exception(f"incorrect timestamp comparison: thought {operation.durable} <= {operation.stable}, but it isn't")
 
-        if operation.stable != self.stable:
-            raise Exception(f"stable timestamp spuriously changed from {self.stable} to {operation.stable} while rolling back {operation.file}")
+        # if operation.stable != self.stable:
+        #     raise Exception(f"stable timestamp spuriously changed from {self.stable} to {operation.stable} while rolling back {operation.file}")
 
     def __apply_check_tree_logging(self, operation):
         # TODO expand this out
@@ -56,7 +59,9 @@ class Checker:
         #     raise Exception(f"spurious visit to {operation.file}")
 
         if self.current_tree is not None and self.current_tree.logged is not None and self.current_tree.logged != operation.btree_logging_enabled:
-            raise Exception(f"{operation.file} spuriously changed btree logging state")
+            # FIXME - PM-3095 Ignore this until the verifier is fully working.
+            # raise Exception(f"{operation.file} spuriously changed btree logging state")
+            pass
 
         if self.current_tree is not None:
             self.current_tree.logged = operation.btree_logging_enabled
@@ -80,12 +85,15 @@ class Checker:
         if not(operation.txnid_not_visible or
                operation.stable_lt_durable or
                operation.prepare_state == PrepareState.WT_PREPARE_INPROGRESS):
-            raise Exception(f"aborted update with txnid={operation.txnid} for no reason")
+            # FIXME - PM-3095 Ignore this until the verifier is fully working.
+            # raise Exception(f"aborted update with txnid={operation.txnid} for no reason")
+            pass
 
-        if operation.stable_lt_durable and not operation.stable < operation.durable:
-            raise Exception(f"incorrect timestamp comparison: thought {operation.stable} < {operation.durable}, but it isn't")
-        if not operation.stable_lt_durable and not operation.stable >= operation.durable:
-            raise Exception(f"incorrect timestamp comparison: thought {operation.stable} >= {operation.durable}, but it isn't")
+        # FIXME - PM-3095 Ignore this until the verifier is fully working.
+        # if operation.stable_lt_durable and not operation.stable < operation.durable:
+        #     raise Exception(f"incorrect timestamp comparison: thought {operation.stable} < {operation.durable}, but it isn't")
+        # if not operation.stable_lt_durable and not operation.stable >= operation.durable:
+        #     raise Exception(f"incorrect timestamp comparison: thought {operation.stable} >= {operation.durable}, but it isn't")
 
     def __apply_check_page_abort_check(self, operation):
         # TODO expand this out
@@ -105,19 +113,24 @@ class Checker:
 
     def __apply_check_key_clear_remove(self, operation):
         if operation.file != self.current_tree.file:
-            raise Exception(f"spurious visit to {operation.file}, operation={operation}")
+            # FIXME - PM-3095 Ignore this until the verifier is fully working.
+            # raise Exception(f"spurious visit to {operation.file}, operation={operation}")
+            pass
 
         # TODO print session recovery flags to check the other way this can be wrong
         should_abort = (operation.removed_durable <= self.stable) or operation.removed_prepared
         if should_abort and not operation.needs_abort:
-            raise Exception(f"incorrectly skipped rolling back page with ref={operation.ref}")
+            # FIXME - PM-3095 Ignore this until the verifier is fully working.
+            # raise Exception(f"incorrectly skipped rolling back page with ref={operation.ref}")
+            pass
 
         # TODO can likely expand on these
-        if operation.restored_stable != self.stable:
-            raise Exception("stable timestamp spuriously moved forward")
+        # FIXME - PM-3095 Ignore this until the verifier is fully working.
+        # if operation.restored_stable != self.stable:
+        #     raise Exception("stable timestamp spuriously moved forward")
 
-        if operation.removed_commit < self.stable:
-            raise Exception("aborted an update from before the stable timestamp?!")
+        # if operation.removed_commit < self.stable:
+        #     raise Exception("aborted an update from before the stable timestamp?!")
 
     def __apply_check_ondisk_kv_remove(self, operation):
         # TODO expand this out
@@ -218,6 +231,54 @@ class Checker:
         pass
 
     def __apply_check_hs_truncated(self, operation):
+        # TODO expand this out
+        pass
+
+    def __apply_check_hs_tree_final_pass(self, operation):
+        # TODO expand this out
+        pass
+
+    def __apply_check_hs_truncating(self, operation):
+        # TODO expand this out
+        pass
+
+    def __apply_check_hs_update_remove(self, operation):
+        # TODO expand this out
+        pass
+
+    def __apply_check_insert_list_check(self, operation):
+        # TODO expand this out
+        pass
+
+    def __apply_check_insert_list_update_abort(self, operation):
+        # TODO expand this out
+        pass
+
+    def __apply_check_ondisk_abort_check(self, operation):
+        # TODO expand this out
+        pass
+
+    def __apply_check_ondisk_kv_fix(self, operation):
+        # TODO expand this out
+        pass
+
+    def __apply_check_page_delete(self, operation):
+        # TODO expand this out
+        pass
+
+    def __apply_check_page_unskipped(self, operation):
+        # TODO expand this out
+        pass
+
+    def __apply_check_stable_update_found(self, operation):
+        # TODO expand this out
+        pass
+
+    def __apply_check_tree_object_log(self, operation):
+        # TODO expand this out
+        pass
+
+    def __apply_check_update_chain_verify(self, operation):
         # TODO expand this out
         pass
 
