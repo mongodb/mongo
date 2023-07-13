@@ -312,13 +312,14 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     bool numericOnly = storageStatsSpec.getNumericOnly();
     static constexpr auto kStorageStatsField = "storageStats"_sd;
 
-    const auto bucketNss = nss.makeTimeseriesBucketsNamespace();
+    const auto bucketNss =
+        nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace();
     // Hold reference to the catalog for collection lookup without locks to be safe.
     auto catalog = CollectionCatalog::get(opCtx);
-    const auto isTimeseries = nss.isTimeseriesBucketsCollection() ||
-        catalog->lookupCollectionByNamespace(opCtx, bucketNss);
+    auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
+    const bool mayBeTimeseries = bucketsColl && bucketsColl->getTimeseriesOptions();
     const auto collNss =
-        (isTimeseries && !nss.isTimeseriesBucketsCollection()) ? std::move(bucketNss) : nss;
+        (mayBeTimeseries && !nss.isTimeseriesBucketsCollection()) ? std::move(bucketNss) : nss;
 
     auto failed = [&](const DBException& ex) {
         LOGV2_DEBUG(3088801,
@@ -342,7 +343,15 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     }
 
     const auto& collection = autoColl->getCollection();  // Will be set if present
-    if (!collection) {
+    const bool isTimeseries = collection && collection->getTimeseriesOptions().has_value();
+
+    // We decided the requested namespace was a time series view, so we redirected to the underlying
+    // buckets collection. However, when we tried to acquire that collection, it did not exist or it
+    // did not have time series options, which means it was dropped and potentially recreated in
+    // between the two calls. Logically, the collection that we were looking for does not exist.
+    bool logicallyNotFound = collNss != nss && !isTimeseries;
+
+    if (!collection || logicallyNotFound) {
         result->appendNumber("size", 0);
         result->appendNumber("count", 0);
         result->appendNumber("numOrphanDocs", 0);
