@@ -814,13 +814,12 @@ tasks:
         vars:
           test_control: "cursor_manager"
 
-  # unscheduling according to SERVER-78888
-  # - name: mixed_workloads
-  #   priority: 5
-  #   commands:
-  #     - func: f_run_dsi_workload
-  #       vars:
-  #         test_control: "mixed_workloads"
+  - name: mixed_workloads
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "mixed_workloads"
 
   - name: mixed_workloads_genny_stepdowns
     priority: 5
@@ -2011,6 +2010,7 @@ buildvariants:
       - name: crud_workloads_w1
       - name: genny_canaries
       - name: cursor_manager
+      - name: mixed_workloads
       - name: misc_workloads
       - name: map_reduce_workloads
       - name: non_sharded_workloads
@@ -2425,6 +2425,7 @@ buildvariants:
       - name: ycsb_60GB
       - name: ycsb_60GB.long
       - name: crud_workloads_majority
+      - name: mixed_workloads
       - name: misc_workloads
       - name: map_reduce_workloads
       - name: smoke_test
@@ -2540,6 +2541,7 @@ buildvariants:
       - name: ycsb_60GB
       - name: ycsb_60GB.long
       - name: crud_workloads_majority
+      - name: mixed_workloads
       - name: tpcc
       - name: linkbench
       - name: linkbench2
@@ -2743,6 +2745,7 @@ buildvariants:
       - name: industry_benchmarks_w1
       - name: crud_workloads_majority
       - name: crud_workloads_w1
+      - name: mixed_workloads
       - name: misc_workloads
       - name: map_reduce_workloads
       - name: smoke_test
@@ -2780,6 +2783,7 @@ buildvariants:
       - name: industry_benchmarks
       - name: crud_workloads_majority
       - name: crud_workloads_w1
+      - name: mixed_workloads
 
   - name: linux-3-shard-heuristic-bonsai.2022-11
     display_name: Linux 3-Shard Cluster 2022-11 (Bonsai with Heuristic CE)
@@ -2856,6 +2860,7 @@ buildvariants:
       - name: change_streams_listen_throughput
       - name: industry_benchmarks
       - name: linkbench
+      - name: mixed_workloads
       - name: mongos_workloads
       - name: mongos_large_catalog_workloads
       - name: move_chunk_large_chunk_map_workloads
@@ -2888,6 +2893,7 @@ buildvariants:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
+      - name: mixed_workloads
       - name: mongos_workloads
       - name: move_chunk_workloads
       - name: move_chunk_waiting_workloads
@@ -2995,6 +3001,7 @@ buildvariants:
       - name: industry_benchmarks_secondary_reads
       - name: crud_workloads_majority
       - name: crud_workloads_w1
+      - name: mixed_workloads
       - name: misc_workloads
       - name: map_reduce_workloads
       - name: refine_shard_key_transaction_stress
@@ -3050,6 +3057,7 @@ buildvariants:
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: crud_workloads_majority
+      - name: mixed_workloads
       - name: smoke_test
       - name: linkbench
       - name: linkbench2
@@ -3082,6 +3090,7 @@ buildvariants:
       - name: industry_benchmarks_w1
       - name: crud_workloads_majority
       - name: crud_workloads_w1
+      - name: mixed_workloads
       - name: misc_workloads
       - name: map_reduce_workloads
       - name: refine_shard_key_transaction_stress
@@ -3139,6 +3148,7 @@ buildvariants:
       - name: industry_benchmarks_w1
       - name: crud_workloads_majority
       - name: crud_workloads_w1
+      - name: mixed_workloads
       - name: misc_workloads
       - name: map_reduce_workloads
       - name: refine_shard_key_transaction_stress
@@ -3196,6 +3206,7 @@ buildvariants:
       - name: industry_benchmarks_w1
       - name: crud_workloads_majority
       - name: crud_workloads_w1
+      - name: mixed_workloads
       - name: misc_workloads
       - name: map_reduce_workloads
       - name: refine_shard_key_transaction_stress
@@ -3250,6 +3261,7 @@ buildvariants:
       - name: schedule_variant_auto_tasks
       - name: crud_workloads_majority
       - name: industry_benchmarks
+      - name: mixed_workloads
 
   - name: linux-3-node-replSet-maintenance-events.2022-11
     display_name: Linux 3-Node ReplSet (Maintenance Events) 2022-11
@@ -3452,6 +3464,7 @@ buildvariants:
       - name: ycsb_60GB.long
       - name: crud_workloads_majority
       - name: crud_workloads_w1
+      - name: mixed_workloads
       - name: tpcc
       - name: linkbench
       - name: linkbench2
@@ -3481,6 +3494,7 @@ buildvariants:
       - name: industry_benchmarks
       - name: linkbench2
       - name: misc_workloads
+      - name: mixed_workloads
       - name: snapshot_reads
       - name: tpcc
       - name: ycsb_60GB
