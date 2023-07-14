@@ -198,25 +198,8 @@ functions:
       shell: bash
       script: |
         set -o errexit
-        set -o verbose
-        # Note: ${var} is used for expansions of evergreen variables, whereas $var are /bin/sh variables.
-        python_configured=$(grep PYTHON_EXECUTABLE: ./CMakeCache.txt | sed -e 's/.*=//')
-        if [ "${python_binary}" = '' -o "$python_configured" = '' -o "$(${python_binary} -V -V)" != "$($python_configured -V -V)" ]; then
-           echo "Python versions do not match."
-           echo "Python version used by cmake builds ($python_configured):"
-           if [ "$python_configured" = '' ]; then
-               echo "No python configured"
-           else
-               $python_configured -V -V
-           fi
-           echo "Python version used in shell commands (${python_binary}):"
-           if [ "${python_binary}" = '' ]; then
-               echo "No python set in Expansions"
-           else
-               ${python_binary} -V -V
-           fi
-           exit 1
-        fi
+        # Confirm that the Python binary matches the version of that configured by CMake.
+        ${python_binary} ../test/evergreen/python_version_check.py -v -c ./CMakeCache.txt -s ${python_config_search_string}
   "make wiredtiger": &make_wiredtiger
     command: shell.exec
     params:
@@ -1164,6 +1147,33 @@ variables:
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
     ENABLE_CPPSUITE: -DENABLE_CPPSUITE=0
+
+
+# Template for Mac tests
+  - &mac_test_template
+    expansions: &mac_test_template_expansions
+      # The cmake toolchain file is set to the mongodb toolchain gcc by default.
+      # Remove that configuration here and let MacOS use the default Xcode toolchain instead.
+      # We'll explicitly use the python3 in /usr/bin, we use the same in configuring cmake.
+      CMAKE_TOOLCHAIN_FILE:
+      CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
+      smp_command: -j $(sysctl -n hw.logicalcpu)
+      cmake_generator: "Unix Makefiles"
+      make_command: make
+      test_env_vars:
+        WT_BUILDDIR=$(git rev-parse --show-toplevel)/cmake_build
+        DYLD_LIBRARY_PATH=$WT_BUILDDIR
+      # Must disable TCMALLOC as it may be picked up locally and its not on all hosts.
+      posix_configure_flags: -DENABLE_TCMALLOC=0
+    tasks:
+      - name: compile
+      - name: make-check-test
+      # FIXME: WT-9575
+      # Using a special version of unit test for macOS to reduce the concurrency level.
+      - name: unit-test-macos
+      - name: fops
+      - name: memory-model-test-mac
+        batchtime: 40320 # 28 days
 
 #########################################################################################
 # The following stress tests are configured to run for six hours via the "-t 360"
@@ -6073,43 +6083,27 @@ buildvariants:
     - name: fops
     - name: unittest-test
 
-- name: macos-1100
-  display_name: "macOS 11.00"
-  run_on:
-  - macos-1100
-  batchtime: 120 # 2 hours
-  expansions:
-    # The cmake toolchain file is set to the mongodb toolchain gcc by default.
-    # Remove that configuration here and let MacOS use the default Xcode toolchain instead.
-    # We'll explicitly use the python3 in /usr/bin, we use the same in configuring cmake.
-    CMAKE_TOOLCHAIN_FILE:
-    CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
-    python_binary: '/usr/bin/python3'
-    smp_command: -j $(sysctl -n hw.logicalcpu)
-    cmake_generator: "Unix Makefiles"
-    make_command: make
-    test_env_vars:
-      WT_BUILDDIR=$(git rev-parse --show-toplevel)/cmake_build
-      DYLD_LIBRARY_PATH=$WT_BUILDDIR
-    # Must disable TCMALLOC as it may be picked up locally and its not on all hosts.
-    posix_configure_flags: -DENABLE_TCMALLOC=0
-  tasks:
-    - name: compile
-    - name: make-check-test
-    # FIXME: WT-9575
-    # Using a special version of unit test for macOS to reduce the concurrency level.
-    - name: unit-test-macos
-    - name: fops
-    - name: memory-model-test-mac
-      batchtime: 40320 # 28 days
-
-- name: macos-1100-arm64
+- <<: *mac_test_template
+  name: macos-1100-arm64
   display_name: "macOS 11.00 ARM64"
   run_on:
     - macos-1100-arm64
-  batchtime: 40320 # 28 days
-  tasks:
-    - name: memory-model-test-mac
+  batchtime: 120 # 2 hours
+  expansions:
+    python_binary: '/opt/homebrew/Frameworks/Python.framework/Versions/3.11/bin/python3.11'
+    python_config_search_string: '_Python3_EXECUTABLE'
+    <<: *mac_test_template_expansions
+
+- <<: *mac_test_template
+  name: macos-1100
+  display_name: "macOS 11.00"
+  run_on:
+    - macos-1100
+  batchtime: 120 # 2 hours
+  expansions:
+    python_binary: '/usr/bin/python3'
+    python_config_search_string: 'PYTHON_EXECUTABLE'
+    <<: *mac_test_template_expansions
 
 - name: little-endian
   display_name: "~ Little-endian (x86)"

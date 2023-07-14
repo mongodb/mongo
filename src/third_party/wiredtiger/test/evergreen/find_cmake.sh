@@ -17,7 +17,14 @@ find_cmake ()
     elif [ -f "/opt/mongodbtoolchain/v4/bin/cmake" ]; then
         CMAKE="/opt/mongodbtoolchain/v4/bin/cmake"
         CTEST="/opt/mongodbtoolchain/v4/bin/ctest"
+    elif [ -f "/opt/homebrew/bin/cmake" ]; then
+        # Mac: If a homebrew version of CMake and CTest is installed then it is likely newer than the default one.
+        # This is important on M1 Macs as M1 silicon is only supported in CMake 3.19.2 and later
+        # (see https://cmake.org/cmake/help/latest/release/3.19.html), and the default version may be too old.
+        CMAKE="/opt/homebrew/bin/cmake"
+        CTEST="/opt/homebrew/bin/ctest"
     elif [ -f "/Applications/CMake.app/Contents/bin/cmake" ]; then
+        # Mac: use the default installed versions of CMake and CTest
         CMAKE="/Applications/CMake.app/Contents/bin/cmake"
         CTEST="/Applications/CMake.app/Contents/bin/ctest"
     elif [ -f "/opt/cmake/bin/cmake" ]; then
