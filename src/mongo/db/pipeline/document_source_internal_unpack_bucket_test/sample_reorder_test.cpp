@@ -82,7 +82,7 @@ TEST_F(InternalUnpackBucketSampleReorderTest, SampleThenComputedProject) {
 
     ASSERT_EQ(3, serialized.size());
     ASSERT_BSONOBJ_EQ(
-        fromjson("{$_internalUnpackBucket: { include: ['_id', 'temp', 'myMeta'], "
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'myMeta', 'temp'], "
                  "timeField: 'foo', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
         serialized[0]);
     ASSERT_BSONOBJ_EQ(sampleSpec, serialized[1]);
@@ -126,7 +126,7 @@ TEST_F(InternalUnpackBucketSampleReorderTest, ComputedProjectThenSample) {
 
     ASSERT_EQ(3, serialized.size());
     ASSERT_BSONOBJ_EQ(
-        fromjson("{$_internalUnpackBucket: { include: ['_id', 'temp', 'myMeta'], timeField: "
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'myMeta', 'temp'], timeField: "
                  "'foo', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
         serialized[0]);
     ASSERT_BSONOBJ_EQ(sampleSpec, serialized[1]);

@@ -77,7 +77,7 @@ public:
     virtual void extractSingleMeasurement(MutableDocument& measurement,
                                           int j,
                                           const BucketSpec& spec,
-                                          const std::set<std::string>& unpackFieldsToIncludeExclude,
+                                          const StringSet& unpackFieldsToIncludeExclude,
                                           const BSONObj& bucket,
                                           const Value& metaValue,
                                           bool includeTimeField,
@@ -131,7 +131,7 @@ public:
     void extractSingleMeasurement(MutableDocument& measurement,
                                   int j,
                                   const BucketSpec& spec,
-                                  const std::set<std::string>& unpackFieldsToIncludeExclude,
+                                  const StringSet& unpackFieldsToIncludeExclude,
                                   const BSONObj& bucket,
                                   const Value& metaValue,
                                   bool includeTimeField,
@@ -239,15 +239,14 @@ bool BucketUnpackerV1::getNext(BSONObjBuilder& builder,
     return _timeFieldIter.more();
 }
 
-void BucketUnpackerV1::extractSingleMeasurement(
-    MutableDocument& measurement,
-    int j,
-    const BucketSpec& spec,
-    const std::set<std::string>& unpackFieldsToIncludeExclude,
-    const BSONObj& bucket,
-    const Value& metaValue,
-    bool includeTimeField,
-    bool includeMetaField) {
+void BucketUnpackerV1::extractSingleMeasurement(MutableDocument& measurement,
+                                                int j,
+                                                const BucketSpec& spec,
+                                                const StringSet& unpackFieldsToIncludeExclude,
+                                                const BSONObj& bucket,
+                                                const Value& metaValue,
+                                                bool includeTimeField,
+                                                bool includeMetaField) {
     auto rowKey = std::to_string(j);
     auto targetIdx = StringData{rowKey};
     auto&& dataRegion = bucket.getField(timeseries::kBucketDataFieldName).Obj();
@@ -294,7 +293,7 @@ public:
     void extractSingleMeasurement(MutableDocument& measurement,
                                   int j,
                                   const BucketSpec& spec,
-                                  const std::set<std::string>& unpackFieldsToIncludeExclude,
+                                  const StringSet& unpackFieldsToIncludeExclude,
                                   const BSONObj& bucket,
                                   const Value& metaValue,
                                   bool includeTimeField,
@@ -404,15 +403,14 @@ bool BucketUnpackerV2::getNext(BSONObjBuilder& builder,
     return _timeColumn.it.more();
 }
 
-void BucketUnpackerV2::extractSingleMeasurement(
-    MutableDocument& measurement,
-    int j,
-    const BucketSpec& spec,
-    const std::set<std::string>& unpackFieldsToIncludeExclude,
-    const BSONObj& bucket,
-    const Value& metaValue,
-    bool includeTimeField,
-    bool includeMetaField) {
+void BucketUnpackerV2::extractSingleMeasurement(MutableDocument& measurement,
+                                                int j,
+                                                const BucketSpec& spec,
+                                                const StringSet& unpackFieldsToIncludeExclude,
+                                                const BSONObj& bucket,
+                                                const Value& metaValue,
+                                                bool includeTimeField,
+                                                bool includeMetaField) {
     if (includeTimeField) {
         auto val = _timeColumn.column[j];
         uassert(
@@ -750,12 +748,12 @@ void BucketUnpacker::setIncludeMaxTimeAsMetadata() {
     _includeMaxTimeAsMetadata = true;
 }
 
-const std::set<std::string>& BucketUnpacker::fieldsToIncludeExcludeDuringUnpack() {
+const StringSet& BucketUnpacker::fieldsToIncludeExcludeDuringUnpack() {
     if (_unpackFieldsToIncludeExclude) {
         return *_unpackFieldsToIncludeExclude;
     }
 
-    _unpackFieldsToIncludeExclude = std::set<std::string>();
+    _unpackFieldsToIncludeExclude = StringSet();
     const auto& metaProjFields = _spec.computedMetaProjFields();
     if (_spec.behavior() == BucketSpec::Behavior::kInclude) {
         // For include, we unpack fieldSet - metaProjFields.
