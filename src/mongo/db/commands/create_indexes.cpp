@@ -321,11 +321,12 @@ bool indexesAlreadyExist(OperationContext* opCtx,
  * Checks database sharding state. Throws exception on error.
  */
 void checkDatabaseShardingState(OperationContext* opCtx, const NamespaceString& ns) {
+    Lock::CollectionLock collLock(opCtx, ns, MODE_IS);
+
     auto dss = DatabaseShardingState::get(opCtx, ns.db());
     auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
     dss->checkDbVersion(opCtx, dssLock);
 
-    Lock::CollectionLock collLock(opCtx, ns, MODE_IS);
     try {
         const auto collDesc =
             CollectionShardingState::get(opCtx, ns)->getCollectionDescription(opCtx);
