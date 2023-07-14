@@ -647,6 +647,9 @@ assertProjectionIsNotRemoved([{$project: {a: 1}}, {$group: {_id: "$a", s: {$sum:
 assertProjectionIsNotRemoved(
     [{$project: {a: 1, b: 1}}, {$group: {_id: "$a.b", s: {$sum: "$b.c"}}}]);
 
+// Test that an inclusion projection is NOT optimized away if group depends on the entire document.
+assertProjectionIsNotRemoved([{$project: {a: 1}}, {$group: {_id: "$$ROOT"}}]);
+
 // If the $group depends on both "path" and "path.subpath" then it will generate a $project on only
 // "path" to express its dependency set. We then fail to optimize that out. As a future improvement,
 // we could improve the optimizer to ensure that a projection stage is not present in the resulting

@@ -716,6 +716,8 @@ void removeInclusionProjectionBelowGroupRecursive(QuerySolutionNode* solnRoot) {
         if (auto projection = attemptToGetProjectionFromQuerySolution(*projectNodeCandidate);
             // only eliminate inclusion projections
             projection && projection.value()->isInclusionOnly() &&
+            // only eliminate when group depends on a subset of fields
+            !groupNode->needWholeDocument &&
             // only eliminate projections which preserve all fields used by the group
             isSubset(groupNode->requiredFields, projection.value()->getRequiredFields())) {
             // Attach the projectNode's child directly as the groupNode's child, eliminating the
