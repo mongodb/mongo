@@ -450,6 +450,7 @@ Status insertDocuments(OperationContext* opCtx,
         auto& validationSettings = DocumentValidationSettings::get(opCtx);
 
         if (collection->getCollectionOptions().encryptedFieldConfig &&
+            !collection->ns().isTemporaryReshardingCollection() &&
             !validationSettings.isSchemaValidationDisabled() &&
             !validationSettings.isSafeContentValidationDisabled() &&
             it->doc.hasField(kSafeContent)) {
@@ -562,6 +563,7 @@ void updateDocument(OperationContext* opCtx,
 
     auto& validationSettings = DocumentValidationSettings::get(opCtx);
     if (collection->getCollectionOptions().encryptedFieldConfig &&
+        !collection->ns().isTemporaryReshardingCollection() &&
         !validationSettings.isSchemaValidationDisabled() &&
         !validationSettings.isSafeContentValidationDisabled()) {
 
