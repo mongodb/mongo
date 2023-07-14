@@ -39,6 +39,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop_metrics.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/apply_ops.h"
@@ -923,10 +924,11 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
     invariant(!opCtx->writesAreReplicated());
     invariant(documentValidationDisabled(opCtx));
 
-    auto op = entryOrGroupedInserts.getOp();
     // Count each log op application as a separate operation, for reporting purposes
     CurOp individualOp(opCtx);
+    ON_BLOCK_EXIT([opCtx]() { recordCurOpMetricsOplogApplication(opCtx); });
 
+    auto op = entryOrGroupedInserts.getOp();
     const NamespaceString nss(op.getNss());
 
     auto incrementOpsAppliedStats = [] { opsAppliedStats.increment(1); };
