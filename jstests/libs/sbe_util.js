@@ -43,25 +43,15 @@ export function checkSBEEnabled(theDB, featureFlags = [], checkAllNodes = false)
 
                 const getParam = conn.adminCommand({
                     getParameter: 1,
-                    internalQueryForceClassicEngine: 1,
                     internalQueryFrameworkControl: 1,
                 });
-
-                // v6.0 does not include the new internalQueryFrameworkControl server parameter.
-                // Here, we are accounting for both the old and new frameworks (where enabling a
-                // certain engine differs semantically).
-                if (getParam.hasOwnProperty("internalQueryForceClassicEngine") &&
-                    getParam.internalQueryForceClassicEngine) {
-                    checkResult = false;
-                }
 
                 if (getParam.hasOwnProperty("internalQueryFrameworkControl") &&
                     getParam.internalQueryFrameworkControl === "forceClassicEngine") {
                     checkResult = false;
                 }
 
-                if (!getParam.hasOwnProperty("internalQueryForceClassicEngine") &&
-                    !getParam.hasOwnProperty("internalQueryFrameworkControl")) {
+                if (!getParam.hasOwnProperty("internalQueryFrameworkControl")) {
                     checkResult = false;
                 }
 
