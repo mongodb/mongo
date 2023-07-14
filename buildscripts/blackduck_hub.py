@@ -74,6 +74,10 @@ BUILD_LOGGER_TIMEOUT_SECS = 65
 
 LOCAL_REPORTS_DIR = "bd_reports"
 
+# Detect script constants
+BLACKDUCK_DETECT_VERSION = "8"
+BLACKDUCK_DETECT_CHECKSUM = "cc7daaf95e79bd06f249eb3d8a3413ec02e38db0b3388099becb72b13c110fd9"
+
 ############################################################################
 
 THIRD_PARTY_DIRECTORIES = [
@@ -563,7 +567,9 @@ def _run_scan():
 
     with tempfile.NamedTemporaryFile() as fp:
         fp.write(f"""#/!bin/sh
-curl --retry 5 -s -L https://detect.synopsys.com/detect8.sh | bash -s -- --blackduck.url={bdc.url} --blackduck.api.token={bdc.token} --detect.report.timeout={BLACKDUCK_TIMEOUT_SECS} --snippet-matching --upload-source --detect.wait.for.results=true --logging.level.detect=TRACE --detect.diagnostic=true --detect.cleanup=false
+curl --retry 5 -s -L -O https://detect.synopsys.com/detect{BLACKDUCK_DETECT_VERSION}.sh
+echo "{BLACKDUCK_DETECT_CHECKSUM}  detect{BLACKDUCK_DETECT_VERSION}.sh" | sha256sum --check && \
+bash detect{BLACKDUCK_DETECT_VERSION}.sh --blackduck.url={bdc.url} --blackduck.api.token={bdc.token} --detect.report.timeout={BLACKDUCK_TIMEOUT_SECS} --snippet-matching --upload-source --detect.wait.for.results=true --logging.level.detect=TRACE --detect.diagnostic=true --detect.cleanup=false
 """.encode())
         fp.flush()
 
