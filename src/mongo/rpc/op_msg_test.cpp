@@ -1139,6 +1139,61 @@ TEST(OpMsgTest, EmptyMessageWithChecksumFlag) {
     ASSERT_THROWS_CODE(msg.parse(), AssertionException, 51252);
 }
 
+TEST_F(OpMsgWithAuth, GetDbNameWithVTS) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
+
+    const auto kTenantId = TenantId(OID::gen());
+    auto createMsg = [&](bool prefixed, bool hasDollarTenant) {
+        std::string db = prefixed ? kTenantId.toString() + "_myDb" : "myDb";
+        BSONObjBuilder builder;
+        builder.append("ping", 1).append("$db", db);
+
+        if (hasDollarTenant) {
+            if (prefixed) {
+                builder.append("expectPrefix", true);
+            }
+            kTenantId.serializeToBSON("$tenant", &builder);
+        }
+        const auto body = builder.obj();
+        OpMsg msg =
+            OpMsgBytes{
+                kNoFlags,  //
+                kBodySection,
+                body,
+                kDocSequenceSection,
+                Sized{
+                    "docs",  //
+                    fromjson("{a: 1}"),
+                    fromjson("{a: 2}"),
+                },
+            }
+                .parse(client.get());
+        return msg;
+    };
+
+    const DatabaseName expectedTenantDbName =
+        DatabaseName::createDatabaseName_forTest(kTenantId, "myDb");
+    // Test the request which has tenant prefix and $tenant.
+    OpMsgRequest request = OpMsgRequest(createMsg(true, true));
+    DatabaseName dbName = request.getDbName();
+    ASSERT_EQ(request.getDbName(), expectedTenantDbName);
+
+    // Test the request which has tenant prefix alone.
+    request = OpMsgRequest(createMsg(true, false));
+    ASSERT_EQ(request.getDbName(), expectedTenantDbName);
+
+    // Test the request which has $tenant alone.
+    request = OpMsgRequest(createMsg(false, true));
+    ASSERT_EQ(request.getDbName(), expectedTenantDbName);
+
+    // Test the request which has neither tenant prefix nore $tenant.
+    const DatabaseName expectedDbName =
+        DatabaseName::createDatabaseName_forTest(boost::none, "myDb");
+    request = OpMsgRequest(createMsg(false, false));
+    ASSERT_EQ(request.getDbName(), expectedDbName);
+}
+
 }  // namespace
 }  // namespace test
 }  // namespace rpc

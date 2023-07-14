@@ -223,6 +223,8 @@ struct OpMsgRequest : public OpMsg {
         uasserted(40571, "OP_MSG requests require a $db argument");
     }
 
+    DatabaseName getDbName() const;
+
     StringData getCommandName() const {
         return body.firstElementFieldName();
     }

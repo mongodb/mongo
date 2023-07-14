@@ -286,6 +286,24 @@ boost::optional<TenantId> parseDollarTenant(const BSONObj body) {
     }
 }
 
+DatabaseName OpMsgRequest::getDbName() const {
+    if (!gMultitenancySupport) {
+        return DatabaseNameUtil::deserialize(boost::none, getDatabase());
+    }
+
+    SerializationContext sc = SerializationContext::stateCommandRequest();
+    auto tenantId = getValidatedTenantId();
+    if (!tenantId) {
+        tenantId = parseDollarTenant(body);
+    }
+    sc.setTenantIdSource(tenantId ? true : false);
+
+    if (auto const expectPrefix = body.getField("expectPrefix")) {
+        sc.setPrefixState(expectPrefix.boolean());
+    }
+    return DatabaseNameUtil::deserialize(tenantId, getDatabase(), sc);
+}
+
 bool appendDollarTenant(BSONObjBuilder& builder,
                         const TenantId& tenant,
                         boost::optional<TenantId> existingDollarTenant = boost::none) {
