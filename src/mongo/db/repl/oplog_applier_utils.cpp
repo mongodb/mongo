@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_metrics.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -197,9 +198,11 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     OpCounters* opCounters) {
     invariant(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
 
-    auto op = entryOrGroupedInserts.getOp();
     // Count each log op application as a separate operation, for reporting purposes
     CurOp individualOp(opCtx);
+    ON_BLOCK_EXIT([opCtx]() { recordCurOpMetricsOplogApplication(opCtx); });
+
+    auto op = entryOrGroupedInserts.getOp();
     const NamespaceString nss(op.getNss());
     auto opType = op.getOpType();
     if (opType == OpTypeEnum::kNoop) {
