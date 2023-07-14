@@ -61,7 +61,8 @@ void acquireCollectionLocksInResourceIdOrder(
     const NamespaceStringOrUUID& nsOrUUID,
     LockMode modeColl,
     Date_t deadline,
-    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs,
+    std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsBegin,
+    std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsEnd,
     std::vector<CollectionNamespaceOrUUIDLock>* collLocks) {
     invariant(collLocks->empty());
     auto catalog = CollectionCatalog::get(opCtx);
@@ -78,7 +79,8 @@ void acquireCollectionLocksInResourceIdOrder(
         // Create a single set with all the resolved namespaces sorted by ascending
         // ResourceId(RESOURCE_COLLECTION, nss).
         temp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID));
-        for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
+        for (auto iter = secondaryNssOrUUIDsBegin; iter != secondaryNssOrUUIDsEnd; ++iter) {
+            const auto& secondaryNssOrUUID = *iter;
             invariant(secondaryNssOrUUID.dbName() == nsOrUUID.dbName(),
                       str::stream()
                           << "Unable to acquire locks for collections across different databases ("
@@ -102,7 +104,8 @@ void acquireCollectionLocksInResourceIdOrder(
         // won't see any concurrent DDL/catalog operations.
         auto catalog = CollectionCatalog::get(opCtx);
         verifyTemp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID));
-        for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
+        for (auto iter = secondaryNssOrUUIDsBegin; iter != secondaryNssOrUUIDsEnd; ++iter) {
+            const auto& secondaryNssOrUUID = *iter;
             verifyTemp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
         }
     } while (temp != verifyTemp);

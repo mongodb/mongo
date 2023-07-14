@@ -56,7 +56,8 @@ void acquireCollectionLocksInResourceIdOrder(
     const NamespaceStringOrUUID& nsOrUUID,
     LockMode modeColl,
     Date_t deadline,
-    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs,
+    std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsBegin,
+    std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsEnd,
     std::vector<CollectionNamespaceOrUUIDLock>* collLocks);
 
 /**

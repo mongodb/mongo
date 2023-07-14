@@ -382,8 +382,13 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
 
         _collLocks.emplace_back(opCtx, nsOrUUID, modeColl, deadline);
     } else {
-        catalog_helper::acquireCollectionLocksInResourceIdOrder(
-            opCtx, nsOrUUID, modeColl, deadline, secondaryNssOrUUIDs, &_collLocks);
+        catalog_helper::acquireCollectionLocksInResourceIdOrder(opCtx,
+                                                                nsOrUUID,
+                                                                modeColl,
+                                                                deadline,
+                                                                secondaryNssOrUUIDs.cbegin(),
+                                                                secondaryNssOrUUIDs.cend(),
+                                                                &_collLocks);
     }
 
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
