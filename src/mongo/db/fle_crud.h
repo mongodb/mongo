@@ -178,6 +178,13 @@ processFLEFindAndModifyExplainMongos(
 /**
  * Process a findAndModify request from a replica set.
  */
+StatusWith<std::pair<write_ops::FindAndModifyCommandReply, OpMsgRequest>>
+processFLEFindAndModifyHelper(OperationContext* opCtx,
+                              const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
+
+/**
+ * Process a findAndModify request from a replica set.
+ */
 write_ops::FindAndModifyCommandReply processFLEFindAndModify(
     OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest);
 

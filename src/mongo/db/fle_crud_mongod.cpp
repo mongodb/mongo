@@ -429,8 +429,9 @@ write_ops::DeleteCommandReply processFLEDelete(
     return deleteReply;
 }
 
-write_ops::FindAndModifyCommandReply processFLEFindAndModify(
-    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
+StatusWith<std::pair<write_ops::FindAndModifyCommandReply, OpMsgRequest>>
+processFLEFindAndModifyHelper(OperationContext* opCtx,
+                              const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
 
     uassert(
         6371800,
@@ -440,7 +441,12 @@ write_ops::FindAndModifyCommandReply processFLEFindAndModify(
     auto reply = processFindAndModifyRequest<write_ops::FindAndModifyCommandReply>(
         opCtx, findAndModifyRequest, &getTransactionWithRetriesForMongoD);
 
-    return uassertStatusOK(reply).first;
+    return reply;
+}
+
+write_ops::FindAndModifyCommandReply processFLEFindAndModify(
+    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
+    return uassertStatusOK(processFLEFindAndModifyHelper(opCtx, findAndModifyRequest)).first;
 }
 
 write_ops::UpdateCommandReply processFLEUpdate(
