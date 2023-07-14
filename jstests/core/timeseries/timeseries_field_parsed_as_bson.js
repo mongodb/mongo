@@ -4,6 +4,7 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   multiversion_incompatible
  * ]
  */
 
