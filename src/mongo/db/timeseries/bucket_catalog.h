@@ -243,6 +243,12 @@ public:
      */
     void appendExecutionStats(const NamespaceString& ns, BSONObjBuilder* builder) const;
 
+    /**
+     * Resets the counter used for bucket OID generation. Should be called after a bucket _id
+     * collision.
+     */
+    void resetBucketOIDCounter();
+
 private:
     /**
      * This class provides a mutex with shared and exclusive locking semantics. Unlike some shared

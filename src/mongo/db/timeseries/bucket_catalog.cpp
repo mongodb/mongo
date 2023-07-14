@@ -57,6 +57,7 @@ MONGO_FAIL_POINT_DEFINE(hangWaitingForConflictingPreparedBatch);
 Mutex _bucketIdGenLock =
     MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "bucket_catalog_internal::_bucketIdGenLock");
 PseudoRandom _bucketIdGenPRNG(SecureRandom().nextInt64());
+AtomicWord<uint64_t> _bucketIdGenCounter{static_cast<uint64_t>(_bucketIdGenPRNG.nextInt64())};
 
 uint8_t numDigits(uint32_t num) {
     uint8_t numDigits = 0;
@@ -186,15 +187,17 @@ std::pair<OID, Date_t> generateBucketId(const Date_t& time, const TimeseriesOpti
     // paradox converges to roughly the square root of the size of the space, so we would need a few
     // billion buckets with the same timestamp to expect collisions. In the rare case that we do get
     // a collision, we can (and do) simply regenerate the bucket _id at a higher level.
+    uint64_t bits = BigEndian<uint64_t>::store(_bucketIdGenCounter.addAndFetch(1));
+
     OID::InstanceUnique instance;
+    const auto instanceBuf = static_cast<uint8_t*>(instance.bytes);
+    std::memcpy(instanceBuf, &bits, OID::kInstanceUniqueSize);
+
     OID::Increment increment;
-    {
-        // We need to serialize access to '_bucketIdGenPRNG' since this instance is shared between
-        // all bucket_catalog operations, and not protected by the catalog or stripe locks.
-        stdx::unique_lock lk{_bucketIdGenLock};
-        _bucketIdGenPRNG.fill(instance.bytes, OID::kInstanceUniqueSize);
-        _bucketIdGenPRNG.fill(increment.bytes, OID::kIncrementSize);
-    }
+    const auto incrementBuf = static_cast<uint8_t*>(increment.bytes);
+    uint8_t* bitsBuf = (uint8_t*)&bits;
+    std::memcpy(incrementBuf, &(bitsBuf)[OID::kInstanceUniqueSize], OID::kIncrementSize);
+
     oid.setInstanceUnique(instance);
     oid.setIncrement(increment);
 
@@ -506,6 +509,11 @@ void BucketCatalog::appendExecutionStats(const NamespaceString& ns, BSONObjBuild
     }
 }
 
+void BucketCatalog::resetBucketOIDCounter() {
+    stdx::lock_guard lk{_bucketIdGenLock};
+    _bucketIdGenCounter.store(static_cast<uint64_t>(_bucketIdGenPRNG.nextInt64()));
+}
+
 BucketCatalog::StripedMutex::ExclusiveLock::ExclusiveLock(const StripedMutex& sm) {
     invariant(sm._mutexes.size() == _locks.size());
     for (std::size_t i = 0; i < sm._mutexes.size(); ++i) {
@@ -692,6 +700,9 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(const BucketKey& key,
         std::tie(bucketId, roundedTime) = generateBucketId(time, options);
         std::tie(it, inserted) =
             _allBuckets.try_emplace(bucketId, std::make_unique<Bucket>(bucketId));
+        if (!inserted) {
+            resetBucketOIDCounter();
+        }
     }
     uassert(6130900,
             "Unable to insert documents due to internal OID generation collision. Increase the "
