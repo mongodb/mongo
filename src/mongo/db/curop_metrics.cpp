@@ -73,4 +73,11 @@ void recordCurOpMetrics(OperationContext* opCtx) {
     queryFrameworkCounters.incrementQueryEngineCounters(CurOp::get(opCtx));
 }
 
+void recordCurOpMetricsOplogApplication(OperationContext* opCtx) {
+    const OpDebug& debug = CurOp::get(opCtx)->debug();
+    if (auto n = debug.additiveMetrics.writeConflicts.load(); n > 0) {
+        writeConflictsCounter.increment(n);
+    }
+}
+
 }  // namespace mongo

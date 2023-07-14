@@ -653,6 +653,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/mongod_fsync',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/curop_metrics',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/storage/storage_control',
         'repl_server_parameters',
