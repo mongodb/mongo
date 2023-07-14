@@ -1,10 +1,8 @@
 // listCollections tests expect that a collection is not implicitly created after a drop.
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
-//   requires_non_retryable_commands,
-//   skip_for_query_stats,
+//   requires_non_retryable_commands
 // ]
-// TODO SERVER-78861 reenable test in query_stats_passthrough
 
 /**
  * Tests for JSON Schema document validation.

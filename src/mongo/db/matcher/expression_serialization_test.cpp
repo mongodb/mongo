@@ -2012,7 +2012,7 @@ TEST(SerializeInternalSchema, MatchArrayIndexRedactsCorrectly) {
                     "namePlaceholder": "HASH<i>",
                     "expression": {
                         "HASH<i>": {
-                            "$type": "?array<?string>"
+                            "$type": ['number']
                         }
                     }
                 }
@@ -2125,7 +2125,7 @@ TEST(SerializeInternalSchema, BinDataEncryptedTypeRedactsCorrectly) {
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$_internalSchemaBinDataEncryptedType":"?array<?number>"})",
+        R"({"$_internalSchemaBinDataEncryptedType":[2,9]})",
         e.getSerializedRightHandSide(opts));
 }
 
@@ -2134,7 +2134,7 @@ TEST(SerializeInternalSchema, BinDataFLE2EncryptedTypeRedactsCorrectly) {
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$_internalSchemaBinDataFLE2EncryptedType":"?array<?number>"})",
+        R"({"$_internalSchemaBinDataFLE2EncryptedType":[2]})",
         e.getSerializedRightHandSide(opts));
 }
 

@@ -231,7 +231,7 @@ TEST(ExpressionTypeTest, RedactsTypesCorrectly) {
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$type":"?array<?number>"})",
+        R"({"$type":[2]})",
         type.getSerializedRightHandSide(opts));
 }
 

@@ -4,7 +4,6 @@
 // @tags: [ skip_for_query_stats ]
 // Note: Separate line for each TODO to ensure the linter checks for each ticket in the queue, but
 // the test shouldn't be formally re-enabled until all TODOs are removed.
-// TODO SERVER-78861 reenable test in query_stats_passthrough
 // TODO SERVER-78865 reenable test in query_stats_passthrough
 var t = db.dbref3;
 

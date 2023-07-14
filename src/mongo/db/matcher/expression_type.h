@@ -102,7 +102,7 @@ public:
     }
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob, SerializationOptions opts) const final {
-        opts.appendLiteral(bob, name(), _typeSet.toBSONArray());
+        bob->appendArray(name(), _typeSet.toBSONArray());
     }
 
     bool equivalent(const MatchExpression* other) const final {
