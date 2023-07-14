@@ -1648,12 +1648,14 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         validator->shutDown();
     }
 
-    auto pool = Grid::get(serviceContext)->isInitialized()
-        ? Grid::get(serviceContext)->getExecutorPool()
-        : nullptr;
-    if (pool) {
-        LOGV2_OPTIONS(6773200, {LogComponent::kSharding}, "Shutting down the ExecutorPool");
-        pool->shutdownAndJoin();
+    if (TestingProctor::instance().isEnabled()) {
+        auto pool = Grid::get(serviceContext)->isInitialized()
+            ? Grid::get(serviceContext)->getExecutorPool()
+            : nullptr;
+        if (pool) {
+            LOGV2_OPTIONS(6773200, {LogComponent::kSharding}, "Shutting down the ExecutorPool");
+            pool->shutdownAndJoin();
+        }
     }
 
     // The migrationutil executor must be shut down before shutting down the CatalogCacheLoader.
