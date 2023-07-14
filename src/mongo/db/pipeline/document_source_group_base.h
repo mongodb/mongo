@@ -55,6 +55,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/group_from_first_document_transformation.h"
+#include "mongo/db/pipeline/group_processor.h"
 #include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
@@ -73,7 +74,7 @@ namespace mongo {
  * It contains some common execution code between the two algorithms, such as:
  *  - Handling spilling to disk.
  *  - Computing the group key
- *  - Accumulating values and populating output documents.
+ *  - Accumulating values in a hash table and populating output documents.
  */
 class DocumentSourceGroupBase : public DocumentSource {
 public:
@@ -94,13 +95,17 @@ public:
      * once execution has begun.
      */
     std::vector<boost::intrusive_ptr<Expression>>& getMutableIdFields();
-    const std::vector<AccumulationStatement>& getAccumulatedFields() const;
 
     /**
-     * Can be used to change or swap out individual accumulated fields, but should not be used
-     * once execution has begun.
+     * Returns all the AccumulationStatements.
      */
-    std::vector<AccumulationStatement>& getMutableAccumulatedFields();
+    const std::vector<AccumulationStatement>& getAccumulationStatements() const;
+
+    /**
+     * Similar to above, but can be used to change or swap out individual accumulated fields.
+     * Should not be used once execution has begun.
+     */
+    std::vector<AccumulationStatement>& getMutableAccumulationStatements();
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kBlocking,
@@ -115,15 +120,9 @@ public:
         return constraints;
     }
 
-    /**
-     * Add an accumulator, which will become a field in each Document that results from grouping.
-     */
-    void addAccumulator(AccumulationStatement accumulationStatement);
-
-    /**
-     * Sets the expression to use to determine the group id of each document.
-     */
-    void setIdExpression(boost::intrusive_ptr<Expression> idExpression);
+    GroupProcessor* getGroupProcessor() {
+        return &_groupProcessor;
+    }
 
     /**
      * Returns the expression to use to determine the group id of each document.
@@ -135,25 +134,25 @@ public:
      * results from earlier partial groups.
      */
     bool doingMerge() const {
-        return _doingMerge;
+        return _groupProcessor.doingMerge();
     }
 
-    /**
-     * Tell this source if it is doing a merge from shards. Defaults to false.
-     */
-    void setDoingMerge(bool doingMerge) {
-        _doingMerge = doingMerge;
+    const SpecificStats* getSpecificStats() const final {
+        return &_groupProcessor.getStats();
     }
 
     /**
      * Returns true if this $group stage used disk during execution and false otherwise.
      */
     bool usedDisk() final {
-        return _stats.spills > 0;
+        return _groupProcessor.usedDisk();
     }
 
-    const SpecificStats* getSpecificStats() const final {
-        return &_stats;
+    /**
+     * Returns maximum allowed memory footprint.
+     */
+    size_t getMaxMemoryUsageBytes() const {
+        return _groupProcessor.getMemoryTracker()._maxAllowedMemoryUsageBytes;
     }
 
     bool canRunInParallelBeforeWriteStage(
@@ -170,11 +169,6 @@ public:
      */
     std::unique_ptr<GroupFromFirstDocumentTransformation> rewriteGroupAsTransformOnFirstDocument()
         const;
-
-    /**
-     * Returns maximum allowed memory footprint.
-     */
-    size_t getMaxMemoryUsageBytes() const;
 
     // True if this $group can be pushed down to SBE.
     SbeCompatibility sbeCompatibility() const {
@@ -193,104 +187,16 @@ protected:
 
     void doDispose() final;
 
-    /**
-     * Cleans up any pending memory usage. Throws error, if memory usage is above
-     * 'maxMemoryUsageBytes' and cannot spill to disk.
-     *
-     * Returns true, if the caller should spill to disk, false otherwise.
-     */
-    bool shouldSpillWithAttemptToSaveMemory();
-
-    /**
-     * Spill groups map to disk and returns an iterator to the file. Note: Since a sorted $group
-     * does not exhaust the previous stage before returning, and thus does not maintain as large a
-     * store of documents at any one time, only an unsorted group can spill to disk.
-     */
-    void spill();
-
-    /**
-     * Computes the internal representation of the group key.
-     */
-    Value computeId(const Document& root);
-
-    void processDocument(const Value& id, const Document& root);
-
-    void readyGroups();
-    void resetReadyGroups();
-
-    GetNextResult getNextReadyGroup();
-
-    void setExecutionStarted() {
-        _executionStarted = true;
-    }
-
     virtual void serializeAdditionalFields(
         MutableDocument& out, SerializationOptions opts = SerializationOptions()) const {};
 
-    // If the expression for the '_id' field represents a non-empty object, we track its fields'
-    // names in '_idFieldNames'.
-    std::vector<std::string> _idFieldNames;
-    // Expressions for the individual fields when '_id' produces a document in the order of
-    // '_idFieldNames' or the whole expression otherwise.
-    std::vector<boost::intrusive_ptr<Expression>> _idExpressions;
+    GroupProcessor _groupProcessor;
 
 private:
-    GetNextResult getNextSpilled();
-    GetNextResult getNextStandard();
-
-    /**
-     * If we ran out of memory, finish all the pending operations so that some memory
-     * can be freed.
-     */
-    void freeMemory();
-
-    Document makeDocument(const Value& id, const Accumulators& accums, bool mergeableOutput);
-
-    /**
-     * Converts the internal representation of the group key to the _id shape specified by the
-     * user.
-     */
-    Value expandId(const Value& val);
-
     /**
      * Returns true if 'dottedPath' is one of the group keys present in '_idExpressions'.
      */
     bool pathIncludedInGroupKeys(const std::string& dottedPath) const;
-
-    std::vector<AccumulationStatement> _accumulatedFields;
-
-    bool _doingMerge;
-
-    MemoryUsageTracker _memoryTracker;
-
-    GroupStats _stats;
-
-    /**
-     * This flag should be set during first execution of getNext() to assert that non-const methods
-     * that expose internal structures are not called during runtime.
-     */
-    bool _executionStarted;
-
-    // We use boost::optional to defer initialization until the ExpressionContext containing the
-    // correct comparator is injected, since the groups must be built using the comparator's
-    // definition of equality.
-    boost::optional<GroupsMap> _groups;
-
-    // Tracks the size of the spill file.
-    std::unique_ptr<SorterFileStats> _spillStats;
-    std::shared_ptr<Sorter<Value, Value>::File> _file;
-    std::vector<std::shared_ptr<Sorter<Value, Value>::Iterator>> _sortedFiles;
-    bool _spilled;
-
-
-    // Only used when '_spilled' is false.
-    GroupsMap::iterator _groupsIterator;
-
-    // Only used when '_spilled' is true.
-    std::unique_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
-
-    std::pair<Value, Value> _firstPartOfNextGroup;
-    Accumulators _currentAccumulators;
 
     SbeCompatibility _sbeCompatibility = SbeCompatibility::notCompatible;
 };

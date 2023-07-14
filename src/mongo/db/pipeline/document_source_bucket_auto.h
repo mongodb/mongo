@@ -127,11 +127,11 @@ public:
     boost::intrusive_ptr<Expression> getGroupByExpression() const;
     boost::intrusive_ptr<Expression>& getMutableGroupByExpression();
     /**
-     * Returns the accumulated fields expressions. The mutable getter can be used to alter
+     * Returns the AccumulationStatements. The mutable getter can be used to alter
      * the expression, but should not be used after execution has begun.
      */
-    const std::vector<AccumulationStatement>& getAccumulatedFields() const;
-    std::vector<AccumulationStatement>& getMutableAccumulatedFields();
+    const std::vector<AccumulationStatement>& getAccumulationStatements() const;
+    std::vector<AccumulationStatement>& getMutableAccumulationStatements();
 
 protected:
     GetNextResult doGetNext() final;

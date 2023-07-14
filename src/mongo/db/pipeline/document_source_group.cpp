@@ -69,9 +69,9 @@ boost::intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
     boost::optional<size_t> maxMemoryUsageBytes) {
     boost::intrusive_ptr<DocumentSourceGroup> groupStage =
         new DocumentSourceGroup(expCtx, maxMemoryUsageBytes);
-    groupStage->setIdExpression(groupByExpression);
+    groupStage->_groupProcessor.setIdExpression(groupByExpression);
     for (auto&& statement : accumulationStatements) {
-        groupStage->addAccumulator(statement);
+        groupStage->_groupProcessor.addAccumulationStatement(statement);
     }
 
     return groupStage;
@@ -187,11 +187,12 @@ DocumentSource::GetNextResult DocumentSourceGroup::doGetNext() {
         invariant(initializationResult.isEOF());
     }
 
-    auto result = getNextReadyGroup();
-    if (result.isEOF()) {
+    auto result = _groupProcessor.getNext();
+    if (!result) {
         dispose();
+        return GetNextResult::makeEOF();
     }
-    return result;
+    return GetNextResult(std::move(*result));
 }
 
 DocumentSource::GetNextResult DocumentSourceGroup::performBlockingGroup() {
@@ -203,18 +204,14 @@ DocumentSource::GetNextResult DocumentSourceGroup::performBlockingGroup() {
 // performBlockingGroup() and prevent stack overflows.
 MONGO_COMPILER_NOINLINE DocumentSource::GetNextResult DocumentSourceGroup::performBlockingGroupSelf(
     GetNextResult input) {
-    setExecutionStarted();
+    _groupProcessor.setExecutionStarted();
     // Barring any pausing, this loop exhausts 'pSource' and populates '_groups'.
     for (; input.isAdvanced(); input = pSource->getNext()) {
-        if (shouldSpillWithAttemptToSaveMemory()) {
-            spill();
-        }
-
         // We release the result document here so that it does not outlive the end of this loop
         // iteration. Not releasing could lead to an array copy when this group follows an unwind.
         auto rootDocument = input.releaseDocument();
-        Value id = computeId(rootDocument);
-        processDocument(id, rootDocument);
+        Value id = _groupProcessor.computeId(rootDocument);
+        _groupProcessor.add(id, rootDocument);
     }
 
     switch (input.getStatus()) {
@@ -225,7 +222,7 @@ MONGO_COMPILER_NOINLINE DocumentSource::GetNextResult DocumentSourceGroup::perfo
             return input;  // Propagate pause.
         }
         case DocumentSource::GetNextResult::ReturnStatus::kEOF: {
-            readyGroups();
+            _groupProcessor.readyGroups();
             // This must happen last so that, unless control gets here, we will re-enter
             // initialization after getting a GetNextResult::ResultState::kPauseExecution.
             _groupsReady = true;

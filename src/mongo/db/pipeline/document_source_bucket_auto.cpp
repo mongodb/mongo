@@ -479,11 +479,12 @@ boost::intrusive_ptr<Expression>& DocumentSourceBucketAuto::getMutableGroupByExp
     return _groupByExpression;
 }
 
-const std::vector<AccumulationStatement>& DocumentSourceBucketAuto::getAccumulatedFields() const {
+const std::vector<AccumulationStatement>& DocumentSourceBucketAuto::getAccumulationStatements()
+    const {
     return _accumulatedFields;
 }
 
-std::vector<AccumulationStatement>& DocumentSourceBucketAuto::getMutableAccumulatedFields() {
+std::vector<AccumulationStatement>& DocumentSourceBucketAuto::getMutableAccumulationStatements() {
     tassert(7020502,
             "Cannot change accumulated field expression once execution has begun in BucketAuto",
             !_populated);

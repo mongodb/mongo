@@ -1165,7 +1165,7 @@ private:
     int expectedSpills() const {
         // 'DocumentSourceGroup' has test-only behavior where it will spill more aggressively in
         // debug builds.
-        return kDebugBuild ? kCount : 3;
+        return kDebugBuild ? kCount : 4;
     }
 
     deque<DocumentSource::GetNextResult> inputData() final {

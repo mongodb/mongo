@@ -72,19 +72,24 @@ const char* DocumentSourceStreamingGroup::getSourceName() const {
 }
 
 DocumentSource::GetNextResult DocumentSourceStreamingGroup::doGetNext() {
-    auto getReadyResult = getNextReadyGroup();
-    if (!getReadyResult.isEOF()) {
-        return getReadyResult;
+    auto result = _groupProcessor.getNext();
+    if (result) {
+        return GetNextResult(std::move(*result));
     } else if (_sourceDepleted) {
         dispose();
-        return getReadyResult;
+        return GetNextResult::makeEOF();
     }
 
     auto prepareResult = readyNextBatch();
     if (prepareResult.isPaused()) {
         return prepareResult;
     }
-    return getNextReadyGroup();
+
+    result = _groupProcessor.getNext();
+    if (!result) {
+        return GetNextResult::makeEOF();
+    }
+    return GetNextResult(std::move(*result));
 }
 
 DocumentSourceStreamingGroup::DocumentSourceStreamingGroup(
@@ -100,9 +105,9 @@ boost::intrusive_ptr<DocumentSourceStreamingGroup> DocumentSourceStreamingGroup:
     boost::optional<size_t> maxMemoryUsageBytes) {
     boost::intrusive_ptr<DocumentSourceStreamingGroup> groupStage =
         new DocumentSourceStreamingGroup(expCtx, maxMemoryUsageBytes);
-    groupStage->setIdExpression(groupByExpression);
+    groupStage->_groupProcessor.setIdExpression(groupByExpression);
     for (auto&& statement : accumulationStatements) {
-        groupStage->addAccumulator(statement);
+        groupStage->_groupProcessor.addAccumulationStatement(statement);
     }
     uassert(7026709,
             "streaming group must have at least one monotonic id expression",
@@ -111,7 +116,9 @@ boost::intrusive_ptr<DocumentSourceStreamingGroup> DocumentSourceStreamingGroup:
             "streaming group monotonic expression indexes must correspond to id expressions",
             std::all_of(monotonicExpressionIndexes.begin(),
                         monotonicExpressionIndexes.end(),
-                        [&](size_t i) { return i < groupStage->_idExpressions.size(); }));
+                        [&](size_t i) {
+                            return i < groupStage->_groupProcessor.getIdExpressions().size();
+                        }));
     groupStage->_monotonicExpressionIndexes = std::move(monotonicExpressionIndexes);
     return groupStage;
 }
@@ -135,7 +142,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBso
                 kMonotonicIdFieldsSpecField,
             monotonicIdFieldsElem.type() == Array);
     const auto& monotonicIdFields = monotonicIdFieldsElem.Array();
-    if (groupStage->_idFieldNames.empty()) {
+    const auto& idFieldNames = groupStage->_groupProcessor.getIdFieldNames();
+    if (idFieldNames.empty()) {
         uassert(7026703,
                 "if there is no explicit id fields, " + kMonotonicIdFieldsSpecField +
                     " must contain a single \"_id\" string",
@@ -149,11 +157,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBso
                     kMonotonicIdFieldsSpecField + " elements must be strings",
                     fieldNameElem.type() == String);
             StringData fieldName = fieldNameElem.valueStringData();
-            auto it = std::find(
-                groupStage->_idFieldNames.begin(), groupStage->_idFieldNames.end(), fieldName);
-            uassert(7026705, "id field not found", it != groupStage->_idFieldNames.end());
+            auto it = std::find(idFieldNames.begin(), idFieldNames.end(), fieldName);
+            uassert(7026705, "id field not found", it != idFieldNames.end());
             groupStage->_monotonicExpressionIndexes.push_back(
-                std::distance(groupStage->_idFieldNames.begin(), it));
+                std::distance(idFieldNames.begin(), it));
         }
         std::sort(groupStage->_monotonicExpressionIndexes.begin(),
                   groupStage->_monotonicExpressionIndexes.end());
@@ -165,11 +172,12 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBso
 void DocumentSourceStreamingGroup::serializeAdditionalFields(MutableDocument& out,
                                                              SerializationOptions opts) const {
     std::vector<Value> monotonicIdFields;
-    if (_idFieldNames.empty()) {
+    const auto& idFieldNames = _groupProcessor.getIdFieldNames();
+    if (idFieldNames.empty()) {
         monotonicIdFields.emplace_back(opts.serializeFieldPath("_id"));
     } else {
         for (size_t i : _monotonicExpressionIndexes) {
-            monotonicIdFields.emplace_back(opts.serializeFieldPathFromString(_idFieldNames[i]));
+            monotonicIdFields.emplace_back(opts.serializeFieldPathFromString(idFieldNames[i]));
         }
     }
     out[kMonotonicIdFieldsSpecField] = Value(std::move(monotonicIdFields));
@@ -189,7 +197,7 @@ DocumentSource::GetNextResult DocumentSourceStreamingGroup::getNextDocument() {
 }
 
 DocumentSource::GetNextResult DocumentSourceStreamingGroup::readyNextBatch() {
-    resetReadyGroups();
+    _groupProcessor.reset();
     GetNextResult input = getNextDocument();
     return readyNextBatchInner(input);
 }
@@ -198,23 +206,20 @@ DocumentSource::GetNextResult DocumentSourceStreamingGroup::readyNextBatch() {
 // and prevent stack overflows.
 MONGO_COMPILER_NOINLINE DocumentSource::GetNextResult
 DocumentSourceStreamingGroup::readyNextBatchInner(GetNextResult input) {
-    setExecutionStarted();
+    _groupProcessor.setExecutionStarted();
     // Calculate groups until we either exaust pSource or encounter change in monotonic id
     // expression, which means all current groups are finalized.
     for (; input.isAdvanced(); input = pSource->getNext()) {
-        if (shouldSpillWithAttemptToSaveMemory()) {
-            spill();
-        }
         auto root = input.releaseDocument();
-        Value id = computeId(root);
+        Value id = _groupProcessor.computeId(root);
 
         if (isBatchFinished(id)) {
             _firstDocumentOfNextBatch = std::move(root);
-            readyGroups();
+            _groupProcessor.readyGroups();
             return input;
         }
 
-        processDocument(id, root);
+        _groupProcessor.add(id, root);
     }
 
     switch (input.getStatus()) {
@@ -225,7 +230,7 @@ DocumentSourceStreamingGroup::readyNextBatchInner(GetNextResult input) {
             return input;  // Propagate pause.
         }
         case DocumentSource::GetNextResult::ReturnStatus::kEOF: {
-            readyGroups();
+            _groupProcessor.readyGroups();
             _sourceDepleted = true;
             return input;
         }
@@ -234,7 +239,7 @@ DocumentSourceStreamingGroup::readyNextBatchInner(GetNextResult input) {
 }
 
 bool DocumentSourceStreamingGroup::isBatchFinished(const Value& id) {
-    if (_idExpressions.size() == 1) {
+    if (_groupProcessor.getIdExpressions().size() == 1) {
         tassert(7026706,
                 "if there are no explicit id fields, it is only one monotonic expression with id 0",
                 _monotonicExpressionIndexes.size() == 1 && _monotonicExpressionIndexes[0] == 0);

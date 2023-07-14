@@ -153,7 +153,7 @@ protected:
 
         auto groupNode = std::make_unique<GroupNode>(std::move(virtScanNode),
                                                      docSrcGroup->getIdExpression(),
-                                                     docSrcGroup->getAccumulatedFields(),
+                                                     docSrcGroup->getAccumulationStatements(),
                                                      false /*doingMerge*/,
                                                      true /*shouldProduceBson*/);
 

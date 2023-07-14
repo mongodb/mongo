@@ -1685,7 +1685,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             solnForAgg =
                 std::make_unique<GroupNode>(std::move(solnForAgg),
                                             groupStage->getIdExpression(),
-                                            groupStage->getAccumulatedFields(),
+                                            groupStage->getAccumulationStatements(),
                                             groupStage->doingMerge(),
                                             innerStage->isLastSource() /* shouldProduceBson */);
             continue;

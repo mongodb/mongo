@@ -139,7 +139,8 @@ void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
     ProjectionNameVector aggLowLevelOutputProjNames;
 
     ABTVector aggregationProjections;
-    const std::vector<AccumulationStatement>& accumulatedFields = source.getAccumulatedFields();
+    const std::vector<AccumulationStatement>& accumulatedFields =
+        source.getAccumulationStatements();
 
     // Used to keep track which $sum and $count projections to use to compute $avg.
     struct AvgProjNames {

@@ -830,7 +830,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
     }
 
     std::vector<AccumulationStatement> accumulationStatements;
-    for (const AccumulationStatement& stmt : groupPtr->getAccumulatedFields()) {
+    for (const AccumulationStatement& stmt : groupPtr->getAccumulationStatements()) {
         const auto* exprArg = stmt.expr.argument.get();
         if (const auto* exprArgPath = dynamic_cast<const ExpressionFieldPath*>(exprArg)) {
             const auto& path = exprArgPath->getFieldPath();
@@ -969,12 +969,12 @@ bool DocumentSourceInternalUnpackBucket::enableStreamingGroupIfPossible(
         return false;
     }
 
-    *itr =
-        DocumentSourceStreamingGroup::create(pExpCtx,
-                                             groupStage->getIdExpression(),
-                                             std::move(monotonicIdFields),
-                                             std::move(groupStage->getMutableAccumulatedFields()),
-                                             groupStage->getMaxMemoryUsageBytes());
+    *itr = DocumentSourceStreamingGroup::create(
+        pExpCtx,
+        groupStage->getIdExpression(),
+        std::move(monotonicIdFields),
+        std::move(groupStage->getMutableAccumulationStatements()),
+        groupStage->getMaxMemoryUsageBytes());
     return true;
 }
 
@@ -1046,7 +1046,7 @@ tryRewriteGroupAsSortGroup(boost::intrusive_ptr<ExpressionContext> expCtx,
                            Pipeline::SourceContainer::iterator itr,
                            Pipeline::SourceContainer* container,
                            DocumentSourceGroup* groupStage) {
-    const auto accumulators = groupStage->getAccumulatedFields();
+    const auto accumulators = groupStage->getAccumulationStatements();
     if (accumulators.size() != 1) {
         // If we have multiple accumulators, we fail to optimize for a lastpoint query.
         return {nullptr, nullptr};
@@ -1158,7 +1158,7 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
     auto newFieldPath = rewrittenFieldPath.fullPath();
 
     // Check to see if $group uses only the specified accumulator.
-    auto accumulators = groupStage->getAccumulatedFields();
+    auto accumulators = groupStage->getAccumulationStatements();
     auto groupOnlyUsesTargetAccum = [&](AccumulatorDocumentsNeeded targetAccum) {
         return std::all_of(accumulators.begin(), accumulators.end(), [&](auto&& accum) {
             return targetAccum == accum.makeAccumulator()->documentsNeeded();
