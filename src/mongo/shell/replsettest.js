@@ -1720,6 +1720,20 @@ var ReplSetTest = function(opts) {
               (new Date() - awaitTsStart) + "ms for " + this.nodes.length + " nodes in set '" +
               this.name + "'");
 
+        // Waits for the services which write on step-up to finish rebuilding to avoid background
+        // writes after initiation is done. PrimaryOnlyServices wait for the stepup optime to be
+        // majority committed before rebuilding services, so we skip waiting for PrimaryOnlyServices
+        // if we do not wait for replication.
+        if (!doNotWaitForReplication && !doNotWaitForPrimaryOnlyServices) {
+            primary = self.getPrimary();
+            // TODO(SERVER-57924): cleanup asCluster() to avoid checking here.
+            if (self._notX509Auth(primary) || primary.isTLS()) {
+                asCluster(primary, function() {
+                    self.waitForStepUpWrites(primary);
+                });
+            }
+        }
+
         // Make sure all nodes are up to date. Bypass this if the heartbeat interval wasn't turned
         // down or the test specifies that we should not wait for replication. This is only an
         // optimization so it's OK if we bypass it in some suites.
@@ -1727,32 +1741,6 @@ var ReplSetTest = function(opts) {
             asCluster(self.nodes, function() {
                 self.awaitNodesAgreeOnAppliedOpTime();
             });
-        }
-
-        // Waits for the primary only services to finish rebuilding to avoid background writes
-        // after initiation is done. PrimaryOnlyServices wait for the stepup optime to be majority
-        // committed before rebuilding services, so we skip waiting for PrimaryOnlyServices if
-        // we do not wait for replication.
-        if (!doNotWaitForReplication && !doNotWaitForPrimaryOnlyServices) {
-            primary = self.getPrimary();
-            // TODO(SERVER-57924): cleanup asCluster() to avoid checking here.
-            if (self._notX509Auth(primary) || primary.isTLS()) {
-                asCluster(self.nodes, function() {
-                    self.waitForPrimaryOnlyServices(primary);
-                });
-            }
-        }
-
-        // Wait for the query analysis writer to finish setting up to avoid background writes
-        // after initiation is done.
-        if (!doNotWaitForReplication) {
-            primary = self.getPrimary();
-            // TODO(SERVER-57924): cleanup asCluster() to avoid checking here.
-            if (self._notX509Auth(primary) || primary.isTLS()) {
-                asCluster(self.nodes, function() {
-                    self.waitForQueryAnalysisWriterSetup(primary);
-                });
-            }
         }
 
         // Turn off the failpoints now that initial sync and initial setup is complete.
@@ -1779,25 +1767,28 @@ var ReplSetTest = function(opts) {
         let startTime = new Date();  // Measure the execution time of this function.
         this.initiateWithAnyNodeAsPrimary(cfg, initCmd, {doNotWaitForPrimaryOnlyServices: true});
 
-        // stepUp() calls awaitReplication() which requires all nodes to be authorized to run
-        // replSetGetStatus.
-        asCluster(this.nodes, function() {
-            const newPrimary = self.nodes[0];
-            self.stepUp(newPrimary);
-            if (!doNotWaitForPrimaryOnlyServices) {
-                self.waitForPrimaryOnlyServices(newPrimary);
-            }
-        });
-
-        // Wait for the query analysis writer to finish setting up to avoid background writes
-        // after initiation is done.
-        asCluster(this.nodes, function() {
-            const newPrimary = self.nodes[0];
-            self.stepUp(newPrimary);
-            if (!doNotWaitForPrimaryOnlyServices) {
-                self.waitForQueryAnalysisWriterSetup(newPrimary);
-            }
-        });
+        // Most of the time node 0 will already be primary so we can skip the step-up.
+        let primary = self.getPrimary();
+        if (self.getNodeId(self.nodes[0]) == self.getNodeId(primary)) {
+            print("ReplSetTest initiateWithNodeZeroAsPrimary skipping step-up because node 0 is " +
+                  "already primary");
+            asCluster(primary, function() {
+                if (!doNotWaitForPrimaryOnlyServices) {
+                    self.waitForStepUpWrites(primary);
+                }
+            });
+        } else {
+            // stepUp() calls awaitReplication() which requires all nodes to be authorized to run
+            // replSetGetStatus.
+            asCluster(this.nodes, function() {
+                const newPrimary = self.nodes[0];
+                self.stepUp(newPrimary,
+                            {doNotWaitForPrimaryOnlyServices: doNotWaitForPrimaryOnlyServices});
+                if (!doNotWaitForPrimaryOnlyServices) {
+                    self.waitForStepUpWrites(newPrimary);
+                }
+            });
+        }
 
         print("ReplSetTest initiateWithNodeZeroAsPrimary took " + (new Date() - startTime) +
               "ms for " + this.nodes.length + " nodes.");
@@ -1835,11 +1826,15 @@ var ReplSetTest = function(opts) {
      */
     this.stepUp = function(node, {
         awaitReplicationBeforeStepUp: awaitReplicationBeforeStepUp = true,
-        awaitWritablePrimary: awaitWritablePrimary = true
+        awaitWritablePrimary: awaitWritablePrimary = true,
+        doNotWaitForPrimaryOnlyServices = false,
     } = {}) {
         jsTest.log("ReplSetTest stepUp: Stepping up " + node.host);
 
         if (awaitReplicationBeforeStepUp) {
+            if (!doNotWaitForPrimaryOnlyServices) {
+                this.waitForStepUpWrites();
+            }
             this.awaitReplication();
         }
 
@@ -1877,6 +1872,17 @@ var ReplSetTest = function(opts) {
 
         jsTest.log("ReplSetTest stepUp: Finished stepping up " + node.host);
         return node;
+    };
+
+    /**
+     * Wait for writes which may happen when nodes are stepped up.  This currently includes
+     * primary-only service writes and writes from the query analysis writer, the latter being
+     * a replica-set-aware service for which there is no generic way to wait.
+     */
+    this.waitForStepUpWrites = function(primary) {
+        primary = primary || self.getPrimary();
+        this.waitForPrimaryOnlyServices(primary);
+        this.waitForQueryAnalysisWriterSetup(primary);
     };
 
     /**

@@ -103,7 +103,9 @@ function makeTenantId() {
         // rebuild, so we need to skip waiting on PrimaryOnlyServices.
         // This is also a problem when setting the server featureCompatibilityVersion, as this
         // waits for a rebuild, which is why this test is tagged as 'multiversion_incompatible'.
-        tenantMigrationTest.getDonorRst().initiate(
+        // We initiate with any node as primary because we cannot safely step up node 0 if we
+        // don't wait for primary only services.
+        tenantMigrationTest.getDonorRst().initiateWithAnyNodeAsPrimary(
             null, null, {doNotWaitForPrimaryOnlyServices: true});
         createTenantMigrationRecipientRoleIfNotExist(tenantMigrationTest.getDonorRst());
 
