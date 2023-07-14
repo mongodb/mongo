@@ -6,6 +6,7 @@
  *   requires_timeseries,
  *   # Cannot insert into a time-series collection in a multi-document transaction
  *   does_not_support_transactions,
+ *   multiversion_incompatible
  * ]
  */
 
