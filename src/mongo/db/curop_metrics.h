@@ -33,6 +33,12 @@ namespace mongo {
 
 class OperationContext;
 
+// Updates the global counter metrics from the CurOp of an OperationContext.
+// This is mainly used on primaries or secondaries during requests handling.
 void recordCurOpMetrics(OperationContext* opCtx);
+
+// Similar to recordCurOpMetrics, but mainly used on secondaries to collect
+// metrics during oplog application.
+void recordCurOpMetricsOplogApplication(OperationContext* opCtx);
 
 }  // namespace mongo

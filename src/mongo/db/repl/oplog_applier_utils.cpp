@@ -60,6 +60,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_metrics.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/feature_flag.h"
@@ -425,9 +426,11 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     invariant(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
 
     const auto& op = entryOrGroupedInserts.getOp();
-    // Count each log op application as a separate operation, for reporting purposes
+    // Count each log op application as a separate operation, for reporting purposes.
     CurOp individualOp;
     individualOp.push(opCtx);
+    ON_BLOCK_EXIT([opCtx]() { recordCurOpMetricsOplogApplication(opCtx); });
+
     const NamespaceString nss(op->getNss());
     auto opType = op->getOpType();
 
