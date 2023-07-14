@@ -350,24 +350,13 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
                 prerequisites.uuid = collectionPtr->uuid();
             }
 
-            boost::optional<LockFreeReadsBlock> lockFreeReadsBlock;
-            if (acquisitionRequest.second.lockFreeReadsResources.lockFreeReadsBlock) {
-                lockFreeReadsBlock.emplace(std::move(
-                    *acquisitionRequest.second.lockFreeReadsResources.lockFreeReadsBlock));
-            }
-            boost::optional<Lock::GlobalLock> globalLock;
-            if (acquisitionRequest.second.lockFreeReadsResources.globalLock) {
-                globalLock.emplace(
-                    std::move(*acquisitionRequest.second.lockFreeReadsResources.globalLock));
-            }
-
             shard_role_details::AcquiredCollection& acquiredCollection =
                 txnResources.addAcquiredCollection(
                     {prerequisites,
                      std::move(acquisitionRequest.second.dbLock),
                      std::move(acquisitionRequest.second.collLock),
-                     std::move(lockFreeReadsBlock),
-                     std::move(globalLock),
+                     std::move(acquisitionRequest.second.lockFreeReadsResources.lockFreeReadsBlock),
+                     std::move(acquisitionRequest.second.lockFreeReadsResources.globalLock),
                      std::move(snapshotedServices.collectionDescription),
                      std::move(snapshotedServices.ownershipFilter),
                      std::move(std::get<CollectionPtr>(snapshotedServices.collectionPtrOrView))});
@@ -798,6 +787,28 @@ CollectionAcquisition acquireCollectionMaybeLockFree(
     return CollectionAcquisition(acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest));
 }
 
+CollectionAcquisitions acquireCollectionsMaybeLockFree(
+    OperationContext* opCtx, std::vector<CollectionAcquisitionRequest> acquisitionRequests) {
+    // Transform the CollectionAcquisitionRequests to NamespaceOrViewAcquisitionRequests.
+    std::vector<CollectionOrViewAcquisitionRequest> namespaceOrViewAcquisitionRequests;
+    std::move(acquisitionRequests.begin(),
+              acquisitionRequests.end(),
+              std::back_inserter(namespaceOrViewAcquisitionRequests));
+
+    // Acquire the collections
+    auto acquisitions =
+        acquireCollectionsOrViewsMaybeLockFree(opCtx, namespaceOrViewAcquisitionRequests);
+
+    // Transform the acquisitions to CollectionAcquisitions
+    CollectionAcquisitions collectionAcquisitions;
+    for (auto& acquisition : acquisitions) {
+        // It must be a collection, because that's what the acquisition request stated.
+        invariant(acquisition.second.isCollection());
+        collectionAcquisitions.emplace(std::move(acquisition));
+    }
+    return collectionAcquisitions;
+}
+
 CollectionOrViewAcquisition acquireCollectionOrViewMaybeLockFree(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest) {
     auto acquisition =
@@ -903,7 +914,8 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap generateSortedAcquisitionRequests(
     OperationContext* opCtx,
     const CollectionCatalog& catalog,
     const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests,
-    ResolvedNamespaceOrViewAcquisitionRequest::LockFreeReadsResources&& lockFreeReadsResources) {
+    const ResolvedNamespaceOrViewAcquisitionRequest::LockFreeReadsResources&
+        lockFreeReadsResources) {
     ResolvedNamespaceOrViewAcquisitionRequestsMap sortedAcquisitionRequests;
 
     auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);

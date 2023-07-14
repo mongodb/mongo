@@ -347,6 +347,9 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
 CollectionAcquisition acquireCollectionMaybeLockFree(
     OperationContext* opCtx, CollectionAcquisitionRequest acquisitionRequest);
 
+CollectionAcquisitions acquireCollectionsMaybeLockFree(
+    OperationContext* opCtx, std::vector<CollectionAcquisitionRequest> acquisitionRequests);
+
 CollectionOrViewAcquisition acquireCollectionOrViewMaybeLockFree(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest);
 

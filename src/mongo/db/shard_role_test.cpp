@@ -1995,5 +1995,115 @@ DEATH_TEST_F(ShardRoleTest,
                        AcquisitionPrerequisites::kWrite},
                       MODE_IX);
 }
+
+// ---------------------------------------------------------------------------
+// Recursive locking
+TEST_F(ShardRoleTest,
+       acquiringMultipleCollectionsInSameAcquisitionDoesNotRecursivelyLockGlobalLock) {
+    const auto testFn = [&](bool withLocks) {
+        const auto acquisitionRequest1 =
+            CollectionAcquisitionRequest(nssUnshardedCollection1,
+                                         PlacementConcern{},
+                                         repl::ReadConcernArgs(),
+                                         AcquisitionPrerequisites::kRead);
+
+        const auto acquisitionRequest2 =
+            CollectionAcquisitionRequest(nssShardedCollection1,
+                                         PlacementConcern{},
+                                         repl::ReadConcernArgs(),
+                                         AcquisitionPrerequisites::kRead);
+
+        // Acquire two collections in the same acquisition.
+        boost::optional<CollectionAcquisition> acquisition1;
+        boost::optional<CollectionAcquisition> acquisition2;
+        {
+            CollectionAcquisitions acquisitions = withLocks
+                ? acquireCollections(opCtx(), {acquisitionRequest1, acquisitionRequest2}, MODE_IS)
+                : acquireCollectionsMaybeLockFree(opCtx(),
+                                                  {acquisitionRequest1, acquisitionRequest2});
+            acquisition1 = acquisitions.at(acquisitionRequest1.nssOrUUID.nss());
+            acquisition2 = acquisitions.at(acquisitionRequest2.nssOrUUID.nss());
+        }
+
+        // Check not recursively locked.
+        ASSERT_TRUE(opCtx()->lockState()->isReadLocked());  // Global lock
+        ASSERT_FALSE(opCtx()->lockState()->isGlobalLockedRecursively());
+        if (!withLocks) {
+            ASSERT_TRUE(opCtx()->isLockFreeReadsOp());
+        }
+
+        // Release one acquisition. Global lock still held.
+        acquisition1.reset();
+        ASSERT_TRUE(opCtx()->lockState()->isReadLocked());  // Global lock
+        ASSERT_FALSE(opCtx()->lockState()->isGlobalLockedRecursively());
+        if (!withLocks) {
+            ASSERT_TRUE(opCtx()->isLockFreeReadsOp());
+        }
+
+        // Release the other acquisition. Global lock no longer held.
+        acquisition2.reset();
+        ASSERT_FALSE(opCtx()->lockState()->isReadLocked());  // Global lock
+        ASSERT_FALSE(opCtx()->lockState()->isGlobalLockedRecursively());
+        if (!withLocks) {
+            ASSERT_FALSE(opCtx()->isLockFreeReadsOp());
+        }
+    };
+
+    testFn(true);   // with locks
+    testFn(false);  // lock-free
+}
+
+TEST_F(ShardRoleTest,
+       acquiringMultipleCollectionsInDifferentAcquisitionsDoesRecursivelyLocksGlobalLock) {
+    const auto testFn = [&](bool withLocks) {
+        const auto acquisitionRequest1 =
+            CollectionAcquisitionRequest(nssUnshardedCollection1,
+                                         PlacementConcern{},
+                                         repl::ReadConcernArgs(),
+                                         AcquisitionPrerequisites::kRead);
+
+        const auto acquisitionRequest2 =
+            CollectionAcquisitionRequest(nssShardedCollection1,
+                                         PlacementConcern{},
+                                         repl::ReadConcernArgs(),
+                                         AcquisitionPrerequisites::kRead);
+
+        // Acquire two collections in different acquisitions.
+        boost::optional<CollectionAcquisition> acquisition1 = withLocks
+            ? acquireCollection(opCtx(), acquisitionRequest1, MODE_IS)
+            : acquireCollectionMaybeLockFree(opCtx(), acquisitionRequest1);
+
+        boost::optional<CollectionAcquisition> acquisition2 = withLocks
+            ? acquireCollection(opCtx(), acquisitionRequest2, MODE_IS)
+            : acquireCollectionMaybeLockFree(opCtx(), acquisitionRequest2);
+
+        // Check locked recursively.
+        ASSERT_TRUE(opCtx()->lockState()->isReadLocked());  // Global lock
+        ASSERT_TRUE(opCtx()->lockState()->isGlobalLockedRecursively());
+        if (!withLocks) {
+            ASSERT_TRUE(opCtx()->isLockFreeReadsOp());
+        }
+
+        // Release one acquisition. Check no longer locked recursively.
+        acquisition1.reset();
+        ASSERT_TRUE(opCtx()->lockState()->isReadLocked());  // Global lock
+        ASSERT_FALSE(opCtx()->lockState()->isGlobalLockedRecursively());
+        if (!withLocks) {
+            ASSERT_TRUE(opCtx()->isLockFreeReadsOp());
+        }
+
+        // Release the other acquisition. Check no locks are held.
+        acquisition2.reset();
+        ASSERT_FALSE(opCtx()->lockState()->isReadLocked());  // Global lock
+        ASSERT_FALSE(opCtx()->lockState()->isGlobalLockedRecursively());
+        if (!withLocks) {
+            ASSERT_FALSE(opCtx()->isLockFreeReadsOp());
+        }
+    };
+
+    testFn(true);   // with locks
+    testFn(false);  // lock-free
+}
+
 }  // namespace
 }  // namespace mongo

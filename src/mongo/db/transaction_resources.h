@@ -112,8 +112,8 @@ struct AcquiredCollection {
     AcquiredCollection(AcquisitionPrerequisites prerequisites,
                        std::shared_ptr<Lock::DBLock> dbLock,
                        boost::optional<Lock::CollectionLock> collectionLock,
-                       boost::optional<LockFreeReadsBlock> lockFreeReadsBlock,
-                       boost::optional<Lock::GlobalLock> globalLock,
+                       std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock,
+                       std::shared_ptr<Lock::GlobalLock> globalLock,
                        boost::optional<ScopedCollectionDescription> collectionDescription,
                        boost::optional<ScopedCollectionFilter> ownershipFilter,
                        CollectionPtr collectionPtr)
@@ -134,8 +134,8 @@ struct AcquiredCollection {
         : AcquiredCollection(std::move(prerequisites),
                              std::move(dbLock),
                              std::move(collectionLock),
-                             boost::none,
-                             boost::none,
+                             nullptr,
+                             nullptr,
                              boost::none,
                              boost::none,
                              std::move(collectionPtr)){};
@@ -145,8 +145,9 @@ struct AcquiredCollection {
     std::shared_ptr<Lock::DBLock> dbLock;
     boost::optional<Lock::CollectionLock> collectionLock;
 
-    boost::optional<LockFreeReadsBlock> lockFreeReadsBlock;
-    boost::optional<Lock::GlobalLock> globalLock;
+    std::shared_ptr<LockFreeReadsBlock> lockFreeReadsBlock;
+    std::shared_ptr<Lock::GlobalLock> globalLock;  // Only for lock-free acquisitions. Otherwise the
+                                                   // global lock is held by 'dbLock'.
 
     boost::optional<ScopedCollectionDescription> collectionDescription;
     boost::optional<ScopedCollectionFilter> ownershipFilter;
