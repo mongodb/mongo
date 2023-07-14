@@ -157,6 +157,14 @@ structs:
                       transaction."
         type: bool
         optional: true
+      placementConflictTime:
+        description: "This optional value represents a conservative upper bound for placement
+                      changes (i.e., chunk migrations) for any collection which might be accessed
+                      for the lifetime of the transaction. If specified, transactions will fail with
+                      a retryable MigrationConflict error if any placement changes have committed
+                      since this time."
+        type: logicalTime
+        optional: true
 
   OperationSessionInfoFromClientBase:
     description: "Parser for pulling out session transaction metadata from commands, as opposed to
