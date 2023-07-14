@@ -378,6 +378,10 @@ void clear(BucketCatalog& catalog, const DatabaseName& dbName) {
           [dbName](const NamespaceString& bucketNs) { return bucketNs.dbName() == dbName; });
 }
 
+void resetBucketOIDCounter() {
+    internal::resetBucketOIDCounter();
+}
+
 void appendExecutionStats(const BucketCatalog& catalog,
                           const NamespaceString& ns,
                           BSONObjBuilder& builder) {

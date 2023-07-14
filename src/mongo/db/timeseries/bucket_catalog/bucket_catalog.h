@@ -293,6 +293,11 @@ void clear(BucketCatalog& catalog, const NamespaceString& ns);
 void clear(BucketCatalog& catalog, const DatabaseName& dbName);
 
 /**
+ * Resets the counter used for bucket OID generation. Should be called after a bucket _id collision.
+ */
+void resetBucketOIDCounter();
+
+/**
  * Appends the execution stats for the given namespace to the builder.
  */
 void appendExecutionStats(const BucketCatalog& catalog,
