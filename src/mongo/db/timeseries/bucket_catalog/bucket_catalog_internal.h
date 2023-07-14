@@ -295,6 +295,11 @@ void expireIdleBuckets(BucketCatalog& catalog,
 std::pair<OID, Date_t> generateBucketOID(const Date_t& time, const TimeseriesOptions& options);
 
 /**
+ * Resets the counter used for bucket OID generation. Should be called after a collision.
+ */
+void resetBucketOIDCounter();
+
+/**
  * Allocates a new bucket and adds it to the catalog.
  */
 Bucket& allocateBucket(BucketCatalog& catalog,

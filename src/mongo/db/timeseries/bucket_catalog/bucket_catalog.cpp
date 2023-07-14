@@ -369,6 +369,10 @@ void clear(BucketCatalog& catalog, StringData dbName) {
     });
 }
 
+void resetBucketOIDCounter() {
+    internal::resetBucketOIDCounter();
+}
+
 void appendExecutionStats(const BucketCatalog& catalog,
                           const NamespaceString& ns,
                           BSONObjBuilder& builder) {
