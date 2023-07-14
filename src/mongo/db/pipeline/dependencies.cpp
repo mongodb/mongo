@@ -116,7 +116,7 @@ void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type, bool r
 }
 
 // Returns true if the lhs value should sort before the rhs, false otherwise.
-bool PathComparator::operator()(const std::string& lhs, const std::string& rhs) const {
+bool PathComparator::operator()(StringData lhs, StringData rhs) const {
     constexpr char dot = '.';
 
     for (size_t pos = 0, len = std::min(lhs.size(), rhs.size()); pos < len; ++pos) {

@@ -46,8 +46,10 @@ namespace mongo {
  * This ensures that a parent field is ordered directly before its children.
  */
 struct PathComparator {
+    using is_transparent = void;
+
     /* Returns true if the lhs value should sort before the rhs, false otherwise. */
-    bool operator()(const std::string& lhs, const std::string& rhs) const;
+    bool operator()(StringData lhs, StringData rhs) const;
 };
 
 /**

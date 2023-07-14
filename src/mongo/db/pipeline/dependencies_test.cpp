@@ -320,23 +320,47 @@ TEST(DependenciesToProjectionTest, SortFieldPaths) {
 
 TEST(DependenciesToProjectionTest, PathLessThan) {
     auto lessThan = PathComparator();
-    ASSERT_FALSE(lessThan("a", "a"));
-    ASSERT_TRUE(lessThan("a", "aa"));
-    ASSERT_TRUE(lessThan("a", "b"));
-    ASSERT_TRUE(lessThan("", "a"));
-    ASSERT_TRUE(lessThan("Aa", "aa"));
-    ASSERT_TRUE(lessThan("a.b", "ab"));
-    ASSERT_TRUE(lessThan("a.b", "a-b"));  // SERVER-66418
-    ASSERT_TRUE(lessThan("a.b", "a b"));  // SERVER-66418
-    // verify the difference from the standard sort
+
+    // Test std::string type comparison.
+    ASSERT_FALSE(lessThan(std::string("a"), std::string("a")));
+    ASSERT_TRUE(lessThan(std::string("a"), std::string("aa")));
+    ASSERT_TRUE(lessThan(std::string("a"), std::string("b")));
+    ASSERT_TRUE(lessThan(std::string(""), std::string("a")));
+    ASSERT_TRUE(lessThan(std::string("Aa"), std::string("aa")));
+    ASSERT_TRUE(lessThan(std::string("a.b"), std::string("ab")));
+    ASSERT_TRUE(lessThan(std::string("a.b"), std::string("a-b")));  // SERVER-66418
+    ASSERT_TRUE(lessThan(std::string("a.b"), std::string("a b")));  // SERVER-66418
+    // Verify the difference from the standard sort.
     ASSERT_TRUE(std::string("a.b") > std::string("a-b"));
     ASSERT_TRUE(std::string("a.b") > std::string("a b"));
-    // test unicode behavior
-    ASSERT_TRUE(lessThan("a.b", "a🌲"));
-    ASSERT_TRUE(lessThan("a.b", "a🌲b"));
-    ASSERT_TRUE(lessThan("🌲", "🌳"));  // U+1F332 < U+1F333
-    ASSERT_TRUE(lessThan("🌲", "🌲.b"));
-    ASSERT_FALSE(lessThan("🌲.b", "🌲"));
+    // Test unicode behavior.
+    ASSERT_TRUE(lessThan(std::string("a.b"), std::string("a🌲")));
+    ASSERT_TRUE(lessThan(std::string("a.b"), std::string("a🌲b")));
+    ASSERT_TRUE(lessThan(std::string("🌲"), std::string("🌳")));  // U+1F332 < U+1F333
+    ASSERT_TRUE(lessThan(std::string("🌲"), std::string("🌲.b")));
+    ASSERT_FALSE(lessThan(std::string("🌲.b"), std::string("🌲")));
+
+    // Test StringData type comparison.
+    ASSERT_FALSE(lessThan(StringData("a"), StringData("a")));
+    ASSERT_TRUE(lessThan(StringData("a"), StringData("aa")));
+    ASSERT_TRUE(lessThan(StringData("a"), StringData("b")));
+    ASSERT_TRUE(lessThan(StringData(""), StringData("a")));
+    ASSERT_TRUE(lessThan(StringData("Aa"), StringData("aa")));
+    ASSERT_TRUE(lessThan(StringData("a.b"), StringData("ab")));
+
+    ASSERT_TRUE(lessThan(StringData("a.b"), StringData("a-b")));  // SERVER-66418
+    ASSERT_TRUE(lessThan(StringData("a.b"), StringData("a b")));  // SERVER-66418
+
+    // Verify the difference from the standard sort.
+    ASSERT_TRUE(StringData("a.b") > StringData("a-b"));
+    ASSERT_TRUE(StringData("a.b") > StringData("a b"));
+
+    // Test unicode behavior.
+    ASSERT_TRUE(lessThan(StringData("a.b"), StringData("a🌲")));
+    ASSERT_TRUE(lessThan(StringData("a.b"), StringData("a🌲b")));
+    ASSERT_TRUE(lessThan(StringData("🌲"), StringData("🌳")));  // U+1F332 < U+1F333
+    ASSERT_TRUE(lessThan(StringData("🌲"), StringData("🌲.b")));
+    ASSERT_FALSE(lessThan(StringData("🌲.b"), StringData("🌲")));
 }
 
 }  // namespace
