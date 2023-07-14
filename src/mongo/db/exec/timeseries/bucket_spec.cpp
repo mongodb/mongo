@@ -1003,18 +1003,18 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
             .residualExpr = std::move(residualPred)};
 }
 
-BucketSpec::BucketSpec(std::string timeField,
-                       boost::optional<std::string> metaField,
-                       StringSet fields,
+BucketSpec::BucketSpec(const std::string& timeField,
+                       const boost::optional<std::string>& metaField,
+                       const std::set<std::string>& fields,
                        Behavior behavior,
-                       StringSet computedProjections,
+                       const std::set<std::string>& computedProjections,
                        bool usesExtendedRange)
-    : _fieldSet(std::move(fields)),
+    : _fieldSet(fields),
       _behavior(behavior),
-      _computedMetaProjFields(std::move(computedProjections)),
-      _timeField(std::move(timeField)),
+      _computedMetaProjFields(computedProjections),
+      _timeField(timeField),
       _timeFieldHashed(FieldNameHasher().hashedFieldName(_timeField)),
-      _metaField(std::move(metaField)),
+      _metaField(metaField),
       _usesExtendedRange(usesExtendedRange) {
     if (_metaField) {
         _metaFieldHashed = FieldNameHasher().hashedFieldName(*_metaField);

@@ -893,7 +893,7 @@ TEST_F(InternalUnpackBucketExecTest, ParserRejectsBothIncludeAndExcludeParameter
 
 TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsIncludeMeta) {
     auto bson = fromjson(
-        "{$_internalUnpackBucket: {include: ['meta', 'steve'], timeField: 'time', metaField: "
+        "{$_internalUnpackBucket: {include: ['steve', 'meta'], timeField: 'time', metaField: "
         "'meta', bucketMaxSpanSeconds: 3600}}");
     auto array = std::vector<Value>{};
     DocumentSourceInternalUnpackBucket::createFromBsonInternal(bson.firstElement(), getExpCtx())

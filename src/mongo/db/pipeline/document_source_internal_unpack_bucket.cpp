@@ -535,13 +535,9 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
         _bucketUnpacker.behavior() == BucketSpec::Behavior::kInclude ? kInclude : kExclude;
     const auto& spec = _bucketUnpacker.bucketSpec();
     std::vector<Value> fields;
-    fields.reserve(spec.fieldSet().size() + 1);
-    std::transform(spec.fieldSet().cbegin(),
-                   spec.fieldSet().cend(),
-                   std::back_inserter(fields),
-                   [opts](auto&& fieldString) {
-                       return Value{opts.serializeFieldPathFromString(fieldString)};
-                   });
+    for (auto&& field : spec.fieldSet()) {
+        fields.emplace_back(opts.serializeFieldPathFromString(field));
+    }
     if (((_bucketUnpacker.includeMetaField() &&
           _bucketUnpacker.behavior() == BucketSpec::Behavior::kInclude) ||
          (!_bucketUnpacker.includeMetaField() &&
@@ -551,8 +547,6 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
                   *spec.metaField()) == spec.computedMetaProjFields().cend())
         fields.emplace_back(opts.serializeFieldPathFromString(*spec.metaField()));
 
-    ValueComparator defaultComparator{};
-    std::sort(fields.begin(), fields.end(), defaultComparator.getLessThan());
     out.addField(behavior, Value{std::move(fields)});
     out.addField(timeseries::kTimeFieldName,
                  Value{opts.serializeFieldPathFromString(spec.timeField())});
@@ -574,19 +568,17 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
     }
 
     if (!spec.computedMetaProjFields().empty())
-        out.addField(
-            "computedMetaProjFields", Value{[&] {
-                std::vector<Value> compFields;
-                compFields.reserve(spec.computedMetaProjFields().size());
-                std::transform(spec.computedMetaProjFields().cbegin(),
-                               spec.computedMetaProjFields().cend(),
-                               std::back_inserter(compFields),
-                               [opts](auto&& projString) {
-                                   return Value{opts.serializeFieldPathFromString(projString)};
-                               });
-                std::sort(compFields.begin(), compFields.end(), defaultComparator.getLessThan());
-                return compFields;
-            }()});
+        out.addField("computedMetaProjFields", Value{[&] {
+                         std::vector<Value> compFields;
+                         std::transform(spec.computedMetaProjFields().cbegin(),
+                                        spec.computedMetaProjFields().cend(),
+                                        std::back_inserter(compFields),
+                                        [opts](auto&& projString) {
+                                            return Value{
+                                                opts.serializeFieldPathFromString(projString)};
+                                        });
+                         return compFields;
+                     }()});
 
     if (_bucketUnpacker.includeMinTimeAsMetadata()) {
         out.addField(kIncludeMinTimeAsMetadata,
@@ -726,7 +718,7 @@ void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& proje
                                                             bool isInclusion) {
     // 'fields' are the top-level fields to be included/excluded by the unpacker. We handle the
     // special case of _id, which may be excluded in an inclusion $project (or vice versa), here.
-    auto fields = project.getFieldNames<StringSet>();
+    auto fields = project.getFieldNames<std::set<std::string>>();
     if (auto elt = project.getField("_id"); (elt.isBoolean() && elt.Bool() != isInclusion) ||
         (elt.isNumber() && (elt.Int() == 1) != isInclusion)) {
         fields.erase("_id");

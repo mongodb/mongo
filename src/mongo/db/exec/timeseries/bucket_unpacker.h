@@ -180,7 +180,7 @@ public:
 
     // Fill _spec.unpackFieldsToIncludeExclude with final list of fields to include/exclude during
     // unpacking. Only calculates the list the first time it is called.
-    const StringSet& fieldsToIncludeExcludeDuringUnpack();
+    const std::set<std::string>& fieldsToIncludeExcludeDuringUnpack();
 
     class UnpackingImpl;
 
@@ -249,6 +249,6 @@ private:
 
     // Final list of fields to include/exclude during unpacking. This is computed once during the
     // first doGetNext call so we don't have to recalculate every time we reach a new bucket.
-    boost::optional<StringSet> _unpackFieldsToIncludeExclude = boost::none;
+    boost::optional<std::set<std::string>> _unpackFieldsToIncludeExclude = boost::none;
 };
 }  // namespace mongo

@@ -409,7 +409,7 @@ TEST_F(OptimizePipeline, ProjectThenMixedMatchPushedDown) {
                                "{$type: [ \"$control.max.a\" ]} ]}} ]} ]}}"),
                       stages[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(
-        fromjson("{ $_internalUnpackBucket: { include: [ \"_id\", \"a\", \"myMeta\", \"x\" ], "
+        fromjson("{ $_internalUnpackBucket: { include: [ \"_id\", \"a\", \"x\", \"myMeta\" ], "
                  "timeField: \"time\", metaField: \"myMeta\", bucketMaxSpanSeconds: 3600, "
                  "eventFilter: { a: { $lte: 4 } } } }"),
         stages[1].getDocument().toBson());
@@ -539,7 +539,7 @@ TEST_F(OptimizePipeline, MetaSortThenProjectPushedDown) {
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {meta: -1}}"), serialized[0]);
     ASSERT_BSONOBJ_EQ(
-        fromjson("{$_internalUnpackBucket: { include: ['_id', 'myMeta', 'x'], timeField: 'time', "
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'x', 'myMeta'], timeField: 'time', "
                  "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
         serialized[1]);
 }
@@ -560,7 +560,7 @@ TEST_F(OptimizePipeline, ProjectThenMetaSortPushedDown) {
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {meta: -1}}"), serialized[0]);
     ASSERT_BSONOBJ_EQ(
-        fromjson("{$_internalUnpackBucket: { include: ['_id', 'myMeta', 'x'], timeField: 'time', "
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'x', 'myMeta'], timeField: 'time', "
                  "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
         serialized[1]);
 }
@@ -767,11 +767,10 @@ TEST_F(OptimizePipeline, InternalizeProjectAndPushdownAddFields) {
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {newMeta: '$meta.a'}}"), serialized[0]);
-    ASSERT_BSONOBJ_EQ(
-        fromjson("{$_internalUnpackBucket: { include: ['_id', "
-                 "'myMeta', 'newMeta', 'x', 'y'], timeField: 'time', metaField: 'myMeta', "
-                 "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['newMeta']}}"),
-        serialized[1]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'newMeta', 'x', 'y', "
+                               "'myMeta'], timeField: 'time', metaField: 'myMeta', "
+                               "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['newMeta']}}"),
+                      serialized[1]);
 }
 
 TEST_F(OptimizePipeline, DoNotSwapAddFieldsIfDependencyIsExcluded) {

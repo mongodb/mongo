@@ -67,11 +67,11 @@ public:
     enum class Behavior { kInclude, kExclude };
 
     BucketSpec() = default;
-    BucketSpec(std::string timeField,
-               boost::optional<std::string> metaField,
-               StringSet fields = {},
+    BucketSpec(const std::string& timeField,
+               const boost::optional<std::string>& metaField,
+               const std::set<std::string>& fields = {},
                Behavior behavior = Behavior::kExclude,
-               StringSet computedProjections = {},
+               const std::set<std::string>& computedProjections = {},
                bool usesExtendedRange = false);
     BucketSpec(const BucketSpec&);
     BucketSpec(BucketSpec&&);
@@ -91,7 +91,7 @@ public:
     const boost::optional<std::string>& metaField() const;
     boost::optional<HashedFieldName> metaFieldHashed() const;
 
-    void setFieldSet(StringSet& fieldSet) {
+    void setFieldSet(std::set<std::string>& fieldSet) {
         _fieldSet = std::move(fieldSet);
     }
 
@@ -103,7 +103,7 @@ public:
         _fieldSet.erase(field);
     }
 
-    const StringSet& fieldSet() const {
+    const std::set<std::string>& fieldSet() const {
         return _fieldSet;
     }
 
@@ -119,7 +119,7 @@ public:
         _computedMetaProjFields.emplace(field);
     }
 
-    const StringSet& computedMetaProjFields() const {
+    const std::set<std::string>& computedMetaProjFields() const {
         return _computedMetaProjFields;
     }
 
@@ -261,12 +261,12 @@ public:
 
 private:
     // The set of field names in the data region that should be included or excluded.
-    StringSet _fieldSet;
+    std::set<std::string> _fieldSet;
     Behavior _behavior = Behavior::kExclude;
 
     // Set of computed meta field projection names. Added at the end of materialized
     // measurements.
-    StringSet _computedMetaProjFields;
+    std::set<std::string> _computedMetaProjFields;
 
     std::string _timeField;
     boost::optional<HashedFieldName> _timeFieldHashed;
@@ -281,9 +281,10 @@ private:
  */
 inline bool determineIncludeField(StringData fieldName,
                                   BucketSpec::Behavior unpackerBehavior,
-                                  const StringSet& unpackFieldsToIncludeExclude) {
+                                  const std::set<std::string>& unpackFieldsToIncludeExclude) {
     const bool isInclude = unpackerBehavior == BucketSpec::Behavior::kInclude;
-    const bool unpackFieldsContains = unpackFieldsToIncludeExclude.contains(fieldName);
+    const bool unpackFieldsContains = unpackFieldsToIncludeExclude.find(fieldName.toString()) !=
+        unpackFieldsToIncludeExclude.cend();
     return isInclude == unpackFieldsContains;
 }
 }  // namespace mongo
