@@ -33,6 +33,7 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/idl/mutable_observer_registry.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
@@ -138,6 +139,8 @@ public:
      */
     static QueryAnalysisWriter* get(OperationContext* opCtx);
     static QueryAnalysisWriter* get(ServiceContext* serviceContext);
+
+    static inline MutableObserverRegistry<int32_t> observeQueryAnalysisWriterIntervalSecs;
 
     /**
      * ReplicaSetAwareService methods:
@@ -260,10 +263,10 @@ private:
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisWriter::_mutex");
 
-    PeriodicJobAnchor _periodicQueryWriter;
+    std::shared_ptr<PeriodicJobAnchor> _periodicQueryWriter;
     Buffer _queries{NamespaceString::kConfigSampledQueriesNamespace};
 
-    PeriodicJobAnchor _periodicDiffWriter;
+    std::shared_ptr<PeriodicJobAnchor> _periodicDiffWriter;
     Buffer _diffs{NamespaceString::kConfigSampledQueriesDiffNamespace};
 
     // Initialized on startup and joined on shutdown.

@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/idl/mutable_observer_registry.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
@@ -88,8 +89,6 @@ public:
 
     private:
         double _calculateExponentialMovingAverage(double prevAvg, long long newVal) const;
-
-        const double _smoothingFactor = gQueryAnalysisQueryStatsSmoothingFactor;
 
         // The counts for update, delete and find are already tracked by the OpCounters.
         long long _lastFindAndModifyQueriesCount = 0;
@@ -190,6 +189,9 @@ public:
     static QueryAnalysisSampler& get(OperationContext* opCtx);
     static QueryAnalysisSampler& get(ServiceContext* serviceContext);
 
+    static inline MutableObserverRegistry<int32_t>
+        observeQueryAnalysisSamplerConfigurationRefreshSecs;
+
     void onStartup();
 
     void onShutdown();
@@ -250,7 +252,7 @@ private:
     PeriodicJobAnchor _periodicQueryStatsRefresher;
     QueryStats _queryStats;
 
-    PeriodicJobAnchor _periodicConfigurationsRefresher;
+    std::shared_ptr<PeriodicJobAnchor> _periodicConfigurationsRefresher;
     std::map<NamespaceString, SampleRateLimiter> _sampleRateLimiters;
     std::array<AtomicWord<uint64_t>, srlBloomFilterNumBlocks> _srlBloomFilter{};
 };
