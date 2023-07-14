@@ -304,6 +304,12 @@ public:
      */
     void appendGlobalExecutionStats(BSONObjBuilder* builder) const;
 
+    /**
+     * Resets the counter used for bucket OID generation. Should be called after a bucket _id
+     * collision.
+     */
+    void resetBucketOIDCounter();
+
 private:
     enum class BucketState {
         // Bucket can be inserted into, and does not have an outstanding prepared commit
