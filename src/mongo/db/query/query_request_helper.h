@@ -91,13 +91,6 @@ std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
     bool apiStrict = false);
 
 /**
- * Converts this FindCommandRequest into an aggregation using $match. If this FindCommandRequest has
- * options that cannot be satisfied by aggregation, a non-OK status is returned and 'cmdBuilder' is
- * not modified.
- */
-StatusWith<BSONObj> asAggregationCommand(const FindCommandRequest& findCommand);
-
-/**
  * Helper function to identify text search sort key
  * Example: {a: {$meta: "textScore"}}
  */

@@ -39,6 +39,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -1247,127 +1248,139 @@ TEST(QueryRequestTest, ParseMaxTimeMSPositiveInRangeSucceeds) {
 
 TEST(QueryRequestTest, ConvertToAggregationSucceeds) {
     FindCommandRequest findCommand(testns);
-    auto agg = query_request_helper::asAggregationCommand(findCommand);
-    ASSERT_OK(agg);
+    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
-    ASSERT_OK(ar.getStatus());
-    ASSERT(!ar.getValue().getExplain());
-    ASSERT(!ar.getValue().getAllowDiskUse().has_value());
-    ASSERT(ar.getValue().getPipeline().empty());
-    ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
-                  aggregation_request_helper::kDefaultBatchSize),
+    ASSERT(!ar.getExplain());
+    ASSERT(!ar.getAllowDiskUse().has_value());
+    ASSERT(ar.getPipeline().empty());
+    ASSERT_EQ(ar.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
               aggregation_request_helper::kDefaultBatchSize);
-    ASSERT_EQ(ar.getValue().getNamespace(), testns);
-    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
+    ASSERT_EQ(ar.getNamespace(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getCollation().value_or(BSONObj()), BSONObj());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationOmitsExplain) {
     FindCommandRequest findCommand(testns);
-    auto agg = query_request_helper::asAggregationCommand(findCommand);
-    ASSERT_OK(agg);
+    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
-    ASSERT_OK(ar.getStatus());
-    ASSERT_FALSE(ar.getValue().getExplain());
-    ASSERT(ar.getValue().getPipeline().empty());
-    ASSERT_EQ(ar.getValue().getNamespace(), testns);
-    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
+    ASSERT_FALSE(ar.getExplain());
+    ASSERT(ar.getPipeline().empty());
+    ASSERT_EQ(ar.getNamespace(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getCollation().value_or(BSONObj()), BSONObj());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithHintSucceeds) {
     FindCommandRequest findCommand(testns);
     findCommand.setHint(fromjson("{a_1: -1}"));
-    const auto agg = query_request_helper::asAggregationCommand(findCommand);
-    ASSERT_OK(agg);
+    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
-    ASSERT_OK(ar.getStatus());
-    ASSERT_BSONOBJ_EQ(findCommand.getHint(), ar.getValue().getHint().value_or(BSONObj()));
+    ASSERT_BSONOBJ_EQ(findCommand.getHint(), ar.getHint().value_or(BSONObj()));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithMinFails) {
     FindCommandRequest findCommand(testns);
     findCommand.setMin(fromjson("{a: 1}"));
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
+    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
+                       DBException,
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithMaxFails) {
     FindCommandRequest findCommand(testns);
     findCommand.setMax(fromjson("{a: 1}"));
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
+    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
+                       DBException,
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithSingleBatchFieldFails) {
     FindCommandRequest findCommand(testns);
     findCommand.setSingleBatch(true);
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
+    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
+                       DBException,
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithSingleBatchFieldAndLimitFails) {
     FindCommandRequest findCommand(testns);
     findCommand.setSingleBatch(true);
     findCommand.setLimit(7);
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
+    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
+                       DBException,
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithSingleBatchFieldLimitOneSucceeds) {
     FindCommandRequest findCommand(testns);
     findCommand.setSingleBatch(true);
     findCommand.setLimit(1);
-    ASSERT_OK(query_request_helper::asAggregationCommand(findCommand));
+
+    ASSERT_DOES_NOT_THROW(query_request_conversion::asAggregateCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithReturnKeyFails) {
     FindCommandRequest findCommand(testns);
     findCommand.setReturnKey(true);
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
+    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
+                       DBException,
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithShowRecordIdFails) {
     FindCommandRequest findCommand(testns);
     findCommand.setShowRecordId(true);
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
+    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
+                       DBException,
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithTailableFails) {
     FindCommandRequest findCommand(testns);
     query_request_helper::setTailableMode(TailableModeEnum::kTailable, &findCommand);
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
+    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
+                       DBException,
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithNoCursorTimeoutFails) {
     FindCommandRequest findCommand(testns);
     findCommand.setNoCursorTimeout(true);
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
+    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
+                       DBException,
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithAwaitDataFails) {
     FindCommandRequest findCommand(testns);
     query_request_helper::setTailableMode(TailableModeEnum::kTailableAndAwaitData, &findCommand);
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
+    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
+                       DBException,
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithAllowPartialResultsFails) {
     FindCommandRequest findCommand(testns);
     findCommand.setAllowPartialResults(true);
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
+    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
+                       DBException,
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenFails) {
     FindCommandRequest findCommand(testns);
     findCommand.setRequestResumeToken(true);
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
+    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
+                       DBException,
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithResumeAfterFails) {
     FindCommandRequest findCommand(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL);
     findCommand.setResumeAfter(resumeAfter);
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
+    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
+                       DBException,
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithPipeline) {
@@ -1378,18 +1391,13 @@ TEST(QueryRequestTest, ConvertToAggregationWithPipeline) {
     findCommand.setSkip(7);
     findCommand.setProjection(BSON("z" << 0));
 
-    auto agg = query_request_helper::asAggregationCommand(findCommand);
-    ASSERT_OK(agg);
+    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
-    ASSERT_OK(ar.getStatus());
-    ASSERT(!ar.getValue().getExplain());
-    ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
-                  aggregation_request_helper::kDefaultBatchSize),
+    ASSERT(!ar.getExplain());
+    ASSERT_EQ(ar.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
               aggregation_request_helper::kDefaultBatchSize);
-    ASSERT_EQ(ar.getValue().getNamespace(), testns);
-    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
+    ASSERT_EQ(ar.getNamespace(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getCollation().value_or(BSONObj()), BSONObj());
 
     std::vector<BSONObj> expectedPipeline{BSON("$match" << BSON("x" << 1)),
                                           BSON("$sort" << BSON("y" << -1)),
@@ -1398,7 +1406,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithPipeline) {
                                           BSON("$project" << BSON("z" << 0))};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
-                      ar.getValue().getPipeline().begin(),
+                      ar.getPipeline().begin(),
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
@@ -1406,112 +1414,87 @@ TEST(QueryRequestTest, ConvertToAggregationWithBatchSize) {
     FindCommandRequest findCommand(testns);
     findCommand.setBatchSize(4);
 
-    auto agg = query_request_helper::asAggregationCommand(findCommand);
-    ASSERT_OK(agg);
+    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
-    ASSERT_OK(ar.getStatus());
-    ASSERT(!ar.getValue().getExplain());
-    ASSERT_EQ(ar.getValue().getNamespace(), testns);
-    ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
-                  aggregation_request_helper::kDefaultBatchSize),
+    ASSERT(!ar.getExplain());
+    ASSERT_EQ(ar.getNamespace(), testns);
+    ASSERT_EQ(ar.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
               4LL);
-    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
+    ASSERT_BSONOBJ_EQ(ar.getCollation().value_or(BSONObj()), BSONObj());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithMaxTimeMS) {
     FindCommandRequest findCommand(testns);
     findCommand.setMaxTimeMS(9);
 
-    auto agg = query_request_helper::asAggregationCommand(findCommand);
-    ASSERT_OK(agg);
+    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
-    const BSONObj cmdObj = agg.getValue();
-    ASSERT_EQ(cmdObj["maxTimeMS"].Int(), 9);
+    ASSERT_TRUE(ar.getMaxTimeMS().has_value());
+    ASSERT_EQ(ar.getMaxTimeMS().get(), 9);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), cmdObj).body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
-    ASSERT_OK(ar.getStatus());
-    ASSERT(!ar.getValue().getExplain());
-    ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
-                  aggregation_request_helper::kDefaultBatchSize),
+    ASSERT(!ar.getExplain());
+    ASSERT_EQ(ar.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
               aggregation_request_helper::kDefaultBatchSize);
-    ASSERT_EQ(ar.getValue().getNamespace(), testns);
-    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
+    ASSERT_EQ(ar.getNamespace(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getCollation().value_or(BSONObj()), BSONObj());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithCollationSucceeds) {
     FindCommandRequest findCommand(testns);
     findCommand.setCollation(BSON("f" << 1));
-    auto agg = query_request_helper::asAggregationCommand(findCommand);
-    ASSERT_OK(agg);
+    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
-    ASSERT_OK(ar.getStatus());
-    ASSERT(!ar.getValue().getExplain());
-    ASSERT(ar.getValue().getPipeline().empty());
-    ASSERT_EQ(ar.getValue().getCursor().getBatchSize().value_or(
-                  aggregation_request_helper::kDefaultBatchSize),
+    ASSERT(!ar.getExplain());
+    ASSERT(ar.getPipeline().empty());
+    ASSERT_EQ(ar.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
               aggregation_request_helper::kDefaultBatchSize);
-    ASSERT_EQ(ar.getValue().getNamespace(), testns);
-    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSON("f" << 1));
+    ASSERT_EQ(ar.getNamespace(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getCollation().value_or(BSONObj()), BSON("f" << 1));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithReadOnceFails) {
     FindCommandRequest findCommand(testns);
     findCommand.setReadOnce(true);
-    const auto aggCmd = query_request_helper::asAggregationCommand(findCommand);
-    ASSERT_EQ(ErrorCodes::InvalidPipelineOperator, aggCmd.getStatus().code());
+    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
+                       DBException,
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithAllowSpeculativeMajorityReadFails) {
     FindCommandRequest findCommand(testns);
     findCommand.setAllowSpeculativeMajorityRead(true);
-    const auto aggCmd = query_request_helper::asAggregationCommand(findCommand);
-    ASSERT_EQ(ErrorCodes::InvalidPipelineOperator, aggCmd.getStatus().code());
+    ASSERT_THROWS_CODE(query_request_conversion::asAggregateCommandRequest(findCommand),
+                       DBException,
+                       ErrorCodes::InvalidPipelineOperator);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithLegacyRuntimeConstantsSucceeds) {
     LegacyRuntimeConstants rtc{Date_t::now(), Timestamp(1, 1)};
     FindCommandRequest findCommand(testns);
     findCommand.setLegacyRuntimeConstants(rtc);
-    auto agg = query_request_helper::asAggregationCommand(findCommand);
-    ASSERT_OK(agg);
+    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
-    ASSERT_OK(ar.getStatus());
-    ASSERT(ar.getValue().getLegacyRuntimeConstants().has_value());
-    ASSERT_EQ(ar.getValue().getLegacyRuntimeConstants()->getLocalNow(), rtc.getLocalNow());
-    ASSERT_EQ(ar.getValue().getLegacyRuntimeConstants()->getClusterTime(), rtc.getClusterTime());
+    ASSERT(ar.getLegacyRuntimeConstants().has_value());
+    ASSERT_EQ(ar.getLegacyRuntimeConstants()->getLocalNow(), rtc.getLocalNow());
+    ASSERT_EQ(ar.getLegacyRuntimeConstants()->getClusterTime(), rtc.getClusterTime());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseTrueSucceeds) {
     FindCommandRequest findCommand(testns);
     findCommand.setAllowDiskUse(true);
-    const auto agg = query_request_helper::asAggregationCommand(findCommand);
-    ASSERT_OK(agg.getStatus());
+    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
-    ASSERT_OK(ar.getStatus());
-    ASSERT(ar.getValue().getAllowDiskUse().has_value());
-    ASSERT_EQ(true, ar.getValue().getAllowDiskUse());
+    ASSERT(ar.getAllowDiskUse().has_value());
+    ASSERT_EQ(true, ar.getAllowDiskUse());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseFalseSucceeds) {
     FindCommandRequest findCommand(testns);
     findCommand.setAllowDiskUse(false);
-    const auto agg = query_request_helper::asAggregationCommand(findCommand);
-    ASSERT_OK(agg.getStatus());
+    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
-    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
-    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
-    ASSERT_OK(ar.getStatus());
-    ASSERT(ar.getValue().getAllowDiskUse().has_value());
-    ASSERT_EQ(false, ar.getValue().getAllowDiskUse());
+    ASSERT(ar.getAllowDiskUse().has_value());
+    ASSERT_EQ(false, ar.getAllowDiskUse());
 }
 
 TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseTrueSucceeds) {

@@ -37,6 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/telemetry.h"
 #include "mongo/db/stats/counters.h"
@@ -181,17 +182,9 @@ public:
                 auto bodyBuilder = result->getBodyBuilder();
                 bodyBuilder.resetToEmpty();
 
-                auto aggCmdOnView =
-                    uassertStatusOK(query_request_helper::asAggregationCommand(*findCommand));
-                auto viewAggregationCommand =
-                    OpMsgRequest::fromDBAndBody(_dbName.db(), aggCmdOnView).body;
-
-                auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
-                    opCtx,
-                    ns(),
-                    viewAggregationCommand,
-                    verbosity,
-                    APIParameters::get(opCtx).getAPIStrict().value_or(false));
+                auto aggRequestOnView =
+                    query_request_conversion::asAggregateCommandRequest(*findCommand);
+                aggRequestOnView.setExplain(verbosity);
 
                 // An empty PrivilegeVector is acceptable because these privileges are only checked
                 // on getMore and explain will not open a cursor.
@@ -251,17 +244,8 @@ public:
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 result->reset();
 
-                auto aggCmdOnView = uassertStatusOK(
-                    query_request_helper::asAggregationCommand(cq->getFindCommandRequest()));
-                auto viewAggregationCommand =
-                    OpMsgRequest::fromDBAndBody(_dbName.db(), aggCmdOnView).body;
-
-                auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
-                    opCtx,
-                    ns(),
-                    viewAggregationCommand,
-                    boost::none,
-                    APIParameters::get(opCtx).getAPIStrict().value_or(false));
+                auto aggRequestOnView = query_request_conversion::asAggregateCommandRequest(
+                    cq->getFindCommandRequest());
 
                 auto bodyBuilder = result->getBodyBuilder();
                 uassertStatusOK(ClusterAggregate::retryOnViewError(

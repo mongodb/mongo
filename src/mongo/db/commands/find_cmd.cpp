@@ -44,6 +44,7 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
@@ -326,28 +327,14 @@ public:
                 // Convert the find command into an aggregation using $match (and other stages, as
                 // necessary), if possible.
                 const auto& findCommand = cq->getFindCommandRequest();
-                auto viewAggregationCommand =
-                    uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
-
-                auto viewAggCmd =
-                    OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                        _dbName, _request.validatedTenancyScope, viewAggregationCommand)
-                        .body;
-
-                // Create the agg request equivalent of the find operation, with the explain
-                // verbosity included.
-                auto aggRequest = aggregation_request_helper::parseFromBSON(
-                    opCtx,
-                    nss,
-                    viewAggCmd,
-                    verbosity,
-                    APIParameters::get(opCtx).getAPIStrict().value_or(false));
+                auto aggRequest = query_request_conversion::asAggregateCommandRequest(findCommand);
+                aggRequest.setExplain(verbosity);
 
                 try {
                     // An empty PrivilegeVector is acceptable because these privileges are only
                     // checked on getMore and explain will not open a cursor.
                     uassertStatusOK(runAggregate(
-                        opCtx, nss, aggRequest, viewAggCmd, PrivilegeVector(), result));
+                        opCtx, nss, aggRequest, _request.body, PrivilegeVector(), result));
                 } catch (DBException& error) {
                     if (error.code() == ErrorCodes::InvalidPipelineOperator) {
                         uasserted(ErrorCodes::InvalidPipelineOperator,
@@ -569,18 +556,24 @@ public:
                 // Convert the find command into an aggregation using $match (and other stages, as
                 // necessary), if possible.
                 const auto& findCommand = cq->getFindCommandRequest();
-                auto viewAggregationCommand =
-                    uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
-                auto aggRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    _dbName, _request.validatedTenancyScope, std::move(viewAggregationCommand));
-                BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, aggRequest);
-                auto status = getStatusFromCommandResult(aggResult);
+                auto aggRequest = query_request_conversion::asAggregateCommandRequest(findCommand);
+
+                auto privileges = uassertStatusOK(
+                    auth::getPrivilegesForAggregate(AuthorizationSession::get(opCtx->getClient()),
+                                                    aggRequest.getNamespace(),
+                                                    aggRequest,
+                                                    false));
+                auto status = runAggregate(opCtx,
+                                           aggRequest.getNamespace(),
+                                           aggRequest,
+                                           _request.body,
+                                           privileges,
+                                           result);
                 if (status.code() == ErrorCodes::InvalidPipelineOperator) {
                     uasserted(ErrorCodes::InvalidPipelineOperator,
                               str::stream() << "Unsupported in view pipeline: " << status.reason());
                 }
                 uassertStatusOK(status);
-                result->getBodyBuilder().appendElements(aggResult);
                 return;
             }
 
