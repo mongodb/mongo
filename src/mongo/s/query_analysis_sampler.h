@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/idl/mutable_observer_registry.h"
 #include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <map>
@@ -99,8 +100,6 @@ public:
 
     private:
         double _calculateExponentialMovingAverage(double prevAvg, long long newVal) const;
-
-        const double _smoothingFactor = gQueryAnalysisQueryStatsSmoothingFactor;
 
         // The counts for update, delete and find are already tracked by the OpCounters.
         long long _lastFindAndModifyQueriesCount = 0;
@@ -201,6 +200,9 @@ public:
     static QueryAnalysisSampler& get(OperationContext* opCtx);
     static QueryAnalysisSampler& get(ServiceContext* serviceContext);
 
+    static inline MutableObserverRegistry<int32_t>
+        observeQueryAnalysisSamplerConfigurationRefreshSecs;
+
     void onStartup();
 
     void onShutdown();
@@ -253,7 +255,7 @@ private:
     PeriodicJobAnchor _periodicQueryStatsRefresher;
     QueryStats _queryStats;
 
-    PeriodicJobAnchor _periodicConfigurationsRefresher;
+    std::shared_ptr<PeriodicJobAnchor> _periodicConfigurationsRefresher;
     std::map<NamespaceString, SampleRateLimiter> _sampleRateLimiters;
 };
 

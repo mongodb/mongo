@@ -78,7 +78,7 @@ namespace {
 
 using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
 
-const auto smoothingFactor = gQueryAnalysisQueryStatsSmoothingFactor;
+const auto smoothingFactor = gQueryAnalysisQueryStatsSmoothingFactor.load();
 
 class QueryAnalysisSamplerRateLimiterTest : public ServiceContextTest {
 public:

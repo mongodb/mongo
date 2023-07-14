@@ -32,6 +32,8 @@ global:
     cpp_namespace: "mongo::analyze_shard_key"
     cpp_includes:
         - "mongo/db/ops/write_ops.h"
+        - "mongo/db/s/query_analysis_writer.h"
+        - "mongo/s/query_analysis_sampler.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -100,8 +102,8 @@ server_parameters:
         description: The smoothing factor for the exponential moving average of the number
                      of queries that a sampler executes per second. The average determines the share
                      of the cluster-wide sample rate that will be assigned to the sampler.
-        set_at: startup
-        cpp_vartype: double
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<double>
         cpp_varname: gQueryAnalysisQueryStatsSmoothingFactor
         default: 0.125
         validator:
@@ -120,9 +122,10 @@ server_parameters:
     queryAnalysisSamplerConfigurationRefreshSecs:
         description: The interval in seconds at which a sampler refreshes its query analysis sample
                      rates.
-        set_at: startup
-        cpp_vartype: int
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
         cpp_varname: gQueryAnalysisSamplerConfigurationRefreshSecs
+        on_update: std::ref(QueryAnalysisSampler::observeQueryAnalysisSamplerConfigurationRefreshSecs)
         default: 10
         validator:
             gt: 0
@@ -138,9 +141,10 @@ server_parameters:
             gte: 1
     queryAnalysisWriterIntervalSecs:
         description: The interval in seconds at which sampled queries are written to disk.
-        set_at: startup
-        cpp_vartype: int
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
         cpp_varname: gQueryAnalysisWriterIntervalSecs
+        on_update: std::ref(QueryAnalysisWriter::observeQueryAnalysisWriterIntervalSecs)
         default: 90
         validator:
             gt: 0

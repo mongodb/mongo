@@ -81,6 +81,8 @@ namespace analyze_shard_key {
 namespace {
 
 using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
+using ConfigurationRefreshSecs =
+    decltype(QueryAnalysisSampler::observeQueryAnalysisSamplerConfigurationRefreshSecs)::Argument;
 
 MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisSampler);
 MONGO_FAIL_POINT_DEFINE(overwriteQueryAnalysisSamplerAvgLastCountToZero);
@@ -174,20 +176,32 @@ void QueryAnalysisSampler::onStartup() {
                       "error"_attr = redact(ex));
             }
         },
-        Seconds(gQueryAnalysisSamplerConfigurationRefreshSecs),
+        Seconds(gQueryAnalysisSamplerConfigurationRefreshSecs.load()),
         // TODO(SERVER-74662): Please revisit if this periodic job could be made killable.
         false /*isKillableByStepdown*/);
-    _periodicConfigurationsRefresher =
-        periodicRunner->makeJob(std::move(configurationsRefresherJob));
-    _periodicConfigurationsRefresher.start();
+    _periodicConfigurationsRefresher = std::make_shared<PeriodicJobAnchor>(
+        periodicRunner->makeJob(std::move(configurationsRefresherJob)));
+    _periodicConfigurationsRefresher->start();
+
+    QueryAnalysisSampler::observeQueryAnalysisSamplerConfigurationRefreshSecs.addObserver(
+        [refresher = _periodicConfigurationsRefresher](const ConfigurationRefreshSecs& secs) {
+            try {
+                refresher->setPeriod(Seconds(secs));
+            } catch (const DBException& ex) {
+                LOGV2(7891301,
+                      "Failed to update the period of the thread for refreshing query sampling "
+                      "configurations",
+                      "error"_attr = ex.toStatus());
+            }
+        });
 }
 
 void QueryAnalysisSampler::onShutdown() {
     if (_periodicQueryStatsRefresher.isValid()) {
         _periodicQueryStatsRefresher.stop();
     }
-    if (_periodicConfigurationsRefresher.isValid()) {
-        _periodicConfigurationsRefresher.stop();
+    if (_periodicConfigurationsRefresher && _periodicConfigurationsRefresher->isValid()) {
+        _periodicConfigurationsRefresher->stop();
     }
 }
 
@@ -205,7 +219,8 @@ void QueryAnalysisSampler::QueryStats::gotCommand(const StringData& cmdName) {
 
 double QueryAnalysisSampler::QueryStats::_calculateExponentialMovingAverage(
     double prevAvg, long long newVal) const {
-    return (1 - _smoothingFactor) * prevAvg + _smoothingFactor * newVal;
+    auto smoothingFactor = gQueryAnalysisQueryStatsSmoothingFactor.load();
+    return (1 - smoothingFactor) * prevAvg + smoothingFactor * newVal;
 }
 
 void QueryAnalysisSampler::QueryStats::refreshTotalCount() {

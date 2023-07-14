@@ -419,6 +419,8 @@ last-continuous:
     ticket: SERVER-78595
   - test_file: jstests/replsets/config_txns_reaping_interrupt.js
     ticket: SERVER-78187
+  - test_file: jstests/sharding/analyze_shard_key/query_sampling_server_params.js
+    ticket: SERVER-78913
   suites: null
 last-lts:
   all:
@@ -932,4 +934,6 @@ last-lts:
     ticket: SERVER-78786
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_snapshot.js
     ticket: SERVER-78855
+  - test_file: jstests/sharding/analyze_shard_key/query_sampling_server_params.js
+    ticket: SERVER-78913
   suites: null

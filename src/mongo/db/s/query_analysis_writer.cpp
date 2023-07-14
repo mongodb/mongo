@@ -89,6 +89,9 @@ namespace analyze_shard_key {
 
 namespace {
 
+using WriterIntervalSecs =
+    decltype(QueryAnalysisWriter::observeQueryAnalysisWriterIntervalSecs)::Argument;
+
 const auto getQueryAnalysisWriter = ServiceContext::declareDecoration<QueryAnalysisWriter>();
 
 static ReplicaSetAwareServiceRegistry::Registerer<QueryAnalysisWriter>
@@ -336,11 +339,12 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
             auto opCtx = client->makeOperationContext();
             _flushQueries(opCtx.get());
         },
-        Seconds(gQueryAnalysisWriterIntervalSecs),
+        Seconds(gQueryAnalysisWriterIntervalSecs.load()),
         // TODO(SERVER-74662): Please revisit if this periodic job could be made killable.
         false /*isKillableByStepdown*/);
-    _periodicQueryWriter = periodicRunner->makeJob(std::move(queryWriterJob));
-    _periodicQueryWriter.start();
+    _periodicQueryWriter =
+        std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(queryWriterJob)));
+    _periodicQueryWriter->start();
 
     PeriodicRunner::PeriodicJob diffWriterJob(
         "QueryAnalysisDiffWriter",
@@ -351,11 +355,26 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
             auto opCtx = client->makeOperationContext();
             _flushDiffs(opCtx.get());
         },
-        Seconds(gQueryAnalysisWriterIntervalSecs),
+        Seconds(gQueryAnalysisWriterIntervalSecs.load()),
         // TODO(SERVER-74662): Please revisit if this periodic job could be made killable.
         false /*isKillableByStepdown*/);
-    _periodicDiffWriter = periodicRunner->makeJob(std::move(diffWriterJob));
-    _periodicDiffWriter.start();
+    _periodicDiffWriter =
+        std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(diffWriterJob)));
+    _periodicDiffWriter->start();
+
+    QueryAnalysisWriter::observeQueryAnalysisWriterIntervalSecs.addObserver(
+        [queryWriter = _periodicQueryWriter,
+         diffWriter = _periodicDiffWriter](const WriterIntervalSecs& secs) {
+            try {
+                queryWriter->setPeriod(Seconds(secs));
+                diffWriter->setPeriod(Seconds(secs));
+            } catch (const DBException& ex) {
+                LOGV2(7891302,
+                      "Failed to update the periods of the threads for writing sampled queries and "
+                      "diffs to disk",
+                      "error"_attr = ex.toStatus());
+            }
+        });
 
     ThreadPool::Options threadPoolOptions;
     threadPoolOptions.maxThreads = gQueryAnalysisWriterMaxThreadPoolSize;
@@ -380,11 +399,11 @@ void QueryAnalysisWriter::onShutdown() {
         _executor->shutdown();
         _executor->join();
     }
-    if (_periodicQueryWriter.isValid()) {
-        _periodicQueryWriter.stop();
+    if (_periodicQueryWriter && _periodicQueryWriter->isValid()) {
+        _periodicQueryWriter->stop();
     }
-    if (_periodicDiffWriter.isValid()) {
-        _periodicDiffWriter.stop();
+    if (_periodicDiffWriter && _periodicDiffWriter->isValid()) {
+        _periodicDiffWriter->stop();
     }
 }
 
