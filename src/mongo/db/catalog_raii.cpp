@@ -441,7 +441,7 @@ Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx) {
 AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
                                                      const NamespaceStringOrUUID& nsOrUUID,
                                                      RestoreFromYieldFn restoreFromYield,
-                                                     Options options)
+                                                     const Options& options)
     : _lockFreeReadsBlock(opCtx),
       _globalLock(opCtx, MODE_IS, options._deadline, Lock::InterruptBehavior::kThrow, [] {
           Lock::GlobalLockSkipOptions options;

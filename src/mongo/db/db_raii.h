@@ -209,7 +209,7 @@ class AutoGetCollectionForReadPITCatalog {
 public:
     AutoGetCollectionForReadPITCatalog(OperationContext* opCtx,
                                        const NamespaceStringOrUUID& nsOrUUID,
-                                       AutoGetCollection::Options = {});
+                                       const AutoGetCollection::Options& = {});
 
     explicit operator bool() const {
         return static_cast<bool>(getCollection());
@@ -363,7 +363,7 @@ private:
 class AutoGetCollectionForReadLockFreePITCatalog final {
 public:
     AutoGetCollectionForReadLockFreePITCatalog(OperationContext* opCtx,
-                                               NamespaceStringOrUUID nsOrUUID,
+                                               const NamespaceStringOrUUID& nsOrUUID,
                                                AutoGetCollection::Options options = {});
 
     const CollectionPtr& getCollection() const {
@@ -383,14 +383,7 @@ public:
     }
 
 private:
-    /**
-     * Creates the std::function object used by CollectionPtrs to restore state for this
-     * AutoGetCollectionForReadLockFreePITCatalog object after having yielded.
-     */
-    CollectionPtr::RestoreFn _makeRestoreFromYieldFn(
-        const AutoGetCollection::Options& options,
-        bool callerExpectedToConflictWithSecondaryBatchApplication,
-        const DatabaseName& dbName);
+    const Collection* _restoreFromYield(OperationContext* opCtx, UUID uuid);
 
     // Used so that we can reset the read source back to the original read source when this instance
     // of AutoGetCollectionForReadLockFreePITCatalog is destroyed.
@@ -444,11 +437,17 @@ private:
     // May change after construction, when restoring from yield.
     NamespaceString _resolvedNss;
 
+    // Holds a copy of '_resolvedNss.dbName()'. Unlike '_resolvedNss', this field does _not_ change
+    // after construction.
+    DatabaseName _resolvedDbName;
+
     // Only set if _collectionPtr does not contain a nullptr and if the requested namesapce is a
     // view.
     //
     // May change after construction, when restoring from yield.
     std::shared_ptr<const ViewDefinition> _view;
+
+    AutoGetCollection::Options _options;
 };
 
 /**
@@ -573,7 +572,7 @@ public:
     AutoGetCollectionForReadCommandBase(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
-        AutoGetCollection::Options options = {},
+        const AutoGetCollection::Options& options = {},
         AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
 
     explicit operator bool() const {

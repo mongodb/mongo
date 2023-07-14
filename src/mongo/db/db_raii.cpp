@@ -678,7 +678,7 @@ AutoGetCollectionForReadLegacy::AutoGetCollectionForReadLegacy(
 AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollection::Options options)
+    const AutoGetCollection::Options& options)
     : _callerWasConflicting(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()),
       _shouldNotConflictWithSecondaryBatchApplicationBlock(
           [&]() -> boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> {
@@ -872,9 +872,9 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                                    AutoGetCollection::Options options) {
     // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
     if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-        _legacy.emplace(opCtx, nsOrUUID, options);
+        _legacy.emplace(opCtx, nsOrUUID, std::move(options));
     } else {
-        _pitCatalog.emplace(opCtx, nsOrUUID, options);
+        _pitCatalog.emplace(opCtx, nsOrUUID, std::move(options));
     }
 }
 
@@ -1066,7 +1066,7 @@ struct ConsistentCatalogAndSnapshot {
  */
 ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
     OperationContext* opCtx,
-    NamespaceStringOrUUID nsOrUUID,
+    const NamespaceStringOrUUID& nsOrUUID,
     const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs,
     const repl::ReadConcernArgs& readConcernArgs,
     bool callerExpectedToConflictWithSecondaryBatchApplication) {
@@ -1171,8 +1171,7 @@ getCollectionForLockFreeRead(OperationContext* opCtx,
                              const std::shared_ptr<const CollectionCatalog>& catalog,
                              boost::optional<Timestamp> readTimestamp,
                              const NamespaceStringOrUUID& nsOrUUID,
-                             AutoGetCollection::Options options) {
-
+                             const AutoGetCollection::Options& options) {
     auto& hangBeforeAutoGetCollectionLockFreeShardedStateAccess =
         *globalFailPointRegistry().find("hangBeforeAutoGetCollectionLockFreeShardedStateAccess");
 
@@ -1191,11 +1190,12 @@ getCollectionForLockFreeRead(OperationContext* opCtx,
     // Note: This call to resolveNamespaceStringOrUUID must happen after getCollectionFromCatalog
     // above, since getCollectionFromCatalog may call openCollection, which could change the result
     // of namespace resolution.
-    const auto nss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
+    auto nss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
 
     std::shared_ptr<const ViewDefinition> viewDefinition =
         coll ? nullptr : lookupView(opCtx, catalog, nss, options._viewMode);
-    return {nss, coll, std::move(viewDefinition)};
+
+    return {std::move(nss), coll, std::move(viewDefinition)};
 }
 
 static const Lock::GlobalLockSkipOptions kLockFreeReadsGlobalLockOptions{[] {
@@ -1212,12 +1212,12 @@ struct CatalogStateForNamespace {
     std::shared_ptr<const ViewDefinition> view;
 };
 
-CatalogStateForNamespace acquireCatalogStateForNamespace(
+inline CatalogStateForNamespace acquireCatalogStateForNamespace(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
     const repl::ReadConcernArgs& readConcernArgs,
     bool callerExpectedToConflictWithSecondaryBatchApplication,
-    AutoGetCollection::Options options) {
+    const AutoGetCollection::Options& options) {
 
     auto [catalog, isAnySecondaryNssShardedOrAView, readSource, readTimestamp] =
         getConsistentCatalogAndSnapshot(opCtx,
@@ -1229,8 +1229,11 @@ CatalogStateForNamespace acquireCatalogStateForNamespace(
     auto [resolvedNss, collection, view] =
         getCollectionForLockFreeRead(opCtx, catalog, readTimestamp, nsOrUUID, options);
 
-    return CatalogStateForNamespace{
-        catalog, isAnySecondaryNssShardedOrAView, resolvedNss, collection, view};
+    return CatalogStateForNamespace{std::move(catalog),
+                                    isAnySecondaryNssShardedOrAView,
+                                    std::move(resolvedNss),
+                                    collection,
+                                    std::move(view)};
 }
 
 boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
@@ -1248,43 +1251,39 @@ makeShouldNotConflictWithSecondaryBatchApplicationBlock(OperationContext* opCtx,
 
 }  // namespace
 
-CollectionPtr::RestoreFn AutoGetCollectionForReadLockFreePITCatalog::_makeRestoreFromYieldFn(
-    const AutoGetCollection::Options& options,
-    bool callerExpectedToConflictWithSecondaryBatchApplication,
-    const DatabaseName& dbName) {
-    return [this, options, callerExpectedToConflictWithSecondaryBatchApplication, dbName](
-               OperationContext* opCtx, UUID uuid) -> const Collection* {
-        _catalogStasher.reset();
+const Collection* AutoGetCollectionForReadLockFreePITCatalog::_restoreFromYield(
+    OperationContext* opCtx, UUID uuid) {
+    _catalogStasher.reset();
 
-        auto nsOrUUID = NamespaceStringOrUUID(dbName, uuid);
-        try {
-            auto catalogStateForNamespace = acquireCatalogStateForNamespace(
-                opCtx,
-                nsOrUUID,
-                repl::ReadConcernArgs::get(opCtx),
-                callerExpectedToConflictWithSecondaryBatchApplication,
-                options);
+    auto nsOrUUID = NamespaceStringOrUUID(_resolvedDbName, uuid);
+    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    bool callerExpectedToConflict = _callerExpectedToConflictWithSecondaryBatchApplication;
 
-            _resolvedNss = catalogStateForNamespace.resolvedNss;
-            _view = catalogStateForNamespace.view;
-            _catalogStasher.stash(std::move(catalogStateForNamespace.catalog));
+    try {
+        auto catalogStateForNamespace = acquireCatalogStateForNamespace(
+            opCtx, nsOrUUID, readConcernArgs, callerExpectedToConflict, _options);
 
-            return catalogStateForNamespace.collection;
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            // Calls to CollectionCatalog::resolveNamespaceStringOrUUID (called from
-            // acquireCatalogStateForNamespace) will result in a NamespaceNotFound error if the
-            // collection corresponding to the UUID passed as a parameter no longer exists. This can
-            // happen if this collection was dropped while the query was yielding.
-            //
-            // In this case, the query subsystem expects that this CollectionPtr::RestoreFn will
-            // result in a nullptr, so NamespaceNotFound errors are converted to nullptr here.
-            return nullptr;
-        }
-    };
+        _resolvedNss = catalogStateForNamespace.resolvedNss;
+        _view = catalogStateForNamespace.view;
+        _catalogStasher.stash(std::move(catalogStateForNamespace.catalog));
+
+        return catalogStateForNamespace.collection;
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // Calls to CollectionCatalog::resolveNamespaceStringOrUUID (called from
+        // acquireCatalogStateForNamespace) will result in a NamespaceNotFound error if the
+        // collection corresponding to the UUID passed as a parameter no longer exists. This can
+        // happen if this collection was dropped while the query was yielding.
+        //
+        // In this case, the query subsystem expects that this CollectionPtr::RestoreFn will
+        // result in a nullptr, so NamespaceNotFound errors are converted to nullptr here.
+        return nullptr;
+    }
 }
 
 AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITCatalog(
-    OperationContext* opCtx, NamespaceStringOrUUID nsOrUUID, AutoGetCollection::Options options)
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    AutoGetCollection::Options options)
     : _originalReadSource(opCtx->recoveryUnit()->getTimestampReadSource()),
       _isLockFreeReadSubOperation(opCtx->isLockFreeReadsOp()),  // This has to come before LFRBlock.
       _catalogStasher(opCtx),
@@ -1298,7 +1297,8 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
                   MODE_IS,
                   options._deadline,
                   Lock::InterruptBehavior::kThrow,
-                  kLockFreeReadsGlobalLockOptions) {
+                  kLockFreeReadsGlobalLockOptions),
+      _options(std::move(options)) {
 
     catalog_helper::setAutoGetCollectionWaitFailpointExecute(
         [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); });
@@ -1322,8 +1322,9 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
                                          catalog,
                                          opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx),
                                          nsOrUUID,
-                                         options);
+                                         _options);
         _resolvedNss = resolvedNss;
+        _resolvedDbName = _resolvedNss.dbName();
         _view = view;
 
         if (_view) {
@@ -1343,9 +1344,10 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
                                             nsOrUUID,
                                             readConcernArgs,
                                             _callerExpectedToConflictWithSecondaryBatchApplication,
-                                            options);
+                                            _options);
 
         _resolvedNss = catalogStateForNamespace.resolvedNss;
+        _resolvedDbName = _resolvedNss.dbName();
         _view = catalogStateForNamespace.view;
 
         if (_view) {
@@ -1355,11 +1357,11 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
         _secondaryNssIsAViewOrSharded = catalogStateForNamespace.isAnySecondaryNssShardedOrAView;
 
         _collectionPtr = CollectionPtr(catalogStateForNamespace.collection);
+
         _collectionPtr.makeYieldable(
-            opCtx,
-            _makeRestoreFromYieldFn(options,
-                                    _callerExpectedToConflictWithSecondaryBatchApplication,
-                                    _resolvedNss.dbName()));
+            opCtx, [this](OperationContext* opCtx, UUID uuid) -> const Collection* {
+                return _restoreFromYield(opCtx, std::move(uuid));
+            });
     }
 
     if (_collectionPtr) {
@@ -1372,7 +1374,7 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
             _collectionPtr.setShardKeyPattern(collDesc.getKeyPattern());
         }
     } else {
-        invariant(!options._expectedUUID);
+        invariant(!_options._expectedUUID);
     }
 }
 
@@ -1436,7 +1438,7 @@ template <typename AutoGetCollectionForReadType>
 AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
     AutoGetCollectionForReadCommandBase(OperationContext* opCtx,
                                         const NamespaceStringOrUUID& nsOrUUID,
-                                        AutoGetCollection::Options options,
+                                        const AutoGetCollection::Options& options,
                                         AutoStatsTracker::LogMode logMode)
     :  // We disable the expectedUUID option as we must check it after all the shard versioning
        // checks.

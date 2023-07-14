@@ -511,13 +511,13 @@ public:
      * can be resolved, but the resulting collection is in the wrong database.
      */
     NamespaceString resolveNamespaceStringOrUUID(OperationContext* opCtx,
-                                                 NamespaceStringOrUUID nsOrUUID) const;
+                                                 const NamespaceStringOrUUID& nsOrUUID) const;
 
     /**
      * Returns whether the collection with 'uuid' satisfies the provided 'predicate'. If the
      * collection with 'uuid' is not found, false is returned.
      */
-    bool checkIfCollectionSatisfiable(UUID uuid, CollectionInfoFn predicate) const;
+    bool checkIfCollectionSatisfiable(UUID uuid, const CollectionInfoFn& predicate) const;
 
     /**
      * This function gets the UUIDs of all collections from `dbName`.

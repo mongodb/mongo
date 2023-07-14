@@ -1838,7 +1838,7 @@ std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupViewWithoutValida
 }
 
 NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(
-    OperationContext* opCtx, NamespaceStringOrUUID nsOrUUID) const {
+    OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) const {
     if (nsOrUUID.isNamespaceString()) {
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Namespace " << nsOrUUID.toString()
@@ -1863,7 +1863,8 @@ NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(
     return std::move(*resolvedNss);
 }
 
-bool CollectionCatalog::checkIfCollectionSatisfiable(UUID uuid, CollectionInfoFn predicate) const {
+bool CollectionCatalog::checkIfCollectionSatisfiable(UUID uuid,
+                                                     const CollectionInfoFn& predicate) const {
     invariant(predicate);
 
     auto collection = _lookupCollectionByUUID(uuid);

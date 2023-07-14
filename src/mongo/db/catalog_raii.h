@@ -336,7 +336,7 @@ public:
     AutoGetCollectionLockFree(OperationContext* opCtx,
                               const NamespaceStringOrUUID& nsOrUUID,
                               RestoreFromYieldFn restoreFromYield,
-                              Options options = {});
+                              const Options& options = {});
 
     explicit operator bool() const {
         // Use the CollectionPtr because it is updated if it yields whereas _collection is not until
