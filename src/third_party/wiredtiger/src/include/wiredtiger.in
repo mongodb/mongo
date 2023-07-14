@@ -2199,9 +2199,8 @@ struct __wt_connection {
      * \c false.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;hashsize, number of buckets in the hashtable that
      * keeps track of objects., an integer between \c 64 and \c 1048576; default \c 1024.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;type, cache location: DRAM or FILE (file system or block
-     * device)., a string; default empty.}
-     * @config{ ),,}
+     * @config{
+     * ),,}
      * @config{compatibility = (, set compatibility version of database.  Changing the compatibility
      * version requires that there are no active operations for the duration of the call., a set of
      * related configuration options defined as follows.}
@@ -2953,8 +2952,6 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
  * hashsize, number of buckets in the hashtable that keeps track of objects., an integer between \c
  * 64 and \c 1048576; default \c 1024.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;type, cache location: DRAM
- * or FILE (file system or block device)., a string; default empty.}
  * @config{ ),,}
  * @config{compatibility = (, set compatibility version of database.  Changing the compatibility
  * version requires that there are no active operations for the duration of the call., a set of

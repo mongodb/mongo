@@ -574,8 +574,9 @@ connection_runtime_config = [
         Config('hashsize', '1024', r'''
             number of buckets in the hashtable that keeps track of objects''',
             min='64', max='1048576'),
-        Config('type', '', r'''
-            cache location: DRAM or FILE (file system or block device)'''),
+        Config('type', 'FILE', r'''
+            cache location, defaults to the file system.''',
+            choices=['FILE', 'DRAM'], undoc=True),
         ]),
     Config('debug_mode', '', r'''
         control the settings of various extended debugging features''',
