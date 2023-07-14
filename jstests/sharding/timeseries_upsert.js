@@ -6,7 +6,6 @@
  *   requires_persistence,
  *   # Upsert on sharded timeseries collection is only supported in FCV 7.1+
  *   requires_fcv_71,
- *   featureFlagTimeseriesUpdatesSupport,
  * ]
  */
 

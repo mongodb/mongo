@@ -5,7 +5,7 @@
  * @tags: [
  *   requires_replication,
  *   requires_timeseries,
- *   featureFlagTimeseriesUpdatesSupport,
+ *   requires_fcv_71,
  * ]
  */
 (function() {

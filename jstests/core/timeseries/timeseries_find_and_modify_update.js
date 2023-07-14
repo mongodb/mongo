@@ -4,7 +4,7 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   featureFlagTimeseriesUpdatesSupport,
+ *   requires_fcv_71,
  *   # TODO SERVER-76583 Remove the following two tags.
  *   does_not_support_retryable_writes,
  *   requires_non_retryable_writes,

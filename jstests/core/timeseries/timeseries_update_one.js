@@ -4,7 +4,7 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   featureFlagTimeseriesUpdatesSupport,
+ *   requires_fcv_71,
  *   # TODO SERVER-78683: Remove this tag.
  *   # Internal transaction api might not handle stepdowns correctly and time-series retryable
  *   # updates use internal transaction api.
@@ -507,7 +507,8 @@ import {
     while (batchNum < 4) {
         let batch = [];
         for (let i = 0; i < 30; i++) {
-            const doc = {_id: i, [timeFieldName]: ISODate(), value: "a".repeat(1000)};
+            const doc =
+                {_id: i, [timeFieldName]: ISODate("2023-07-13T17:00:00Z"), value: "a".repeat(1000)};
             batch.push(doc);
         }
 
@@ -516,7 +517,8 @@ import {
     }
 
     // Update any of the measurements with a document which will exceed the 128000 byte threshold.
-    const chunkyDoc = {_id: 128000, [timeFieldName]: ISODate(), value: "a".repeat(10000)};
+    const chunkyDoc =
+        {_id: 128000, [timeFieldName]: ISODate("2023-07-13T17:00:00Z"), value: "a".repeat(10000)};
 
     const updateCommand = {update: collName, updates: [{q: {}, u: chunkyDoc, multi: false}]};
     const res = assert.commandWorked(testDB.runCommand(updateCommand));

@@ -4,7 +4,7 @@
  * @tags: [
  *   requires_replication,
  *   requires_timeseries,
- *   featureFlagTimeseriesUpdatesSupport,
+ *   requires_fcv_71,
  * ]
  */
 load("jstests/libs/fail_point_util.js");
