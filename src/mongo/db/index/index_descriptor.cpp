@@ -182,6 +182,11 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
              return indexKeyPattern;
         }
         
+        //hidden index is not restricted
+        if (hidden() == true) {
+            return indexKeyPattern;
+        }
+ 
         BSONObjBuilder build;
         BSONObjIterator kpIt(indexKeyPattern);
         while (kpIt.more()) {
