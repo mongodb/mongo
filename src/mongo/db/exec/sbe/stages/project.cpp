@@ -46,7 +46,7 @@
 namespace mongo {
 namespace sbe {
 ProjectStage::ProjectStage(std::unique_ptr<PlanStage> input,
-                           value::SlotMap<std::unique_ptr<EExpression>> projects,
+                           SlotExprPairVector projects,
                            PlanNodeId nodeId,
                            bool participateInTrialRunTracking)
     : PlanStage("project"_sd, nodeId, participateInTrialRunTracking),
@@ -55,9 +55,9 @@ ProjectStage::ProjectStage(std::unique_ptr<PlanStage> input,
 }
 
 std::unique_ptr<PlanStage> ProjectStage::clone() const {
-    value::SlotMap<std::unique_ptr<EExpression>> projects;
+    SlotExprPairVector projects;
     for (auto& [k, v] : _projects) {
-        projects.emplace(k, v->clone());
+        projects.emplace_back(k, v->clone());
     }
     return std::make_unique<ProjectStage>(_children[0]->clone(),
                                           std::move(projects),
@@ -125,9 +125,9 @@ std::unique_ptr<PlanStageStats> ProjectStage::getStats(bool includeDebugInfo) co
     if (includeDebugInfo) {
         DebugPrinter printer;
         BSONObjBuilder bob;
-        value::orderedSlotMapTraverse(_projects, [&](auto slot, auto&& expr) {
+        for (auto&& [slot, expr] : _projects) {
             bob.append(str::stream() << slot, printer.print(expr->debugPrint()));
-        });
+        }
         ret->debugInfo = BSON("projections" << bob.obj());
     }
 
@@ -144,7 +144,7 @@ std::vector<DebugPrinter::Block> ProjectStage::debugPrint() const {
 
     ret.emplace_back("[`");
     bool first = true;
-    value::orderedSlotMapTraverse(_projects, [&](auto slot, auto&& expr) {
+    for (auto&& [slot, expr] : _projects) {
         if (!first) {
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
@@ -153,7 +153,7 @@ std::vector<DebugPrinter::Block> ProjectStage::debugPrint() const {
         ret.emplace_back("=");
         DebugPrinter::addBlocks(ret, expr->debugPrint());
         first = false;
-    });
+    }
     ret.emplace_back("`]");
 
     DebugPrinter::addNewLine(ret);

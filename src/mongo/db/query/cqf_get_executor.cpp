@@ -400,17 +400,14 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
         OPTIMIZER_DEBUG_LOG(6264802, 5, "Lowered SBE plan", "plan"_attr = p.print(*sbePlan.get()));
     }
 
-    stage_builder::PlanStageSlots outputs;
-    outputs.set(stage_builder::PlanStageSlots::kResult, slotMap.begin()->second);
+    auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
+    staticData->resultSlot = slotMap.begin()->second;
     if (requireRID) {
-        outputs.set(stage_builder::PlanStageSlots::kRecordId, *ridSlot);
+        staticData->recordIdSlot = ridSlot;
     }
 
-    auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
-    staticData->outputs = std::move(outputs);
-
-    stage_builder::PlanStageData data(
-        stage_builder::PlanStageEnvironment(std::move(runtimeEnvironment)), std::move(staticData));
+    stage_builder::PlanStageData data(stage_builder::Environment(std::move(runtimeEnvironment)),
+                                      std::move(staticData));
 
     sbePlan->attachToOperationContext(opCtx);
     if (needsExplain || expCtx->mayDbProfile) {

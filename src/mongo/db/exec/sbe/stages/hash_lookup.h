@@ -107,7 +107,7 @@ public:
                     value::SlotId outerCond,
                     value::SlotId innerCond,
                     value::SlotVector innerProjects,
-                    value::SlotMap<std::unique_ptr<EExpression>> innerAggs,
+                    SlotExprPairVector innerAggs,
                     boost::optional<value::SlotId> collatorSlot,
                     PlanNodeId planNodeId,
                     bool participateInTrialRunTracking = true);
@@ -205,7 +205,7 @@ private:
     const value::SlotId _outerCond;
     const value::SlotId _innerCond;
     const value::SlotVector _innerProjects;
-    const value::SlotMap<std::unique_ptr<EExpression>> _innerAggs;
+    const SlotExprPairVector _innerAggs;
     const boost::optional<value::SlotId> _collatorSlot;
     CollatorInterface* _collator{nullptr};
 

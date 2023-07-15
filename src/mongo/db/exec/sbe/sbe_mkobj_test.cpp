@@ -172,14 +172,14 @@ public:
         auto objOutSlotId = generateSlotId();
         auto slotVec = makeSV(generateSlotId(), generateSlotId());
 
-        value::SlotMap<std::unique_ptr<EExpression>> slotMap;
-        slotMap[slotVec[0]] = makeE<EConstant>("one");
-        slotMap[slotVec[1]] = makeE<EConstant>("two");
+        SlotExprPairVector slotExprVec;
+        slotExprVec.emplace_back(slotVec[0], makeE<EConstant>("one"));
+        slotExprVec.emplace_back(slotVec[1], makeE<EConstant>("two"));
 
-        auto makeStageFn = [objOutSlotId, &slotVec, &slotMap](
+        auto makeStageFn = [objOutSlotId, &slotVec, &slotExprVec](
                                value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
             auto project =
-                makeS<ProjectStage>(std::move(scanStage), std::move(slotMap), kEmptyPlanNodeId);
+                makeS<ProjectStage>(std::move(scanStage), std::move(slotExprVec), kEmptyPlanNodeId);
 
             auto mkobj = makeS<MkObjStageType>(std::move(project),
                                                objOutSlotId,
@@ -223,14 +223,14 @@ public:
         auto objOutSlotId = generateSlotId();
         auto slotVec = makeSV(generateSlotId(), generateSlotId());
 
-        value::SlotMap<std::unique_ptr<EExpression>> slotMap;
-        slotMap[slotVec[0]] = makeE<EConstant>("one");
-        slotMap[slotVec[1]] = makeE<EConstant>("two");
+        SlotExprPairVector slotExprVec;
+        slotExprVec.emplace_back(slotVec[0], makeE<EConstant>("one"));
+        slotExprVec.emplace_back(slotVec[1], makeE<EConstant>("two"));
 
-        auto makeStageFn = [objOutSlotId, &slotVec, &slotMap](
+        auto makeStageFn = [objOutSlotId, &slotVec, &slotExprVec](
                                value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
             auto project =
-                makeS<ProjectStage>(std::move(scanStage), std::move(slotMap), kEmptyPlanNodeId);
+                makeS<ProjectStage>(std::move(scanStage), std::move(slotExprVec), kEmptyPlanNodeId);
 
             auto mkobj = makeS<MkObjStageType>(std::move(project),
                                                objOutSlotId,

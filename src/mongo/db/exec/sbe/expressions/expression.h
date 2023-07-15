@@ -165,11 +165,7 @@ template <typename R>
 inline void makeSlotExprPairHelper(R& result,
                                    value::SlotId slot,
                                    std::unique_ptr<EExpression> expr) {
-    if constexpr (std::is_same_v<R, value::SlotMap<std::unique_ptr<EExpression>>>) {
-        result.emplace(slot, std::move(expr));
-    } else {
-        result.push_back({slot, std::move(expr)});
-    }
+    result.emplace_back(slot, std::move(expr));
 }
 
 // recursive case
@@ -178,12 +174,7 @@ inline void makeSlotExprPairHelper(R& result,
                                    value::SlotId slot,
                                    std::unique_ptr<EExpression> expr,
                                    Ts&&... rest) {
-    if constexpr (std::is_same_v<R, value::SlotMap<std::unique_ptr<EExpression>>>) {
-        result.emplace(slot, std::move(expr));
-    } else {
-        static_assert(std::is_same_v<R, SlotExprPairVector>);
-        result.push_back({slot, std::move(expr)});
-    }
+    result.emplace_back(slot, std::move(expr));
     makeSlotExprPairHelper(result, std::forward<Ts>(rest)...);
 }
 
@@ -219,16 +210,6 @@ inline void makeAggExprPairHelper(R& result,
     makeAggExprPairHelper(result, std::forward<Ts>(rest)...);
 }
 }  // namespace detail
-
-template <typename... Ts>
-auto makeEM(Ts&&... pack) {
-    value::SlotMap<std::unique_ptr<EExpression>> result;
-    if constexpr (sizeof...(pack) > 0) {
-        result.reserve(sizeof...(Ts) / 2);
-        detail::makeSlotExprPairHelper(result, std::forward<Ts>(pack)...);
-    }
-    return result;
-}
 
 template <typename... Args>
 auto makeSV(Args&&... args) {

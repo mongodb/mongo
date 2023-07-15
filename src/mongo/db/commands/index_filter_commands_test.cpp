@@ -333,7 +333,7 @@ private:
         auto cacheData = std::make_unique<sbe::CachedSbePlan>(
             std::make_unique<sbe::CoScanStage>(PlanNodeId{}),
             stage_builder::PlanStageData(
-                stage_builder::PlanStageEnvironment(std::make_unique<sbe::RuntimeEnvironment>()),
+                stage_builder::Environment(std::make_unique<sbe::RuntimeEnvironment>()),
                 std::make_unique<stage_builder::PlanStageStaticData>()));
         auto decision = createDecision(1U);
         auto querySolution = std::make_unique<QuerySolution>();

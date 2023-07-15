@@ -1040,8 +1040,8 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildHashJoi
     // Build lookup stage that matches the local and foreign rows and aggregates the
     // foreign values in an array.
     auto lookupAggSlot = slotIdGenerator.generate();
-    auto aggs = makeEM(lookupAggSlot,
-                       stage_builder::makeFunction("addToArray", makeVariable(foreignRecordSlot)));
+    auto aggs = makeSlotExprPairVec(
+        lookupAggSlot, stage_builder::makeFunction("addToArray", makeVariable(foreignRecordSlot)));
     std::unique_ptr<sbe::PlanStage> hl = makeS<HashLookupStage>(std::move(outerRootStage),
                                                                 std::move(foreignKeyStage),
                                                                 localKeySlot,
@@ -1197,7 +1197,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         const auto& foreignColl =
             _collections.lookupCollection(NamespaceString(eqLookupNode->foreignCollection));
 
-        boost::optional<SlotId> collatorSlot = _state.env->getSlotIfExists("collator"_sd);
+        boost::optional<SlotId> collatorSlot = _state.getCollatorSlot();
         switch (eqLookupNode->lookupStrategy) {
             // When foreign collection doesn't exist, we create stages that simply append empty
             // arrays to each local document and do not consider the case that foreign collection

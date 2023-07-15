@@ -103,9 +103,9 @@ SbeStageBuilderTestFixture::buildPlanStage(
 
     auto slots = sbe::makeSV();
     if (hasRecordId) {
-        slots.push_back(data.staticData->outputs.get(stage_builder::PlanStageSlots::kRecordId));
+        slots.push_back(*data.staticData->recordIdSlot);
     }
-    slots.push_back(data.staticData->outputs.get(stage_builder::PlanStageSlots::kResult));
+    slots.push_back(*data.staticData->resultSlot);
 
     // 'expCtx' owns the collator and a collator slot is registered into the runtime environment
     // while creating 'builder'. So, the caller should retain the 'expCtx' until the execution is
