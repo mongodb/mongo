@@ -124,9 +124,9 @@ public:
 
         // Build and prepare for execution loop join of the two scan stages.
         auto lookupAggSlot = generateSlotId();
-        auto aggs =
-            makeEM(lookupAggSlot,
-                   stage_builder::makeFunction("addToArray", makeE<EVariable>(innerScanSlots[0])));
+        auto aggs = makeSlotExprPairVec(
+            lookupAggSlot,
+            stage_builder::makeFunction("addToArray", makeE<EVariable>(innerScanSlots[0])));
         auto lookupStage = makeS<HashLookupStage>(std::move(outerScanStage),
                                                   std::move(innerScanStage),
                                                   outerScanSlots[1],

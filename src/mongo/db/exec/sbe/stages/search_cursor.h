@@ -96,6 +96,7 @@ template <typename... Ts>
 inline auto makeSearchCursorStage(std::unique_ptr<PlanStage> input,
                                   PlanNodeId nodeId,
                                   Ts&&... pack) {
-    return makeS<SearchCursorStage>(std::move(input), makeEM(std::forward<Ts>(pack)...), nodeId);
+    return makeS<SearchCursorStage>(
+        std::move(input), makeSlotExprPairVec(std::forward<Ts>(pack)...), nodeId);
 }
 }  // namespace mongo::sbe

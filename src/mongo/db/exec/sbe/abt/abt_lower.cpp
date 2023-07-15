@@ -573,14 +573,14 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const EvaluationNode& n,
     auto& names = binder.names();
     auto& exprs = binder.exprs();
 
-    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
+    sbe::SlotExprPairVector projects;
 
     for (size_t idx = 0; idx < exprs.size(); ++idx) {
         auto expr = lowerExpression(exprs[idx], slotMap, &_nodeToGroupPropsMap.at(&n));
         auto slot = _slotIdGenerator.generate();
 
         mapProjToSlot(slotMap, names[idx], slot);
-        projects.emplace(slot, std::move(expr));
+        projects.emplace_back(slot, std::move(expr));
     }
 
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;

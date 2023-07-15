@@ -50,6 +50,7 @@
 #include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
@@ -123,20 +124,11 @@ std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
 std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
                                                std::unique_ptr<sbe::EExpression> lhs,
                                                std::unique_ptr<sbe::EExpression> rhs,
-                                               sbe::RuntimeEnvironment* runtimeEnv) {
-    invariant(runtimeEnv);
-
-    auto collatorSlot = runtimeEnv->getSlotIfExists("collator"_sd);
+                                               StageBuilderState& state) {
+    auto collatorSlot = state.getCollatorSlot();
     auto collatorVar = collatorSlot ? sbe::makeE<sbe::EVariable>(*collatorSlot) : nullptr;
 
     return makeBinaryOp(binaryOp, std::move(lhs), std::move(rhs), std::move(collatorVar));
-}
-
-std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
-                                               std::unique_ptr<sbe::EExpression> lhs,
-                                               std::unique_ptr<sbe::EExpression> rhs,
-                                               PlanStageEnvironment& env) {
-    return makeBinaryOp(binaryOp, std::move(lhs), std::move(rhs), env.runtimeEnv);
 }
 
 std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
@@ -151,19 +143,11 @@ std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression>
 
 std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
                                                std::unique_ptr<sbe::EExpression> arr,
-                                               sbe::RuntimeEnvironment* runtimeEnv) {
-    invariant(runtimeEnv);
-
-    auto collatorSlot = runtimeEnv->getSlotIfExists("collator"_sd);
+                                               StageBuilderState& state) {
+    auto collatorSlot = state.getCollatorSlot();
     auto collatorVar = collatorSlot ? sbe::makeE<sbe::EVariable>(*collatorSlot) : nullptr;
 
     return makeIsMember(std::move(input), std::move(arr), std::move(collatorVar));
-}
-
-std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
-                                               std::unique_ptr<sbe::EExpression> arr,
-                                               PlanStageEnvironment& env) {
-    return makeIsMember(std::move(input), std::move(arr), env.runtimeEnv);
 }
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissingExpr(const sbe::EExpression& expr) {
@@ -193,7 +177,7 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EEx
 }
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(EvalExpr arg, StageBuilderState& state) {
-    auto expr = arg.extractExpr(state.slotVarMap, *state.env);
+    auto expr = arg.extractExpr(state.slotVarMap, state);
     return generateNullOrMissingExpr(*expr);
 }
 
@@ -202,7 +186,7 @@ std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& 
 }
 
 std::unique_ptr<sbe::EExpression> generateNonNumericCheck(EvalExpr expr, StageBuilderState& state) {
-    return makeNot(makeFunction("isNumber", expr.extractExpr(state.slotVarMap, *state.env)));
+    return makeNot(makeFunction("isNumber", expr.extractExpr(state.slotVarMap, state)));
 }
 
 std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable& var) {
@@ -225,7 +209,7 @@ std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var) {
 }
 
 std::unique_ptr<sbe::EExpression> generateNaNCheck(EvalExpr expr, StageBuilderState& state) {
-    return makeFunction("isNaN", expr.extractExpr(state.slotVarMap, *state.env));
+    return makeFunction("isNaN", expr.extractExpr(state.slotVarMap, state));
 }
 
 std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& var) {
@@ -233,7 +217,7 @@ std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& va
 }
 
 std::unique_ptr<sbe::EExpression> generateInfinityCheck(EvalExpr expr, StageBuilderState& state) {
-    return makeFunction("isInfinity"_sd, expr.extractExpr(state.slotVarMap, *state.env));
+    return makeFunction("isInfinity"_sd, expr.extractExpr(state.slotVarMap, state));
 }
 
 std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable& var) {
@@ -390,14 +374,12 @@ std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
     // If expr's value is an expression, create a ProjectStage to evaluate the expression
     // into a slot.
     auto slot = slotIdGenerator->generate();
-    stage = makeProject(
-        std::move(stage), planNodeId, slot, expr.extractExpr(state.slotVarMap, *state.env));
+    stage =
+        makeProject(std::move(stage), planNodeId, slot, expr.extractExpr(state.slotVarMap, state));
     return {slot, std::move(stage)};
 }
 
-EvalStage makeProject(EvalStage stage,
-                      sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects,
-                      PlanNodeId planNodeId) {
+EvalStage makeProject(EvalStage stage, sbe::SlotExprPairVector projects, PlanNodeId planNodeId) {
     auto outSlots = stage.extractOutSlots();
     for (auto& [slot, _] : projects) {
         outSlots.push_back(slot);
@@ -653,10 +635,10 @@ std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtu
     // Create a ProjectStage that will read the data from 'scanStage' and split it up
     // across multiple output slots.
     sbe::value::SlotVector projectSlots;
-    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projections;
+    sbe::SlotExprPairVector projections;
     for (int32_t i = 0; i < numSlots; ++i) {
         projectSlots.emplace_back(slotIdGenerator->generate());
-        projections.emplace(
+        projections.emplace_back(
             projectSlots.back(),
             makeFunction("getElement"_sd,
                          sbe::makeE<sbe::EVariable>(scanSlot),
@@ -941,6 +923,75 @@ sbe::value::SlotId StageBuilderState::registerInputParamSlot(
     return slotId;
 }
 
+boost::optional<sbe::value::SlotId> StageBuilderState::getTimeZoneDBSlot() {
+    auto slotId = env->getSlotIfExists("timeZoneDB"_sd);
+
+    if (!slotId) {
+        return env->registerSlot(
+            "timeZoneDB"_sd,
+            sbe::value::TypeTags::timeZoneDB,
+            sbe::value::bitcastFrom<const TimeZoneDatabase*>(getTimeZoneDatabase(opCtx)),
+            false,
+            slotIdGenerator);
+    }
+
+    return slotId;
+}
+
+boost::optional<sbe::value::SlotId> StageBuilderState::getCollatorSlot() {
+    auto slotId = env->getSlotIfExists("collator"_sd);
+
+    if (!slotId) {
+        if (auto coll = data->queryCollator.get()) {
+            return env->registerSlot("collator"_sd,
+                                     sbe::value::TypeTags::collator,
+                                     sbe::value::bitcastFrom<const CollatorInterface*>(coll),
+                                     false,
+                                     slotIdGenerator);
+        }
+    }
+
+    return slotId;
+}
+
+boost::optional<sbe::value::SlotId> StageBuilderState::getOplogTsSlot() {
+    auto slotId = env->getSlotIfExists("oplogTs"_sd);
+
+    if (!slotId) {
+        return env->registerSlot(
+            "oplogTs"_sd, sbe::value::TypeTags::Nothing, 0, false, slotIdGenerator);
+    }
+
+    return slotId;
+}
+
+boost::optional<sbe::value::SlotId> StageBuilderState::getBuiltinVarSlot(Variables::Id id) {
+    if (id == Variables::kRootId || id == Variables::kRemoveId) {
+        return boost::none;
+    }
+
+    auto it = Variables::kIdToBuiltinVarName.find(id);
+    tassert(1234567, "Expected 'id' to be in map", it != Variables::kIdToBuiltinVarName.end());
+
+    auto& name = it->second;
+    auto slotId = env->getSlotIfExists(name);
+    if (!slotId) {
+        if (variables.hasValue(id)) {
+            auto [tag, val] = sbe::value::makeValue(variables.getValue(id));
+            return env->registerSlot(name, tag, val, true, slotIdGenerator);
+        } else if (id == Variables::kSearchMetaId) {
+            // Normally, $search is responsible for setting a value for SEARCH_META, in which case
+            // we will bind the value to a slot above. However, in the event of a query that does
+            // not use $search, but references SEARCH_META, we need to bind a value of 'missing' to
+            // a slot so that the plan can run correctly.
+            return env->registerSlot(
+                name, sbe::value::TypeTags::Nothing, 0, false, slotIdGenerator);
+        }
+    }
+
+    return slotId;
+}
+
 /**
  * Given a key pattern and an array of slots of equal size, builds a SlotTreeNode representing the
  * mapping between key pattern component and slot.
@@ -1174,7 +1225,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
     const bool topLevelFieldsOnly = std::all_of(
         fields.begin(), fields.end(), [](auto&& s) { return s.find('.') == std::string::npos; });
     if (topLevelFieldsOnly) {
-        sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
+        sbe::SlotExprPairVector projects;
         for (size_t i = 0; i < fields.size(); ++i) {
             auto name = std::make_pair(PlanStageSlots::kField, StringData(fields[i]));
             auto fieldSlot = slots != nullptr ? slots->getIfExists(name) : boost::none;
@@ -1185,7 +1236,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
                 auto getFieldExpr =
                     makeFunction("getField"_sd, makeVariable(resultSlot), makeConstant(fields[i]));
                 outputSlots.emplace_back(slot);
-                projects.insert({slot, std::move(getFieldExpr)});
+                projects.emplace_back(slot, std::move(getFieldExpr));
             }
         }
         if (!projects.empty()) {
@@ -1239,7 +1290,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
         visitPathTreeNodes(treeRoot.get(), preVisit, postVisit);
     }
 
-    std::vector<sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>>> stackOfProjects;
+    std::vector<sbe::SlotExprPairVector> stackOfProjects;
     using DfsState = std::vector<std::pair<Node*, size_t>>;
     size_t depth = 0;
 
@@ -1259,12 +1310,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
                 tassert(7182002, "Expected DfsState to have at least 2 entries", dfs.size() >= 2);
 
                 auto parent = dfs[dfs.size() - 2].first;
-                auto getFieldExpr =
-                    makeFunction("getField"_sd,
-                                 parent->value.hasSlot()
-                                     ? makeVariable(*parent->value.getSlot())
-                                     : parent->value.extractExpr(state.slotVarMap, *state.env),
-                                 makeConstant(node->name));
+                auto getFieldExpr = makeFunction(
+                    "getField"_sd,
+                    parent->value.hasSlot() ? makeVariable(*parent->value.getSlot())
+                                            : parent->value.extractExpr(state.slotVarMap, state),
+                    makeConstant(node->name));
 
                 auto hasOneChildToVisit = [&] {
                     size_t count = 0;
@@ -1292,7 +1342,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
                 }
                 // Add the projection to the appropriate level of 'stackOfProjects'.
                 auto& projects = stackOfProjects[depth];
-                projects.insert({slot, std::move(getFieldExpr)});
+                projects.emplace_back(slot, std::move(getFieldExpr));
                 // Increment the depth while we visit node's descendents.
                 ++depth;
 

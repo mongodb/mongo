@@ -89,16 +89,17 @@ public:
                                    kEmptyPlanNodeId);
 
         value::SlotVector resultSlots;
-        value::SlotMap<std::unique_ptr<EExpression>> slotMap;
+        SlotExprPairVector projects;
         for (auto windowSlot : windowSlots) {
             auto resultSlot = generateSlotId();
             resultSlots.push_back(resultSlot);
-            slotMap[resultSlot] =
+            projects.emplace_back(
+                resultSlot,
                 makeE<EIf>(makeFunction("exists", makeVariable(windowSlot)),
                            makeFunction("doubleDoubleSumFinalize", makeVariable(windowSlot)),
-                           makeConstant(value::TypeTags::NumberInt32, 0));
+                           makeConstant(value::TypeTags::NumberInt32, 0)));
         }
-        stage = makeS<ProjectStage>(std::move(stage), std::move(slotMap), kEmptyPlanNodeId);
+        stage = makeS<ProjectStage>(std::move(stage), std::move(projects), kEmptyPlanNodeId);
         return {std::move(stage), std::move(resultSlots)};
     }
 };

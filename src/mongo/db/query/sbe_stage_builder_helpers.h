@@ -90,7 +90,7 @@ class Projection;
 namespace mongo::stage_builder {
 
 class PlanStageSlots;
-struct PlanStageEnvironment;
+struct Environment;
 struct PlanStageStaticData;
 
 std::unique_ptr<sbe::EExpression> makeUnaryOp(sbe::EPrimUnary::Op unaryOp,
@@ -109,12 +109,7 @@ std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
 std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
                                                std::unique_ptr<sbe::EExpression> lhs,
                                                std::unique_ptr<sbe::EExpression> rhs,
-                                               sbe::RuntimeEnvironment* env);
-
-std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
-                                               std::unique_ptr<sbe::EExpression> lhs,
-                                               std::unique_ptr<sbe::EExpression> rhs,
-                                               PlanStageEnvironment& env);
+                                               StageBuilderState& state);
 
 std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
                                                std::unique_ptr<sbe::EExpression> arr,
@@ -122,11 +117,7 @@ std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression>
 
 std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
                                                std::unique_ptr<sbe::EExpression> arr,
-                                               sbe::RuntimeEnvironment* env);
-
-std::unique_ptr<sbe::EExpression> makeIsMember(std::unique_ptr<sbe::EExpression> input,
-                                               std::unique_ptr<sbe::EExpression> arr,
-                                               PlanStageEnvironment& env);
+                                               StageBuilderState& state);
 
 /**
  * Generates an EExpression that checks if the input expression is null or missing.
@@ -398,13 +389,12 @@ EvalStage makeFilter(EvalStage stage,
             stage.extractOutSlots()};
 }
 
-EvalStage makeProject(EvalStage stage,
-                      sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects,
-                      PlanNodeId planNodeId);
+EvalStage makeProject(EvalStage stage, sbe::SlotExprPairVector projects, PlanNodeId planNodeId);
 
 template <typename... Ts>
 EvalStage makeProject(EvalStage stage, PlanNodeId planNodeId, Ts&&... pack) {
-    return makeProject(std::move(stage), makeEM(std::forward<Ts>(pack)...), planNodeId);
+    return makeProject(
+        std::move(stage), makeSlotExprPairVec(std::forward<Ts>(pack)...), planNodeId);
 }
 
 /**
@@ -610,7 +600,7 @@ std::pair<sbe::IndexKeysInclusionSet, std::vector<std::string>> makeIndexKeyIncl
  */
 struct StageBuilderState {
     StageBuilderState(OperationContext* opCtx,
-                      PlanStageEnvironment& env,
+                      Environment& env,
                       PlanStageStaticData* data,
                       const Variables& variables,
                       sbe::value::SlotIdGenerator* slotIdGenerator,
@@ -644,6 +634,11 @@ struct StageBuilderState {
         return spoolIdGenerator->generate();
     }
 
+    boost::optional<sbe::value::SlotId> getTimeZoneDBSlot();
+    boost::optional<sbe::value::SlotId> getCollatorSlot();
+    boost::optional<sbe::value::SlotId> getOplogTsSlot();
+    boost::optional<sbe::value::SlotId> getBuiltinVarSlot(Variables::Id id);
+
     /**
      * Register a Slot in the 'RuntimeEnvironment'. The newly registered Slot should be associated
      * with 'paramId' and tracked in the 'InputParamToSlotMap' for auto-parameterization use. The
@@ -657,7 +652,7 @@ struct StageBuilderState {
     sbe::value::SpoolIdGenerator* const spoolIdGenerator;
 
     OperationContext* const opCtx;
-    PlanStageEnvironment& env;
+    Environment& env;
     PlanStageStaticData* const data;
 
     const Variables& variables;

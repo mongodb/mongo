@@ -100,14 +100,16 @@ EvalExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
     exprs.reserve(leaves.size());
     for (auto&& e : leaves) {
-        exprs.emplace_back(e.extractExpr(state.slotVarMap, *state.env));
+        exprs.emplace_back(e.extractExpr(state));
     }
     return EvalExpr{makeBalancedBooleanOpTree(logicOp, std::move(exprs))};
 }
 
 std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt,
                                             optimizer::SlotVarMap& slotMap,
-                                            const sbe::RuntimeEnvironment& runtimeEnv) {
+                                            StageBuilderState& state) {
+    auto& runtimeEnv = *state.env;
+
     auto env = optimizer::VariableEnvironment::build(abt);
 
     // Do not use descriptive names here.
@@ -117,7 +119,7 @@ std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt,
     pathLower.optimize(abt);
 
     const CollatorInterface* collator = nullptr;
-    boost::optional<sbe::value::SlotId> collatorSlot = runtimeEnv.getSlotIfExists("collator");
+    boost::optional<sbe::value::SlotId> collatorSlot = state.getCollatorSlot();
     if (collatorSlot) {
         auto [collatorTag, collatorValue] = runtimeEnv.getAccessor(*collatorSlot)->getViewOfValue();
         tassert(7158700,

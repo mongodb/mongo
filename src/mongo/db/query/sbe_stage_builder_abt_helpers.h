@@ -62,7 +62,7 @@ EvalExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
 
 std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt,
                                             optimizer::SlotVarMap& slotMap,
-                                            const sbe::RuntimeEnvironment& runtimeEnv);
+                                            StageBuilderState& state);
 
 template <typename... Args>
 inline auto makeABTFunction(StringData name, Args&&... args) {

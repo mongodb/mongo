@@ -142,7 +142,7 @@ public:
                     "sbe expression benchmark PlanStage",
                     "stage"_attr = debugPrint(stage.get()));
 
-        auto expr = evalExpr.extractExpr(state.slotVarMap, *_env);
+        auto expr = evalExpr.extractExpr(state);
         LOGV2_DEBUG(6979802,
                     1,
                     "sbe expression benchmark EExpression",
@@ -183,7 +183,7 @@ private:
         }
     }
 
-    stage_builder::PlanStageEnvironment _env;
+    stage_builder::Environment _env;
     std::unique_ptr<stage_builder::PlanStageStaticData> _planStageData;
     Variables _variables;
     sbe::value::SlotIdGenerator _slotIdGenerator;

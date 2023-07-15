@@ -53,6 +53,7 @@ class RuntimeEnvironment;
 
 namespace mongo::stage_builder {
 
+struct Environment;
 struct StageBuilderState;
 
 /**
@@ -153,9 +154,9 @@ public:
     }
 
     std::unique_ptr<sbe::EExpression> getExpr(optimizer::SlotVarMap& varMap,
-                                              const sbe::RuntimeEnvironment& runtimeEnv) const {
-        return clone().extractExpr(varMap, runtimeEnv);
-    }
+                                              StageBuilderState& state) const;
+
+    std::unique_ptr<sbe::EExpression> getExpr(StageBuilderState& state) const;
 
     /**
      * Extract the expression on top of the stack as an SBE EExpression node. If the expression is
@@ -163,7 +164,7 @@ public:
      * convert variable names into slot ids.
      */
     std::unique_ptr<sbe::EExpression> extractExpr(optimizer::SlotVarMap& varMap,
-                                                  const sbe::RuntimeEnvironment& runtimeEnv);
+                                                  StageBuilderState& state);
 
     /**
      * Helper function that obtains data needed for EvalExpr::extractExpr from StageBuilderState
