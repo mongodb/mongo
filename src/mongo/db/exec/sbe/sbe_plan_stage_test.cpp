@@ -64,6 +64,7 @@ void PlanStageTestFixture::assertValuesEqual(value::TypeTags lhsTag,
     }
     ASSERT_TRUE(equal);
 }
+
 std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateVirtualScan(
     const BSONArray& array) {
     auto [arrTag, arrVal] = stage_builder::makeValue(array);

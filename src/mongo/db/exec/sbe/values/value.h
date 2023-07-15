@@ -122,6 +122,8 @@ using IndexKeysInclusionSet = std::bitset<Ordering::kMaxCompoundIndexKeys>;
 namespace value {
 class SortSpec;
 struct CsiCell;
+struct ValueBlock;
+struct CellBlock;
 
 static constexpr size_t kNewUUIDLength = 16;
 
@@ -220,6 +222,12 @@ enum class TypeTags : uint8_t {
 
     // Pointer to a timezone object
     timeZone,
+
+    // Pointer to a ValueBlock object.
+    valueBlock,
+
+    // Pointer to a CellBlock object.
+    cellBlock,
 };
 
 inline constexpr bool isNumber(TypeTags tag) noexcept {
@@ -1181,6 +1189,14 @@ std::pair<TypeTags, Value> makeNewRecordId(int64_t rid);
 std::pair<TypeTags, Value> makeNewRecordId(const char* str, int32_t size);
 std::pair<TypeTags, Value> makeCopyRecordId(const RecordId&);
 
+inline ValueBlock* getValueBlock(Value v) {
+    return reinterpret_cast<ValueBlock*>(v);
+}
+
+inline CellBlock* getCellBlock(Value v) {
+    return reinterpret_cast<CellBlock*>(v);
+}
+
 inline bool canUseSmallString(StringData input) {
     auto length = input.size();
     auto ptr = input.rawData();
@@ -1301,6 +1317,10 @@ std::pair<TypeTags, Value> makeNewPcreRegex(StringData pattern, StringData optio
 std::pair<TypeTags, Value> makeCopyPcreRegex(const pcre::Regex& regex);
 
 std::pair<TypeTags, Value> makeCopyTimeZone(const TimeZone& tz);
+
+std::pair<TypeTags, Value> makeCopyValueBlock(const ValueBlock& block);
+
+std::pair<TypeTags, Value> makeCopyCellBlock(const CellBlock& block);
 
 inline pcre::Regex* getPcreRegexView(Value val) noexcept {
     return reinterpret_cast<pcre::Regex*>(val);
@@ -1562,6 +1582,10 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeCopyIndexBounds(*getIndexBoundsView(val));
         case TypeTags::timeZone:
             return makeCopyTimeZone(*getTimeZoneView(val));
+        case TypeTags::valueBlock:
+            return makeCopyValueBlock(*getValueBlock(val));
+        case TypeTags::cellBlock:
+            return makeCopyCellBlock(*getCellBlock(val));
         default:
             break;
     }

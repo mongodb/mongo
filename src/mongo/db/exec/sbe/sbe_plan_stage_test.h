@@ -122,6 +122,10 @@ public:
         return _slotIdGenerator->generate();
     }
 
+    value::SlotVector generateMultipleSlotIds(int numSlots) {
+        return _slotIdGenerator->generateMultiple(numSlots);
+    }
+
     SpoolId generateSpoolId() {
         return _spoolIdGenerator->generate();
     }

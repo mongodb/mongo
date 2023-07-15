@@ -34,9 +34,8 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/numeric/conversion/converter_policies.hpp>
 #include <boost/optional/optional.hpp>
-#include <cmath>
-
 #include <boost/preprocessor/control/iif.hpp>
+#include <cmath>
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/string_data_comparator_interface.h"
@@ -47,7 +46,9 @@
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/util/print_options.h"
+#include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -170,6 +171,16 @@ std::pair<TypeTags, Value> makeCopyPcreRegex(const pcre::Regex& regex) {
 std::pair<TypeTags, Value> makeCopyTimeZone(const TimeZone& tz) {
     auto tzCopy = std::make_unique<TimeZone>(tz);
     return {TypeTags::timeZone, bitcastFrom<TimeZone*>(tzCopy.release())};
+}
+
+std::pair<TypeTags, Value> makeCopyValueBlock(const ValueBlock& block) {
+    auto blockCopy = block.clone();
+    return {TypeTags::valueBlock, bitcastFrom<ValueBlock*>(blockCopy.release())};
+}
+
+std::pair<TypeTags, Value> makeCopyCellBlock(const CellBlock& block) {
+    auto blockCopy = block.clone();
+    return {TypeTags::cellBlock, bitcastFrom<CellBlock*>(blockCopy.release())};
 }
 
 key_string::Value SortSpec::generateSortKey(const BSONObj& obj, const CollatorInterface* collator) {
@@ -409,6 +420,12 @@ void releaseValueDeep(TypeTags tag, Value val) noexcept {
             break;
         case TypeTags::timeZone:
             delete getTimeZoneView(val);
+            break;
+        case TypeTags::valueBlock:
+            delete getValueBlock(val);
+            break;
+        case TypeTags::cellBlock:
+            delete getCellBlock(val);
             break;
         default:
             break;
