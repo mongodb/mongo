@@ -316,13 +316,18 @@ AutoStatsTracker::AutoStatsTracker(
     LogMode logMode,
     int dbProfilingLevel,
     Date_t deadline,
-    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDVector)
+    boost::optional<std::vector<NamespaceStringOrUUID>::const_iterator> secondaryNssVectorBegin,
+    boost::optional<std::vector<NamespaceStringOrUUID>::const_iterator> secondaryNssVectorEnd)
     : _opCtx(opCtx), _lockType(lockType), _logMode(logMode) {
     // Deduplicate all namespaces for Top reporting on destruct.
     _nssSet.insert(nss);
-    auto catalog = CollectionCatalog::get(opCtx);
-    for (auto&& secondaryNssOrUUID : secondaryNssOrUUIDVector) {
-        _nssSet.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
+
+    if (secondaryNssVectorBegin && secondaryNssVectorEnd) {
+        auto catalog = CollectionCatalog::get(opCtx);
+        for (auto iter = *secondaryNssVectorBegin; iter != *secondaryNssVectorEnd; ++iter) {
+            const auto& secondaryNssOrUUID = *iter;
+            _nssSet.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
+        }
     }
 
     if (_logMode == LogMode::kUpdateTop) {
@@ -1020,7 +1025,8 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
                     CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(
                         _autoCollForRead.getNss().dbName()),
                     options._deadline,
-                    options._secondaryNssOrUUIDs) {
+                    options._secondaryNssOrUUIDs.cbegin(),
+                    options._secondaryNssOrUUIDs.cend()) {
     hangBeforeAutoGetShardVersionCheck.executeIf(
         [&](auto&) { hangBeforeAutoGetShardVersionCheck.pauseWhileSet(opCtx); },
         [&](const BSONObj& data) {

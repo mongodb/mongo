@@ -91,7 +91,10 @@ public:
                      LogMode logMode,
                      int dbProfilingLevel,
                      Date_t deadline = Date_t::max(),
-                     const std::vector<NamespaceStringOrUUID>& secondaryNssVector = {});
+                     boost::optional<std::vector<NamespaceStringOrUUID>::const_iterator>
+                         secondaryNssVectorBegin = boost::none,
+                     boost::optional<std::vector<NamespaceStringOrUUID>::const_iterator>
+                         secondaryNssVectorEnd = boost::none);
 
     /**
      * Records stats about the current operation via Top, if 'logMode' is 'kUpdateTop' or
