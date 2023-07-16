@@ -860,8 +860,8 @@ const Collection* AutoGetCollectionForReadLockFree::_restoreFromYield(OperationC
         auto catalogStateForNamespace = acquireCatalogStateForNamespace(
             opCtx, nsOrUUID, readConcernArgs, callerExpectedToConflict, _options);
 
-        _resolvedNss = catalogStateForNamespace.resolvedNss;
-        _view = catalogStateForNamespace.view;
+        _resolvedNss = std::move(catalogStateForNamespace.resolvedNss);
+        _view = std::move(catalogStateForNamespace.view);
         CollectionCatalog::stash(opCtx, std::move(catalogStateForNamespace.catalog));
 
         return catalogStateForNamespace.collection;
@@ -940,9 +940,9 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
                                             _callerExpectedToConflictWithSecondaryBatchApplication,
                                             _options);
 
-        _resolvedNss = catalogStateForNamespace.resolvedNss;
+        _resolvedNss = std::move(catalogStateForNamespace.resolvedNss);
         _resolvedDbName = _resolvedNss.dbName();
-        _view = catalogStateForNamespace.view;
+        _view = std::move(catalogStateForNamespace.view);
 
         if (_view) {
             _lockFreeReadsBlock.reset();

@@ -248,7 +248,7 @@ public:
     AutoGetCollection(OperationContext* opCtx,
                       const NamespaceStringOrUUID& nsOrUUID,
                       LockMode modeColl,
-                      Options options = {});
+                      const Options& options = {});
 
     /**
      * Special constructor when this class is instantiated from AutoGetCollectionForRead. Used to
@@ -259,7 +259,7 @@ public:
     AutoGetCollection(OperationContext* opCtx,
                       const NamespaceStringOrUUID& nsOrUUID,
                       LockMode modeColl,
-                      Options options,
+                      const Options& options,
                       ForReadTag read);
 
     AutoGetCollection(AutoGetCollection&&) = default;
@@ -329,7 +329,7 @@ protected:
     AutoGetCollection(OperationContext* opCtx,
                       const NamespaceStringOrUUID& nsOrUUID,
                       LockMode modeColl,
-                      Options options,
+                      const Options& options,
                       bool verifyWriteEligible);
     // Ordering matters, the _collLocks should destruct before the _autoGetDb releases the
     // rstl/global/database locks.
