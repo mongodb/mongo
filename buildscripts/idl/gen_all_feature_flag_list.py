@@ -41,7 +41,7 @@ import yaml
 sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), '../../..')))
 
 # pylint: disable=wrong-import-position
-import buildscripts.idl.lib as lib
+from buildscripts.idl import lib
 from buildscripts.idl.idl import parser
 
 

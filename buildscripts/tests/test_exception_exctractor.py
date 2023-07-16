@@ -43,7 +43,7 @@ class TestExceptionExtractor(unittest.TestCase):
         assert exception_extractor.active is True
         assert exception_extractor.exception_detected is False
         assert list(exception_extractor.current_exception) == expected_current_exception
-        assert exception_extractor.get_exception() == []
+        assert not exception_extractor.get_exception()
 
     def test_no_extraction(self):
         logs = [
@@ -58,7 +58,7 @@ class TestExceptionExtractor(unittest.TestCase):
         assert exception_extractor.active is False
         assert exception_extractor.exception_detected is False
         assert list(exception_extractor.current_exception) == expected_current_exception
-        assert exception_extractor.get_exception() == []
+        assert not exception_extractor.get_exception()
 
     def test_successful_extraction_truncate_first(self):
         logs = ["START"] + ["not captured"

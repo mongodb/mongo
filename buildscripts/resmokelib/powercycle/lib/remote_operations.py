@@ -14,7 +14,7 @@ import textwrap
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-_IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
+_IS_WINDOWS = sys.platform in ["win32", "cygwin"]
 
 _SSH_CONNECTION_ERRORS = [
     "Connection refused",

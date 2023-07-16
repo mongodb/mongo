@@ -38,7 +38,7 @@ from buildscripts.resmokelib.powercycle import powercycle_config, powercycle_con
 from buildscripts.resmokelib.powercycle.lib.services import WindowsService, PosixService
 from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path
 
-_IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
+_IS_WINDOWS = sys.platform in ["win32", "cygwin"]
 _IS_LINUX = sys.platform.startswith("linux")
 _IS_DARWIN = sys.platform == "darwin"
 
@@ -192,7 +192,7 @@ def dump_stacks_and_exit(signum, frame):  # pylint: disable=unused-argument
     LOGGER.info("Dumping stacks!")
 
     sb = []
-    frames = sys._current_frames()  # pylint: disable=protected-access
+    frames = sys._current_frames()
     sb.append("Total threads: {}\n".format(len(frames)))
     sb.append("")
 
@@ -205,7 +205,7 @@ def dump_stacks_and_exit(signum, frame):  # pylint: disable=unused-argument
 
     if _IS_WINDOWS:
         exit_handler()
-        os._exit(1)  # pylint: disable=protected-access
+        os._exit(1)
     else:
         sys.exit(1)
 
@@ -1060,7 +1060,7 @@ def crash_server_or_kill_mongod(task_config, crash_canary, local_ops, script_nam
     LOGGER.info("%s in %d seconds", message_prefix, crash_wait_time)
     time.sleep(crash_wait_time)
 
-    if task_config.crash_method == "internal" or task_config.crash_method == "kill":
+    if task_config.crash_method in ["internal", "kill"]:
         crash_cmd = "crash_server" if task_config.crash_method == "internal" else "kill_mongod"
         crash_func = local_ops.shell
         remote_python = get_remote_python()

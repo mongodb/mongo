@@ -6,10 +6,12 @@ import os
 
 DISALLOWED_ROOT = "buildscripts"
 ALLOWED_IMPORTS = [
+    "buildscripts.resmokelib.testing.fixtures",
     "buildscripts.resmokelib.testing.fixtures.external",
     "buildscripts.resmokelib.testing.fixtures.interface",
     "buildscripts.resmokelib.testing.fixtures.fixturelib",
     "buildscripts.resmokelib.multiversionconstants",
+    "buildscripts.resmokelib.utils",
     "buildscripts.resmokelib.utils.registry",
 ]
 FIXTURE_PATH = os.path.normpath("buildscripts/resmokelib/testing/fixtures")

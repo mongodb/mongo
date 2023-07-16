@@ -15,7 +15,7 @@ from typing import Set, List, Optional
 
 import yaml
 
-import buildscripts.util.runcommand as runcommand
+from buildscripts.util import runcommand
 
 ENTERPRISE_MODULE_NAME = "enterprise"
 ASAN_SIGNATURE = "detect_leaks=1"

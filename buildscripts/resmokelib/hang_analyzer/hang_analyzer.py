@@ -210,7 +210,7 @@ class HangAnalyzer(Subcommand):
         self.root_logger.info("OS: %s", platform.platform())
 
         try:
-            if sys.platform == "win32" or sys.platform == "cygwin":
+            if sys.platform in ["win32", "cygwin"]:
                 self.root_logger.info("Windows Distribution: %s", platform.win32_ver())
             else:
                 self.root_logger.info("Linux Distribution: %s", distro.linux_distribution())

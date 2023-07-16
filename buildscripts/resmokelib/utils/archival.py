@@ -14,7 +14,7 @@ import math
 
 from buildscripts.resmokelib import config
 
-_IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
+_IS_WINDOWS = sys.platform in ("win32", "cygwin")
 
 if _IS_WINDOWS:
     import ctypes
@@ -277,7 +277,7 @@ class Archival(object):
             return 1, str(err), 0
 
         # Round up the size of the archive.
-        size_mb = int(math.ceil(float(file_list_size(temp_file)) / (1024 * 1024)))  # pylint: disable=c-extension-no-member
+        size_mb = int(math.ceil(float(file_list_size(temp_file)) / (1024 * 1024)))
         self._upload_queue.put(
             UploadArgs(self.archival_json_file, display_name, temp_file, "application/x-gzip",
                        s3_bucket, s3_path, True))

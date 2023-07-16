@@ -21,6 +21,8 @@ class Scheduler(sched.scheduler):
         # only has a resolution of ~15ms. We therefore use the `is` operator to remove the correct
         # event from the list.
         with self._lock:
+            # Disable warning, since we're deleting elements from a queue while traversing it
+            # pylint: disable=C0200
             for i in range(len(self._queue)):
                 if self._queue[i] is event:
                     del self._queue[i]

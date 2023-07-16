@@ -4,8 +4,8 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, Type
 
-import buildscripts.resmokelib.config as config
-import buildscripts.resmokelib.utils.registry as registry
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib.utils import registry
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.testing.fixtures.interface import _FIXTURES
