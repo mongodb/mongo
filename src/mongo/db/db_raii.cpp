@@ -169,10 +169,12 @@ bool isAnyNssAViewOrSharded(OperationContext* opCtx,
 boost::optional<std::vector<NamespaceString>> resolveSecondaryNamespacesOrUUIDs(
     OperationContext* opCtx,
     const CollectionCatalog* catalog,
-    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs) {
+    std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsBegin,
+    std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsEnd) {
     std::vector<NamespaceString> resolvedNamespaces;
-    resolvedNamespaces.reserve(secondaryNssOrUUIDs.size());
-    for (auto&& nssOrUUID : secondaryNssOrUUIDs) {
+    resolvedNamespaces.reserve(std::distance(secondaryNssOrUUIDsBegin, secondaryNssOrUUIDsEnd));
+    for (auto iter = secondaryNssOrUUIDsBegin; iter != secondaryNssOrUUIDsEnd; ++iter) {
+        const auto& nssOrUUID = *iter;
         auto nss = catalog->resolveNamespaceStringOrUUID(opCtx, nssOrUUID);
         resolvedNamespaces.emplace_back(nss);
     }
@@ -433,8 +435,8 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     if (!secondaryNssOrUUIDs.empty()) {
         // Check that none of the namespaces are views or sharded collections, which are not
         // supported for secondary namespaces.
-        auto resolvedSecondaryNamespaces =
-            resolveSecondaryNamespacesOrUUIDs(opCtx, catalog.get(), secondaryNssOrUUIDs);
+        auto resolvedSecondaryNamespaces = resolveSecondaryNamespacesOrUUIDs(
+            opCtx, catalog.get(), secondaryNssOrUUIDs.cbegin(), secondaryNssOrUUIDs.cend());
         _secondaryNssIsAViewOrSharded = !resolvedSecondaryNamespaces.has_value();
 
         if (!_secondaryNssIsAViewOrSharded) {
@@ -645,8 +647,11 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
         // is either kNoTimestamp or kLastApplied.
         const bool shouldReadAtLastApplied = SnapshotHelper::changeReadSourceIfNeeded(opCtx, nss);
 
-        const auto resolvedSecondaryNamespaces = resolveSecondaryNamespacesOrUUIDs(
-            opCtx, catalogBeforeSnapshot.get(), secondaryNssOrUUIDs);
+        const auto resolvedSecondaryNamespaces =
+            resolveSecondaryNamespacesOrUUIDs(opCtx,
+                                              catalogBeforeSnapshot.get(),
+                                              secondaryNssOrUUIDs.cbegin(),
+                                              secondaryNssOrUUIDs.cend());
 
         // If the collection requires capped snapshots (i.e. it is unreplicated, capped, not the
         // oplog, and not clustered), establish a capped snapshot. This must happen before opening
