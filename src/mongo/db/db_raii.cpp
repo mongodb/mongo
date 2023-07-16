@@ -609,7 +609,8 @@ struct ConsistentCatalogAndSnapshot {
 ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
-    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs,
+    std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsBegin,
+    std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsEnd,
     const repl::ReadConcernArgs& readConcernArgs,
     bool callerExpectedToConflictWithSecondaryBatchApplication) {
     // Loop until we get a consistent catalog and snapshot or throw an exception.
@@ -647,11 +648,8 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
         // is either kNoTimestamp or kLastApplied.
         const bool shouldReadAtLastApplied = SnapshotHelper::changeReadSourceIfNeeded(opCtx, nss);
 
-        const auto resolvedSecondaryNamespaces =
-            resolveSecondaryNamespacesOrUUIDs(opCtx,
-                                              catalogBeforeSnapshot.get(),
-                                              secondaryNssOrUUIDs.cbegin(),
-                                              secondaryNssOrUUIDs.cend());
+        const auto resolvedSecondaryNamespaces = resolveSecondaryNamespacesOrUUIDs(
+            opCtx, catalogBeforeSnapshot.get(), secondaryNssOrUUIDsBegin, secondaryNssOrUUIDsEnd);
 
         // If the collection requires capped snapshots (i.e. it is unreplicated, capped, not the
         // oplog, and not clustered), establish a capped snapshot. This must happen before opening
@@ -821,7 +819,8 @@ inline CatalogStateForNamespace acquireCatalogStateForNamespace(
     auto [catalog, isAnySecondaryNssShardedOrAView, readSource, readTimestamp] =
         getConsistentCatalogAndSnapshot(opCtx,
                                         nsOrUUID,
-                                        options._secondaryNssOrUUIDs,
+                                        options._secondaryNssOrUUIDs.cbegin(),
+                                        options._secondaryNssOrUUIDs.cend(),
                                         readConcernArgs,
                                         callerExpectedToConflictWithSecondaryBatchApplication);
 
