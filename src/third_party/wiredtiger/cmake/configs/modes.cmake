@@ -138,8 +138,8 @@ set(ubsan_compiler_cxx_flag "-fsanitize=undefined")
 
 # MSAN build variant flags.
 set(msan_link_flags "-fsanitize=memory")
-set(msan_compiler_c_flag "-fsanitize=memory" "-fno-optimize-sibling-calls" "-fsanitize-memory-track-origins=2")
-set(msan_compiler_cxx_flag "-fsanitize=memory" "-fno-optimize-sibling-calls" "-fsanitize-memory-track-origins=2")
+set(msan_compiler_c_flag "-fsanitize=memory" "-fno-optimize-sibling-calls" "-fsanitize-memory-track-origins=2" "-fsanitize-ignorelist=${CMAKE_CURRENT_LIST_DIR}/msan-ignorelist.txt")
+set(msan_compiler_cxx_flag "-fsanitize=memory" "-fno-optimize-sibling-calls" "-fsanitize-memory-track-origins=2" "-fsanitize-ignorelist=${CMAKE_CURRENT_LIST_DIR}/msan-ignorelist.txt")
 
 # TSAN build variant flags.
 set(tsan_link_flags "-fsanitize=thread")
