@@ -512,6 +512,11 @@ bool CurOp::completeAndLogOperation(logv2::LogComponent component,
                 // Retrieving storage stats should not be blocked by oplog application.
                 ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
                     opCtx->lockState());
+                // Slow query logs are critical for observability and should not wait for ticket
+                // acquisition. Slow queries can happen for various reasons; however, if queries are
+                // slower due to ticket exhaustion, queueing in order to log can compound the issue.
+                ScopedAdmissionPriorityForLock skipAdmissionControl(
+                    opCtx->lockState(), AdmissionContext::Priority::kImmediate);
                 Lock::GlobalLock lk(opCtx,
                                     MODE_IS,
                                     Date_t::now() + Milliseconds(500),
