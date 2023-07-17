@@ -60,11 +60,10 @@ stdx::condition_variable shutdownTasksComplete;
 boost::optional<ExitCode> shutdownExitCode;
 bool shutdownTasksInProgress = false;
 AtomicWord<unsigned> shutdownFlag;
-std::stack<ShutdownTask> shutdownTasks;
+std::stack<unique_function<void(const ShutdownTaskArgs&)>> shutdownTasks;
 stdx::thread::id shutdownTasksThreadId;
 
-void runRegisteredShutdownTasks(decltype(shutdownTasks) tasks,
-                                const ShutdownTaskArgs& shutdownArgs) noexcept {
+void runTasks(decltype(shutdownTasks) tasks, const ShutdownTaskArgs& shutdownArgs) noexcept {
     while (!tasks.empty()) {
         const auto& task = tasks.top();
         task(shutdownArgs);
@@ -101,7 +100,7 @@ ExitCode waitForShutdown() {
     return shutdownExitCode.value();
 }
 
-void registerShutdownTask(ShutdownTask task) {
+void registerShutdownTask(unique_function<void(const ShutdownTaskArgs&)> task) {
     stdx::lock_guard<Latch> lock(shutdownMutex);
     invariant(!globalInShutdownDeprecated());
     shutdownTasks.emplace(std::move(task));
@@ -147,7 +146,7 @@ void shutdown(ExitCode code, const ShutdownTaskArgs& shutdownArgs) {
         localTasks.swap(shutdownTasks);
     }
 
-    runRegisteredShutdownTasks(std::move(localTasks), shutdownArgs);
+    runTasks(std::move(localTasks), shutdownArgs);
 
     {
         stdx::lock_guard<Latch> lock(shutdownMutex);
@@ -159,7 +158,6 @@ void shutdown(ExitCode code, const ShutdownTaskArgs& shutdownArgs) {
     }
 }
 
-#if defined(_WIN32)
 void shutdownNoTerminate(const ShutdownTaskArgs& shutdownArgs) {
     decltype(shutdownTasks) localTasks;
 
@@ -176,7 +174,7 @@ void shutdownNoTerminate(const ShutdownTaskArgs& shutdownArgs) {
         localTasks.swap(shutdownTasks);
     }
 
-    runRegisteredShutdownTasks(std::move(localTasks), shutdownArgs);
+    runTasks(std::move(localTasks), shutdownArgs);
 
     {
         stdx::lock_guard<Latch> lock(shutdownMutex);
@@ -186,5 +184,5 @@ void shutdownNoTerminate(const ShutdownTaskArgs& shutdownArgs) {
 
     shutdownTasksComplete.notify_all();
 }
-#endif
+
 }  // namespace mongo
