@@ -3284,7 +3284,7 @@ TEST_F(CollectionCatalogTimestampTest, ResolveNamespaceStringOrUUIDAtLatest) {
 }
 
 TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
-    const NamespaceString nss("test.abc");
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.abc");
     createCollection(opCtx.get(), nss, Timestamp::min());
 
     {

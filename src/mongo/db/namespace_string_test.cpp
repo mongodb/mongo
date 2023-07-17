@@ -176,15 +176,19 @@ TEST_F(NamespaceStringTest, DatabaseValidNames) {
 }
 
 TEST_F(NamespaceStringTest, ListCollectionsCursorNS) {
-    ASSERT(NamespaceString("test.$cmd.listCollections").isListCollectionsCursorNS());
+    ASSERT(
+        makeNamespaceString(boost::none, "test.$cmd.listCollections").isListCollectionsCursorNS());
 
-    ASSERT(!NamespaceString("test.foo").isListCollectionsCursorNS());
-    ASSERT(!NamespaceString("test.foo.$cmd.listCollections").isListCollectionsCursorNS());
-    ASSERT(!NamespaceString("test.$cmd.").isListCollectionsCursorNS());
-    ASSERT(!NamespaceString("test.$cmd.foo.").isListCollectionsCursorNS());
-    ASSERT(!NamespaceString("test.$cmd.listCollections.").isListCollectionsCursorNS());
-    ASSERT(!NamespaceString("test.$cmd.listIndexes").isListCollectionsCursorNS());
-    ASSERT(!NamespaceString("test.$cmd.listIndexes.foo").isListCollectionsCursorNS());
+    ASSERT(!makeNamespaceString(boost::none, "test.foo").isListCollectionsCursorNS());
+    ASSERT(!makeNamespaceString(boost::none, "test.foo.$cmd.listCollections")
+                .isListCollectionsCursorNS());
+    ASSERT(!makeNamespaceString(boost::none, "test.$cmd.").isListCollectionsCursorNS());
+    ASSERT(!makeNamespaceString(boost::none, "test.$cmd.foo.").isListCollectionsCursorNS());
+    ASSERT(!makeNamespaceString(boost::none, "test.$cmd.listCollections.")
+                .isListCollectionsCursorNS());
+    ASSERT(!makeNamespaceString(boost::none, "test.$cmd.listIndexes").isListCollectionsCursorNS());
+    ASSERT(
+        !makeNamespaceString(boost::none, "test.$cmd.listIndexes.foo").isListCollectionsCursorNS());
 }
 
 TEST_F(NamespaceStringTest, IsCollectionlessCursorNamespace) {

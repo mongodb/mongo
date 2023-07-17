@@ -529,7 +529,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
         })",
         key);
 
-    FindCommandRequest fcr2(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    FindCommandRequest fcr2(
+        NamespaceStringOrUUID(NamespaceString::createNamespaceString_forTest("testDB.testColl")));
     fcr2.setAwaitData(true);
     fcr2.setTailable(true);
     fcr2.setSort(BSON("$natural" << 1));

@@ -1742,7 +1742,7 @@ public:
 
         // Check oplog replay mode with missing collection.
         FindCommandRequest findRequestMissingColl{
-            NamespaceString{"local.oplog.querytests.missing"}};
+            NamespaceString::createNamespaceString_forTest("local.oplog.querytests.missing")};
         findRequestMissingColl.setFilter(BSON("ts" << GTE << Timestamp(1000, 50)));
         std::unique_ptr<DBClientCursor> c0 = _client.find(std::move(findRequestMissingColl));
         ASSERT(!c0->more());

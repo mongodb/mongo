@@ -280,6 +280,9 @@ NSS_CONSTANT(kDefaultOplogTruncateAfterPointNamespace,
              DatabaseName::kLocal,
              "replset.oplogTruncateAfterPoint"_sd)
 
+// Namespace used for local system rollback id.
+NSS_CONSTANT(kDefaultRollbackIdNamespace, DatabaseName::kLocal, "system.rollback.id"_sd)
+
 // Namespace used for the local oplog dollar main namespace.
 NSS_CONSTANT(kLocalOplogDollarMain, DatabaseName::kLocal, "oplog.$main"_sd)
 
@@ -291,9 +294,6 @@ NSS_CONSTANT(kDefaultOplogCollectionNamespace, DatabaseName::kLocal, "temp_oplog
 
 // Namespace used for local minimum valid namespace.
 NSS_CONSTANT(kDefaultMinValidNamespace, DatabaseName::kLocal, "replset.minvalid"_sd)
-
-// Namespace used for local system rollback id.
-NSS_CONSTANT(kDefaultRollbackIdNamespace, DatabaseName::kLocal, "system.rollback.id"_sd)
 
 // Namespace used by the test command to pin the oldest timestamp.
 NSS_CONSTANT(kDurableHistoryTestNamespace, DatabaseName::kMdbTesting, "pinned_timestamp"_sd)

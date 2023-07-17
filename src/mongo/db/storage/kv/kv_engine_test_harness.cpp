@@ -288,7 +288,7 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
     ASSERT(engine);
 
     std::string ident = "abc";
-    NamespaceString nss("mydb.mycoll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("mydb.mycoll");
 
     CollectionOptions options;
     options.uuid = UUID::gen();
@@ -842,7 +842,7 @@ TEST_F(KVEngineTestHarness, SingleReadWithConflictWithOplog) {
         options.cappedSize = 10240;
         options.cappedMaxDocs = -1;
 
-        NamespaceString oplogNss("local.oplog.rs");
+        NamespaceString oplogNss = NamespaceString::createNamespaceString_forTest("local.oplog.rs");
         ASSERT_OK(engine->createRecordStore(opCtx.get(), oplogNss, "ident", options));
         oplogRs = engine->getRecordStore(opCtx.get(), oplogNss, "ident", options);
         ASSERT(oplogRs);
@@ -1477,7 +1477,7 @@ DEATH_TEST_REGEX_F(DurableCatalogTest,
     ASSERT(engine);
 
     std::string ident = "abc";
-    NamespaceString nss("mydb.mycoll");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("mydb.mycoll");
 
     CollectionOptions options;
     options.uuid = UUID::gen();

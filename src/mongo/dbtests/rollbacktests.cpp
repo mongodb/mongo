@@ -264,7 +264,8 @@ public:
         {
             WriteUnitOfWork uow(&opCtx);
             ASSERT(collectionExists(&opCtx, &ctx, ns));
-            ASSERT_OK(ctx.db()->dropCollection(&opCtx, NamespaceString(ns)));
+            ASSERT_OK(ctx.db()->dropCollection(&opCtx,
+                                               NamespaceString::createNamespaceString_forTest(ns)));
             ASSERT(!collectionExists(&opCtx, &ctx, ns));
             if (!rollback) {
                 uow.commit();

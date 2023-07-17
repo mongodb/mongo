@@ -1928,7 +1928,8 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
 
     std::vector<std::int64_t> field1{1, 2, 3};
     ASSERT_TRUE(field1 == testStruct.getField1());
-    std::vector<NamespaceString> field2{{"a", "b"}, {"c", "d"}};
+    std::vector<NamespaceString> field2{NamespaceString::createNamespaceString_forTest("a", "b"),
+                                        NamespaceString::createNamespaceString_forTest("c", "d")};
     ASSERT_TRUE(field2 == testStruct.getField2());
 
     ASSERT_EQUALS(testStruct.getField6().size(), 2u);
