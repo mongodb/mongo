@@ -219,7 +219,11 @@ const boost::optional<CEType>& ScanDefinition::getCE() const {
     return _ce;
 }
 
-ShardingMetadata ScanDefinition::shardingMetadata() const {
+const ShardingMetadata& ScanDefinition::shardingMetadata() const {
+    return _shardingMetadata;
+}
+
+ShardingMetadata& ScanDefinition::shardingMetadata() {
     return _shardingMetadata;
 }
 

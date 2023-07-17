@@ -220,7 +220,8 @@ public:
 
     const boost::optional<CEType>& getCE() const;
 
-    ShardingMetadata shardingMetadata() const;
+    const ShardingMetadata& shardingMetadata() const;
+    ShardingMetadata& shardingMetadata();
 
 private:
     ScanDefOptions _options;

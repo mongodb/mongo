@@ -646,16 +646,33 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
     }
 
     const size_t numberOfPartitions = internalQueryDefaultDOP.load();
+
+    const bool isSharded = collection.isSharded_DEPRECATED();
+    ABTVector shardKey;
+    if (isSharded) {
+        for (auto&& e : collection.getShardKeyPattern().getKeyPattern().toBSON()) {
+            shardKey.push_back(translateShardKeyField(e.fieldName()));
+        }
+    }
+
+    DistributionType type{DistributionType::UnknownPartitioning};
+    if (isSharded) {
+        // TODO SERVER-78503: Handle hashed distribution
+        type = DistributionType::RangePartitioning;
+    } else if (numberOfPartitions == 1) {
+        type = DistributionType::Centralized;
+    }
+
     // For now handle only local parallelism (no over-the-network exchanges).
-    DistributionAndPaths distribution{(numberOfPartitions == 1)
-                                          ? DistributionType::Centralized
-                                          : DistributionType::UnknownPartitioning};
+    DistributionAndPaths distribution{type, shardKey};
 
     opt::unordered_map<std::string, ScanDefinition> scanDefs;
     boost::optional<CEType> numRecords;
     if (collectionExists) {
         numRecords = static_cast<double>(collection->numRecords(opCtx));
     }
+    ShardingMetadata shardingMetadata{.mayContainOrphans = isSharded};
+
     scanDefs.emplace(scanDefName,
                      createScanDef({{"type", "mongod"},
                                     {"database", nss.db_deprecated().toString()},
@@ -666,7 +683,8 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
                                    constFold,
                                    std::move(distribution),
                                    collectionExists,
-                                   numRecords));
+                                   numRecords,
+                                   std::move(shardingMetadata)));
 
     // Add a scan definition for all involved collections. Note that the base namespace has already
     // been accounted for above and isn't included here.
@@ -700,9 +718,11 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
     switch (mode) {
         case CEMode::kSampling: {
             Metadata metadataForSampling = metadata;
-            // Do not use indexes for sampling.
             for (auto& entry : metadataForSampling._scanDefs) {
+                // Do not use indexes for sampling.
                 entry.second.getIndexDefs().clear();
+                // Do not perform shard filtering for sampling.
+                entry.second.shardingMetadata().mayContainOrphans = false;
             }
 
             // TODO: consider a limited rewrite set.

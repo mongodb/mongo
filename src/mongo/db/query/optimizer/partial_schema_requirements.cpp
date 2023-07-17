@@ -137,9 +137,9 @@ bool PartialSchemaRequirements::isNoop() const {
 
 boost::optional<ProjectionName> PartialSchemaRequirements::findProjection(
     const PartialSchemaKey& key) const {
-    tassert(7453908,
-            "Expected PartialSchemaRequirement to be a singleton disjunction",
-            PSRExpr::isSingletonDisjunction(getRoot()));
+    if (!PSRExpr::isSingletonDisjunction(getRoot())) {
+        return boost::none;
+    }
 
     boost::optional<ProjectionName> proj;
     PSRExpr::visitDNF(_expr, [&](const Entry& entry, const PSRExpr::VisitorContext&) {
