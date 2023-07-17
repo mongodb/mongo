@@ -148,8 +148,12 @@ x = dbForTest._adminCommand("fsync");
 assert(x.ok == 1, "fsync failed: " + tojson(x));
 
 // test fsync+lock on admin db
-x = dbForTest._adminCommand({"fsync": 1, lock: true});
-assert(!x.ok, "lock should fail: " + tojson(x));
+const featureFlagClusterFsyncLock =
+    FeatureFlagUtil.isEnabled(s.configRS.getPrimary().getDB('admin'), "ClusterFsyncLock");
+if (!featureFlagClusterFsyncLock) {
+    x = dbForTest._adminCommand({"fsync": 1, lock: true});
+    assert(!x.ok, "lock should fail: " + tojson(x));
+}
 
 s.stop();
 })();
