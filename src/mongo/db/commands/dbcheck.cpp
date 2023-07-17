@@ -141,6 +141,7 @@ public:
     DbCheckStartAndStopLogger(OperationContext* opCtx) : _opCtx(opCtx) {
         try {
             const auto healthLogEntry = dbCheckHealthLogEntry(boost::none /*nss*/,
+                                                              boost::none /*collectionUUID*/,
                                                               SeverityEnum::Info,
                                                               "",
                                                               OplogEntriesEnum::Start,
@@ -167,6 +168,7 @@ public:
             _logOp(_opCtx, nss, boost::none /*uuid*/, oplogEntry.toBSON());
 
             const auto healthLogEntry = dbCheckHealthLogEntry(boost::none /*nss*/,
+                                                              boost::none /*collectionUUID*/,
                                                               SeverityEnum::Info,
                                                               "",
                                                               OplogEntriesEnum::Stop,
@@ -387,7 +389,7 @@ protected:
                 _doCollection(opCtx, coll);
             } catch (const DBException& e) {
                 auto logEntry = dbCheckErrorHealthLogEntry(
-                    coll.nss, "dbCheck failed", OplogEntriesEnum::Batch, e.toStatus());
+                    coll.nss, coll.uuid, "dbCheck failed", OplogEntriesEnum::Batch, e.toStatus());
                 HealthLogInterface::get(Client::getCurrent()->getServiceContext())->log(*logEntry);
                 return;
             }
@@ -419,6 +421,7 @@ private:
             } else {
                 const auto entry = dbCheckWarningHealthLogEntry(
                     info.nss,
+                    info.uuid,
                     "abandoning dbCheck batch because collection no longer exists",
                     OplogEntriesEnum::Batch,
                     Status(ErrorCodes::NamespaceNotFound, "collection not found"));
@@ -466,6 +469,7 @@ private:
                     retryable = true;
                     entry = dbCheckWarningHealthLogEntry(
                         info.nss,
+                        info.uuid,
                         "retrying dbCheck batch after timeout due to lock unavailability",
                         OplogEntriesEnum::Batch,
                         result.getStatus());
@@ -473,29 +477,34 @@ private:
                     retryable = true;
                     entry = dbCheckWarningHealthLogEntry(
                         info.nss,
+                        info.uuid,
                         "retrying dbCheck batch after conflict with pending catalog operation",
                         OplogEntriesEnum::Batch,
                         result.getStatus());
                 } else if (code == ErrorCodes::NamespaceNotFound) {
                     entry = dbCheckWarningHealthLogEntry(
                         info.nss,
+                        info.uuid,
                         "abandoning dbCheck batch because collection no longer exists",
                         OplogEntriesEnum::Batch,
                         result.getStatus());
                 } else if (code == ErrorCodes::IndexNotFound) {
                     entry = dbCheckWarningHealthLogEntry(
                         info.nss,
+                        info.uuid,
                         "skipping dbCheck on collection because it is missing an _id index",
                         OplogEntriesEnum::Batch,
                         result.getStatus());
                 } else if (ErrorCodes::isA<ErrorCategory::NotPrimaryError>(code)) {
                     entry = dbCheckWarningHealthLogEntry(
                         info.nss,
+                        info.uuid,
                         "stopping dbCheck because node is no longer primary",
                         OplogEntriesEnum::Batch,
                         result.getStatus());
                 } else {
                     entry = dbCheckErrorHealthLogEntry(info.nss,
+                                                       info.uuid,
                                                        "dbCheck batch failed",
                                                        OplogEntriesEnum::Batch,
                                                        result.getStatus());
@@ -511,6 +520,7 @@ private:
 
             _batchesProcessed++;
             auto entry = dbCheckBatchEntry(info.nss,
+                                           info.uuid,
                                            stats.nDocs,
                                            stats.nBytes,
                                            stats.md5,
@@ -530,6 +540,7 @@ private:
             auto status = waitForWriteConcern(opCtx, stats.time, info.writeConcern, &unused);
             if (!status.isOK()) {
                 auto entry = dbCheckWarningHealthLogEntry(info.nss,
+                                                          info.uuid,
                                                           "dbCheck failed waiting for writeConcern",
                                                           OplogEntriesEnum::Batch,
                                                           status);
