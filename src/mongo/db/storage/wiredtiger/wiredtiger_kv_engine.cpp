@@ -674,6 +674,7 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
             "This version of MongoDB is too recent to start up on the existing data files. "
             "Try MongoDB 4.2 or earlier.");
     }
+    invariantWTOK(_conn->close(_conn, nullptr), nullptr);
 
     // MongoDB 4.4 doing clean shutdown in FCV 4.2 will use compatibility version 3.3.
     configStr = wtOpenConfig + ",compatibility=(require_min=\"3.3.0\")";
@@ -682,6 +683,7 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
         _fileVersion = {WiredTigerFileVersion::StartupVersion::IS_44_FCV_42};
         return;
     }
+    invariantWTOK(_conn->close(_conn, nullptr), nullptr);
 
     // MongoDB 4.2 uses compatibility version 3.2.
     configStr = wtOpenConfig + ",compatibility=(require_min=\"3.2.0\")";
@@ -709,6 +711,7 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
         LOGV2_FATAL_NOTRACE(
             28595, "Terminating.", "reason"_attr = wtRCToStatus(ret, nullptr).reason());
     }
+    invariantWTOK(_conn->close(_conn, nullptr), nullptr);
 
     // Always attempt to salvage metadata regardless of error code when in repair mode.
     LOGV2_WARNING(22349, "Attempting to salvage WiredTiger metadata");
