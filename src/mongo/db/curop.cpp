@@ -66,6 +66,7 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/redaction.h"
@@ -871,9 +872,15 @@ void CurOp::reportState(BSONObjBuilder* builder,
         builder->append("dataThroughputAverage", *_debug.dataThroughputAverage);
     }
 
-    auto admissionPriority = opCtx->lockState()->getAdmissionPriority();
-    if (admissionPriority < AdmissionContext::Priority::kNormal) {
-        builder->append("admissionPriority", toString(admissionPriority));
+    // (Ignore FCV check): This feature flag is used to initialize ticketing during storage engine
+    // initialization and FCV checking is ignored there, so here we also need to ignore FCV to keep
+    // consistent behavior.
+    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
+            .isEnabledAndIgnoreFCVUnsafe()) {
+        auto admissionPriority = opCtx->lockState()->getAdmissionPriority();
+        if (admissionPriority < AdmissionContext::Priority::kNormal) {
+            builder->append("admissionPriority", toString(admissionPriority));
+        }
     }
 
     if (auto start = _waitForWriteConcernStart.load(); start > 0) {
@@ -1092,9 +1099,15 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("reslen", responseLength);
     }
 
-    auto admissionPriority = opCtx->lockState()->getAdmissionPriority();
-    if (admissionPriority < AdmissionContext::Priority::kNormal) {
-        pAttrs->add("admissionPriority", admissionPriority);
+    // (Ignore FCV check): This feature flag is used to initialize ticketing during storage engine
+    // initialization and FCV checking is ignored there, so here we also need to ignore FCV to keep
+    // consistent behavior.
+    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
+            .isEnabledAndIgnoreFCVUnsafe()) {
+        auto admissionPriority = opCtx->lockState()->getAdmissionPriority();
+        if (admissionPriority < AdmissionContext::Priority::kNormal) {
+            pAttrs->add("admissionPriority", admissionPriority);
+        }
     }
 
     if (lockStats) {
