@@ -327,7 +327,14 @@ void RegexMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
     }
 
     if (!_flags.empty()) {
-        opts.appendLiteral(bob, "$options", _flags);
+        if (opts.literalPolicy == LiteralSerializationPolicy::kToRepresentativeParseableValue) {
+            // We need to make sure the $options value can be re-parsed as legal regex options, so
+            // we'll set the representative value in this case to be the empty string rather than
+            // "?", which is the standard representative for string values.
+            bob->append("$options", "");
+        } else {
+            opts.appendLiteral(bob, "$options", _flags);
+        }
     }
 }
 
