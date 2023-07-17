@@ -2372,7 +2372,7 @@ std::shared_ptr<HelloResponse> ReplicationCoordinatorImpl::_makeHelloResponse(
         response->setIsSecondary(true);
     }
 
-    if (_waitingForRSTLAtStepDown) {
+    if (_stepDownPending) {
         response->setIsWritablePrimary(false);
     }
 
@@ -2673,6 +2673,12 @@ ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpSt
     // The state transition should never be rollback within this class.
     invariant(_stateTransition != ReplicationCoordinator::OpsKillingStateTransitionEnum::kRollback);
 
+    if (_stateTransition == ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown)
+        _replCord->autoGetRstlEnterStepDown();
+    ScopeGuard callReplCoordExit([&] {
+        if (_stateTransition == ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown)
+            _replCord->autoGetRstlExitStepDown();
+    });
     int rstlTimeout = fassertOnLockTimeoutForStepUpDown.load();
     Date_t start{Date_t::now()};
     if (rstlTimeout > 0 && deadline - start > Seconds(rstlTimeout)) {
@@ -2701,7 +2707,13 @@ ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpSt
                     "calling abort() to allow cluster to progress",
                     "lockRep"_attr = lockRep.obj());
     });
+    callReplCoordExit.dismiss();
 };
+
+ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::~AutoGetRstlForStepUpStepDown() {
+    if (_stateTransition == ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown)
+        _replCord->autoGetRstlExitStepDown();
+}
 
 void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_startKillOpThread() {
     invariant(!_killOpThread);
@@ -2806,6 +2818,24 @@ const OperationContext* ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown
     return _opCtx;
 }
 
+void ReplicationCoordinatorImpl::autoGetRstlEnterStepDown() {
+    stdx::lock_guard lk(_mutex);
+    // This makes us tell the 'hello' command we can't accept writes (though in fact we can,
+    // it is not valid to disable writes until we actually acquire the RSTL).
+    if (_stepDownPending++ == 0)
+        _fulfillTopologyChangePromise(lk);
+}
+
+void ReplicationCoordinatorImpl::autoGetRstlExitStepDown() {
+    stdx::lock_guard lk(_mutex);
+    // Once we release the RSTL, we announce either that we can accept writes or that we're now
+    // a real secondary.
+    invariant(_stepDownPending > 0);
+    if (--_stepDownPending == 0)
+        _fulfillTopologyChangePromise(lk);
+}
+
+
 void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                                           const bool force,
                                           const Milliseconds& waitTime,
@@ -2820,19 +2850,6 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     uassert(ErrorCodes::NotWritablePrimary,
             "not primary so can't step down",
             getMemberState().primary());
-
-    // This makes us tell the 'hello' command we can't accept writes (though in fact we can,
-    // it is not valid to disable writes until we actually acquire the RSTL).
-    {
-        stdx::lock_guard lk(_mutex);
-        _waitingForRSTLAtStepDown++;
-        _fulfillTopologyChangePromise(lk);
-    }
-    ScopeGuard clearStepDownFlag([&] {
-        stdx::lock_guard lk(_mutex);
-        _waitingForRSTLAtStepDown--;
-        _fulfillTopologyChangePromise(lk);
-    });
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &stepdownHangBeforeRSTLEnqueue, opCtx, "stepdownHangBeforeRSTLEnqueue");
@@ -2861,14 +2878,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     // attempt fails later we can release the RSTL and go to sleep to allow secondaries to
     // catch up without allowing new writes in.
     _updateWriteAbilityFromTopologyCoordinator(lk, opCtx);
-    auto action = _updateMemberStateFromTopologyCoordinator(lk);
-    invariant(action == PostMemberStateUpdateAction::kActionNone);
     invariant(!_readWriteAbility->canAcceptNonLocalWrites(lk));
-
-    // We truly cannot accept writes now, and we've updated the topology version to say so, so
-    // no need for this flag any more, nor to increment the topology version again.
-    _waitingForRSTLAtStepDown--;
-    clearStepDownFlag.dismiss();
 
     auto updateMemberState = [&] {
         invariant(lk.owns_lock());
@@ -4132,7 +4142,9 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
             // liveness timeout. And, no new election can happen as we have already set our
             // ReplicationCoordinatorImpl::_rsConfigState state to "kConfigReconfiguring" which
             // prevents new elections from happening. So, its safe to release the RSTL lock.
+            lk.unlock();
             arsd.reset();
+            lk.lock();
         }
     }
 
@@ -4653,11 +4665,11 @@ ReplicationCoordinatorImpl::PostMemberStateUpdateAction
 ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock lk) {
     // We want to respond to any waiting hellos even if our current and target state are the
     // same as it is possible writes have been disabled during a stepDown but the primary has yet
-    // to transition to SECONDARY state.  We do not do so when _waitingForRSTLAtStepDown is true
+    // to transition to SECONDARY state.  We do not do so when _stepDownPending is true
     // because in that case we have already said we cannot accept writes in the hello response
     // and explictly incremented the toplogy version.
     ON_BLOCK_EXIT([&] {
-        if (_rsConfig.isInitialized() && !_waitingForRSTLAtStepDown) {
+        if (_rsConfig.isInitialized() && !_stepDownPending) {
             _fulfillTopologyChangePromise(lk);
         }
     });

@@ -4912,9 +4912,22 @@ TEST_F(ReplCoordTest, AwaitHelloResponseReturnsOnElectionTimeout) {
     // awaitHelloResponse blocks and waits on a future when the request TopologyVersion equals
     // the current TopologyVersion of the server.
     stdx::thread getHelloThread([&] {
-        const auto response =
+        // We expect two topology changes, one when we attempt to obtain the RSTL (when we report
+        // ourselves as a non-writable primary), and one when we succeed in stepping down.
+        auto response =
             awaitHelloWithNewOpCtx(getReplCoord(), currentTopologyVersion, {}, deadline);
         auto topologyVersion = response->getTopologyVersion();
+        ASSERT_EQUALS(topologyVersion->getCounter(), expectedCounter);
+        ASSERT_EQUALS(topologyVersion->getProcessId(), expectedProcessId);
+
+        ASSERT_FALSE(response->isWritablePrimary());
+        ASSERT_FALSE(response->isSecondary());
+        ASSERT_TRUE(response->hasPrimary());
+
+        currentTopologyVersion = *topologyVersion;
+        expectedCounter = currentTopologyVersion.getCounter() + 1;
+        response = awaitHelloWithNewOpCtx(getReplCoord(), currentTopologyVersion, {}, deadline);
+        topologyVersion = response->getTopologyVersion();
         ASSERT_EQUALS(topologyVersion->getCounter(), expectedCounter);
         ASSERT_EQUALS(topologyVersion->getProcessId(), expectedProcessId);
 

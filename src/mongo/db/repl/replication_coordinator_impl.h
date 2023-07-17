@@ -486,6 +486,15 @@ public:
 
     virtual SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
 
+    // ==================== Private API ===================
+    // Called by AutoGetRstlForStepUpStepDown before taking RSTL when making stepdown transitions
+    void autoGetRstlEnterStepDown();
+
+    // Called by AutoGetRstlForStepUpStepDown before releasing RSTL when making stepdown
+    // transitions.  Also called in case of failure to acquire RSTL.  There will be one call to this
+    // method for each call to autoGetRSTLEnterStepDown.
+    void autoGetRstlExitStepDown();
+
     // ================== Test support API ===================
 
     /**
@@ -717,6 +726,8 @@ private:
             OperationContext* opCtx,
             ReplicationCoordinator::OpsKillingStateTransitionEnum stateTransition,
             Date_t deadline = Date_t::max());
+
+        ~AutoGetRstlForStepUpStepDown();
 
         // Disallows copying.
         AutoGetRstlForStepUpStepDown(const AutoGetRstlForStepUpStepDown&) = delete;
@@ -1892,10 +1903,10 @@ private:
 
     AtomicWord<bool> _startedSteadyStateReplication{false};
 
-    // If we're waiting to get the RSTL at stepdown and therefore should claim we don't allow
+    // If we're in stepdown code and therefore should claim we don't allow
     // writes.  This is a counter rather than a flag because there are scenarios where multiple
     // stepdowns are attempted at once.
-    short _waitingForRSTLAtStepDown = 0;
+    short _stepDownPending = 0;
 
     // If we're in terminal shutdown.  If true, we'll refuse to vote in elections.
     bool _inTerminalShutdown = false;  // (M)
