@@ -60,9 +60,6 @@ class ReplicationConsistencyMarkersImpl : public ReplicationConsistencyMarkers {
     ReplicationConsistencyMarkersImpl& operator=(const ReplicationConsistencyMarkersImpl&) = delete;
 
 public:
-    static constexpr StringData kDefaultMinValidNamespace = "local.replset.minvalid"_sd;
-    static constexpr StringData kDefaultInitialSyncIdNamespace = "local.replset.initialSyncId"_sd;
-
     explicit ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface);
     ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface,
                                       NamespaceString minValidNss,

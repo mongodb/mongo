@@ -71,7 +71,6 @@ namespace repl {
 
 namespace {
 
-const StringData kDefaultOplogCollectionNamespace = "local.temp_oplog_buffer"_sd;
 const StringData kOplogEntryFieldName = "entry"_sd;
 const StringData kIdFieldName = "_id"_sd;
 const StringData kTimestampFieldName = "ts"_sd;
@@ -80,7 +79,7 @@ const StringData kIdIdxName = "_id_"_sd;
 }  // namespace
 
 NamespaceString OplogBufferCollection::getDefaultNamespace() {
-    return NamespaceString(kDefaultOplogCollectionNamespace);
+    return NamespaceString::kDefaultOplogCollectionNamespace;
 }
 
 std::tuple<BSONObj, Timestamp> OplogBufferCollection::addIdToDocument(const BSONObj& orig) {
@@ -276,7 +275,7 @@ void OplogBufferCollection::clear(OperationContext* opCtx) {
     stdx::lock_guard<Latch> lk(_mutex);
     // We acquire the appropriate locks for the temporary oplog buffer collection here,
     // so that we perform the drop and create under the same locks.
-    AutoGetCollection autoColl(opCtx, NamespaceString(kDefaultOplogCollectionNamespace), MODE_X);
+    AutoGetCollection autoColl(opCtx, NamespaceString::kDefaultOplogCollectionNamespace, MODE_X);
     _dropCollection(opCtx);
     _createCollection(opCtx);
     _size = 0;

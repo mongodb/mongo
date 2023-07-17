@@ -281,9 +281,7 @@ TEST_F(StorageInterfaceImplTest, InitializeRollbackIDReturnsNamespaceExistsOnExi
     StorageInterfaceImpl storage;
     auto opCtx = getOperationContext();
 
-    createCollection(opCtx,
-                     NamespaceString::createNamespaceString_forTest(
-                         StorageInterfaceImpl::kDefaultRollbackIdNamespace));
+    createCollection(opCtx, NamespaceString::kDefaultRollbackIdNamespace);
     ASSERT_EQUALS(ErrorCodes::NamespaceExists, storage.initializeRollbackID(opCtx));
 }
 
@@ -325,8 +323,7 @@ void _assertDocumentsInCollectionEquals(OperationContext* opCtx,
 void _assertRollbackIDDocument(OperationContext* opCtx, int id) {
     _assertDocumentsInCollectionEquals(
         opCtx,
-        NamespaceString::createNamespaceString_forTest(
-            StorageInterfaceImpl::kDefaultRollbackIdNamespace),
+        NamespaceString::kDefaultRollbackIdNamespace,
         {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId
                     << StorageInterfaceImpl::kRollbackIdFieldName << id)});
 }
@@ -359,8 +356,7 @@ TEST_F(StorageInterfaceImplTest, RollbackIdInitializesIncrementsAndReadsProperly
 TEST_F(StorageInterfaceImplTest, IncrementRollbackIDRollsToOneWhenExceedingMaxInt) {
     StorageInterfaceImpl storage;
     auto opCtx = getOperationContext();
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        StorageInterfaceImpl::kDefaultRollbackIdNamespace);
+    NamespaceString nss = NamespaceString::kDefaultRollbackIdNamespace;
     createCollection(opCtx, nss);
     TimestampedBSONObj maxDoc = {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId
                                             << StorageInterfaceImpl::kRollbackIdFieldName
@@ -388,8 +384,7 @@ TEST_F(StorageInterfaceImplTest, IncrementRollbackIDRollsToOneWhenExceedingMaxIn
 TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfDocumentHasBadField) {
     StorageInterfaceImpl storage;
     auto opCtx = getOperationContext();
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        StorageInterfaceImpl::kDefaultRollbackIdNamespace);
+    NamespaceString nss = NamespaceString::kDefaultRollbackIdNamespace;
 
     createCollection(opCtx, nss);
 
@@ -404,8 +399,7 @@ TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfDocumentHasBadFi
 TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfRollbackIDIsNotInt) {
     StorageInterfaceImpl storage;
     auto opCtx = getOperationContext();
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        StorageInterfaceImpl::kDefaultRollbackIdNamespace);
+    NamespaceString nss = NamespaceString::kDefaultRollbackIdNamespace;
 
     createCollection(opCtx, nss);
 

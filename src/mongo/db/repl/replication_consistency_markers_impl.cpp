@@ -71,8 +71,6 @@
 namespace mongo {
 namespace repl {
 
-constexpr StringData ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace;
-constexpr StringData ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace;
 
 namespace {
 const BSONObj kInitialSyncFlag(BSON(MinValidDocument::kInitialSyncFlagFieldName << true));
@@ -82,11 +80,10 @@ const BSONObj kOplogTruncateAfterPointId(BSON("_id"
 
 ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
     StorageInterface* storageInterface)
-    : ReplicationConsistencyMarkersImpl(
-          storageInterface,
-          NamespaceString(ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace),
-          NamespaceString::kDefaultOplogTruncateAfterPointNamespace,
-          NamespaceString(ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace)) {}
+    : ReplicationConsistencyMarkersImpl(storageInterface,
+                                        NamespaceString::kDefaultMinValidNamespace,
+                                        NamespaceString::kDefaultOplogTruncateAfterPointNamespace,
+                                        NamespaceString::kDefaultInitialSyncIdNamespace) {}
 
 ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
     StorageInterface* storageInterface,

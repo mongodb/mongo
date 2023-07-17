@@ -1772,8 +1772,7 @@ TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) 
 }
 
 TEST_F(StorageTimestampTest, InitializeMinValid) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
+    NamespaceString nss = NamespaceString::kDefaultMinValidNamespace;
     create(nss);
 
     repl::ReplicationConsistencyMarkersImpl consistencyMarkers(repl::StorageInterface::get(_opCtx));
@@ -1790,8 +1789,7 @@ TEST_F(StorageTimestampTest, InitializeMinValid) {
 }
 
 TEST_F(StorageTimestampTest, SetMinValidInitialSyncFlag) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
+    NamespaceString nss = NamespaceString::kDefaultMinValidNamespace;
     create(nss);
 
     repl::ReplicationConsistencyMarkersImpl consistencyMarkers(repl::StorageInterface::get(_opCtx));
@@ -1816,8 +1814,7 @@ TEST_F(StorageTimestampTest, SetMinValidInitialSyncFlag) {
 }
 
 TEST_F(StorageTimestampTest, SetMinValidAppliedThrough) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
+    NamespaceString nss = NamespaceString::kDefaultMinValidNamespace;
     create(nss);
 
     repl::ReplicationConsistencyMarkersImpl consistencyMarkers(repl::StorageInterface::get(_opCtx));

@@ -434,8 +434,7 @@ protected:
         _mockServer->setCommandReply("listDatabases", makeListDatabasesResponse({}));
         _options1.uuid = UUID::gen();
 
-        _mockServer->insert(NamespaceString::createNamespaceString_forTest(
-                                ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace),
+        _mockServer->insert(NamespaceString::kDefaultInitialSyncIdNamespace,
                             BSON("_id" << UUID::gen()));
 
         reset();

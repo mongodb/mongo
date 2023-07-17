@@ -153,9 +153,8 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::connectStage() {
 }
 
 BaseCloner::AfterStageBehavior AllDatabaseCloner::getInitialSyncIdStage() {
-    auto initialSyncId = getClient()->findOne(
-        NamespaceString{ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace},
-        BSONObj{});
+    auto initialSyncId =
+        getClient()->findOne(NamespaceString::kDefaultInitialSyncIdNamespace, BSONObj{});
     uassert(ErrorCodes::InitialSyncFailure,
             "Cannot retrieve sync source initial sync ID",
             !initialSyncId.isEmpty());

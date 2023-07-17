@@ -822,8 +822,7 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfIncrementRollbackIDFails) {
     ASSERT_OK(_insertOplogEntry(makeOp(2)));
 
     // Delete the rollback id collection.
-    auto rollbackIdNss = NamespaceString::createNamespaceString_forTest(
-        _storageInterface->kDefaultRollbackIdNamespace);
+    auto rollbackIdNss = NamespaceString::kDefaultRollbackIdNamespace;
     ASSERT_OK(_storageInterface->dropCollection(_opCtx.get(), rollbackIdNss));
 
     _assertDocsInOplog(_opCtx.get(), {1, 2});

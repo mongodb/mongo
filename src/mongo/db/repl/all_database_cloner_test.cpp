@@ -432,8 +432,7 @@ TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButInitialSyncIdChanges) {
     _mockServer->reboot();
 
     // Clear and change the initial sync ID
-    const auto nss = NamespaceString::createNamespaceString_forTest(
-        ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace);
+    const auto nss = NamespaceString::kDefaultInitialSyncIdNamespace;
     _mockServer->remove(nss, BSONObj{} /*filter*/);
     _mockServer->insert(nss, BSON("_id" << UUID::gen()));
 

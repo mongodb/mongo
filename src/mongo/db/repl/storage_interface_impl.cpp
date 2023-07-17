@@ -120,7 +120,6 @@ namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(holdStableTimestampAtSpecificTimestamp);
 
-const char StorageInterfaceImpl::kDefaultRollbackIdNamespace[] = "local.system.rollback.id";
 const char StorageInterfaceImpl::kRollbackIdFieldName[] = "rollbackId";
 const char StorageInterfaceImpl::kRollbackIdDocumentId[] = "rollbackId";
 
@@ -132,7 +131,7 @@ const auto kIdIndexName = "_id_"_sd;
 }  // namespace
 
 StorageInterfaceImpl::StorageInterfaceImpl()
-    : _rollbackIdNss(StorageInterfaceImpl::kDefaultRollbackIdNamespace) {}
+    : _rollbackIdNss(NamespaceString::kDefaultRollbackIdNamespace) {}
 
 StatusWith<int> StorageInterfaceImpl::getRollbackID(OperationContext* opCtx) {
     BSONObjBuilder bob;

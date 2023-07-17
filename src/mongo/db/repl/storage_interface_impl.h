@@ -64,7 +64,6 @@ class StorageInterfaceImpl : public StorageInterface {
     StorageInterfaceImpl& operator=(const StorageInterfaceImpl&) = delete;
 
 public:
-    static const char kDefaultRollbackIdNamespace[];
     static const char kRollbackIdFieldName[];
     static const char kRollbackIdDocumentId[];
 
