@@ -141,7 +141,7 @@ functions:
           # Use the Windows powershell script to configure the CMake build.
           # We execute it in a powershell environment as its easier to detect and source the Visual Studio
           # toolchain in a native Windows environment. We can't easily execute the build in a cygwin environment.
-          powershell.exe  -NonInteractive '.\test\evergreen\build_windows.ps1' -configure 1 ${windows_configure_flags|}
+          ${configure_env_vars|} powershell.exe  -NonInteractive '.\test\evergreen\build_windows.ps1' -configure 1 ${windows_configure_flags|}
         else
           # Compiling with CMake.
           . test/evergreen/find_cmake.sh
@@ -151,7 +151,7 @@ functions:
           if [ -d cmake_build ]; then rm -r cmake_build; fi
           mkdir -p cmake_build
           cd cmake_build
-          $CMAKE \
+          ${configure_env_vars|} $CMAKE \
           ${posix_configure_flags|-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_C_FLAGS="-ggdb" -DHAVE_DIAGNOSTIC=1 -DENABLE_PYTHON=1 -DENABLE_ZLIB=1 -DENABLE_STATIC=1 -DENABLE_STRICT=1 -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL} $MACOS_PYTHON_FLAGS -G "${cmake_generator|Ninja}" ./..
         fi
   "python config check":
@@ -194,7 +194,7 @@ functions:
         else
           # Compiling with CMake generated Ninja file.
           cd cmake_build
-          ${make_command|ninja} ${smp_command|} 2>&1
+          ${compile_env_vars|} ${make_command|ninja} ${smp_command|} 2>&1
         fi
   "compile wiredtiger":
     - *configure_wiredtiger
@@ -885,15 +885,16 @@ tasks:
       - func: "compile wiredtiger"
         vars:
           posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=0
-      - func: "compile wiredtiger"
-        vars:
-          posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION=6.0 -DCLANG_CXX_VERSION=6.0 -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1
-      - func: "compile wiredtiger"
-        vars:
-          posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION=7 -DCLANG_CXX_VERSION=7 -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1
-      - func: "compile wiredtiger"
-        vars:
-          posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION=8 -DCLANG_CXX_VERSION=8 -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1
+      # FIXME-WT-11239 - Re-enable these tasks once libstdc++.so can be found by older versions of clang.
+      # - func: "compile wiredtiger"
+      #   vars:
+      #     posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION=6.0 -DCLANG_CXX_VERSION=6.0 -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1
+      # - func: "compile wiredtiger"
+      #   vars:
+      #     posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION=7 -DCLANG_CXX_VERSION=7 -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1
+      # - func: "compile wiredtiger"
+      #   vars:
+      #     posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION=8 -DCLANG_CXX_VERSION=8 -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1
 
   - name: make-check-test
     commands:
@@ -3816,7 +3817,10 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars:
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
@@ -3892,7 +3896,10 @@ buildvariants:
       -DCMAKE_CXX_FLAGS="-ggdb"
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars:
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0:unmap_shadow_on_exit=1"
@@ -3900,7 +3907,6 @@ buildvariants:
       ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
       TESTUTIL_BYPASS_ASAN=1
       LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so 
-      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
   tasks:
     - name: ".pull_request !.pull_request_compilers !.python"
@@ -3923,11 +3929,13 @@ buildvariants:
       -DCMAKE_C_FLAGS="-ggdb"
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars:
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       MSAN_OPTIONS="abort_on_error=1:disable_coredump=0:print_stacktrace=1"
       MSAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
       LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
-      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR
@@ -3962,10 +3970,12 @@ buildvariants:
       -DCMAKE_CXX_FLAGS="-ggdb"
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars:
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       UBSAN_OPTIONS="detect_leaks=1:disable_coredump=0:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer:abort_on_error=1:print_stacktrace=1"
       LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
-      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
@@ -3989,6 +3999,9 @@ buildvariants:
   run_on:
   - ubuntu2004-wt-build
   expansions:
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     posix_configure_flags: 
       -DHAVE_DIAGNOSTIC=1
       -DENABLE_STRICT=1
@@ -4012,9 +4025,11 @@ buildvariants:
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars:
-      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
@@ -4051,9 +4066,11 @@ buildvariants:
   expansions:
     smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
     make_command: ninja
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars:
-      LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libeatmydata.so
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+      LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libeatmydata.so
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
@@ -4085,7 +4102,10 @@ buildvariants:
   run_on:
   - ubuntu2004-medium
   expansions:
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars:
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
@@ -4123,9 +4143,11 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars:
-      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
@@ -4144,9 +4166,11 @@ buildvariants:
   run_on:
   - rhel80-test
   expansions:
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars:
-      LD_PRELOAD=/usr/local/lib/libeatmydata.so
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+      LD_PRELOAD=/usr/local/lib/libeatmydata.so
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
@@ -4181,10 +4205,12 @@ buildvariants:
   - windows-64-vs2017-test
   expansions:
     python_binary: '/cygdrive/c/Python311/python'
+    configure_env_vars: PATH=/cygdrive/c/Python311:/cygdrive/c/Python311/Scripts:$PATH
+    compile_env_vars: PATH=/cygdrive/c/Python311:/cygdrive/c/Python311/Scripts:$PATH
     test_env_vars:
+      PATH=/cygdrive/c/Python311:/cygdrive/c/Python311/Scripts:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
-      PATH=/cygdrive/c/Python311:/cygdrive/c/Python311/Scripts:$PATH
       PYTHONPATH=($WT_TOPDIR/lang/python/wiredtiger):$(cygpath -w $WT_TOPDIR/lang/python)
     windows_configure_flags: -vcvars_bat "'C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\VC\Auxiliary\Build\vcvars64.bat'"
   tasks:
@@ -4207,11 +4233,14 @@ buildvariants:
       -DENABLE_ZLIB=1
       -DENABLE_STRICT=1 
       -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
-    python_binary: 'python3'
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     smp_command: -j $(sysctl -n hw.logicalcpu)
     cmake_generator: "Unix Makefiles"
     make_command: make
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars: 
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       WT_BUILDDIR=$(git rev-parse --show-toplevel)/cmake_build
       DYLD_LIBRARY_PATH=$WT_BUILDDIR
   tasks:
@@ -4228,6 +4257,8 @@ buildvariants:
   expansions:
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars:
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
@@ -4251,6 +4282,8 @@ buildvariants:
   expansions:
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars:
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
@@ -4271,7 +4304,10 @@ buildvariants:
   batchtime: 120 # 2 hours
   expansions:
     format_test_setting: ulimit -c unlimited
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars:
+      PATH=/opt/mongodbtoolchain/v4/bin:$PATH
       WT_BUILDDIR=$(git rev-parse --show-toplevel)/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR
     posix_configure_flags:
@@ -4303,7 +4339,10 @@ buildvariants:
   - rhel80-zseries-test
   batchtime: 120 # 2 hours
   expansions:
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars:
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       WT_BUILDDIR=$(git rev-parse --show-toplevel)/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR
     posix_configure_flags:
@@ -4334,7 +4373,10 @@ buildvariants:
   - ubuntu2004-arm64-small
   batchtime: 1440 # 24 hours
   expansions:
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     test_env_vars:
+      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR
