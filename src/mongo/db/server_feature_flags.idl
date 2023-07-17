@@ -97,3 +97,8 @@ feature_flags:
         cpp_varname: gFeatureFlagAllMongodsAreSharded
         default: false
         shouldBeFCVGated: true
+    featureFlagShardKeyIndexOptionalHashedSharding:
+        description: "Feature flag to make a supporting shard key index for hashed sharding optional"
+        cpp_varname: gFeatureFlagShardKeyIndexOptionalHashedSharding
+        default: false
+        shouldBeFCVGated: true
