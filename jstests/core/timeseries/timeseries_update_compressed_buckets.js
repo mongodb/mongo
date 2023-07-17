@@ -1,13 +1,13 @@
 /**
  * TODO SERVER-78946: Check if we can remove this test.
- * Tests running the deleteOne and deleteMany command on a time-series collection with compressed
+ * Tests running the updateOne and updateMany command on a time-series collection with compressed
  * buckets.
  *
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   requires_non_retryable_writes,
- *   requires_fcv_70,
+ *   requires_fcv_71,
  * ]
  */
 
@@ -21,7 +21,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBucket
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
-const dateTime = ISODate("2021-07-12T16:00:00Z");
+const dateTime = ISODate("2023-07-13T16:00:00Z");
 
 // Assumes each bucket has a limit of 1000 measurements.
 const bucketMaxCount = 1000;
@@ -70,22 +70,24 @@ function prepareCompressedBucket() {
               `Expected second bucket to start at ${bucketMaxCount}. ${tojson(bucketDocs)}`);
 }
 
-// Delete many records. This will hit both the compressed and uncompressed buckets.
+// Update many records. This will hit both the compressed and uncompressed buckets.
 prepareCompressedBucket();
-let result = assert.commandWorked(coll.deleteMany({str: "even"}));
-assert.eq(numDocs / 2, result.deletedCount);
-assert.eq(
-    coll.countDocuments({str: "even"}), 0, "Expected records matching the filter to be deleted.");
-assert.eq(coll.countDocuments({str: "odd"}),
+let result = assert.commandWorked(coll.updateMany({str: "even"}, {$inc: {updated: 1}}));
+assert.eq(numDocs / 2, result.modifiedCount);
+assert.eq(coll.countDocuments({updated: 1, str: "even"}),
           numDocs / 2,
-          "Expected records not matching the filter not to be deleted.");
+          "Expected records matching the filter to be updated.");
+assert.eq(coll.countDocuments({updated: 1, str: "odd"}),
+          0,
+          "Expected records not matching the filter not to be updated.");
 
-// Delete one record from the compressed bucket.
+// Update one record from the compressed bucket.
 prepareCompressedBucket();
-if (FeatureFlagUtil.isPresentAndEnabled(db, "UpdateOneWithoutShardKey")) {
-    result = assert.commandWorked(coll.deleteOne({f: {$lt: 100}}));
-    assert.eq(1, result.deletedCount);
-    assert.eq(coll.countDocuments({f: {$lt: 100}}),
-              100 - 1,
-              "Expected exactly one record matching the filter to be deleted.");
-}
+result = assert.commandWorked(coll.updateOne({str: "even", f: {$lt: 100}}, {$inc: {updated: 1}}));
+assert.eq(1, result.modifiedCount);
+assert.eq(coll.countDocuments({updated: 1, str: "even", f: {$lt: 100}}),
+          1,
+          "Expected exactly one record matching the filter to be updated.");
+assert.eq(coll.countDocuments({updated: 1}),
+          1,
+          "Expected records not matching the filter not to be updated.");
