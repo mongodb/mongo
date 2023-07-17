@@ -195,28 +195,32 @@ TEST(DatabaseNameTest, FromDataEquality) {
     ASSERT_EQ(testTwo.dbName(), DatabaseName::createDatabaseName_forTest(boost::none, "foo"));
 }
 
-TEST(DatabaseNameTest, ValidDbNameLength) {
-    const std::string longStr =
-        "1234567890123456789012345678901234567890123456789012345678901234567890";
-    const auto dbName = DatabaseName::createDatabaseName_forTest(
-        boost::none, longStr.substr(0, DatabaseName::kMaxDatabaseNameLength));
-    ASSERT_EQ(dbName.toString_forTest().size(), DatabaseName::kMaxDatabaseNameLength);
-    ASSERT_THROWS_CODE(
-        DatabaseName::createDatabaseName_forTest(
-            boost::none, longStr.substr(0, DatabaseName::kMaxDatabaseNameLength + 1)),
-        DBException,
-        ErrorCodes::InvalidNamespace);
+TEST(DatabaseNameTest, Size) {
+    const std::string kMaxSizeDb(DatabaseName::kMaxDatabaseNameLength, 'a');
+    const std::string kMaxSizeTenantDb(DatabaseName::kMaxTenantDatabaseNameLength, 'a');
 
-    const TenantId tenantId(OID::gen());
-    const auto tenantDbName = DatabaseName::createDatabaseName_forTest(
-        tenantId, longStr.substr(0, DatabaseName::kMaxTenantDatabaseNameLength));
-    ASSERT_EQ(tenantDbName.toString_forTest().size(), DatabaseName::kMaxTenantDatabaseNameLength);
-    ASSERT_THROWS_CODE(
-        DatabaseName::createDatabaseName_forTest(
-            tenantId, longStr.substr(0, DatabaseName::kMaxTenantDatabaseNameLength + 1)),
-        DBException,
-        ErrorCodes::InvalidNamespace);
+    const auto checkDbSize = [](std::vector<std::string> dbs, boost::optional<TenantId> tenantId) {
+        for (size_t i = 0; i < dbs.size(); i++) {
+            const auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbs[i]);
+            ASSERT_EQ(dbName.size(), dbs[i].size());
+        }
+    };
+
+    checkDbSize({"", "myDb", kMaxSizeDb}, boost::none);
+    checkDbSize({"", "myDb", kMaxSizeTenantDb}, TenantId(OID::gen()));
 }
 
+TEST(DatabaseNameTest, ValidDbNameLength) {
+    const std::string kInvalidDbName(DatabaseName::kMaxDatabaseNameLength + 1, 'a');
+    ASSERT_THROWS_CODE(DatabaseName::createDatabaseName_forTest(boost::none, kInvalidDbName),
+                       DBException,
+                       ErrorCodes::InvalidNamespace);
+
+    const TenantId tenantId(OID::gen());
+    const std::string kInvalidTenantDbName(DatabaseName::kMaxTenantDatabaseNameLength + 1, 'a');
+    ASSERT_THROWS_CODE(DatabaseName::createDatabaseName_forTest(tenantId, kInvalidTenantDbName),
+                       DBException,
+                       ErrorCodes::InvalidNamespace);
+}
 }  // namespace
 }  // namespace mongo

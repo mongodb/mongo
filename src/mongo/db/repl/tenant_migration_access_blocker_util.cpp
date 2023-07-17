@@ -572,7 +572,7 @@ void assertCanGetMoreChangeStream(OperationContext* opCtx, const DatabaseName& d
 }
 
 bool hasActiveTenantMigration(OperationContext* opCtx, const DatabaseName& dbName) {
-    if (dbName.db().empty()) {
+    if (dbName.size() == 0) {
         return false;
     }
 

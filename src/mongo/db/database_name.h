@@ -160,8 +160,13 @@ public:
         return StringData{_data.data() + offset, _data.size() - offset};
     }
 
+    size_t size() const {
+        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
+        return _data.size() - offset;
+    }
+
     bool isEmpty() const {
-        return _data.size() == kDataOffset;
+        return size() == 0;
     }
     bool isAdminDB() const {
         return db() == DatabaseName::kAdmin.db();

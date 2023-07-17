@@ -500,8 +500,12 @@ public:
         return _data.size() - offset;
     }
 
+    size_t dbSize() const {
+        return _dbNameOffsetEnd();
+    }
+
     bool isEmpty() const {
-        return _data.size() == kDataOffset;
+        return size() == 0;
     }
 
     //

@@ -189,7 +189,7 @@ int64_t size(const boost::optional<DatabaseName>& dbName) {
     if (!dbName) {
         return 0;
     }
-    return dbName->db().size();
+    return dbName->size();
 }
 
 int64_t size(const boost::optional<BSONObj>& obj) {

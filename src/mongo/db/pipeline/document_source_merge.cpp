@@ -406,7 +406,7 @@ DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(const BSONElemen
             // database, and the provided namespace value as a collection name.
             targetNss = NamespaceStringUtil::parseNamespaceFromRequest(
                 defaultDb, targetNss.serializeWithoutTenantPrefix_UNSAFE());
-        } else if (targetNss.dbName().db().empty()) {
+        } else if (targetNss.dbSize() == 0) {
             // Use the default database name if it wasn't specified explicilty.
             targetNss = NamespaceStringUtil::parseNamespaceFromRequest(defaultDb, targetNss.coll());
         }
