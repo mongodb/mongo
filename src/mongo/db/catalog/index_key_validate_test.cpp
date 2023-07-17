@@ -467,6 +467,28 @@ TEST(IndexKeyValidateTest, RepairIndexSpecs) {
                    fromjson("{key: {a: 1}, name: 'index', sparse: 'true', background: '1', safe: "
                             "true, force: true}"))));
 
+    ASSERT(fromjson("{key: {a: 1}, name: 'index'}")
+               .binaryEqual(index_key_validate::repairIndexSpec(
+                   NamespaceString::createNamespaceString_forTest("coll"),
+                   fromjson("{key: {a: 1}, name: 'index', weights: {key: 1, name: 1}}"))));
+
+    ASSERT(fromjson("{key: {'a': 'text'}, name: 'index', weights: {key: 1, name: 1}}")
+               .binaryEqual(index_key_validate::repairIndexSpec(
+                   NamespaceString::createNamespaceString_forTest("coll"),
+                   fromjson("{key: {'a': 'text'}, name: 'index', weights: {key: 1, name: 1}}"))));
+
+    ASSERT(fromjson("{key: {'$**': 'text'}, name: 'index', weights: {key: 1, name: 1}}")
+               .binaryEqual(index_key_validate::repairIndexSpec(
+                   NamespaceString::createNamespaceString_forTest("coll"),
+                   fromjson("{key: {'$**': 'text'}, name: 'index', weights: {key: 1, name: 1}}"))));
+
+    ASSERT(
+        fromjson("{key: {a: 1, 'name': 'text'}, name: 'index', weights: {key: 1, name: 1}}")
+            .binaryEqual(index_key_validate::repairIndexSpec(
+                NamespaceString::createNamespaceString_forTest("coll"),
+                fromjson(
+                    "{key: {a: 1, 'name': 'text'}, name: 'index', weights: {key: 1, name: 1}}"))));
+
     ASSERT(BSON("key" << BSON("a" << 1) << "name"
                       << "index"
                       << "expireAfterSeconds" << std::numeric_limits<int32_t>::max())
