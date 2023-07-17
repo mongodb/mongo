@@ -1,4 +1,0 @@
-# False positives for 64bit stat() calls in glibc.
-# https://reviews.llvm.org/D121652
-fun:stat
-fun:fstat
