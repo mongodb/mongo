@@ -139,6 +139,20 @@ structs:
                 type: array<ShardKeyRange>
                 description: "The key ranges for the new shard key. This should be continuous and complete."
                 optional: true
+            unique:
+                type: bool
+                description: "The user-specified value for the unique request field."
+                optional: true
+            collation:
+                type: object_owned
+                description: "The user-specified value for the collation request field."
+                optional: true
+            sourceKey:
+                type: object_owned
+                description:  >-
+                    The shard key of the collection before resharding
+                    (defined as optional for retro compatibility).
+                optional: true
             forceRedistribution:
                 type: bool
                 description: "Whether to initiate reshardCollection if the shardKey doesn't change."

@@ -36,14 +36,15 @@ namespace mongo {
 namespace notify_sharding_event {
 
 static constexpr char kDatabasesAdded[] = "databasesAdded";
+static constexpr char kCollectionResharded[] = "collectionResharded";
 
 inline Status validateEventType(const std::string& eventType) {
-    if (eventType != kDatabasesAdded) {
-        return {ErrorCodes::UnsupportedShardingEventNotification,
-                "Unrecognized EventType: " + eventType};
+    if (eventType == kDatabasesAdded || eventType == kCollectionResharded) {
+        return Status::OK();
     }
 
-    return Status::OK();
+    return {ErrorCodes::UnsupportedShardingEventNotification,
+            "Unrecognized EventType: " + eventType};
 }
 
 }  // namespace notify_sharding_event

@@ -70,6 +70,41 @@ structs:
             phase:
                 description: "The sub-phase of the event being notified."
                 type: CommitPhase
+
+    CollectionResharded:
+        description: "Event describing the details of a reshardCollection operation."
+        strict: false
+        fields:
+            nss:
+                description: "The namespace of the resharded collection."
+                type: namespacestring
+            sourceUUID:
+                description: "The original UUID of the collection."
+                type: uuid
+            reshardingUUID:
+                description: "The UUID of the resharded collection."
+                type: uuid
+            sourceKey:
+                description: "The original shard key of the collection
+                              (defined as optional for retro compatibility)."
+                type: object_owned
+                optional: true
+            unique:
+                type: bool
+                description: "The user-specified value for the unique request field."
+                optional: true
+            collation:
+                type: object_owned
+                description: "The user-specified value for the collation request field."
+                optional: true
+            reshardingKey:
+                description: "The shard key of the resharded collection."
+                type: object_owned
+            numInitialChunks:
+                type: long
+                description: "The number of chunks the new collection should have after resharding."
+                optional: true
+
                 
 commands:
     _shardsvrNotifyShardingEvent:

@@ -504,6 +504,13 @@ private:
     void _commit(const ReshardingCoordinatorDocument& updatedDoc);
 
     /**
+     * Sends a _shardsvrNotifyShardingEvent commands to the primary shard of the resharded
+     * collection to trigger the generation of the related internal op entry.
+     */
+    void _generateOpEventOnCoordinatingShard(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
      * Waits on _reshardingCoordinatorObserver to notify that:
      * 1. All recipient shards have renamed the temporary collection to the original collection
      *    namespace or have finished aborting, and

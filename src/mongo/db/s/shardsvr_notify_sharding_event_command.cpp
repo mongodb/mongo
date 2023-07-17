@@ -96,6 +96,13 @@ public:
                 return;
             }
 
+            if (request().getEventType() == notify_sharding_event::kCollectionResharded) {
+                const auto event = CollectionResharded::parse(
+                    IDLParserContext("_shardsvrNotifyShardingEvent"), request().getDetails());
+                notifyChangeStreamsOnReshardCollectionComplete(opCtx, event);
+                return;
+            }
+
             MONGO_UNREACHABLE;
         }
 

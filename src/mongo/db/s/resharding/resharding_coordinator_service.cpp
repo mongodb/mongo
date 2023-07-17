@@ -58,6 +58,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/notify_sharding_event_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/feature_flag.h"
@@ -1709,6 +1710,8 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                        return ExecutorFuture<void>(**executor)
                            .then([this] { return _waitForMajority(_ctHolder->getStepdownToken()); })
                            .thenRunOn(**executor)
+                           .then(
+                               [this, executor] { _generateOpEventOnCoordinatingShard(executor); })
                            .then([this, executor] {
                                _tellAllParticipantsToCommit(_coordinatorDoc.getSourceNss(),
                                                             executor);
@@ -2457,6 +2460,46 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
     // Update the in memory state
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
 }
+
+void ReshardingCoordinator::_generateOpEventOnCoordinatingShard(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+
+    CollectionResharded eventNotification(_coordinatorDoc.getSourceNss(),
+                                          _coordinatorDoc.getSourceUUID(),
+                                          _coordinatorDoc.getReshardingUUID(),
+                                          _coordinatorDoc.getReshardingKey().toBSON());
+    eventNotification.setSourceKey(_coordinatorDoc.getSourceKey());
+    eventNotification.setNumInitialChunks(_coordinatorDoc.getNumInitialChunks());
+    eventNotification.setUnique(_coordinatorDoc.getUnique());
+    eventNotification.setCollation(_coordinatorDoc.getCollation());
+
+    ShardsvrNotifyShardingEventRequest request(notify_sharding_event::kCollectionResharded,
+                                               eventNotification.toBSON());
+
+    const auto cm = uassertStatusOK(Grid::get(opCtx.get())
+                                        ->catalogCache()
+                                        ->getShardedCollectionRoutingInfoWithPlacementRefresh(
+                                            opCtx.get(), _coordinatorDoc.getSourceNss()))
+                        .cm;
+
+    // In case the recipient is running a legacy binary, swallow the error.
+    try {
+        async_rpc::GenericArgs args;
+        async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+        const auto opts =
+            std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrNotifyShardingEventRequest>>(
+                request, **executor, _ctHolder->getStepdownToken(), args);
+        opts->cmd.setDbName(DatabaseName::kAdmin);
+        _reshardingCoordinatorExternalState->sendCommandToShards(
+            opCtx.get(), opts, {cm.dbPrimary()});
+    } catch (const ExceptionFor<ErrorCodes::UnsupportedShardingEventNotification>& e) {
+        LOGV2_WARNING(7403100,
+                      "Unable to generate op entry on reshardCollection commit",
+                      "error"_attr = redact(e.toStatus()));
+    }
+}
+
 
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {

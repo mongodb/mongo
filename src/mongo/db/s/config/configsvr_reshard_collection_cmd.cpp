@@ -219,8 +219,8 @@ public:
 
                     auto coordinatorDoc =
                         ReshardingCoordinatorDocument(std::move(CoordinatorStateEnum::kUnused),
-                                                      {},   // donorShards
-                                                      {});  // recipientShards
+                                                      {} /* donorShards */,
+                                                      {} /* recipientShards */);
 
                     // Generate the resharding metadata for the ReshardingCoordinatorDocument.
                     auto reshardingUUID = UUID::gen();
@@ -236,12 +236,15 @@ public:
                         commonMetadata.setUserReshardingUUID(*request().getReshardingUUID());
                     }
 
+                    coordinatorDoc.setSourceKey(cm.getShardKeyPattern().getKeyPattern().toBSON());
                     coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
                     coordinatorDoc.setZones(request().getZones());
                     coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
                     coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
                     coordinatorDoc.setShardDistribution(request().getShardDistribution());
                     coordinatorDoc.setForceRedistribution(request().getForceRedistribution());
+                    coordinatorDoc.setUnique(request().getUnique());
+                    coordinatorDoc.setCollation(request().getCollation());
 
                     auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);
                     instance->getCoordinatorDocWrittenFuture().get(opCtx);

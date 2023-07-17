@@ -94,4 +94,10 @@ void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
                                       const ShardId& oldPrimary,
                                       const ShardId& newPrimary);
 
+/**
+ * Writes a no-op oplog entry to match the completion of a reshardCollection operation.
+ */
+void notifyChangeStreamsOnReshardCollectionComplete(
+    OperationContext* opCtx, const CollectionResharded& CollectionReshardedNotification);
+
 }  // namespace mongo
