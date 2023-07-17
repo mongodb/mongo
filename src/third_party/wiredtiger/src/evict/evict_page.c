@@ -143,7 +143,7 @@ __evict_stats_update(WT_SESSION_IMPL *session, uint8_t flags)
         if (conn->txn_global.checkpoint_running)
             WT_STAT_CONN_INCR(session, cache_eviction_pages_in_parallel_with_checkpoint);
     } else {
-        if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
+        if (LF_ISSET(WT_EVICT_STATS_URGENT)) {
             if (LF_ISSET(WT_EVICT_STATS_FORCE_HS))
                 WT_STAT_CONN_INCR(session, cache_eviction_force_hs_fail);
             WT_STAT_CONN_INCR(session, cache_eviction_force_fail);
