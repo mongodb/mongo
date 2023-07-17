@@ -33,13 +33,24 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/util/assert_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
 namespace {
 
+constexpr auto kRawFieldName = "raw"_sd;
 class FsyncCommand : public ErrmsgCommandDeprecated {
 public:
     FsyncCommand() : ErrmsgCommandDeprecated("fsync") {}
@@ -72,53 +83,62 @@ public:
         return Status::OK();
     }
 
+    void unlockLockedShards(const std::set<ShardId> lockedShards,
+                            OperationContext* opCtx,
+                            const std::string& dbname) {
+        std::vector<AsyncRequestsSender::Request> requests;
+
+        for (const ShardId& shardId : lockedShards) {
+            requests.emplace_back(shardId, BSON("fsyncUnlock" << 1));
+        }
+        auto responses = gatherResponses(opCtx,
+                                         dbname,
+                                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                         Shard::RetryPolicy::kIdempotent,
+                                         requests);
+        std::string errmsg;
+        BSONObjBuilder rawResult;
+        const auto response = appendRawResponses(opCtx, &errmsg, &rawResult, responses);
+        if (!response.responseOK) {
+            LOGV2_WARNING(781491, "Unlocking of shards failed: {error}", "error"_attr = errmsg);
+        }
+    }
+
     bool errmsgRun(OperationContext* opCtx,
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-        if (cmdObj["lock"].trueValue()) {
+
+        if (cmdObj["lock"].trueValue() &&
+            !feature_flags::gClusterFsyncLock.isEnabled(serverGlobalParams.featureCompatibility)) {
             errmsg = "can't do lock through mongos";
             return false;
         }
 
-        BSONObjBuilder sub;
+        auto shardResults = scatterGatherUnversionedTargetAllShards(
+            opCtx,
+            dbname,
+            applyReadWriteConcern(
+                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            Shard::RetryPolicy::kIdempotent);
 
-        bool ok = true;
-
-        auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
-        const auto shardIds = shardRegistry->getAllShardIds(opCtx);
-
-        for (const ShardId& shardId : shardIds) {
-            auto shardStatus = shardRegistry->getShard(opCtx, shardId);
-            if (!shardStatus.isOK()) {
-                continue;
-            }
-            const auto s = std::move(shardStatus.getValue());
-
-            auto response = uassertStatusOK(s->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                "admin",
-                BSON("fsync" << 1),
-                Shard::RetryPolicy::kIdempotent));
-            uassertStatusOK(response.commandStatus);
-            BSONObj x = std::move(response.response);
-
-            sub.append(s->getId().toString(), x);
-
-            if (!x["ok"].trueValue()) {
-                ok = false;
-                errmsg = x["errmsg"].String();
-            }
-        }
+        BSONObjBuilder rawResult;
+        const auto response = appendRawResponses(opCtx, &errmsg, &rawResult, shardResults);
 
         // This field has had dummy value since MMAP went away. It is undocumented.
         // Maintaining it so as not to cause unnecessary user pain across upgrades.
         result.append("numFiles", 1);
-        result.append("all", sub.obj());
+        result.append("all", rawResult.obj()[kRawFieldName].Obj());
+        if (!response.responseOK) {
+            if (cmdObj["lock"].trueValue()) {
+                unlockLockedShards(response.shardsWithSuccessResponses, opCtx, dbname);
+            }
+            return false;
+        }
 
-        return ok;
+        return true;
     }
 
 } clusterFsyncCmd;
