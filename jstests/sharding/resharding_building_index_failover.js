@@ -59,7 +59,7 @@ reshardingTest.withReshardingInBackground(
         const recipientRS = reshardingTest.getReplSetForShard(recipientShardNames[0]);
         recipientRS.awaitSecondaryNodes();
         recipientRS.awaitReplication();
-        hangAfterInitializingIndexBuildFailPoint.off();
+        reshardingTest.retryOnceOnNetworkError(hangAfterInitializingIndexBuildFailPoint.off);
     },
     {
         afterReshardingFn: () => {
