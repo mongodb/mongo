@@ -1,7 +1,10 @@
 /**
  * Tests that inserts related to query sampling are deprioritized.
  *
- * @tags: [requires_fcv_70]
+ * @tags: [
+ *   featureFlagDeprioritizeLowPriorityOperations,
+ *   requires_fcv_70,
+ * ]
  */
 
 (function() {
