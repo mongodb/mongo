@@ -1,7 +1,5 @@
 // @tags: [
 //   requires_non_retryable_writes,
-//   # TODO SERVER-78865 reenable test in query_stats_passthrough
-//   skip_for_query_stats,
 // ]
 
 (function() {
