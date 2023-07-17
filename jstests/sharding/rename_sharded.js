@@ -59,21 +59,36 @@ const st = new ShardingTest({shards: 3, mongos: 1, other: {enableBalancer: false
 
 const mongos = st.s0;
 
-// Rename to non-existing target collection must succeed
-{
-    const dbName = 'testRenameToNewCollection';
-    const toNs = dbName + '.to';
-    testRename(st, dbName, toNs, false /* dropTarget */, false /* mustFail */);
-}
-
-// Rename non-existing source collection must fail
+// Rename non-existing source collection to a target collection/view (dropTarget=false) must
+// fail with NamespaceNotFound. Make sure the check on the source is done before any check on the
+// target for consistency with replicaset. We cannot delegate this to passthrough suite since in
+// those suites any non-existing collection will always be implicitely sharded at the first access
 {
     const dbName = 'notExistingSource';
     assert.commandWorked(
         mongos.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
+
+    // Rename non-existing source to non-existing target
     assert.commandFailedWithCode(
         st.getDB(dbName).adminCommand(
             {renameCollection: dbName + ".source", to: dbName + ".target"}),
+        ErrorCodes.NamespaceNotFound);
+
+    // Rename non-existing source to existing collection
+    const toCollName = dbName + ".target";
+    const toColl = mongos.getCollection(toCollName);
+    toColl.insert({a: 0});
+
+    assert.commandFailedWithCode(
+        st.getDB(dbName).adminCommand({renameCollection: dbName + ".source", to: toCollName}),
+        ErrorCodes.NamespaceNotFound);
+
+    // Rename non-existing source to existing view
+    const toViewName = dbName + ".target_view";
+    assert.commandWorked(st.getDB(dbName).createView(toViewName, toCollName, []));
+
+    assert.commandFailedWithCode(
+        st.getDB(dbName).adminCommand({renameCollection: dbName + ".source", to: toViewName}),
         ErrorCodes.NamespaceNotFound);
 }
 
@@ -100,7 +115,6 @@ const mongos = st.s0;
 
     testRename(st, dbName, toNs, true /* dropTarget */, false /* mustFail */);
 }
-
 // Rename to existing unsharded target collection with dropTarget=true must succeed
 {
     const dbName = 'testRenameToExistingUnshardedCollection';
@@ -119,19 +133,6 @@ const mongos = st.s0;
     const toNs = dbName + '.to';
     assert.commandWorked(
         mongos.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
-    const toColl = mongos.getCollection(toNs);
-    toColl.insert({a: 0});
-
-    testRename(st, dbName, toNs, false /* dropTarget */, true /* mustFail */);
-}
-
-// Rename to existing sharded target collection with dropTarget=false must fail
-{
-    const dbName = 'testRenameToShardedCollectionWithoutDropTarget';
-    const toNs = dbName + '.to';
-    assert.commandWorked(
-        mongos.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
-    assert.commandWorked(mongos.adminCommand({shardCollection: toNs, key: {a: 1}}));
     const toColl = mongos.getCollection(toNs);
     toColl.insert({a: 0});
 
