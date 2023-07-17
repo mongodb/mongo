@@ -352,7 +352,7 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionPlacementInfoAt(
             allowLocks || !opCtx->lockState()->isLocked());
 
     try {
-        const auto swDbInfo = getDatabase(opCtx, nss.db(), allowLocks);
+        const auto swDbInfo = getDatabase(opCtx, nss.db_forSharding(), allowLocks);
         if (!swDbInfo.isOK()) {
             if (swDbInfo == ErrorCodes::NamespaceNotFound) {
                 LOGV2_FOR_CATALOG_REFRESH(
@@ -502,7 +502,7 @@ boost::optional<ShardingIndexesCatalogCache> CatalogCache::_getCollectionIndexIn
                   "SERVER-37398.");
     }
 
-    const auto swDbInfo = getDatabase(opCtx, nss.db(), allowLocks);
+    const auto swDbInfo = getDatabase(opCtx, nss.db_forSharding(), allowLocks);
     if (!swDbInfo.isOK()) {
         if (swDbInfo == ErrorCodes::NamespaceNotFound) {
             LOGV2_FOR_CATALOG_REFRESH(
@@ -747,8 +747,9 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
 void CatalogCache::purgeDatabase(StringData dbName) {
     _databaseCache.invalidateKey(dbName);
     _collectionCache.invalidateKeyIf(
-        [&](const NamespaceString& nss) { return nss.db() == dbName; });
-    _indexCache.invalidateKeyIf([&](const NamespaceString& nss) { return nss.db() == dbName; });
+        [&](const NamespaceString& nss) { return nss.db_forSharding() == dbName; });
+    _indexCache.invalidateKeyIf(
+        [&](const NamespaceString& nss) { return nss.db_forSharding() == dbName; });
 }
 
 void CatalogCache::purgeAllDatabases() {

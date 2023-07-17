@@ -570,11 +570,11 @@ void checkRenamePreconditions(OperationContext* opCtx,
 void checkDbPrimariesOnTheSameShard(OperationContext* opCtx,
                                     const NamespaceString& fromNss,
                                     const NamespaceString& toNss) {
-    const auto fromDB =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, fromNss.db()));
+    const auto fromDB = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, fromNss.db_forSharding()));
 
     const auto toDB = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, toNss.db()));
+        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, toNss.db_forSharding()));
 
     uassert(ErrorCodes::CommandFailed,
             "Source and destination collections must be on same shard",

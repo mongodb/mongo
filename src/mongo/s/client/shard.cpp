@@ -259,7 +259,7 @@ BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* opCtx,
                                                    const Milliseconds maxTimeMS,
                                                    const BatchedCommandRequest& batchRequest,
                                                    RetryPolicy retryPolicy) {
-    const StringData dbname = batchRequest.getNS().db();
+    const StringData dbname = batchRequest.getNS().db_forSharding();
     const BSONObj cmdObj = batchRequest.toBSON();
 
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {

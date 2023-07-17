@@ -79,7 +79,7 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             const NamespaceString& nss = ns();
-            const std::string dbName = nss.db().toString();
+            const std::string dbName = nss.db_forSharding().toString();
             const CachedDatabaseInfo dbInfo =
                 uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
 

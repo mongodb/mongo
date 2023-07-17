@@ -114,7 +114,7 @@ protected:
 
         if (findCmd) {
             // If there is no '$db', append it.
-            auto cmd = OpMsgRequest::fromDBAndBody(kTestNss.db(), *findCmd).body;
+            auto cmd = OpMsgRequest::fromDBAndBody(kTestNss.dbName(), *findCmd).body;
             const auto findCommand =
                 query_request_helper::makeFromFindCommandForTests(cmd, kTestNss);
             if (!findCommand->getSort().isEmpty()) {

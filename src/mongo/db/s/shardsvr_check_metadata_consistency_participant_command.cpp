@@ -329,7 +329,7 @@ public:
                 case MetadataConsistencyCommandLevelEnum::kDatabaseLevel: {
                     return Grid::get(opCtx)->catalogClient()->getCollections(
                         opCtx,
-                        nss.db(),
+                        nss.db_forSharding(),
                         repl::ReadConcernLevel::kMajorityReadConcern,
                         BSON(CollectionType::kNssFieldName << 1) /*sort*/);
                 }

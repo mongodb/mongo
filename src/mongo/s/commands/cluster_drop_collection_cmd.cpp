@@ -117,8 +117,8 @@ public:
                     Grid::get(opCtx)->catalogCache()->invalidateIndexEntry_LINEARIZABLE(nss);
                 });
 
-                const auto dbInfo =
-                    uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db()));
+                const auto dbInfo = uassertStatusOK(
+                    Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db_forSharding()));
 
                 // Send it to the primary shard
                 ShardsvrDropCollection dropCollectionCommand(nss);
@@ -127,7 +127,7 @@ public:
 
                 auto cmdResponse = executeCommandAgainstDatabasePrimary(
                     opCtx,
-                    nss.db(),
+                    nss.db_forSharding(),
                     dbInfo,
                     CommandHelpers::appendMajorityWriteConcern(dropCollectionCommand.toBSON({}),
                                                                opCtx->getWriteConcern()),

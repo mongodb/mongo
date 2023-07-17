@@ -204,6 +204,10 @@ struct OpMsgRequest : public OpMsg {
         return OpMsgRequest(OpMsg::parseOwned(message, client));
     }
 
+    static OpMsgRequest fromDBAndBody(const DatabaseName& db,
+                                      BSONObj body,
+                                      const BSONObj& extraFields = {});
+
     static OpMsgRequest fromDBAndBody(StringData db, BSONObj body, const BSONObj& extraFields = {});
 
     // There are no valid reasons for which a database name should not be a string, but

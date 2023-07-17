@@ -450,7 +450,7 @@ void killRemoteCursor(OperationContext* opCtx,
     BSONObj cmdObj = KillCursorsCommandRequest(nss, {cursor.getCursorResponse().getCursorId()})
                          .toBSON(BSONObj{});
     executor::RemoteCommandRequest request(
-        cursor.getHostAndPort(), nss.db().toString(), cmdObj, opCtx);
+        cursor.getHostAndPort(), nss.db_forSharding().toString(), cmdObj, opCtx);
 
     // We do not process the response to the killCursors request (we make a good-faith
     // attempt at cleaning up the cursors, but ignore any returned errors).
@@ -498,7 +498,7 @@ std::vector<RemoteCursor> establishCursorsOnAllHosts(
     options.maxConcurrency = internalQueryAggMulticastMaxConcurrency;
     auto results = executor::AsyncMulticaster(executor, options)
                        .multicast(servers,
-                                  nss.db().toString(),
+                                  nss.db_forSharding().toString(),
                                   cmd,
                                   opCtx,
                                   Milliseconds(internalQueryAggMulticastTimeoutMS));

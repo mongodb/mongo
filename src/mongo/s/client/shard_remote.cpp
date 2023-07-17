@@ -406,8 +406,11 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         findCommand.serialize(BSONObj(), &findCmdBuilder);
     }
 
-    return _runExhaustiveCursorCommand(
-        opCtx, readPrefWithConfigTime, nss.db().toString(), maxTimeMS, findCmdBuilder.done());
+    return _runExhaustiveCursorCommand(opCtx,
+                                       readPrefWithConfigTime,
+                                       nss.db_forSharding().toString(),
+                                       maxTimeMS,
+                                       findCmdBuilder.done());
 }
 
 void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,
@@ -498,7 +501,7 @@ Status ShardRemote::runAggregation(
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     Fetcher fetcher(executor.get(),
                     host,
-                    aggRequest.getNamespace().db().toString(),
+                    aggRequest.getNamespace().db_forSharding().toString(),
                     aggregation_request_helper::serializeToCommandObj(aggRequest),
                     fetcherCallback,
                     readPrefMetadata,

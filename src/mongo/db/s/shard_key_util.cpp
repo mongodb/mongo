@@ -380,7 +380,7 @@ std::vector<BSONObj> ValidationBehaviorsRefineShardKey::loadIndexes(
     auto indexesRes = _indexShard->runExhaustiveCursorCommand(
         _opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        nss.db().toString(),
+        nss.db_forSharding().toString(),
         appendShardVersion(BSON("listIndexes" << nss.coll()),
                            _cri.getShardVersion(_indexShard->getId())),
         Milliseconds(-1));

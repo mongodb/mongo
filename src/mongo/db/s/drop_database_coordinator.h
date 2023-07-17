@@ -62,7 +62,7 @@ public:
 
     DropDatabaseCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "DropDatabaseCoordinator", initialState),
-          _dbName(nss().db()),
+          _dbName(nss().db_forSharding()),
           _critSecReason(BSON("dropDatabase" << _dbName)) {}
     ~DropDatabaseCoordinator() = default;
 

@@ -40,7 +40,7 @@ namespace global_index {
 NamespaceString skipIdNss(const NamespaceString& nss, StringData indexName) {
     return NamespaceStringUtil::parseNamespaceFromRequest(
         nss.tenantId(),
-        nss.db(),
+        nss.db_forSharding(),
         ("{}.globalIndex.{}.skipList"_format(nss.coll(), indexName.toString())));
 }
 

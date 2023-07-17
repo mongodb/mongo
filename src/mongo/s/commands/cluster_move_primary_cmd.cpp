@@ -75,11 +75,11 @@ public:
                 // Invalidate the routing table cache entry for this database in order to reload it
                 // at the next access, even if sending the command to the primary shard fails (e.g.,
                 // NetworkError).
-                Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.db());
+                Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.db_forSharding());
             });
 
-            const auto dbInfo =
-                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbNss.db()));
+            const auto dbInfo = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbNss.db_forSharding()));
 
             ShardsvrMovePrimary shardsvrRequest{dbNss.dbName()};
             shardsvrRequest.setDbName(DatabaseName::kAdmin);

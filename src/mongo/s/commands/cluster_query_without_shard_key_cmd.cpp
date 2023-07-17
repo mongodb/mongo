@@ -349,7 +349,7 @@ public:
 
             // Parse into OpMsgRequest to append the $db field, which is required for command
             // parsing.
-            const auto opMsgRequest = OpMsgRequest::fromDBAndBody(ns().db(), writeCmdObj);
+            const auto opMsgRequest = OpMsgRequest::fromDBAndBody(ns().dbName(), writeCmdObj);
             auto parsedInfoFromRequest = parseWriteCommand(opCtx, opMsgRequest.body);
 
             auto allShardsContainingChunksForNs =
@@ -484,7 +484,7 @@ public:
             const auto writeCmdObj = [&] {
                 const auto explainCmdObj = request().getWriteCmd();
                 const auto opMsgRequestExplainCmd =
-                    OpMsgRequest::fromDBAndBody(ns().db(), explainCmdObj);
+                    OpMsgRequest::fromDBAndBody(ns().dbName(), explainCmdObj);
                 auto explainRequest = ExplainCommandRequest::parse(
                     IDLParserContext("_clusterQueryWithoutShardKeyExplain"),
                     opMsgRequestExplainCmd.body);
@@ -498,7 +498,8 @@ public:
 
             // Parse into OpMsgRequest to append the $db field, which is required for command
             // parsing.
-            const auto opMsgRequestWriteCmd = OpMsgRequest::fromDBAndBody(ns().db(), writeCmdObj);
+            const auto opMsgRequestWriteCmd =
+                OpMsgRequest::fromDBAndBody(ns().dbName(), writeCmdObj);
             auto parsedInfoFromRequest = parseWriteCommand(opCtx, opMsgRequestWriteCmd.body);
 
             auto allShardsContainingChunksForNs =

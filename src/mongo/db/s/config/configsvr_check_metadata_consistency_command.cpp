@@ -127,7 +127,8 @@ public:
 
             switch (metadata_consistency_util::getCommandLevel(nss)) {
                 case MetadataConsistencyCommandLevelEnum::kDatabaseLevel: {
-                    const auto collections = catalogClient->getCollections(opCtx, nss.db());
+                    const auto collections =
+                        catalogClient->getCollections(opCtx, nss.db_forSharding());
 
                     for (const auto& coll : collections) {
                         _runChecksForCollection(opCtx, coll, inconsistenciesMerged);

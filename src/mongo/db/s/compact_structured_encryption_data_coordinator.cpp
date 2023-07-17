@@ -213,7 +213,7 @@ bool doRenameOperation(const CompactionState& state,
         cmd.setDropTarget(false);
         cmd.setCollectionUUID(state.getEcocUuid().value());
 
-        uassertStatusOK(doRunCommand(opCtx.get(), ecocNss.db(), cmd));
+        uassertStatusOK(doRunCommand(opCtx.get(), ecocNss.db_forSharding(), cmd));
         *newEcocRenameUuid = state.getEcocUuid();
     }
 
@@ -228,7 +228,7 @@ bool doRenameOperation(const CompactionState& state,
         mongo::ClusteredIndexSpec clusterIdxSpec(BSON("_id" << 1), true);
         createCmd.setClusteredIndex(
             stdx::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
-        auto status = doRunCommand(opCtx.get(), ecocNss.db(), createCmd);
+        auto status = doRunCommand(opCtx.get(), ecocNss.db_forSharding(), createCmd);
         if (!status.isOK()) {
             if (status != ErrorCodes::NamespaceExists) {
                 uassertStatusOK(status);
@@ -314,7 +314,7 @@ void doDropOperation(const State& state) {
 
     Drop cmd(ecocNss);
     cmd.setCollectionUUID(state.getEcocRenameUuid().value());
-    uassertStatusOK(doRunCommand(opCtx.get(), ecocNss.db(), cmd));
+    uassertStatusOK(doRunCommand(opCtx.get(), ecocNss.db_forSharding(), cmd));
 }
 
 }  // namespace

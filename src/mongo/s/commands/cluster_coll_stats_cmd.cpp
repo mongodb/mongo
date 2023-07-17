@@ -275,7 +275,7 @@ public:
         // statistics.
         auto unscaledShardResults = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
-            nss.db(),
+            nss.db_forSharding(),
             targeter.getNS(),
             cri,
             applyReadWriteConcern(

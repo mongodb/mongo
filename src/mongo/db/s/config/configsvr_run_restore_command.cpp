@@ -155,7 +155,7 @@ std::set<std::string> getDatabasesToRestore(OperationContext* opCtx) {
 
         NamespaceString nss =
             NamespaceStringUtil::deserialize(boost::none, doc.getStringField("ns"));
-        databasesToRestore.emplace(nss.db());
+        databasesToRestore.emplace(nss.db_forSharding());
     }
 
     return databasesToRestore;
@@ -326,7 +326,8 @@ public:
                             logAttrs(coll->ns().dbName()),
                             "uuid"_attr = coll->uuid(),
                             "_id"_attr = doc.getField("_id"));
-                NamespaceStringOrUUID nssOrUUID(coll->ns().db().toString(), coll->uuid());
+                NamespaceStringOrUUID nssOrUUID(coll->ns().db_forSharding().toString(),
+                                                coll->uuid());
                 uassertStatusOK(repl::StorageInterface::get(opCtx)->deleteById(
                     opCtx, nssOrUUID, doc.getField("_id")));
             }
@@ -366,7 +367,8 @@ public:
                     }
 
                     bool shouldRestore =
-                        databasesRestored.find(dbNss.db().toString()) != databasesRestored.end();
+                        databasesRestored.find(dbNss.db_forSharding().toString()) !=
+                        databasesRestored.end();
 
                     LOGV2_DEBUG(6261305,
                                 1,
@@ -388,7 +390,8 @@ public:
                                 logAttrs(coll->ns().dbName()),
                                 "uuid"_attr = coll->uuid(),
                                 "_id"_attr = doc.getField("_id"));
-                    NamespaceStringOrUUID nssOrUUID(coll->ns().db().toString(), coll->uuid());
+                    NamespaceStringOrUUID nssOrUUID(coll->ns().db_forSharding().toString(),
+                                                    coll->uuid());
                     uassertStatusOK(repl::StorageInterface::get(opCtx)->deleteById(
                         opCtx, nssOrUUID, doc.getField("_id")));
                 }

@@ -284,11 +284,11 @@ void ReshardingCoordinatorCleaner::_dropTemporaryReshardingCollection(
     dropCollectionCommand.setDbName(tempReshardingNss.dbName());
 
     const auto dbInfo = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, tempReshardingNss.db()));
+        Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, tempReshardingNss.db_forSharding()));
 
     auto cmdResponse = executeCommandAgainstDatabasePrimary(
         opCtx,
-        tempReshardingNss.db(),
+        tempReshardingNss.db_forSharding(),
         dbInfo,
         CommandHelpers::appendMajorityWriteConcern(dropCollectionCommand.toBSON({}),
                                                    opCtx->getWriteConcern()),

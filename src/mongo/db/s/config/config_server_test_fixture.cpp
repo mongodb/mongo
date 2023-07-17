@@ -192,7 +192,7 @@ Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* opCtx
     auto insertResponse = getConfigShard()->runCommand(
         opCtx,
         kReadPref,
-        ns.db().toString(),
+        ns.db_forTest().toString(),
         [&]() {
             write_ops::InsertCommandRequest insertOp(ns);
             insertOp.setDocuments({doc});
@@ -214,7 +214,7 @@ Status ConfigServerTestFixture::updateToConfigCollection(OperationContext* opCtx
     auto updateResponse = getConfigShard()->runCommand(
         opCtx,
         kReadPref,
-        ns.db().toString(),
+        ns.db_forTest().toString(),
         [&]() {
             write_ops::UpdateCommandRequest updateOp(ns);
             updateOp.setUpdates({[&] {
@@ -242,7 +242,7 @@ Status ConfigServerTestFixture::deleteToConfigCollection(OperationContext* opCtx
     auto deleteResponse = getConfigShard()->runCommand(
         opCtx,
         kReadPref,
-        ns.db().toString(),
+        ns.db_forTest().toString(),
         [&]() {
             write_ops::DeleteCommandRequest deleteOp(ns);
             deleteOp.setDeletes({[&] {
@@ -309,10 +309,10 @@ StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* opC
 CollectionType ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
                                                         const KeyPattern& shardKey,
                                                         const std::vector<ChunkType>& chunks) {
-    auto dbDoc =
-        findOneOnConfigCollection(operationContext(),
-                                  NamespaceString::kConfigDatabasesNamespace,
-                                  BSON(DatabaseType::kNameFieldName << nss.db().toString()));
+    auto dbDoc = findOneOnConfigCollection(
+        operationContext(),
+        NamespaceString::kConfigDatabasesNamespace,
+        BSON(DatabaseType::kNameFieldName << nss.db_forTest().toString()));
     if (!dbDoc.isOK()) {
         // If the database is not setup, choose the first available shard as primary to implicitly
         // create the db
@@ -321,7 +321,7 @@ CollectionType ConfigServerTestFixture::setupCollection(const NamespaceString& n
         invariant(swShardDoc.isOK(),
                   "At least one shard should be setup when initializing a collection");
         auto shard = uassertStatusOK(ShardType::fromBSON(swShardDoc.getValue()));
-        setupDatabase(nss.db().toString(), ShardId(shard.getName()));
+        setupDatabase(nss.db_forTest().toString(), ShardId(shard.getName()));
     }
 
     CollectionType coll(nss,
@@ -410,7 +410,7 @@ StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationCo
 
     auto response = configShard->runCommand(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            ns.db().toString(),
+                                            ns.db_forTest().toString(),
                                             BSON("listIndexes" << ns.coll().toString()),
                                             Shard::kDefaultConfigCommandTimeout,
                                             Shard::RetryPolicy::kIdempotent);

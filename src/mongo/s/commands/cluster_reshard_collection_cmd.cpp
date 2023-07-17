@@ -116,7 +116,8 @@ public:
                 std::move(reshardCollectionRequest));
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
-            const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));
+            const auto dbInfo =
+                uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db_forSharding()));
 
             auto cmdResponse = executeCommandAgainstDatabasePrimary(
                 opCtx,

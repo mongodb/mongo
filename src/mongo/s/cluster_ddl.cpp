@@ -145,11 +145,11 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
 
 void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& request) {
     const auto& nss = request.getNamespace();
-    const auto dbInfo = createDatabase(opCtx, nss.db());
+    const auto dbInfo = createDatabase(opCtx, nss.db_forSharding());
 
     auto cmdResponse = executeCommandAgainstDatabasePrimaryOrFirstShard(
         opCtx,
-        nss.db(),
+        nss.db_forSharding(),
         dbInfo,
         CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),

@@ -174,8 +174,11 @@ bool updateShardKeyForDocumentLegacy(OperationContext* opCtx,
         updatePreImage);
     auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage, fleCrudProcessed);
 
-    return executeOperationsAsPartOfShardKeyUpdate(
-        opCtx, deleteCmdObj, insertCmdObj, nss.db(), documentKeyChangeInfo.getShouldUpsert());
+    return executeOperationsAsPartOfShardKeyUpdate(opCtx,
+                                                   deleteCmdObj,
+                                                   insertCmdObj,
+                                                   nss.db_forSharding(),
+                                                   documentKeyChangeInfo.getShouldUpsert());
 }
 
 void startTransactionForShardKeyUpdate(OperationContext* opCtx) {
@@ -217,7 +220,7 @@ SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txn
     auto deleteCmdObj = documentShardKeyUpdateUtil::constructShardKeyDeleteCmdObj(
         nss.isTimeseriesBucketsCollection() ? nss.getTimeseriesViewNamespace() : nss,
         changeInfo.getPreImage().getOwned());
-    auto deleteOpMsg = OpMsgRequest::fromDBAndBody(nss.db(), std::move(deleteCmdObj));
+    auto deleteOpMsg = OpMsgRequest::fromDBAndBody(nss.dbName(), std::move(deleteCmdObj));
     auto deleteRequest = BatchedCommandRequest::parseDelete(std::move(deleteOpMsg));
 
     // Retry history for this delete isn't necessary, but it can be part of a retryable transaction,
@@ -250,7 +253,8 @@ SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txn
 
             auto insertCmdObj = documentShardKeyUpdateUtil::constructShardKeyInsertCmdObj(
                 nss, changeInfo.getPostImage().getOwned(), fleCrudProcessed);
-            auto insertOpMsg = OpMsgRequest::fromDBAndBody(nss.db(), std::move(insertCmdObj));
+            auto insertOpMsg =
+                OpMsgRequest::fromDBAndBody(nss.db_forSharding(), std::move(insertCmdObj));
             auto insertRequest = BatchedCommandRequest::parseInsert(std::move(insertOpMsg));
 
             // Same as for the insert, retry history isn't necessary so opt out with a sentinel

@@ -1095,7 +1095,7 @@ void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(
 
     if (!requests.empty()) {
         auto responses = gatherResponses(opCtx,
-                                         nss().db(),
+                                         nss().db_forSharding(),
                                          ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                          Shard::RetryPolicy::kIdempotent,
                                          requests);

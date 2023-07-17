@@ -548,7 +548,7 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
 
     auto responses = gatherResponses(
         opCtx,
-        nss.db(),
+        nss.db_forSharding(),
         readPref,
         retryPolicy,
         buildVersionedRequestsForTargetedShards(
@@ -815,7 +815,7 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
     return indexShard->runExhaustiveCursorCommand(
         opCtx,
         ReadPreferenceSetting::get(opCtx),
-        nss.db().toString(),
+        nss.db_forSharding().toString(),
         listIndexesCmd,
         opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1));
 }

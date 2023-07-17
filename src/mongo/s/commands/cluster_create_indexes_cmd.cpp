@@ -140,7 +140,7 @@ public:
 
         auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
-            nss.db(),
+            nss.db_forSharding(),
             targeter.getNS(),
             routingInfo,
             CommandHelpers::filterCommandRequestForPassthrough(

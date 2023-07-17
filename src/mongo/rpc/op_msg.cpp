@@ -273,8 +273,14 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
     throw;
 }
 
+OpMsgRequest OpMsgRequest::fromDBAndBody(const DatabaseName& db,
+                                         BSONObj body,
+                                         const BSONObj& extraFields) {
+    return OpMsgRequestBuilder::create(db, std::move(body), extraFields);
+}
+
 OpMsgRequest OpMsgRequest::fromDBAndBody(StringData db, BSONObj body, const BSONObj& extraFields) {
-    return OpMsgRequestBuilder::create(
+    return fromDBAndBody(
         DatabaseNameUtil::deserialize(boost::none, db), std::move(body), extraFields);
 }
 

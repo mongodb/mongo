@@ -160,7 +160,8 @@ NamespaceString constructTemporaryReshardingNss(StringData db, const UUID& sourc
 std::set<ShardId> getRecipientShards(OperationContext* opCtx,
                                      const NamespaceString& sourceNss,
                                      const UUID& reshardingUUID) {
-    const auto& tempNss = constructTemporaryReshardingNss(sourceNss.db(), reshardingUUID);
+    const auto& tempNss =
+        constructTemporaryReshardingNss(sourceNss.db_forSharding(), reshardingUUID);
     auto* catalogCache = Grid::get(opCtx)->catalogCache();
     auto [cm, _] = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, tempNss));
 

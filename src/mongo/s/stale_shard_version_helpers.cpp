@@ -69,7 +69,7 @@ void checkErrorStatusAndMaxRetries(const Status& status,
     if (status == ErrorCodes::StaleDbVersion) {
         auto staleInfo = status.extraInfo<
             error_details::ErrorExtraInfoForImpl<ErrorCodes::StaleDbVersion>::type>();
-        invariant(staleInfo->getDb() == nss.db(),
+        invariant(staleInfo->getDb() == nss.db_forSharding(),
                   str::stream() << "StaleDbVersion error on unexpected database. Expected "
                                 << nss.dbName().toStringForErrorMsg() << ", received "
                                 << staleInfo->getDb());

@@ -155,7 +155,7 @@ void coordinateIndexCatalogModificationAcrossCollectionShards(
 
     sharding_util::sendCommandToShards(
         opCtx,
-        userCollectionNss.db(),
+        userCollectionNss.db_forSharding(),
         CommandHelpers::appendMajorityWriteConcern(shardsvrBlockWritesRequest.toBSON({})),
         shardIdsVec,
         executor);
@@ -167,7 +167,7 @@ void coordinateIndexCatalogModificationAcrossCollectionShards(
     shardsvrBlockWritesRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
     sharding_util::sendCommandToShards(
         opCtx,
-        userCollectionNss.db(),
+        userCollectionNss.db_forSharding(),
         CommandHelpers::appendMajorityWriteConcern(shardsvrBlockWritesRequest.toBSON({})),
         shardIdsVec,
         executor);
@@ -211,7 +211,7 @@ void registerIndexCatalogEntry(OperationContext* opCtx,
 
             sharding_util::sendCommandToShards(
                 opCtx,
-                userCollectionNss.db(),
+                userCollectionNss.db_forSharding(),
                 CommandHelpers::appendMajorityWriteConcern(
                     shardsvrCommitIndexParticipantRequest.toBSON(osi.toBSON())),
                 shardIds,

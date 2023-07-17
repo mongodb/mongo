@@ -415,6 +415,13 @@ public:
     }
 
     /**
+     * This function must only be used in sharding code (src/mongo/s and src/mongo/db/s).
+     */
+    StringData db_forSharding() const {
+        return db();
+    }
+
+    /**
      * This function must only be used in unit tests.
      */
     StringData db_forTest() const {

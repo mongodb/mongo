@@ -157,7 +157,7 @@ public:
                         opCtx, findCommand->getNamespaceOrUUID().nss()));
                 shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
-                    findCommand->getNamespaceOrUUID().nss().db(),
+                    findCommand->getNamespaceOrUUID().nss().db_forSharding(),
                     findCommand->getNamespaceOrUUID().nss(),
                     cri,
                     explainCmd,

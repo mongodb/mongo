@@ -142,7 +142,7 @@ public:
             const auto collation = countRequest.getCollation().get_value_or(BSONObj());
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
-                nss.db(),
+                nss.db_forSharding(),
                 nss,
                 cri,
                 applyReadWriteConcern(
@@ -162,7 +162,7 @@ public:
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
             auto aggCmdOnView =
                 uassertStatusOK(countCommandAsAggregationCommand(countRequest, nss));
-            auto aggCmdOnViewObj = OpMsgRequest::fromDBAndBody(nss.db(), aggCmdOnView).body;
+            auto aggCmdOnViewObj = OpMsgRequest::fromDBAndBody(nss.dbName(), aggCmdOnView).body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                 opCtx,
                 nss,
@@ -260,7 +260,7 @@ public:
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             shardResponses =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                           nss.db(),
+                                                           nss.db_forSharding(),
                                                            nss,
                                                            cri,
                                                            explainCmd,
@@ -284,7 +284,7 @@ public:
             }
 
             auto aggCmdOnViewObj =
-                OpMsgRequest::fromDBAndBody(nss.db(), aggCmdOnView.getValue()).body;
+                OpMsgRequest::fromDBAndBody(nss.dbName(), aggCmdOnView.getValue()).body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                 opCtx,
                 nss,

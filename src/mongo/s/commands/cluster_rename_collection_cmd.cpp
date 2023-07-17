@@ -143,7 +143,8 @@ public:
                         ActionType::setUserWriteBlockMode));
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
-            auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, fromNss.db());
+            auto swDbInfo =
+                Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, fromNss.db_forSharding());
             if (swDbInfo == ErrorCodes::NamespaceNotFound) {
                 uassert(CollectionUUIDMismatchInfo(fromNss.dbName(),
                                                    *request().getCollectionUUID(),
@@ -160,7 +161,7 @@ public:
             auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                fromNss.db().toString(),
+                fromNss.db_forSharding().toString(),
                 CommandHelpers::appendMajorityWriteConcern(
                     appendDbVersionIfPresent(renameCollRequest.toBSON({}), dbInfo->getVersion())),
                 Shard::RetryPolicy::kNoRetry));

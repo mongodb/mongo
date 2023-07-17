@@ -112,7 +112,7 @@ Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
 
     auto nss = request().getNamespace();
     const auto dbInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db()));
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db_forSharding()));
 
     // Rewrite command verb to _shardSvrCleanupStructuredEnccryptionData.
     auto cmd = request().toBSON({});
@@ -128,7 +128,7 @@ Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
     auto response = uassertStatusOK(
         executeCommandAgainstDatabasePrimary(
             opCtx,
-            nss.db(),
+            nss.db_forSharding(),
             dbInfo,
             CommandHelpers::appendMajorityWriteConcern(req.obj(), opCtx->getWriteConcern()),
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),

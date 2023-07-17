@@ -129,7 +129,7 @@ std::pair<std::vector<mongo::ChunkType>, mongo::ChunkManager> createChunks(
     const auto collEpoch = OID::gen();
     const auto collTimestamp = Timestamp(100, 5);
     const auto tempNss = NamespaceString::createNamespaceString_forTest(
-        kNss.db(),
+        kNss.db_forSharding(),
         fmt::format("{}{}",
                     NamespaceString::kTemporaryReshardingCollectionPrefix,
                     collIdentifier.toString()));

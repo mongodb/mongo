@@ -129,7 +129,7 @@ StatusWith<long long> retrieveCollectionShardSize(OperationContext* opCtx,
     auto statStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-        ns.db().toString(),
+        ns.db_forSharding().toString(),
         cmdObj,
         maxTimeMSOverride,
         Shard::RetryPolicy::kIdempotent);
@@ -171,7 +171,7 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
     auto cmdStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-        nss.db().toString(),
+        nss.db_forSharding().toString(),
         req.toBSON({}),
         Shard::RetryPolicy::kIdempotent);
 

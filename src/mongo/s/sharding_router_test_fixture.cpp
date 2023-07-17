@@ -284,7 +284,7 @@ void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) 
         ASSERT_EQ(nss, NamespaceString::kConfigsvrShardsNamespace);
 
         // If there is no '$db', append it.
-        auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), request.cmdObj).body;
+        auto cmd = OpMsgRequest::fromDBAndBody(nss.dbName(), request.cmdObj).body;
         auto query = query_request_helper::makeFromFindCommandForTests(cmd, nss);
         ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigsvrShardsNamespace);
 
@@ -310,7 +310,7 @@ void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) 
 void ShardingTestFixture::expectInserts(const NamespaceString& nss,
                                         const std::vector<BSONObj>& expected) {
     onCommand([&nss, &expected](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(nss.db(), request.dbname);
+        ASSERT_EQUALS(nss.db_forTest(), request.dbname);
 
         const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         const auto insertOp = InsertOp::parse(opMsgRequest);

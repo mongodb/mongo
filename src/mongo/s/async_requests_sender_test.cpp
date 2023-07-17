@@ -301,7 +301,7 @@ TEST_F(AsyncRequestsSenderTest, DesignatedHostChosen) {
     designatedHosts[kTestShardIds[1]] = shard1Secondary;
     auto ars = AsyncRequestsSender(operationContext(),
                                    executor(),
-                                   kTestNss.db(),
+                                   kTestNss.db_forSharding(),
                                    requests,
                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                    Shard::RetryPolicy::kNoRetry,
@@ -364,7 +364,7 @@ TEST_F(AsyncRequestsSenderTest, DesignatedHostMustBeInShard) {
     designatedHosts[kTestShardIds[1]] = HostAndPort("HostNotInShard", 12345);
     auto ars = AsyncRequestsSender(operationContext(),
                                    executor(),
-                                   kTestNss.db(),
+                                   kTestNss.db_forSharding(),
                                    requests,
                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                    Shard::RetryPolicy::kNoRetry,

@@ -1481,10 +1481,10 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
                                                           << BSON("$lte" << atClusterTime)),
                                                expCtx);
 
-        bool isCollectionSearch = !nss->db().empty() && !nss->coll().empty();
+        bool isCollectionSearch = !nss->db_forSharding().empty() && !nss->coll().empty();
         auto collMatchExpression = isCollectionSearch ? pcre_util::quoteMeta(nss->coll()) : ".*";
-        auto regexString =
-            "^" + pcre_util::quoteMeta(nss->db()) + "(\\." + collMatchExpression + ")?$";
+        auto regexString = "^" + pcre_util::quoteMeta(nss->db_forSharding()) + "(\\." +
+            collMatchExpression + ")?$";
         return DocumentSourceMatch::create(BSON("nss" << BSON("$regex" << regexString)
                                                       << "timestamp"
                                                       << BSON("$lte" << atClusterTime)),

@@ -1187,7 +1187,7 @@ StatusWith<long long> ShardingCatalogManager::_runCountCommandOnConfig(Operation
     auto resultStatus =
         _localConfigShard->runCommandWithFixedRetryAttempts(opCtx,
                                                             kConfigReadSelector,
-                                                            nss.db().toString(),
+                                                            nss.db_forSharding().toString(),
                                                             countBuilder.done(),
                                                             Shard::kDefaultConfigCommandTimeout,
                                                             Shard::RetryPolicy::kIdempotent);

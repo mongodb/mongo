@@ -180,9 +180,10 @@ SampledCommandRequest makeSampledUpdateCommandRequest(
     write_ops::UpdateCommandRequest sampledCmd(originalCmd.getNamespace(), {std::move(op)});
     sampledCmd.setLet(originalCmd.getLet());
 
-    return {sampleId,
-            sampledCmd.getNamespace(),
-            sampledCmd.toBSON(BSON("$db" << sampledCmd.getNamespace().db().toString()))};
+    return {
+        sampleId,
+        sampledCmd.getNamespace(),
+        sampledCmd.toBSON(BSON("$db" << sampledCmd.getNamespace().db_forSharding().toString()))};
 }
 
 /*
@@ -219,9 +220,10 @@ SampledCommandRequest makeSampledDeleteCommandRequest(
     write_ops::DeleteCommandRequest sampledCmd(originalCmd.getNamespace(), {std::move(op)});
     sampledCmd.setLet(originalCmd.getLet());
 
-    return {sampleId,
-            sampledCmd.getNamespace(),
-            sampledCmd.toBSON(BSON("$db" << sampledCmd.getNamespace().db().toString()))};
+    return {
+        sampleId,
+        sampledCmd.getNamespace(),
+        sampledCmd.toBSON(BSON("$db" << sampledCmd.getNamespace().db_forSharding().toString()))};
 }
 
 /*
@@ -261,9 +263,10 @@ SampledCommandRequest makeSampledFindAndModifyCommandRequest(
     sampledCmd.setArrayFilters(originalCmd.getArrayFilters());
     sampledCmd.setLet(originalCmd.getLet());
 
-    return {sampleId,
-            sampledCmd.getNamespace(),
-            sampledCmd.toBSON(BSON("$db" << sampledCmd.getNamespace().db().toString()))};
+    return {
+        sampleId,
+        sampledCmd.getNamespace(),
+        sampledCmd.toBSON(BSON("$db" << sampledCmd.getNamespace().db_forSharding().toString()))};
 }
 
 /*

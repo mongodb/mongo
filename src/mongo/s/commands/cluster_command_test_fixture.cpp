@@ -158,7 +158,7 @@ DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
     if (cmd.firstElementFieldNameStringData() == "bulkWrite") {
         opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin.db(), cmd);
     } else {
-        opMsgRequest = OpMsgRequest::fromDBAndBody(kNss.db(), cmd);
+        opMsgRequest = OpMsgRequest::fromDBAndBody(kNss.dbName(), cmd);
     }
 
     AlternativeClientRegion acr(client);

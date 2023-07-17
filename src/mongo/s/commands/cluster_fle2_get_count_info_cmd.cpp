@@ -131,12 +131,12 @@ ClusterGetQueryableEncryptionCountInfoCmd::Invocation::typedRun(OperationContext
 
     auto nss = request().getNamespace();
     const auto dbInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db()));
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db_forSharding()));
 
     auto response = uassertStatusOK(
         executeCommandAgainstDatabasePrimary(
             opCtx,
-            nss.db(),
+            nss.db_forSharding(),
             dbInfo,
             applyReadWriteConcern(
                 opCtx,

@@ -209,8 +209,8 @@ public:
                             ->catalogCache()
                             ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
 
-                    auto tempReshardingNss =
-                        resharding::constructTemporaryReshardingNss(nss.db(), cm.getUUID());
+                    auto tempReshardingNss = resharding::constructTemporaryReshardingNss(
+                        nss.db_forSharding(), cm.getUUID());
 
 
                     if (auto zones = request().getZones()) {

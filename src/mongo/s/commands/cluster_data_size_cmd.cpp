@@ -103,7 +103,7 @@ public:
 
             auto shardResults = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
-                nss.db(),
+                nss.db_forSharding(),
                 nss,
                 cri,
                 applyReadWriteConcern(

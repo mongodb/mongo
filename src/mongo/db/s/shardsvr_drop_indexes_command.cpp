@@ -232,7 +232,7 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
             auto shardResponses =
                 scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
                     opCtx,
-                    resolvedNs.db(),
+                    resolvedNs.db_forSharding(),
                     resolvedNs,
                     cri,
                     retryState.shardsWithSuccessResponses,

@@ -179,7 +179,7 @@ public:
                         try {
                             sharding_util::sendCommandToShardsWithVersion(
                                 opCtx,
-                                nss.db(),
+                                nss.db_forSharding(),
                                 validateRequest.toBSON({}),
                                 shardsIdsVec,
                                 Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),

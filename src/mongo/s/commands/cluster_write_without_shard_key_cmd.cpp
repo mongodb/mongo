@@ -159,7 +159,7 @@ BSONObj _createCmdObj(OperationContext* opCtx,
 
     // Parse into OpMsgRequest to append the $db field, which is required for command
     // parsing.
-    const auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), writeCmd);
+    const auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.dbName(), writeCmd);
 
     // Parse original write command and set _id as query filter for new command object.
     if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
@@ -347,7 +347,7 @@ public:
             const auto writeCmdObj = [&] {
                 const auto explainCmdObj = request().getWriteCmd();
                 const auto opMsgRequestExplainCmd =
-                    OpMsgRequest::fromDBAndBody(ns().db(), explainCmdObj);
+                    OpMsgRequest::fromDBAndBody(ns().dbName(), explainCmdObj);
                 auto explainRequest = ExplainCommandRequest::parse(
                     IDLParserContext("_clusterWriteWithoutShardKeyExplain"),
                     opMsgRequestExplainCmd.body);

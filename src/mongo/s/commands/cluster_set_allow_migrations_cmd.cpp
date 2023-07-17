@@ -83,10 +83,11 @@ public:
             shardsvrRequest.setSetAllowMigrationsRequest(allowMigrationsRequest);
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
-            const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));
+            const auto dbInfo =
+                uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db_forSharding()));
             auto cmdResponse = executeCommandAgainstDatabasePrimary(
                 opCtx,
-                nss.db(),
+                nss.db_forSharding(),
                 dbInfo,
                 CommandHelpers::appendMajorityWriteConcern(shardsvrRequest.toBSON({})),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),

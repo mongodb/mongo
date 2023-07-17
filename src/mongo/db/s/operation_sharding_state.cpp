@@ -98,7 +98,8 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
     }
 
     if (databaseVersion) {
-        auto emplaceResult = oss._databaseVersions.try_emplace(nss.db(), *databaseVersion);
+        auto emplaceResult =
+            oss._databaseVersions.try_emplace(nss.db_forSharding(), *databaseVersion);
         auto& tracker = emplaceResult.first->second;
         if (!emplaceResult.second) {
             uassert(640571,
@@ -244,7 +245,7 @@ ScopedSetShardRole::~ScopedSetShardRole() {
     }
 
     if (_databaseVersion) {
-        auto it = oss._databaseVersions.find(_nss.db());
+        auto it = oss._databaseVersions.find(_nss.db_forSharding());
         invariant(it != oss._databaseVersions.end());
         auto& tracker = it->second;
         invariant(--tracker.recursion >= 0);

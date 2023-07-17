@@ -123,7 +123,7 @@ public:
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
-            nss.db(),
+            nss.db_forSharding(),
             nss,
             cri,
             applyReadWriteConcern(
