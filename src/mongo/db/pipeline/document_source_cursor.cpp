@@ -168,7 +168,8 @@ void DocumentSourceCursor::loadBatch() {
     autoColl.emplace(
         pExpCtx->opCtx,
         _exec->nss(),
-        AutoGetCollection::Options{}.secondaryNssOrUUIDs(_exec->getSecondaryNamespaces()));
+        AutoGetCollection::Options{}.secondaryNssOrUUIDs(_exec->getSecondaryNamespaces().cbegin(),
+                                                         _exec->getSecondaryNamespaces().cend()));
     uassertStatusOK(repl::ReplicationCoordinator::get(pExpCtx->opCtx)
                         ->checkCanServeReadsFor(pExpCtx->opCtx, _exec->nss(), true));
 
@@ -253,7 +254,8 @@ Value DocumentSourceCursor::serialize(SerializationOptions opts) const {
         AutoGetCollectionForReadMaybeLockFree readLock(
             opCtx,
             _exec->nss(),
-            AutoGetCollection::Options{}.secondaryNssOrUUIDs(secondaryNssList));
+            AutoGetCollection::Options{}.secondaryNssOrUUIDs(secondaryNssList.cbegin(),
+                                                             secondaryNssList.cend()));
         MultipleCollectionAccessor collections(opCtx,
                                                &readLock.getCollection(),
                                                readLock.getNss(),

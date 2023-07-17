@@ -84,12 +84,15 @@ struct OptionsBase {
 struct Options : OptionsBase<Options> {};
 struct OptionsWithSecondaryCollections : OptionsBase<OptionsWithSecondaryCollections> {
     OptionsWithSecondaryCollections secondaryNssOrUUIDs(
-        std::vector<NamespaceStringOrUUID> secondaryNssOrUUIDs) {
-        _secondaryNssOrUUIDs = std::move(secondaryNssOrUUIDs);
+        std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsBegin,
+        std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsEnd) {
+        _secondaryNssOrUUIDsBegin = secondaryNssOrUUIDsBegin;
+        _secondaryNssOrUUIDsEnd = secondaryNssOrUUIDsEnd;
         return std::move(*this);
     }
 
-    std::vector<NamespaceStringOrUUID> _secondaryNssOrUUIDs;
+    std::vector<NamespaceStringOrUUID>::const_iterator _secondaryNssOrUUIDsBegin;
+    std::vector<NamespaceStringOrUUID>::const_iterator _secondaryNssOrUUIDsEnd;
 };
 }  // namespace auto_get_collection
 

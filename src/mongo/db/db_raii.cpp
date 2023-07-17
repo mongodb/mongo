@@ -376,12 +376,13 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     const auto modeColl = getLockModeForQuery(opCtx, nsOrUUID);
     const auto viewMode = options._viewMode;
     const auto deadline = options._deadline;
-    const auto& secondaryNssOrUUIDs = options._secondaryNssOrUUIDs;
+    const auto& secondaryNssOrUUIDsBegin = options._secondaryNssOrUUIDsBegin;
+    const auto& secondaryNssOrUUIDsEnd = options._secondaryNssOrUUIDsEnd;
 
     // Acquire the collection locks. If there's only one lock, then it can simply be taken. If
     // there are many, however, the locks must be taken in _ascending_ ResourceId order to avoid
     // deadlocks across threads.
-    if (secondaryNssOrUUIDs.empty()) {
+    if (secondaryNssOrUUIDsBegin == secondaryNssOrUUIDsEnd) {
         uassert(ErrorCodes::InvalidNamespace,
                 fmt::format("Namespace {} is not a valid collection name",
                             nsOrUUID.toStringForErrorMsg()),
@@ -393,8 +394,8 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                                                 nsOrUUID,
                                                                 modeColl,
                                                                 deadline,
-                                                                secondaryNssOrUUIDs.cbegin(),
-                                                                secondaryNssOrUUIDs.cend(),
+                                                                secondaryNssOrUUIDsBegin,
+                                                                secondaryNssOrUUIDsEnd,
                                                                 &_collLocks);
     }
 
@@ -432,17 +433,18 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     verifyNamespaceLockingRequirements(opCtx, modeColl, _resolvedNss);
 
     // Check secondary collections and verify they are valid for use.
-    if (!secondaryNssOrUUIDs.empty()) {
+    if (secondaryNssOrUUIDsBegin != secondaryNssOrUUIDsEnd) {
         // Check that none of the namespaces are views or sharded collections, which are not
         // supported for secondary namespaces.
         auto resolvedSecondaryNamespaces = resolveSecondaryNamespacesOrUUIDs(
-            opCtx, catalog.get(), secondaryNssOrUUIDs.cbegin(), secondaryNssOrUUIDs.cend());
+            opCtx, catalog.get(), secondaryNssOrUUIDsBegin, secondaryNssOrUUIDsEnd);
         _secondaryNssIsAViewOrSharded = !resolvedSecondaryNamespaces.has_value();
 
         if (!_secondaryNssIsAViewOrSharded) {
             // Ensure that the readTimestamp is compatible with the latest Collection instances or
             // create PIT instances in the 'catalog' (if the collections existed at that PIT).
-            for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
+            for (auto iter = secondaryNssOrUUIDsBegin; iter != secondaryNssOrUUIDsEnd; ++iter) {
+                const auto& secondaryNssOrUUID = *iter;
                 auto secondaryCollectionAtPIT = catalog->establishConsistentCollection(
                     opCtx, secondaryNssOrUUID, readTimestamp);
                 if (secondaryCollectionAtPIT) {
@@ -819,8 +821,8 @@ inline CatalogStateForNamespace acquireCatalogStateForNamespace(
     auto [catalog, isAnySecondaryNssShardedOrAView, readSource, readTimestamp] =
         getConsistentCatalogAndSnapshot(opCtx,
                                         nsOrUUID,
-                                        options._secondaryNssOrUUIDs.cbegin(),
-                                        options._secondaryNssOrUUIDs.cend(),
+                                        options._secondaryNssOrUUIDsBegin,
+                                        options._secondaryNssOrUUIDsEnd,
                                         readConcernArgs,
                                         callerExpectedToConflictWithSecondaryBatchApplication);
 
@@ -1030,8 +1032,8 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
                     CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(
                         _autoCollForRead.getNss().dbName()),
                     options._deadline,
-                    options._secondaryNssOrUUIDs.cbegin(),
-                    options._secondaryNssOrUUIDs.cend()) {
+                    options._secondaryNssOrUUIDsBegin,
+                    options._secondaryNssOrUUIDsEnd) {
     hangBeforeAutoGetShardVersionCheck.executeIf(
         [&](auto&) { hangBeforeAutoGetShardVersionCheck.pauseWhileSet(opCtx); },
         [&](const BSONObj& data) {

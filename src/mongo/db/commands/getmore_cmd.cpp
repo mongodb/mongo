@@ -584,10 +584,12 @@ public:
                 // Note that some pipelines which were optimized away may require locking multiple
                 // namespaces. As such, we pass any secondary namespaces required by the pinned
                 // cursor's executor when constructing 'readLock'.
+                const auto& secondaryNamespaces =
+                    cursorPin->getExecutor()->getSecondaryNamespaces();
                 readLock.emplace(opCtx,
                                  cursorPin->getExecutor()->nss(),
                                  AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                                     cursorPin->getExecutor()->getSecondaryNamespaces()));
+                                     secondaryNamespaces.cbegin(), secondaryNamespaces.cend()));
 
                 statsTracker.emplace(
                     opCtx,

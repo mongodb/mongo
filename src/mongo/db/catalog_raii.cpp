@@ -277,7 +277,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
     auto& viewMode = options._viewMode;
     auto& deadline = options._deadline;
-    auto& secondaryNssOrUUIDs = options._secondaryNssOrUUIDs;
+    auto& secondaryNssOrUUIDsBegin = options._secondaryNssOrUUIDsBegin;
+    auto& secondaryNssOrUUIDsEnd = options._secondaryNssOrUUIDsEnd;
 
     // Out of an abundance of caution, force operations to acquire new snapshots after
     // acquiring exclusive collection locks. Operations that hold MODE_X locks make an
@@ -293,7 +294,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     // Acquire the collection locks. If there's only one lock, then it can simply be taken. If
     // there are many, however, the locks must be taken in _ascending_ ResourceId order to avoid
     // deadlocks across threads.
-    if (secondaryNssOrUUIDs.empty()) {
+    if (secondaryNssOrUUIDsBegin == secondaryNssOrUUIDsEnd) {
         uassert(ErrorCodes::InvalidNamespace,
                 fmt::format("Namespace {} is not a valid collection name",
                             nsOrUUID.toStringForErrorMsg()),
@@ -305,8 +306,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                                                 nsOrUUID,
                                                                 modeColl,
                                                                 deadline,
-                                                                secondaryNssOrUUIDs.cbegin(),
-                                                                secondaryNssOrUUIDs.cend(),
+                                                                secondaryNssOrUUIDsBegin,
+                                                                secondaryNssOrUUIDsEnd,
                                                                 &_collLocks);
     }
 
@@ -333,7 +334,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
     verifyDbAndCollection(
         opCtx, modeColl, nsOrUUID, _resolvedNss, _coll.get(), _autoDb.getDb(), verifyWriteEligible);
-    for (auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
+    for (auto iter = secondaryNssOrUUIDsBegin; iter != secondaryNssOrUUIDsEnd; ++iter) {
+        const auto& secondaryNssOrUUID = *iter;
         auto secondaryResolvedNss =
             catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID);
         auto secondaryColl = catalog->lookupCollectionByNamespace(opCtx, secondaryResolvedNss);

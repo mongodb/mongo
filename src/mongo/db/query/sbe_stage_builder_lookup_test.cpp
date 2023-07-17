@@ -177,11 +177,13 @@ public:
                       << std::endl;
         }
 
-        AutoGetCollection localColl(
-            operationContext(),
-            _nss,
-            LockMode::MODE_IS,
-            AutoGetCollection::Options{}.secondaryNssOrUUIDs({_foreignNss}));
+        std::vector<NamespaceStringOrUUID> foreignNssVec({_foreignNss});
+
+        AutoGetCollection localColl(operationContext(),
+                                    _nss,
+                                    LockMode::MODE_IS,
+                                    AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                                        foreignNssVec.cbegin(), foreignNssVec.cend()));
 
         MultipleCollectionAccessor colls(operationContext(),
                                          &localColl.getCollection(),

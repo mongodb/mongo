@@ -94,8 +94,12 @@ void renameCollectionShardingIndexCatalog(OperationContext* opCtx,
         [&]() {
             boost::optional<UUID> toUuid;
             WriteUnitOfWork wunit(opCtx);
-            AutoGetCollection fromToColl(
-                opCtx, fromNss, MODE_IX, AutoGetCollection::Options{}.secondaryNssOrUUIDs({toNss}));
+            std::vector<NamespaceStringOrUUID> toNssVec({toNss});
+            AutoGetCollection fromToColl(opCtx,
+                                         fromNss,
+                                         MODE_IX,
+                                         AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                                             toNssVec.cbegin(), toNssVec.cend()));
             auto acquisitions = acquireCollections(
                 opCtx,
                 {CollectionAcquisitionRequest(

@@ -147,7 +147,10 @@ TEST_F(AutoGetCollectionMultiTest, SecondaryNssMinimumVisible) {
     std::vector<NamespaceStringOrUUID> secondaryNamespaces{NamespaceStringOrUUID(_secondaryNss1),
                                                            NamespaceStringOrUUID(_secondaryNss2)};
     AutoGetCollectionForRead autogetForRead(
-        opCtx1, _primaryNss, AutoGetCollection::Options{}.secondaryNssOrUUIDs(secondaryNamespaces));
+        opCtx1,
+        _primaryNss,
+        AutoGetCollection::Options{}.secondaryNssOrUUIDs(secondaryNamespaces.cbegin(),
+                                                         secondaryNamespaces.cend()));
 
     // We can see the collections at `_primaryNss` and `_secondaryNss1` but not `_secondaryNss2`.
     ASSERT(CollectionCatalog::get(opCtx1)->lookupCollectionByNamespace(opCtx1, _primaryNss));
@@ -165,7 +168,8 @@ TEST_F(AutoGetCollectionMultiTest, LockFreeMultiCollectionSingleDB) {
     AutoGetCollectionForReadLockFree autoGet(
         opCtx1,
         NamespaceStringOrUUID(_primaryNss),
-        AutoGetCollection::Options{}.secondaryNssOrUUIDs(_secondaryNssOrUUIDVec));
+        AutoGetCollection::Options{}.secondaryNssOrUUIDs(_secondaryNssOrUUIDVec.cbegin(),
+                                                         _secondaryNssOrUUIDVec.cend()));
 
     auto locker = opCtx1->lockState();
     locker->dump();
@@ -195,10 +199,10 @@ TEST_F(AutoGetCollectionMultiTest, LockedDuplicateNamespaces) {
 
     invariant(!opCtx1->lockState()->isCollectionLockedForMode(_primaryNss, MODE_IS));
 
-    AutoGetCollectionForRead autoGet(
-        opCtx1,
-        NamespaceStringOrUUID(_primaryNss),
-        AutoGetCollection::Options{}.secondaryNssOrUUIDs(duplicateNssVector));
+    AutoGetCollectionForRead autoGet(opCtx1,
+                                     NamespaceStringOrUUID(_primaryNss),
+                                     AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                                         duplicateNssVector.cbegin(), duplicateNssVector.cend()));
 
     auto locker = opCtx1->lockState();
     locker->dump();
@@ -224,7 +228,8 @@ TEST_F(AutoGetCollectionMultiTest, LockFreeMultiDBs) {
     AutoGetCollectionForReadLockFree autoGet(
         opCtx1,
         NamespaceStringOrUUID(_primaryNss),
-        AutoGetCollection::Options{}.secondaryNssOrUUIDs(_secondaryNssOtherDbNssVec));
+        AutoGetCollection::Options{}.secondaryNssOrUUIDs(_secondaryNssOtherDbNssVec.cbegin(),
+                                                         _secondaryNssOtherDbNssVec.cend()));
 
     auto locker = opCtx1->lockState();
     locker->dump();
@@ -250,7 +255,8 @@ TEST_F(AutoGetCollectionMultiTest, LockFreeSecondaryNamespaceNotFoundIsOK) {
     AutoGetCollectionForReadLockFree autoGet(
         opCtx1,
         NamespaceStringOrUUID(_primaryNss),
-        AutoGetCollection::Options{}.secondaryNssOrUUIDs(_secondaryNssOrUUIDAllVec));
+        AutoGetCollection::Options{}.secondaryNssOrUUIDs(_secondaryNssOrUUIDAllVec.cbegin(),
+                                                         _secondaryNssOrUUIDAllVec.cend()));
 
     invariant(opCtx1->lockState()->isLocked());
     ASSERT(!CollectionCatalog::get(opCtx1)->lookupCollectionByNamespace(opCtx1, _secondaryNss2));
@@ -264,7 +270,8 @@ TEST_F(AutoGetCollectionMultiTest, LockedSecondaryNamespaceNotFound) {
     AutoGetCollectionForRead autoGet(
         opCtx1,
         NamespaceStringOrUUID(_primaryNss),
-        AutoGetCollection::Options{}.secondaryNssOrUUIDs(_secondaryNssOrUUIDVec));
+        AutoGetCollection::Options{}.secondaryNssOrUUIDs(_secondaryNssOrUUIDVec.cbegin(),
+                                                         _secondaryNssOrUUIDVec.cend()));
 
     auto locker = opCtx1->lockState();
 

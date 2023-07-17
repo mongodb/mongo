@@ -280,12 +280,11 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
 
         // We want to read all the system.views as well as _mdb_catalog (again) using a consistent
         // snapshot.
-        // TODO(SERVER-63754): Replace with a less verbose constructor overload when available.
         AutoGetCollectionForReadCommandMaybeLockFree collLock(
             opCtx,
             systemViewsNamespaces.front(),
-            AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                {++systemViewsNamespaces.cbegin(), systemViewsNamespaces.cend()}),
+            AutoGetCollection::Options{}.secondaryNssOrUUIDs(++systemViewsNamespaces.cbegin(),
+                                                             systemViewsNamespaces.cend()),
             AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
 
         // If the primary collection is not available, it means the information from parsing
@@ -504,7 +503,8 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
 
     autoColl.emplace(expCtx->opCtx,
                      nsOrUUID,
-                     AutoGetCollection::Options{}.secondaryNssOrUUIDs(secondaryNamespaces),
+                     AutoGetCollection::Options{}.secondaryNssOrUUIDs(secondaryNamespaces.cbegin(),
+                                                                      secondaryNamespaces.cend()),
                      AutoStatsTracker::LogMode::kUpdateTop);
 
     MultipleCollectionAccessor holder{expCtx->opCtx,
