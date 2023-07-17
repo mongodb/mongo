@@ -272,6 +272,7 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
     ServiceContext::UniqueOperationContext opCtx;
     try {
         opCtx = client->makeOperationContext();
+
         Date_t currentTimeForTimeBasedExpiration =
             change_stream_pre_image_util::getCurrentTimeForPreImageRemoval(opCtx.get());
         size_t numberOfRemovals = 0;
@@ -393,8 +394,9 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithCollSc
     const auto currentEarliestOplogEntryTs =
         repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);
 
-    const auto preImageExpirationTime = change_stream_pre_image_util::getPreImageExpirationTime(
-        opCtx, currentTimeForTimeBasedExpiration);
+    const auto preImageExpirationTime =
+        change_stream_pre_image_util::getPreImageOpTimeExpirationDate(
+            opCtx, boost::none /** tenantId **/, currentTimeForTimeBasedExpiration);
 
     // Configure the filter for the case when expiration parameter is set.
     if (preImageExpirationTime) {

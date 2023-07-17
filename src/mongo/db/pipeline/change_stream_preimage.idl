@@ -35,6 +35,14 @@ imports:
     - "mongo/db/basic_types.idl"
 
 server_parameters:
+    disableExpiredPreImagesRemover:
+        description: Disables the expired pre-images remover.
+        set_at: [ startup ]
+        cpp_vartype: bool
+        cpp_varname: gPreImageRemoverDisabled
+        default: false
+        test_only: true
+
     expiredChangeStreamPreImageRemovalJobSleepSecs:
         description: >-
             Specifies the period within which expired pre-image removal job is running.

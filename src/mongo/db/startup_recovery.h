@@ -51,5 +51,25 @@ void runStartupRecoveryInMode(OperationContext* opCtx,
                               StorageEngine::LastShutdownState lastShutdownState,
                               StartupRecoveryMode mode);
 
+/**
+ * Ensures data on the change stream collections is consistent on startup. Only after unclean
+ * shutdown is there a risk of inconsistent data.
+ *
+ * 'lastShutdownState': Indicates whether there was a clean or unclean shutdown before startup.
+ * 'isStandalone': Whether the server is started up as a standalone.
+ *
+ * Both change stream change collections and change stream pre-images collections use unreplicated,
+ * untimestamped truncates to remove expired documents, similar to the oplog. Unlike the oplog, the
+ * collections aren't logged, and previously truncated data can unexpectedly surface after an
+ * unclean shutdown.
+ *
+ * To prevent ranges of inconsistent data, preemptively and liberally truncates all documents which
+ * may have expired before the crash at startup. Errs on the side of caution by potentially
+ * truncating slightly more documents than those expired at the time of shutdown.
+ */
+void recoverChangeStreamCollections(OperationContext* opCtx,
+                                    bool isStandalone,
+                                    StorageEngine::LastShutdownState lastShutdownState);
+
 }  // namespace startup_recovery
 }  // namespace mongo

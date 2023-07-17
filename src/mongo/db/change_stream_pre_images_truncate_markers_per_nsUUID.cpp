@@ -71,16 +71,17 @@ bool isExpired(OperationContext* opCtx,
     auto currentTimeForTimeBasedExpiration =
         change_stream_pre_image_util::getCurrentTimeForPreImageRemoval(opCtx);
 
+    auto opTimeExpirationDate = change_stream_pre_image_util::getPreImageOpTimeExpirationDate(
+        opCtx, tenantId, currentTimeForTimeBasedExpiration);
+
     if (tenantId) {
-        // In a serverless environment, the 'expireAfterSeconds' is set per tenant and is the only
-        // criteria considered when determining whether a marker is expired.
-        //
+        // In a serverless environment, the 'expireAfterSeconds' is set per tenant and pre-images
+        // always expire according to their 'operationTime'.
+        invariant(opTimeExpirationDate);
+
         // The oldest marker is expired if:
-        //   'wallTime' of the oldest marker <= current node time - 'expireAfterSeconds'
-        auto expireAfterSeconds =
-            Seconds{change_stream_serverless_helpers::getExpireAfterSeconds(tenantId.get())};
-        auto preImageExpirationTime = currentTimeForTimeBasedExpiration - expireAfterSeconds;
-        return highestWallTime <= preImageExpirationTime;
+        //   'wallTime' of the oldest marker <= current node time - 'expireAfterSeconds'.
+        return highestWallTime <= *opTimeExpirationDate;
     }
 
     // In a non-serverless environment, a marker is expired if either:
@@ -90,10 +91,8 @@ bool isExpired(OperationContext* opCtx,
     //     Timestamp of earliest oplog entry
 
     // The 'expireAfterSeconds' may or may not be set in a non-serverless environment.
-    const auto preImageExpirationTime = change_stream_pre_image_util::getPreImageExpirationTime(
-        opCtx, currentTimeForTimeBasedExpiration);
     bool expiredByTimeBasedExpiration =
-        preImageExpirationTime ? highestWallTime <= preImageExpirationTime : false;
+        opTimeExpirationDate ? highestWallTime <= opTimeExpirationDate : false;
 
     const auto currentEarliestOplogEntryTs =
         repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);

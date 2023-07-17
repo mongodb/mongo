@@ -63,6 +63,8 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/change_stream_pre_image_util.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -82,6 +84,8 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/resumable_index_builds_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/storage_options.h"
@@ -390,6 +394,90 @@ void clearTempFilesExceptForResumableBuilds(const std::vector<ResumeIndexInfo>& 
     }
 }
 
+bool useUnreplicatedTruncatesForChangeStreamCollections() {
+    bool res = mongo::feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions.isEnabled(
+        serverGlobalParams.featureCompatibility);
+    return res;
+}
+
+void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx,
+                                                    boost::optional<TenantId> tenantId) {
+    const auto preImagesColl = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(tenantId),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+
+    if (!preImagesColl.exists()) {
+        LOGV2_DEBUG(
+            7803702,
+            3,
+            "Bypassing truncation of pre-images collection on startup recovery because it does "
+            "not exist");
+        return;
+    }
+
+    auto currentTime = change_stream_pre_image_util::getCurrentTimeForPreImageRemoval(opCtx);
+    auto operationTimeExpirationDate =
+        change_stream_pre_image_util::getPreImageOpTimeExpirationDate(opCtx, tenantId, currentTime);
+    if (operationTimeExpirationDate) {
+        // Pre-image expiration is based on either 'operationTime', or '_id.ts'. However, after
+        // unclean shutdown, initial truncation must be based on RecordId (which only encodes
+        // '_id.ts') since truncate markers haven't been created yet. A pre-image's
+        // 'operationTime' is based off it's corresponding oplog entry's reserved 'opTime'.
+        // Because writes can commit out of order with respect to their reserved 'opTime' (e.g.
+        // oplog holes), the pre-images collection may not be strictly monotonically increasing
+        // with respect to 'operationTime'.
+        //
+        // To account for oplog holes, and a loss of precision converting Date_t to Timestamp,
+        // truncate up to a few seconds past the expiration date to guarantee only consistent
+        // data survives post crash.
+        auto newOperationTimeExpirationDate = *operationTimeExpirationDate + Seconds(10);
+        LOGV2_DEBUG(
+            7803700,
+            1,
+            "Extending truncate range for pre-images expired by 'operationTime' by 10 seconds",
+            "originalExpirationDate"_attr = *operationTimeExpirationDate,
+            "newExpirationDate"_attr = newOperationTimeExpirationDate);
+
+        operationTimeExpirationDate = newOperationTimeExpirationDate;
+    }
+
+    auto operationTimeExpirationTSEstimate = operationTimeExpirationDate
+        ? Timestamp{Timestamp(operationTimeExpirationDate->toMillisSinceEpoch() / 1000,
+                              std::numeric_limits<unsigned>::max())}
+        : Timestamp();
+
+    if (tenantId) {
+        // Multi-tenant environment, pre-images only expire by 'operationTime'.
+        invariant(operationTimeExpirationDate);
+        LOGV2_DEBUG(7803701,
+                    1,
+                    "About to truncate pre-images for tenant after unclean shutdown",
+                    "truncateAtTimestamp"_attr = *operationTimeExpirationDate,
+                    "tenantId"_attr = tenantId);
+        change_stream_pre_image_util::truncatePreImagesByTimestampExpirationApproximation(
+            opCtx, preImagesColl.getCollectionPtr(), operationTimeExpirationTSEstimate);
+        return;
+    }
+
+    // Pre-images expired when "_id.ts" < oldest oplog timestamp OR "_id.ts" <= the estimated
+    // timestamp for the 'operationTime' expiration date.
+    const auto oldestOplogTimestamp =
+        repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);
+    const auto expirationTimestamp =
+        std::max(oldestOplogTimestamp, operationTimeExpirationTSEstimate);
+    LOGV2_DEBUG(7803703,
+                1,
+                "About to truncate pre-images after unclean shutdown",
+                "truncateAtTimestamp"_attr = expirationTimestamp,
+                "oldestOplogEntryTimestamp"_attr = oldestOplogTimestamp);
+    change_stream_pre_image_util::truncatePreImagesByTimestampExpirationApproximation(
+        opCtx, preImagesColl.getCollectionPtr(), expirationTimestamp);
+}
+
 void reconcileCatalogAndRebuildUnfinishedIndexes(
     OperationContext* opCtx,
     StorageEngine* storageEngine,
@@ -644,6 +732,11 @@ void startupRecovery(OperationContext* opCtx,
     });
 }
 
+// Returns true if the oplog collection exists. Will always return false if the cached pointer to
+// the collection has not yet been initialized.
+bool oplogExists(OperationContext* opCtx) {
+    return static_cast<bool>(LocalOplogInfo::get(opCtx)->getCollection());
+}
 }  // namespace
 
 namespace startup_recovery {
@@ -697,5 +790,55 @@ void runStartupRecoveryInMode(OperationContext* opCtx,
     startupRecovery(opCtx, storageEngine, lastShutdownState, mode);
 }
 
+void recoverChangeStreamCollections(OperationContext* opCtx,
+                                    bool isStandalone,
+                                    StorageEngine::LastShutdownState lastShutdownState) {
+    if (lastShutdownState != StorageEngine::LastShutdownState::kUnclean) {
+        // The storage engine guarantees consistent data ranges after truncate on clean
+        // shutdown.
+        return;
+    }
+
+    if (!useUnreplicatedTruncatesForChangeStreamCollections()) {
+        // This recovery procedure only applies to non-logged collections using untimestamped
+        // truncates.
+        return;
+    }
+
+    if (isStandalone) {
+        // If the node is started up as a standalone, it could have either (1) previously been a
+        // standalone (the oplog doesn't exist), or (2) previously been a replica set node (the
+        // oplog collection exists and the cached pointer to the oplog is initialized, or the oplog
+        // collection exists but the cached pointer to the oplog hasn't been initialized yet).
+        if (!oplogExists(opCtx)) {
+            // Try to initialize the cached pointer to the oplog collection, provided the collection
+            // exists.
+            LOGV2_DEBUG(
+                7803705,
+                4,
+                "Attempting to initialize a cached pointer to the oplog on startup recovery");
+            repl::acquireOplogCollectionForLogging(opCtx);
+            if (!oplogExists(opCtx)) {
+                // There is no underlying oplog collection. Nothing to do since change stream
+                // collections implicitly replicate from the oplog, and can't exist without it.
+                LOGV2_DEBUG(7803704,
+                            3,
+                            "Skipping truncation of pre-images collection on startup recovery "
+                            "because there is no oplog");
+
+                return;
+            }
+        }
+    }
+
+    if (change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+        const auto tenantIds = change_stream_serverless_helpers::getConfigDbTenants(opCtx);
+        for (const auto& tenantId : tenantIds) {
+            cleanupPreImagesCollectionAfterUncleanShutdown(opCtx, tenantId);
+        }
+    } else {
+        cleanupPreImagesCollectionAfterUncleanShutdown(opCtx, boost::none);
+    }
+}
 }  // namespace startup_recovery
 }  // namespace mongo

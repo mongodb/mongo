@@ -48,17 +48,23 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/change_stream_options_gen.h"
 #include "mongo/db/change_stream_options_manager.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 // Fail point to set current time for time-based expiration of pre-images.
@@ -67,7 +73,9 @@ MONGO_FAIL_POINT_DEFINE(changeStreamPreImageRemoverCurrentTime);
 namespace change_stream_pre_image_util {
 
 namespace {
-// Get the 'expireAfterSeconds' from the 'ChangeStreamOptions' if not 'off', boost::none otherwise.
+
+// Get the 'expireAfterSeconds' for a single-tenant environment from the 'ChangeStreamOptions' if
+// not 'off', boost::none otherwise.
 boost::optional<std::int64_t> getExpireAfterSecondsFromChangeStreamOptions(
     ChangeStreamOptions& changeStreamOptions) {
     const stdx::variant<std::string, std::int64_t>& expireAfterSeconds =
@@ -79,21 +87,34 @@ boost::optional<std::int64_t> getExpireAfterSecondsFromChangeStreamOptions(
 
     return boost::none;
 }
+
+boost::optional<Seconds> getExpireAfterSeconds(OperationContext* opCtx,
+                                               boost::optional<TenantId> tenantId) {
+    if (tenantId) {
+        return Seconds{change_stream_serverless_helpers::getExpireAfterSeconds(tenantId.get())};
+    }
+
+    // Get the expiration time directly from the change stream manager for a single-tenant
+    // environment.
+    auto changeStreamOptions = ChangeStreamOptionsManager::get(opCtx).getOptions(opCtx);
+    auto expireAfterSeconds = getExpireAfterSecondsFromChangeStreamOptions(changeStreamOptions);
+    return expireAfterSeconds ? boost::optional<Seconds>(*expireAfterSeconds) : boost::none;
+}
 }  // namespace
 
-boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_t currentTime) {
-    // Non-serverless and serverless environments expire pre-images according to different logic and
-    // parameters. This method retrieves the 'expireAfterSeconds' for a single-tenant environment.
-    boost::optional<std::int64_t> expireAfterSeconds = boost::none;
+boost::optional<Date_t> getPreImageOpTimeExpirationDate(OperationContext* opCtx,
+                                                        boost::optional<TenantId> tenantId,
+                                                        Date_t currentTime) {
+    auto expireAfterSeconds = getExpireAfterSeconds(opCtx, tenantId);
 
-    // Get the expiration time directly from the change stream manager.
-    auto changeStreamOptions = ChangeStreamOptionsManager::get(opCtx).getOptions(opCtx);
-    expireAfterSeconds = getExpireAfterSecondsFromChangeStreamOptions(changeStreamOptions);
+    // In a serverless environment, 'expireAfterSeconds' must always be specified.
+    invariant((tenantId && expireAfterSeconds) || !tenantId);
 
-    // A pre-image is eligible for deletion if:
-    //   pre-image's op-time + expireAfterSeconds  < currentTime.
-    return expireAfterSeconds ? boost::optional<Date_t>(currentTime - Seconds(*expireAfterSeconds))
-                              : boost::none;
+    if (expireAfterSeconds) {
+        return currentTime - *expireAfterSeconds;
+    }
+
+    return boost::none;
 }
 
 Timestamp getPreImageTimestamp(const RecordId& rid) {
@@ -126,6 +147,63 @@ RecordIdBound getAbsoluteMinPreImageRecordIdBoundForNs(const UUID& nsUUID) {
 RecordIdBound getAbsoluteMaxPreImageRecordIdBoundForNs(const UUID& nsUUID) {
     return RecordIdBound(change_stream_pre_image_util::toRecordId(
         ChangeStreamPreImageId(nsUUID, Timestamp::max(), std::numeric_limits<int64_t>::max())));
+}
+
+void truncateRange(OperationContext* opCtx,
+                   const CollectionPtr& preImagesColl,
+                   const RecordId& minRecordId,
+                   const RecordId& maxRecordId,
+                   int64_t bytesDeleted,
+                   int64_t docsDeleted) {
+    // Exclusively truncate based on the most recent WT snapshot.
+    opCtx->recoveryUnit()->abandonSnapshot();
+    opCtx->recoveryUnit()->allowOneUntimestampedWrite();
+
+    WriteUnitOfWork wuow(opCtx);
+    auto rs = preImagesColl->getRecordStore();
+    auto status = rs->rangeTruncate(opCtx, minRecordId, maxRecordId, -bytesDeleted, -docsDeleted);
+    invariantStatusOK(status);
+    wuow.commit();
+}
+
+void truncatePreImagesByTimestampExpirationApproximation(
+    OperationContext* opCtx,
+    const CollectionPtr& preImagesColl,
+    Timestamp expirationTimestampApproximation) {
+
+    stdx::unordered_set<UUID, UUID::Hash> nsUUIDs;
+
+    // Placeholder for the wall time of the first document of the current pre-images internal
+    // collection being examined.
+    Date_t firstDocWallTime{};
+    boost::optional<UUID> currentNsUUID = boost::none;
+    while ((currentNsUUID = change_stream_pre_image_util::findNextCollectionUUID(
+                opCtx, &preImagesColl, currentNsUUID, firstDocWallTime))) {
+        nsUUIDs.emplace(*currentNsUUID);
+    }
+
+    for (auto nsUUID : nsUUIDs) {
+        RecordId minRecordId =
+            change_stream_pre_image_util::getAbsoluteMinPreImageRecordIdBoundForNs(nsUUID)
+                .recordId();
+
+        RecordId maxRecordIdApproximation =
+            RecordIdBound(
+                change_stream_pre_image_util::toRecordId(ChangeStreamPreImageId(
+                    nsUUID, expirationTimestampApproximation, std::numeric_limits<int64_t>::max())))
+                .recordId();
+
+        writeConflictRetry(
+            opCtx,
+            "truncate pre-images by approximate timestamp expiration",
+            preImagesColl->ns(),
+            [&] {
+                // Truncation is based on Timestamp expiration approximation -
+                // meaning there isn't a good estimate of the number of bytes and
+                // documents to be truncated, so default to 0.
+                truncateRange(opCtx, preImagesColl, minRecordId, maxRecordIdApproximation, 0, 0);
+            });
+    }
 }
 
 UUID getPreImageNsUUID(const BSONObj& preImageObj) {
@@ -169,13 +247,19 @@ Date_t getCurrentTimeForPreImageRemoval(OperationContext* opCtx) {
         // Populate the current time for time based expiration of pre-images.
         if (auto currentTimeElem = data["currentTimeForTimeBasedExpiration"]) {
             const BSONType bsonType = currentTimeElem.type();
-            tassert(7500501,
-                    str::stream() << "Expected type for 'currentTimeForTimeBasedExpiration' is "
-                                     "'date', but found: "
-                                  << bsonType,
-                    bsonType == BSONType::Date);
+            if (bsonType == BSONType::String) {
+                auto stringDate = currentTimeElem.String();
+                currentTime = dateFromISOString(stringDate).getValue();
+            } else {
+                tassert(7500501,
+                        str::stream()
+                            << "Expected type for 'currentTimeForTimeBasedExpiration' is "
+                               "'date' or a 'string' representation of ISODate, but found: "
+                            << bsonType,
+                        bsonType == BSONType::Date);
 
-            currentTime = currentTimeElem.Date();
+                currentTime = currentTimeElem.Date();
+            }
         }
     });
 

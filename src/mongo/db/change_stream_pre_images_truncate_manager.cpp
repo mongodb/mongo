@@ -469,24 +469,6 @@ PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTena
     }
 }
 
-void truncateRange(OperationContext* opCtx,
-                   const CollectionPtr& preImagesColl,
-                   const RecordId& minRecordId,
-                   const RecordId& maxRecordId,
-                   int64_t bytesDeleted,
-                   int64_t docsDeleted) {
-    // The session might be in use from marker initialisation so we must
-    // reset it here in order to allow an untimestamped write.
-    opCtx->recoveryUnit()->abandonSnapshot();
-    opCtx->recoveryUnit()->allowOneUntimestampedWrite();
-
-    WriteUnitOfWork wuow(opCtx);
-    auto rs = preImagesColl->getRecordStore();
-    auto status = rs->rangeTruncate(opCtx, minRecordId, maxRecordId, -bytesDeleted, -docsDeleted);
-    invariantStatusOK(status);
-    wuow.commit();
-}
-
 // Performs a ranged truncate over each expired marker in 'truncateMarkersForNss'. Updates the
 // "Output" parameters to communicate the respective docs deleted, bytes deleted, and and maximum
 // wall time of documents deleted to the caller.
@@ -504,12 +486,12 @@ void truncateExpiredMarkersForNsUUID(
             auto bytesDeleted = marker->bytes;
             auto docsDeleted = marker->records;
 
-            truncateRange(opCtx,
-                          preImagesColl,
-                          minRecordIdForNs,
-                          marker->lastRecord,
-                          bytesDeleted,
-                          docsDeleted);
+            change_stream_pre_image_util::truncateRange(opCtx,
+                                                        preImagesColl,
+                                                        minRecordIdForNs,
+                                                        marker->lastRecord,
+                                                        bytesDeleted,
+                                                        docsDeleted);
 
             if (marker->wallTime > maxWallTimeForNsTruncateOutput) {
                 maxWallTimeForNsTruncateOutput = marker->wallTime;
@@ -592,7 +574,8 @@ PreImagesTruncateManager::TruncateStats PreImagesTruncateManager::truncateExpire
                     .recordId();
 
             writeConflictRetry(opCtx, "final truncate", preImagesColl->ns(), [&] {
-                truncateRange(opCtx, preImagesColl, minRecordId, maxRecordId, 0, 0);
+                change_stream_pre_image_util::truncateRange(
+                    opCtx, preImagesColl, minRecordId, maxRecordId, 0, 0);
             });
 
             tenantTruncateMarkers->erase(nsUUID);

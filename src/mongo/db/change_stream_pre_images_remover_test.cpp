@@ -125,7 +125,8 @@ public:
     }
 };
 
-TEST_F(ChangeStreamPreImageExpirationPolicyTest, getPreImageExpirationTimeWithValidIntegralValue) {
+TEST_F(ChangeStreamPreImageExpirationPolicyTest,
+       getPreImageOpTimeExpirationDateWithValidIntegralValue) {
     auto opCtx = cc().makeOperationContext();
     const int64_t expireAfterSeconds = 10;
 
@@ -133,30 +134,30 @@ TEST_F(ChangeStreamPreImageExpirationPolicyTest, getPreImageExpirationTimeWithVa
     setChangeStreamOptionsToManager(opCtx.get(), *changeStreamOptions.get());
 
     auto currentTime = Date_t::now();
-    auto receivedExpireAfterSeconds =
-        change_stream_pre_image_util::getPreImageExpirationTime(opCtx.get(), currentTime);
+    auto receivedExpireAfterSeconds = change_stream_pre_image_util::getPreImageOpTimeExpirationDate(
+        opCtx.get(), boost::none /** tenantId **/, currentTime);
     ASSERT(receivedExpireAfterSeconds);
     ASSERT_EQ(*receivedExpireAfterSeconds, currentTime - Seconds(expireAfterSeconds));
 }
 
-TEST_F(ChangeStreamPreImageExpirationPolicyTest, getPreImageExpirationTimeWithUnsetValue) {
+TEST_F(ChangeStreamPreImageExpirationPolicyTest, getPreImageOpTimeExpirationDateWithUnsetValue) {
     auto opCtx = cc().makeOperationContext();
 
     auto currentTime = Date_t::now();
-    auto receivedExpireAfterSeconds =
-        change_stream_pre_image_util::getPreImageExpirationTime(opCtx.get(), currentTime);
+    auto receivedExpireAfterSeconds = change_stream_pre_image_util::getPreImageOpTimeExpirationDate(
+        opCtx.get(), boost::none /** tenantId **/, currentTime);
     ASSERT_FALSE(receivedExpireAfterSeconds);
 }
 
-TEST_F(ChangeStreamPreImageExpirationPolicyTest, getPreImageExpirationTimeWithOffValue) {
+TEST_F(ChangeStreamPreImageExpirationPolicyTest, getPreImageOpTimeExpirationDateWithOffValue) {
     auto opCtx = cc().makeOperationContext();
 
     auto changeStreamOptions = populateChangeStreamPreImageOptions("off");
     setChangeStreamOptionsToManager(opCtx.get(), *changeStreamOptions.get());
 
     auto currentTime = Date_t::now();
-    auto receivedExpireAfterSeconds =
-        change_stream_pre_image_util::getPreImageExpirationTime(opCtx.get(), currentTime);
+    auto receivedExpireAfterSeconds = change_stream_pre_image_util::getPreImageOpTimeExpirationDate(
+        opCtx.get(), boost::none /** tenantId **/, currentTime);
     ASSERT_FALSE(receivedExpireAfterSeconds);
 }
 }  // namespace
