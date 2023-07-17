@@ -2,6 +2,7 @@
  * Tests that unbounded collections scans access the storage engine with low priority.
  *
  * @tags: [
+ *   featureFlagDeprioritizeLowPriorityOperations,
  *   requires_wiredtiger,
  * ]
  */
