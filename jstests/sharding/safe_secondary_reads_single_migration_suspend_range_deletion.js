@@ -419,6 +419,7 @@ let testCases = {
     setChangeStreamState: {skip: "does not return user data"},
     setClusterParameter: {skip: "does not return user data"},
     setQuerySettings: {skip: "does not return user data"},
+    removeQuerySettings: {skip: "does not return user data"},
     setUserWriteBlockMode: {skip: "primary only"},
     shardCollection: {skip: "primary only"},
     shardingState: {skip: "does not return user data"},

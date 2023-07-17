@@ -236,13 +236,13 @@ BSONObj extractQueryShape(const BSONObj& cmd,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
                           const boost::optional<TenantId>& tenantId) {
-    if (cmd.firstElementFieldName() == "find"_sd) {
+    if (cmd.firstElementFieldName() == FindCommandRequest::kCommandName) {
         auto findCommandRequest = std::make_unique<FindCommandRequest>(FindCommandRequest::parse(
             IDLParserContext("findCommandRequest", false /* apiStrict */, tenantId), cmd));
         auto parsedFindCommand =
             uassertStatusOK(parsed_find_command::parse(expCtx, std::move(findCommandRequest)));
         return extractQueryShape(*parsedFindCommand, SerializationOptions(), expCtx);
-    } else if (cmd.firstElementFieldName() == "aggregate"_sd) {
+    } else if (cmd.firstElementFieldName() == AggregateCommandRequest::kCommandName) {
         auto aggregateCommandRequest = AggregateCommandRequest::parse(
             IDLParserContext("aggregateCommandRequest", false /* apiStrict */, tenantId), cmd);
         auto pipeline = Pipeline::parse(aggregateCommandRequest.getPipeline(), expCtx);

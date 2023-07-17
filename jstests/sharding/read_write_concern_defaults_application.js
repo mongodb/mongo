@@ -755,6 +755,7 @@ let testCases = {
     setChangeStreamState: {skip: "does not accept read or write concern"},
     setClusterParameter: {skip: "does not accept read or write concern"},
     setQuerySettings: {skip: "does not accept read or write concern"},
+    removeQuerySettings: {skip: "does not accept read or write concern"},
     setUserWriteBlockMode: {skip: "does not accept read or write concern"},
     shardCollection: {skip: "does not accept read or write concern"},
     shardingState: {skip: "does not accept read or write concern"},

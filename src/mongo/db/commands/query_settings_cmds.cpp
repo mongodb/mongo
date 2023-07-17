@@ -125,8 +125,7 @@ public:
         SetQuerySettingsCommandReply updateQuerySettings(
             OperationContext* opCtx,
             QueryShapeConfiguration currentQueryShapeConfiguration,
-            QuerySettings newQuerySettings,
-            boost::optional<QueryInstance> inputQuery = boost::none) {
+            QuerySettings newQuerySettings) {
             // TODO: SERVER-77465 Implement setQuerySettings command (update case).
             uasserted(ErrorCodes::NotImplemented,
                       "setQuerySettings command can not update query settings yet");
@@ -166,8 +165,7 @@ public:
                                            QueryShapeConfiguration(std::move(queryShapeHash),
                                                                    std::move(lookupResult->first),
                                                                    std::move(lookupResult->second)),
-                                           std::move(request().getSettings()),
-                                           queryInstance);
+                                           std::move(request().getSettings()));
             } else {
                 return insertQuerySettings(
                     opCtx,
@@ -209,5 +207,89 @@ public:
         }
     };
 } setChangeStreamStateCommand;
+
+class RemoveQuerySettingsCommand final : public TypedCommand<RemoveQuerySettingsCommand> {
+public:
+    using Request = RemoveQuerySettingsCommandRequest;
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kNever;
+    }
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    std::string help() const override {
+        return "Removes the query settings for the query shape of a given query.";
+    }
+
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            uassert(7746700,
+                    "removeQuerySettings command is unknown",
+                    feature_flags::gFeatureFlagQuerySettings.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+            auto tenantId = request().getDbName().tenantId();
+            auto queryShapeHash = stdx::visit(
+                OverloadedVisitor{
+                    [&](const query_shape::QueryShapeHash& queryShapeHash) {
+                        return queryShapeHash;
+                    },
+                    [&](const QueryInstance& queryInstance) {
+                        // Converts 'queryInstance' into QueryShapeHash, for convenient comparison
+                        // during search for the matching QueryShapeConfiguration.
+                        auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, ns());
+                        auto queryShape = query_shape::extractQueryShape(
+                            queryInstance, SerializationOptions(), std::move(expCtx), tenantId);
+                        return query_shape::hash(std::move(queryShape));
+                    },
+                },
+                request().getCommandParameter());
+            auto& querySettingsManager = QuerySettingsManager::get(opCtx);
+
+            // Build the new 'settingsArray' by removing the QueryShapeConfiguration with a matching
+            // QueryShapeHash.
+            auto settingsArray =
+                querySettingsManager.getAllQueryShapeConfigurations(opCtx, tenantId);
+            auto matchingQueryShapeConfigurationIt =
+                std::find_if(settingsArray.begin(),
+                             settingsArray.end(),
+                             [&](const QueryShapeConfiguration& configuration) {
+                                 return configuration.getQueryShapeHash() == queryShapeHash;
+                             });
+            uassert(7746701,
+                    "A matching query settings entry does not exist",
+                    matchingQueryShapeConfigurationIt != settingsArray.end());
+            settingsArray.erase(matchingQueryShapeConfigurationIt);
+
+            // Run SetClusterParameter command with the new value of the 'querySettings' cluster
+            // parameter.
+            setClusterParameter(
+                opCtx, makeSetClusterParameterRequest(settingsArray, request().getDbName()));
+        }
+
+    private:
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        NamespaceString ns() const override {
+            return NamespaceString();
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            // TODO: SERVER-77551 Ensure only users with allowed permissions may invoke query
+            // settings commands.
+        }
+    };
+} removeChangeStreamStateCommand;
 }  // namespace
 }  // namespace mongo

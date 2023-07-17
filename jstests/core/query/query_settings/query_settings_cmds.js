@@ -1,4 +1,4 @@
-// Tests query settings setQuerySettings command.
+// Tests query settings setQuerySettings and removeQuerySettings commands.
 // @tags: [
 //   directly_against_shardsvrs_incompatible,
 //   featureFlagQuerySettings,
@@ -90,10 +90,30 @@ function assertQueryShapeConfiguration(expectedQueryShapeConfigurations) {
     assertQueryShapeConfiguration([queryShapeConfigurationA, queryShapeConfigurationB]);
 }
 
-// Remove all query settings by setting the settings array to an empty array.
+// Ensure that removeQuerySettings command fails for invalid input.
 {
-    assert.commandWorked(
-        adminDB.runCommand({setClusterParameter: {querySettings: {settingsArray: []}}}));
+    assert.commandFailedWithCode(db.adminCommand({removeQuerySettings: nonExistentQueryShapeHash}),
+                                 7746701);
+    assert.commandFailedWithCode(db.adminCommand({removeQuerySettings: {notAValid: "query"}}),
+                                 7746402);
+}
+
+// Ensure that removeQuerySettings command removes one query settings from the 'settingsArray' of
+// the 'querySettings' cluster parameter by providing a query instance.
+{
+    assert.commandWorked(db.adminCommand({removeQuerySettings: queryB}));
+    assertQueryShapeConfiguration([queryShapeConfigurationA]);
+}
+
+// Ensure that query settings cluster parameter is empty by issuing a removeQuerySettings command
+// providing a query shape hash.
+{
+    const actualQueryShapeConfigurations =
+        assert.commandWorked(adminDB.runCommand({getClusterParameter: "querySettings"}))
+            .clusterParameters[0]
+            .settingsArray;
+    const queryShapeHashA = actualQueryShapeConfigurations[0].queryShapeHash;
+    assert.commandWorked(db.adminCommand({removeQuerySettings: queryShapeHashA}));
     assertQueryShapeConfiguration([]);
 }
 })();

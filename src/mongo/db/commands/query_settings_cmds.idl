@@ -41,10 +41,6 @@ structs:
     inline_chained_structs: true
     chained_structs:
       QueryShapeConfiguration: queryShapeConfiguration
-    fields:
-      inputQuery:
-        type: object_owned
-        optional: true
 
 commands:
   setQuerySettings:
@@ -59,3 +55,13 @@ commands:
     fields:
       settings: QuerySettings
     reply_type: SetQuerySettingsCommandReply
+
+  removeQuerySettings:
+    description: "Removes query settings on the entire cluster for the given query shape."
+    command_name: removeQuerySettings
+    namespace: type
+    cpp_name: RemoveQuerySettingsCommandRequest
+    api_version: ""
+    strict: true
+    type:
+      variant: [QueryShapeHash, object_owned]

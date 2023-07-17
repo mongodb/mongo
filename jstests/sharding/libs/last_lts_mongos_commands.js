@@ -44,6 +44,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "setAllowMigrations",
     "setClusterParameter",
     "setQuerySettings",
+    "removeQuerySettings",
     "setUserWriteBlockMode",
     "testDeprecation",
     "testDeprecationInVersion2",
