@@ -247,12 +247,12 @@ auth::ParsedPrivilege Privilege::toParsedPrivilege() const {
 
         case MatchTypeEnum::kMatchExactNamespace:
             // { db: '...', collection: '...' }
-            rsrc.setDb(_resource.dbNameToMatch().db());
+            rsrc.setDb(StringData{_resource.dbNameToMatch().serializeWithoutTenantPrefix_UNSAFE()});
             rsrc.setCollection(_resource.collectionToMatch());
             break;
         case MatchTypeEnum::kMatchDatabaseName:
             // { db: '...', collection: '' }
-            rsrc.setDb(_resource.dbNameToMatch().db());
+            rsrc.setDb(StringData{_resource.dbNameToMatch().serializeWithoutTenantPrefix_UNSAFE()});
             rsrc.setCollection(""_sd);
             break;
         case MatchTypeEnum::kMatchCollectionName:
@@ -268,7 +268,7 @@ auth::ParsedPrivilege Privilege::toParsedPrivilege() const {
 
         case MatchTypeEnum::kMatchExactSystemBucketResource:
             // { db: '...', system_buckets: '...' }
-            rsrc.setDb(_resource.dbNameToMatch().db());
+            rsrc.setDb(StringData{_resource.dbNameToMatch().serializeWithoutTenantPrefix_UNSAFE()});
             rsrc.setSystemBuckets(_resource.collectionToMatch());
             break;
         case MatchTypeEnum::kMatchSystemBucketInAnyDBResource:
@@ -277,7 +277,7 @@ auth::ParsedPrivilege Privilege::toParsedPrivilege() const {
             break;
         case MatchTypeEnum::kMatchAnySystemBucketInDBResource:
             // { db: '...', system_buckets: '' }
-            rsrc.setDb(_resource.dbNameToMatch().db());
+            rsrc.setDb(StringData{_resource.dbNameToMatch().serializeWithoutTenantPrefix_UNSAFE()});
             rsrc.setSystemBuckets(""_sd);
             break;
         case MatchTypeEnum::kMatchAnySystemBucketResource:

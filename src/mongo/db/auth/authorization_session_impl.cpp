@@ -628,7 +628,8 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::checkAuthorizedToListColle
     }
 
     return Status(ErrorCodes::Unauthorized,
-                  str::stream() << "Not authorized to list collections on db: " << dbname.db());
+                  str::stream() << "Not authorized to list collections on db: "
+                                << dbname.toStringForErrorMsg());
 }
 
 bool AuthorizationSessionImpl::isAuthenticatedAsUserWithRole(const RoleName& roleName) {

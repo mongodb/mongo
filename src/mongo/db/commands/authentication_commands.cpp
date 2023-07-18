@@ -329,8 +329,7 @@ AuthenticateReply authCommand(OperationContext* opCtx,
     session->metrics()->restart();
 
     auto& internalSecurityUser = (*internalSecurity.getUser())->getName();
-    if (getTestCommandsEnabled() && dbname.db() == "admin" &&
-        user == internalSecurityUser.getUser()) {
+    if (getTestCommandsEnabled() && dbname.isAdminDB() && user == internalSecurityUser.getUser()) {
         // Allows authenticating as the internal user against the admin database.  This is to
         // support the auth passthrough test framework on mongos (since you can't use the local
         // database on a mongos, so you can't auth as the internal user without this).

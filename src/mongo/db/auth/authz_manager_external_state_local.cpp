@@ -733,7 +733,8 @@ Status AuthzManagerExternalStateLocal::getRoleDescriptionsForDB(
 
     return query(opCtx,
                  getRolesCollection(dbname.tenantId()),
-                 BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname.db()),
+                 BSON(AuthorizationManager::ROLE_DB_FIELD_NAME
+                      << dbname.serializeWithoutTenantPrefix_UNSAFE()),
                  BSONObj(),
                  [&](const BSONObj& roleDoc) {
                      try {

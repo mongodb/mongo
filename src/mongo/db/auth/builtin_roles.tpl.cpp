@@ -67,7 +67,7 @@ void addPrivileges_${role.name}(PrivilegeVector* privileges, const DatabaseName&
 void addPrivileges_${role.name}(PrivilegeVector* privileges, const DatabaseName& dbName) {
     //#if $role.adminOnly
     /* Admin only builtin role */
-    fassert(6837401, dbName.db() == kAdminDB);
+    fassert(6837401, dbName.isAdminDB());
     //#end if
 
     //#for $subrole in $role.roles
@@ -167,7 +167,7 @@ stdx::unordered_set<RoleName> auth::getBuiltinRoleNamesForDB(const DatabaseName&
         return {};
     }
 
-    if (dbName.db() == kAdminDB) {
+    if (dbName.isAdminDB()) {
         if (dbName.tenantId() == boost::none) {
             // Specialcase for the admin DB in non-multitenancy mode.
             return kAdminBuiltinRolesNoTenant;

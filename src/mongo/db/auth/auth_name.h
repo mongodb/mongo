@@ -83,7 +83,7 @@ public:
 
     template <typename Name>
     AuthName(Name name, const DatabaseName& dbname)
-        : AuthName(name, dbname.db(), dbname.tenantId()) {}
+        : AuthName(name, dbname.serializeWithoutTenantPrefix_UNSAFE(), dbname.tenantId()) {}
 
     /**
      * Parses a string of the form "db.name" into an AuthName object with an optional tenant.

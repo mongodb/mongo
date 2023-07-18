@@ -73,7 +73,7 @@ Status checkAuthorizedToGrantPrivilege(AuthorizationSession* authzSession,
                 ResourcePattern::forDatabaseName(targetDb), ActionType::grantRole)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "Not authorized to grant privileges on the "
-                                        << targetDb.db() << "database");
+                                        << targetDb.toStringForErrorMsg() << "database");
         }
     } else if (!authzSession->isAuthorizedForActionsOnResource(
                    ResourcePattern::forDatabaseName(
@@ -149,7 +149,7 @@ Status checkAuthorizedToRevokePrivilege(AuthorizationSession* authzSession,
                 ResourcePattern::forDatabaseName(targetDb), ActionType::revokeRole)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "Not authorized to revoke privileges on the "
-                                        << targetDb.db() << "database");
+                                        << targetDb.toStringForErrorMsg() << "database");
         }
     } else if (!authzSession->isAuthorizedForActionsOnResource(
                    ResourcePattern::forDatabaseName(

@@ -91,9 +91,8 @@ public:
      * "ns" for which ns.isSystem() is false and ns.db() == dbname.
      */
     static ResourcePattern forDatabaseName(const DatabaseName& dbName) {
-        return ResourcePattern(
-            MatchTypeEnum::kMatchDatabaseName,
-            NamespaceString::createNamespaceStringForAuth(dbName.tenantId(), dbName.db(), ""_sd));
+        return ResourcePattern(MatchTypeEnum::kMatchDatabaseName,
+                               NamespaceString::createNamespaceStringForAuth(dbName, ""_sd));
     }
 
     /**
