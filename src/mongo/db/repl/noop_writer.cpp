@@ -103,24 +103,25 @@ private:
     void run(Seconds waitTime, NoopWriteFn noopWrite) {
         Client::initThread("NoopWriter");
 
-        // TODO(SERVER-74656): Please revisit if this thread could be made killable.
-        {
-            stdx::lock_guard<Client> lk(cc());
-            cc().setSystemOperationUnkillableByStepdown(lk);
-        }
-
         while (true) {
-            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-            OperationContext& opCtx = *opCtxPtr;
-            {
-                stdx::unique_lock<Latch> lk(_mutex);
-                MONGO_IDLE_THREAD_BLOCK;
-                _cv.wait_for(lk, waitTime.toSystemDuration(), [&] { return _inShutdown; });
+            try {
+                const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+                OperationContext& opCtx = *opCtxPtr;
+                {
+                    stdx::unique_lock<Latch> lk(_mutex);
+                    MONGO_IDLE_THREAD_BLOCK;
+                    _cv.wait_for(lk, waitTime.toSystemDuration(), [&] { return _inShutdown; });
 
-                if (_inShutdown)
-                    return;
+                    if (_inShutdown)
+                        return;
+                }
+                noopWrite(&opCtx);
+            } catch (ExceptionForCat<ErrorCategory::Interruption>& ex) {
+                LOGV2_DEBUG(7465602,
+                            2,
+                            "NoopWriter interrupted, will retry in the next run",
+                            "{reason}"_attr = ex.reason());
             }
-            noopWrite(&opCtx);
         }
     }
 

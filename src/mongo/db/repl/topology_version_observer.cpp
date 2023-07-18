@@ -192,11 +192,10 @@ void TopologyVersionObserver::_workerThreadBody() noexcept try {
     invariant(_serviceContext);
     ThreadClient tc(kTopologyVersionObserverName, _serviceContext);
 
-    // TODO(SERVER-74656): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
+    // This thread may be interrupted by replication state changes and this is safe because
+    // _cacheHelloResponse is the only place where an opCtx is used and already has logic for
+    // handling exceptions. Any logic added to this thread that uses the opCtx must be able to
+    // handle interrupts.
 
     auto getTopologyVersion = [&]() -> boost::optional<TopologyVersion> {
         // Only the observer thread updates `_cache`, thus there is no need to hold the lock before
