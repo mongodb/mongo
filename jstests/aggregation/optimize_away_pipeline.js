@@ -15,7 +15,6 @@
 //   requires_profiling,
 // ]
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isWiredTiger.
-
 import {
     getPlanStages,
     getAggPlanStage,
@@ -26,6 +25,10 @@ import {
 } from "jstests/libs/analyze_plan.js";
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos' and 'isSharded'.
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+
+const groupPushdownEnabled = checkSBEEnabled(db);
+// TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature here and below.
+const featureFlagSbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 const coll = db.optimize_away_pipeline;
 coll.drop();
@@ -142,8 +145,6 @@ function testGetMore({command = null, expectedResult = null} = {}) {
     assert.sameMembers(documents, expectedResult);
 }
 
-const groupPushdownEnabled = checkSBEEnabled(db);
-
 // Calls 'assertPushdownEnabled' if groupPushdownEnabled is 'true'. Otherwise, it calls
 // 'assertPushdownDisabled'.
 function assertPipelineIfGroupPushdown(assertPushdownEnabled, assertPushdownDisabled) {
@@ -254,13 +255,22 @@ assertPipelineDoesNotUseAggregation({
 
 // Pipelines which cannot be optimized away.
 
-// We cannot optimize away a pipeline if there are stages which have no equivalent in the
-// find command.
-assertPipelineUsesAggregation({
-    pipeline: [{$match: {x: {$gte: 20}}}, {$count: "count"}],
-    expectedStages: ["COLLSCAN"],
-    expectedResult: [{count: 2}]
-});
+// TODO SERVER-72549: Remove use of featureFlagSbeFull by SBE Pushdown feature.
+if (featureFlagSbeFull) {
+    assertPipelineDoesNotUseAggregation({
+        pipeline: [{$match: {x: {$gte: 20}}}, {$count: "count"}],
+        expectedStages: ["COLLSCAN", "GROUP", "PROJECTION_DEFAULT"],
+        expectedResult: [{count: 2}]
+    });
+} else {
+    // We cannot optimize away a pipeline if there are stages which have no equivalent in the
+    // find command.
+    assertPipelineUsesAggregation({
+        pipeline: [{$match: {x: {$gte: 20}}}, {$count: "count"}],
+        expectedStages: ["COLLSCAN"],
+        expectedResult: [{count: 2}]
+    });
+}
 
 assertPipelineIfGroupPushdown(
     function() {
@@ -592,10 +602,17 @@ assertPipelineIfGroupPushdown(
 
 // Similar as above, but with $addFields stage at the front of the pipeline.
 pipeline = [{$addFields: {z: "abc"}}, {$group: {_id: "$a", b: {$sum: "$b"}}}];
-assertPipelineUsesAggregation({
-    pipeline: pipeline,
-    expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
-});
+if (featureFlagSbeFull) {
+    assertPipelineDoesNotUseAggregation({
+        pipeline: pipeline,
+        expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "PROJECTION_DEFAULT", "GROUP"],
+    });
+} else {
+    assertPipelineUsesAggregation({
+        pipeline: pipeline,
+        expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
+    });
+}
 explain = coll.explain().aggregate(pipeline);
 let projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
 assert.neq(null, projStage, explain);
@@ -704,10 +721,17 @@ assertPipelineIfGroupPushdown(
 // We generate a projection stage from dependency analysis, even if the pipeline begins with an
 // exclusion projection.
 pipeline = [{$project: {c: 0}}, {$group: {_id: "$a", b: {$sum: "$b"}}}];
-assertPipelineUsesAggregation({
-    pipeline: pipeline,
-    expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$project"],
-});
+if (featureFlagSbeFull) {
+    assertPipelineDoesNotUseAggregation({
+        pipeline: pipeline,
+        expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "PROJECTION_DEFAULT", "GROUP"],
+    });
+} else {
+    assertPipelineUsesAggregation({
+        pipeline: pipeline,
+        expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$project"],
+    });
+}
 explain = coll.explain().aggregate(pipeline);
 projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
 assert.neq(null, projStage, explain);
@@ -716,10 +740,17 @@ assertTransformByShape({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
 // Similar as above, but with a field 'a' presented both in the finite dependency set, and in the
 // exclusion projection at the front of the pipeline.
 pipeline = [{$project: {a: 0}}, {$group: {_id: "$a", b: {$sum: "$b"}}}];
-assertPipelineUsesAggregation({
-    pipeline: pipeline,
-    expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$project"],
-});
+if (featureFlagSbeFull) {
+    assertPipelineDoesNotUseAggregation({
+        pipeline: pipeline,
+        expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "PROJECTION_DEFAULT", "GROUP"],
+    });
+} else {
+    assertPipelineUsesAggregation({
+        pipeline: pipeline,
+        expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$project"],
+    });
+}
 explain = coll.explain().aggregate(pipeline);
 projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
 assert.neq(null, projStage, explain);

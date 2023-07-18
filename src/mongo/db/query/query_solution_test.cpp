@@ -886,7 +886,7 @@ TEST(QuerySolutionTest, InclusionProjectionPreservesSort) {
     auto matchExprAndProjection = createMatchExprAndProjection(match, projection);
 
     ProjectionNodeDefault proj{
-        std::move(node), *matchExprAndProjection.first, matchExprAndProjection.second};
+        std::move(node), matchExprAndProjection.first.get(), matchExprAndProjection.second};
     proj.computeProperties();
 
     ASSERT_EQ(proj.providedSorts(), ProvidedSortSet(BSON("a" << 1), {}));
@@ -903,7 +903,7 @@ TEST(QuerySolutionTest, ExclusionProjectionDoesNotPreserveSort) {
     auto matchExprAndProjection = createMatchExprAndProjection(match, projection);
 
     ProjectionNodeDefault proj{
-        std::move(node), *matchExprAndProjection.first, matchExprAndProjection.second};
+        std::move(node), matchExprAndProjection.first.get(), matchExprAndProjection.second};
     proj.computeProperties();
 
     ASSERT_EQ(proj.providedSorts(), kEmptySet);
@@ -919,7 +919,7 @@ TEST(QuerySolutionTest, InclusionProjectionTruncatesSort) {
     auto matchExprAndProjection = createMatchExprAndProjection(match, projection);
 
     ProjectionNodeDefault proj{
-        std::move(node), *matchExprAndProjection.first, matchExprAndProjection.second};
+        std::move(node), matchExprAndProjection.first.get(), matchExprAndProjection.second};
     proj.computeProperties();
 
     ASSERT_EQ(proj.providedSorts(), ProvidedSortSet(BSON("a" << 1), {}));
@@ -935,7 +935,7 @@ TEST(QuerySolutionTest, ExclusionProjectionTruncatesSort) {
     auto matchExprAndProjection = createMatchExprAndProjection(match, projection);
 
     ProjectionNodeDefault proj{
-        std::move(node), *matchExprAndProjection.first, matchExprAndProjection.second};
+        std::move(node), matchExprAndProjection.first.get(), matchExprAndProjection.second};
     proj.computeProperties();
 
     ASSERT_EQ(proj.providedSorts(), ProvidedSortSet(BSON("a" << 1), {}));

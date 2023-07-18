@@ -932,7 +932,7 @@ struct ReturnKeyNode : public QuerySolutionNode {
  */
 struct ProjectionNode : public QuerySolutionNodeWithSortSet {
     ProjectionNode(std::unique_ptr<QuerySolutionNode> child,
-                   const MatchExpression& fullExpression,
+                   const MatchExpression* fullExpression,
                    projection_ast::Projection proj)
         : QuerySolutionNodeWithSortSet(std::move(child)),
           fullExpression(fullExpression),
@@ -977,9 +977,9 @@ public:
      */
     virtual StringData projectionImplementationTypeToString() const = 0;
 
-    // The full query tree.  Needed when we have positional operators.
-    // Owned in the CanonicalQuery, not here.
-    const MatchExpression& fullExpression;
+    // The full query tree. Needed when we have positional operators. Owned in the CanonicalQuery,
+    // not here, so here this is a native pointer, not a std_unique, to avoid having to clone it.
+    const MatchExpression* fullExpression;
 
     projection_ast::Projection proj;
 };
@@ -1006,7 +1006,7 @@ struct ProjectionNodeDefault final : ProjectionNode {
  */
 struct ProjectionNodeCovered final : ProjectionNode {
     ProjectionNodeCovered(std::unique_ptr<QuerySolutionNode> child,
-                          const MatchExpression& fullExpression,
+                          const MatchExpression* fullExpression,
                           projection_ast::Projection proj,
                           BSONObj coveredKeyObj)
         : ProjectionNode(std::move(child), fullExpression, std::move(proj)),
