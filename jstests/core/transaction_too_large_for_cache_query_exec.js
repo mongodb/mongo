@@ -1,7 +1,9 @@
 /**
- * Tests that an operation requiring more cache than available fails instead of retrying infinitely.
+ * Tests that an update operation requiring more cache than available fails instead of retrying
+ * infinitely.
  *
  * @tags: [
+ *   assumes_no_implicit_index_creation,
  *   does_not_support_config_fuzzer,
  *   requires_fcv_63,
  *   requires_persistence,
@@ -40,19 +42,31 @@ for (let i = 0; i < 61; i++) {
     assert.commandWorked(coll.createIndex({x: 1, ["field" + i]: 1}));
 }
 
-// Retry the operation until we eventually hit the TransactionTooLargeForCache. Retry on
+coll.insertOne({_id: 0});
+
+// Retry the operation until we eventually hit the TransactionTooLargeForCache error. Retry on
 // WriteConflict or TemporarilyUnavailable errors, as those are expected to be returned if the
 // threshold for TransactionTooLargeForCache is not reached, possibly due to concurrent operations.
-assert.soon(() => {
-    let result;
-    try {
-        result = coll.insert(doc);
-        assert.commandFailedWithCode(result, ErrorCodes.TransactionTooLargeForCache);
-        return true;
-    } catch (e) {
-        assert.commandFailedWithCode(result,
-                                     [ErrorCodes.WriteConflict, ErrorCodes.TemporarilyUnavailable]);
-        return false;
-    }
-}, "Expected operation to eventually fail with TransactionTooLargeForCache error.");
+let attempts = 0;
+assert.soon(
+    () => {
+        attempts++;
+        const e = assert.throws(() => {
+            coll.updateOne({_id: 0}, {$set: doc});
+        });
+        switch (e.code) {
+            case ErrorCodes.TransactionTooLargeForCache:
+                return true;
+            case ErrorCodes.WriteConflict:
+            // fallthrough
+            case ErrorCodes.TemporarilyUnavailable:
+                return false;
+        }
+        assert(false, "unexpected error: " + e);
+    },
+    "Expected operation to eventually fail with TransactionTooLargeForCache error, did not occur after " +
+        attempts + " attempts.");
+
+jsTestLog("Operation correctly failed with TransactionTooLargeForCache error after " + attempts +
+          " attempts");
 }());

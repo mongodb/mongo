@@ -462,7 +462,7 @@ public:
         if (_cursor) {
             try {
                 _cursor->reset(_cursor);
-            } catch (const WriteConflictException&) {
+            } catch (const StorageUnavailableException&) {
                 // Ignore since this is only called when we are about to kill our transaction
                 // anyway.
             }
@@ -921,7 +921,11 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
     invariant(_keyFormat == KeyFormat::Long);
 
     Timer timer;
-    while (auto truncateMarker = _oplogTruncateMarkers->peekOldestMarkerIfNeeded(opCtx)) {
+    for (auto getNextMarker = true; getNextMarker;) {
+        auto truncateMarker = _oplogTruncateMarkers->peekOldestMarkerIfNeeded(opCtx);
+        if (!truncateMarker) {
+            break;
+        }
         invariant(truncateMarker->lastRecord.isValid());
 
         LOGV2_DEBUG(7420100,
@@ -935,7 +939,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
         WiredTigerRecoveryUnit* ru = WiredTigerRecoveryUnit::get(opCtx);
         WT_SESSION* session = ru->getSession()->getSession();
 
-        try {
+        writeConflictRetry(opCtx, "reclaimOplog", NamespaceString::kRsOplogNamespace, [&] {
             WriteUnitOfWork wuow(opCtx);
 
             WiredTigerCursor cwrap(_uri, _tableId, true, opCtx);
@@ -976,6 +980,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
                 ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return cursor->next(cursor); });
                 if (ret == WT_NOTFOUND) {
                     LOGV2_DEBUG(5140900, 0, "Will not truncate entire oplog");
+                    getNextMarker = false;
                     return;
                 }
                 invariantWTOK(ret, cursor->session);
@@ -989,6 +994,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
                     "before the truncate-up-to point",
                     "nextRecord"_attr = Timestamp(nextRecord.getLong()),
                     "mayTruncateUpTo"_attr = mayTruncateUpTo);
+                getNextMarker = false;
                 return;
             }
 
@@ -1009,10 +1015,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
             Timestamp firstRecordTimestamp{
                 static_cast<uint64_t>(truncateMarker->lastRecord.getLong())};
             _oplogFirstRecordTimestamp.store(firstRecordTimestamp);
-        } catch (const WriteConflictException&) {
-            LOGV2_DEBUG(
-                22400, 1, "Caught WriteConflictException while truncating oplog entries, retrying");
-        }
+        });
     }
 
     auto elapsedMicros = timer.micros();
@@ -2272,9 +2275,8 @@ void WiredTigerRecordStoreCursorBase::save() {
         _cappedSnapshot = boost::none;
         _readTimestampForOplog = boost::none;
         _hasRestored = false;
-    } catch (const WriteConflictException&) {
-        // Ignore since this is only called when we are about to kill our transaction
-        // anyway.
+    } catch (const StorageUnavailableException&) {
+        // Ignore since this is only called when we are about to kill our transaction anyway.
     }
 }
 

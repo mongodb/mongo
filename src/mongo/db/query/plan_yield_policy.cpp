@@ -142,8 +142,7 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
 
             try {
                 saveState(opCtx);
-            } catch (const WriteConflictException&) {
-                // Saving the state of an execution plan must never throw WCE.
+            } catch (const StorageUnavailableException&) {
                 MONGO_UNREACHABLE;
             }
 
@@ -183,7 +182,7 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                              ? stdx::get<const Yieldable*>(yieldable)
                              : nullptr);
             return Status::OK();
-        } catch (const WriteConflictException& e) {
+        } catch (const StorageUnavailableException& e) {
             if (_callbacks) {
                 _callbacks->handledWriteConflict(opCtx);
             }

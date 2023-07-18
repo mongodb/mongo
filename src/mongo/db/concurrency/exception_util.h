@@ -62,24 +62,26 @@ void logWriteConflictAndBackoff(int attempt,
                                 StringData reason,
                                 const NamespaceStringOrUUID& nssOrUUID);
 
-void handleTemporarilyUnavailableException(OperationContext* opCtx,
-                                           int attempts,
-                                           StringData opStr,
-                                           const NamespaceStringOrUUID& nssOrUUID,
-                                           const TemporarilyUnavailableException& e);
+void handleTemporarilyUnavailableException(
+    OperationContext* opCtx,
+    int attempts,
+    StringData opStr,
+    const NamespaceStringOrUUID& nssOrUUID,
+    const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e);
 
 /**
- * Handle a TemporarilyUnavailableException inside a multi-document transaction.
+ * Convert `e` into a `WriteConflictException` and throw it.
  */
-void handleTemporarilyUnavailableExceptionInTransaction(OperationContext* opCtx,
-                                                        StringData opStr,
-                                                        const TemporarilyUnavailableException& e);
+void convertToWCEAndRethrow(OperationContext* opCtx,
+                            StringData opStr,
+                            const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e);
 
-void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
-                                                int* writeConflictAttempts,
-                                                StringData opStr,
-                                                const NamespaceStringOrUUID& nssOrUUID,
-                                                const TransactionTooLargeForCacheException& e);
+void handleTransactionTooLargeForCacheException(
+    OperationContext* opCtx,
+    int* writeConflictAttempts,
+    StringData opStr,
+    const NamespaceStringOrUUID& nssOrUUID,
+    const ExceptionFor<ErrorCodes::TransactionTooLargeForCache>& e);
 
 namespace error_details {
 /**
@@ -153,9 +155,9 @@ auto writeConflictRetry(OperationContext* opCtx,
     if (opCtx->lockState()->inAWriteUnitOfWork() || userSkipWriteConflictRetry) {
         try {
             return f();
-        } catch (TemporarilyUnavailableException const& e) {
+        } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable> const& e) {
             if (opCtx->inMultiDocumentTransaction()) {
-                handleTemporarilyUnavailableExceptionInTransaction(opCtx, opStr, e);
+                convertToWCEAndRethrow(opCtx, opStr, e);
             }
             throw;
         }
@@ -166,15 +168,15 @@ auto writeConflictRetry(OperationContext* opCtx,
     while (true) {
         try {
             return f();
-        } catch (WriteConflictException const& e) {
+        } catch (ExceptionFor<ErrorCodes::WriteConflict> const& e) {
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
             logWriteConflictAndBackoff(writeConflictAttempts, opStr, e.reason(), nssOrUUID);
             ++writeConflictAttempts;
             opCtx->recoveryUnit()->abandonSnapshot();
-        } catch (TemporarilyUnavailableException const& e) {
+        } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable> const& e) {
             handleTemporarilyUnavailableException(
                 opCtx, ++attemptsTempUnavailable, opStr, nssOrUUID, e);
-        } catch (TransactionTooLargeForCacheException const& e) {
+        } catch (ExceptionFor<ErrorCodes::TransactionTooLargeForCache> const& e) {
             handleTransactionTooLargeForCacheException(
                 opCtx, &writeConflictAttempts, opStr, nssOrUUID, e);
         }

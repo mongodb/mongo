@@ -290,7 +290,7 @@ void PlanExecutorImpl::saveState() {
 void PlanExecutorImpl::restoreState(const RestoreContext& context) {
     try {
         restoreStateWithoutRetrying(context, context.collection());
-    } catch (const WriteConflictException&) {
+    } catch (const StorageUnavailableException&) {
         if (!_yieldPolicy->canAutoYield())
             throw;
 
@@ -489,7 +489,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                     tempUnavailErrorsInARow,
                     "plan executor",
                     NamespaceStringOrUUID(_nss),
-                    TemporarilyUnavailableException(
+                    ExceptionFor<ErrorCodes::TemporarilyUnavailable>(
                         Status(ErrorCodes::TemporarilyUnavailable, "temporarily unavailable")));
             } else {
                 // We're yielding because of a WriteConflictException.
