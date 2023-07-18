@@ -124,6 +124,10 @@ SelectivityType heuristicIntervalSel(const PathCompare& left,
         // Reached when the query has $in. We don't handle it yet.
         return kDefaultFilterSel;
     }
+    if (left.op() == Operations::Neq || right.op() == Operations::Neq) {
+        // Reached when the query has $ne. We don't handle it yet.
+        return kDefaultFilterSel;
+    }
 
     bool lowBoundUnknown = false;
     bool highBoundUnknown = false;
@@ -161,7 +165,9 @@ SelectivityType heuristicIntervalSel(const PathCompare& left,
                     getConstTypeTag(compare.getVal()).get_value_or(TypeTags::Nothing);
                 break;
             default:
-                MONGO_UNREACHABLE;
+                tasserted(7908901,
+                          str::stream() << "Unexpected comparison op in heuristicIntervalSel: "
+                                        << toStringData(compare.op()));
         }
     }
 
