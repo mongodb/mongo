@@ -359,11 +359,11 @@ jsTest.log(
     // Verify that the drop database start event has been logged
     const startLogCount =
         configDB.changelog.countDocuments({what: 'dropDatabase.start', ns: db.getName()});
-    assert.gte(1, startLogCount, "dropDatabase start event not found in changelog");
+    assert.gte(startLogCount, 1, "dropDatabase start event not found in changelog");
 
     // Verify that the drop database end event has been logged
-    const endLogCount = configDB.changelog.countDocuments({what: 'dropDatabase', ms: db.getName()});
-    assert.gte(1, endLogCount, "dropDatabase end event not found in changelog");
+    const endLogCount = configDB.changelog.countDocuments({what: 'dropDatabase', ns: db.getName()});
+    assert.gte(endLogCount, 1, "dropDatabase end event not found in changelog");
 }
 
 jsTest.log("Test that dropping a sharded database, relevant events are properly logged on CSRS");
@@ -378,11 +378,11 @@ jsTest.log("Test that dropping a sharded database, relevant events are properly 
     // Verify that the drop database start event has been logged
     const startLogCount =
         configDB.changelog.countDocuments({what: 'dropDatabase.start', ns: db.getName()});
-    assert.gte(1, startLogCount, "dropDatabase start event not found in changelog");
+    assert.gte(startLogCount, 1, "dropDatabase start event not found in changelog");
 
     // Verify that the drop database end event has been logged
     const endLogCount = configDB.changelog.countDocuments({what: 'dropDatabase', ns: db.getName()});
-    assert.gte(1, endLogCount, "dropDatabase end event not found in changelog");
+    assert.gte(endLogCount, 1, "dropDatabase end event not found in changelog");
 }
 
 st.stop();

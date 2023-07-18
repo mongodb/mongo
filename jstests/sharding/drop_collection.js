@@ -294,12 +294,12 @@ jsTest.log("Test that dropping an unsharded collection, relevant events are logg
     // Verify that the drop collection start event has been logged
     const startLogCount =
         configDB.changelog.countDocuments({what: 'dropCollection.start', ns: coll.getFullName()});
-    assert.gte(1, startLogCount, "dropCollection start event not found in changelog");
+    assert.gte(startLogCount, 1, "dropCollection start event not found in changelog");
 
     // Verify that the drop collection end event has been logged
     const endLogCount =
-        configDB.changelog.countDocuments({what: 'dropCollection', ms: coll.getFullName()});
-    assert.gte(1, endLogCount, "dropCollection end event not found in changelog");
+        configDB.changelog.countDocuments({what: 'dropCollection', ns: coll.getFullName()});
+    assert.gte(endLogCount, 1, "dropCollection end event not found in changelog");
 }
 
 jsTest.log("Test that dropping a sharded collection, relevant events are logged on CSRS.");
@@ -326,12 +326,12 @@ jsTest.log("Test that dropping a sharded collection, relevant events are logged 
     // Verify that the drop collection start event has been logged
     const startLogCount =
         configDB.changelog.countDocuments({what: 'dropCollection.start', ns: coll.getFullName()});
-    assert.gte(1, startLogCount, "dropCollection start event not found in changelog");
+    assert.gte(startLogCount, 1, "dropCollection start event not found in changelog");
 
     // Verify that the drop collection end event has been logged
     const endLogCount =
-        configDB.changelog.countDocuments({what: 'dropCollection', ms: coll.getFullName()});
-    assert.gte(1, endLogCount, "dropCollection end event not found in changelog");
+        configDB.changelog.countDocuments({what: 'dropCollection', ns: coll.getFullName()});
+    assert.gte(endLogCount, 1, "dropCollection end event not found in changelog");
 }
 
 jsTest.log("Test that dropping a sharded collection, the cached metadata on shards is cleaned up.");
