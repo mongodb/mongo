@@ -48,7 +48,6 @@
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/sbe/stages/window.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -109,24 +108,6 @@ inline size_t estimate(const AggExprPair& expr) {
         size += expr.init->estimateSize();
     }
     size += expr.acc->estimateSize();
-    return size;
-}
-
-inline size_t estimate(const WindowStage::Window& window) {
-    size_t size = sizeof(window);
-    if (window.lowBoundExpr) {
-        size += size_estimator::estimate(window.lowBoundExpr);
-    }
-    if (window.highBoundExpr) {
-        size += size_estimator::estimate(window.highBoundExpr);
-    }
-    if (window.initExpr) {
-        size += size_estimator::estimate(window.initExpr);
-    }
-    size += size_estimator::estimate(window.addExpr);
-    if (window.removeExpr) {
-        size += size_estimator::estimate(window.removeExpr);
-    }
     return size;
 }
 
@@ -224,4 +205,5 @@ inline size_t estimate(const IndexedStringVector& vec) {
     size += size_estimator::estimate(vec.getUnderlyingMap());
     return size;
 }
+
 }  // namespace mongo::sbe::size_estimator
