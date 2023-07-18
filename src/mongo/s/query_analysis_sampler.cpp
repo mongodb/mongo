@@ -119,7 +119,7 @@ void QueryAnalysisSampler::onStartup() {
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_sampleRateLimitersMutex);
 
     PeriodicRunner::PeriodicJob queryStatsRefresherJob(
         "QueryAnalysisQueryStatsRefresher",
@@ -326,7 +326,7 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
                 "numQueriesExecutedPerSecond"_attr = lastAvgCount,
                 "configurations"_attr = configurations);
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_sampleRateLimitersMutex);
 
     if (configurations.size() != _sampleRateLimiters.size()) {
         LOGV2(7362407,
@@ -430,8 +430,8 @@ boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext
     }
 
     // Before checking '_sampleRateLimiters', check '_srlBloomFilter' first. If the bit
-    // corresponding to nss's hash is 0, then we don't need to bother with acquiring '_mutex'
-    // and we can return 'boost::none'.
+    // corresponding to nss's hash is 0, then we don't need to bother with acquiring
+    // '_sampleRateLimitersMutex' and we can return 'boost::none'.
     size_t nssHash = absl::Hash<NamespaceString>{}(nss);
     size_t blockIdx = (nssHash / srlBloomFilterNumBitsPerBlock) % srlBloomFilterNumBlocks;
     size_t bit = nssHash % srlBloomFilterNumBitsPerBlock;
@@ -439,7 +439,7 @@ boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext
         return boost::none;
     }
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_sampleRateLimitersMutex);
     auto it = _sampleRateLimiters.find(nss);
 
     if (it == _sampleRateLimiters.end()) {

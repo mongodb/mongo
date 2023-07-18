@@ -226,7 +226,7 @@ public:
     }
 
     std::map<NamespaceString, SampleRateLimiter> getRateLimitersForTest() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_sampleRateLimitersMutex);
         return _sampleRateLimiters;
     }
 
@@ -246,7 +246,8 @@ private:
                             const NamespaceString& nss,
                             SampledCommandNameEnum cmdName);
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisSampler::_mutex");
+    mutable Mutex _sampleRateLimitersMutex =
+        MONGO_MAKE_LATCH("QueryAnalysisSampler::_sampleRateLimitersMutex");
     mutable Mutex _queryStatsMutex = MONGO_MAKE_LATCH("QueryAnalysisSampler::_queryStatsMutex");
 
     PeriodicJobAnchor _periodicQueryStatsRefresher;
