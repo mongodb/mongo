@@ -48,16 +48,20 @@ DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransfor
     const StringData name,
     bool isIndependentOfAnyCollection)
     : DocumentSource(name, pExpCtx),
-      _parsedTransform(std::move(parsedTransform)),
       _name(name.toString()),
-      _isIndependentOfAnyCollection(isIndependentOfAnyCollection) {}
+      _isIndependentOfAnyCollection(isIndependentOfAnyCollection) {
+    if (parsedTransform) {
+        _transformationProcessor.emplace(
+            SingleDocumentTransformationProcessor(std::move(parsedTransform)));
+    }
+}
 
 const char* DocumentSourceSingleDocumentTransformation::getSourceName() const {
     return _name.c_str();
 }
 
 DocumentSource::GetNextResult DocumentSourceSingleDocumentTransformation::doGetNext() {
-    if (!_parsedTransform) {
+    if (!_transformationProcessor) {
         return DocumentSource::GetNextResult::makeEOF();
     }
 
@@ -68,29 +72,31 @@ DocumentSource::GetNextResult DocumentSourceSingleDocumentTransformation::doGetN
     }
 
     // Apply and return the document with added fields.
-    return _parsedTransform->applyTransformation(input.releaseDocument());
+    return _transformationProcessor->process(input.releaseDocument());
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSingleDocumentTransformation::optimize() {
-    if (_parsedTransform) {
-        _parsedTransform->optimize();
+    if (_transformationProcessor) {
+        _transformationProcessor->getTransformer().optimize();
     }
     return this;
 }
 
 void DocumentSourceSingleDocumentTransformation::doDispose() {
-    if (_parsedTransform) {
+    if (_transformationProcessor) {
         // Cache the stage options document in case this stage is serialized after disposing.
-        _cachedStageOptions = _parsedTransform->serializeTransformation(pExpCtx->explain);
-        _parsedTransform.reset();
+        _cachedStageOptions =
+            _transformationProcessor->getTransformer().serializeTransformation(pExpCtx->explain);
+        _transformationProcessor.reset();
     }
 }
 
 Value DocumentSourceSingleDocumentTransformation::serialize(SerializationOptions opts) const {
-    return Value(
-        Document{{getSourceName(),
-                  _parsedTransform ? _parsedTransform->serializeTransformation(opts.verbosity, opts)
-                                   : _cachedStageOptions}});
+    return Value(Document{{getSourceName(),
+                           _transformationProcessor
+                               ? _transformationProcessor->getTransformer().serializeTransformation(
+                                     opts.verbosity, opts)
+                               : _cachedStageOptions}});
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::doOptimizeAt(
@@ -114,17 +120,17 @@ DepsTracker::State DocumentSourceSingleDocumentTransformation::getDependencies(
     DepsTracker* deps) const {
     // Each parsed transformation is responsible for adding its own dependencies, and returning
     // the correct dependency return type for that transformation.
-    return _parsedTransform->addDependencies(deps);
+    return _transformationProcessor->getTransformer().addDependencies(deps);
 }
 
 void DocumentSourceSingleDocumentTransformation::addVariableRefs(
     std::set<Variables::Id>* refs) const {
-    _parsedTransform->addVariableRefs(refs);
+    _transformationProcessor->getTransformer().addVariableRefs(refs);
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceSingleDocumentTransformation::getModifiedPaths()
     const {
-    return _parsedTransform->getModifiedPaths();
+    return _transformationProcessor->getTransformer().getModifiedPaths();
 }
 
 }  // namespace mongo

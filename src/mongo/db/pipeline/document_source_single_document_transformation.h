@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/single_document_transformation_processor.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/pipeline/variables.h"
@@ -113,14 +114,18 @@ public:
     }
 
     TransformerInterface::TransformerType getType() const {
-        return _parsedTransform->getType();
+        return _transformationProcessor->getTransformer().getType();
     }
 
     const auto& getTransformer() const {
-        return *_parsedTransform;
+        return _transformationProcessor->getTransformer();
     }
     auto& getTransformer() {
-        return *_parsedTransform;
+        return _transformationProcessor->getTransformer();
+    }
+
+    SingleDocumentTransformationProcessor* getTransformationProcessor() {
+        return _transformationProcessor.get_ptr();
     }
 
     /**
@@ -143,7 +148,8 @@ public:
     std::pair<BSONObj, bool> extractComputedProjections(const StringData& oldName,
                                                         const StringData& newName,
                                                         const std::set<StringData>& reservedNames) {
-        return _parsedTransform->extractComputedProjections(oldName, newName, reservedNames);
+        return _transformationProcessor->getTransformer().extractComputedProjections(
+            oldName, newName, reservedNames);
     }
 
     /**
@@ -154,7 +160,8 @@ public:
      */
     std::pair<BSONObj, bool> extractProjectOnFieldAndRename(const StringData& oldName,
                                                             const StringData& newName) {
-        return _parsedTransform->extractProjectOnFieldAndRename(oldName, newName);
+        return _transformationProcessor->getTransformer().extractProjectOnFieldAndRename(oldName,
+                                                                                         newName);
     }
 
 protected:
@@ -165,8 +172,7 @@ protected:
                                                      Pipeline::SourceContainer* container) final;
 
 private:
-    // Stores transformation logic.
-    std::unique_ptr<TransformerInterface> _parsedTransform;
+    boost::optional<SingleDocumentTransformationProcessor> _transformationProcessor;
 
     // Specific name of the transformation.
     std::string _name;

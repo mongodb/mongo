@@ -52,6 +52,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/match_processor.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
@@ -63,6 +64,11 @@ namespace mongo {
 
 class DocumentSourceMatch : public DocumentSource {
 public:
+    DocumentSourceMatch(std::unique_ptr<MatchExpression> expr,
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    virtual ~DocumentSourceMatch() = default;
+
     virtual boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
         // Raw new is needed to access non-public constructors.
@@ -109,21 +115,6 @@ public:
     splitMatchByModifiedFields(const boost::intrusive_ptr<DocumentSourceMatch>& match,
                                const DocumentSource::GetModPathsReturn& modifiedPathsRet);
 
-    DocumentSourceMatch(std::unique_ptr<MatchExpression> expr,
-                        const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(kStageName, expCtx) {
-        // TODO SERVER-48830: Remove need for holding serialized version of the MatchExpression.
-        _expression = std::move(expr);
-        _predicate = _expression->serialize();
-        _isTextQuery = isTextQuery(_predicate);
-        _dependencies =
-            DepsTracker(_isTextQuery ? DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore
-                                     : DepsTracker::kAllMetadata);
-        getDependencies(&_dependencies);
-    }
-
-    virtual ~DocumentSourceMatch() = default;
-
     /**
      * Parses 'filter' and resets the member of this source to be consistent with the new
      * MatchExpression. Takes ownership of 'filter'.
@@ -164,11 +155,16 @@ public:
         return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
     }
 
+    MatchProcessor* getMatchProcessor() {
+        return _matchProcessor.get_ptr();
+    }
+
     /**
-     * Access the MatchExpression stored inside the DocumentSourceMatch. Does not release ownership.
+     * Access the MatchExpression stored inside the DocumentSourceMatch. Does not release
+     * ownership.
      */
     MatchExpression* getMatchExpression() const {
-        return _expression.get();
+        return _matchProcessor->getExpression().get();
     }
 
     /**
@@ -204,20 +200,22 @@ public:
     }
 
     /**
-     * Attempt to split this $match into two stages, where the first is not dependent upon any path
-     * from 'fields', and where applying them in sequence is equivalent to applying this stage once.
+     * Attempt to split this $match into two stages, where the first is not dependent upon any
+     * path from 'fields', and where applying them in sequence is equivalent to applying this
+     * stage once.
      *
-     * Will return two intrusive_ptrs to new $match stages, where the first pointer is independent
-     * of 'fields', and the second is dependent. Either pointer may be null, so be sure to check the
-     * return value.
+     * Will return two intrusive_ptrs to new $match stages, where the first pointer is
+     * independent of 'fields', and the second is dependent. Either pointer may be null, so be
+     * sure to check the return value.
      *
-     * For example, {$match: {a: "foo", "b.c": 4}} split by "b" will return pointers to two stages:
+     * For example, {$match: {a: "foo", "b.c": 4}} split by "b" will return pointers to two
+     * stages:
      * {$match: {a: "foo"}}, and {$match: {"b.c": 4}}.
      *
-     * The 'renames' structure maps from a field to an alias that should be used in the independent
-     * portion of the match. For example, suppose that we split by fields "a" with the rename "b" =>
-     * "c". The match {$match: {a: "foo", b: "bar", z: "baz"}} will split into {$match: {c: "bar",
-     * z: "baz"}} and {$match: {a: "foo"}}.
+     * The 'renames' structure maps from a field to an alias that should be used in the
+     * independent portion of the match. For example, suppose that we split by fields "a" with
+     * the rename "b" => "c". The match {$match: {a: "foo", b: "bar", z: "baz"}} will split into
+     * {$match: {c: "bar", z: "baz"}} and {$match: {a: "foo"}}.
      */
     std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
     splitSourceBy(const OrderedPathSet& fields, const StringMap<std::string>& renames) &&;
@@ -233,24 +231,29 @@ protected:
               other.serialize().getDocument().toBson().firstElement().embeddedObject(),
               newExpCtx ? newExpCtx : other.pExpCtx) {}
 
-    GetNextResult doGetNext() override;
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    BSONObj _predicate;
+    GetNextResult doGetNext() override;
+
+    const BSONObj& getPredicate() const {
+        return _predicate;
+    }
 
 private:
+    void rebuild(BSONObj predicate, std::unique_ptr<MatchExpression> expr);
+
+    DepsTracker::State getDependencies(const MatchExpression* expr, DepsTracker* deps) const;
+
     std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
     splitSourceByFunc(const OrderedPathSet& fields,
                       const StringMap<std::string>& renames,
                       expression::ShouldSplitExprFunc func) &&;
 
-    std::unique_ptr<MatchExpression> _expression;
-
-    bool _isTextQuery;
-
-    // Cache the dependencies so that we know what fields we need to serialize to BSON for matching.
-    DepsTracker _dependencies;
+    // TODO(SERVER-48830): Remove need for holding serialized version of the MatchExpression.
+    BSONObj _predicate;
+    bool _isTextQuery{false};
+    boost::optional<MatchProcessor> _matchProcessor;
 };
 
 }  // namespace mongo

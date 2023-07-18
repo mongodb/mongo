@@ -90,7 +90,7 @@ Value DocumentSourceListSessions::serialize(SerializationOptions opts) const {
     ListSessionsSpec spec;
     spec.setAllUsers(_allUsers);
     spec.setUsers(_users);
-    spec.setPredicate(_predicate);
+    spec.setPredicate(getPredicate());
     return Value(Document{{getSourceName(), spec.toBSON(opts)}});
 }
 

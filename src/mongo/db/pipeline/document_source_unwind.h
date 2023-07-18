@@ -53,6 +53,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/unwind_processor.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/serialization_options.h"
 
@@ -107,16 +108,20 @@ public:
         const boost::optional<std::string>& includeArrayIndex,
         bool strict = false);
 
-    std::string getUnwindPath() const {
-        return _unwindPath.fullPath();
+    UnwindProcessor* getUnwindProcessor() {
+        return _unwindProcessor.get_ptr();
+    }
+
+    const std::string& getUnwindPath() const {
+        return _unwindProcessor->getUnwindFullPath();
     }
 
     bool preserveNullAndEmptyArrays() const {
-        return _preserveNullAndEmptyArrays;
+        return _unwindProcessor->getPreserveNullAndEmptyArrays();
     }
 
     const boost::optional<FieldPath>& indexPath() const {
-        return _indexPath;
+        return _unwindProcessor->getIndexPath();
     }
 
 protected:
@@ -141,70 +146,12 @@ private:
     // Checks if a limit is eligible to be moved before the unwind.
     bool canPushLimitBack(const DocumentSourceLimit* limit) const;
 
-    // Configuration state.
-    const FieldPath _unwindPath;
-    // Documents that have a nullish value, or an empty array for the field '_unwindPath', will pass
-    // through the $unwind stage unmodified if '_preserveNullAndEmptyArrays' is true.
-    const bool _preserveNullAndEmptyArrays;
-    // If set, the $unwind stage will include the array index in the specified path, overwriting any
-    // existing value, setting to null when the value was a non-array or empty array.
-    const boost::optional<FieldPath> _indexPath;
-
-    // Iteration state.
-    class Unwinder;
-    std::unique_ptr<Unwinder> _unwinder;
+    boost::optional<UnwindProcessor> _unwindProcessor;
 
     // If preserveNullAndEmptyArrays is true and unwind is followed by a limit, we can duplicate
     // the limit before the unwind. We only want to do this if we've found a limit smaller than the
     // one we already pushed down. boost::none means no push down has occurred yet.
     boost::optional<long long> _smallestLimitPushedDown;
-};
-
-/** Helper class to unwind array from a single document. */
-class DocumentSourceUnwind::Unwinder {
-public:
-    Unwinder(const FieldPath& unwindPath,
-             bool preserveNullAndEmptyArrays,
-             const boost::optional<FieldPath>& indexPath,
-             bool strict);
-    /** Reset the unwinder to unwind a new document. */
-    void resetDocument(const Document& document);
-
-    /**
-     * @return the next document unwound from the document provided to resetDocument(), using
-     * the current value in the array located at the provided unwindPath.
-     *
-     * Returns boost::none if the array is exhausted.
-     */
-    DocumentSource::GetNextResult getNext();
-
-private:
-    // Tracks whether or not we can possibly return any more documents. Note we may return
-    // boost::none even if this is true.
-    bool _haveNext = false;
-
-    // Path to the array to unwind.
-    const FieldPath _unwindPath;
-
-    // Documents that have a nullish value, or an empty array for the field '_unwindPath', will pass
-    // through the $unwind stage unmodified if '_preserveNullAndEmptyArrays' is true.
-    const bool _preserveNullAndEmptyArrays;
-
-    // If set, the $unwind stage will include the array index in the specified path, overwriting any
-    // existing value, setting to null when the value was a non-array or empty array.
-    const boost::optional<FieldPath> _indexPath;
-    // Specifies if input to $unwind is required to be an array.
-    const bool _strict;
-
-    Value _inputArray;
-
-    MutableDocument _output;
-
-    // Document indexes of the field path components.
-    std::vector<Position> _unwindPathFieldIndexes;
-
-    // Index into the _inputArray to return next.
-    size_t _index = 0;
 };
 
 }  // namespace mongo

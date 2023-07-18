@@ -235,7 +235,7 @@ Value DocumentSourceChangeStreamOplogMatch::serialize(SerializationOptions opts)
             sub.append(DocumentSourceChangeStreamOplogMatchSpec::kFilterFieldName,
                        getMatchExpression()->serialize(opts));
         } else {
-            DocumentSourceChangeStreamOplogMatchSpec(_predicate).serialize(&sub);
+            DocumentSourceChangeStreamOplogMatchSpec(getPredicate()).serialize(&sub);
         }
         sub.done();
     }

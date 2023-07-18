@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/redact_processor.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/serialization_options.h"
@@ -85,26 +86,26 @@ public:
 
     Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
 
+    RedactProcessor* getRedactProcessor() {
+        return _redactProcessor.get_ptr();
+    }
+
     boost::intrusive_ptr<Expression> getExpression() {
-        return _expression;
+        return _redactProcessor->getExpression();
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {
-        expression::addVariableRefs(_expression.get(), refs);
+        expression::addVariableRefs(_redactProcessor->getExpression().get(), refs);
     }
 
 private:
     DocumentSourceRedact(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                         const boost::intrusive_ptr<Expression>& previsit);
+                         const boost::intrusive_ptr<Expression>& previsit,
+                         Variables::Id currentId);
 
     GetNextResult doGetNext() final;
 
-    // These both work over pExpCtx->variables.
-    boost::optional<Document> redactObject(const Document& root);  // redacts CURRENT
-    Value redactValue(const Value& in, const Document& root);
-
-    Variables::Id _currentId;
-    boost::intrusive_ptr<Expression> _expression;
+    boost::optional<RedactProcessor> _redactProcessor;
 };
 
 }  // namespace mongo
