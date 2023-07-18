@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import subprocess, re
+import common_functions
 
 # This is a temporary script to detect code changes to WiredTiger primitives.
 # FIXME-WT-10861 That ticket will introduce a script to replace this one, delete this script when
@@ -34,7 +35,7 @@ primitives = [
 command = "git rev-parse --show-toplevel"
 root = subprocess.run(command, capture_output=True, text=True, shell=True).stdout
 
-command = "git diff $(git merge-base --fork-point develop) -- src/"
+command = f"git diff {common_functions.last_commit_from_dev()} -- src/"
 diff = subprocess.run(command, capture_output=True, cwd=root.strip(), text=True, shell=True).stdout
 found = False
 found_primitives = []

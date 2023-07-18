@@ -18,7 +18,8 @@ search_str="find bench examples ext src test -name '*.[ch]' -o -name '*.in' -o -
 single_file=0
 if [ $# -eq 1 ]; then
     if [ "$1" = "-F" ]; then
-        search_str="git diff --name-only $(git merge-base --fork-point develop) | grep -E '\.(c|h|cpp|cxx|i|py|dox|cmake)$'"
+        last_commit_from_dev=$(python3 ./common_functions.py last_commit_from_dev)
+        search_str="git diff --name-only ${last_commit_from_dev} | grep -E '\.(c|h|cpp|cxx|i|py|dox|cmake)$'"
     else
         single_file=1
     fi

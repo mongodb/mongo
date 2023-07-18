@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse, os, re, subprocess, sys
+import common_functions
 
 def report_illegal_comment(file_name, line_num, line, multiline):
     print("Illegal " + multiline + "comment in " + file_name + ":" + str(line_num - 1) + " " +
@@ -131,7 +132,8 @@ if __name__ == '__main__':
         -o \( -name \"*.in\" ! -name \"Makefile.in\" \) \
         -o -name \"*.cpp\" -o -name \"*.i\" "
     if args.fast:
-        command = "git diff --name-only $(git merge-base --fork-point develop) bench \
+        since_dev = common_functions.last_commit_from_dev()
+        command = f"git diff --name-only {since_dev} bench \
             examples ext src test | grep -E '(.c|.h|.cpp|.in|.i)$'"
 
     result = subprocess.run(command, shell=True, capture_output=True, text=True).stdout.strip('\n')

@@ -84,7 +84,8 @@ case $# in
     # If the -F option is not specified then find every source file.
     if [ $1 == "-F" ]; then
         # We are running in fast mode, get all the source files modified according to git.
-        search=`git diff --name-only $(git merge-base --fork-point develop) | grep -E '\.(c|h|cpp)$'`
+        last_commit_from_dev=$(python3 dist/common_functions.py last_commit_from_dev)
+        search=`git diff --name-only ${last_commit_from_dev} | grep -E '\.(c|h|cpp)$'`
     else
         search="$1"
         exclude=false

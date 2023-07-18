@@ -35,7 +35,8 @@ file_parse()
 if test $fast -eq 1 ; then
     files=`find bench examples ext src test -name '*.c' -o -name '*_inline.h'`
 else
-    files=`git diff --name-only $(git merge-base --fork-point develop) bench examples ext src test | grep -E '(.c|_inline.h)$'`
+    last_commit_from_dev=$(python3 dist/common_functions.py last_commit_from_dev)
+    files=`git diff --name-only "${last_commit_from_dev}" bench examples ext src test | grep -E '(.c|_inline.h)$'`
 fi
 
 # Returns in functions after a jump to the error label, or an infinite loop
@@ -130,7 +131,8 @@ done
 if test $fast -eq 1 ; then
     files=`find src -name '*.c' -o -name '*._inline.h'`
 else
-    files=`git diff --name-only $(git merge-base --fork-point develop) src | grep -E '(.c|_inline.h)$'`
+    last_commit_from_dev=$(python3 dist/common_functions.py last_commit_from_dev)
+    files=`git diff --name-only "${last_commit_from_dev}" src | grep -E '(.c|_inline.h)$'`
 fi
 
 # __wt_verbose with a bitwise OR category parameter.

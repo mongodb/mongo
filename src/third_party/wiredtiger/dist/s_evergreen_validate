@@ -21,9 +21,10 @@ esac
 if [ $(command -v evergreen) ] && [ -f ~/.evergreen.yml ]; then
     if $fast ; then
         # Check the evergreen.yml files for modifications.
-        search=`git diff --name-only $(git merge-base --fork-point develop) | grep -E 'evergreen.*\.yml$'`
+        last_commit_from_dev=$(python3 ./common_functions.py last_commit_from_dev)
+        search=`git diff --name-only "${last_commit_from_dev}" | grep -E 'evergreen.*\.yml$'`
         # If we didn't find any files then exit.
-        if test -z $search; then
+        if test -z "$search"; then
             exit 0
         fi
     fi
