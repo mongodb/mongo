@@ -29,9 +29,7 @@ jsTest.log("Rename collection with documents (create SRC and then DST)");
     const src = getNewColl();
     const dstName = getNewCollName();
 
-    src.save({x: 1});
-    src.save({x: 2});
-    src.save({x: 3});
+    assert.commandWorked(src.insert([{x: 1}, {x: 2}, {x: 3}]));
 
     assert.eq(3, src.countDocuments({}));
 
@@ -48,9 +46,7 @@ jsTest.log("Rename collection with documents (create DST and then SRC)");
     const src = getNewColl();
     const dstName = getNewCollName();
 
-    src.save({x: 1});
-    src.save({x: 2});
-    src.save({x: 3});
+    assert.commandWorked(src.insert([{x: 1}, {x: 2}, {x: 3}]));
 
     assert.eq(3, src.countDocuments({}));
 
@@ -68,12 +64,10 @@ jsTest.log("Rename collection with indexes");
     const dstName = getNewCollName();
     const existingDst = getNewColl();
 
-    src.save({a: 1});
-    src.save({a: 2});
-    src.createIndex({a: 1});
-    src.createIndex({b: 1});
+    assert.commandWorked(src.insert([{a: 1}, {a: 2}]));
+    assert.commandWorked(src.createIndexes([{a: 1}, {b: 1}]));
 
-    existingDst.save({a: 100});
+    assert.commandWorked(existingDst.insert({a: 100}));
     assert.commandFailed(
         db.adminCommand({renameCollection: src.getFullName(), to: existingDst.getFullName()}));
 
@@ -95,8 +89,8 @@ jsTest.log("Rename collection with existing target");
     const src = getNewColl();
     const dst = getNewColl();
 
-    src.save({x: 1});
-    dst.save({x: 2});
+    assert.commandWorked(src.insert({x: 1}));
+    assert.commandWorked(dst.insert({x: 2}));
 
     assert.eq(1, src.countDocuments({x: 1}));
     assert.eq(1, dst.countDocuments({x: 2}));
