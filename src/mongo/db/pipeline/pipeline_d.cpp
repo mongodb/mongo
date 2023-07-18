@@ -103,6 +103,7 @@
 #include "mongo/db/pipeline/inner_pipeline_stage_impl.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/transformer_interface.h"
@@ -858,7 +859,27 @@ PipelineD::buildInnerQueryExecutor(const MultipleCollectionAccessor& collections
     // We will be modifying the source vector as we go.
     Pipeline::SourceContainer& sources = pipeline->_sources;
 
-    if (!sources.empty() && !sources.front()->constraints().requiresInputDocSource) {
+    // We skip the 'requiresInputDocSource' check in the case of pushing $search down into SBE,
+    // as $search has 'requiresInputDocSource' as false. Specifically, we skip this check if
+    // it is a $search pipeline, 'featureFlagSearchInSbe' is enabled and forceClassicEngine
+    // is false.
+    auto firstStageIsSearch =
+        getSearchHelpers(expCtx->opCtx->getServiceContext())->isSearchPipeline(pipeline) ||
+        getSearchHelpers(expCtx->opCtx->getServiceContext())->isSearchMetaPipeline(pipeline);
+    auto searchInSbeEnabled =
+        feature_flags::gFeatureFlagSearchInSbe.isEnabled(serverGlobalParams.featureCompatibility);
+
+    // TODO SERVER-78998: This check should be modified once we've refactored checking
+    // 'internalQueryFrameworkControl'.
+    auto forceClassicEngine = ServerParameterSet::getNodeParameterSet()
+                                  ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
+                                  ->_data.get() == QueryFrameworkControlEnum::kForceClassicEngine;
+
+    bool skipRequiresInputDocSourceCheck =
+        firstStageIsSearch && searchInSbeEnabled && !forceClassicEngine;
+
+    if (!skipRequiresInputDocSourceCheck && !sources.empty() &&
+        !sources.front()->constraints().requiresInputDocSource) {
         return {};
     }
 
