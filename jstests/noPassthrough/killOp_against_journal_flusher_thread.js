@@ -17,6 +17,8 @@ const primary = rst.getPrimary();
 const adminDB = primary.getDB("admin");
 const testColl = primary.getDB("testDB").getCollection("testColl");
 
+assert.commandWorked(adminDB.setLogLevel(1));
+
 // Pause the JournalFlusher thread right before it flushes. The JournalFlusher resets its
 // OperationContext every flush, so we need it to remain stable across identifying the operation via
 // currentOp (which looks at the opCtx ID for opId) and then marking it to die via killOp (by opId).

@@ -96,12 +96,6 @@ void JournalFlusher::run() {
     ThreadClient tc(name(), getGlobalServiceContext());
     LOGV2_DEBUG(4584701, 1, "starting {name} thread", "name"_attr = name());
 
-    // TODO(SERVER-74657): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
-
     // The thread must not run and access the service context to create an opCtx while unit test
     // infrastructure is still being set up and expects sole access to the service context (there is
     // no conurrency control on the service context during this phase).
@@ -146,16 +140,15 @@ void JournalFlusher::run() {
             // Signal the waiters that a round completed.
             _currentSharedPromise->emplaceValue();
         } catch (const AssertionException& e) {
-            // Can be caused by killOp.
+            // Can be caused by killOp or stepdown.
             if (e.code() == ErrorCodes::Interrupted) {
-                // This thread should not be affected by killOp. Therefore, the thread will
-                // immediately restart the journal flush without sending errors to waiting callers.
-                // The opCtx error should already be cleared of the interrupt by the ON_BLOCK_EXIT
-                // handling above.
-                LOGV2(5574501,
-                      "The JournalFlusher received and is ignoring a killOp error: the user should "
-                      "not kill mongod internal threads",
-                      "JournalFlusherError"_attr = e.toString());
+                // When this thread is interrupted it will immediately restart the journal flush
+                // without sending errors to waiting callers. The opCtx error should already be
+                // cleared of the interrupt by the ON_BLOCK_EXIT handling above.
+                LOGV2_DEBUG(5574501,
+                            1,
+                            "The JournalFlusher got interrupted, retrying",
+                            "error"_attr = e.toString());
                 continue;
             }
 
