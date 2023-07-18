@@ -142,7 +142,7 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
             // this should fail
             rs->updateRecord(t2.get(), id1, "c", 2).transitional_ignore();
             ASSERT(0);
-        } catch (WriteConflictException&) {
+        } catch (const StorageUnavailableException&) {
             w2.reset(nullptr);
             t2.reset(nullptr);
         }
@@ -197,7 +197,7 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
                 // this should fail as our version of id1 is too old
                 rs->updateRecord(t2.get(), id1, "c", 2).transitional_ignore();
                 ASSERT(0);
-            } catch (WriteConflictException&) {
+            } catch (const StorageUnavailableException&) {
             }
         }
     }

@@ -84,7 +84,7 @@ private:
     /**
      * Deletes all expired documents. May consist of several sub-passes.
      */
-    void _doTTLPass();
+    void _doTTLPass(OperationContext* opCtx);
 
     /**
      * A sub-pass iterates over a list of TTL indexes until there are no more expired documents to

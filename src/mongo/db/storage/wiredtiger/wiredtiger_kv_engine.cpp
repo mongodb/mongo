@@ -1378,7 +1378,7 @@ void WiredTigerKVEngine::syncSizeInfo(bool sync) const {
     while (true) {
         try {
             return _sizeStorer->flush(sync);
-        } catch (const WriteConflictException&) {
+        } catch (const StorageUnavailableException&) {
             if (!sync) {
                 // ignore, we'll try again later.
                 return;
@@ -2015,8 +2015,8 @@ void WiredTigerKVEngine::_checkpoint(OperationContext* opCtx, WT_SESSION* sessio
             _oplogNeededForCrashRecovery.store(oplogNeededForRollback.getValue().asULL());
         }
     }
-} catch (const WriteConflictException&) {
-    LOGV2_WARNING(22346, "Checkpoint encountered a write conflict exception.");
+} catch (const StorageUnavailableException&) {
+    LOGV2_WARNING(7754200, "Checkpoint encountered a StorageUnavailableException.");
 } catch (const AssertionException& exc) {
     invariant(ErrorCodes::isShutdownError(exc.code()), exc.what());
 }

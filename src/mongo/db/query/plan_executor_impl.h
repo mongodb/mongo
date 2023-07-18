@@ -62,14 +62,27 @@ auto handlePlanStageYield(
 
     try {
         return f();
-    } catch (const WriteConflictException&) {
+    } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
         yieldHandler();
         return PlanStage::NEED_YIELD;
-    } catch (const TemporarilyUnavailableException& e) {
+    } catch (const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e) {
         if (opCtx->inMultiDocumentTransaction()) {
-            handleTemporarilyUnavailableExceptionInTransaction(opCtx, opStr, ns, e);
+            convertToWCEAndRethrow(opCtx, opStr, e);
         }
         expCtx->setTemporarilyUnavailableException(true);
+        yieldHandler();
+        return PlanStage::NEED_YIELD;
+    } catch (const ExceptionFor<ErrorCodes::TransactionTooLargeForCache>&) {
+        if (opCtx->writesAreReplicated()) {
+            // Surface error on primaries.
+            throw;
+        }
+
+        // If an operation succeeds on primary, it should always be retried on secondaries.
+        // Secondaries always retry TemporarilyUnavailableExceptions and WriteConflictExceptions
+        // indefinitely, the only difference being the rate of retry. We prefer retrying faster, by
+        // converting to WriteConflictException, to avoid stalling replication longer than
+        // necessary.
         yieldHandler();
         return PlanStage::NEED_YIELD;
     }

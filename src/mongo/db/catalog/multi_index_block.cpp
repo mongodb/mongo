@@ -198,7 +198,7 @@ void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
             wunit.commit();
             _buildIsCleanedUp = true;
             return;
-        } catch (const WriteConflictException&) {
+        } catch (const StorageUnavailableException&) {
             continue;
         } catch (const DBException& e) {
             if (e.toStatus() == ErrorCodes::ExceededMemoryLimit)
@@ -431,8 +431,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
         wunit.commit();
         return indexInfoObjs;
-    } catch (const WriteConflictException&) {
-        // Avoid converting WCE to Status.
+    } catch (const StorageUnavailableException&) {
         throw;
     } catch (const ExceptionForCat<ErrorCategory::TenantMigrationConflictError>&) {
         // Avoid converting TenantMigrationConflict errors to Status.

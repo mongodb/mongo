@@ -251,7 +251,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
 
             // Go to the next document
             retries = 0;
-        } catch (const WriteConflictException&) {
+        } catch (const StorageUnavailableException&) {
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
             retries++;  // logAndBackoff expects this to be 1 on first call.
             logWriteConflictAndBackoff(retries, "cloneCollectionAsCapped", fromNss.ns());

@@ -1158,7 +1158,7 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
 
     try {
         writeTest();
-    } catch (WriteConflictException const&) {
+    } catch (StorageUnavailableException const&) {
         // It's expected to get a WCE the first time we try this, due to the multi-timestamp
         // constraint. We'll try again and it will fassert and print out extra debug info.
     }

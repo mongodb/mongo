@@ -663,7 +663,7 @@ void clearTempCollections(OperationContext* opCtx, const DatabaseName& dbName) {
                               "error"_attr = redact(status));
             }
             wuow.commit();
-        } catch (const WriteConflictException&) {
+        } catch (const StorageUnavailableException&) {
             LOGV2_WARNING(
                 20328,
                 "could not drop temp collection '{namespace}' due to WriteConflictException",

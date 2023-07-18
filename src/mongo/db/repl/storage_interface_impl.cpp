@@ -816,8 +816,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                         docs.push_back(out.getOwned());
                     }
                 }
-            } catch (const WriteConflictException&) {
-                // Re-throw the WCE, since it will get caught be a retry loop at a higher level.
+            } catch (const StorageUnavailableException&) {
                 throw;
             } catch (const DBException&) {
                 return exceptionToStatus();
@@ -995,8 +994,7 @@ Status _updateWithQuery(OperationContext* opCtx,
         try {
             // The update result is ignored.
             [[maybe_unused]] auto updateResult = planExecutor->executeUpdate();
-        } catch (const WriteConflictException&) {
-            // Re-throw the WCE, since it will get caught and retried at a higher level.
+        } catch (const StorageUnavailableException&) {
             throw;
         } catch (const DBException&) {
             return exceptionToStatus();
@@ -1069,8 +1067,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
         try {
             // The update result is ignored.
             [[maybe_unused]] auto updateResult = planExecutor->executeUpdate();
-        } catch (const WriteConflictException&) {
-            // Re-throw the WCE, since it will get caught and retried at a higher level.
+        } catch (const StorageUnavailableException&) {
             throw;
         } catch (const DBException&) {
             return exceptionToStatus();
@@ -1148,8 +1145,7 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
         try {
             // The count of deleted documents is ignored.
             [[maybe_unused]] auto nDeleted = planExecutor->executeDelete();
-        } catch (const WriteConflictException&) {
-            // Re-throw the WCE, since it will get caught and retried at a higher level.
+        } catch (const StorageUnavailableException&) {
             throw;
         } catch (const DBException&) {
             return exceptionToStatus();
@@ -1201,13 +1197,13 @@ boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTi
     while (true) {
         try {
             return findOplogEntryLessThanOrEqualToTimestamp(opCtx, oplogCollection, timestamp);
-        } catch (const WriteConflictException&) {
+        } catch (const StorageUnavailableException&) {
             // This will log a message about the conflict initially and then every 5 seconds, with
             // the current rather arbitrary settings.
             if (retries % 10 == 0) {
-                LOGV2(4795900,
-                      "Reading the oplog collection conflicts with a validate cmd. Continuing to "
-                      "retry.",
+                LOGV2(7754201,
+                      "Got a StorageUnavailableException while reading the oplog. This "
+                      "could be due to conflict with a validate cmd. Continuing to retry.",
                       "retries"_attr = retries);
             }
 

@@ -600,6 +600,78 @@ transactional way.  Note that `Change`s are not executed until the destruction o
 `WriteUnitOfWork`, which can be long after the storage engine committed.  Two-phase locking ensures
 that all locks are held while a Change's `commit()` or `rollback()` function runs.
 
+## StorageUnavailableException
+
+`StorageUnavailableException`  indicates that a storage transaction rolled back due to
+resource contention in the storage engine. This exception is the base of exceptions related to
+concurrency (`WriteConflict`) and to those related to cache pressure (`TemporarilyUnavailable` and
+`TransactionTooLargeForCache`).
+
+We recommend using the [writeConflictRetry](https://github.com/10gen/mongo/blob/9381db6748aada1d9a0056cea0e9899301e7f70b/src/mongo/db/concurrency/exception_util.h#L140)
+helper which transparently handles all exceptions related to this error category.
+
+### WriteConflictException
+
+Writers may conflict with each other when more than one operation stages an uncommitted write to the
+same document concurrently. To force one or more of the writers to retry, the storage engine may
+throw a WriteConflictException at any point, up to and including the call to commit(). This is
+referred to as optimistic concurrency control because it allows uncontended writes to commit
+quickly. Because of this behavior, most WUOWs are enclosed in a writeConflictRetry loop that retries
+the write transaction until it succeeds, accompanied by a bounded exponential back-off.
+
+### TemporarilyUnavailableException
+
+When the server parameter `enableTemporarilyUnavailableExceptions` is enabled (on by default), a
+TemporarilyUnavailableException may be thrown inside the server to indicate that an operation cannot
+complete without blocking and must be retried. The storage engine may throw a
+TemporarilyUnavailableException (converted to a TemporarilyUnavailable error for users) when an
+operation is excessively rolled-back in the storage engine due to cache pressure or any reason that
+would prevent the operation from completing without impacting concurrent operations. The operation
+may be at fault for writing too much uncommitted data, or it may be a victim. That information is
+not exposed. However, if this error is returned, it is likely that the operation was the cause of
+the problem, rather than a victim.
+
+Before 6.0, this type of error was returned as a WriteConflict and retried indefinitely inside a
+writeConflictRetry loop. As of 6.0, MongoDB will retry the operation internally at most
+`temporarilyUnavailableMaxRetries` times, backing off for `temporarilyUnavailableBackoffBaseMs`
+milliseconds, with a linearly-increasing backoff on each attempt. After this point, the error will
+escape the handler and be returned to the client.
+
+If an operation receives a TemporarilyUnavailable error internally, a `temporarilyUnavailableErrors`
+counter will be displayed in the slow query logs and in FTDC.
+
+Notably, this behavior does not apply to multi-document transactions, which continue to return a
+WriteConflict to the client in this scenario without retrying internally.
+
+See
+[wtRcToStatus](https://github.com/mongodb/mongo/blob/c799851554dc01493d35b43701416e9c78b3665c/src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp#L178-L183)
+where we throw the exception in WiredTiger.
+See [TemporarilyUnavailableException](https://github.com/mongodb/mongo/blob/c799851554dc01493d35b43701416e9c78b3665c/src/mongo/db/concurrency/temporarily_unavailable_exception.h#L39-L45).
+
+### TransactionTooLargeForCacheException
+
+A TransactionTooLargeForCacheException may be thrown inside the server to indicate that an operation
+was rolled-back and is unlikely to ever complete because the storage engine cache is insufficient,
+even in the absence of concurrent operations. This is determined by a simple heuristic wherein,
+after a rollback, a threshold on the proportion of total dirty cache bytes the running transaction
+can represent and still be considered fullfillable is checked. The threshold can be tuned with the
+`transactionTooLargeForCacheThreshold` parameter. Setting this threshold to its maximum value (1.0)
+causes the check to be skipped and TransactionTooLargeForCacheException to be disabled.
+
+On replica sets, if an operation succeeds on a primary, it should also succeed on a secondary. It
+would be possible to convert to both TemporarilyUnavailableException and WriteConflictException,
+as if TransactionTooLargeForCacheException was disabled. But on secondaries the only
+difference between the two is the rate at which the operation is retried. Hence,
+TransactionTooLargeForCacheException is always converted to a WriteConflictException, which retries
+faster, to avoid stalling replication longer than necessary.
+
+Prior to 6.3, or when TransactionTooLargeForCacheException is disabled, multi-document
+transactions always return a WriteConflictException, which may result in drivers retrying  an
+operation indefinitely. For non-multi-document operations, there is a limited number of retries on
+TemporarilyUnavailableException, but it might still be beneficial to not retry operations which are
+unlikely to complete and are disruptive for concurrent operations.
+
+
 
 # Read Operations
 
@@ -750,69 +822,6 @@ for efficient mass-deletes.
 
 See
 [WriteUnitOfWork](https://github.com/mongodb/mongo/blob/fa32d665bd63de7a9d246fa99df5e30840a931de/src/mongo/db/storage/write_unit_of_work.h).
-
-## WriteConflictException
-
-Writers may conflict with each other when more than one operation stages an uncommitted write to the
-same document concurrently. To force one or more of the writers to retry, the storage engine may
-throw a WriteConflictException at any point, up to and including the the call to commit(). This is
-referred to as optimistic concurrency control because it allows uncontended writes to commit
-quickly. Because of this behavior, most WUOWs are enclosed in a writeConflictRetry loop that retries
-the write transaction until it succeeds, accompanied by a bounded exponential back-off.
-
-See [writeConflictRetry](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/concurrency/write_conflict_exception.h).
-
-## TemporarilyUnavailableException
-
-When the server parameter `enableTemporarilyUnavailableExceptions` is enabled (on by default), a
-TemporarilyUnavailableException may be thrown inside the server to indicate that an operation cannot
-complete without blocking and must be retried. The storage engine may throw a
-TemporarilyUnavailableException (converted to a TemporarilyUnavailable error for users) when an
-operation is excessively rolled-back in the storage engine due to cache pressure or any reason that
-would prevent the operation from completing without impacting concurrent operations. The operation
-may be at fault for writing too much uncommitted data, or it may be a victim. That information is
-not exposed. However, if this error is returned, it is likely that the operation was the cause of
-the problem, rather than a victim.
-
-Before 6.0, this type of error was returned as a WriteConflict and retried indefinitely inside a
-writeConflictRetry loop. As of 6.0, MongoDB will retry the operation internally at most
-`temporarilyUnavailableMaxRetries` times, backing off for `temporarilyUnavailableBackoffBaseMs`
-milliseconds, with a linearly-increasing backoff on each attempt. After this point, the error will
-escape the handler and be returned to the client.
-
-If an operation receives a TemporarilyUnavailable error internally, a `temporarilyUnavailableErrors`
-counter will be displayed in the slow query logs and in FTDC.
-
-Notably, this behavior does not apply to multi-document transactions, which continue to return a
-WriteConflict to the client in this scenario without retrying internally.
-
-See
-[wtRcToStatus](https://github.com/mongodb/mongo/blob/c799851554dc01493d35b43701416e9c78b3665c/src/mongo/db/storage/wiredtiger/wiredtiger_util.cpp#L178-L183)
-where we throw the exception in WiredTiger.
-See [TemporarilyUnavailableException](https://github.com/mongodb/mongo/blob/c799851554dc01493d35b43701416e9c78b3665c/src/mongo/db/concurrency/temporarily_unavailable_exception.h#L39-L45).
-
-## TransactionTooLargeForCacheException
-
-A TransactionTooLargeForCacheException may be thrown inside the server to indicate that an operation
-was rolled-back and is unlikely to ever complete because the storage engine cache is insufficient,
-even in the absence of concurrent operations. This is determined by a simple heuristic wherein,
-after a rollback, a threshold on the proportion of total dirty cache bytes the running transaction
-can represent and still be considered fullfillable is checked. The threshold can be tuned with the
-`transactionTooLargeForCacheThreshold` parameter. Setting this threshold to its maximum value (1.0)
-causes the check to be skipped and TransactionTooLargeForCacheException to be disabled.
-
-On replica sets, if an operation succeeds on a primary, it should also succeed on a secondary. It
-would be possible to convert to both TemporarilyUnavailableException and WriteConflictException,
-as if TransactionTooLargeForCacheException was disabled. But on secondaries the only
-difference between the two is the rate at which the operation is retried. Hence,
-TransactionTooLargeForCacheException is always converted to a WriteConflictException, which retries
-faster, to avoid stalling replication longer than necessary.
-
-Prior to 6.3, or when TransactionTooLargeForCacheException is disabled, multi-document
-transactions always return a WriteConflictException, which may result in drivers retrying  an
-operation indefinitely. For non-multi-document operations, there is a limited number of retries on
-TemporarilyUnavailableException, but it might still be beneficial to not retry operations which are
-unlikely to complete and are disruptive for concurrent operations.
 
 ## Collection and Index Writes
 

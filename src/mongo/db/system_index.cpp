@@ -208,9 +208,9 @@ void createSystemIndexes(OperationContext* opCtx, CollectionWriter& collection, 
         try {
             IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
                 opCtx, collection, {indexSpec}, fromMigrate);
-        } catch (WriteConflictException&) {
+        } catch (const StorageUnavailableException&) {
             throw;
-        } catch (DBException& ex) {
+        } catch (const DBException& ex) {
             fassertFailedWithStatus(40456, ex.toStatus());
         }
     }

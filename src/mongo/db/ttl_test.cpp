@@ -81,7 +81,7 @@ protected:
 
     void doTTLPassForTest() {
         TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
-        ttlMonitor->_doTTLPass();
+        ttlMonitor->_doTTLPass(_opCtx.get());
     }
 
     bool doTTLSubPassForTest(OperationContext* opCtx) {
