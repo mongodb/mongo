@@ -2667,11 +2667,8 @@ var ReplSetTest = function(opts) {
             // to time out since it may take a while to process each batch and a test may have
             // changed "cursorTimeoutMillis" to a short time period.
             this._cursorExhausted = false;
-            this.cursor = coll.find(query)
-                              .sort({$natural: -1})
-                              .noCursorTimeout()
-                              .readConcern("local")
-                              .limit(-1);
+            this.cursor =
+                coll.find(query).sort({$natural: -1}).noCursorTimeout().readConcern("local");
         };
 
         this.getFirstDoc = function() {
@@ -2815,6 +2812,39 @@ var ReplSetTest = function(opts) {
         return readers;
     }
 
+    function dumpPreImagesCollection(msgPrefix, node, nsUUID, timestamp, limit) {
+        const beforeCursor =
+            node.getDB("config")["system.preimages"]
+                .find({"_id.nsUUID": nsUUID, "_id.ts": {"$lt": timestamp}})
+                .sort({$natural: -1})
+                .noCursorTimeout()
+                .readConcern("local")
+                .limit(limit / 2);  // We print up to half of the limit in the before part so that
+                                    // the timestamp is centered.
+        const beforeEntries = beforeCursor.toArray().reverse();
+
+        let log = `${msgPrefix} -- Dumping a window of ${
+            limit} entries for preimages of collection ${nsUUID} from host ${
+            node.host} centered around timestamp ${timestamp.toStringIncomparable()}`;
+
+        beforeEntries.forEach(entry => {
+            log += '\n' + tojsononeline(entry);
+        });
+
+        const remainingWindow = limit - beforeEntries.length;
+        const cursor = node.getDB("config")["system.preimages"]
+                           .find({"_id.nsUUID": nsUUID, "_id.ts": {"$gte": timestamp}})
+                           .sort({$natural: 1})
+                           .noCursorTimeout()
+                           .readConcern("local")
+                           .limit(remainingWindow);
+        cursor.forEach(entry => {
+            log += '\n' + tojsononeline(entry);
+        });
+
+        jsTestLog(log);
+    }
+
     /**
      * Check preimages on all nodes, by reading reading from the last time. Since the preimage may
      * or may not be maintained independently, each node may not contain the same number of entries
@@ -2822,6 +2852,8 @@ var ReplSetTest = function(opts) {
      */
     function checkPreImageCollection(rst, secondaries, msgPrefix = 'checkPreImageCollection') {
         secondaries = secondaries || rst._secondaries;
+
+        const originalPreferences = [];
 
         print(`${msgPrefix} -- starting preimage checks.`);
         print(`${msgPrefix} -- waiting for secondaries to be ready.`);
@@ -2845,7 +2877,13 @@ var ReplSetTest = function(opts) {
                 }
 
                 const preImageColl = node.getDB("config")["system.preimages"];
-                // Reset connection preferences in case the test has modified them.
+                // Reset connection preferences in case the test has modified them. We'll restore
+                // them back to what they were originally in the end.
+                originalPreferences[i] = {
+                    secondaryOk: preImageColl.getMongo().getSecondaryOk(),
+                    readPref: preImageColl.getMongo().getReadPref()
+                };
+
                 preImageColl.getMongo().setSecondaryOk(true);
                 preImageColl.getMongo().setReadPref(rst._primary === node ? "primary"
                                                                           : "secondary");
@@ -2862,14 +2900,39 @@ var ReplSetTest = function(opts) {
 
                 while (true) {
                     let preImageEntryToCompare = undefined;
+                    let originNode = undefined;
                     for (const reader of readers) {
                         if (reader.hasNext()) {
                             const preImageEntry = reader.next();
                             if (preImageEntryToCompare === undefined) {
                                 preImageEntryToCompare = preImageEntry;
+                                originNode = reader.mongo;
                             } else {
-                                assert(bsonBinaryEqual(preImageEntryToCompare, preImageEntry),
-                                       `Detected preimage entries that have different content`);
+                                if (!bsonBinaryEqual(preImageEntryToCompare, preImageEntry)) {
+                                    // TODO SERVER-55756: Investigate if we can remove this since
+                                    // we'll have the data files present in case this fails with
+                                    // PeriodicKillSecondaries.
+                                    print(
+                                        `${msgPrefix} -- preimage inconsistency detected.` +
+                                        "\n" +
+                                        `${originNode.host} -> ${
+                                            tojsononeline(preImageEntryToCompare)}` +
+                                        "\n" +
+                                        `${reader.mongo.host} -> ${tojsononeline(preImageEntry)}`);
+                                    print("Printing previous entries:");
+                                    dumpPreImagesCollection(msgPrefix,
+                                                            originNode,
+                                                            nsUUID,
+                                                            preImageEntryToCompare._id.ts,
+                                                            100);
+                                    dumpPreImagesCollection(
+                                        msgPrefix, reader.mongo, nsUUID, preImageEntry._id.ts, 100);
+                                    const log = `${msgPrefix} -- non-matching preimage entries:\n` +
+                                        `${originNode.host} -> ${
+                                                    tojsononeline(preImageEntryToCompare)}\n` +
+                                        `${reader.mongo.host} -> ${tojsononeline(preImageEntry)}`;
+                                    assert(false, log);
+                                }
                             }
                         }
                     }
@@ -2880,6 +2943,14 @@ var ReplSetTest = function(opts) {
             }
         }
         print(`${msgPrefix} -- preimages check complete.`);
+
+        // Restore original read preferences used by the connection.
+        for (const idx in originalPreferences) {
+            const node = rst.nodes[idx];
+            const conn = node.getDB("config").getMongo();
+            conn.setSecondaryOk(originalPreferences[idx].secondaryOk);
+            conn.setReadPref(originalPreferences[idx].readPref);
+        }
     }
 
     this.checkPreImageCollection = function(msgPrefix) {

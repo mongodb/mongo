@@ -31,7 +31,11 @@ function getPreImage(collectionIndex, ts) {
 }
 
 assert.doesNotThrow(() => {
-    const replSetTest = new ReplSetTest({name: "replSet", nodes: 2});
+    const replSetTest = new ReplSetTest({
+        name: "replSet",
+        nodes: 2,
+        nodeOptions: {setParameter: {disableExpiredPreImagesRemover: true}},
+    });
     replSetTest.startSet();
     replSetTest.initiate();
 
@@ -63,7 +67,11 @@ assert.doesNotThrow(() => {
     replSetTest.stopSet();
 });
 
-const replSetTest = new ReplSetTest({name: "replSet", nodes: 2});
+const replSetTest = new ReplSetTest({
+    name: "replSet",
+    nodes: 2,
+    nodeOptions: {setParameter: {disableExpiredPreImagesRemover: true}},
+});
 replSetTest.startSet();
 replSetTest.initiate();
 
@@ -73,19 +81,32 @@ const secondary = replSetTest.getSecondary();
 const coll = primary.getDB("config")["system.preimages"];
 const secondaryColl = secondary.getDB("config")["system.preimages"];
 
-// Insert a document to the preimage collection. Ensure it is not replicated to secondaries.
+// Insert a few documents to the preimage collection. Ensure it is not replicated to secondaries.
 coll.insert(getPreImage(1, 0));
-assert.eq(coll.find({}).itcount(), 1);
+coll.insert(getPreImage(1, 1));
+coll.insert(getPreImage(1, 2));
+coll.insert(getPreImage(1, 3));
+coll.insert(getPreImage(1, 4));
+coll.insert(getPreImage(1, 5));
+coll.insert(getPreImage(1, 6));
+coll.insert(getPreImage(1, 7));
+assert.eq(coll.find({}).itcount(), 8);
 assert.eq(secondaryColl.find({}).itcount(), 0);
 
-// Now insert another document to the secondary, this will cause an inconsistency error when we stop
-// the replica set.
+// Now insert another set of documents to the secondary, this will cause an inconsistency error when
+// we stop the replica set.
 replSetTest.stepUp(secondary);
 
 const newPrimary = replSetTest.getPrimary();
 
 const newColl = newPrimary.getDB("config")["system.preimages"];
+newColl.insert(getPreImage(1, 0));
 newColl.insert(getPreImage(1, 1));
+newColl.insert(getPreImage(1, 2));
+newColl.insert(getPreImage(1, 3));
+newColl.insert(getPreImage(1, 5));
+newColl.insert(getPreImage(1, 6));
+newColl.insert(getPreImage(1, 7));
 
 // Verify that the two nodes are inconsistent.
 assert.throws(() => replSetTest.stopSet());
@@ -94,7 +115,7 @@ try {
     replSetTest.stopSet();
 } catch (e) {
     // Verify that the inconsistency is the one we're looking for in preimages.
-    assert.eq(e.message.includes("Detected preimage entries that have different content"), true);
+    assert.eq(e.message.includes("non-matching preimage entries"), true);
 }
 // Tear down the nodes now without checking for consistency.
 replSetTest.stopSet(undefined, undefined, {skipCheckDBHashes: true});

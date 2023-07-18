@@ -5,6 +5,7 @@
  *
  * @tags: [
  *   does_not_support_stepdowns,
+ *   incompatible_with_preimages_by_default,
  * ]
  */
 (function() {

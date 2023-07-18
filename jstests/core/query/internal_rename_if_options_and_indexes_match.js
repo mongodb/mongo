@@ -9,6 +9,7 @@
 //   requires_capped,
 //   requires_non_retryable_commands,
 //   uses_rename,
+//   incompatible_with_preimages_by_default,
 // ]
 
 (function() {

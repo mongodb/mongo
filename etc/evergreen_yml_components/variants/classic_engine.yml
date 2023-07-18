@@ -150,6 +150,12 @@ buildvariants:
   - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
     distros:
     - rhel80-xlarge
+  - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough_gen
   - name: sasl

@@ -100,6 +100,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failPreimagesCollectionCreation);
+MONGO_FAIL_POINT_DEFINE(truncateOnlyOnSecondaries);
 
 const auto getPreImagesCollectionManager =
     ServiceContext::declareDecoration<ChangeStreamPreImagesCollectionManager>();
@@ -473,7 +474,10 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTrunca
         MODE_IX);
 
 
-    if (!preImagesColl.exists()) {
+    if (!preImagesColl.exists() ||
+        (MONGO_unlikely(truncateOnlyOnSecondaries.shouldFail()) &&
+         repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
+             repl::MemberState::RS_PRIMARY)) {
         return 0;
     }
 

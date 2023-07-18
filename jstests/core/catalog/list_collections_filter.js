@@ -9,6 +9,8 @@
  *   assumes_against_mongod_not_mongos,
  *   # Tenant migrations don't support applyOps.
  *   tenant_migration_incompatible,
+ *   # Requires no extra options present
+ *   incompatible_with_preimages_by_default,
  * ]
  */
 
