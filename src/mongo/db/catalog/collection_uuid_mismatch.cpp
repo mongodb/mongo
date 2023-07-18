@@ -74,15 +74,15 @@ void checkCollectionUUIDMismatch(OperationContext* opCtx,
     }
 
     auto actualNamespace = catalog.lookupNSSByUUID(opCtx, *uuid);
-    uassert(
-        (CollectionUUIDMismatchInfo{ns.dbName(),
-                                    *uuid,
-                                    ns.coll().toString(),
-                                    actualNamespace && actualNamespace->db() == ns.db()
-                                        ? boost::make_optional(actualNamespace->coll().toString())
-                                        : boost::none}),
-        "Collection UUID does not match that specified",
-        coll && coll->uuid() == *uuid);
+    uassert((CollectionUUIDMismatchInfo{
+                ns.dbName(),
+                *uuid,
+                ns.coll().toString(),
+                actualNamespace && actualNamespace->db_deprecated() == ns.db_deprecated()
+                    ? boost::make_optional(actualNamespace->coll().toString())
+                    : boost::none}),
+            "Collection UUID does not match that specified",
+            coll && coll->uuid() == *uuid);
 }
 
 }  // namespace mongo

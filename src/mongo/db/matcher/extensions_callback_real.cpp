@@ -79,7 +79,8 @@ std::unique_ptr<MatchExpression> ExtensionsCallbackReal::createWhere(
         return std::make_unique<ExprMatchExpression>(fnExpression, expCtx);
     } else {
         expCtx->hasWhereClause = true;
-        return std::make_unique<WhereMatchExpression>(_opCtx, std::move(where), expCtx->ns.db());
+        return std::make_unique<WhereMatchExpression>(
+            _opCtx, std::move(where), expCtx->ns.db_deprecated());
     }
 }
 

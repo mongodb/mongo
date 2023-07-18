@@ -996,7 +996,7 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_killBackupCursor() {
             stdx::lock_guard lk(_mutex);
             executor::RemoteCommandRequest request(
                 _client->getServerHostAndPort(),
-                donorBackupCursorInfo.nss.db().toString(),
+                donorBackupCursorInfo.nss.db_deprecated().toString(),
                 BSON("killCursors" << donorBackupCursorInfo.nss.coll().toString() << "cursors"
                                    << BSON_ARRAY(donorBackupCursorInfo.cursorId)),
                 nullptr);
@@ -1175,7 +1175,7 @@ ShardMergeRecipientService::Instance::_scheduleKillBackupCursorWithLock(
     auto& donorBackupCursorInfo = _getDonorBackupCursorInfo(lk);
     executor::RemoteCommandRequest killCursorsRequest(
         _client->getServerHostAndPort(),
-        donorBackupCursorInfo.nss.db().toString(),
+        donorBackupCursorInfo.nss.db_deprecated().toString(),
         BSON("killCursors" << donorBackupCursorInfo.nss.coll().toString() << "cursors"
                            << BSON_ARRAY(donorBackupCursorInfo.cursorId)),
         nullptr);

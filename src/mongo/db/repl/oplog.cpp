@@ -2372,7 +2372,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 Command* cmd = CommandHelpers::findCommand(o.firstElement().fieldName());
                 invariant(cmd);
 
-                auto ns = cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db(), o))->ns();
+                auto ns =
+                    cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db_deprecated(), o))->ns();
 
                 if (mode == OplogApplication::Mode::kInitialSync) {
                     // Aborting an index build involves writing to the catalog. This write needs to

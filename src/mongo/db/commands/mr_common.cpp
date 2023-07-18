@@ -94,9 +94,10 @@ using namespace std::string_literals;
 Status interpretTranslationError(DBException* ex, const MapReduceCommandRequest& parsedMr) {
     auto status = ex->toStatus();
     auto outOptions = parsedMr.getOutOptions();
-    auto outNss = NamespaceString{outOptions.getDatabaseName() ? *outOptions.getDatabaseName()
-                                                               : parsedMr.getNamespace().db(),
-                                  outOptions.getCollectionName()};
+    auto outNss =
+        NamespaceString{outOptions.getDatabaseName() ? *outOptions.getDatabaseName()
+                                                     : parsedMr.getNamespace().db_deprecated(),
+                        outOptions.getCollectionName()};
     std::string error;
     switch (static_cast<int>(ex->code())) {
         case ErrorCodes::InvalidNamespace:
@@ -428,7 +429,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
     MapReduceCommandRequest parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx) {
     auto outNss = NamespaceString{parsedMr.getOutOptions().getDatabaseName()
                                       ? *parsedMr.getOutOptions().getDatabaseName()
-                                      : parsedMr.getNamespace().db(),
+                                      : parsedMr.getNamespace().db_deprecated(),
                                   parsedMr.getOutOptions().getCollectionName()};
 
     std::set<FieldPath> shardKey;

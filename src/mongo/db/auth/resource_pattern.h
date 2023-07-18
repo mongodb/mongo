@@ -147,7 +147,7 @@ public:
      */
     static ResourcePattern forExactSystemBucketsCollection(const NamespaceString& nss) {
         uassert(ErrorCodes::InvalidNamespace,
-                "Invalid namespace '{}.system.buckets.{}'"_format(nss.db(), nss.coll()),
+                "Invalid namespace '{}.system.buckets.{}'"_format(nss.db_deprecated(), nss.coll()),
                 !nss.coll().startsWith("system.buckets."));
         return ResourcePattern(MatchTypeEnum::kMatchExactSystemBucketResource, nss);
     }
@@ -254,7 +254,7 @@ public:
     }
 
     StringData databaseToMatch() const {
-        return _ns.db();
+        return _ns.db_deprecated();
     }
 
     /**
@@ -286,8 +286,8 @@ public:
      * TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
      */
     bool matchesIgnoringTenant(const ResourcePattern& other) const {
-        return (_matchType == other._matchType) && (_ns.db() == other._ns.db()) &&
-            (_ns.coll() == other._ns.coll());
+        return (_matchType == other._matchType) &&
+            (_ns.db_deprecated() == other._ns.db_deprecated()) && (_ns.coll() == other._ns.coll());
     }
 
     template <typename H>

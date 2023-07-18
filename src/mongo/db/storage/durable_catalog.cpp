@@ -185,7 +185,7 @@ std::string DurableCatalog::generateUniqueIdent(NamespaceString nss, const char*
     stdx::lock_guard<Latch> lk(_randLock);
     StringBuilder buf;
     if (_directoryPerDb) {
-        buf << escapeDbName(nss.db()) << '/';
+        buf << escapeDbName(nss.db_deprecated()) << '/';
     }
     buf << kind;
     buf << (_directoryForIndexes ? '/' : '-');

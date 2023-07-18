@@ -1097,7 +1097,7 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
     // If this is an initial syncing node, drop any conflicting ready index specs prior to
     // proceeding with building them.
     if (indexBuildOptions.applicationMode == ApplicationMode::kInitialSync) {
-        auto dbAndUUID = NamespaceStringOrUUID(nss.db().toString(), collUUID);
+        auto dbAndUUID = NamespaceStringOrUUID(nss.db_deprecated().toString(), collUUID);
         writeConflictRetry(opCtx, "IndexBuildsCoordinator::applyStartIndexBuild", nss, [&] {
             WriteUnitOfWork wuow(opCtx);
 

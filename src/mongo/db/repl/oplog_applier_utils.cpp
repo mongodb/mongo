@@ -566,7 +566,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                     LOGV2(5863600,
                           "Hanging due to 'hangAfterApplyingCollectionDropOplogEntry' failpoint.");
                 },
-                [&](const BSONObj& data) { return (nss.db() == data["dbName"].str()); });
+                [&](const BSONObj& data) { return (nss.db_deprecated() == data["dbName"].str()); });
         }
         return status;
     }

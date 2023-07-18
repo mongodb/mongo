@@ -125,7 +125,7 @@ void checkForCollection(std::shared_ptr<const CollectionCatalog> collectionCatal
                         std::vector<std::string>* pLeaked) {
 
     if (collName.has_value()) {
-        auto nss = NamespaceString(baseNss.db(), collName.value());
+        auto nss = NamespaceString(baseNss.db_deprecated(), collName.value());
 
         if (collectionCatalog->lookupCollectionByNamespace(opCtx, nss)) {
             pLeaked->push_back(toStringForLogging(nss));

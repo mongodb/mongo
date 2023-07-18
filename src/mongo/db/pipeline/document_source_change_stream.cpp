@@ -166,7 +166,7 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
         case ChangeStreamType::kSingleDatabase:
             // Match all namespaces that start with db name, followed by ".", then NOT followed by
             // '$' or 'system.' unless 'showSystemEvents' is set.
-            return "^" + regexEscapeNsForChangeStream(nss.db().toString()) + "\\." +
+            return "^" + regexEscapeNsForChangeStream(nss.db_deprecated().toString()) + "\\." +
                 resolveAllCollectionsRegex(expCtx);
         case ChangeStreamType::kAllChangesForCluster:
             // Match all namespaces that start with any db name other than admin, config, or local,
@@ -184,7 +184,8 @@ std::string DocumentSourceChangeStream::getViewNsRegexForChangeStream(
         case ChangeStreamType::kSingleDatabase:
             // For a single database, match any events on the system.views collection on that
             // database.
-            return "^" + regexEscapeNsForChangeStream(nss.db().toString()) + "\\.system.views$";
+            return "^" + regexEscapeNsForChangeStream(nss.db_deprecated().toString()) +
+                "\\.system.views$";
         case ChangeStreamType::kAllChangesForCluster:
             // Match all system.views collections on all databases.
             return kRegexAllDBs + "\\.system.views$";

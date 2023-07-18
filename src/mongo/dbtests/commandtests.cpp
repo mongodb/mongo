@@ -79,7 +79,7 @@ TEST(CommandTests, InputDocumentSequeceWorksEndToEnd) {
     ASSERT_EQ(db.count(nss), 0u);
 
     OpMsgRequest request;
-    request.body = BSON("insert" << nss.coll() << "$db" << nss.db());
+    request.body = BSON("insert" << nss.coll() << "$db" << nss.db_forTest());
     request.sequences = {{"documents",
                           {
                               BSON("_id" << 1),

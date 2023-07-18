@@ -435,7 +435,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 //            ns: "foo.x"
                 //        }
 
-                string ns = nss.db().toString() + '.' + first.str();
+                string ns = nss.db_deprecated().toString() + '.' + first.str();
 
                 string indexName;
                 auto status = bsonExtractStringField(obj, "index", &indexName);
@@ -1295,7 +1295,7 @@ void syncFixUp(OperationContext* opCtx,
             BSONObj good;
             NamespaceString resNss;
 
-            std::string dbName = nss ? nss->db().toString() : "";
+            std::string dbName = nss ? nss->db_deprecated().toString() : "";
             std::tie(good, resNss) = rollbackSource.findOneByUUID(dbName, uuid, doc._id.wrap());
 
             // To prevent inconsistencies in the transactions collection, rollback fails if the UUID

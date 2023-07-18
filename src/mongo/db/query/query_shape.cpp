@@ -228,7 +228,7 @@ void appendNamespaceShape(BSONObjBuilder& bob,
     if (nss.tenantId()) {
         bob.append("tenantId", opts.serializeIdentifier(nss.tenantId().value().toString()));
     }
-    bob.append("db", opts.serializeIdentifier(nss.db()));
+    bob.append("db", opts.serializeIdentifier(nss.db_deprecated()));
     bob.append("coll", opts.serializeIdentifier(nss.coll()));
 }
 

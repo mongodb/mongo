@@ -145,7 +145,7 @@ void ShardingTestFixtureCommon::expectConfigCollectionInsert(const HostAndPort& 
         const auto batchRequest(BatchedCommandRequest::parseInsert(opMsg));
         const auto& insertReq(batchRequest.getInsertRequest());
 
-        ASSERT_EQ(DatabaseName::kConfig.db(), insertReq.getNamespace().db());
+        ASSERT_EQ(DatabaseName::kConfig.db(), insertReq.getNamespace().db_forTest());
         ASSERT_EQ(collName, insertReq.getNamespace().coll());
 
         const auto& inserts = insertReq.getDocuments();

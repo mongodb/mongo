@@ -112,7 +112,7 @@ public:
             return _get().ns();
         }
         decltype(auto) db() const {
-            return _get().db();
+            return _get().db_deprecated();
         }
         decltype(auto) coll() const {
             return _get().coll();
@@ -413,7 +413,13 @@ public:
         return TenantId{OID::from(&_data[kDataOffset])};
     }
 
-    StringData db() const {
+    /**
+     * This method is deprecated and will be removed as part of SERVER-65456. We strongly
+     * encourage to make the use of `dbName`, which returns a DatabaseName object instead.
+     * In case you would need to a StringData object instead we strongly recommend taking a look
+     * at the DatabaseNameUtil::serialize method which takes in a DatabaseName object.
+     */
+    StringData db_deprecated() const {
         // TODO SERVER-65456 Remove this function.
         auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
         return StringData{_data.data() + offset, _dbNameOffsetEnd()};
@@ -423,7 +429,7 @@ public:
      * This function must only be used in sharding code (src/mongo/s and src/mongo/db/s).
      */
     StringData db_forSharding() const {
-        return db();
+        return db_deprecated();
     }
 
     /**
@@ -537,10 +543,10 @@ public:
         return coll().startsWith(kGlobalIndexCollectionPrefix);
     }
     bool isAdminDB() const {
-        return db() == DatabaseName::kAdmin.db();
+        return db_deprecated() == DatabaseName::kAdmin.db();
     }
     bool isLocalDB() const {
-        return db() == DatabaseName::kLocal.db();
+        return db_deprecated() == DatabaseName::kLocal.db();
     }
     bool isSystemDotProfile() const {
         return coll() == kSystemDotProfileCollectionName;
@@ -565,7 +571,7 @@ public:
         return (coll() == kSystemUsers) || (coll() == kSystemRoles);
     }
     bool isConfigDB() const {
-        return db() == DatabaseName::kConfig.db();
+        return db_deprecated() == DatabaseName::kConfig.db();
     }
     bool isCommand() const {
         return coll() == "$cmd";

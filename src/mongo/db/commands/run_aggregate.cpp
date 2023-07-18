@@ -425,7 +425,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
         // If the involved namespace is not in the same database as the aggregation, it must be
         // from a $lookup/$graphLookup into a tenant migration donor's oplog view or from an
         // $out/$merge to a collection in a different database.
-        if (involvedNs.db() != request.getNamespace().db()) {
+        if (involvedNs.db_deprecated() != request.getNamespace().db_deprecated()) {
             if (involvedNs == NamespaceString::kTenantMigrationOplogView) {
                 // For tenant migrations, we perform an aggregation on 'config.transactions' but
                 // require a lookup stage involving a view on the 'local' database.

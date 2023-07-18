@@ -283,7 +283,7 @@ EncryptedStateCollectionsNamespaces::createFromDataCollection(const Collection& 
     }
 
     auto& cfg = *(edc.getCollectionOptions().encryptedFieldConfig);
-    auto db = edc.ns().db();
+    auto db = edc.ns().db_deprecated();
     StringData missingColl;
     EncryptedStateCollectionsNamespaces namespaces;
 

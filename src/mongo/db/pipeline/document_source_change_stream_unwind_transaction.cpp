@@ -511,7 +511,7 @@ void DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::_addAff
     const Document& object = doc["o"].getDocument();
     for (const auto& fieldName : kCollectionField) {
         if (object[fieldName].getType() == BSONType::String) {
-            _affectedNamespaces.emplace(str::stream{} << dbCmdNs.db() << "."
+            _affectedNamespaces.emplace(str::stream{} << dbCmdNs.db_deprecated() << "."
                                                       << object[fieldName].getStringData());
             return;
         }

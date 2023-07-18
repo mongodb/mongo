@@ -216,8 +216,8 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     bool stayTemp,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
-    auto cachedDbInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, targetNs.db()));
+    auto cachedDbInfo = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, targetNs.db_deprecated()));
     auto newCmdObj = CommonMongodProcessInterface::_convertRenameToInternalRename(
         opCtx, sourceNs, targetNs, originalCollectionOptions, originalIndexes);
     BSONObjBuilder newCmdWithWriteConcernBuilder(std::move(newCmdObj));
@@ -248,7 +248,7 @@ BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCt
     }
 
     auto cachedDbInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db()));
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db_deprecated()));
     auto shard = uassertStatusOK(
         Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cachedDbInfo->getPrimary()));
 
@@ -260,7 +260,7 @@ BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCt
         resultCollections = uassertStatusOK(
             shard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                              nss.db().toString(),
+                                              nss.db_deprecated().toString(),
                                               appendDbVersionIfPresent(cmdObj, cachedDbInfo),
                                               Milliseconds(-1)));
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
@@ -307,7 +307,7 @@ std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* 
     // Note that 'ns' must be an unsharded collection. The indexes for a sharded collection must be
     // read from a shard with a chunk instead of the primary shard.
     auto cachedDbInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db()));
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db_deprecated()));
     auto shard = uassertStatusOK(
         Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cachedDbInfo->getPrimary()));
     auto cmdObj = BSON("listIndexes" << ns.coll());
@@ -316,7 +316,7 @@ std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* 
         indexes = uassertStatusOK(
             shard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                              ns.db().toString(),
+                                              ns.db_deprecated().toString(),
                                               appendDbVersionIfPresent(cmdObj, cachedDbInfo),
                                               Milliseconds(-1)));
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
@@ -354,7 +354,7 @@ void ShardServerProcessInterface::createCollection(OperationContext* opCtx,
 
 void ShardServerProcessInterface::createIndexesOnEmptyCollection(
     OperationContext* opCtx, const NamespaceString& ns, const std::vector<BSONObj>& indexSpecs) {
-    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), ns.db());
+    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), ns.db_deprecated());
     router.route(
         opCtx,
         "copying index for empty collection {}"_format(NamespaceStringUtil::serialize(ns)),
@@ -371,7 +371,7 @@ void ShardServerProcessInterface::createIndexesOnEmptyCollection(
 
             auto response = std::move(
                 gatherResponses(opCtx,
-                                ns.db(),
+                                ns.db_deprecated(),
                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                 Shard::RetryPolicy::kIdempotent,
                                 std::vector<AsyncRequestsSender::Request>{
@@ -396,7 +396,7 @@ void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
     // Build and execute the dropCollection command against the primary shard of the given
     // database.
     auto cachedDbInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db()));
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db_deprecated()));
     BSONObjBuilder newCmdBuilder;
     newCmdBuilder.append("drop", ns.coll());
     newCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
@@ -404,7 +404,7 @@ void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
     auto cmdObj = newCmdBuilder.done();
     auto response =
         executeCommandAgainstDatabasePrimary(opCtx,
-                                             ns.db(),
+                                             ns.db_deprecated(),
                                              std::move(cachedDbInfo),
                                              cmdObj,
                                              ReadPreferenceSetting(ReadPreference::PrimaryOnly),

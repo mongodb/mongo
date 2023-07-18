@@ -520,7 +520,7 @@ static void populateAdditionalScanDefs(
         }
         scanDefs.emplace(scanDefName,
                          createScanDef({{"type", "mongod"},
-                                        {"database", involvedNss.db().toString()},
+                                        {"database", involvedNss.db_deprecated().toString()},
                                         {"uuid", uuidStr},
                                         {ScanNode::kDefaultCollectionNameSpec, collNameStr}},
                                        std::move(indexDefs),
@@ -651,7 +651,7 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
     }
     scanDefs.emplace(scanDefName,
                      createScanDef({{"type", "mongod"},
-                                    {"database", nss.db().toString()},
+                                    {"database", nss.db_deprecated().toString()},
                                     {"uuid", uuidStr},
                                     {ScanNode::kDefaultCollectionNameSpec, nss.coll().toString()}},
                                    std::move(indexDefs),

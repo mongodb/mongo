@@ -256,7 +256,7 @@ NamespaceString NamespaceString::makeDummyNamespace(const boost::optional<Tenant
 
 std::string NamespaceString::getSisterNS(StringData local) const {
     MONGO_verify(local.size() && local[0] != '.');
-    return db().toString() + "." + local.toString();
+    return db_deprecated().toString() + "." + local.toString();
 }
 
 void NamespaceString::serializeCollectionName(BSONObjBuilder* builder, StringData fieldName) const {
@@ -273,7 +273,7 @@ bool NamespaceString::isDropPendingNamespace() const {
 
 NamespaceString NamespaceString::makeDropPendingNamespace(const repl::OpTime& opTime) const {
     StringBuilder ss;
-    ss << db() << "." << dropPendingNSPrefix;
+    ss << db_deprecated() << "." << dropPendingNSPrefix;
     ss << opTime.getSecs() << "i" << opTime.getTimestamp().getInc() << "t" << opTime.getTerm();
     ss << "." << coll();
     return NamespaceString(ss.stringData());
@@ -348,15 +348,15 @@ bool NamespaceString::isNamespaceAlwaysUnsharded() const {
 }
 
 bool NamespaceString::isConfigDotCacheDotChunks() const {
-    return db() == "config" && coll().startsWith("cache.chunks.");
+    return db_deprecated() == "config" && coll().startsWith("cache.chunks.");
 }
 
 bool NamespaceString::isReshardingLocalOplogBufferCollection() const {
-    return db() == "config" && coll().startsWith(kReshardingLocalOplogBufferPrefix);
+    return db_deprecated() == "config" && coll().startsWith(kReshardingLocalOplogBufferPrefix);
 }
 
 bool NamespaceString::isReshardingConflictStashCollection() const {
-    return db() == "config" && coll().startsWith(kReshardingConflictStashPrefix);
+    return db_deprecated() == "config" && coll().startsWith(kReshardingConflictStashPrefix);
 }
 
 bool NamespaceString::isTemporaryReshardingCollection() const {
@@ -412,7 +412,7 @@ NamespaceString NamespaceString::getTimeseriesViewNamespace() const {
 }
 
 bool NamespaceString::isImplicitlyReplicated() const {
-    if (db() == DatabaseName::kConfig.db()) {
+    if (db_deprecated() == DatabaseName::kConfig.db()) {
         if (isChangeStreamPreImagesCollection() || isConfigImagesCollection() ||
             isChangeCollection()) {
             // Implicitly replicated namespaces are replicated, although they only replicate a

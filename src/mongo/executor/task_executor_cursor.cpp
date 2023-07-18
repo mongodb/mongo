@@ -256,7 +256,7 @@ void TaskExecutorCursor::_processResponse(OperationContext* opCtx, CursorRespons
     // If this was our first batch.
     if (_cursorId == kUnitializedCursorId) {
         _ns = response.getNSS();
-        _rcr.dbname = _ns.db().toString();
+        _rcr.dbname = _ns.db_deprecated().toString();
         // 'vars' and type are only included in the first batch.
         _cursorVars = response.getVarsField();
         _cursorType = response.getCursorType();

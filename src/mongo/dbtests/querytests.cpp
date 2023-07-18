@@ -1884,18 +1884,18 @@ public:
         const bool includeBuildUUIDs = false;
         const int options = 0;
 
-        auto specsWithIdIndexOnly =
-            _client.getIndexSpecs(NamespaceStringOrUUID(nss().db().toString(), *coll_opts.uuid),
-                                  includeBuildUUIDs,
-                                  options);
+        auto specsWithIdIndexOnly = _client.getIndexSpecs(
+            NamespaceStringOrUUID(nss().db_forTest().toString(), *coll_opts.uuid),
+            includeBuildUUIDs,
+            options);
         ASSERT_EQUALS(1U, specsWithIdIndexOnly.size());
 
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("a" << 1), true));
 
-        auto specsWithBothIndexes =
-            _client.getIndexSpecs(NamespaceStringOrUUID(nss().db().toString(), *coll_opts.uuid),
-                                  includeBuildUUIDs,
-                                  options);
+        auto specsWithBothIndexes = _client.getIndexSpecs(
+            NamespaceStringOrUUID(nss().db_forTest().toString(), *coll_opts.uuid),
+            includeBuildUUIDs,
+            options);
         ASSERT_EQUALS(2U, specsWithBothIndexes.size());
     }
 };

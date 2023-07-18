@@ -338,7 +338,7 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
                                 const NamespaceString& source,
                                 const NamespaceString& target,
                                 RenameCollectionOptions options) {
-    invariant(source.db() == target.db());
+    invariant(source.db_deprecated() == target.db_deprecated());
     DisableDocumentValidation validationDisabler(opCtx);
 
     AutoGetDb autoDb(opCtx, source.dbName(), MODE_IX);
@@ -392,7 +392,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                                            const boost::optional<UUID>& uuidToDrop,
                                            repl::OpTime renameOpTimeFromApplyOps,
                                            const RenameCollectionOptions& options) {
-    invariant(source.db() == target.db());
+    invariant(source.db_deprecated() == target.db_deprecated());
     DisableDocumentValidation validationDisabler(opCtx);
 
     AutoGetDb autoDb(opCtx, source.dbName(), MODE_X);
@@ -457,7 +457,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
             invariant(options.dropTarget);
             auto collToDropBasedOnUUID = getNamespaceFromUUID(opCtx, uuidToDrop.value());
             if (collToDropBasedOnUUID && !collToDropBasedOnUUID->isDropPendingNamespace()) {
-                invariant(collToDropBasedOnUUID->db() == target.db());
+                invariant(collToDropBasedOnUUID->db_deprecated() == target.db_deprecated());
                 targetColl = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                     opCtx, *collToDropBasedOnUUID);
             }
@@ -495,7 +495,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                                        const NamespaceString& target,
                                        const RenameCollectionOptions& options) {
     invariant(
-        source.db() != target.db(),
+        source.db_deprecated() != target.db_deprecated(),
         str::stream()
             << "cannot rename within same database (use renameCollectionWithinDB instead): source: "
             << source.toStringForErrorMsg() << "; target: " << target.toStringForErrorMsg());
@@ -786,7 +786,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
 
     // Getting here means we successfully built the target copy. We now do the final
     // in-place rename and remove the source collection.
-    invariant(tmpName.db() == target.db());
+    invariant(tmpName.db_deprecated() == target.db_deprecated());
     RenameCollectionOptions tempOptions(options);
     Status status = renameCollectionWithinDB(opCtx, tmpName, target, tempOptions);
     if (!status.isOK())
@@ -962,7 +962,7 @@ Status renameCollection(OperationContext* opCtx,
           "targetNamespace"_attr = target,
           "dropTarget"_attr = dropTargetMsg);
 
-    if (source.db() == target.db())
+    if (source.db_deprecated() == target.db_deprecated())
         return renameCollectionWithinDB(opCtx, source, target, options);
     else {
         return renameCollectionAcrossDatabases(opCtx, source, target, options);
@@ -1065,7 +1065,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
           "targetNamespace"_attr = targetNss,
           "uuidToDrop"_attr = uuidToDropString);
 
-    if (sourceNss.db() == targetNss.db()) {
+    if (sourceNss.db_deprecated() == targetNss.db_deprecated()) {
         return renameCollectionWithinDBForApplyOps(
             opCtx, sourceNss, targetNss, uuidToDrop, renameOpTime, options);
     } else {
@@ -1079,7 +1079,7 @@ Status renameCollectionForRollback(OperationContext* opCtx,
     // If the UUID we're targeting already exists, rename from there no matter what.
     auto source = getNamespaceFromUUID(opCtx, uuid);
     invariant(source);
-    invariant(source->db() == target.db(),
+    invariant(source->db_deprecated() == target.db_deprecated(),
               str::stream() << "renameCollectionForRollback: source and target namespaces must "
                                "have the same database. source: "
                             << (*source).toStringForErrorMsg()

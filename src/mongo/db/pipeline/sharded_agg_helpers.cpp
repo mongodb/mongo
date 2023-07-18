@@ -1247,7 +1247,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
             // should not participate in the shard version protocol.
             shardResults =
                 scatterGatherUnversionedTargetAllShards(opCtx,
-                                                        expCtx->ns.db(),
+                                                        expCtx->ns.db_deprecated(),
                                                         targetedCommand,
                                                         ReadPreferenceSetting::get(opCtx),
                                                         Shard::RetryPolicy::kIdempotent);
@@ -1257,7 +1257,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
             invariant(executionNsRoutingInfo);
             shardResults =
                 scatterGatherVersionedTargetByRoutingTable(expCtx,
-                                                           expCtx->ns.db(),
+                                                           expCtx->ns.db_deprecated(),
                                                            expCtx->ns,
                                                            *executionNsRoutingInfo,
                                                            targetedCommand,
@@ -1297,7 +1297,8 @@ DispatchShardPipelineResults dispatchShardPipeline(
 
         // For $changeStream, we must open an extra cursor on the 'config.shards' collection, so
         // that we can monitor for the addition of new shards inline with real events.
-        if (hasChangeStream && expCtx->ns.db() != NamespaceString::kConfigsvrShardsNamespace.db()) {
+        if (hasChangeStream &&
+            expCtx->ns.db_deprecated() != NamespaceString::kConfigsvrShardsNamespace.db()) {
             cursors.emplace_back(openChangeStreamNewShardMonitor(expCtx, shardRegistryReloadTime));
         }
     }

@@ -112,7 +112,7 @@ void createCollection(OperationContext* opCtx, const NamespaceString& nss) {
 Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& source,
                         const NamespaceString& target) {
-    ASSERT_EQ(source.db(), target.db());
+    ASSERT_EQ(source.db_forTest(), target.db_forTest());
     return renameCollection(opCtx, source, target, {});
 }
 

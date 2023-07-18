@@ -89,7 +89,7 @@ bool ClonerUtils::isNamespaceForTenant(NamespaceString nss, StringData prefix) {
     if (gMultitenancySupport && nss.tenantId() != boost::none) {
         return nss.tenantId()->toString() == prefix;
     }
-    return nss.db().startsWith(prefix + "_");
+    return nss.db_deprecated().startsWith(prefix + "_");
 }
 
 }  // namespace repl

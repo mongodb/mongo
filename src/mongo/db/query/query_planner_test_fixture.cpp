@@ -486,7 +486,7 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     const bool isExplain = false;
 
     // If there is no '$db', append it.
-    auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), cmdObj).body;
+    auto cmd = OpMsgRequest::fromDBAndBody(nss.db_forTest(), cmdObj).body;
     std::unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmd, nss));
 
@@ -518,7 +518,7 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
     const bool isExplain = false;
 
     // If there is no '$db', append it.
-    auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), cmdObj).body;
+    auto cmd = OpMsgRequest::fromDBAndBody(nss.db_forTest(), cmdObj).body;
     std::unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmd, nss));
 

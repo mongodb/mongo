@@ -96,7 +96,7 @@ public:
                 auto result = CommandHelpers::runCommandDirectly(
                     opCtx,
                     OpMsgRequest::fromDBAndBody(
-                        ns.db(),
+                        ns.db_deprecated(),
                         BSON("aggregate" << ns.coll() << "cursor" << BSONObj{} << "pipeline"
                                          << BSON_ARRAY(BSON("$collStats" << BSON(
                                                                 "storageStats" << BSON(

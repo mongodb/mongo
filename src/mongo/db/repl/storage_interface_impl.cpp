@@ -584,7 +584,7 @@ Status StorageInterfaceImpl::renameCollection(OperationContext* opCtx,
                                               const NamespaceString& fromNS,
                                               const NamespaceString& toNS,
                                               bool stayTemp) {
-    if (fromNS.db() != toNS.db()) {
+    if (fromNS.db_deprecated() != toNS.db_deprecated()) {
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "Cannot rename collection between databases. From NS: "
                                     << fromNS.toStringForErrorMsg()

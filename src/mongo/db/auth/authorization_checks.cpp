@@ -76,7 +76,7 @@ Status checkAuthForCreateOrModifyView(OperationContext* opCtx,
         opCtx,
         viewNs,
         BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline << "cursor" << BSONObj()
-                         << "$db" << viewOnNs.db()),
+                         << "$db" << viewOnNs.db_deprecated()),
         boost::none,
         false);
 

@@ -186,7 +186,8 @@ Status KeysCollectionClientDirect::_insert(OperationContext* opCtx,
 
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {
         // Note: write commands can only be issued against a primary.
-        auto swResponse = _rsLocalClient.runCommandOnce(opCtx, nss.db().toString(), cmdObj);
+        auto swResponse =
+            _rsLocalClient.runCommandOnce(opCtx, nss.db_deprecated().toString(), cmdObj);
 
         BatchedCommandResponse batchResponse;
         auto writeStatus =
