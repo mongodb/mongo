@@ -372,6 +372,24 @@ struct HashLookupStats : public SpecificStats {
     long long spilledBuffBytesOverAllRecords{0};
 };
 
+struct WindowStats : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<WindowStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const final {
+        return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+};
+
 /**
  * Visitor for calculating the number of storage reads during plan execution.
  */

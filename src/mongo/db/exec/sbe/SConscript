@@ -100,6 +100,7 @@ sbeEnv.Library(
         'stages/union.cpp',
         'stages/unique.cpp',
         'stages/unwind.cpp',
+        'stages/window.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -242,6 +243,7 @@ env.CppUnitTest(
         'sbe_trial_run_tracker_test.cpp',
         'sbe_unique_test.cpp',
         'sbe_unittest.cpp',
+        'sbe_window_test.cpp',
         'util/stage_results_printer_test.cpp',
         'values/column_store_encoder_test.cpp',
         'values/columnar_test.cpp',
