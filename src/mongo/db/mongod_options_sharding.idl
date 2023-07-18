@@ -37,20 +37,24 @@ global:
 
 configs:
     configsvr:
-        description: 'Declare this is a config db of a cluster; default port 27019; default dir /data/configdb'
+        description: >-
+            Assigns the config-server role to this node in a sharded cluster. The default listening
+            port is 27019 and the default database directory is /data/configdb.
         arg_vartype: Switch
         source: [ cli, ini ]
-        conflicts: [ shardsvr ]
+        conflicts: shardsvr
     shardsvr:
-        description: 'Declare this is a shard db of a cluster; default port 27018'
+        description: >-
+            Assigns the shard-server role to this node in a sharded cluster. The default listening
+            port is 27018.
         arg_vartype: Switch
         source: [ cli, ini ]
         conflicts: configsvr
     'sharding.clusterRole':
         description: >-
-            Choose what role this mongod has in a sharded cluster.  Possible values are:
-            "configsvr": Start this node as a config server.  Starts on port 27019 by default.
-            "shardsvr": Start this node as a shard server.  Starts on port 27018 by default.
+            Assigns a role to this node in a sharded cluster. Possible values are:
+            "configsvr": Assigns the config-server role. The default listening port is 27019.
+            "shardsvr": Assigns the shard-server role. The default listening port is 27018.
         arg_vartype: String
         source: yaml
         validator:
@@ -63,3 +67,15 @@ configs:
         source: yaml
         conflicts: configsvr
         requires: 'storage.queryableBackupMode'
+    router:
+        description: >-
+            Assigns the router role to this node in a sharded cluster, and results in listening on
+            a dedicated port (27017 by default) for routing requests.
+        arg_vartype: Switch
+        source: [ cli, ini ]
+    'sharding.routerEnabled':
+        description: >-
+            Assigns the router role to this node in a sharded cluster, and results in listening on
+            a dedicated port (27017 by default) for routing requests.
+        arg_vartype: Bool
+        source: yaml

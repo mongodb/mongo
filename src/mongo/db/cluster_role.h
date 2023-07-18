@@ -67,6 +67,7 @@ public:
     ClusterRole(Value role = ClusterRole::None);
     ClusterRole(std::initializer_list<Value> roles);
     ClusterRole& operator=(const ClusterRole& rhs);
+    ClusterRole& operator+=(Value role);
 
     /**
      * Returns `true` if this node plays the given role, `false` otherwise. Even if the node plays

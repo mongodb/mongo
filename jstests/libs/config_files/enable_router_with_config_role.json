@@ -1,0 +1,9 @@
+{
+    "sharding" : {
+        "clusterRole" : "configsvr",
+        "routerEnabled" : true
+    },
+    "replication" : {
+        "replSetName" : "dummy"
+    }
+}

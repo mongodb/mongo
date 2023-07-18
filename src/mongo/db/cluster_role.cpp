@@ -52,6 +52,15 @@ ClusterRole& ClusterRole::operator=(const ClusterRole& rhs) {
     return *this;
 }
 
+ClusterRole& ClusterRole::operator+=(Value role) {
+    _roleMask |= role;
+    // TODO (SERVER-78810): Review these invariants as a node acting config and router roles (no
+    // shard role) would be allowed.
+    invariant(!hasExclusively(ClusterRole::ConfigServer),
+              "Role cannot be set to config server only");
+    return *this;
+}
+
 bool ClusterRole::has(const ClusterRole& role) const {
     return role._roleMask == None ? _roleMask == None : _roleMask & role._roleMask;
 }

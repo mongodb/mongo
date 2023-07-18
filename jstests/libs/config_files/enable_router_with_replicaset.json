@@ -1,0 +1,8 @@
+{
+    "sharding" : {
+        "routerEnabled" : true
+    },
+    "replication" : {
+        "replSetName" : "dummy"
+    }
+}

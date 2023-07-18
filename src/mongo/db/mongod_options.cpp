@@ -238,6 +238,25 @@ Status validateMongodOptions(const moe::Environment& params) {
     }
 #endif
 
+    bool setConfigRole = params.count("configsvr");
+    bool setShardRole = params.count("shardsvr");
+    if (params.count("sharding.clusterRole")) {
+        auto clusterRole = params["sharding.clusterRole"].as<std::string>();
+        setConfigRole = setConfigRole || clusterRole == "configsvr";
+        setShardRole = setShardRole || clusterRole == "shardsvr";
+    }
+
+    bool setRouterRole = params.count("router");
+    if (params.count("sharding.routerEnabled")) {
+        setRouterRole = setRouterRole || params["sharding.routerEnabled"].as<bool>();
+    }
+
+    // TODO (SERVER-79008): Make `--configdb` mandatory when the embedded router is enabled.
+    if (setRouterRole && !setConfigRole && !setShardRole) {
+        return Status(ErrorCodes::BadValue,
+                      "The embedded router requires the node to act as a shard or config server");
+    }
+
     if (params.count("storage.queryableBackupMode")) {
         // Command line options that are disallowed when --queryableBackupMode is specified.
         for (const auto& disallowedOption :
@@ -249,13 +268,7 @@ Status validateMongodOptions(const moe::Environment& params) {
             }
         }
 
-        bool isClusterRoleShard = params.count("shardsvr");
-        if (params.count("sharding.clusterRole")) {
-            auto clusterRole = params["sharding.clusterRole"].as<std::string>();
-            isClusterRoleShard = isClusterRoleShard || (clusterRole == "shardsvr");
-        }
-
-        if (isClusterRoleShard && !params.count("sharding._overrideShardIdentity")) {
+        if (setShardRole && !params.count("sharding._overrideShardIdentity")) {
             return Status(
                 ErrorCodes::BadValue,
                 "shardsvr cluster role with queryableBackupMode requires _overrideShardIdentity");
@@ -266,7 +279,6 @@ Status validateMongodOptions(const moe::Environment& params) {
 }
 
 Status canonicalizeMongodOptions(moe::Environment* params) {
-
     Status ret = canonicalizeServerOptions(params);
     if (!ret.isOK()) {
         return ret;
@@ -318,6 +330,20 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
             return ret;
         }
         ret = params->remove("shardsvr");
+        if (!ret.isOK()) {
+            return ret;
+        }
+    }
+
+    // "sharding.routerEnabled" comes from the config file, so override it if "router" is set since
+    // those come from the command line.
+    if (params->count("router")) {
+        Status ret =
+            params->set("sharding.routerEnabled", moe::Value((*params)["router"].as<bool>()));
+        if (!ret.isOK()) {
+            return ret;
+        }
+        ret = params->remove("router");
         if (!ret.isOK()) {
             return ret;
         }
@@ -641,6 +667,10 @@ Status storeMongodOptions(const moe::Environment& params) {
             }
         } else if (clusterRoleParam == "shardsvr") {
             serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+        }
+
+        if (params.count("sharding.routerEnabled") && params["sharding.routerEnabled"].as<bool>()) {
+            serverGlobalParams.clusterRole += ClusterRole::RouterServer;
         }
     }
 
