@@ -162,7 +162,7 @@ GlobalInitializerRegisterer filterAllowedIndexFieldNamesEmbeddedInitializer(
     "FilterAllowedIndexFieldNamesEmbedded",
     [](InitializerContext* service) {
         index_key_validate::filterAllowedIndexFieldNames =
-            [](std::map<StringData, std::set<IndexType>>& allowedIndexFieldNames) {
+            [](std::set<StringData>& allowedIndexFieldNames) {
                 allowedIndexFieldNames.erase(IndexDescriptor::kBackgroundFieldName);
                 allowedIndexFieldNames.erase(IndexDescriptor::kExpireAfterSecondsFieldName);
             };

@@ -92,7 +92,7 @@
 namespace mongo {
 namespace index_key_validate {
 
-std::function<void(std::map<StringData, std::set<IndexType>>&)> filterAllowedIndexFieldNames;
+std::function<void(std::set<StringData>&)> filterAllowedIndexFieldNames;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
@@ -142,16 +142,12 @@ Status isIndexVersionAllowedForCreation(IndexVersion indexVersion, const BSONObj
 BSONObj buildRepairedIndexSpec(
     const NamespaceString& ns,
     const BSONObj& indexSpec,
-    const std::map<StringData, std::set<IndexType>>& allowedFieldNames,
+    const std::set<StringData>& allowedFieldNames,
     std::function<void(const BSONElement&, BSONObjBuilder*)> indexSpecHandleFn) {
-    const auto key = indexSpec.getObjectField(IndexDescriptor::kKeyPatternFieldName);
-    const auto indexName = IndexNames::nameToType(IndexNames::findPluginName(key));
     BSONObjBuilder builder;
     for (const auto& indexSpecElem : indexSpec) {
         StringData fieldName = indexSpecElem.fieldNameStringData();
-        auto it = allowedFieldNames.find(fieldName);
-        if (it != allowedFieldNames.end() &&
-            (it->second.empty() || it->second.count(indexName) != 0)) {
+        if (allowedFieldNames.count(fieldName)) {
             indexSpecHandleFn(indexSpecElem, &builder);
         } else {
             LOGV2_WARNING(23878,
@@ -330,7 +326,7 @@ BSONObj removeUnknownFields(const NamespaceString& ns, const BSONObj& indexSpec)
 
 BSONObj repairIndexSpec(const NamespaceString& ns,
                         const BSONObj& indexSpec,
-                        const std::map<StringData, std::set<IndexType>>& allowedFieldNames) {
+                        const std::set<StringData>& allowedFieldNames) {
     auto fixIndexSpecFn = [&indexSpec, &ns](const BSONElement& indexSpecElem,
                                             BSONObjBuilder* builder) {
         StringData fieldName = indexSpecElem.fieldNameStringData();
