@@ -148,6 +148,7 @@ variables:
   # 3.4.0-rc3 and 3.4.0-rc4 when running Jepsen with at least --time-limit=600.
   jepsen_time_limit: --time-limit 1200
   jepsen_write_concern: ""
+  mongod_conf: --mongod-conf mongod_verbose.conf
 
 # Template for running Jepsen tests
 - &run_jepsen_template
@@ -1420,6 +1421,23 @@ functions:
       binary: bash
       args:
       - "./src/evergreen/jepsen_docker/setup.sh"
+  "setup jepsen config fuzzer":
+  - *f_expansions_write
+  - command: subprocess.exec
+    type: system
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/do_jepsen_setup/create_fuzz_config.sh"
+
+  "setup jepsen docker config fuzzer":
+  - *f_expansions_write
+  - command: subprocess.exec
+    type: system
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/jepsen_docker/setup_config_fuzzer.sh"
   "run jepsen docker test":
   - *f_expansions_write
   - command: subprocess.exec
@@ -3791,6 +3809,105 @@ tasks:
   commands:
   - func: "do setup"
   - func: "do jepsen docker setup"
+  - func: "run jepsen docker test"
+
+- <<: *run_jepsen_template
+  name: jepsen_config_fuzzer_register_findAndModify
+  tags: ["jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "setup jepsen config fuzzer"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      mongod_conf: --mongod-conf mongod.conf
+      jepsen_read_with_find_and_modify: --read-with-find-and-modify
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: register
+
+- <<: *run_jepsen_template
+  name: jepsen_config_fuzzer_register_linearizableRead
+  tags: ["jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "setup jepsen config fuzzer"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      mongod_conf: --mongod-conf mongod.conf
+      jepsen_read_concern: --read-concern linearizable
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: register
+
+- <<: *run_jepsen_template
+  name: jepsen_config_fuzzer_set_linearizableRead
+  tags: ["jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "setup jepsen config fuzzer"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      mongod_conf: --mongod-conf mongod.conf
+      jepsen_read_concern: --read-concern linearizable
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: set
+
+- <<: *run_jepsen_template
+  name: jepsen_config_fuzzer_read-concern-majority
+  tags: ["jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "setup jepsen config fuzzer"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      mongod_conf: --mongod-conf mongod.conf
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: read-concern-majority
+
+# Smoke test to ensure the Server still works with Jepsen
+- <<: *run_jepsen_template
+  name: jepsen-config_fuzzer_smoke
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "setup jepsen config fuzzer"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      mongod_conf: --mongod-conf mongod.conf
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: read-concern-majority
+      jepsen_time_limit: --time-limit 120
+
+- <<: *run_jepsen_template
+  name: jepsen_config_fuzzer_read-concern-majority_w1
+  tags: ["jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "setup jepsen config fuzzer"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      mongod_conf: --mongod-conf mongod.conf
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: read-concern-majority
+      jepsen_write_concern: --write-concern w1
+
+- <<: *run_jepsen_template
+  name: jepsen_config_fuzzer_list-append
+  tags: ["jepsen_docker"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen docker setup"
+  - func: "setup jepsen docker config fuzzer"
   - func: "run jepsen docker test"
 
 ## initial sync multiversion fuzzer ##

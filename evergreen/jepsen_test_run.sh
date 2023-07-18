@@ -26,9 +26,9 @@ lein run test --test ${jepsen_test_name} \
   --working-dir ${workdir}/src/jepsen-workdir \
   --clock-skew faketime \
   --libfaketime-path ${workdir}/src/libfaketime/build/libfaketime.so.1 \
-  --mongod-conf mongod_verbose.conf \
   --virtualization none \
   --nodes-file ../nodes.txt \
+  ${mongod_conf} \
   ${jepsen_key_time_limit} \
   ${jepsen_protocol_version} \
   ${jepsen_read_concern} \
