@@ -949,13 +949,13 @@ bool DocumentSourceInternalUnpackBucket::enableStreamingGroupIfPossible(
         return false;
     }
 
-    const auto& idFields = groupStage->getMutableIdFields();
+    auto& idFields = groupStage->getMutableIdFields();
     std::vector<size_t> monotonicIdFields;
     for (size_t i = 0; i < idFields.size(); ++i) {
         // To enable streaming, we need id field expression to be clustered, so that all documents
         // with the same value of this id field are in a single continious cluster. However this
         // property is hard to check for, so we check for monotonicity instead, which is stronger.
-        idFields[i]->optimize();  // We optimize here to make use of constant folding.
+        idFields[i] = idFields[i]->optimize();  // We optimize here to make use of constant folding.
         auto monotonicState = idFields[i]->getMonotonicState(timeField);
 
         // We don't add monotonic::State::Constant id fields, because they are useless when

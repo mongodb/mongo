@@ -74,7 +74,7 @@ public:
 
     // Optimize the newRoot expression.
     void optimize() final {
-        _newRoot->optimize();
+        _newRoot = _newRoot->optimize();
     }
 
     Document serializeTransformation(boost::optional<ExplainOptions::Verbosity> explain,

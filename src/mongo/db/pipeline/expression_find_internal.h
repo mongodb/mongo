@@ -108,8 +108,8 @@ public:
     }
 
     boost::intrusive_ptr<Expression> optimize() final {
-        for (const auto& child : _children) {
-            child->optimize();
+        for (auto& child : _children) {
+            child = child->optimize();
         }
         // SERVER-43740: ideally we'd want to optimize '_matchExpr' here as well. However, given
         // that the match expression is stored as a shared copyable expression in this class, and
@@ -180,7 +180,7 @@ public:
     boost::intrusive_ptr<Expression> optimize() final {
         invariant(_children.size() == 1ul);
 
-        _children[0]->optimize();
+        _children[0] = _children[0]->optimize();
         return this;
     }
 
@@ -226,7 +226,7 @@ public:
     boost::intrusive_ptr<Expression> optimize() final {
         invariant(_children.size() == 1ul);
 
-        _children[0]->optimize();
+        _children[0] = _children[0]->optimize();
         // SERVER-43740: ideally we'd want to optimize '_matchExpr' here as well. However, given
         // that the match expression is stored as a shared copyable expression in this class, and
         // 'MatchExpression::optimize()' takes and returns a unique pointer on a match expression,

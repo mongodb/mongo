@@ -75,7 +75,7 @@ public:
      */
     void optimize() override {
         if (_rootReplacementExpression) {
-            _rootReplacementExpression->optimize();
+            _rootReplacementExpression = _rootReplacementExpression->optimize();
         }
     }
 
