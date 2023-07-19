@@ -114,6 +114,13 @@ function assertExpectedChunksOnShard(configDB, coll, shardName, expectedChunks) 
     });
 }
 
+function waitForAutomergerToCompleteAndAssert(configDB, coll, shardName, expectedChunks) {
+    assert.soonNoExcept(() => {
+        assertExpectedChunksOnShard(configDB, coll, shardName, expectedChunks);
+        return true;
+    }, "Automerger didn't merge the expected chunks within a reasonable time");
+}
+
 /* Build the following scenario:
  *  - shard0
  *         { min: MinKey, max:0 }
@@ -356,22 +363,19 @@ function balancerTriggersAutomergerWhenIsEnabledTest(st, testDB) {
     setBalanceRoundInterval(st, 100 /* ms */);
     setBalancerMergeThrottling(st, 0);
 
-    // Enable Automerger
+    // Enable the AutoMerger
     st.startBalancer();
 
-    // Perform a couple of balancer rounds to give automerger time to do its job
-    for (let i = 0; i < 3; ++i) {
-        st.awaitBalancerRound();
-    }
-
-    // All mergeable chunks should be merged
+    // All mergeable chunks should be eventually merged by the AutoMerger
     colls.forEach((coll) => {
-        assertExpectedChunksOnShard(
+        waitForAutomergerToCompleteAndAssert(
             configDB,
             coll,
             shard0,
             [{min: MinKey, max: 1}, {min: 3, max: 7}, {min: 10, max: MaxKey}]);
-        assertExpectedChunksOnShard(configDB, coll, shard1, [{min: 1, max: 3}, {min: 7, max: 10}]);
+
+        waitForAutomergerToCompleteAndAssert(
+            configDB, coll, shard1, [{min: 1, max: 3}, {min: 7, max: 10}]);
     });
 }
 
