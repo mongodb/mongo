@@ -61,42 +61,30 @@ assert.commandWorked(lessThanSevenView.explain().count());
 assert.commandWorked(greaterThanThreeView.explain().count({x: 6}));
 let explainPlan = lessThanSevenView.explain().count({foo: "bar"});
 assert.commandWorked(explainPlan);
-if (explainPlan.hasOwnProperty("stages")) {
-    explainPlan = explainPlan.stages[0].$cursor;
-}
-assert.eq(explainPlan.queryPlanner.namespace, "views_count.coll");
+assert.eq(explainPlan["stages"][0]["$cursor"]["queryPlanner"]["namespace"], "views_count.coll");
 
 // Count with explicit explain modes works on a view.
 explainPlan = assert.commandWorked(lessThanSevenView.explain("queryPlanner").count({x: {$gte: 5}}));
-if (explainPlan.hasOwnProperty("stages")) {
-    explainPlan = explainPlan.stages[0].$cursor;
-}
-assert.eq(explainPlan.queryPlanner.namespace, "views_count.coll");
-assert(!explainPlan.hasOwnProperty("executionStats"));
+assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_count.coll");
+assert(!explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
 
 explainPlan =
     assert.commandWorked(lessThanSevenView.explain("executionStats").count({x: {$gte: 5}}));
-if (explainPlan.hasOwnProperty("stages")) {
-    explainPlan = explainPlan.stages[0].$cursor;
-}
-assert.eq(explainPlan.queryPlanner.namespace, "views_count.coll");
-assert(explainPlan.hasOwnProperty("executionStats"));
-assert.eq(explainPlan.executionStats.nReturned,
+assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_count.coll");
+assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned,
           sbeEnabled ? 1 : 2,  // SBE group push down causes count to be emitted in first stage.
           tojson(explainPlan));
-assert(!explainPlan.executionStats.hasOwnProperty("allPlansExecution"));
+assert(!explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
 
 explainPlan =
     assert.commandWorked(lessThanSevenView.explain("allPlansExecution").count({x: {$gte: 5}}));
-if (explainPlan.hasOwnProperty("stages")) {
-    explainPlan = explainPlan.stages[0].$cursor;
-}
-assert.eq(explainPlan.queryPlanner.namespace, "views_count.coll");
-assert(explainPlan.hasOwnProperty("executionStats"));
-assert.eq(explainPlan.executionStats.nReturned,
+assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_count.coll");
+assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned,
           sbeEnabled ? 1 : 2,  // SBE group push down causes count to be emitted in first stage.
           tojson(explainPlan));
-assert(explainPlan.executionStats.hasOwnProperty("allPlansExecution"));
+assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
 
 // Count with hint works on a view.
 assert.commandWorked(viewsDB.runCommand({count: "identityView", hint: "_id_"}));

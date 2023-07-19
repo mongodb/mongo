@@ -131,20 +131,11 @@ assertResultsMatch({
     expectProjectToCoalesce: true,
     pipelineOptimizedAway: true
 });
-// TODO SERVER-72549: Remove use of featureFlagSbeFull by SBE Pushdown feature.
-if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
-    assertResultsMatch({
-        pipeline: [{$sort: {a: 1}}, {$group: {_id: "$_id", a: {$sum: "$a"}}}, {$project: {arr: 1}}],
-        expectProjectToCoalesce: true,
-        pipelineOptimizedAway: true
-    });
-} else {
-    assertResultsMatch({
-        pipeline: [{$sort: {a: 1}}, {$group: {_id: "$_id", a: {$sum: "$a"}}}, {$project: {arr: 1}}],
-        expectProjectToCoalesce:
-            !groupPushdownEnabled,  // lowering $group into SBE prevents coalesing of projects
-    });
-}
+assertResultsMatch({
+    pipeline: [{$sort: {a: 1}}, {$group: {_id: "$_id", a: {$sum: "$a"}}}, {$project: {arr: 1}}],
+    expectProjectToCoalesce:
+        !groupPushdownEnabled,  // lowering $group into SBE prevents coalesing of projects
+});
 
 // Test that projections with computed fields are removed from the pipeline.
 assertResultsMatch({
@@ -164,29 +155,16 @@ assertResultsMatch({
     pipelineOptimizedAway: true
 });
 
-// TODO SERVER-72549: Remove use of featureFlagSbeFull by SBE Pushdown feature.
-if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
-    assertResultsMatch({
-        pipeline: [
-            {$project: {_id: 0, a: 1}},
-            {$group: {_id: "$a", c: {$sum: "$c"}, a: {$sum: "$a"}}},
-            {$project: {_id: 0}}
-        ],
-        expectProjectToCoalesce: true,
-        pipelineOptimizedAway: true
-    });
-} else {
-    // Test that only the first projection is removed from the pipeline.
-    assertResultsMatch({
-        pipeline: [
-            {$project: {_id: 0, a: 1}},
-            {$group: {_id: "$a", c: {$sum: "$c"}, a: {$sum: "$a"}}},
-            {$project: {_id: 0}}
-        ],
-        expectProjectToCoalesce: true,
-        removedProjectStage: {_id: 0, a: 1},
-    });
-}
+// Test that only the first projection is removed from the pipeline.
+assertResultsMatch({
+    pipeline: [
+        {$project: {_id: 0, a: 1}},
+        {$group: {_id: "$a", c: {$sum: "$c"}, a: {$sum: "$a"}}},
+        {$project: {_id: 0}}
+    ],
+    expectProjectToCoalesce: true,
+    removedProjectStage: {_id: 0, a: 1},
+});
 
 // Test that projections on _id with nested fields are removed from pipeline.
 indexSpec = {

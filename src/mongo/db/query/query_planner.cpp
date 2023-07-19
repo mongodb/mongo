@@ -62,14 +62,10 @@
 #include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/matcher/expression_always_boolean.h"
-#include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group.h"
-#include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -1716,16 +1712,6 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                                                std::move(idxEntry),
                                                innerStage->isLastSource() /* shouldProduceBson */);
             solnForAgg = std::move(eqLookupNode);
-            continue;
-        }
-
-        // 'projectionStage' pushdown pushes both $project and $addFields to SBE, as the latter is
-        // implemented as a variant of the former.
-        auto projectionStage =
-            dynamic_cast<DocumentSourceInternalProjection*>(innerStage->documentSource());
-        if (projectionStage) {
-            solnForAgg = std::make_unique<ProjectionNodeDefault>(
-                std::move(solnForAgg), nullptr, projectionStage->projection());
             continue;
         }
 

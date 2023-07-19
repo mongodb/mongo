@@ -67,10 +67,9 @@ struct ProjectionDependencies {
 };
 
 /**
- * Used to represent a projection for dependency analysis and query planning. 'kAddition' is for
- * $addFields, which is implemented as a variant of projection.
+ * Used to represent a projection for dependency analysis and query planning.
  */
-enum class ProjectType { kInclusion, kExclusion, kAddition };
+enum class ProjectType { kInclusion, kExclusion };
 class Projection {
 public:
     Projection(ProjectionPathASTNode root, ProjectType type);
@@ -107,6 +106,7 @@ public:
      * not needed. Includes _id explicitly if it is required - implicitily or explicitly.
      */
     const OrderedPathSet& getRequiredFields() const {
+        invariant(_type == ProjectType::kInclusion);
         return *_deps.paths;
     }
 
@@ -136,12 +136,11 @@ public:
     /**
      * A projection is considered "simple" if it operates only on top-level fields,
      * has no positional projection or expressions, and doesn't require metadata.
-     * Both exclusion and inclusion projections can be simple but not addition projections.
+     * Both exclusion and inclusion projections can be simple.
      */
     bool isSimple() const {
         return !_deps.hasDottedPath && !_deps.requiresMatchDetails &&
-            !_deps.metadataRequested.any() && !_deps.hasExpressions &&
-            _type != ProjectType::kAddition;
+            !_deps.metadataRequested.any() && !_deps.hasExpressions;
     }
 
     /**

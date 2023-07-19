@@ -28,12 +28,7 @@ assert.commandWorked(coll.insert([
 
 function assertCountScan(pipeline) {
     const explain = coll.explain().aggregate(pipeline);
-    let queryPlan;
-    if (explain.hasOwnProperty("stages")) {
-        queryPlan = getWinningPlan(explain.stages[0].$cursor.queryPlanner);
-    } else {
-        queryPlan = getWinningPlan(explain.queryPlanner);
-    }
+    const queryPlan = getWinningPlan(explain.stages[0].$cursor.queryPlanner);
     const countScan = getPlanStages(queryPlan, "COUNT_SCAN");
     assert.neq([], countScan, explain);
 }

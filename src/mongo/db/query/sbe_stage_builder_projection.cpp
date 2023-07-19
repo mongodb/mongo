@@ -129,7 +129,7 @@ struct ProjectionTraversalVisitorContext {
         levels.push({state, std::move(rootExpr), {}, boost::none});
     }
 
-    const std::string& topFrontField() const {
+    const auto& topFrontField() const {
         invariant(!levels.empty());
         invariant(!levels.top().fields.empty());
         return levels.top().fields.front();
@@ -137,10 +137,8 @@ struct ProjectionTraversalVisitorContext {
 
     void popFrontField() {
         invariant(!levels.empty());
-        // An empty field name occurs for {$addFields: {}}, which is treated as a no-op.
-        if (MONGO_likely(!levels.top().fields.empty())) {
-            levels.top().fields.pop_front();
-        }
+        invariant(!levels.top().fields.empty());
+        levels.top().fields.pop_front();
     }
 
     size_t numLevels() const {
@@ -229,10 +227,7 @@ public:
         _context->pushLevel(
             {node->fieldNames().begin(), node->fieldNames().end()}, std::move(expr), lambdaFrame);
 
-        if (node->children().size() > 0) {
-            // There is no need to update the field path when it has no child nodes to evaluate.
-            _context->currentFieldPath.push_back(_context->topFrontField());
-        }
+        _context->currentFieldPath.push_back(_context->topFrontField());
     }
 
     void visit(const projection_ast::ProjectionPositionalASTNode* node) final {}
@@ -370,11 +365,9 @@ public:
     void visit(const projection_ast::ProjectionPathASTNode* node) final {
         using namespace std::literals;
 
-        if (node->children().size() > 0) {
-            // Remove the last field name from context and ensure that there are no more left.
-            _context->popFrontField();
-            _context->currentFieldPath.pop_back();
-        }
+        // Remove the last field name from context and ensure that there are no more left.
+        _context->popFrontField();
+        _context->currentFieldPath.pop_back();
         invariant(_context->topLevel().fields.empty());
 
         auto [keepFields, dropFields, projectFields, projectExprs] =
@@ -382,8 +375,6 @@ public:
 
         // Generate a document for the current nested level.
         const bool isInclusion = _context->projectType == projection_ast::ProjectType::kInclusion;
-        const bool isInclusionOrAddFields =
-            _context->projectType != projection_ast::ProjectType::kExclusion;
 
         auto [fieldBehavior, fieldVector] = isInclusion
             ? std::make_pair(sbe::MakeObjSpec::FieldBehavior::keep, std::move(keepFields))
@@ -417,7 +408,7 @@ public:
 
         auto innerExpr = sbe::makeE<sbe::EFunction>("makeBsonObj", std::move(args));
 
-        if (!isInclusionOrAddFields || !containsComputedField) {
+        if (!isInclusion || !containsComputedField) {
             // If this is an inclusion projection and with no computed fields, then anything that's
             // not an object should get filtered out. Example:
             // projection: {a: {b: 1}}
@@ -435,7 +426,7 @@ public:
             // preserved as-is.
             innerExpr = sbe::makeE<sbe::EIf>(makeFunction("isObject", childInputExpr->clone()),
                                              std::move(innerExpr),
-                                             isInclusionOrAddFields && !containsComputedField
+                                             isInclusion && !containsComputedField
                                                  ? makeConstant(sbe::value::TypeTags::Nothing, 0)
                                                  : childInputExpr->clone());
         }

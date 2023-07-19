@@ -92,7 +92,6 @@
 #include "mongo/db/pipeline/document_source_geo_near_cursor.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_group_base.h"
-#include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -136,19 +135,14 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/storage/test_harness_helper.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
-#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -162,67 +156,19 @@ using write_ops::InsertCommandRequest;
 
 namespace {
 /**
- * Helper for findSbeCompatibleStagesForPushdown() that checks whether 'stage' is a $project or
- * $addFields that can be pushed down to SBE as a 'DocumentSourceInternalProjection' stage. If so,
- * this returns a pointer to a constructed object of the latter type, else it returns nullptr.
- */
-boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTransformation(
-    const DocumentSource& stage) {
-    const DocumentSourceSingleDocumentTransformation* transformStage =
-        dynamic_cast<const DocumentSourceSingleDocumentTransformation*>(&stage);
-    if (!transformStage) {
-        return nullptr;
-    }
-
-    InternalProjectionPolicyEnum policies;
-    switch (transformStage->getType()) {
-        case TransformerInterface::TransformerType::kExclusionProjection:
-        case TransformerInterface::TransformerType::kInclusionProjection:
-            policies = InternalProjectionPolicyEnum::kAggregate;
-            break;
-        case TransformerInterface::TransformerType::kComputedProjection:
-            policies = InternalProjectionPolicyEnum::kAddFields;
-            break;
-        default:
-            return nullptr;
-    }
-
-    const boost::intrusive_ptr<ExpressionContext>& expCtx = transformStage->getContext();
-    ON_BLOCK_EXIT([&,
-                   originalSbeCompatibility{std::exchange(expCtx->sbeCompatibility,
-                                                          SbeCompatibility::fullyCompatible)}]() {
-        expCtx->sbeCompatibility = originalSbeCompatibility;
-    });
-
-    boost::intrusive_ptr<DocumentSource> projectionStage =
-        make_intrusive<DocumentSourceInternalProjection>(
-            expCtx,
-            transformStage->getTransformer().serializeTransformation(boost::none).toBson(),
-            policies);
-
-    return (expCtx->sbeCompatibility != SbeCompatibility::notCompatible) ? projectionStage
-                                                                         : nullptr;
-}
-
-/**
- * Finds a prefix of stages from the given pipeline to prepare for pushdown into the inner query
- * layer so that it can be executed using SBE.
+ * Finds a prefix of 'DocumentSourceGroup' and 'DocumentSourceLookUp' stages from the given
+ * pipeline to prepare for pushdown of $group and $lookup into the inner query layer so that it
+ * can be executed using SBE.
+ * Group stages are extracted from the pipeline when all of the following conditions are met:
+ *    - When the 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
+ *    - When the 'internalQuerySlotBasedExecutionDisableGroupPushdown' query knob is 'false'.
+ *    - When the DocumentSourceGroup has 'doingMerge=false'.
  *
- * $group stages ('DocumentSourceGroup') are extracted from the pipeline when all of:
- *    - 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
- *    - 'internalQuerySlotBasedExecutionDisableGroupPushdown' query knob is 'false'.
- *    - DocumentSourceGroup has 'doingMerge=false'.
- *
- * $lookup stages ('DocumentSourceLookUp') are extracted when all of:
- *    - 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
- *    - 'internalQuerySlotBasedExecutionDisableLookupPushdown' query knob is 'false'.
+ * Lookup stages are extracted from the pipeline when all of the following conditions are met:
+ *    - When the 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
+ *    - When the 'internalQuerySlotBasedExecutionDisableLookupPushdown' query knob is 'false'.
  *    - The $lookup uses only the 'localField'/'foreignField' syntax (no pipelines).
  *    - The foreign collection is neither sharded nor a view.
- *
- * $project and $addFields stages (collectively 'DocumentSourceInternalProjection') are extracted
- * when all of:
- *    - 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
- *    - featureFlagSbeFull is enabled (TODO SERVER-72549 remove this comment line: SBE Pushdown)
  */
 std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStagesForPushdown(
     const MultipleCollectionAccessor& collections,
@@ -292,18 +238,6 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
                 continue;
             }
             break;
-        }
-
-        // TODO SERVER-72549: Remove use of featureFlagSbeFull by SBE Pushdown feature.
-        // (Ignore FCV check): This is intentional because we always want to use this feature when
-        // the feature flag is enabled.
-        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe()) {
-            if (boost::intrusive_ptr<DocumentSource> projectionStage =
-                    sbeCompatibleProjectionFromSingleDocumentTransformation(**itr)) {
-                stagesForPushdown.push_back(
-                    std::make_unique<InnerPipelineStageImpl>(projectionStage, isLastSource));
-                continue;
-            }
         }
 
         // Current stage cannot be pushed down.

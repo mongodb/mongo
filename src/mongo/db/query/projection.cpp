@@ -225,7 +225,7 @@ auto analyzeProjection(const ProjectionPathASTNode* root, ProjectType type) {
     const auto& userData = context.data();
     const auto& tracker = userData.fieldDependencyTracker;
 
-    if (type == ProjectType::kInclusion || type == ProjectType::kAddition) {
+    if (type == ProjectType::kInclusion) {
         deps.paths = userData.requiredFields();
     } else {
         invariant(type == ProjectType::kExclusion);

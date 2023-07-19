@@ -17,8 +17,8 @@
  */
 load("jstests/libs/fail_point_util.js");
 import {getPlanStages, aggPlanHasStage, planHasStage} from "jstests/libs/analyze_plan.js";
-import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 load("jstests/aggregation/extras/utils.js");  // For "resultsEq."
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     quit();
@@ -364,6 +364,7 @@ assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
 
     let nonHintedExplain = coll.explain().aggregate(pipeline);
     assert(aggPlanHasStage(nonHintedExplain, "COLUMN_SCAN"), nonHintedExplain);
+    assert(!aggPlanHasStage(nonHintedExplain, "PROJECTION_DEFAULT"), nonHintedExplain);
     assert(!aggPlanHasStage(nonHintedExplain, "PROJECTION_SIMPLE"), nonHintedExplain);
 
     assert(resultsEq(coll.aggregate(pipeline, {hint: {$natural: 1}}).toArray(),
@@ -445,6 +446,7 @@ assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
 
         let explain = c.explain().aggregate(pipeline);
         assert(aggPlanHasStage(explain, "COLUMN_SCAN"), explain);
+        assert(!aggPlanHasStage(explain, "PROJECTION_DEFAULT"), explain);
         assert(!aggPlanHasStage(explain, "PROJECTION_SIMPLE"), explain);
 
         let actualResults = c.aggregate(pipeline).toArray();

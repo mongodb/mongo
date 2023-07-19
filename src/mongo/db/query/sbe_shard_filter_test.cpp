@@ -272,7 +272,7 @@ TEST_F(SbeShardFilterTest, CoveredShardFilterPlan) {
     auto shardFilter = std::make_unique<ShardingFilterNode>();
     shardFilter->children.push_back(std::move(virtScan));
     auto projectNode = std::make_unique<ProjectionNodeCovered>(
-        std::move(shardFilter), emptyMatchExpression.get(), projectionAst, indexKeyPattern);
+        std::move(shardFilter), *emptyMatchExpression, projectionAst, indexKeyPattern);
 
     runTest(std::move(projectNode),
             expected,
