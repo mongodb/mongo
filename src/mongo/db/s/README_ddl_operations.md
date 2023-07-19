@@ -37,7 +37,7 @@ loop DDL Coordinator Infrastructure
 end
 ```
 
-The outer loop is common to all standard DDL operations and ensures that different DDLs within the same database serialize properly by acquiring [DDL locks](#synchronization). The inner loop is specific to each operation, and will perform some set of updates to the sharding metadata while under the critical section. Some operations may not involve all shards or may have more complex phases on the participant shards, but all follow the same general pattern of acquiring the critical section, updating some metadata, and releasing the critical section, checkpointing their progress along the way.
+The outer loop is common to all standard DDL operations and ensures that different DDLs within the same database/namespace serialize properly by acquiring [DDL locks](#synchronization). The inner loop is specific to each operation, and will perform some set of updates to the sharding metadata while under the critical section. Some operations may not involve all shards or may have more complex phases on the participant shards, but all follow the same general pattern of acquiring the critical section, updating some metadata, and releasing the critical section, checkpointing their progress along the way.
 
 The checkpoints are majority write concern updates to a persisted document on the coordinator. This document - called a state document - contains all the information about the running operation including the operation type, namespaces involved, and which checkpoint the operation has reached. An initial checkpoint must be the first thing any coordinator does in order to ensure that the operation will continue to run even [in the presence of failovers](#recovery). Subsequent checkpoints allow retries to skip phases that have already been completed.
 
@@ -45,9 +45,19 @@ The checkpoints are majority write concern updates to a persisted document on th
 Most DDL operations must complete after they have started. An exception to this is often a *CheckPreconditions* phase at the beginning of a coordinator in which the operation will check some conditions and will be allowed to exit if these conditions are not met. After this, however, the operation will continue to retry until it succeeds. This is because the updates to the sharding metadata would cause inconsistencies if the critical section were released partially through the operation. For this reason, DDL operations should not throw non-retriable errors after the initial phase of checking preconditions.
 
 ### Synchronization
-DDL operations are serialized on the coordinator by acquisition of the DDL locks, handled by the [DDL Lock Manager](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/s/ddl_lock_manager.h). DDL locks are local to the coordinator and only in memory, so they must be reacquired during [recovery](#recovery).
+DDL operations are serialized on the coordinator by acquisition of the DDL locks, handled by the [DDL Lock Manager](https://github.com/mongodb/mongo/blob/r7.0.0-rc7/src/mongo/db/s/ddl_lock_manager.h). DDL locks are local to the coordinator and only in memory, so they must be reacquired during [recovery](#recovery).
 
-Each operation acquires a DDL lock on the database first, and then the collection for the operation. Some operations also acquire additional DDL locks, such as renameCollection, which will acquire the target namespace after acquiring the database and source collection locks. At the end of the operation, the locks are released in reverse order.
+The DDL locks follow a [multiple granularity hierarchical approach](https://en.wikipedia.org/wiki/Multiple_granularity_locking), which means DDL locks must be acquired in a specific order using the [intentional locking protocol](https://en.wikipedia.org/wiki/Multiple_granularity_locking#:~:text=MGL%20also%20uses%20intentional%20%22locks%22) appropriately. With that, we ensure that a DDL operation acting over a whole database serializes with another DDL operation targeting a collection from that database, and, at the same time, two DDL operations targeting different collections can run concurrently.
+
+Every DDL lock resource should be taken in the following order:
+1. DDL Database lock
+2. DDL Collection lock
+
+Therefore, if a DDL operation needs to update collection metadata, a DDL lock will be acquired first on the database in IX mode and then on the collection in X mode. On the other hand, if a DDL operation only updates the database metadata (like dropDatabase), only the DDL lock on the database will be taken in X mode.
+
+Some operations also acquire additional DDL locks, such as renameCollection, which will acquire the database and collection DDL locks for the target namespace after acquiring the DDL locks on the source collection. 
+
+Finally, at the end of the operation, all of the locks are released in reverse order.
 
 ### Recovery
 DDL coordinators are resilient to elections and sudden crashes because they are implemented as [primary only services](https://github.com/mongodb/mongo/blob/r6.0.0/docs/primary_only_service.md#primaryonlyservice) that - by definition - get automatically resumed when the node of a shard steps up.
