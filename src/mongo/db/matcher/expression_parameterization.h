@@ -52,6 +52,28 @@ namespace mongo {
 struct MatchExpressionParameterizationVisitorContext {
     using InputParamId = MatchExpression::InputParamId;
 
+    /**
+     * Assigns a parameter id to `expr` with the ability to reuse an already-assigned parameter id
+     * if `expr` is equivalent to an expression we have seen before. This is used to model
+     * dependencies within a query (e.g. $or[{a:1}, {a:1, b:1}] --> $or[{a:P0}, {a:P0, b:P1}]) and
+     * to reduce the number of parameters. The reusable parameters use the same vector for tracking
+     * as the non-reusable to ensure uniqueness of the parameterId.
+     */
+    boost::optional<InputParamId> nextReusableInputParamId(const MatchExpression* expr) {
+        // Check to see if the expression is in the 'map' already.
+        if (expr && !revertMode) {
+            auto it = std::find_if(
+                inputParamIdToExpressionMap.begin(),
+                inputParamIdToExpressionMap.end(),
+                [expr](const MatchExpression* m) -> bool { return m->equivalent(expr); });
+            if (it == inputParamIdToExpressionMap.end()) {
+                return nextInputParamId(expr);
+            }
+            return it - inputParamIdToExpressionMap.begin();
+        }
+        return boost::none;
+    }
+
     boost::optional<InputParamId> nextInputParamId(const MatchExpression* expr) {
         if (!revertMode) {
             inputParamIdToExpressionMap.push_back(expr);
