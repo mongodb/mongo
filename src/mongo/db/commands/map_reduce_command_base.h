@@ -102,12 +102,7 @@ public:
         auto builder = result->getBodyBuilder();
         auto explain = boost::make_optional(verbosity);
         try {
-            _explainImpl(opCtx,
-                         DatabaseNameUtil::deserialize(request.getValidatedTenantId(),
-                                                       request.getDatabase()),
-                         request.body,
-                         builder,
-                         explain);
+            _explainImpl(opCtx, request.getDbName(), request.body, builder, explain);
         } catch (...) {
             return exceptionToStatus();
         }

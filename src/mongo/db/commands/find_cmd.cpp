@@ -310,8 +310,7 @@ public:
         Invocation(const FindCmd* definition, const OpMsgRequest& request)
             : CommandInvocation(definition),
               _request(request),
-              _dbName(DatabaseNameUtil::deserialize(_request.getValidatedTenantId(),
-                                                    _request.getDatabase())),
+              _dbName(request.getDbName()),
               _ns(CommandHelpers::parseNsFromCommand(_dbName, _request.body)) {
             invariant(_request.body.isOwned());
         }

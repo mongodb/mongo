@@ -115,8 +115,7 @@ public:
 
         const auto aggregationRequest = aggregation_request_helper::parseFromBSON(
             opCtx,
-            DatabaseNameUtil::deserialize(opMsgRequest.getValidatedTenantId(),
-                                          opMsgRequest.getDatabase()),
+            opMsgRequest.getDbName(),
             opMsgRequest.body,
             explainVerbosity,
             APIParameters::get(opCtx).getAPIStrict().value_or(false),
@@ -152,8 +151,7 @@ public:
                    PrivilegeVector privileges)
             : CommandInvocation(cmd),
               _request(request),
-              _dbName(DatabaseNameUtil::deserialize(request.getValidatedTenantId(),
-                                                    request.getDatabase())),
+              _dbName(request.getDbName()),
               _aggregationRequest(std::move(aggregationRequest)),
               _liteParsedPipeline(_aggregationRequest),
               _privileges(std::move(privileges)) {

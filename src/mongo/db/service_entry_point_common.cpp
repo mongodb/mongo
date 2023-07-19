@@ -1305,8 +1305,7 @@ void RunCommandImpl::_epilogue() {
         });
 
     behaviors.waitForLinearizableReadConcern(opCtx);
-    const DatabaseName requestDbName =
-        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
+    const DatabaseName requestDbName = request.getDbName();
     tenant_migration_access_blocker::checkIfLinearizableReadWasAllowedOrThrow(opCtx, requestDbName);
 
     // Wait for data to satisfy the read concern level, if necessary.
@@ -1562,8 +1561,7 @@ void ExecCommandDatabase::_initiateCommand() {
 
     CommandHelpers::evaluateFailCommandFailPoint(opCtx, _invocation.get());
 
-    const auto dbName =
-        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
+    const auto dbName = request.getDbName();
     uassert(ErrorCodes::InvalidNamespace,
             fmt::format("Invalid database name: '{}'", dbName.toStringForErrorMsg()),
             NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
@@ -2104,8 +2102,7 @@ void curOpCommandSetup(OperationContext* opCtx, const OpMsgRequest& request) {
 
     // We construct a legacy $cmd namespace so we can fill in curOp using
     // the existing logic that existed for OP_QUERY commands
-    NamespaceString nss(NamespaceString::makeCommandNamespace(
-        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase())));
+    NamespaceString nss(NamespaceString::makeCommandNamespace(request.getDbName()));
 
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     curop->setNS_inlock(nss);

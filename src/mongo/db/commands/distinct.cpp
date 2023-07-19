@@ -197,8 +197,7 @@ public:
                    const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
-        const DatabaseName dbName =
-            DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
+        const DatabaseName dbName = request.getDbName();
         const BSONObj& cmdObj = request.body;
         // Acquire locks. The RAII object is optional, because in the case of a view, the locks
         // need to be released.

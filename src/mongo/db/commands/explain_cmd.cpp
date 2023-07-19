@@ -125,8 +125,7 @@ public:
                std::unique_ptr<CommandInvocation> innerInvocation)
         : CommandInvocation(explainCommand),
           _outerRequest{&request},
-          _dbName(DatabaseNameUtil::deserialize(_outerRequest->getValidatedTenantId(),
-                                                _outerRequest->getDatabase())),
+          _dbName(request.getDbName()),
           _verbosity{std::move(verbosity)},
           _innerRequest{std::move(innerRequest)},
           _innerInvocation{std::move(innerInvocation)} {}

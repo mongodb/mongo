@@ -895,8 +895,7 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
                 namespace mmb = mutablebson;
                 mmb::Document cmdToLog(request.body, mmb::Document::kInPlaceDisabled);
                 c->snipForLogging(&cmdToLog);
-                auto dbName = DatabaseNameUtil::deserialize(request.getValidatedTenantId(),
-                                                            request.getDatabase());
+                auto dbName = request.getDbName();
                 uasserted(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized on " << dbName.toStringForErrorMsg()
                                         << " to execute command " << redact(cmdToLog.getObject()));
@@ -925,8 +924,7 @@ public:
         : CommandInvocation(command),
           _command(command),
           _request(request),
-          _dbName(DatabaseNameUtil::deserialize(_request.getValidatedTenantId(),
-                                                _request.getDatabase())) {}
+          _dbName(request.getDbName()) {}
 
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
