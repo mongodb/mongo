@@ -68,6 +68,9 @@ selector:
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
+  # Tags tests which assume that the collections they are running against are not implicitly created
+  # as clustered collections.
+  - does_not_support_clustered_collections
 
 executor:
   archive:

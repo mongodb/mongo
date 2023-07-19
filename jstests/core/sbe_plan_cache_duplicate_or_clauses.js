@@ -4,10 +4,22 @@
  * dependency between the values of the $or expression
  *
  * @tags: [
+ *   # $planCacheStats requires readConcern:"local".
+ *   assumes_read_concern_unchanged,
+ *   # Plan cache state is node-local so the test assumes it is always reading from the same node.
+ *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection,
+ *   cqf_incompatible,
+ *   # This test assumes that the SBE plan cache is in use, but SBE does not support clustered
+ *   # collections in 7.0.
+ *   does_not_support_clustered_collections,
+ *   # Plan cache state is node-local, so this test assumes it is always operating against the same
+ *   # mongod.
+ *   does_not_support_stepdowns,
+ *   # $planCacheStats is not supported in transactions.
+ *   does_not_support_transactions,
  *   # Plan cache state is node-local and will not get migrated alongside tenant data.
  *   tenant_migration_incompatible,
- *   cqf_incompatible,
  * ]
  */
 (function() {
@@ -30,7 +42,7 @@ assert.eq(1, coll.find({a: 1, b: 1, $or: [{c: 1}, {c: 1, d: {$eq: null}}]}).itco
 
 // Check that we have 2 distinct plans in the cache.
 let cacheEntries = coll.getPlanCache().list();
-assert.eq(2, cacheEntries.length);
+assert.eq(2, cacheEntries.length, cacheEntries);
 
 // The query from above should still return 2 results.
 assert.eq(2, coll.find({a: 1, b: 1, $or: [{c: 2}, {c: 3, d: {$eq: null}}]}).itcount());
