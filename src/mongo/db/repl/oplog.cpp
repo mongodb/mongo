@@ -338,6 +338,11 @@ void createIndexForApplyOps(OperationContext* opCtx,
 /**
  * @param dataImage can be BSONObj::isEmpty to signal the node is in initial sync and must
  *                  invalidate relevant image collection data.
+ * @param upsertConfigImage indicates whether to upsert the config image. If a DuplicateKey error is
+ * encountered performing the update (i.e. due to performing racing upserts), this value will be
+ * overwritten to false, and this method will throw a write conflict exception. Callers performing
+ * upserts using this method within a writeConflictRetry loop should always pass the same variable
+ * in on retries, to avoid hitting repeated DuplicateKey errors.
  */
 void writeToImageCollection(OperationContext* opCtx,
                             const LogicalSessionId& sessionId,
@@ -1545,9 +1550,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     "mode should be in initialSync or recovering",
                     mode == OplogApplication::Mode::kInitialSync ||
                         OplogApplication::inRecovering(mode));
+            // writeToImageCollection will set this variable to false if a DuplicateKeyError is
+            // encountered, allowing us to retry as a non-upsert. See SERVER-79033 for context.
+            bool upsertConfigImage = true;
             writeConflictRetry(opCtx, "applyOps_imageInvalidation", op.getNss().toString(), [&] {
                 WriteUnitOfWork wuow(opCtx);
-                bool upsertConfigImage = true;
                 writeToImageCollection(opCtx,
                                        op.getSessionId().value(),
                                        op.getTxnNumber().value(),

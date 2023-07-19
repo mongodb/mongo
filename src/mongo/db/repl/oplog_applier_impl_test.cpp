@@ -774,6 +774,31 @@ TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenantAcrossTenantsRequ
     ASSERT_FALSE(collectionExists(_opCtx.get(), wrongTargetNss));
 }
 
+OplogEntry makeInvalidateOp(OpTime opTime,
+                            NamespaceString nss,
+                            BSONObj document,
+                            OperationSessionInfo sessionInfo,
+                            mongo::UUID uuid) {
+    return DurableOplogEntry(opTime,                     // optime
+                             OpTypeEnum::kUpdate,        // opType
+                             std::move(nss),             // namespace
+                             uuid,                       // uuid
+                             boost::none,                // fromMigrate
+                             OplogEntry::kOplogVersion,  // version
+                             document,                   // o
+                             boost::none,                // o2
+                             sessionInfo,                // sessionInfo
+                             boost::none,                // upsert
+                             Date_t(),                   // wall clock time
+                             {},                         // statement ids
+                             boost::none,  // optime of previous write within same transaction
+                             boost::none,  // pre-image optime
+                             boost::none,  // post-image optime
+                             boost::none,  // ShardId of resharding recipient
+                             boost::none,  // _id
+                             RetryImageEnum::kPreImage);  // needsRetryImage
+}
+
 TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateChangeStreamPreImages) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     CollectionOptions options;
@@ -811,25 +836,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateChangeStreamPreImages) {
     }
 
     // Make an oplog entry to invalidate the pre image.
-    OplogEntry invalidateOp =
-        DurableOplogEntry(OpTime(),                   // optime
-                          OpTypeEnum::kUpdate,        // opType
-                          std::move(nss),             // namespace
-                          kUuid,                      // uuid
-                          boost::none,                // fromMigrate
-                          OplogEntry::kOplogVersion,  // version
-                          document,                   // o
-                          boost::none,                // o2
-                          sessionInfo,                // sessionInfo
-                          boost::none,                // upsert
-                          Date_t(),                   // wall clock time
-                          {},                         // statement ids
-                          boost::none,  // optime of previous write within same transaction
-                          boost::none,  // pre-image optime
-                          boost::none,  // post-image optime
-                          boost::none,  // ShardId of resharding recipient
-                          boost::none,  // _id
-                          RetryImageEnum::kPreImage);  // needsRetryImage
+    OplogEntry invalidateOp = makeInvalidateOp(OpTime(), nss, document, sessionInfo, kUuid);
 
     // Apply the oplog entry.
     {
@@ -842,6 +849,99 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateChangeStreamPreImages) {
                       ExceptionFor<ErrorCodes::NamespaceNotFound>);
     }
 
+    AutoGetCollection sideCollection(
+        _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
+    imageEntry = ImageEntry::parse(IDLParserContext("test"),
+                                   Helpers::findOneForTesting(_opCtx.get(),
+                                                              sideCollection.getCollection(),
+                                                              BSON("_id" << sessionId.toBSON())));
+    ASSERT(imageEntry.getInvalidated());
+}
+
+// Tests we correctly handle the case in SERVER-79033 where we attempt to invalidate the image
+// collection entry for a given lsid but we have already written an invalidate entry with a later
+// timestamp.
+TEST_F(OplogApplierImplTest, ImageCollectionInvalidationInInitialSyncHandlesConflictingUpsert) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    CollectionOptions options;
+    createCollection(_opCtx.get(), NamespaceString::kConfigImagesNamespace, options);
+
+    auto document = BSON("_id" << 0);
+
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(3);
+
+    const BSONObj preImage(BSON("_id" << 2));
+    OpTime opTime = OpTime();
+
+    repl::ImageEntry imageEntry;
+    imageEntry.set_id(sessionId);
+    imageEntry.setTxnNumber(2);
+    imageEntry.setTs(opTime.getTimestamp());
+    imageEntry.setImageKind(repl::RetryImageEnum::kPreImage);
+    imageEntry.setImage(preImage);
+    imageEntry.setInvalidated(false);
+
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        _opCtx.get(), NamespaceString::kConfigImagesNamespace, {imageEntry.toBSON()}, 0));
+
+    {
+        AutoGetCollection sideCollection(
+            _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
+        auto imageEntry = ImageEntry::parse(
+            IDLParserContext("test"),
+            Helpers::findOneForTesting(
+                _opCtx.get(), sideCollection.getCollection(), BSON("_id" << sessionId.toBSON())));
+        ASSERT_FALSE(imageEntry.getInvalidated());
+    }
+
+    OpTime invalidateOpTime = OpTime(Timestamp(1686186824, 50), 1);
+    OpTime earlierInvalidateOpTime = OpTime(Timestamp(1686186824, 47), 1);
+
+    // Make an oplog entry to invalidate the pre image.
+    OplogEntry invalidateOp = makeInvalidateOp(invalidateOpTime, nss, document, sessionInfo, kUuid);
+
+    // Apply the first oplog entry which should lead us to write an invalidate entry.
+    {
+        repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+        DisableDocumentValidation validationDisabler(_opCtx.get());
+        ASSERT_THROWS(applyOplogEntryOrGroupedInserts(_opCtx.get(),
+                                                      ApplierOperation{&invalidateOp},
+                                                      OplogApplication::Mode::kInitialSync,
+                                                      /* isDataConsistent */ false),
+                      ExceptionFor<ErrorCodes::NamespaceNotFound>);
+
+        // Confirm that we wrote an invalidate entry.
+        AutoGetCollection sideCollection(
+            _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
+        imageEntry = ImageEntry::parse(
+            IDLParserContext("test"),
+            Helpers::findOneForTesting(
+                _opCtx.get(), sideCollection.getCollection(), BSON("_id" << sessionId.toBSON())));
+        ASSERT(imageEntry.getInvalidated());
+        ASSERT_EQ(imageEntry.getTs(), invalidateOpTime.getTimestamp());
+    }
+
+    // Create and attempt to apply another entry that will also lead us to try to insert an
+    // invalidate document, but with an earlier timestamp than the first one. If we don't switch to
+    // upsert:false on retry, then we will hang indefinitely here due to repeated write conflicts,
+    // as we will never observe the existing document due to its timestamp being later than ours.
+    OplogEntry earlierInvalidateOp =
+        makeInvalidateOp(earlierInvalidateOpTime, nss, document, sessionInfo, kUuid);
+
+    {
+        repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+        DisableDocumentValidation validationDisabler(_opCtx.get());
+        ASSERT_THROWS(applyOplogEntryOrGroupedInserts(_opCtx.get(),
+                                                      ApplierOperation{&earlierInvalidateOp},
+                                                      OplogApplication::Mode::kInitialSync,
+                                                      /* isDataConsistent */ false),
+                      ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    }
+
+    // The image collection entgry should be unchanged.
     AutoGetCollection sideCollection(
         _opCtx.get(), NamespaceString::kConfigImagesNamespace, MODE_IS);
     imageEntry = ImageEntry::parse(IDLParserContext("test"),
