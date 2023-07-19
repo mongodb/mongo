@@ -1,11 +1,15 @@
-// Tests query settings setQuerySettings and removeQuerySettings commands.
+// Tests query settings setQuerySettings and removeQuerySettings commands as well as $querySettings
+// agg stage.
 // @tags: [
 //   directly_against_shardsvrs_incompatible,
 //   featureFlagQuerySettings,
+//   does_not_support_stepdowns,
 // ]
 //
 (function() {
 'use strict';
+
+load("jstests/libs/fixture_helpers.js");
 
 const adminDB = db.getSiblingDB("admin");
 const coll = db[jsTestName()];
@@ -35,30 +39,35 @@ const queryShapeConfigurationB = {
     settings: querySettingsB,
     representativeQuery: queryB
 };
+const querySettingsAggPipeline = [
+    {$querySettings: {}},
+    {$project: {queryShapeHash: 0}},
+    {$sort: {representativeQuery: 1}},
+];
 
 /**
  * Helper function to assert equality of QueryShapeConfigurations. In order to ease the assertion
  * logic, 'queryShapeHash' field is removed from the QueryShapeConfiguration prior to assertion.
+ *
+ * Since in sharded clusters the query settings may arrive with a delay to the mongos, the assertion
+ * is done via 'assert.soon'.
  */
 function assertQueryShapeConfiguration(expectedQueryShapeConfigurations) {
-    const actualQueryShapeConfigurations =
-        assert.commandWorked(adminDB.runCommand({getClusterParameter: "querySettings"}))
-            .clusterParameters[0]
-            .settingsArray;
-
-    assert.eq(actualQueryShapeConfigurations.length,
-              expectedQueryShapeConfigurations.length,
-              actualQueryShapeConfigurations);
-
-    actualQueryShapeConfigurations.forEach((cfg) => {
-        delete cfg.queryShapeHash;
+    assert.soon(() => {
+        const settingsArray = adminDB.aggregate(querySettingsAggPipeline).toArray();
+        return bsonWoCompare(settingsArray, expectedQueryShapeConfigurations) == 0;
     });
-    actualQueryShapeConfigurations.sort(bsonWoCompare);
-    expectedQueryShapeConfigurations.sort(bsonWoCompare);
+}
 
-    assert.eq(actualQueryShapeConfigurations,
-              expectedQueryShapeConfigurations,
-              actualQueryShapeConfigurations);
+// Set the 'clusterServerParameterRefreshIntervalSecs' value to 1 second for faster fetching of
+// 'querySettings' cluster parameter on mongos from the configsvr.
+let initParameterRefreshInterval = 0;
+if (FixtureHelpers.isMongos(db)) {
+    const response = assert.commandWorked(
+        db.adminCommand({getParameter: 1, clusterServerParameterRefreshIntervalSecs: 1}));
+    initParameterRefreshInterval = response.clusterServerParameterRefreshIntervalSecs;
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, clusterServerParameterRefreshIntervalSecs: 1}));
 }
 
 // Ensure that query settings cluster parameter is empty.
@@ -108,12 +117,25 @@ function assertQueryShapeConfiguration(expectedQueryShapeConfigurations) {
 // Ensure that query settings cluster parameter is empty by issuing a removeQuerySettings command
 // providing a query shape hash.
 {
-    const actualQueryShapeConfigurations =
-        assert.commandWorked(adminDB.runCommand({getClusterParameter: "querySettings"}))
-            .clusterParameters[0]
-            .settingsArray;
-    const queryShapeHashA = actualQueryShapeConfigurations[0].queryShapeHash;
+    const queryShapeHashA = adminDB.aggregate([{$querySettings: {}}]).toArray()[0].queryShapeHash;
     assert.commandWorked(db.adminCommand({removeQuerySettings: queryShapeHashA}));
     assertQueryShapeConfiguration([]);
+}
+
+// Ensure that $querySettings agg stage inherits the constraints from the underlying alias stages,
+// including $queue.
+{
+    assert.commandFailedWithCode(
+        db.adminCommand(
+            {aggregate: 1, pipeline: [{$documents: []}, {$querySettings: {}}], cursor: {}}),
+        40602);
+}
+
+// Reset the 'clusterServerParameterRefreshIntervalSecs' parameter to its initial value.
+if (FixtureHelpers.isMongos(db)) {
+    assert.commandWorked(db.adminCommand({
+        setParameter: 1,
+        clusterServerParameterRefreshIntervalSecs: initParameterRefreshInterval
+    }));
 }
 })();
