@@ -747,10 +747,6 @@ const mongo::Date_t& OplogEntry::getWallClockTime() const {
     return _entry.getWallClockTime();
 }
 
-boost::optional<std::int64_t> OplogEntry::getHash() const& {
-    return _entry.getHash();
-}
-
 std::int64_t OplogEntry::getVersion() const {
     return _entry.getVersion();
 }

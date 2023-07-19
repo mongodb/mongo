@@ -461,7 +461,6 @@ public:
     using MutableOplogEntry::kDurableReplOperationFieldName;
     using MutableOplogEntry::kFromMigrateFieldName;
     using MutableOplogEntry::kFromTenantMigrationFieldName;
-    using MutableOplogEntry::kHashFieldName;
     using MutableOplogEntry::kNssFieldName;
     using MutableOplogEntry::kObject2FieldName;
     using MutableOplogEntry::kObjectFieldName;
@@ -490,7 +489,6 @@ public:
     using MutableOplogEntry::getDurableReplOperation;
     using MutableOplogEntry::getFromMigrate;
     using MutableOplogEntry::getFromTenantMigration;
-    using MutableOplogEntry::getHash;
     using MutableOplogEntry::getNeedsRetryImage;
     using MutableOplogEntry::getNss;
     using MutableOplogEntry::getObject;
@@ -754,7 +752,6 @@ public:
     static constexpr auto kDonorOpTimeFieldName = DurableOplogEntry::kDonorOpTimeFieldName;
     static constexpr auto kDonorApplyOpsIndexFieldName =
         DurableOplogEntry::kDonorApplyOpsIndexFieldName;
-    static constexpr auto kHashFieldName = DurableOplogEntry::kHashFieldName;
     static constexpr auto kTidFieldName = DurableOplogEntry::kTidFieldName;
     static constexpr auto kNssFieldName = DurableOplogEntry::kNssFieldName;
     static constexpr auto kObject2FieldName = DurableOplogEntry::kObject2FieldName;
@@ -821,7 +818,6 @@ public:
     const mongo::Timestamp& getTimestamp() const;
     boost::optional<std::int64_t> getTerm() const;
     const mongo::Date_t& getWallClockTime() const;
-    boost::optional<std::int64_t> getHash() const&;
     std::int64_t getVersion() const;
     boost::optional<bool> getFromMigrate() const&;
     const boost::optional<mongo::UUID>& getFromTenantMigration() const&;

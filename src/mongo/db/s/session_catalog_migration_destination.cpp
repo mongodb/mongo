@@ -520,9 +520,6 @@ SessionCatalogMigrationDestination::_processSessionOplog(const BSONObj& oplogBSO
     // Reset OpTime so logOp() can assign a new one.
     oplogEntry.setOpTime(OplogSlot());
 
-    // We should not be writing this field so make sure it is always "none".
-    oplogEntry.setHash(boost::none);
-
     writeConflictRetry(
         opCtx, "SessionOplogMigration", NamespaceString::kSessionTransactionsTableNamespace, [&] {
             // Need to take global lock here so repl::logOp will not unlock it and trigger the

@@ -298,7 +298,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
 
 /**
  * Allocates optimes for new entries in the oplog.  Returns a vector of OplogSlots, which
- * contain the new optimes along with their terms and newly calculated hash fields.
+ * contain the new optimes along with their terms.
  */
 std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count);
 

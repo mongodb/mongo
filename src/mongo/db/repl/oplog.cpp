@@ -433,9 +433,8 @@ void writeToImageCollection(OperationContext* opCtx,
 }
 
 /* we write to local.oplog.rs:
-     { ts : ..., h: ..., v: ..., op: ..., etc }
+     { ts : ..., v: ..., op: ..., etc }
    ts: an OpTime timestamp
-   h: hash
    v: version
    op:
     "i" insert
