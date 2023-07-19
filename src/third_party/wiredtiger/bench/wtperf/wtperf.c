@@ -1680,6 +1680,12 @@ execute_populate(WTPERF *wtperf)
     return (0);
 }
 
+static bool
+need_reopen(CONFIG_OPTS *opts)
+{
+    return opts->readonly || opts->reopen_connection || (strlen(opts->chunk_cache_config) != 0);
+}
+
 static int
 close_reopen(WTPERF *wtperf)
 {
@@ -1691,7 +1697,7 @@ close_reopen(WTPERF *wtperf)
     if (opts->in_memory)
         return (0);
 
-    if (!opts->readonly && !opts->reopen_connection)
+    if (!need_reopen(opts))
         return (0);
     /*
      * Reopen the connection. We do this so that the workload phase always starts with the on-disk
@@ -2642,20 +2648,9 @@ main(int argc, char *argv[])
         testutil_snprintf(
           wtperf->partial_config, req_len, "%s%s", opts->table_config, LOG_PARTIAL_CONFIG);
     }
-    /*
-     * Set the config for reopen. If readonly add in that string. If not readonly then just copy the
-     * original conn_config.
-     */
-    if (opts->readonly)
-        req_len = strlen(opts->conn_config) + strlen(READONLY_CONFIG) + 1;
-    else
-        req_len = strlen(opts->conn_config) + 1;
-    wtperf->reopen_config = dmalloc(req_len);
-    if (opts->readonly)
-        testutil_snprintf(
-          wtperf->reopen_config, req_len, "%s%s", opts->conn_config, READONLY_CONFIG);
-    else
-        testutil_snprintf(wtperf->reopen_config, req_len, "%s", opts->conn_config);
+
+    /* Generate config for the close/reopen after populating. */
+    wtperf->reopen_config = config_reopen(opts);
 
     /* Sanity-check the configuration. */
     if ((ret = config_sanity(wtperf)) != 0)

@@ -827,6 +827,12 @@ config_sanity(WTPERF *wtperf)
                 return (EINVAL);
             }
         }
+
+    if (opts->chunk_cache_config == NULL) {
+        fprintf(stderr, "chunk_cache_config was null, somehow.\n");
+        return (EINVAL);
+    }
+
     return (0);
 }
 
@@ -937,6 +943,11 @@ config_opt_print(WTPERF *wtperf)
       "\t"
       "Connection configuration: %s\n",
       opts->conn_config);
+    if (opts->chunk_cache_config != NULL)
+        printf(
+          "\t"
+          "Chunk cache configuration: %s\n",
+          opts->chunk_cache_config);
     if (opts->sess_config != NULL)
         printf(
           "\t"
@@ -965,7 +976,7 @@ config_opt_print(WTPERF *wtperf)
           "Workload configuration(s):\n");
         for (i = 0, workp = wtperf->workload; i < wtperf->workload_cnt; ++i, ++workp)
             printf("\t\t%" PRId64 " threads (inserts=%" PRId64 ", reads=%" PRId64
-                   ", updates=%" PRId64 ", truncates=% " PRId64 ")\n",
+                   ", updates=%" PRId64 ", truncates=%" PRId64 ")\n",
               workp->threads, workp->insert, workp->read, workp->update, workp->truncate);
     }
 
@@ -1063,4 +1074,36 @@ config_opt_usage(void)
         printf("%s (%s, default=%s)\n", config_opts_desc[i].name, typestr, defaultval);
         pretty_print(config_opts_desc[i].description, "\t");
     }
+}
+
+/*
+ * config_reopen --
+ *     Set the config string for reopen from the given options structure.
+ */
+char *
+config_reopen(CONFIG_OPTS *opts)
+{
+    char *ret;
+    size_t chunk_cache_cfg_len, req_len;
+
+    chunk_cache_cfg_len = strlen(opts->chunk_cache_config);
+    req_len = strlen(opts->conn_config) + 1;
+    opts->reopen_connection = true;
+    if (opts->readonly)
+        req_len += strlen(READONLY_CONFIG);
+    if (chunk_cache_cfg_len != 0)
+        req_len += chunk_cache_cfg_len;
+
+    ret = dmalloc(req_len);
+    if (opts->readonly && chunk_cache_cfg_len != 0)
+        testutil_snprintf(
+          ret, req_len, "%s%s%s", opts->conn_config, READONLY_CONFIG, opts->chunk_cache_config);
+    else if (opts->readonly)
+        testutil_snprintf(ret, req_len, "%s%s", opts->conn_config, READONLY_CONFIG);
+    else if (chunk_cache_cfg_len != 0)
+        testutil_snprintf(ret, req_len, "%s%s", opts->conn_config, opts->chunk_cache_config);
+    else
+        testutil_snprintf(ret, req_len, "%s", opts->conn_config);
+
+    return (ret);
 }
