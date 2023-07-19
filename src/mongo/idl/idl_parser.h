@@ -375,8 +375,19 @@ public:
     /**
      * Throw an 'APIStrictError' if the user command has 'apiStrict' field as true.
      */
+    void checkAndthrowAPIStrictErrorIfApplicable(StringData fieldName) const {
+        if (_apiStrict) {
+            throwAPIStrictErrorIfApplicable(fieldName);
+        }
+    }
+
+    void checkAndthrowAPIStrictErrorIfApplicable(BSONElement element) const {
+        if (_apiStrict) {
+            throwAPIStrictErrorIfApplicable(element.fieldNameStringData());
+        }
+    }
+
     void throwAPIStrictErrorIfApplicable(StringData fieldName) const;
-    void throwAPIStrictErrorIfApplicable(BSONElement fieldName) const;
 
     /**
      * Check that the collection name in 'element' is valid. Throws an exception if not valid.

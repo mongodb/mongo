@@ -175,3 +175,16 @@ env.CppUnitTest(
         'cluster_server_parameter',
     ],
 )
+
+env.Benchmark(
+    target='idl_parser_bm',
+    source=[
+        'idl_parser_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/mongo/db/query/query_request',
+        'idl_parser',
+    ],
+)

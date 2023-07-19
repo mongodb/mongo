@@ -1007,6 +1007,20 @@ structs:
             field0: string
             field1: string
 
+    TestTrieArgs:
+        description: "Test word prefixes for tries"
+        is_generic_cmd_list: "arg"
+        fields:
+            swim:
+                type: IDLAnyType
+                forward_to_shards: false
+            swimmer:
+                type: IDLAnyType
+                forward_to_shards: false
+            swimmed: # Note: spelled wrong on purpose
+                type: IDLAnyType
+                forward_to_shards: false
+
 ##################################################################################################
 #
 # Test commands

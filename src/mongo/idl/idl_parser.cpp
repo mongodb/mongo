@@ -234,15 +234,10 @@ void IDLParserContext::throwBadType(const BSONElement& element,
                             << "']");
 }
 
-void IDLParserContext::throwAPIStrictErrorIfApplicable(BSONElement field) const {
-    throwAPIStrictErrorIfApplicable(field.fieldNameStringData());
-}
-
 void IDLParserContext::throwAPIStrictErrorIfApplicable(StringData fieldName) const {
-    uassert(ErrorCodes::APIStrictError,
-            str::stream() << "BSON field '" << getElementPath(fieldName)
-                          << "' is not allowed with apiStrict:true.",
-            !_apiStrict);
+    uasserted(ErrorCodes::APIStrictError,
+              str::stream() << "BSON field '" << getElementPath(fieldName)
+                            << "' is not allowed with apiStrict:true.");
 }
 
 StringData IDLParserContext::checkAndAssertCollectionName(const BSONElement& element,

@@ -202,7 +202,7 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
 
         num_internal_only = len(
             [field.name for field in fields if field.type and field.type.internal_only])
-        self._writer.write_line('std::bitset<%d> usedFields;' % (len(fields) - num_internal_only))
+        self.field_count = len(fields) - num_internal_only
 
         bit_id = 0
         for field in fields:
@@ -212,6 +212,9 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
             self._writer.write_line(
                 'const size_t %s = %d;' % (_gen_field_usage_constant(field), bit_id))
             bit_id += 1
+
+        if bit_id != 0:
+            self._writer.write_line('std::bitset<%d> usedFields;' % (self.field_count))
 
     def add_store(self, field_name):
         # type: (str) -> None
@@ -235,24 +238,47 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
 
         if field.stability == 'unstable':
             self._writer.write_line(
-                'ctxt.throwAPIStrictErrorIfApplicable(%s);' % (bson_element_variable))
+                'ctxt.checkAndthrowAPIStrictErrorIfApplicable(%s);' % (bson_element_variable))
             self._writer.write_empty_line()
 
     def add_final_checks(self):
         # type: () -> None
         """Output the code to check for missing fields."""
-        with writer.IndentedScopedBlock(self._writer, 'if (MONGO_unlikely(!usedFields.all())) {',
-                                        '}'):
-            for field in self._fields:
+        required_fields = [
+            field for field in self._fields
+            if (not field.optional) and (not field.ignore) and (not field.default)
+        ]
+
+        # Don't output dead code we know is unused
+        if len(required_fields) == 0:
+            return
+
+        # To build this bitmask, we assume less then 64 fields. If we exceed this count, we will need a new approach
+        assert self.field_count < 64
+
+        required_fields = sorted(required_fields, key=lambda f: f.cpp_name)
+
+        bitmask = ' | '.join(
+            ['(1ULL << %s)' % (_gen_field_usage_constant(rf)) for rf in required_fields])
+
+        self._writer.write_line(f'constexpr std::uint64_t requiredFieldBitMask = {bitmask};')
+
+        self._writer.write_line(
+            'std::bitset<%d> requiredFields(requiredFieldBitMask);' % (self.field_count))
+
+        self._writer.write_line(
+            'bool hasMissingRequiredFields = (requiredFields & usedFields) != requiredFields;')
+
+        with writer.IndentedScopedBlock(self._writer, 'if (hasMissingRequiredFields) {', '}'):
+            for field in required_fields:
                 # If 'field.default' is true, the fields(members) gets initialized with the default
                 # value in the class definition. So, it's ok to skip setting the field to
                 # default value here.
-                if (not field.optional) and (not field.ignore) and (not field.default):
-                    with writer.IndentedScopedBlock(
-                            self._writer,
-                            'if (!usedFields[%s]) {' % (_gen_field_usage_constant(field)), '}'):
-                        self._writer.write_line(
-                            'ctxt.throwMissingField(%s);' % (_get_field_constant_name(field)))
+                with writer.IndentedScopedBlock(
+                        self._writer, 'if (!usedFields[%s]) {' % (_gen_field_usage_constant(field)),
+                        '}'):
+                    self._writer.write_line(
+                        'ctxt.throwMissingField(%s);' % (_get_field_constant_name(field)))
 
 
 class _SlowFieldUsageChecker(_FastFieldUsageChecker):
@@ -1164,8 +1190,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
                     if struct.generic_list_type:
                         self.gen_field_list_entry_lookup_methods_struct(struct)
-                        self.write_empty_line()
-                        self.gen_field_list_entries_declaration_struct(struct)
 
                     self.write_unindented_line('protected:')
                     self.gen_protected_ownership_setters()
@@ -1331,15 +1355,18 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             # Check the array field names are integers
             self._writer.write_line('Status status = NumberParser{}(arrayFieldName, &fieldNumber);')
-            with self._predicate('status.isOK()'):
+            with self._predicate('MONGO_likely(status.isOK())'):
 
                 # Check that the array field names are sequential
-                with self._predicate('fieldNumber != expectedFieldNumber'):
+                with self._predicate('MONGO_unlikely(fieldNumber != expectedFieldNumber)'):
                     self._writer.write_line('arrayCtxt.throwBadArrayFieldNumberSequence(' +
                                             'fieldNumber, expectedFieldNumber);')
                 self._writer.write_empty_line()
 
-                with self._predicate(_get_bson_type_check('arrayElement', 'arrayCtxt', ast_type)):
+                check = _get_bson_type_check('arrayElement', 'arrayCtxt', ast_type)
+                check = "MONGO_likely(%s)" % (check) if check is not None else check
+
+                with self._predicate(check):
                     if ast_type.is_variant:
                         # _gen_variant_deserializer generates code to parse the variant into the variable "_" + field.cpp_name,
                         # so we create a local variable '_tmp'
@@ -1780,16 +1807,29 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate the definitions for generic argument or reply field lookup methods."""
         field_list_info = generic_field_list_types.get_field_list_info(struct)
         defn = field_list_info.get_has_field_method().get_definition()
-        with self._block('%s {' % (defn, ), '}'):
-            self._writer.write_line(
-                'return _genericFields->find(fieldName) != _genericFields->end();')
+
+        field_names = [f.name for f in struct.fields]
+        field_name_map = {f.name: f for f in struct.fields}
+
+        def map_return_true(_field_name):
+            self._writer.write_line("return true;")
+
+        with self._block('%s {' % (defn), '}'):
+            writer.gen_trie(field_names, self._writer, map_return_true)
+            self._writer.write_line('return false;')
 
         self._writer.write_empty_line()
 
+        def map_field(field_name):
+            rv = "true" if field_name_map[field_name].generic_field_info.get_should_forward(
+            ) else "false"
+            self._writer.write_line("return %s;" % (rv))
+
         defn = field_list_info.get_should_forward_method().get_definition()
         with self._block('%s {' % (defn, ), '}'):
-            self._writer.write_line('auto it = _genericFields->find(fieldName);')
-            self._writer.write_line('return (it == _genericFields->end() || it->second);')
+            writer.gen_trie(field_names, self._writer, map_field)
+
+            self._writer.write_line('return true;')
 
         self._writer.write_empty_line()
 
@@ -1850,6 +1890,36 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         deferred_fields = []  # type: List[ast.Field]
         deferred_field_names = []  # type: List[str]
+        field_name_map = {f.name: f for f in struct.fields}
+
+        def map_field(field_name):
+            field = field_name_map[field_name]
+
+            def defer_field():
+                # type: () -> None
+                """Field depends on other field(s), store its location and defer processing till later."""
+                assert field.name in deferred_field_names
+                self._writer.write_line('%s = element;' % (_gen_field_element_name(field)))
+
+            if field.ignore:
+                field_usage_check.add(field, "element")
+                self._writer.write_line('// ignore field')
+            else:
+                fn = defer_field if field.name in deferred_field_names else None
+                self.gen_field_deserializer(field, field.type, bson_object, "element",
+                                            field_usage_check, tenant, deserialize_fn=fn)
+            self._writer.write_line('continue;')
+
+        def is_parse(field):
+            # Do not parse chained fields as fields since they are actually chained types.
+            if field.chained and not field.chained_struct_field:
+                return False
+            # Internal only fields are not parsed from BSON objects
+            if field.type and field.type.internal_only:
+                return False
+
+            return True
+
         if 'expectPrefix' in [field.name for field in struct.fields]:
             # Deserialization of 'expectPrefix' modifies the deserializationContext and how
             # certain other fields are then deserialized.
@@ -1883,37 +1953,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line('firstFieldFound = true;')
                     self._writer.write_line('continue;')
 
-                self._writer.write_empty_line()
-
-            first_field = True
-            for field in struct.fields:
-                # Do not parse chained fields as fields since they are actually chained types.
-                if field.chained and not field.chained_struct_field:
-                    continue
-                # Internal only fields are not parsed from BSON objects
-                if field.type and field.type.internal_only:
-                    continue
-
-                field_predicate = 'fieldName == %s' % (_get_field_constant_name(field))
-
-                with self._predicate(field_predicate, not first_field):
-
-                    def defer_field():
-                        # type: () -> None
-                        """Field depends on other field(s), store its location and defer processing till later."""
-                        assert field.name in deferred_field_names
-                        self._writer.write_line('%s = element;' % (_gen_field_element_name(field)))
-
-                    if field.ignore:
-                        field_usage_check.add(field, "element")
-                        self._writer.write_line('// ignore field')
-                    else:
-                        fn = defer_field if field.name in deferred_field_names else None
-                        self.gen_field_deserializer(field, field.type, bson_object, "element",
-                                                    field_usage_check, tenant, deserialize_fn=fn)
-
-                if first_field:
-                    first_field = False
+            field_names = [f.name for f in struct.fields if is_parse(f)]
+            if len(field_names) > 0:
+                writer.gen_trie(field_names, self._writer, map_field)
 
             # End of for fields
             # Generate strict check for extranous fields
@@ -1928,20 +1970,18 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 if struct.is_command_reply:
                     command_predicate = "!mongo::isGenericReply(fieldName)"
 
-                with self._block('else {', '}'):
-                    with self._predicate(command_predicate):
-                        self._writer.write_line('ctxt.throwUnknownField(fieldName);')
+                with self._predicate(command_predicate):
+                    self._writer.write_line('ctxt.throwUnknownField(fieldName);')
             elif not struct.unsafe_dangerous_disable_extra_field_duplicate_checks:
-                with self._else(not first_field):
-                    self._writer.write_line('auto push_result = usedFieldSet.insert(fieldName);')
-                    with writer.IndentedScopedBlock(
-                            self._writer, 'if (MONGO_unlikely(push_result.second == false)) {',
-                            '}'):
-                        self._writer.write_line('ctxt.throwDuplicateField(fieldName);')
+                self._writer.write_line('auto push_result = usedFieldSet.insert(fieldName);')
+                with writer.IndentedScopedBlock(
+                        self._writer, 'if (MONGO_unlikely(push_result.second == false)) {', '}'):
+                    self._writer.write_line('ctxt.throwDuplicateField(fieldName);')
 
         # Handle the deferred fields after their possible dependencies have been processed.
         for field in deferred_fields:
             element_name = _gen_field_element_name(field)
+            self._writer.write_empty_line()
             with self._predicate(element_name):
                 self.gen_field_deserializer(field, field.type, bson_object, element_name, None,
                                             tenant)
@@ -3154,8 +3194,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self.write_empty_line()
 
                 if struct.generic_list_type:
-                    self.gen_field_list_entries_declaration_struct(struct)
-                    self.write_empty_line()
                     # Write field lookup methods
                     self.gen_field_list_entry_lookup_methods_struct(struct)
                     self.write_empty_line()

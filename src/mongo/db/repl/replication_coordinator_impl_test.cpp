@@ -534,7 +534,8 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenInitiatingWithAnEmpt
     BSONObjBuilder result1;
     auto status = getReplCoord()->processReplSetInitiate(opCtx.get(), BSONObj(), &result1);
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "'ReplSetConfig._id' is missing but a required field");
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           "'ReplSetConfig.version' is missing but a required field");
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 

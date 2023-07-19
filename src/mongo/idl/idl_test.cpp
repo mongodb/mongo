@@ -5166,5 +5166,19 @@ TEST(IDLDangerousIgnoreChecks, ValidateDuplicateChecking) {
                       AssertionException);
     }
 }
+
+TEST(IDLTrie, TestPrefixes) {
+    ASSERT_FALSE(TestTrieArgs::hasField("foo"));
+    ASSERT_FALSE(TestTrieArgs::hasField("s"));
+    ASSERT_FALSE(TestTrieArgs::hasField("sw"));
+    ASSERT_FALSE(TestTrieArgs::hasField("swi"));
+    ASSERT_TRUE(TestTrieArgs::hasField("swim"));
+    ASSERT_FALSE(TestTrieArgs::hasField("swims"));
+    ASSERT_FALSE(TestTrieArgs::hasField("swimer"));
+    ASSERT_TRUE(TestTrieArgs::hasField("swimmer"));
+    ASSERT_FALSE(TestTrieArgs::hasField("swimmers"));
+    ASSERT_TRUE(TestTrieArgs::hasField("swimmed"));
+}
+
 }  // namespace
 }  // namespace mongo
