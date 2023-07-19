@@ -940,4 +940,6 @@ last-lts:
     ticket: SERVER-78855
   - test_file: jstests/sharding/analyze_shard_key/query_sampling_server_params.js
     ticket: SERVER-78913
+  - test_file: jstests/replsets/commit_point_propagation_with_oplog_exhaust_cursor.js
+    ticket: SERVER-78813
   suites: null

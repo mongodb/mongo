@@ -77,9 +77,10 @@ bool shouldWaitForInserts(OperationContext* opCtx,
         // coordinator's lastCommittedOpTime has progressed past the client's lastCommittedOpTime.
         // In that case, we will return early so that we can inform the client of the new
         // lastCommittedOpTime immediately.
-        if (!clientsLastKnownCommittedOpTime(opCtx).isNull()) {
+        if (clientsLastKnownCommittedOpTime(opCtx)) {
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            return clientsLastKnownCommittedOpTime(opCtx) >= replCoord->getLastCommittedOpTime();
+            return clientsLastKnownCommittedOpTime(opCtx).value() >=
+                replCoord->getLastCommittedOpTime();
         }
         return true;
     }
