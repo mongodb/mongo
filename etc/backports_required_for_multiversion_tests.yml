@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/sharding/ingress_handshake_and_auth_metrics_mongos.js
+    ticket: SERVER-49202
   - test_file: jstests/sharding/query/find_and_modify_without_two_phase.js
     ticket: SERVER-44422
   - test_file: jstests/sharding/query/delete_without_two_phase.js
@@ -424,6 +426,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/sharding/ingress_handshake_and_auth_metrics_mongos.js
+    ticket: SERVER-49202
   - test_file: jstests/sharding/query/find_and_modify_without_two_phase.js
     ticket: SERVER-44422
   - test_file: jstests/sharding/query/delete_without_two_phase.js

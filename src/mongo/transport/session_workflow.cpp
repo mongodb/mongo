@@ -51,6 +51,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/dbmessage.h"
@@ -96,7 +97,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(doNotSetMoreToCome);
 MONGO_FAIL_POINT_DEFINE(beforeCompressingExhaustResponse);
-MONGO_FAIL_POINT_DEFINE(sessionWorkflowDelaySendMessage);
+MONGO_FAIL_POINT_DEFINE(sessionWorkflowDelayOrFailSendMessage);
 
 namespace metrics_detail {
 
@@ -234,7 +235,7 @@ struct SplitTimerPolicy {
             return;
         }
 
-        logv2::LogSeverity severity = sessionWorkflowDelaySendMessage.shouldFail()
+        logv2::LogSeverity severity = sessionWorkflowDelayOrFailSendMessage.shouldFail()
             ? logv2::LogSeverity::Info()
             : _sep->slowSessionWorkflowLogSeverity();
 
@@ -378,6 +379,8 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
     return false;
 }
 
+// Counts the # of responses to completed operations that we were unable to send back to the client.
+CounterMetric unsendableCompletedResponses("operation.unsendableCompletedResponses");
 }  // namespace
 
 class SessionWorkflow::Impl {
@@ -683,13 +686,21 @@ std::unique_ptr<SessionWorkflow::Impl::WorkItem> SessionWorkflow::Impl::_receive
 void SessionWorkflow::Impl::_sendResponse() {
     if (!_work->hasOut())
         return;
-    sessionWorkflowDelaySendMessage.execute([](auto&& data) {
-        Milliseconds delay{data["millis"].safeNumberLong()};
-        LOGV2(6724101, "sendMessage: failpoint-induced delay", "delay"_attr = delay);
-        sleepFor(delay);
-    });
 
     try {
+        sessionWorkflowDelayOrFailSendMessage.execute([this](auto&& data) {
+            if (auto isDelay = data["millis"]; !isDelay.eoo()) {
+                Milliseconds delay{isDelay.safeNumberLong()};
+                LOGV2(6724101, "sendMessage: failpoint-induced delay", "delay"_attr = delay);
+                sleepFor(delay);
+            } else {
+                auto md = ClientMetadata::get(client());
+                if (md && (md->getApplicationName() == data["appName"].str())) {
+                    LOGV2(4920200, "sendMessage: failpoint-induced failure");
+                    uasserted(ErrorCodes::HostUnreachable, "Sink message failed");
+                }
+            }
+        });
         uassertStatusOK(session()->sinkMessage(_work->consumeOut()));
     } catch (const DBException& ex) {
         LOGV2(22989,
@@ -697,6 +708,7 @@ void SessionWorkflow::Impl::_sendResponse() {
               "error"_attr = ex,
               "remote"_attr = session()->remote(),
               "connectionId"_attr = session()->id());
+        unsendableCompletedResponses.increment();
         throw;
     }
 }

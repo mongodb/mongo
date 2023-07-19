@@ -52,7 +52,7 @@ function ingressHandshakeMetricsTest(conn, options) {
         let waitInHelloFailPoint =
             configureFailPoint(conn, 'waitInHello', {delayMillis: helloProcessingDelayMillis});
         let delaySendMessageFailPoint = configureFailPoint(
-            conn, 'sessionWorkflowDelaySendMessage', {millis: helloResponseDelayMillis});
+            conn, 'sessionWorkflowDelayOrFailSendMessage', {millis: helloResponseDelayMillis});
         let testConn = new Mongo(conn.host);
         delaySendMessageFailPoint.off();
         waitInHelloFailPoint.off();

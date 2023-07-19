@@ -8,8 +8,13 @@
 //    still there at the end of a timeout
 // 5. Disable the fail point
 //
+// It also ensures that we correctly record metrics counting the number of operations killed
+// due to client disconnect, and the number of completed operations that couldn't return data
+// due to client disconnect.
+//
 // @tags: [requires_sharding]
 
+load("jstests/libs/fail_point_util.js");
 (function() {
 "use strict";
 
@@ -128,6 +133,33 @@ function runCommand(cmd) {
     };
 }
 
+// Test that an operation that completes but whose client disconnects before the
+// response is sent is recorded properly.
+function testUnsendableCompletedResponsesCounted(client) {
+    let beforeUnsendableResponsesCount =
+        client.adminCommand({serverStatus: 1}).metrics.operation.unsendableCompletedResponses;
+    id++;
+    const host = client.host;
+    let conn = new Mongo(`mongodb://${host}/?appName=${testName}${id}`);
+    // Make sure the new connection works.
+    assert.commandWorked(conn.adminCommand({ping: 1}));
+
+    // Ensure that after the next command completes, the server fails to send the response.
+    let fp = configureFailPoint(
+        client, "sessionWorkflowDelayOrFailSendMessage", {appName: testName + id});
+
+    // Should fail because the server will close the connection after receiving a simulated network
+    // error sinking the response to the client.
+    const error = assert.throws(() => conn.adminCommand({hello: 1}));
+    assert(isNetworkError(error), error);
+
+    // Ensure we counted the unsendable completed response.
+    let afterUnsendableResponsesCount =
+        client.adminCommand({serverStatus: 1}).metrics.operation.unsendableCompletedResponses;
+
+    assert.eq(beforeUnsendableResponsesCount + 1, afterUnsendableResponsesCount);
+}
+
 function runTests(client) {
     let admin = client.getDB("admin");
 
@@ -189,18 +221,39 @@ function runTests(client) {
      [checkClosedEarly, runCommand({listCollections: 1})],
      [checkClosedEarly, runCommand({listIndexes: "test"})],
     ].forEach(runWithCmdFailPointEnabled(client));
+
+    testUnsendableCompletedResponsesCounted(client);
 }
+
+// Just counts the # of commands we send in an exection of runTests that should be
+// killed due to disconnected client.
+const numThatShouldCloseEarly = 9;
 
 {
     let proc = MongoRunner.runMongod();
+    let admin = proc.getDB("admin");
+    let beforeServerStatusMetrics = admin.runCommand({serverStatus: 1}).metrics;
     assert.neq(proc, null);
     runTests(proc);
+    let afterServerStatusMetrics = admin.runCommand({serverStatus: 1}).metrics;
+    // Ensure that we report the operations killed due to client disconnect in serverStatus.
+    assert.eq(
+        beforeServerStatusMetrics.operation.killedDueToClientDisconnect + numThatShouldCloseEarly,
+        afterServerStatusMetrics.operation.killedDueToClientDisconnect);
     MongoRunner.stopMongod(proc);
 }
 
 {
     let st = ShardingTest({mongo: 1, config: 1, shards: 1});
+    let admin = st.s0.getDB("admin");
+    let beforeServerStatusMetrics = admin.runCommand({serverStatus: 1}).metrics;
     runTests(st.s0);
+    let afterServerStatusMetrics = admin.runCommand({serverStatus: 1}).metrics;
+    // Ensure that we report the operations killed due to client disconnect in serverStatus on
+    // mongos.
+    assert.eq(
+        beforeServerStatusMetrics.operation.killedDueToClientDisconnect + numThatShouldCloseEarly,
+        afterServerStatusMetrics.operation.killedDueToClientDisconnect);
     st.stop();
 }
 })();

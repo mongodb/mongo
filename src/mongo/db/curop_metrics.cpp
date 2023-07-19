@@ -40,6 +40,7 @@
 namespace mongo {
 namespace {
 
+// mongod only metrics
 CounterMetric deletedCounter("document.deleted");
 CounterMetric insertedCounter("document.inserted");
 CounterMetric returnedCounter("document.returned");
@@ -51,31 +52,41 @@ CounterMetric scannedObjectCounter("queryExecutor.scannedObjects");
 CounterMetric scanAndOrderCounter("operation.scanAndOrder");
 CounterMetric writeConflictsCounter("operation.writeConflicts");
 
+// mongos and mongod metrics
+CounterMetric killedDueToClientDisconnectCounter("operation.killedDueToClientDisconnect");
+
 }  // namespace
 
 void recordCurOpMetrics(OperationContext* opCtx) {
     const OpDebug& debug = CurOp::get(opCtx)->debug();
-    if (debug.additiveMetrics.nreturned)
-        returnedCounter.increment(*debug.additiveMetrics.nreturned);
-    if (debug.additiveMetrics.ninserted)
-        insertedCounter.increment(*debug.additiveMetrics.ninserted);
-    if (debug.additiveMetrics.nMatched)
-        updatedCounter.increment(*debug.additiveMetrics.nMatched);
-    if (debug.additiveMetrics.ndeleted)
-        deletedCounter.increment(*debug.additiveMetrics.ndeleted);
-    if (debug.additiveMetrics.keysExamined)
-        scannedCounter.increment(*debug.additiveMetrics.keysExamined);
-    if (debug.additiveMetrics.docsExamined)
-        scannedObjectCounter.increment(*debug.additiveMetrics.docsExamined);
+    // TODO SERVER-78810 Use improved ClusterRole API here, and ensure we only add the non-router
+    // metrics if `opCtx` didn't execute under the router-role.
+    if (!serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
+        if (debug.additiveMetrics.nreturned)
+            returnedCounter.increment(*debug.additiveMetrics.nreturned);
+        if (debug.additiveMetrics.ninserted)
+            insertedCounter.increment(*debug.additiveMetrics.ninserted);
+        if (debug.additiveMetrics.nMatched)
+            updatedCounter.increment(*debug.additiveMetrics.nMatched);
+        if (debug.additiveMetrics.ndeleted)
+            deletedCounter.increment(*debug.additiveMetrics.ndeleted);
+        if (debug.additiveMetrics.keysExamined)
+            scannedCounter.increment(*debug.additiveMetrics.keysExamined);
+        if (debug.additiveMetrics.docsExamined)
+            scannedObjectCounter.increment(*debug.additiveMetrics.docsExamined);
 
-    if (debug.hasSortStage)
-        scanAndOrderCounter.increment();
-    if (auto n = debug.additiveMetrics.writeConflicts.load(); n > 0)
-        writeConflictsCounter.increment(n);
+        if (debug.hasSortStage)
+            scanAndOrderCounter.increment();
+        if (auto n = debug.additiveMetrics.writeConflicts.load(); n > 0)
+            writeConflictsCounter.increment(n);
+        lookupPushdownCounters.incrementLookupCounters(CurOp::get(opCtx)->debug());
+        sortCounters.incrementSortCounters(debug);
+        queryFrameworkCounters.incrementQueryEngineCounters(CurOp::get(opCtx));
+    }
 
-    lookupPushdownCounters.incrementLookupCounters(CurOp::get(opCtx)->debug());
-    sortCounters.incrementSortCounters(debug);
-    queryFrameworkCounters.incrementQueryEngineCounters(CurOp::get(opCtx));
+    if (opCtx->getKillStatus() == ErrorCodes::ClientDisconnect) {
+        killedDueToClientDisconnectCounter.increment();
+    }
 }
 
 void recordCurOpMetricsOplogApplication(OperationContext* opCtx) {

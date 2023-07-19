@@ -48,7 +48,7 @@ function runTest(conn) {
 
     // Wait, then do a query beyond the 100ms threshold. Make sure the slow loop log line exists.
     const fp = configureFailPoint(
-        conn, "sessionWorkflowDelaySendMessage", {millis: sleepMillisInSendResponse});
+        conn, "sessionWorkflowDelayOrFailSendMessage", {millis: sleepMillisInSendResponse});
     coll.find().toArray();
     fp.off();
     let logAndCount = getSlowLogAndCount(conn);
@@ -78,7 +78,7 @@ function runTest(conn) {
     // Wait, then do a query beyond the 100ms threshold. Make sure the slow loop log line does not
     // exist this time.
     const fp2 = configureFailPoint(
-        conn, "sessionWorkflowDelaySendMessage", {millis: sleepMillisInSendResponse});
+        conn, "sessionWorkflowDelayOrFailSendMessage", {millis: sleepMillisInSendResponse});
     coll.find().toArray();
     fp2.off();
     logAndCount = getSlowLogAndCount(conn);
