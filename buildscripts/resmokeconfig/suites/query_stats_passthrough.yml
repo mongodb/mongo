@@ -3,9 +3,10 @@ description: |
   This suite enables the collection of query stats metrics on a mongod server, then runs the tests in
   core and aggregation as normal. This should cause each query or aggregation to compute a query
   shape and query stats key, and record in-memory some metrics like execution time and number of
-  scanned documents. Then it uses the 'RunQueryStats' hook to have a background thread ask to collect
-  the query stats every one second. It doesn't assert anything about the collected query stats, it is
-  just meant to make sure nothing is going seriously awry (e.g. crashing).
+  scanned documents. Then it uses the 'RunQueryStats' hook to collect the query stats at the end of
+  each test, once with HMAC application enabled and once without. It doesn't assert anything about
+  the collected query stats, it is just meant to make sure nothing is going seriously awry (e.g.
+  crashing).
 
 selector:
   roots:
@@ -14,7 +15,6 @@ selector:
   exclude_files:
   # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests.
   - jstests/core/txns/**/*.js
-  - jstests/core/views/invalid_system_views.js # TODO SERVER-78025 reenable coverage on this test
   # Queryable encryption is not supported on standalone
   - jstests/core/queryable_encryption/**/*.js
   exclude_with_any_tags:
