@@ -348,6 +348,8 @@ last-lts:
     ticket: SERVER-78414
   - test_file: jstests/core/query/elemmatch/elemmatch_or_pushdown_paths.js
     ticket: SERVER-74954
+  - test_file: jstests/replsets/commit_point_propagation_with_oplog_exhaust_cursor.js
+    ticket: SERVER-78813
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
