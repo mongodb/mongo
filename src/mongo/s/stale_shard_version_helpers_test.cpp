@@ -136,5 +136,34 @@ TEST_F(AsyncShardVersionRetry, ExhaustedRetriesShouldThrowOriginalException) {
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::StaleDbVersion);
 }
 
+TEST_F(AsyncShardVersionRetry, ShouldNotBreakOnTimeseriesBucketNamespaceRewrite) {
+    CancellationSource cancellationSource;
+    auto token = cancellationSource.token();
+    auto catalogCache = Grid::get(service())->catalogCache();
+
+    int tries = 0;
+    auto future = shardVersionRetry(
+        service(), nss(), catalogCache, desc(), getExecutor(), token, [&](OperationContext*) {
+            if (++tries < 5) {
+                const CollectionGeneration gen1(OID::gen(), Timestamp(1, 0));
+                const CollectionGeneration gen2(OID::gen(), Timestamp(1, 0));
+                uassert(
+                    StaleConfigInfo(
+                        nss().makeTimeseriesBucketsNamespace(),
+                        ShardVersionFactory::make(ChunkVersion(gen1, {5, 23}),
+                                                  boost::optional<CollectionIndexes>(boost::none)),
+                        ShardVersionFactory::make(ChunkVersion(gen2, {6, 99}),
+                                                  boost::optional<CollectionIndexes>(boost::none)),
+                        ShardId("sB")),
+                    "testX",
+                    false);
+            }
+
+            return 10;
+        });
+
+    ASSERT_EQ(10, future.get());
+}
+
 }  // namespace
 }  // namespace mongo
