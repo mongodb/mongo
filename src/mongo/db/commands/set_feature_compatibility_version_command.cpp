@@ -127,7 +127,6 @@
 #include "mongo/rpc/unique_message.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_collection_gen.h"
-#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
@@ -675,8 +674,6 @@ private:
     void _upgradeServerMetadata(OperationContext* opCtx,
                                 const multiversion::FeatureCompatibilityVersion requestedVersion) {
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-            const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
-            _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion, actualVersion);
             _dropConfigMigrationsCollection(opCtx);
         }
 
@@ -793,79 +790,6 @@ private:
                             2,
                             "Resharding coordinator 'active' index did not exist during upgrade.");
             }
-        }
-    }
-
-    // TODO SERVER-68889 remove once 7.0 becomes last LTS
-    void _cleanupConfigVersionOnUpgrade(
-        OperationContext* opCtx,
-        const multiversion::FeatureCompatibilityVersion requestedVersion,
-        const multiversion::FeatureCompatibilityVersion actualVersion) {
-        if (feature_flags::gStopUsingConfigVersion.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
-                requestedVersion, actualVersion)) {
-            LOGV2(6888800, "Removing deprecated fields from config.version collection");
-            static const std::vector<StringData> deprecatedFields{
-                "excluding"_sd,
-                "upgradeId"_sd,
-                "upgradeState"_sd,
-                StringData{VersionType::currentVersion.name()},
-                StringData{VersionType::minCompatibleVersion.name()},
-            };
-
-            const auto updateObj = [&] {
-                BSONObjBuilder updateBuilder;
-                BSONObjBuilder unsetBuilder(updateBuilder.subobjStart("$unset"));
-                for (const auto deprecatedField : deprecatedFields) {
-                    unsetBuilder.append(deprecatedField.toString(), true);
-                }
-                unsetBuilder.doneFast();
-                return updateBuilder.obj();
-            }();
-
-            DBDirectClient client(opCtx);
-            write_ops::UpdateCommandRequest update(VersionType::ConfigNS);
-            update.setUpdates({[&]() {
-                write_ops::UpdateOpEntry entry;
-                entry.setQ({});
-                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(updateObj));
-                entry.setMulti(true);
-                entry.setUpsert(false);
-                return entry;
-            }()});
-            client.update(update);
-        }
-    }
-
-    // TODO SERVER-68889 remove once 7.0 becomes last LTS
-    void _updateConfigVersionOnDowngrade(
-        OperationContext* opCtx,
-        const multiversion::FeatureCompatibilityVersion requestedVersion,
-        const multiversion::FeatureCompatibilityVersion originalVersion) {
-        if (feature_flags::gStopUsingConfigVersion.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
-                requestedVersion, originalVersion)) {
-            LOGV2(6888801, "Restoring removed fields in config.version collection");
-            const auto updateObj = [&] {
-                BSONObjBuilder updateBuilder;
-                BSONObjBuilder unsetBuilder(updateBuilder.subobjStart("$set"));
-                unsetBuilder.append(VersionType::minCompatibleVersion.name(),
-                                    VersionType::MIN_COMPATIBLE_CONFIG_VERSION);
-                unsetBuilder.append(VersionType::currentVersion.name(),
-                                    VersionType::CURRENT_CONFIG_VERSION);
-                unsetBuilder.doneFast();
-                return updateBuilder.obj();
-            }();
-
-            DBDirectClient client(opCtx);
-            write_ops::UpdateCommandRequest update(VersionType::ConfigNS);
-            update.setUpdates({[&]() {
-                write_ops::UpdateOpEntry entry;
-                entry.setQ({});
-                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(updateObj));
-                entry.setMulti(true);
-                entry.setUpsert(false);
-                return entry;
-            }()});
-            client.update(update);
         }
     }
 
@@ -1190,7 +1114,6 @@ private:
             // be able to apply the oplog entries correctly.
             abortAllReshardCollection(opCtx);
             _createReshardingCoordinatorUniqueIndex(opCtx, requestedVersion, originalVersion);
-            _updateConfigVersionOnDowngrade(opCtx, requestedVersion, originalVersion);
         }
 
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {

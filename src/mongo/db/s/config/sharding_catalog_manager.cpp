@@ -767,11 +767,6 @@ Status ShardingCatalogManager::_initConfigVersion(OperationContext* opCtx) {
     VersionType newVersion;
     newVersion.setClusterId(OID::gen());
 
-    if (!feature_flags::gStopUsingConfigVersion.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        newVersion.setCurrentVersion(VersionType::CURRENT_CONFIG_VERSION);
-        newVersion.setMinCompatibleVersion(VersionType::MIN_COMPATIBLE_CONFIG_VERSION);
-    }
     auto insertStatus = _localCatalogClient->insertConfigDocument(
         opCtx, VersionType::ConfigNS, newVersion.toBSON(), kNoWaitWriteConcern);
     return insertStatus;

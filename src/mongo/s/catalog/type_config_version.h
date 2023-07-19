@@ -49,17 +49,8 @@ namespace mongo {
  */
 class VersionType {
 public:
-    // TODO SERVER-68889 remove once 7.0 becomes last LTS
-    static constexpr int MIN_COMPATIBLE_CONFIG_VERSION = 5;
-    static constexpr int CURRENT_CONFIG_VERSION = 6;
-
     // Name of the version collection in the config server.
     static const NamespaceString ConfigNS;
-
-    // Field names and types in the version collection type.
-    // TODO SERVER-68889 remove once 7.0 becomes last LTS
-    static const BSONField<int> minCompatibleVersion;
-    static const BSONField<int> currentVersion;
 
     static const BSONField<OID> clusterId;
 
@@ -95,17 +86,6 @@ public:
      */
     std::string toString() const;
 
-    const boost::optional<int>& getMinCompatibleVersion() const {
-        return _minCompatibleVersion;
-    }
-    void setMinCompatibleVersion(boost::optional<int> minCompatibleVersion);
-
-    const boost::optional<int>& getCurrentVersion() const {
-        return _currentVersion;
-    }
-
-    void setCurrentVersion(boost::optional<int> currentVersion);
-
     const OID& getClusterId() const {
         return _clusterId;
     }
@@ -113,11 +93,6 @@ public:
 
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-
-    // TODO SERVER-68889 remove once 7.0 becomes last LTS
-    boost::optional<int> _minCompatibleVersion;
-    // TODO SERVER-68889 remove once 7.0 becomes last LTS
-    boost::optional<int> _currentVersion;
 
     // (M) clusterId
     OID _clusterId;

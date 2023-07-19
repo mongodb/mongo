@@ -43,13 +43,6 @@ feature_flags:
     default: true
     version: 6.3
     shouldBeFCVGated: true
-  featureFlagStopUsingConfigVersion:
-  # TODO SERVER-68889 remove once 7.0 becomes last LTS
-    description: "Stop using deprecated config version fields to check metadata compatibility between different version"
-    cpp_varname: feature_flags::gStopUsingConfigVersion
-    default: true
-    version: 6.2
-    shouldBeFCVGated: true
   # TODO (SERVER-70396): Remove once 7.0 becomes last LTS
   featureFlagCheckMetadataConsistency:
     description: "Feature flag for checking metadata consistency in the cluster, database or collection"

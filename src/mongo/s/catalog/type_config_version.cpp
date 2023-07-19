@@ -45,21 +45,14 @@ namespace mongo {
 
 const NamespaceString VersionType::ConfigNS(NamespaceString::kConfigVersionNamespace);
 
-const BSONField<int> VersionType::minCompatibleVersion("minCompatibleVersion");
-const BSONField<int> VersionType::currentVersion("currentVersion");
 const BSONField<OID> VersionType::clusterId("clusterId");
 
 void VersionType::clear() {
-    _minCompatibleVersion.reset();
-    _currentVersion.reset();
     _clusterId = OID{};
 }
 
 void VersionType::cloneTo(VersionType* other) const {
     other->clear();
-
-    other->_minCompatibleVersion = _minCompatibleVersion;
-    other->_currentVersion = _currentVersion;
     other->_clusterId = _clusterId;
 }
 
@@ -72,41 +65,11 @@ BSONObj VersionType::toBSON() const {
 
     builder.append("_id", 1);
     builder.append(clusterId.name(), getClusterId());
-    if (_minCompatibleVersion)
-        builder.append(minCompatibleVersion.name(), _minCompatibleVersion.get());
-    if (_currentVersion)
-        builder.append(currentVersion.name(), _currentVersion.get());
-
     return builder.obj();
 }
 
 StatusWith<VersionType> VersionType::fromBSON(const BSONObj& source) {
     VersionType version;
-
-    {
-        long long vMinCompatibleVersion;
-        Status status =
-            bsonExtractIntegerField(source, minCompatibleVersion.name(), &vMinCompatibleVersion);
-        if (status == ErrorCodes::NoSuchKey) {
-            // skip optional field
-        } else if (!status.isOK()) {
-            return status;
-        } else {
-            version._minCompatibleVersion = vMinCompatibleVersion;
-        }
-    }
-
-    {
-        long long vCurrentVersion;
-        Status status = bsonExtractIntegerField(source, currentVersion.name(), &vCurrentVersion);
-        if (status == ErrorCodes::NoSuchKey) {
-            // skip optional field
-        } else if (!status.isOK()) {
-            return status;
-        } else {
-            version._currentVersion = vCurrentVersion;
-        }
-    }
 
     {
         BSONElement vClusterIdElem;
@@ -118,14 +81,6 @@ StatusWith<VersionType> VersionType::fromBSON(const BSONObj& source) {
     }
 
     return version;
-}
-
-void VersionType::setMinCompatibleVersion(boost::optional<int> minCompatibleVersion) {
-    _minCompatibleVersion = minCompatibleVersion;
-}
-
-void VersionType::setCurrentVersion(boost::optional<int> currentVersion) {
-    _currentVersion = currentVersion;
 }
 
 void VersionType::setClusterId(const OID& clusterId) {
