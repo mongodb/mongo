@@ -1,7 +1,7 @@
 # Core (we need these for most buildscripts)
 psutil <= 5.8.0
 pymongo >= 3.9, < 4.0
-PyYAML >= 3.0.0, <= 6.0.0
+PyYAML >= 3.0.0, <= 5.3.1 # Pinned due to SERVER-79126 and linked BF
 requests >= 2.0.0, <= 2.26.0
 pkce == 1.0.3
 oauthlib == 3.1.1
