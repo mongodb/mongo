@@ -1908,7 +1908,7 @@ TEST(SerializeInternalSchema, AllowedPropertiesRedactsCorrectly) {
         R"({
             "$_internalSchemaAllowedProperties": {
                 "properties": "?array<?string>",
-                "namePlaceholder": "?string",
+                "namePlaceholder": "i",
                 "patternProperties": [],
                 "otherwise": {
                     "HASH<i>": {
