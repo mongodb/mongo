@@ -60,390 +60,99 @@
 
 #pragma once
 
-#include <algorithm>
-#include <boost/optional.hpp>
-#include <cstdint>
-#include <fmt/format.h>
-#include <iostream>
-#include <memory>
-#include <sstream>
 #include <type_traits>
-#include <typeindex>
-#include <typeinfo>
-#include <vector>
 
-#include "mongo/util/assert_util.h"
-#include "mongo/util/static_immortal.h"
+#include "mongo/util/decoration_container.h"
+#include "mongo/util/decoration_registry.h"
 
 namespace mongo {
 
-namespace decorable_detail {
-
-struct LifecycleOperations {
-    using CtorFn = void(void*);
-    using DtorFn = void(void*);
-    using CopyFn = void(void*, const void*);
-    using AssignFn = void(void*, const void*);
-
-    template <typename T>
-    static constexpr CtorFn* getCtor() {
-        if constexpr (!std::is_trivially_constructible_v<T>)
-            return +[](void* p) {
-                new (p) T{};
-            };
-        return nullptr;
-    }
-
-    template <typename T>
-    static constexpr DtorFn* getDtor() {
-        if constexpr (!std::is_trivially_destructible_v<T>)
-            return +[](void* p) {
-                static_cast<T*>(p)->~T();
-            };
-        return nullptr;
-    }
-
-    template <typename T, bool needCopy>
-    static constexpr CopyFn* getCopy() {
-        if constexpr (needCopy)
-            return +[](void* p, const void* src) {
-                new (p) T(*static_cast<const T*>(src));
-            };
-        return nullptr;
-    }
-
-    template <typename T, bool needCopy>
-    static constexpr AssignFn* getAssign() {
-        if constexpr (needCopy)
-            return +[](void* p, const void* src) {
-                *static_cast<T*>(p) = *static_cast<const T*>(src);
-            };
-        return nullptr;
-    }
-
-    template <typename T, bool needCopy>
-    static constexpr LifecycleOperations make() {
-        return {getCtor<T>(), getDtor<T>(), getCopy<T, needCopy>(), getAssign<T, needCopy>()};
-    };
-
-    CtorFn* ctor;     /** null if trivial */
-    DtorFn* dtor;     /** null if trivial */
-    CopyFn* copy;     /** null if no copy */
-    AssignFn* assign; /** null if no assignment */
-};
-
-template <typename T, bool needCopy>
-constexpr inline LifecycleOperations lifecycleOperations = LifecycleOperations::make<T, needCopy>();
-
-class Registry {
-public:
-    struct Entry {
-        const std::type_info* typeInfo;
-        ptrdiff_t offset;
-        const LifecycleOperations* ops;
-        size_t size;
-        size_t align;
-    };
-
-    /** Return registry position of new entry. */
-    template <typename T>
-    size_t declare(const LifecycleOperations* ops) {
-        static constexpr auto al = alignof(T);
-        static constexpr auto sz = sizeof(T);
-        static_assert(al <= alignof(std::max_align_t), "over-aligned decoration");
-        ptrdiff_t offset = (_bufferSize + al - 1) / al * al;  // pad to alignment
-        _entries.push_back({&typeid(T), offset, ops, sz, al});
-        _bufferSize = offset + sz;
-        return _entries.size() - 1;
-    }
-
-    size_t bufferSize() const {
-        return _bufferSize;
-    }
-
-    auto begin() const {
-        return _entries.begin();
-    }
-    auto end() const {
-        return _entries.end();
-    }
-    size_t size() const {
-        return _entries.size();
-    }
-    const auto& operator[](size_t i) const {
-        invariant(i < size(), format(FMT_STRING("{} < {}"), i, size()));
-        return _entries[i];
-    }
-
-private:
-    std::vector<Entry> _entries;
-    size_t _bufferSize = sizeof(void*);  // The owner pointer is always present.
-};
-
-/** Defined for gdb pretty-printer visibility only. */
-template <typename D>
-inline const Registry* gdbRegistry = nullptr;
-
-template <typename D>
-Registry& getRegistry() {
-    static auto reg = [] {
-        auto r = new Registry{};
-        gdbRegistry<D> = r;
-        return r;
-    }();
-    return *reg;
-}
-
-/**
- * A token that represents the 2-way link between Decorable D and a decoration
- * of type T attached to it. Given a Decorable, identifies a Decoration. Going
- * in the other direction, it can also be used to identify a decoration's owner.
- */
-template <typename D, typename T>
-class DecorationToken {
-public:
-    using DecoratedType = D;
-    using DecorationType = T;
-
-    explicit DecorationToken(size_t registryPosition) : _registryPosition{registryPosition} {}
-
-    /**
-     * Returns a reference to this decoration object in the specified `Decorable d`.
-     * Const and non-const overloads are provided for deep const semantics.
-     */
-    const DecorationType& decoration(const DecoratedType& d) const {
-        return d.decoration(*this);
-    }
-    DecorationType& decoration(DecoratedType& d) const {
-        return d.decoration(*this);
-    }
-
-    /**
-     * Returns the owner of decoration `t`, with deep const semantics.
-     * Decoration `t` can also be given as a pointer, in which case a pointer to
-     * its owner is returned.
-     */
-    const DecoratedType& owner(const DecorationType& t) const {
-        // The decoration block starts with a backlink to the decorable.
-        const void* p = &t;
-        const void* block = static_cast<const char*>(p) - _offset;
-        return **static_cast<const DecoratedType* const*>(block);
-    }
-    DecoratedType& owner(DecorationType& t) const {
-        return const_cast<DecoratedType&>(owner(std::as_const(t)));
-    }
-    const DecoratedType* owner(const DecorationType* t) const {
-        return &owner(*t);
-    }
-    DecoratedType* owner(DecorationType* t) const {
-        return &owner(*t);
-    }
-
-    /**
-     * Syntactic sugar, equivalent to decoration(d). As a convenience, overloads
-     * are provided so that a pointer `&d` can be given instead.
-     */
-    const DecorationType& operator()(const DecoratedType& d) const {
-        return decoration(d);
-    }
-    DecorationType& operator()(DecoratedType& d) const {
-        return decoration(d);
-    }
-    const DecorationType& operator()(const DecoratedType* d) const {
-        return decoration(*d);
-    }
-    DecorationType& operator()(DecoratedType* d) const {
-        return decoration(*d);
-    }
-
-    size_t registryPosition() const {
-        return _registryPosition;
-    }
-
-    ptrdiff_t offsetInBlock() const {
-        return _offset;
-    }
-
-private:
-    size_t _registryPosition;
-    ptrdiff_t _offset = decorable_detail::getRegistry<DecoratedType>()[_registryPosition].offset;
-};
-
-template <typename D>
-class DecorationBuffer {
-public:
-    using DecoratedType = D;
-
-    template <typename T>
-    static DecorationToken<DecoratedType, T> declareDecoration() {
-        // If DecoratedType has either of the copy operations, then T needs them both.
-        static constexpr bool needCopy =
-            std::is_copy_constructible_v<DecoratedType> || std::is_copy_assignable_v<DecoratedType>;
-        return DecorationToken<DecoratedType, T>{
-            _reg().template declare<T>(&lifecycleOperations<T, needCopy>)};
-    }
-
-    explicit DecorationBuffer(DecoratedType* decorated) {
-        _setBackLink(decorated);
-        _constructorCommon();
-    }
-
-    /** Used when copying, but we need the decorated's address. */
-    DecorationBuffer(DecoratedType* decorated, const DecorationBuffer& other) {
-        _setBackLink(decorated);
-        const auto& reg = _reg();
-        size_t n = reg.size();
-        size_t i = 0;
-        try {
-            for (; i != n; ++i) {
-                const auto& e = reg[i];
-                e.ops->copy(getAtOffset(e.offset), other.getAtOffset(e.offset));
-            }
-        } catch (...) {
-            _tearDownParts(i);
-            throw;
-        }
-    }
-
-    ~DecorationBuffer() {
-        _tearDownParts(_reg().size());
-    }
-
-    /** Only basic (not strong) exception safety for this copy-assign. */
-    DecorationBuffer& operator=(const DecorationBuffer& other) {
-        auto& reg = _reg();
-        size_t n = reg.size();
-        for (size_t i = 0; i != n; ++i) {
-            const auto& e = reg[i];
-            e.ops->assign(getAtOffset(e.offset), other.getAtOffset(e.offset));
-        }
-        return *this;
-    }
-
-    const void* getAtOffset(ptrdiff_t offset) const {
-        return _data + offset;
-    }
-    void* getAtOffset(ptrdiff_t offset) {
-        return const_cast<void*>(std::as_const(*this).getAtOffset(offset));
-    }
-
-private:
-    static Registry& _reg() {
-        return getRegistry<DecoratedType>();
-    }
-
-    void _constructorCommon() {
-        auto& reg = _reg();
-        size_t n = reg.size();
-        size_t i = 0;
-        try {
-            for (; i != n; ++i) {
-                const auto& e = reg[i];
-                if (const auto& ctor = e.ops->ctor)
-                    ctor(getAtOffset(e.offset));
-            }
-        } catch (...) {
-            _tearDownParts(i);
-            throw;
-        }
-    }
-
-    void _tearDownParts(size_t count) noexcept {
-        auto& reg = _reg();
-        while (count--) {
-            const auto& e = reg[count];
-            if (const auto& dtor = e.ops->dtor)
-                dtor(getAtOffset(e.offset));
-        }
-    }
-
-    void _setBackLink(DecoratedType* decorated) {
-        *reinterpret_cast<DecoratedType**>(_data) = decorated;
-    }
-
-    std::unique_ptr<unsigned char[]> _makeData() {
-        return std::make_unique<unsigned char[]>(_reg().bufferSize());
-    }
-
-    std::unique_ptr<unsigned char[]> _dataOwnership{_makeData()};
-    unsigned char* _data{_dataOwnership.get()};
-};
-
-}  // namespace decorable_detail
-
 template <typename D>
 class Decorable {
-public:
-    using DerivedType = D;  // CRTP
+private:
+    struct DecorationConstructionTag {};
 
+public:
     template <typename T>
-    using Decoration = decorable_detail::DecorationToken<DerivedType, T>;
+    class Decoration {
+    public:
+        Decoration() = delete;
+        Decoration(DecorationConstructionTag ignored,
+                   typename DecorationContainer<D>::template DecorationDescriptorWithType<T> raw)
+            : _raw(std::move(raw)) {}
+
+        T& operator()(D& d) const {
+            return static_cast<Decorable&>(d)._decorations.getDecoration(this->_raw);
+        }
+
+        T& operator()(D* const d) const {
+            return (*this)(*d);
+        }
+
+        const T& operator()(const D& d) const {
+            return static_cast<const Decorable&>(d)._decorations.getDecoration(this->_raw);
+        }
+
+        const T& operator()(const D* const d) const {
+            return (*this)(*d);
+        }
+
+        const D* owner(const T* const t) const {
+            return static_cast<const D*>(getOwnerImpl(t));
+        }
+
+        D* owner(T* const t) const {
+            return static_cast<D*>(getOwnerImpl(t));
+        }
+
+        const D& owner(const T& t) const {
+            return *owner(&t);
+        }
+
+        D& owner(T& t) const {
+            return *owner(&t);
+        }
+
+    private:
+        const Decorable* getOwnerImpl(const T* const t) const {
+            return *reinterpret_cast<const Decorable* const*>(
+                reinterpret_cast<const unsigned char* const>(t) - _raw._raw._index);
+        }
+
+        Decorable* getOwnerImpl(T* const t) const {
+            return const_cast<Decorable*>(getOwnerImpl(const_cast<const T*>(t)));
+        }
+
+        typename DecorationContainer<D>::template DecorationDescriptorWithType<T> _raw;
+    };
 
     template <typename T>
     static Decoration<T> declareDecoration() {
-        static_assert(std::is_nothrow_destructible_v<T>);
-        return decorable_detail::DecorationBuffer<DerivedType>::template declareDecoration<T>();
+        if constexpr (std::is_copy_constructible_v<D> || std::is_copy_assignable_v<D>) {
+            return {DecorationConstructionTag{},
+                    getRegistry()->template declareDecorationCopyable<T>()};
+        } else {
+            return {DecorationConstructionTag{}, getRegistry()->template declareDecoration<T>()};
+        }
     }
 
-    Decorable() : _decorations{&_d()} {}
+protected:
+    Decorable() : _decorations(this, getRegistry()) {}
+    ~Decorable() = default;
 
-    Decorable(const Decorable& o) : _decorations{&_d(), o._decorations} {}
-
-    virtual ~Decorable() = default;
-
-    const auto& decorations() const {
-        return _decorations;
-    }
-    auto& decorations() {
-        return _decorations;
-    }
-
-    template <typename T>
-    const T& decoration(const Decoration<T>& deco) const {
-        return *static_cast<const T*>(_decorations.getAtOffset(deco.offsetInBlock()));
-    }
-    template <typename T>
-    T& decoration(const Decoration<T>& deco) {
-        return const_cast<T&>(std::as_const(*this).decoration(deco));
-    }
-
-    /**
-     * A `Decoration<T>` can be used as a maplike key.
-     * So `x[deco]` is syntactic sugar for `x.decoration(deco)`.
-     * Ex:
-     *    class X : Decorable<X> { ... };
-     *    auto deco = X::declareDecoration<int>();
-     *    ...
-     *        X x;
-     *        X* xp = &x;
-     *
-     *        x[deco] = 123;             // map-like syntax
-     *        x.decoration(deco) = 123;  // equivalent
-     *        deco(x) = 123;             // older deco as callable syntax
-     *
-     *        // pointer syntax
-     *        (*xp)[deco] = 123;           // map-like syntax
-     *        xp->decoration(deco) = 123;  // equivalent
-     *        deco(xp) = 123;              // older deco as callable syntax
-     */
-    template <typename T>
-    const T& operator[](const Decoration<T>& deco) const {
-        return decoration(deco);
-    }
-    template <typename T>
-    T& operator[](const Decoration<T>& deco) {
-        return decoration(deco);
+    Decorable(const Decorable& other) : _decorations(this, getRegistry(), other._decorations) {}
+    Decorable& operator=(const Decorable& rhs) {
+        getRegistry()->copyAssign(&_decorations, &rhs._decorations);
+        return *this;
     }
 
 private:
-    const DerivedType& _d() const {
-        return *static_cast<const DerivedType*>(this);
-    }
-    DerivedType& _d() {
-        return *static_cast<DerivedType*>(this);
+    static DecorationRegistry<D>* getRegistry() {
+        static DecorationRegistry<D>* theRegistry = new DecorationRegistry<D>();
+        return theRegistry;
     }
 
-    decorable_detail::DecorationBuffer<DerivedType> _decorations;
+    DecorationContainer<D> _decorations;
 };
 
 }  // namespace mongo
