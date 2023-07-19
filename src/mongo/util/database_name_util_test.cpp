@@ -102,7 +102,7 @@ TEST(DatabaseNameUtilTest,
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     TenantId tenantId(OID::gen());
     DatabaseName dbName = DatabaseNameUtil::deserialize(tenantId, "foo");
-    ASSERT_EQ(dbName.db(), "foo");
+    ASSERT_EQ(dbName.toString_forTest(), "foo");
     ASSERT(dbName.tenantId());
     ASSERT_EQ(dbName, DatabaseName::createDatabaseName_forTest(tenantId, "foo"));
 }
@@ -116,7 +116,7 @@ TEST(DatabaseNameUtilTest, DeserializeMultitenancySupportOnFeatureFlagRequireTen
     std::string tenantDbStr = str::stream() << tenantId.toString() << "_foo";
     DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, tenantDbStr);
     DatabaseName dbName1 = DatabaseNameUtil::deserialize(tenantId, tenantDbStr);
-    ASSERT_EQ(dbName.db(), "foo");
+    ASSERT_EQ(dbName.toString_forTest(), "foo");
     ASSERT(dbName.tenantId());
     ASSERT_EQ(dbName, DatabaseName::createDatabaseName_forTest(tenantId, "foo"));
     ASSERT_EQ(dbName, dbName1);
@@ -138,7 +138,7 @@ TEST(DatabaseNameUtilTest,
     std::string dbNameStr = str::stream() << tenantId.toString() << "_foo";
     DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, dbNameStr);
     ASSERT_EQ(dbName.tenantId(), boost::none);
-    ASSERT_EQ(dbName.db(), dbNameStr);
+    ASSERT_EQ(dbName.toString_forTest(), dbNameStr);
 }
 
 // Deserialize DatabaseName when multitenancySupport and featureFlagRequireTenantID are disabled.
@@ -146,7 +146,7 @@ TEST(DatabaseNameUtilTest, DeserializeMultitenancySupportOffFeatureFlagRequireTe
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
     DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, "foo");
-    ASSERT_EQ(dbName.db(), "foo");
+    ASSERT_EQ(dbName.toString_forTest(), "foo");
     ASSERT(!dbName.tenantId());
     ASSERT_EQ(dbName, DatabaseName::createDatabaseName_forTest(boost::none, "foo"));
 }

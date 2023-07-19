@@ -336,17 +336,18 @@ TEST_F(TenantOplogApplierMergeTest, ApplyInsert_Success) {
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto entry = makeInsertOplogEntry(1, nss, uuid);
     bool onInsertsCalled = false;
-    _opObserver->onInsertsFn =
-        [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
-            ASSERT_FALSE(onInsertsCalled);
-            onInsertsCalled = true;
-            // TODO Check that (nss.dbName() == kTenantDB) once the OplogEntry deserializer passes
-            // "tid" to the NamespaceString constructor
-            ASSERT_EQUALS(nss.dbName().db(), kTenantDB.toStringWithTenantId_forTest());
-            ASSERT_EQUALS(nss.coll(), "bar");
-            ASSERT_EQUALS(1, docs.size());
-            ASSERT_BSONOBJ_EQ(docs[0], entry.getObject());
-        };
+    _opObserver->onInsertsFn = [&](OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const std::vector<BSONObj>& docs) {
+        ASSERT_FALSE(onInsertsCalled);
+        onInsertsCalled = true;
+        // TODO Check that (nss.dbName() == kTenantDB) once the OplogEntry deserializer passes
+        // "tid" to the NamespaceString constructor
+        ASSERT_EQUALS(nss.dbName().toString_forTest(), kTenantDB.toStringWithTenantId_forTest());
+        ASSERT_EQUALS(nss.coll(), "bar");
+        ASSERT_EQUALS(1, docs.size());
+        ASSERT_BSONOBJ_EQ(docs[0], entry.getObject());
+    };
     pushOps({entry});
     ASSERT_OK(_applier->startup());
     auto opAppliedFuture = _applier->getNotificationForOpTime(entry.getOpTime());
@@ -485,7 +486,7 @@ TEST_F(TenantOplogApplierMergeTest, ApplyDelete_Success) {
         ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
         ASSERT_TRUE(opCtx->writesAreReplicated());
         ASSERT_FALSE(args.fromMigrate);
-        ASSERT_EQUALS(nss.dbName().db(), kTenantDB.toStringWithTenantId_forTest());
+        ASSERT_EQUALS(nss.dbName().toString_forTest(), kTenantDB.toStringWithTenantId_forTest());
         ASSERT_EQUALS(nss.coll(), "bar");
         ASSERT_EQUALS(uuid, coll->uuid());
     };

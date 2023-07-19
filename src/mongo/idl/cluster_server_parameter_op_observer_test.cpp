@@ -467,7 +467,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onDropDatabase) {
     assertIgnoredOtherNamespaces(
         [this](const auto& nss) {
             const auto dbname = nss.dbName();
-            if (dbname.db() != kConfigDB) {
+            if (!dbname.isConfigDB()) {
                 doDropDatabase(dbname);
             }
         },
