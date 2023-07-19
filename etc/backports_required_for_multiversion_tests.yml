@@ -392,6 +392,8 @@ last-continuous:
     ticket: SERVER-76988
   - test_file: jstests/replsets/tenant_migration_retryable_internal_transaction.js
     ticket: SERVER-77237
+  - test_file: jstests/core/sbe_plan_cache_duplicate_or_clauses.js
+    ticket: SERVER-78752
   - test_file: jstests/sharding/move_chunk_deferred_lookup.js
     ticket: SERVER-78050
   - test_file: jstests/sharding/cluster_time_across_add_shard.js

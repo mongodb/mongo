@@ -1199,7 +1199,7 @@ bool filtersAreEquivalent(const MatchExpression* lhs, const MatchExpression* rhs
 bool IndexScanNode::operator==(const IndexScanNode& other) const {
     return filtersAreEquivalent(filter.get(), other.filter.get()) && index == other.index &&
         direction == other.direction && addKeyMetadata == other.addKeyMetadata &&
-        bounds == other.bounds;
+        bounds == other.bounds && iets == other.iets;
 }
 
 //
