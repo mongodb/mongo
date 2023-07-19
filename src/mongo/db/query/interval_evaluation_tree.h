@@ -66,10 +66,6 @@ class ConstNode : public optimizer::algebra::OpFixedArity<IET, 0> {
 public:
     explicit ConstNode(const OrderedIntervalList& oil) : oil{oil} {}
 
-    bool operator==(const ConstNode& other) const {
-        return oil == other.oil;
-    }
-
     const OrderedIntervalList oil;
 };
 
@@ -90,10 +86,6 @@ public:
 
     MatchExpression::MatchType matchType() const {
         return _matchType;
-    }
-
-    bool operator==(const EvalNode& other) const {
-        return _inputParamId == other._inputParamId && _matchType == other._matchType;
     }
 
 private:
@@ -129,10 +121,6 @@ public:
         return _index;
     }
 
-    bool operator==(const ExplodeNode& other) const {
-        return _cacheKey == other._cacheKey && _index == other._index && allChildrenEqual(other);
-    }
-
 private:
     const CacheKey _cacheKey;
     const int _index;
@@ -146,10 +134,6 @@ public:
     using Base = optimizer::algebra::OpFixedArity<IET, 2>;
 
     IntersectNode(IET lhs, IET rhs) : Base(std::move(lhs), std::move(rhs)) {}
-
-    bool operator==(const IntersectNode& other) const {
-        return allChildrenEqual(other);
-    }
 };
 
 /**
@@ -160,10 +144,6 @@ public:
     using Base = optimizer::algebra::OpFixedArity<IET, 2>;
 
     UnionNode(IET lhs, IET rhs) : Base(std::move(lhs), std::move(rhs)) {}
-
-    bool operator==(const UnionNode& other) const {
-        return allChildrenEqual(other);
-    }
 };
 
 /**
@@ -174,10 +154,6 @@ public:
     using Base = optimizer::algebra::OpFixedArity<IET, 1>;
 
     ComplementNode(IET child) : Base(std::move(child)) {}
-
-    bool operator==(const ComplementNode& other) const {
-        return allChildrenEqual(other);
-    }
 };
 
 std::string ietToString(const IET& iet);

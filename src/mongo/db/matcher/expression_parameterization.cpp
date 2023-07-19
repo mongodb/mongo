@@ -122,16 +122,16 @@ void MatchExpressionParameterizationVisitor::visitComparisonMatchExpression(
         case BSONType::NumberInt:
         case BSONType::bsonTimestamp:
         case BSONType::NumberLong:
-            expr->setInputParamId(_context->nextReusableInputParamId(expr));
+            expr->setInputParamId(_context->nextInputParamId(expr));
             break;
         case BSONType::NumberDouble:
             if (!std::isnan(expr->getData().numberDouble())) {
-                expr->setInputParamId(_context->nextReusableInputParamId(expr));
+                expr->setInputParamId(_context->nextInputParamId(expr));
             }
             break;
         case BSONType::NumberDecimal:
             if (!expr->getData().numberDecimal().isNaN()) {
-                expr->setInputParamId(_context->nextReusableInputParamId(expr));
+                expr->setInputParamId(_context->nextInputParamId(expr));
             }
             break;
     }
@@ -158,7 +158,7 @@ void MatchExpressionParameterizationVisitor::visit(InMatchExpression* expr) {
         };
     }
 
-    expr->setInputParamId(_context->nextReusableInputParamId(expr));
+    expr->setInputParamId(_context->nextInputParamId(expr));
 }
 
 void MatchExpressionParameterizationVisitor::visit(TypeMatchExpression* expr) {
