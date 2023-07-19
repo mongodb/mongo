@@ -195,7 +195,6 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const Data
 
     // We must hold some form of lock here
     invariant(opCtx->lockState()->isW());
-    invariant(dbName.db().find('.') == std::string::npos);
 
     LOGV2(21029, "repairDatabase", logAttrs(dbName));
 

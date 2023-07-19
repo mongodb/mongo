@@ -248,7 +248,7 @@ Lock::DBLock::DBLock(OperationContext* opCtx,
                         InterruptBehavior::kThrow,
                         std::move(options));
 
-    massert(28539, "need a valid database name", !dbName.db().empty());
+    massert(28539, "need a valid database name", !dbName.isEmpty());
 
     tassert(6671501,
             str::stream() << "Tenant lock mode " << modeName(*tenantLockMode)

@@ -73,7 +73,7 @@ DatabaseCloner::DatabaseCloner(const DatabaseName& dbName,
           "DatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _dbName(dbName),
       _listCollectionsStage("listCollections", this, &DatabaseCloner::listCollectionsStage) {
-    invariant(!dbName.db().empty());
+    invariant(!dbName.isEmpty());
     _stats.dbname = dbName;
 }
 

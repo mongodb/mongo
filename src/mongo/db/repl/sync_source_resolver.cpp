@@ -184,7 +184,7 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
     return std::make_unique<Fetcher>(
         _taskExecutor,
         candidate,
-        NamespaceString::kRsOplogNamespace.dbName().db(),
+        DatabaseName::kLocal.db(),
         BSON("find" << NamespaceString::kRsOplogNamespace.coll() << "limit" << 1 << "sort"
                     << BSON("$natural" << 1) << "projection"
                     << BSON(OplogEntryBase::kTimestampFieldName
@@ -209,7 +209,7 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndP
     return std::make_unique<Fetcher>(
         _taskExecutor,
         candidate,
-        NamespaceString::kRsOplogNamespace.dbName().db(),
+        DatabaseName::kLocal.db(),
         BSON("find" << NamespaceString::kRsOplogNamespace.coll() << "filter"
                     << BSON("ts" << BSON("$gte" << _requiredOpTime.getTimestamp() << "$lte"
                                                 << _requiredOpTime.getTimestamp()))
