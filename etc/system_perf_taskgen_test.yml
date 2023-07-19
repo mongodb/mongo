@@ -1510,6 +1510,7 @@ tasks:
 
 buildvariants:
   - name: task_generation
+    activate: true
     display_name: Task Generation
     modules: *modules
     expansions:
