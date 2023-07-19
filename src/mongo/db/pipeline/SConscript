@@ -583,6 +583,7 @@ env.Benchmark(
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/query_expressions',
+        '$BUILD_DIR/mongo/db/service_context_non_d',
         '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/util/processinfo',
     ],
