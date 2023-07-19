@@ -487,9 +487,6 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
     auto responseStatus = _callRecipient(opCtx, [&] {
         BSONObjBuilder builder;
         builder.append(kRecvChunkCommit, NamespaceStringUtil::serialize(nss()));
-        // For backward compatibility with v6.0 recipients.
-        // TODO (SERVER-67844): Remove it once 7.0 becomes LTS.
-        builder.append("acquireCSOnRecipient", true);
         _sessionId.append(&builder);
         return builder.obj();
     }());
