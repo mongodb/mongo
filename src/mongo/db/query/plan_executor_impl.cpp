@@ -78,8 +78,8 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-const OperationContext::Decoration<repl::OpTime> clientsLastKnownCommittedOpTime =
-    OperationContext::declareDecoration<repl::OpTime>();
+const OperationContext::Decoration<boost::optional<repl::OpTime>> clientsLastKnownCommittedOpTime =
+    OperationContext::declareDecoration<boost::optional<repl::OpTime>>();
 
 // This failpoint is also accessed by the SBE executor so we define it outside of an anonymous
 // namespace.

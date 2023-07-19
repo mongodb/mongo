@@ -412,6 +412,8 @@ last-continuous:
     ticket: SERVER-79136
   - test_file: jstests/core/timeseries/timeseries_create_collection.js
     ticket: SERVER-77382
+  - test_file: jstests/replsets/commit_point_propagation_with_oplog_exhaust_cursor.js
+    ticket: SERVER-78813
   suites: null
 
 last-lts:
@@ -906,4 +908,6 @@ last-lts:
     ticket: SERVER-79136
   - test_file: jstests/core/timeseries/timeseries_create_collection.js
     ticket: SERVER-77382
+  - test_file: jstests/replsets/commit_point_propagation_with_oplog_exhaust_cursor.js
+    ticket: SERVER-78813
   suites: null

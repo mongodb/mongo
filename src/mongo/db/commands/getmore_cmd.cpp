@@ -625,9 +625,7 @@ public:
                     // Use the commit point of the last batch for exhaust cursors.
                     lastKnownCommittedOpTime = cursorPin->getLastKnownCommittedOpTime();
                 }
-                if (lastKnownCommittedOpTime) {
-                    clientsLastKnownCommittedOpTime(opCtx) = lastKnownCommittedOpTime.value();
-                }
+                clientsLastKnownCommittedOpTime(opCtx) = lastKnownCommittedOpTime;
 
                 awaitDataState(opCtx).shouldWaitForInserts = true;
             }
@@ -677,10 +675,19 @@ public:
 
                 cursorPin->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
 
-                if (opCtx->isExhaust() && !clientsLastKnownCommittedOpTime(opCtx).isNull()) {
-                    // Set the commit point of the latest batch.
+                if (opCtx->isExhaust() && clientsLastKnownCommittedOpTime(opCtx)) {
+                    // Update the cursor's lastKnownCommittedOpTime to the current
+                    // lastCommittedOpTime. The lastCommittedOpTime now may be staler than the
+                    // actual lastCommittedOpTime returned in the metadata of this latest batch (see
+                    // appendReplyMetadata).  As a result, we may sometimes return more empty
+                    // batches than we need to. But it is fine to be conservative in this.
                     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-                    cursorPin->setLastKnownCommittedOpTime(replCoord->getLastCommittedOpTime());
+                    auto myLastCommittedOpTime = replCoord->getLastCommittedOpTime();
+                    auto clientsLastKnownCommittedOpTime = cursorPin->getLastKnownCommittedOpTime();
+                    if (!clientsLastKnownCommittedOpTime.has_value() ||
+                        clientsLastKnownCommittedOpTime.value() < myLastCommittedOpTime) {
+                        cursorPin->setLastKnownCommittedOpTime(myLastCommittedOpTime);
+                    }
                 }
             } else {
                 curOp->debug().cursorExhausted = true;
