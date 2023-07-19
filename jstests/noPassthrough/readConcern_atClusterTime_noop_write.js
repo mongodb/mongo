@@ -20,17 +20,6 @@ if (!assert.commandWorked(conn.getDB("test").serverStatus())
 }
 MongoRunner.stopMongod(conn);
 
-// On the config server the lastApplied optime can go past the atClusterTime timestamp due to pings
-// made on collection config.mongos or config.lockping by the distributed lock pinger thread and
-// sharding uptime reporter thread. Hence, it will not write the no-op oplog entry on the config
-// server as part of waiting for read concern.
-// For more deterministic testing of no-op writes to the oplog, disable pinger threads from reaching
-// out to the config server.
-const failpointParams = {
-    // TODO SERVER-68551: Remove once 7.0 becomes last-lts
-    setParameter: {"failpoint.disableReplSetDistLockManager": "{mode: 'alwaysOn'}"}
-};
-
 // The ShardingUptimeReporter only exists on mongos.
 const shardingUptimeFailpointName = jsTestOptions().mongosBinVersion == 'last-lts'
     ? "failpoint.disableShardingUptimeReporterPeriodicThread"
@@ -43,8 +32,6 @@ const st = new ShardingTest({
     shards: 2,
     rs: {nodes: 2},
     other: {
-        configOptions: failpointParams,
-        rsOptions: failpointParams,
         mongosOptions: mongosFailpointParams,
     }
 });

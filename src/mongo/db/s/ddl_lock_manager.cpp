@@ -63,9 +63,6 @@
 namespace mongo {
 namespace {
 
-// TODO SERVER-68551: Remove once 7.0 becomes last-lts
-MONGO_FAIL_POINT_DEFINE(disableReplSetDistLockManager);
-
 const auto ddlLockManagerDecorator = ServiceContext::declareDecoration<DDLLockManager>();
 
 }  // namespace

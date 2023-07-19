@@ -461,31 +461,6 @@ var runner = (function() {
         return true;
     }
 
-    function recordConfigServerData(cluster, workloads, configServerData, errors) {
-        const CONFIG_DATA_LENGTH = 3;
-
-        if (cluster.isSharded()) {
-            var newData;
-            try {
-                newData = cluster.recordAllConfigServerData();
-            } catch (e) {
-                var failureType = 'Config Server Data Collection';
-                errors.push(new WorkloadFailure(e.toString(), e.stack, 'main', failureType));
-                return;
-            }
-
-            newData.previousWorkloads = workloads;
-            newData.time = (new Date()).toISOString();
-            configServerData.push(newData);
-
-            // Limit the amount of data recorded to avoid logging too much info when a test
-            // fails.
-            while (configServerData.length > CONFIG_DATA_LENGTH) {
-                configServerData.shift();
-            }
-        }
-    }
-
     function runWorkloadGroup(threadMgr,
                               workloads,
                               context,
@@ -496,7 +471,6 @@ var runner = (function() {
                               errors,
                               maxAllowedThreads,
                               dbHashDenylist,
-                              configServerData,
                               cleanupOptions) {
         var cleanup = [];
         var teardownFailed = false;
@@ -575,8 +549,6 @@ var runner = (function() {
 
             totalTime = Date.now() - startTime;
             jsTest.log('Workload(s) completed in ' + totalTime + ' ms: ' + workloads.join(' '));
-
-            recordConfigServerData(cluster, workloads, configServerData, errors);
         }
 
         // Only drop the collections/databases if all the workloads ran successfully.
@@ -653,7 +625,6 @@ var runner = (function() {
         var maxAllowedThreads = 100 * executionOptions.threadMultiplier;
         Random.setRandomSeed(clusterOptions.seed);
         var errors = [];
-        var configServerData = [];
 
         try {
             var schedule = scheduleWorkloads(workloads, executionMode, executionOptions);
@@ -681,13 +652,8 @@ var runner = (function() {
                                  errors,
                                  maxAllowedThreads,
                                  dbHashDenylist,
-                                 configServerData,
                                  cleanupOptions);
             });
-
-            if (cluster.isSharded() && errors.length) {
-                jsTest.log('Config Server Data:\n' + tojsononeline(configServerData));
-            }
 
             throwError(errors);
         } finally {

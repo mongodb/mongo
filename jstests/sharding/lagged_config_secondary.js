@@ -15,24 +15,11 @@ TestData.skipCheckShardFilteringMetadata = true;
 
 (function() {
 
-/**
- * On the config server the lastApplied optime can go past the atClusterTime timestamp due to pings
- * made on collection config.mongos or config.lockping by the distributed lock pinger thread and
- * sharding uptime reporter thread. This can cause the insert into test.TestConfigColl to time out.
- * To prevent this, disable the pinger threads to prevent them reaching out to the config server.
- */
-const failpointParams = {
-    // TODO SERVER-68551: Remove once 7.0 becomes last-lts
-    setParameter: {"failpoint.disableReplSetDistLockManager": "{mode: 'alwaysOn'}"}
-};
-
 var st = new ShardingTest({
     shards: 1,
     config: 3,
     configReplSetTestOptions: {settings: {chainingAllowed: false}},
     other: {
-        configOptions: failpointParams,
-        rsOptions: failpointParams,
         mongosOptions:
             {setParameter: {["failpoint.disableShardingUptimeReporting"]: "{mode: 'alwaysOn'}"}}
     }

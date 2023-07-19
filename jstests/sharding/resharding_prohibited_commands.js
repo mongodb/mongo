@@ -171,11 +171,7 @@ withReshardingInBackground(() => {
     assert.commandFailedWithCode(
         mongos.adminCommand(
             {moveChunk: sourceNamespace, find: {oldKey: -10}, to: donorShardNames[1]}),
-
-        [
-            ErrorCodes.LockBusy,  // TODO SERVER-68551: remove LockBusy from expected error set
-            ErrorCodes.ConflictingOperationInProgress
-        ]);
+        [ErrorCodes.ConflictingOperationInProgress]);
     assert.commandFailedWithCode(
         mongos.adminCommand({reshardCollection: otherNamespace, key: {newKey: 1}}),
         ErrorCodes.ReshardCollectionInProgress);

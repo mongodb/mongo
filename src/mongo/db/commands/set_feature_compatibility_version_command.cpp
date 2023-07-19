@@ -215,28 +215,6 @@ void abortAllReshardCollection(OperationContext* opCtx) {
     }
 }
 
-// TODO SERVER-68551: Remove once 7.0 becomes last-lts
-void dropDistLockCollections(OperationContext* opCtx) {
-    LOGV2(6589100, "Dropping deprecated distributed locks collections");
-    static const std::vector<NamespaceString> collectionsToDrop{
-        NamespaceString::kLockpingsNamespace, NamespaceString::kDistLocksNamepsace};
-
-    for (const auto& nss : collectionsToDrop) {
-        DropReply dropReply;
-        const auto dropStatus =
-            dropCollection(opCtx,
-                           nss,
-                           &dropReply,
-                           DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
-        if (dropStatus != ErrorCodes::NamespaceNotFound) {
-            uassertStatusOKWithContext(
-                dropStatus,
-                str::stream() << "Failed to drop deprecated distributed locks collection "
-                              << nss.toStringForErrorMsg());
-        }
-    }
-}
-
 // TODO SERVER-78330 remove this.
 void deleteShardingStateRecoveryDoc(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
@@ -1012,9 +990,6 @@ private:
             // on a consistent version from start to finish. This will ensure that it will be able
             // to apply the oplog entries correctly.
             abortAllReshardCollection(opCtx);
-
-            // TODO SERVER-68551: Remove once 7.0 becomes last-lts
-            dropDistLockCollections(opCtx);
 
             _createShardingIndexCatalogIndexes(
                 opCtx, requestedVersion, NamespaceString::kConfigsvrIndexCatalogNamespace);

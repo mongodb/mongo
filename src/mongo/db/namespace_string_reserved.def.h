@@ -207,12 +207,6 @@ NSS_CONSTANT(kShardCollectionCatalogNamespace, DatabaseName::kConfig, "shard.col
 // Namespace used for storing NamespacePlacementType docs on the CSRS.
 NSS_CONSTANT(kConfigsvrPlacementHistoryNamespace, DatabaseName::kConfig, "placementHistory"_sd)
 
-// TODO SERVER-68551: remove once 7.0 becomes last-lts
-NSS_CONSTANT(kLockpingsNamespace, DatabaseName::kConfig, "lockpings"_sd)
-
-// TODO SERVER-68551: remove once 7.0 becomes last-lts
-NSS_CONSTANT(kDistLocksNamepsace, DatabaseName::kConfig, "locks"_sd)
-
 // Namespace used to store the state document of 'SetChangeStreamStateCoordinator'.
 NSS_CONSTANT(kSetChangeStreamStateCoordinatorNamespace,
              DatabaseName::kConfig,

@@ -66,10 +66,10 @@ function moveChunkParallel(staticMongod,
 }
 
 // moveChunk starts at step 0 and proceeds to 1 (it has *finished* parsing
-// options), 2 (it has reloaded config and got distributed lock) and so on.
+// options), 2 (it has reloaded config and installed MigrationSourceManager) and so on.
 var moveChunkStepNames = {
     parsedOptions: 1,
-    gotDistLock: 2,
+    installedMigrationSourceManager: 2,
     startedMoveChunk: 3,    // called _recvChunkStart on recipient
     reachedSteadyState: 4,  // recipient reports state is "steady"
     chunkDataCommitted: 5,  // called _recvChunkCommit on recipient

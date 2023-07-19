@@ -105,7 +105,7 @@ public:
             }
 
             /**
-             * Acquiring the local part of the distributed locks for involved namespaces allows:
+             * Acquiring the DDL lock for involved namespaces allows to:
              * - Serialize with sharded DDLs, ensuring no concurrent modifications of the
              * collections.
              * - Check safely if the target collection is sharded or not.

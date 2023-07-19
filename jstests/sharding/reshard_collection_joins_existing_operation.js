@@ -4,7 +4,7 @@
  * the ongoing resharding instance.
  *
  * Use _configsvrReshardCollection instead of reshardCollection to exercise the behavior of the
- * config server in the absence of the distributed lock taken by _shardsvrReshardCollection on the
+ * config server in the absence of the DDL lock taken by _shardsvrReshardCollection on the
  * primary shard for the database.
  *
  * @tags: [

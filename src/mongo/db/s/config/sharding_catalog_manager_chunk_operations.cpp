@@ -1408,11 +1408,9 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
                   "Failpoint 'migrationCommitVersionError' generated error");
     }
 
-    // It is possible for a migration to end up running partly without the protection of the
-    // distributed lock if the config primary stepped down since the start of the migration and
-    // failed to recover the migration. Check that the collection has not been dropped and recreated
-    // or had its shard key refined since the migration began, unbeknown to the shard when the
-    // command was sent.
+    // Check that current collection epoch and timestamp still matches the one sent by the shard.
+    // This is to spot scenarios in which the collection has been dropped and recreated or had its
+    // shard key refined since the migration began.
     if (currentCollectionPlacementVersion.epoch() != collectionEpoch ||
         currentCollectionPlacementVersion.getTimestamp() != collectionTimestamp) {
         return {ErrorCodes::StaleEpoch,
@@ -1829,11 +1827,9 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
         ChunkType::parseFromConfigBSON(chunksVector.front(), coll.getEpoch(), coll.getTimestamp()));
     const auto currentCollectionPlacementVersion = highestVersionChunk.getVersion();
 
-    // It is possible for a migration to end up running partly without the protection of the
-    // distributed lock if the config primary stepped down since the start of the migration and
-    // failed to recover the migration. Check that the collection has not been dropped and recreated
-    // or had its shard key refined since the migration began, unbeknown to the shard when the
-    // command was sent.
+    // Check that current collection epoch and timestamp still matches the one sent by the shard.
+    // This is to spot scenarios in which the collection have been dropped and recreated or had its
+    // shard key refined since the migration began.
     uassert(ErrorCodes::StaleEpoch,
             str::stream() << "The epoch of collection '" << nss.toStringForErrorMsg()
                           << "' has changed since the migration began. The config server's "

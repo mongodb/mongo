@@ -47,8 +47,7 @@ namespace mongo {
 
 /**
  * Test fixture for shard components, as opposed to config or mongos components. Provides a mock
- * network via ShardingMongodTestFixture. Additionally sets up mock dist lock catalog and manager
- * with a real catalog client.
+ * network via ShardingMongodTestFixture.
  */
 class ShardServerTestFixture : public ShardingMongodTestFixture {
 protected:

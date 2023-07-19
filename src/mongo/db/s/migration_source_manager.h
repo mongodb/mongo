@@ -66,9 +66,8 @@ struct ShardingStatistics;
  * are held.
  *
  * The intended workflow is as follows:
- *  - Acquire a distributed lock on the collection whose chunk is about to be moved.
- *  - Instantiate a MigrationSourceManager on the stack. This will snapshot the latest collection
- *      metadata, which should stay stable because of the distributed collection lock.
+ *  - Instantiate a MigrationSourceManager on the stack.
+ *      This will perform preliminary checks and snapshot the latest collection
  *  - Call startClone to initiate background cloning of the chunk contents. This will perform the
  *      necessary registration of the cloner with the replication subsystem and will start listening
  *      for document changes, while at the same time responding to data fetch requests from the
@@ -112,16 +111,13 @@ public:
                             BSONObj const& docToDelete);
 
     /**
-     * Instantiates a new migration source manager with the specified migration parameters. Must be
-     * called with the distributed lock acquired in advance (not asserted).
+     * Instantiates a new migration source manager with the specified migration parameters.
      *
-     * Loads the most up-to-date collection metadata and uses it as a starting point. It is assumed
-     * that because of the distributed lock, the collection's metadata will not change further.
+     * Loads the most up-to-date collection metadata and uses it as a starting point.
      *
      * May throw any exception. Known exceptions are:
      *  - InvalidOptions if the operation context is missing shard version
-     *  - StaleConfig if the expected placement version does not match what we find it to be after
-     *    acquiring the distributed lock
+     *  - StaleConfig if the expected placement version does not match the one known by this shard.
      */
     MigrationSourceManager(OperationContext* opCtx,
                            ShardsvrMoveRange&& request,
