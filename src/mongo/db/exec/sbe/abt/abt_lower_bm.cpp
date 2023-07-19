@@ -41,7 +41,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
-#include "mongo/db/exec/sbe/abt/named_slots_mock.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/defs.h"
@@ -101,12 +101,12 @@ protected:
 
             auto env = VariableEnvironment::build(n);
             SlotVarMap map;
-            MockEmptyNamedSlotsProvider namedSlots;
+            sbe::RuntimeEnvironment runtimeEnv;
             boost::optional<sbe::value::SlotId> ridSlot;
             sbe::value::SlotIdGenerator ids;
 
             benchmark::DoNotOptimize(
-                SBENodeLowering{env, namedSlots, ids, m, _nodeMap, ScanOrder::Forward}.optimize(
+                SBENodeLowering{env, runtimeEnv, ids, m, _nodeMap, ScanOrder::Forward}.optimize(
                     n, map, ridSlot));
             benchmark::ClobberMemory();
         }
@@ -277,8 +277,8 @@ void BM_LowerABTLetExpr(benchmark::State& state) {
     for (auto keepRunning : state) {
         auto env = VariableEnvironment::build(n);
         SlotVarMap map;
-        MockEmptyNamedSlotsProvider namedSlots;
-        benchmark::DoNotOptimize(SBEExpressionLowering{env, map, namedSlots}.optimize(n));
+        sbe::RuntimeEnvironment runtimeEnv;
+        benchmark::DoNotOptimize(SBEExpressionLowering{env, map, runtimeEnv}.optimize(n));
         benchmark::ClobberMemory();
     }
 }

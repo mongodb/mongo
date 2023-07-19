@@ -266,6 +266,8 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
 
     // Populate/renew "shardFilterer" if there exists a "shardFilterer" slot. The slot value should
     // be set to Nothing in the plan cache to avoid extending the lifetime of the ownership filter.
+    // TODO SERVER-79007: Merge this method of creating a ShardFilterer with that in
+    // cqf_get_executor.cpp as part of CQF.
     if (auto shardFiltererSlot = env->getSlotIfExists("shardFilterer"_sd)) {
         auto shardFilterer = [&]() -> std::unique_ptr<ShardFilterer> {
             if (collections.isAcquisition()) {
