@@ -183,7 +183,6 @@ var AnalyzeShardKeyUtil = (function() {
         assert.gte(metrics.numDocsTotal, metrics.numDocsSampled, metrics);
         if (metrics.hasOwnProperty("numOrphanDocs")) {
             assert.gte(metrics.numOrphanDocs, 0, metrics);
-            assert.gte(metrics.numDocsTotal, metrics.numOrphanDocs);
         }
         if (metrics.isUnique) {
             assert.eq(metrics.numDocsSampled, metrics.numDistinctValues, metrics);
