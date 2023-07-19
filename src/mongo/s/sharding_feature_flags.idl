@@ -81,3 +81,9 @@ feature_flags:
     cpp_varname: feature_flags::gClusterFsyncLock
     default: false
     shouldBeFCVGated: true
+  featureFlagAuthoritativeShardCollection:
+    description: "Feature flag for enabling the authoritative version of the shardCollection DDL operation."
+    cpp_varname: feature_flags::gAuthoritativeShardCollection
+    default: false
+    shouldBeFCVGated: true
+
