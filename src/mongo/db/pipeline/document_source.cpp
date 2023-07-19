@@ -307,7 +307,8 @@ MONGO_INITIALIZER_GROUP(BeginDocumentSourceRegistration,
 MONGO_INITIALIZER_WITH_PREREQUISITES(EndDocumentSourceRegistration,
                                      ("BeginDocumentSourceRegistration"))
 (InitializerContext*) {
-    auto searchStageNames = {"$vectorSearch"_sd, "$search"_sd, "$searchMeta"_sd};
+    auto searchStageNames = {
+        "$vectorSearch"_sd, "$search"_sd, "$searchMeta"_sd, "$listSearchIndexes"_sd};
     for (auto stageName : searchStageNames) {
         auto searchIt = parserMap.find(stageName);
         // If the stage has not been registered at this point, register a parser that errors
