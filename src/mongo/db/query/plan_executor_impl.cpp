@@ -68,8 +68,8 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-const OperationContext::Decoration<repl::OpTime> clientsLastKnownCommittedOpTime =
-    OperationContext::declareDecoration<repl::OpTime>();
+const OperationContext::Decoration<boost::optional<repl::OpTime>> clientsLastKnownCommittedOpTime =
+    OperationContext::declareDecoration<boost::optional<repl::OpTime>>();
 
 struct CappedInsertNotifierData {
     shared_ptr<CappedInsertNotifier> notifier;
@@ -458,9 +458,10 @@ bool PlanExecutorImpl::_shouldWaitForInserts() {
         // coordinator's lastCommittedOpTime has progressed past the client's lastCommittedOpTime.
         // In that case, we will return early so that we can inform the client of the new
         // lastCommittedOpTime immediately.
-        if (!clientsLastKnownCommittedOpTime(_opCtx).isNull()) {
+        if (clientsLastKnownCommittedOpTime(_opCtx)) {
             auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
-            return clientsLastKnownCommittedOpTime(_opCtx) >= replCoord->getLastCommittedOpTime();
+            return clientsLastKnownCommittedOpTime(_opCtx).value() >=
+                replCoord->getLastCommittedOpTime();
         }
         return true;
     }
