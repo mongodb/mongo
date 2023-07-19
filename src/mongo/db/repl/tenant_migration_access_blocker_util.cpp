@@ -727,23 +727,30 @@ bool shouldExclude(OperationContext* opCtx) {
          (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient));
 }
 
+std::string getTenantPrefix(StringData prefixedDb) {
+    const auto pos = prefixedDb.find('_');
+    if (pos == std::string::npos || pos == 0) {
+        return "";
+    }
+    return prefixedDb.substr(0, pos).toString();
+}
+
 boost::optional<TenantId> parseTenantIdFromDatabaseName(const DatabaseName& dbName) {
     if (gMultitenancySupport) {
         return dbName.tenantId();
     }
 
-    const auto pos = dbName.db().find('_');
-    if (pos == std::string::npos || pos == 0) {
+    const auto tenantStr = getTenantPrefix(DatabaseNameUtil::serialize(dbName));
+    if (tenantStr.empty()) {
         // Not a tenant database.
         return boost::none;
     }
 
-    const auto statusWith = OID::parse(dbName.db().substr(0, pos));
-    if (!statusWith.isOK()) {
+    const auto statusWithOID = OID::parse(tenantStr);
+    if (!statusWithOID.isOK()) {
         return boost::none;
     }
-
-    return TenantId(statusWith.getValue());
+    return TenantId(statusWithOID.getValue());
 }
 
 boost::optional<std::string> extractTenantFromDatabaseName(const DatabaseName& dbName) {
@@ -755,13 +762,12 @@ boost::optional<std::string> extractTenantFromDatabaseName(const DatabaseName& d
         }
     }
 
-    const auto pos = dbName.db().find('_');
-    if (pos == std::string::npos || pos == 0) {
+    const auto tenantStr = getTenantPrefix(DatabaseNameUtil::serialize(dbName));
+    if (tenantStr.empty()) {
         // Not a tenant database.
         return boost::none;
     }
-
-    return dbName.db().substr(0, pos).toString();
+    return tenantStr;
 }
 
 }  // namespace tenant_migration_access_blocker
