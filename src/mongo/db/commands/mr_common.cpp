@@ -366,7 +366,9 @@ Status checkAuthForMapReduce(const BasicCommand* commandTemplate,
                              OperationContext* opCtx,
                              const DatabaseName& dbName,
                              const BSONObj& cmdObj) {
-    OutputOptions outputOptions = parseOutputOptions(dbName.db(), cmdObj);
+    // Map reduce is not supported in multitenancy environment, we can serialize it without
+    // depending on serialization context.
+    OutputOptions outputOptions = parseOutputOptions(DatabaseNameUtil::serialize(dbName), cmdObj);
 
     ResourcePattern inputResource(commandTemplate->parseResourcePattern(dbName, cmdObj));
 
