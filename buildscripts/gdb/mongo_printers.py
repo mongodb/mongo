@@ -360,14 +360,15 @@ class DecorablePrinter(object):
     def __init__(self, val):
         """Initialize DecorablePrinter."""
         self.val = val
+        decorable_t = val.type.template_argument(0)
 
-        decl_vector = val["_decorations"]["_registry"]["_decorationInfo"]
+        reg_sym, _ = gdb.lookup_symbol(
+            "mongo::decorable_detail::gdbRegistry<{}>".format(decorable_t))
+        decl_vector = reg_sym.value()["_entries"]
         # TODO: abstract out navigating a std::vector
         self.start = decl_vector["_M_impl"]["_M_start"]
         finish = decl_vector["_M_impl"]["_M_finish"]
-        decorable_t = val.type.template_argument(0)
-        decinfo_t = lookup_type('mongo::DecorationRegistry<{}>::DecorationInfo'.format(
-            str(decorable_t).replace("class", "").strip()))
+        decinfo_t = lookup_type('mongo::decorable_detail::Registry::Entry')
         self.count = int((int(finish) - int(self.start)) / decinfo_t.sizeof)
 
     @staticmethod
@@ -377,34 +378,26 @@ class DecorablePrinter(object):
 
     def to_string(self):
         """Return Decorable for printing."""
-        return "Decorable<%s> with %s elems " % (self.val.type.template_argument(0), self.count)
+        return "Decorable<{}> with {} elems ".format(self.val.type.template_argument(0), self.count)
 
     def children(self):
         """Children."""
-        decoration_data = get_unique_ptr_bytes(self.val["_decorations"]["_decorationData"])
+        decoration_data = get_unique_ptr_bytes(self.val["_decorations"]["_data"])
 
         for index in range(self.count):
-            descriptor = self.start[index]
-            dindex = int(descriptor["descriptor"]["_index"])
-
-            # In order to get the type stored in the decorable, we examine the type of its
-            # constructor, and do some string manipulations.
-            # TODO: abstract out navigating a std::function
-            type_name = str(descriptor["constructor"])
-            type_name = type_name[0:len(type_name) - 1]
-            type_name = type_name[0:type_name.rindex(">")]
-            type_name = type_name[type_name.index("constructAt<"):].replace("constructAt<", "")
-
-            # If the type is a pointer type, strip the * at the end.
-            if type_name.endswith('*'):
-                type_name = type_name[0:len(type_name) - 1]
-            type_name = type_name.rstrip()
-
-            # Cast the raw char[] into the actual object that is stored there.
-            type_t = lookup_type(type_name)
-            obj = decoration_data[dindex].cast(type_t)
-
-            yield ('key', "%d:%s:%s" % (index, obj.address, type_name))
+            entry = self.start[index]
+            deco_type_info = str(entry["typeInfo"])
+            # print(f"orig: {deco_type_info}")
+            deco_type_name = re.sub(r'.* <typeinfo for (.*)>', r'\1', deco_type_info)
+            offset = int(entry["offset"])
+            obj = decoration_data[offset]
+            obj_addr = re.sub(r'^(.*) .*', r'\1', str(obj.address))
+            try:
+                deco_type = lookup_type(deco_type_name)
+                obj = obj.cast(deco_type)
+            except Exception as err:
+                obj = f'[[Err:{err}]]'
+            yield ('key', "{}:{}:{}".format(index, obj_addr, deco_type_name))
             yield ('value', obj)
 
 
