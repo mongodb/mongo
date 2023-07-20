@@ -41,7 +41,15 @@ wait_for_process()
 			ps $process > /dev/null; ps_exit_status=$?
 			if [ ${ps_exit_status} -eq "1" ] ; then
 				# The process is completed so remove the process id from the list of processes.
-				PID_LIST=(${PID_LIST[@]/$process})
+				# Need to use a loop to prevent partial regex matches.
+				unset NEW_PID_LIST
+				declare -a NEW_PID_LIST
+				for target in ${PID_LIST[@]};do
+					if [ $target -ne $process ]; then
+						NEW_PID_LIST+=("$target")
+					fi
+				done
+				PID_LIST=("${NEW_PID_LIST[@]}")
 
 				# Wait for the process to get the exit status.
 				wait $process
