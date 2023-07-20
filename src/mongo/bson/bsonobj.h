@@ -291,11 +291,13 @@ public:
      */
     void makeOwned();
 
+    enum class RedactLevel : int8_t { all, encryptedAndSensitive, sensitiveOnly };
+
     /**
      * @return a new full (and owned) redacted copy of the object.
      */
     BSONObj redact(
-        bool onlyEncryptedFields = false,
+        RedactLevel level = RedactLevel::all,
         std::function<std::string(const BSONElement&)> fieldNameRedactor = nullptr) const;
 
     /**

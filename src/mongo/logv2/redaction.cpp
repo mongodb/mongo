@@ -53,12 +53,12 @@ constexpr auto kRedactionDefaultMask = "###"_sd;
 BSONObj redact(const BSONObj& objectToRedact) {
     if (!logv2::shouldRedactLogs()) {
         if (!logv2::shouldRedactBinDataEncrypt()) {
-            return objectToRedact;
+            return objectToRedact.redact(BSONObj::RedactLevel::sensitiveOnly);
         }
-        return objectToRedact.redact(true /* onlyEncryptedFields */);
+        return objectToRedact.redact(BSONObj::RedactLevel::encryptedAndSensitive);
     }
 
-    return objectToRedact.redact(false /* onlyEncryptedFields */);
+    return objectToRedact.redact(BSONObj::RedactLevel::all);
 }
 
 StringData redact(StringData stringToRedact) {

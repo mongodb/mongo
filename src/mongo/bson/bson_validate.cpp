@@ -147,6 +147,7 @@ public:
                     case BinDataType::BinDataGeneral:
                     case BinDataType::Function:
                     case BinDataType::Column:  // Validates in FullValidator.
+                    case BinDataType::Sensitive:
                     case BinDataType::bdtCustom:
                         break;
                     case BinDataType::ByteArrayDeprecated:

@@ -41,6 +41,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/logv2/log_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -157,13 +158,103 @@ TEST(RedactEncryptedStringTest, BasicStrings) {
     }
     BSONObj obj = builder.done();
 
-    std::cout << "This is obj: " << obj.toString() << std::endl;
-
     auto redactedStr = R"({ type6: "###", string: "string", nestedobj: { subobj: "###" } })";
     ASSERT_EQ(redact(obj).toString(), redactedStr);
 
     logv2::setShouldRedactBinDataEncrypt(false);
     ASSERT_EQ(redact(obj).toString(), obj.toString());
+}
+
+TEST(RedactSensitiveStringTest, BasicStrings) {
+    BSONObjBuilder builder{};
+    builder.appendBinData("type8", sizeof(zero), BinDataType::Sensitive, zero);
+    builder.append("string", "string");
+    {
+        BSONObjBuilder sub(builder.subobjStart("nestedobj"));
+        sub.appendBinData("subobj", sizeof(zero), BinDataType::Sensitive, zero);
+    }
+    const BSONObj obj = builder.done();
+
+    {
+        logv2::setShouldRedactBinDataEncrypt(true);
+        logv2::setShouldRedactLogs(true);
+
+        // Fully-redacted logs should just redact everything
+        const auto redactedStr = R"({ type8: "###", string: "###", nestedobj: { subobj: "###" } })";
+        ASSERT_EQ(redact(obj).toString(), redactedStr);
+    }
+
+    {
+        const auto redactedStr =
+            R"({ type8: "###", string: "string", nestedobj: { subobj: "###" } })";
+        // The setting for redacting logs shouldn't affect sensitive BinData.
+        logv2::setShouldRedactLogs(false);
+        ASSERT_EQ(redact(obj).toString(), redactedStr);
+
+        // The setting for redacting encrypted BinData shouldn't affect sensitive BinData, either.
+        logv2::setShouldRedactBinDataEncrypt(false);
+        ASSERT_EQ(redact(obj).toString(), redactedStr);
+    }
+}
+
+TEST(RedactSensitiveStringTest, NestedStrings) {
+    // The setting for redacting logs shouldn't affect sensitive BinData.
+    logv2::setShouldRedactBinDataEncrypt(false);
+    // The setting for redacting encrypted BinData shouldn't affect sensitive BinData, either.
+    logv2::setShouldRedactLogs(false);
+
+    BSONObjBuilder builder{};
+
+    // Test for [ "###", { ...: "###" }, ... ] shape cases.
+    {
+        auto subarray = BSONObjBuilder(builder.subarrayStart("subarray"));
+        subarray.appendBinData("0", sizeof(zero), BinDataType::Sensitive, zero);
+
+        for (auto nSubobjs = 0; nSubobjs < 3; ++nSubobjs) {
+            BSONObjBuilder(subarray.subobjStart("subobj"))
+                .appendBinData("type8", sizeof(zero), BinDataType::Sensitive, zero);
+        }
+    }
+
+    // Test for { ...: "###", ...: [ "###", ... ] } shape cases.
+    {
+        auto subobj = BSONObjBuilder(builder.subobjStart("subobj"));
+        subobj.appendBinData("type8", sizeof(zero), BinDataType::Sensitive, zero);
+
+        auto subarray = BSONObjBuilder(subobj.subarrayStart("subarray"));
+        for (auto nSubobjs = 0; nSubobjs < 3; ++nSubobjs) {
+            subarray.appendBinData("0", sizeof(zero), BinDataType::Sensitive, zero);
+        }
+    }
+
+    // Test for [ [ [ "###", ... ] ] ] shape cases.
+    {
+        auto subarray1 = BSONObjBuilder(builder.subarrayStart("subarrays"));
+        auto subarray2 = BSONObjBuilder(subarray1.subarrayStart("subarray"));
+        auto subarray3 = BSONObjBuilder(subarray2.subarrayStart("subarray"));
+        for (auto nSubobjs = 0; nSubobjs < 3; ++nSubobjs) {
+            subarray3.appendBinData("0", sizeof(zero), BinDataType::Sensitive, zero);
+        }
+    }
+
+    // Test for { ...: { ...: { ...: "###" } } } shape cases.
+    {
+        auto subobj1 = BSONObjBuilder(builder.subobjStart("subobjs"));
+        auto subobj2 = BSONObjBuilder(subobj1.subobjStart("subobj"));
+        auto subobj3 = BSONObjBuilder(subobj2.subobjStart("subobj"));
+        subobj3.appendBinData("type8", sizeof(zero), BinDataType::Sensitive, zero);
+    }
+
+    const BSONObj obj = builder.done();
+
+    // Type 8 values should all be redacted.
+    const BSONObj expected = fromjson(R"({
+        subarray: [ "###", { type8: "###" }, { type8: "###" }, { type8: "###" } ],
+        subobj: { type8: "###", subarray: [ "###", "###", "###" ] },
+        subarrays: [ [ [ "###", "###", "###" ] ] ],
+        subobjs: { subobj: { subobj: { type8: "###" } } }
+    })");
+    ASSERT_EQ(redact(obj).toString(), expected.toString());
 }
 
 void testBSONCases(std::vector<BSONStringPair>& testCases) {

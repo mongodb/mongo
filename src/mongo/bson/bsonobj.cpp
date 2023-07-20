@@ -172,7 +172,7 @@ BSONObj BSONObj::getOwned(const BSONObj& obj) {
     return obj.getOwned();
 }
 
-BSONObj BSONObj::redact(bool onlyEncryptedFields,
+BSONObj BSONObj::redact(RedactLevel level,
                         std::function<std::string(const BSONElement&)> fieldNameRedactor) const {
     _validateUnownedSize(objsize());
 
@@ -191,7 +191,7 @@ BSONObj BSONObj::redact(bool onlyEncryptedFields,
         void operator()(BSONObjBuilder& builder,
                         const BSONObj& obj,
                         bool appendMask,
-                        bool onlyEncryptedFields,
+                        RedactLevel level,
                         std::function<std::string(const BSONElement&)> fieldNameRedactor) {
             for (BSONElement e : obj) {
                 StringData fieldNameString;
@@ -205,23 +205,38 @@ BSONObj BSONObj::redact(bool onlyEncryptedFields,
                 }
                 if (e.type() == Object) {
                     BSONObjBuilder subBuilder = builder.subobjStart(fieldNameString);
-                    operator()(
-                        subBuilder, e.Obj(), appendMask, onlyEncryptedFields, fieldNameRedactor);
+                    operator()(subBuilder, e.Obj(), appendMask, level, fieldNameRedactor);
                     subBuilder.done();
                 } else if (e.type() == Array) {
                     BSONObjBuilder subBuilder = builder.subarrayStart(fieldNameString);
-                    operator()(
-                        subBuilder, e.Obj(), appendMask, onlyEncryptedFields, fieldNameRedactor);
+                    operator()(subBuilder, e.Obj(), appendMask, level, fieldNameRedactor);
                     subBuilder.done();
                 } else {
-                    if (onlyEncryptedFields) {
-                        if (e.type() == BinData && e.binDataType() == BinDataType::Encrypt) {
+                    // SERVER-79068 Templatizing this could be a good opportunity for performance
+                    // improvements.
+                    switch (level) {
+                        case RedactLevel::all: {
                             appendRedactedElem(builder, fieldNameString, appendMask);
-                        } else {
-                            builder.append(e);
+                            break;
                         }
-                    } else {
-                        appendRedactedElem(builder, fieldNameString, appendMask);
+                        case RedactLevel::encryptedAndSensitive: {
+                            if (e.type() == BinData &&
+                                (e.binDataType() == BinDataType::Encrypt ||
+                                 e.binDataType() == BinDataType::Sensitive)) {
+                                appendRedactedElem(builder, fieldNameString, appendMask);
+                            } else {
+                                builder.append(e);
+                            }
+                            break;
+                        }
+                        case RedactLevel::sensitiveOnly: {
+                            if (e.type() == BinData && e.binDataType() == BinDataType::Sensitive) {
+                                appendRedactedElem(builder, fieldNameString, appendMask);
+                            } else {
+                                builder.append(e);
+                            }
+                            break;
+                        }
                     }
                 }
             }
@@ -230,7 +245,7 @@ BSONObj BSONObj::redact(bool onlyEncryptedFields,
 
     try {
         BSONObjBuilder builder;
-        redactor()(builder, *this, /*appendMask=*/true, onlyEncryptedFields, fieldNameRedactor);
+        redactor()(builder, *this, /*appendMask=*/true, level, fieldNameRedactor);
         return builder.obj();
     } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
     }
@@ -240,7 +255,7 @@ BSONObj BSONObj::redact(bool onlyEncryptedFields,
     // we use BSONType::jstNull, which ensures the redacted object will not be larger than the
     // original.
     BSONObjBuilder builder;
-    redactor()(builder, *this, /*appendMask=*/false, onlyEncryptedFields, fieldNameRedactor);
+    redactor()(builder, *this, /*appendMask=*/false, level, fieldNameRedactor);
     return builder.obj();
 }
 

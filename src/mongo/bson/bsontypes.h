@@ -203,8 +203,9 @@ enum BinDataType {
     bdtUUID = 3,             /* deprecated */
     newUUID = 4,             /* language-independent UUID format across all drivers */
     MD5Type = 5,
-    Encrypt = 6, /* encryption placeholder or encrypted data */
-    Column = 7,  /* compressed column */
+    Encrypt = 6,   /* encryption placeholder or encrypted data */
+    Column = 7,    /* compressed column */
+    Sensitive = 8, /* data that should be redacted and protected from unnecessary exposure */
     bdtCustom = 128
 };
 
