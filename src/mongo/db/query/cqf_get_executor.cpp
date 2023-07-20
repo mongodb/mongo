@@ -106,6 +106,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/shard_filterer_factory_impl.h"
 #include "mongo/db/query/stats/collection_statistics_impl.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
 #include "mongo/db/service_context.h"
@@ -342,6 +343,34 @@ QueryHints getHintsFromQueryKnobs() {
     return hints;
 }
 
+namespace {
+/*
+ * This function initializes the slot in the SBE runtime environment that provides a
+ * 'ShardFilterer' and populates it.
+ * TODO SERVER-79041: Change how and when the shardFilterer slot is allocated.
+ */
+void setupShardFiltering(OperationContext* opCtx,
+                         const CollectionPtr& collection,
+                         mongo::sbe::RuntimeEnvironment& runtimeEnv,
+                         sbe::value::SlotIdGenerator& slotIdGenerator) {
+    // Allocate a global slot for shard filtering and register it in 'runtimeEnv'.
+    sbe::value::SlotId shardFiltererSlot = runtimeEnv.registerSlot(
+        kshardFiltererSlotName, sbe::value::TypeTags::Nothing, 0, false, &slotIdGenerator);
+
+    // TODO SERVER-79007: Merge this method of creating a ShardFilterer with that in
+    // sbe_stage_builders.cpp.
+    if (collection.isSharded()) {
+        auto shardFilterer = [&]() -> std::unique_ptr<ShardFilterer> {
+            ShardFiltererFactoryImpl shardFiltererFactory(collection);
+            return shardFiltererFactory.makeShardFilterer(opCtx);
+        }();
+        runtimeEnv.resetSlot(shardFiltererSlot,
+                             sbe::value::TypeTags::shardFilterer,
+                             sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),
+                             true);
+    }
+}
+
 static ExecParams createExecutor(OptPhaseManager phaseManager,
                                  PlanAndProps planAndProps,
                                  OperationContext* opCtx,
@@ -356,6 +385,8 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
     auto runtimeEnvironment = std::make_unique<sbe::RuntimeEnvironment>();  // TODO use factory
     sbe::value::SlotIdGenerator ids;
     boost::optional<sbe::value::SlotId> ridSlot;
+    // Construct the ShardFilterer and bind it to the correct slot.
+    setupShardFiltering(opCtx, collection, *runtimeEnvironment, ids);
     SBENodeLowering g{
         env, *runtimeEnvironment, ids, phaseManager.getMetadata(), planAndProps._map, scanOrder};
     auto sbePlan = g.optimize(planAndProps._node, slotMap, ridSlot);
@@ -435,6 +466,8 @@ static ExecParams createExecutor(OptPhaseManager phaseManager,
             false /*isFromPlanCache*/,
             true /* generatedByBonsai */};
 }
+
+}  // namespace
 
 static void populateAdditionalScanDefs(
     OperationContext* opCtx,
