@@ -3460,14 +3460,37 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
         auto specsToBuild = indexCatalog->removeExistingIndexes(
             opCtx, collection, indexSpecs, /*removeIndexBuildsToo=*/true);
         if (indexSpecs.size() != specsToBuild.size()) {
-            LOGV2_WARNING(7176900,
-                          "Secondary node already has a subset of indexes built and will not "
-                          "participate in voting towards the commit quorum. Use the "
-                          "'setIndexCommitQuorum' command to adjust the commit quorum accordingly",
-                          logAttrs(nss),
-                          logAttrs(collection->uuid()),
-                          "requestedSpecs"_attr = indexSpecs,
-                          "specsToBuild"_attr = specsToBuild);
+            if (specsToBuild.size() == 0) {
+                LOGV2_WARNING(
+                    7731100,
+                    "Secondary node already has all indexes built, which can happen as a result of "
+                    "a previous, incomplete rolling index build. The node will not proceed with "
+                    "the index build, and consequently will not participate in voting towards the "
+                    "commit quorum. Use the 'setIndexCommitQuorum' command to adjust the commit "
+                    "quorum accordingly. Caveat: to ensure the index build completes, this node "
+                    "should not become primary for the duration of the build; step it down if it "
+                    "happens",
+                    logAttrs(nss),
+                    logAttrs(collection->uuid()),
+                    "requestedSpecs"_attr = indexSpecs,
+                    "specsToBuild"_attr = specsToBuild);
+            } else {
+                LOGV2_WARNING(
+                    7731101,
+                    "Secondary node already has a subset of indexes built, which can happen as a "
+                    "result of a previous, incomplete rolling index build. The node will not "
+                    "proceed with the index build, and consequently will not participate in voting "
+                    "towards the commit quorum. Use the 'setIndexCommitQuorum' command to adjust "
+                    "the commit quorum accordingly. Caveat: to ensure the index build completes, "
+                    "this node should not become primary for the duration of the build; step it "
+                    "down if it happens. Additionally, this node will be missing a subset of the "
+                    "indices present in the rest of the replica set. To remediate this, manually "
+                    "build the missing indexes on this node as a standalone.",
+                    logAttrs(nss),
+                    logAttrs(collection->uuid()),
+                    "requestedSpecs"_attr = indexSpecs,
+                    "specsToBuild"_attr = specsToBuild);
+            }
         }
         return indexSpecs;
     }

@@ -1855,13 +1855,19 @@ var ReplSetTest = function(opts) {
             const timeout = 60 * 1000;
             this.awaitNodesAgreeOnPrimary(timeout, this.nodes, node);
 
-            // getPrimary() guarantees that there will be only one writable primary for a replica
-            // set.
-            if (!awaitWritablePrimary || this.getPrimary() === node) {
+            if (!awaitWritablePrimary) {
                 return true;
             }
 
-            jsTest.log(node.host + ' is not primary after stepUp command');
+            // getPrimary() guarantees that there will be only one writable primary for a replica
+            // set.
+            const newPrimary = this.getPrimary();
+            if (newPrimary.host === node.host) {
+                return true;
+            }
+
+            jsTest.log(node.host + ' is not primary after stepUp command, ' + newPrimary.host +
+                       ' is the primary');
             return false;
         }, "Timed out while waiting for stepUp to succeed on node in port: " + node.port);
 
