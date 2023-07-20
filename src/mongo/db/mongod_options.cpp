@@ -79,6 +79,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/str.h"
@@ -335,8 +336,8 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
         }
     }
 
-    // "sharding.routerEnabled" comes from the config file, so override it if "router" is set since
-    // those come from the command line.
+    // If the "--router" option is passed from the command line, override "sharding.routerEnabled"
+    // (config file option) as it will be used later.
     if (params->count("router")) {
         Status ret =
             params->set("sharding.routerEnabled", moe::Value((*params)["router"].as<bool>()));
@@ -669,7 +670,8 @@ Status storeMongodOptions(const moe::Environment& params) {
             serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         }
 
-        if (params.count("sharding.routerEnabled") && params["sharding.routerEnabled"].as<bool>()) {
+        if (feature_flags::gCohostedRouter.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
+            params.count("sharding.routerEnabled") && params["sharding.routerEnabled"].as<bool>()) {
             serverGlobalParams.clusterRole += ClusterRole::RouterServer;
         }
     }
