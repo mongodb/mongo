@@ -73,10 +73,28 @@ toolchain_txt="$pip_dir/toolchain-requirements.txt"
 activate_venv
 echo "Upgrading pip to 21.0.1"
 
-python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
-if ! python -m pip --disable-pip-version-check install -r "$toolchain_txt" -q --log install.log; then
-  echo "Pip install error"
+# Loop 5 times to retry the pip install
+# We have seen weird network errors that can sometimes mess up the pip install
+# By retrying we would like to only see errors that happen consistently
+for i in {1..5}; do
+  python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" && RET=0 && break || RET=$? && sleep 1
+done
+
+if [ $RET -ne 0 ]; then
+  echo "Pip install error for wheel and pip version"
+  exit $RET
+fi
+
+# Loop 5 times to retry full venv install
+# We have seen weird network errors that can sometimes mess up the pip install
+# By retrying we would like to only see errors that happen consistently
+for i in {1..5}; do
+  python -m pip --disable-pip-version-check install -r "$toolchain_txt" -q --log install.log && RET=0 && break || RET=$? && sleep 1
+done
+
+if [ $RET -ne 0 ]; then
+  echo "Pip install error for full venv: $toolchain_txt"
   cat install.log || true
-  exit 1
+  exit $RET
 fi
 python -m pip freeze > pip-requirements.txt
