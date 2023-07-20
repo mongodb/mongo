@@ -76,6 +76,14 @@ private:
  */
 class OplogApplierUtils {
 public:
+    /*
+     * Returns the hash of the oplog entry based on the namespace string (and document
+     * key if exists), which is used to determine the thread to apply the op.
+     */
+    static uint32_t getOplogEntryHash(OperationContext* opCtx,
+                                      OplogEntry* op,
+                                      CachedCollectionProperties* collPropertiesCache);
+
     /**
      * Sort operations by their namespaces. There are some special rules for sorting:
      *

@@ -160,18 +160,7 @@ uint32_t getWriterId(OperationContext* opCtx,
                      CachedCollectionProperties* collPropertiesCache,
                      uint32_t numWriters,
                      boost::optional<uint32_t> forceWriterId = boost::none) {
-    boost::optional<size_t> idHash;
-    NamespaceString nss = op->isGlobalIndexCrudOpType()
-        ? NamespaceString::makeGlobalIndexNSS(op->getUuid().value())
-        : op->getNss();
-
-    if (op->isCrudOpType()) {
-        auto collProperties = collPropertiesCache->getCollectionProperties(opCtx, nss);
-        processCrudOp(opCtx, op, collProperties, idHash);
-    }
-
-    auto hash = idHash ? absl::HashOf(nss, *idHash) : absl::HashOf(nss);
-
+    auto hash = OplogApplierUtils::getOplogEntryHash(opCtx, op, collPropertiesCache);
     return (forceWriterId ? *forceWriterId : hash) % numWriters;
 }
 
@@ -235,6 +224,22 @@ void addTopLevelCommitOrAbort(OperationContext* opCtx,
                           ApplicationInstruction::applyTopLevelPreparedTxnOp);
 }
 }  // namespace
+
+uint32_t OplogApplierUtils::getOplogEntryHash(OperationContext* opCtx,
+                                              OplogEntry* op,
+                                              CachedCollectionProperties* collPropertiesCache) {
+    boost::optional<size_t> idHash;
+    NamespaceString nss = op->isGlobalIndexCrudOpType()
+        ? NamespaceString::makeGlobalIndexNSS(op->getUuid().value())
+        : op->getNss();
+
+    if (op->isCrudOpType()) {
+        auto collProperties = collPropertiesCache->getCollectionProperties(opCtx, nss);
+        processCrudOp(opCtx, op, collProperties, idHash);
+    }
+
+    return idHash ? absl::HashOf(nss, *idHash) : absl::HashOf(nss);
+}
 
 uint32_t OplogApplierUtils::addToWriterVector(
     OperationContext* opCtx,

@@ -5,6 +5,7 @@ selector:
   include_files:
   # The trailing asterisk is for handling the .exe extension on Windows.
   - build/install/bin/oplog_application_bm*
+  - build/install/bin/oplog_applier_utils_bm*
 
 executor:
   config: {}

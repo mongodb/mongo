@@ -2175,3 +2175,15 @@ env.Benchmark(
         'storage_interface_impl',
     ],
 )
+
+env.Benchmark(
+    target='oplog_applier_utils_bm',
+    source=[
+        'oplog_applier_utils_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/query/stats/stats_test_utils',
+        'oplog_application',
+    ],
+)

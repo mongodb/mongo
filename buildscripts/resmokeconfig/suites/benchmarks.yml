@@ -33,6 +33,7 @@ selector:
   - build/install/bin/immutable_std_comparison_bm*
   # These benchmarks are being run as part of the benchmarks_replication.yml test suite.
   - build/install/bin/oplog_application_bm*
+  - build/install/bin/oplog_applier_utils_bm*
 
 
 executor:
