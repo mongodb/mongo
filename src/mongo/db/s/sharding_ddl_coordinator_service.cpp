@@ -104,7 +104,11 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
             break;
         case DDLCoordinatorTypeEnum::kRenameCollection:
             return std::make_shared<RenameCollectionCoordinator>(service, std::move(initialState));
+            break;
         case DDLCoordinatorTypeEnum::kCreateCollection:
+            return std::make_shared<CreateCollectionCoordinator>(service, std::move(initialState));
+            break;
+        case DDLCoordinatorTypeEnum::kCreateCollectionPre71Compatible:
             return std::make_shared<CreateCollectionCoordinator>(service, std::move(initialState));
             break;
         case DDLCoordinatorTypeEnum::kRefineCollectionShardKey:
