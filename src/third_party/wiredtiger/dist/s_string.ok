@@ -236,6 +236,7 @@ MacOS
 MapViewOfFile
 Marsaglia
 Marsaglia's
+McIlroy
 Mellor
 Mewhort
 Mitzenmacher
@@ -323,6 +324,7 @@ RXB
 ReadFile
 Readonly
 Realloc
+Recurse
 RedHat
 Redistributions
 Rogerio
@@ -1102,6 +1104,7 @@ qrrSS
 qsort
 quartile
 queueable
+quicksort
 quiesce
 qup
 rN

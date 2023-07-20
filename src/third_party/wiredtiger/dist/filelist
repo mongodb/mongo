@@ -218,6 +218,8 @@ src/support/lock_ext.c
 src/support/modify.c
 src/support/mtx_rw.c
 src/support/pow.c
+src/support/qsort.c
+src/support/qsort_r.c
 src/support/rand.c
 src/support/scratch.c
 src/support/stat.c
