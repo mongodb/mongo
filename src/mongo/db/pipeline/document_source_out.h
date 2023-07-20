@@ -158,13 +158,19 @@ public:
         return kStageName.rawData();
     }
 
+    const NamespaceString& getOutputNs() const override {
+        return _outputNs;
+    }
+
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
     DocumentSourceOut(NamespaceString outputNs,
                       boost::optional<TimeseriesOptions> timeseries,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceWriter(kStageName.rawData(), std::move(outputNs), expCtx),
+        : DocumentSourceWriter(kStageName.rawData(), outputNs, expCtx),
+          _outputNs(std::move(outputNs)),
+          _writeConcern(expCtx->opCtx->getWriteConcern()),
           _timeseries(std::move(timeseries)) {}
 
     static DocumentSourceOutSpec parseOutSpecAndResolveTargetNamespace(
@@ -173,7 +179,7 @@ private:
 
     void finalize() override;
 
-    void spill(BatchedCommandRequest&& bcr, BatchedObjects&& batch) override {
+    void flush(BatchedCommandRequest bcr, BatchedObjects batch) override {
         DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
 
         auto insertCommand = bcr.extractInsertRequest();
@@ -193,13 +199,13 @@ private:
         }
     }
 
-    std::pair<BSONObj, int> makeBatchObject(Document&& doc) const override {
+    std::pair<BSONObj, int> makeBatchObject(Document doc) const override {
         auto obj = doc.toBson();
         tassert(6628900, "_writeSizeEstimator should be initialized", _writeSizeEstimator);
         return {obj, _writeSizeEstimator->estimateInsertSizeBytes(obj)};
     }
 
-    BatchedCommandRequest initializeBatchedWriteRequest() const override;
+    BatchedCommandRequest makeBatchedWriteRequest() const override;
 
     void waitWhileFailPointEnabled() override;
 
@@ -215,6 +221,17 @@ private:
     boost::optional<TimeseriesOptions> validateTimeseries();
 
     NamespaceString makeBucketNsIfTimeseries(const NamespaceString& ns);
+
+    // The namespace where the output will be written to.
+    const NamespaceString _outputNs;
+
+    // Stash the writeConcern of the original command as the operation context may change by the
+    // time we start to flush writes. This is because certain aggregations (e.g. $exchange)
+    // establish cursors with batchSize 0 then run subsequent getMore's which use a new operation
+    // context. The getMore's will not have an attached writeConcern however we still want to
+    // respect the writeConcern of the original command.
+    WriteConcernOptions _writeConcern;
+
     // Holds on to the original collection options and index specs so we can check they didn't
     // change during computation.
     BSONObj _originalOutOptions;

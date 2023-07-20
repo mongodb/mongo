@@ -67,6 +67,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/merge_processor.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/stage_constraints.h"
@@ -90,40 +91,6 @@ namespace mongo {
 class DocumentSourceMerge final : public DocumentSourceWriter<MongoProcessInterface::BatchObject> {
 public:
     static constexpr StringData kStageName = "$merge"_sd;
-
-    using BatchTransform = std::function<void(MongoProcessInterface::BatchObject&)>;
-
-    // A descriptor for a merge strategy. Holds a merge strategy function and a set of actions the
-    // client should be authorized to perform in order to be able to execute a merge operation using
-    // this merge strategy. Additionally holds a 'BatchedCommandGenerator' that will initialize a
-    // BatchedWriteRequest for executing the batch write. If a 'BatchTransform' function is
-    // provided, it will be called when constructing a batch object to transform updates.
-    struct MergeStrategyDescriptor {
-        using WhenMatched = MergeWhenMatchedModeEnum;
-        using WhenNotMatched = MergeWhenNotMatchedModeEnum;
-        using MergeMode = std::pair<WhenMatched, WhenNotMatched>;
-        using UpsertType = MongoProcessInterface::UpsertType;
-        // A function encapsulating a merge strategy for the $merge stage based on the pair of
-        // whenMatched/whenNotMatched modes.
-        using MergeStrategy = std::function<void(const boost::intrusive_ptr<ExpressionContext>&,
-                                                 const NamespaceString&,
-                                                 const WriteConcernOptions&,
-                                                 boost::optional<OID>,
-                                                 BatchedObjects&&,
-                                                 BatchedCommandRequest&&,
-                                                 UpsertType upsert)>;
-
-        // A function object that will be invoked to generate a BatchedCommandRequest.
-        using BatchedCommandGenerator = std::function<BatchedCommandRequest(
-            const boost::intrusive_ptr<ExpressionContext>&, const NamespaceString&)>;
-
-        MergeMode mode;
-        ActionSet actions;
-        MergeStrategy strategy;
-        BatchTransform transform;
-        UpsertType upsertType;
-        BatchedCommandGenerator batchedCommandGenerator;
-    };
 
     /**
      * A "lite parsed" $merge stage to disallow passthrough from mongos even if the source
@@ -178,6 +145,14 @@ public:
         return kStageName.rawData();
     }
 
+    const NamespaceString& getOutputNs() const override {
+        return _mergeProcessor->getOutputNs();
+    }
+
+    MergeProcessor* getMergeProcessor() {
+        return _mergeProcessor.get_ptr();
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
@@ -195,7 +170,7 @@ public:
         boost::optional<BSONObj> letVariables,
         boost::optional<std::vector<BSONObj>> pipeline,
         std::set<FieldPath> mergeOnFields,
-        boost::optional<ChunkVersion> targetCollectionPlacementVersion);
+        boost::optional<ChunkVersion> collectionPlacementVersion);
 
     /**
      * Parses a $merge stage from the user-supplied BSON.
@@ -204,109 +179,58 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     auto getPipeline() const {
-        return _pipeline;
+        return _mergeProcessor->getPipeline();
     }
 
     void initialize() override {
         // This implies that the stage will soon start to write, so it's safe to verify the target
         // collection placement version. This is done here instead of parse time since it requires
         // that locks are not held.
-        if (!pExpCtx->inMongos && _targetCollectionPlacementVersion) {
+        const auto& collectionPlacementVersion = _mergeProcessor->getCollectionPlacementVersion();
+        if (!pExpCtx->inMongos && collectionPlacementVersion) {
             // If mongos has sent us a target placement version, we need to be sure we are prepared
             // to act as a router which is at least as recent as that mongos.
             pExpCtx->mongoProcessInterface->checkRoutingInfoEpochOrThrow(
-                pExpCtx, getOutputNs(), *_targetCollectionPlacementVersion);
+                pExpCtx, getOutputNs(), *collectionPlacementVersion);
         }
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {
         // Although $merge is not allowed in sub-pipelines and this method is used for correlation
         // analysis, the method is generic enough to be used in the future for other purposes.
-        if (_letVariables) {
-            for (auto&& [name, expr] : *_letVariables) {
+        const auto& letVariables = _mergeProcessor->getLetVariables();
+        if (letVariables) {
+            for (auto&& [name, expr] : *letVariables) {
                 expression::addVariableRefs(expr.get(), refs);
             }
         }
     }
 
+    BatchedCommandRequest makeBatchedWriteRequest() const override;
+
+    std::pair<BatchObject, int> makeBatchObject(Document doc) const override;
+
 private:
     /**
      * Builds a new $merge stage which will merge all documents into 'outputNs'. If
-     * 'targetCollectionPlacementVersion' is provided then processing will stop with an error if the
+     * 'collectionPlacementVersion' is provided then processing will stop with an error if the
      * collection's epoch changes during the course of execution. This is used as a mechanism to
      * prevent the shard key from changing.
      */
     DocumentSourceMerge(NamespaceString outputNs,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                        const MergeStrategyDescriptor& descriptor,
+                        MergeStrategyDescriptor::WhenMatched whenMatched,
+                        MergeStrategyDescriptor::WhenNotMatched whenNotMatched,
                         boost::optional<BSONObj> letVariables,
                         boost::optional<std::vector<BSONObj>> pipeline,
                         std::set<FieldPath> mergeOnFields,
-                        boost::optional<ChunkVersion> targetCollectionPlacementVersion);
+                        boost::optional<ChunkVersion> collectionPlacementVersion);
 
-    /**
-     * Creates an UpdateModification object from the given 'doc' to be used with the batched update.
-     */
-    auto makeBatchUpdateModification(const Document& doc) const {
-        return _pipeline ? write_ops::UpdateModification(*_pipeline)
-                         : write_ops::UpdateModification(
-                               doc.toBson(), write_ops::UpdateModification::ReplacementTag{});
-    }
-
-    /**
-     * Resolves 'let' defined variables against the 'doc' and stores the results in the returned
-     * BSON.
-     */
-    boost::optional<BSONObj> resolveLetVariablesIfNeeded(const Document& doc) const {
-        // When we resolve 'let' variables, an empty BSON object or boost::none won't make any
-        // difference at the end-point (in the PipelineExecutor), as in both cases we will end up
-        // with the update pipeline ExpressionContext not being populated with any variables, so we
-        // are not making a distinction between these two cases here.
-        if (!_letVariables || _letVariables->empty()) {
-            return boost::none;
-        }
-
-        BSONObjBuilder bob;
-        for (auto&& [name, expr] : *_letVariables) {
-            bob << name << expr->evaluate(doc, &pExpCtx->variables);
-        }
-        return bob.obj();
-    }
-
-    void spill(BatchedCommandRequest&& bcr, BatchedObjects&& batch) override;
-
-    BatchedCommandRequest initializeBatchedWriteRequest() const override;
+    void flush(BatchedCommandRequest bcr, BatchedObjects batch) override;
 
     void waitWhileFailPointEnabled() override;
 
-    std::pair<BatchObject, int> makeBatchObject(Document&& doc) const override;
-
-    boost::optional<ChunkVersion> _targetCollectionPlacementVersion;
-
-    // A merge descriptor contains a merge strategy function describing how to merge two
-    // collections, as well as some other metadata needed to perform the merge operation. This is
-    // a reference to an element in a static const map 'kMergeStrategyDescriptors', which owns the
-    // descriptor.
-    const MergeStrategyDescriptor& _descriptor;
-
-    // Holds 'let' variables defined in this stage. These variables are propagated to the
-    // ExpressionContext of the pipeline update for use in the inner pipeline execution. The key
-    // of the map is a variable name as defined in the $merge spec 'let' argument, and the value is
-    // a parsed Expression, defining how the variable value must be evaluated.
-    boost::optional<stdx::unordered_map<std::string, boost::intrusive_ptr<Expression>>>
-        _letVariables;
-
-    // A custom pipeline to compute a new version of merging documents.
-    boost::optional<std::vector<BSONObj>> _pipeline;
-
-    // Holds the fields used for uniquely identifying documents. There must exist a unique index
-    // with this key pattern. Default is "_id" for unsharded collections, and "_id" plus the shard
-    // key for sharded collections.
-    std::set<FieldPath> _mergeOnFields;
-
-    // True if '_mergeOnFields' contains the _id. We store this as a separate boolean to avoid
-    // repeated lookups into the set.
-    bool _mergeOnFieldsIncludesId;
+    boost::optional<MergeProcessor> _mergeProcessor;
 };
 
 }  // namespace mongo

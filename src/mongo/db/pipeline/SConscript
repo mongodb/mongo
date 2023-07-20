@@ -334,6 +334,7 @@ pipelineEnv.Library(
         'document_source_unwind.cpp',
         'group_from_first_document_transformation.cpp',
         'match_processor.cpp',
+        'merge_processor.cpp',
         'pipeline.cpp',
         'redact_processor.cpp',
         'search_helper.cpp',
@@ -351,6 +352,7 @@ pipelineEnv.Library(
         'window_function/window_function_exec_linear_fill.cpp',
         'window_function/window_function_exec_removable_document.cpp',
         'window_function/window_function_exec_removable_range.cpp',
+        'writer_util.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_minimal',

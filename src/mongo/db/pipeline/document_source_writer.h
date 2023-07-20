@@ -91,8 +91,8 @@ public:
  *
  *    - 'makeBatchObject()' - creates an object of type 'B' from the given 'Document', which is,
  *       essentially, a result of the input source's 'getNext()' .
- *    - 'spill()' - writes the batch into the output collection.
- *    - 'initializeBatchedWriteRequest()' - initializes the request object for writing a batch to
+ *    - 'flush()' - writes the batch into the output collection.
+ *    - 'makeBatchedWriteRequest()' - initializes the request object for writing a batch to
  *       the output collection.
  *
  * Two other virtual methods exist which a subclass may override: 'initialize()' and 'finalize()',
@@ -105,26 +105,12 @@ public:
     using BatchObject = B;
     using BatchedObjects = std::vector<BatchObject>;
 
-    static BatchedCommandRequest makeInsertCommand(const NamespaceString& outputNs,
-                                                   bool bypassDocumentValidation) {
-        write_ops::InsertCommandRequest insertOp(outputNs);
-        insertOp.setWriteCommandRequestBase([&] {
-            write_ops::WriteCommandRequestBase wcb;
-            wcb.setOrdered(false);
-            wcb.setBypassDocumentValidation(bypassDocumentValidation);
-            return wcb;
-        }());
-        return BatchedCommandRequest(std::move(insertOp));
-    }
-
     DocumentSourceWriter(const char* stageName,
-                         NamespaceString outputNs,
+                         const NamespaceString& outputNs,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(stageName, expCtx),
-          _outputNs(std::move(outputNs)),
-          _writeConcern(expCtx->opCtx->getWriteConcern()),
           _writeSizeEstimator(
-              expCtx->mongoProcessInterface->getWriteSizeEstimator(expCtx->opCtx, _outputNs)) {}
+              expCtx->mongoProcessInterface->getWriteSizeEstimator(expCtx->opCtx, outputNs)) {}
 
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
         deps->needWholeDocument = true;
@@ -146,9 +132,7 @@ public:
         return true;
     }
 
-    const NamespaceString& getOutputNs() const {
-        return _outputNs;
-    }
+    virtual const NamespaceString& getOutputNs() const = 0;
 
 protected:
     GetNextResult doGetNext() final override;
@@ -165,7 +149,7 @@ protected:
     /**
      * Writes the documents in 'batch' to the output namespace via 'bcr'.
      */
-    virtual void spill(BatchedCommandRequest&& bcr, BatchedObjects&& batch) = 0;
+    virtual void flush(BatchedCommandRequest bcr, BatchedObjects batch) = 0;
 
     /**
      * Estimates the size of the header of a batch write (that is, the size of the write command
@@ -187,29 +171,19 @@ protected:
     /**
      * Constructs and configures a BatchedCommandRequest for performing a batch write.
      */
-    virtual BatchedCommandRequest initializeBatchedWriteRequest() const = 0;
+    virtual BatchedCommandRequest makeBatchedWriteRequest() const = 0;
 
     /**
      * Creates a batch object from the given document and returns it to the caller along with the
      * object size.
      */
-    virtual std::pair<B, int> makeBatchObject(Document&& doc) const = 0;
+    virtual std::pair<B, int> makeBatchObject(Document doc) const = 0;
 
     /**
      * A subclass may override this method to enable a fail point right after a next input element
      * has been retrieved, but not processed yet.
      */
     virtual void waitWhileFailPointEnabled() {}
-
-    // The namespace where the output will be written to.
-    const NamespaceString _outputNs;
-
-    // Stash the writeConcern of the original command as the operation context may change by the
-    // time we start to spill writes. This is because certain aggregations (e.g. $exchange)
-    // establish cursors with batchSize 0 then run subsequent getMore's which use a new operation
-    // context. The getMore's will not have an attached writeConcern however we still want to
-    // respect the writeConcern of the original command.
-    WriteConcernOptions _writeConcern;
 
     // An interface that is used to estimate the size of each write operation.
     const std::unique_ptr<MongoProcessInterface::WriteSizeEstimator> _writeSizeEstimator;
@@ -253,7 +227,7 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
         const auto estimatedMetadataSizeBytes =
             rpc::estimateImpersonatedUserMetadataSize(pExpCtx->opCtx);
 
-        BatchedCommandRequest batchWrite = initializeBatchedWriteRequest();
+        BatchedCommandRequest batchWrite = makeBatchedWriteRequest();
         const auto writeHeaderSize = estimateWriteHeaderSize(batchWrite);
         const auto initialRequestSize = estimatedMetadataSizeBytes + writeHeaderSize +
             internalQueryDocumentSourceWriterBatchExtraReservedBytes.load();
@@ -278,15 +252,15 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
             if (!batch.empty() &&
                 (bufferedBytes > maxBatchSizeBytes ||
                  batch.size() >= write_ops::kMaxWriteBatchSize)) {
-                spill(std::move(batchWrite), std::move(batch));
+                flush(std::move(batchWrite), std::move(batch));
                 batch.clear();
-                batchWrite = initializeBatchedWriteRequest();
+                batchWrite = makeBatchedWriteRequest();
                 bufferedBytes = objSize;
             }
-            batch.push_back(obj);
+            batch.push_back(std::move(obj));
         }
         if (!batch.empty()) {
-            spill(std::move(batchWrite), std::move(batch));
+            flush(std::move(batchWrite), std::move(batch));
             batch.clear();
         }
 

@@ -46,6 +46,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_out.h"
+#include "mongo/db/pipeline/writer_util.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -64,8 +65,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-
 namespace mongo {
+
 using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceOutBatch);
@@ -303,11 +304,11 @@ void DocumentSourceOut::finalize() {
     _timeseriesStateConsistent = true;
 }
 
-BatchedCommandRequest DocumentSourceOut::initializeBatchedWriteRequest() const {
+BatchedCommandRequest DocumentSourceOut::makeBatchedWriteRequest() const {
     // Note that our insert targets '_tempNs' (or the associated timeseries view) since we will
     // never write to 'outputNs' directly.
     const auto& targetNss = _timeseries ? _tempNs.getTimeseriesViewNamespace() : _tempNs;
-    return DocumentSourceWriter::makeInsertCommand(targetNss, pExpCtx->bypassDocumentValidation);
+    return makeInsertCommand(targetNss, pExpCtx->bypassDocumentValidation);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(

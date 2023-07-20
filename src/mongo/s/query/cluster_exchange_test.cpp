@@ -82,7 +82,6 @@
 namespace mongo {
 namespace {
 
-using MergeStrategyDescriptor = DocumentSourceMerge::MergeStrategyDescriptor;
 using WhenMatched = MergeStrategyDescriptor::WhenMatched;
 using WhenNotMatched = MergeStrategyDescriptor::WhenNotMatched;
 
