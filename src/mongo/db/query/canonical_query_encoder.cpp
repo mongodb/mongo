@@ -75,6 +75,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
@@ -466,6 +467,14 @@ void encodePipeline(const std::vector<std::unique_ptr<InnerPipelineStageInterfac
         } else if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(stage->documentSource())) {
             auto serializedGroup = groupStage->serialize();
             const auto bson = serializedGroup.getDocument().toBson();
+            bufBuilder->appendBuf(bson.objdata(), bson.objsize());
+        } else if (auto projectionStage =
+                       dynamic_cast<DocumentSourceInternalProjection*>(stage->documentSource())) {
+            projectionStage->serializeToArray(serializedArray, {});
+            tassert(7824600,
+                    "stage isn't serialized to a single bson object",
+                    serializedArray.size() == 1 && serializedArray[0].getType() == Object);
+            const auto bson = serializedArray[0].getDocument().toBson();
             bufBuilder->appendBuf(bson.objdata(), bson.objsize());
         } else {
             tasserted(6443200,

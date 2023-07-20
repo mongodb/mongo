@@ -6,6 +6,7 @@
 "use strict";
 
 load('jstests/aggregation/extras/utils.js');
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 const coll = db.runtime_constants;
 coll.drop();
@@ -16,11 +17,11 @@ assert.commandWorked(coll.insert({x: true}));
 assert.commandFailedWithCode(
     db.runCommand(
         {aggregate: coll.getName(), pipeline: [{$addFields: {testField: "$$IS_MR"}}], cursor: {}}),
-    51144);
+    [51144]);
 
 // Runtime constant $$JS_SCOPE is unable to be retrieved by users.
 assert.commandFailedWithCode(
     db.runCommand(
         {aggregate: coll.getName(), pipeline: [{$addFields: {field: "$$JS_SCOPE"}}], cursor: {}}),
-    51144);
+    [51144]);
 })();

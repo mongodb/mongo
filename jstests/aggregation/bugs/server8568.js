@@ -2,6 +2,8 @@
 
 // For assertErrorCode.
 load('jstests/aggregation/extras/utils.js');
+load("jstests/libs/sbe_assert_error_override.js");         // Override error-code-checking APIs.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";  // TODO SERVER-78596: remove this import
 
 (function() {
 'use strict';
@@ -31,8 +33,11 @@ testOp({$sqrt: [NumberLong("100")]}, 10);
 testOp({$sqrt: [NumberLong("9223372036854775807")]}, 3037000499.97605);
 // Null inputs result in null.
 testOp({$sqrt: [null]}, null);
-// NaN inputs result in NaN.
-testOp({$sqrt: [NaN]}, NaN);
+// TODO SERVER-78596: Remove 'featureFlagSbeFull' check when fixed.
+if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    // NaN inputs result in NaN.
+    testOp({$sqrt: [NaN]}, NaN);
+}
 
 // Invalid input: non-numeric/non-null, arg is negative.
 

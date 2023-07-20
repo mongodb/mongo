@@ -9,6 +9,9 @@ if (!checkSBEEnabled(db)) {
     quit();
 }
 
+// TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature here and below.
+const featureFlagSbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
+
 const coll = db.lookup_with_limit;
 const other = db.lookup_with_limit_other;
 coll.drop();
@@ -61,8 +64,15 @@ pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "additional"}},
     {$limit: 5}
 ];
-checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$addFields", "$lookup", "$limit"]);
-checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "$addFields", "$lookup"]);
+if (featureFlagSbeFull) {
+    checkResults(
+        pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP", "$limit"]);
+    checkResults(
+        pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP"]);
+} else {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$addFields", "$lookup", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "$addFields", "$lookup"]);
+}
 
 // Check that lookup->unwind->limit is reordered to lookup->limit, with the unwind stage being
 // absorbed into the lookup stage and preventing the limit from swapping before it.

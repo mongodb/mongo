@@ -50,7 +50,11 @@ struct ProjectionPolicies {
 
     // Allows the caller to specify whether computed fields should be allowed within inclusion
     // projections. Computed fields are implicitly prohibited by exclusion projections.
-    enum class ComputedFieldsPolicy { kBanComputedFields, kAllowComputedFields };
+    enum class ComputedFieldsPolicy {
+        kBanComputedFields,
+        kAllowComputedFields,
+        kOnlyComputedFields
+    };
 
     // Whether $elemMatch, find() $slice and positional projection are allowed.
     enum class FindOnlyFeaturesPolicy { kBanFindOnlyFeatures, kAllowFindOnlyFeatures };
@@ -82,6 +86,14 @@ struct ProjectionPolicies {
                                   kComputedFieldsPolicyDefault,
                                   FindOnlyFeaturesPolicy::kBanFindOnlyFeatures,
                                   kEmptyProjectionPolicyDefault};
+    }
+
+    static ProjectionPolicies addFieldsProjectionPolicies() {
+        return ProjectionPolicies{kDefaultIdPolicyDefault,
+                                  kArrayRecursionPolicyDefault,
+                                  ComputedFieldsPolicy::kOnlyComputedFields,
+                                  FindOnlyFeaturesPolicy::kBanFindOnlyFeatures,
+                                  EmptyProjectionPolicy::kAllowEmptyProjection};
     }
 
     static ProjectionPolicies wildcardIndexSpecProjectionPolicies() {
