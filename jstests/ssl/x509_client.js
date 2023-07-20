@@ -3,6 +3,8 @@
 const SERVER_CERT = "jstests/libs/server.pem";
 const CA_CERT = "jstests/libs/ca.pem";
 
+const INTERNAL_USER = 'CN=internal,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US';
+const SERVER_USER = 'CN=server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US';
 const CLIENT_USER = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
 const INVALID_CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=invalid";
 
@@ -57,23 +59,21 @@ function authAndTest(mongo) {
     }
     assert(log.some(checkAuthSuccess));
 
-    let createServerUser = function() {
-        // It should be impossible to create users with the same name as the server's subject,
-        // unless guardrails are explicitly overridden
-        external.createUser(
-            {user: SERVER_USER, roles: [{'role': 'userAdminAnyDatabase', 'db': 'admin'}]});
-    };
-    assert.throws(
-        createServerUser, [], "Created user with same name as the server's x.509 subject");
+    // It should be impossible to create users with the same name as the server's subject,
+    // unless guardrails are explicitly overridden
+    assert.commandFailedWithCode(
+        external.runCommand(
+            {createUser: SERVER_USER, roles: [{'role': 'userAdminAnyDatabase', 'db': 'admin'}]}),
+        ErrorCodes.BadValue,
+        "Created user with same name as the server's x.509 subject");
 
-    let createInternalUser = function() {
-        // It should be impossible to create users with names recognized as cluster members,
-        // unless guardrails are explicitly overridden
-        external.createUser(
-            {user: INTERNAL_USER, roles: [{'role': 'userAdminAnyDatabase', 'db': 'admin'}]});
-    };
-    assert.throws(
-        createInternalUser, [], "Created user which would be recognized as a cluster member");
+    // It should be impossible to create users with names recognized as cluster members,
+    // unless guardrails are explicitly overridden
+    assert.commandFailedWithCode(
+        external.runCommand(
+            {createUser: INTERNAL_USER, roles: [{'role': 'userAdminAnyDatabase', 'db': 'admin'}]}),
+        ErrorCodes.BadValue,
+        "Created user which would be recognized as a cluster member");
 
     // Check that we can add a user and read data
     test.createUser(
