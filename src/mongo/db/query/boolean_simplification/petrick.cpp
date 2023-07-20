@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/boolean_simplification/petrick.h"
 
+#include <algorithm>
 #include <boost/dynamic_bitset/dynamic_bitset.hpp>
 #include <boost/move/utility_core.hpp>
 #include <cstddef>
@@ -42,6 +43,8 @@ namespace {
 class PrimeImplicant {
 public:
     PrimeImplicant() {}
+
+    explicit PrimeImplicant(size_t numberOfBits) : _implicant(numberOfBits) {}
 
     PrimeImplicant(size_t numberOfBits, size_t implicantIndex) : _implicant(numberOfBits) {
         _implicant.set(implicantIndex);
@@ -70,6 +73,7 @@ public:
     }
 
     friend PrimeImplicant operator|(const PrimeImplicant& lhs, const PrimeImplicant& rhs);
+    friend bool operator<(const PrimeImplicant& lhs, const PrimeImplicant& rhs);
 
 private:
     boost::dynamic_bitset<size_t> _implicant;
@@ -79,16 +83,16 @@ PrimeImplicant operator|(const PrimeImplicant& lhs, const PrimeImplicant& rhs) {
     return PrimeImplicant(lhs._implicant | rhs._implicant);
 }
 
+bool operator<(const PrimeImplicant& lhs, const PrimeImplicant& rhs) {
+    return lhs._implicant < rhs._implicant;
+}
+
 /**
  * Sum (union) of prime implicants.
  */
 class ImplicantSum {
 public:
     ImplicantSum() {}
-
-    ImplicantSum(PrimeImplicant implicant) {
-        _implicants.push_back(implicant);
-    }
 
     void appendNewImplicant(size_t numberOfBits, size_t implicantIndex) {
         _implicants.emplace_back(numberOfBits, implicantIndex);
@@ -152,6 +156,20 @@ public:
         return result;
     }
 
+    /**
+     * Finds if there is an intersection between a sorted PrimeImplicant vector and the unsorted
+     * _implicants of this ImplicantSum. This lets us sort just the essential prime implicant
+     * vector, which is faster than set_intersection() that requires both vectors to be sorted.
+     */
+    bool intersects(const std::vector<PrimeImplicant>& sorted) const {
+        for (const auto& implicant : _implicants) {
+            if (std::binary_search(sorted.begin(), sorted.end(), implicant)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     void swap(ImplicantSum& other) {
         _implicants.swap(other._implicants);
     }
@@ -160,22 +178,21 @@ public:
         return _implicants.size();
     }
 
-    PrimeImplicant front() const {
+    PrimeImplicant& front() {
         return _implicants.front();
     }
 
     /**
      * Expands a bitset representation of each prime implicant into a vector of minterm indexes and
-     * returns the resulting vector.
+     * returns the resulting vector, adding all essential implicants to each result.
      */
-    std::vector<std::vector<uint32_t>> getCoverages() const {
-        std::vector<std::vector<uint32_t>> result{};
+    std::vector<std::vector<uint32_t>> getCoverages(
+        const PrimeImplicant& essentialImplicants) const {
+        std::vector<std::vector<uint32_t>> result;
         result.reserve(_implicants.size());
-
         for (const auto& implicant : _implicants) {
-            result.emplace_back(implicant.getListOfSetBits());
+            result.emplace_back((implicant | essentialImplicants).getListOfSetBits());
         }
-
         return result;
     }
 
@@ -189,7 +206,7 @@ private:
 class TabularPetrick {
 public:
     explicit TabularPetrick(const std::vector<std::vector<unsigned>>& data)
-        : _numberOfBits(data.size()) {
+        : _numberOfBits(data.size()), _essentialImplicants(PrimeImplicant(data.size())) {
         for (size_t implicantIndex = 0; implicantIndex < data.size(); ++implicantIndex) {
             for (auto mintermIndex : data[implicantIndex]) {
                 insert(mintermIndex, implicantIndex);
@@ -198,30 +215,11 @@ public:
     }
 
     std::vector<std::vector<uint32_t>> getMinimalCoverages() {
-        // Simplifies the table by combining essential implicants. This saves on allocations inside
-        // ImplicantSum.product()
-        std::vector<PrimeImplicant> essentialImplicants{};
-        auto implicantIter = _table.begin();
-        while (implicantIter != _table.end()) {
-            // If an ImplicantSum only has one PrimeImplicant, it is essential, and is removed from
-            // the table and combined with the other essential implicants.
-            if (implicantIter->size() == 1) {
-                essentialImplicants.push_back(implicantIter->front());
-                implicantIter = _table.erase(implicantIter);
-            } else {
-                ++implicantIter;
-            }
-        }
+        extractEssentialImplicants();
 
-        if (!essentialImplicants.empty()) {
-            PrimeImplicant combinedImplicant{essentialImplicants.back()};
-            essentialImplicants.pop_back();
-            for (const auto& implicant : essentialImplicants) {
-                combinedImplicant = combinedImplicant | implicant;
-            }
-            // Add the combined essential implicant to the table as a new row.
-            ImplicantSum combinedImplicantSum{combinedImplicant};
-            _table.push_back(combinedImplicantSum);
+        // Just return a vector of essential implicants if every minterm is already covered.
+        if (_table.empty()) {
+            return std::vector<std::vector<uint32_t>>{_essentialImplicants.getListOfSetBits()};
         }
 
         while (_table.size() > 1) {
@@ -230,8 +228,7 @@ public:
             _table.pop_back();
             _table[_table.size() - 1].swap(productResult);
         }
-
-        return _table.front().getCoverages();
+        return _table.front().getCoverages(_essentialImplicants);
     }
 
 private:
@@ -243,8 +240,40 @@ private:
         _table[mintermIndex].appendNewImplicant(_numberOfBits, implicantIndex);
     };
 
+    /**
+     * Simplifies the table by removing essential implicants and the minterms covered by them, and
+     * sets the combined essential implicants as a member variable.
+     */
+    void extractEssentialImplicants() {
+        std::vector<PrimeImplicant> essentialImplicantList;
+        for (auto& implicantSum : _table) {
+            // If an ImplicantSum only has one PrimeImplicant, it is an essential implicant.
+            if (implicantSum.size() == 1) {
+                essentialImplicantList.push_back(implicantSum.front());
+            }
+        }
+
+        // Look for intersection between vector of essential implicants and each implicantSum.
+        // If we don't have an intersection, then that minterm is not covered by an essential
+        // implicant and has to be simplified with Petrick's Method.
+        std::sort(essentialImplicantList.begin(), essentialImplicantList.end());
+        std::vector<ImplicantSum> newTable;
+        for (auto& implicantSum : _table) {
+            if (!implicantSum.intersects(essentialImplicantList)) {
+                newTable.push_back(std::move(implicantSum));
+            }
+        }
+        _table.swap(newTable);
+
+        // Combine all essential implicants into the first one.
+        for (auto&& i : essentialImplicantList) {
+            _essentialImplicants = _essentialImplicants | i;
+        }
+    }
+
     const size_t _numberOfBits;
     std::vector<ImplicantSum> _table;
+    PrimeImplicant _essentialImplicants;
 };
 }  // namespace
 
