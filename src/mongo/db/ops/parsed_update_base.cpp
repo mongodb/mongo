@@ -119,10 +119,10 @@ ParsedUpdateBase::ParsedUpdateBase(OperationContext* opCtx,
         7655104, "timeseries collection must already exist", _collection || !isRequestToTimeseries);
 }
 
-Status ParsedUpdateBase::maybeTranslateTimeseriesUpdate() {
+void ParsedUpdateBase::maybeTranslateTimeseriesUpdate() {
     if (!_timeseriesUpdateQueryExprs) {
         // Not a timeseries update, bail out.
-        return Status::OK();
+        return;
     }
 
     // TODO: Due to the complexity which is related to the efficient sort support, we don't support
@@ -154,31 +154,6 @@ Status ParsedUpdateBase::maybeTranslateTimeseriesUpdate() {
     }
     _originalExpr = uassertStatusOK(MatchExpressionParser::parse(
         _request->getQuery(), _expCtx, ExtensionsCallbackNoop(), allowedFeatures));
-
-    if (_request->isMulti() && !_timeseriesUpdateQueryExprs->_residualExpr) {
-        // If we don't have a residual predicate and this is not a single update, we might be able
-        // to perform this update directly on the buckets collection. Attempt to translate the
-        // update modification accordingly, if it succeeds, we can do a direct write. If we can't
-        // translate it (due to referencing data fields), go ahead with the arbitrary updates path.
-        const auto& timeseriesOptions = _collection->getTimeseriesOptions();
-        auto swModification =
-            timeseries::translateUpdate(*_modification, timeseriesOptions->getMetaField());
-        if (swModification.isOK()) {
-            _modification =
-                std::make_unique<write_ops::UpdateModification>(swModification.getValue());
-
-            // We need to capture off the correct translated timeseries filter expressions in the
-            // canonical query before we clear out the timeseries state (this is kind of a hacky way
-            // to do it, but this whole fallback optimization is kind of hacky.).
-            if (auto status = parseQueryToCQ(); !status.isOK()) {
-                return status;
-            }
-
-            _timeseriesUpdateQueryExprs = nullptr;
-        }
-    }
-
-    return Status::OK();
 }
 
 Status ParsedUpdateBase::parseRequest() {
@@ -220,9 +195,7 @@ Status ParsedUpdateBase::parseRequest() {
 
     _expCtx->startExpressionCounters();
 
-    if (auto status = maybeTranslateTimeseriesUpdate(); !status.isOK()) {
-        return status;
-    }
+    maybeTranslateTimeseriesUpdate();
 
     // We parse the update portion before the query portion because the dispostion of the update
     // may determine whether or not we need to produce a CanonicalQuery at all.  For example, if
@@ -239,10 +212,7 @@ Status ParsedUpdateBase::parseRequest() {
 }
 
 Status ParsedUpdateBase::parseQuery() {
-    if (_canonicalQuery) {
-        // Query is already parsed.
-        return Status::OK();
-    }
+    dassert(!_canonicalQuery.get());
 
     if (!_timeseriesUpdateQueryExprs && !_driver.needMatchDetails() &&
         CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
