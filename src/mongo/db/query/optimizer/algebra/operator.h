@@ -77,6 +77,20 @@ public:
     requires(I >= 0 && I < Arity) const auto& get() const noexcept {
         return this->_nodes[I];
     }
+
+protected:
+    /**
+     * Helper function to compare 2 nodes children with each other. Returns true if all children
+     * with matching positions are equal and false otherwise.
+     */
+    bool allChildrenEqual(const OpFixedArity<Slot, Arity>& other) const {
+        for (int i = 0; i < Arity; ++i) {
+            if (this->_nodes[i] != other._nodes[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
 };
 
 /**

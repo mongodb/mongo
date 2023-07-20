@@ -395,6 +395,26 @@ TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithScalarsSetsOne
     ASSERT_EQ(1, context.inputParamIdToExpressionMap.size());
 }
 
+TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithScalarsReusesOneParamId) {
+    BSONObj operand = BSON_ARRAY(1 << "r" << true << 1.1);
+    InMatchExpression expr{"a"_sd};
+    std::vector<BSONElement> equalities{operand[0], operand[1], operand[2], operand[3]};
+    ASSERT_OK(expr.setEqualities(std::move(equalities)));
+
+    MatchExpressionParameterizationVisitorContext context{};
+    MatchExpressionParameterizationVisitor visitor{&context};
+    expr.acceptVisitor(&visitor);
+    ASSERT_EQ(1, context.inputParamIdToExpressionMap.size());
+
+    InMatchExpression expr2{"a"_sd};
+    std::vector<BSONElement> equalities2{operand[0], operand[1], operand[2], operand[3]};
+    ASSERT_OK(expr.setEqualities(std::move(equalities2)));
+    expr.acceptVisitor(&visitor);
+
+    // The second $in reused the previouse parameterId.
+    ASSERT_EQ(1, context.inputParamIdToExpressionMap.size());
+}
+
 TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithNullSetsNoParamIds) {
     BSONObj operand = BSON_ARRAY(1 << "r" << true << BSONNULL);
     InMatchExpression expr{"a"_sd};
@@ -478,6 +498,31 @@ TEST(MatchExpressionParameterizationVisitor, ExprMatchExpressionSetsNoParamsIds)
     MatchExpressionParameterizationVisitorContext context{};
     walkExpression(&context, result.getValue().get());
     ASSERT_EQ(0, context.inputParamIdToExpressionMap.size());
+}
+
+TEST(MatchExpressionParameterizationVisitor, OrMatchExpressionSetsOneParam) {
+    BSONObj query = BSON("$or" << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 1)));
+
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_TRUE(result.isOK());
+
+    MatchExpressionParameterizationVisitorContext context{};
+    walkExpression(&context, result.getValue().get());
+    ASSERT_EQ(1, context.inputParamIdToExpressionMap.size());
+}
+
+TEST(MatchExpressionParameterizationVisitor, OrMatchExpressionSetsThreeParamWithFourPredicates) {
+    BSONObj query =
+        BSON("$or" << BSON_ARRAY(BSON("a" << 1) << BSON("b" << 2)) << "a" << 1 << "b" << 3);
+
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_TRUE(result.isOK());
+
+    MatchExpressionParameterizationVisitorContext context{};
+    walkExpression(&context, result.getValue().get());
+    ASSERT_EQ(3, context.inputParamIdToExpressionMap.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor,
