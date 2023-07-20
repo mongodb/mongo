@@ -37,7 +37,6 @@
 #include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/abt/named_slots.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -54,16 +53,13 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer {
-constexpr mongo::StringData kshardFiltererSlotName = "shardFilterer"_sd;
 
 class SBEExpressionLowering {
 public:
     SBEExpressionLowering(const VariableEnvironment& env,
                           SlotVarMap& slotMap,
-                          const mongo::sbe::RuntimeEnvironment& runtimeEnv,
-                          const Metadata* metadata = nullptr,
-                          const NodeProps* np = nullptr)
-        : _env(env), _slotMap(slotMap), _runtimeEnv(runtimeEnv), _metadata(metadata), _np(np) {}
+                          const NamedSlotsProvider& namedSlots)
+        : _env(env), _slotMap(slotMap), _namedSlots(namedSlots) {}
 
     // The default noop transport.
     template <typename T, typename... Ts>
@@ -103,16 +99,9 @@ public:
     std::unique_ptr<sbe::EExpression> optimize(const ABT& n);
 
 private:
-    std::unique_ptr<sbe::EExpression> handleShardFilterFunctionCall(
-        const FunctionCall& fn,
-        std::vector<std::unique_ptr<sbe::EExpression>>& args,
-        std::string name);
-
     const VariableEnvironment& _env;
     SlotVarMap& _slotMap;
-    const sbe::RuntimeEnvironment& _runtimeEnv;
-    const Metadata* _metadata;
-    const NodeProps* _np;
+    const NamedSlotsProvider& _namedSlots;
 
     sbe::FrameId _frameCounter{100};
     stdx::unordered_map<const Let*, sbe::FrameId> _letMap;
@@ -128,13 +117,13 @@ enum class ScanOrder {
 class SBENodeLowering {
 public:
     SBENodeLowering(const VariableEnvironment& env,
-                    const sbe::RuntimeEnvironment& runtimeEnv,
+                    const NamedSlotsProvider& namedSlots,
                     sbe::value::SlotIdGenerator& ids,
                     const Metadata& metadata,
                     const NodeToGroupPropsMap& nodeToGroupPropsMap,
                     const ScanOrder scanOrder)
         : _env(env),
-          _runtimeEnv(runtimeEnv),
+          _namedSlots(namedSlots),
           _slotIdGenerator(ids),
           _metadata(metadata),
           _nodeToGroupPropsMap(nodeToGroupPropsMap),
@@ -338,18 +327,15 @@ private:
     /**
      * Instantiate an expression lowering transporter for use in node lowering.
      */
-    SBEExpressionLowering getExpressionLowering(SlotVarMap& slotMap,
-                                                const NodeProps* np = nullptr) {
-        return SBEExpressionLowering{_env, slotMap, _runtimeEnv, &_metadata, np};
+    SBEExpressionLowering getExpressionLowering(SlotVarMap& slotMap) {
+        return SBEExpressionLowering{_env, slotMap, _namedSlots};
     }
 
-    std::unique_ptr<sbe::EExpression> lowerExpression(const ABT& e,
-                                                      SlotVarMap& slotMap,
-                                                      const NodeProps* np = nullptr) {
-        return getExpressionLowering(slotMap, np).optimize(e);
+    std::unique_ptr<sbe::EExpression> lowerExpression(const ABT& e, SlotVarMap& slotMap) {
+        return getExpressionLowering(slotMap).optimize(e);
     }
     const VariableEnvironment& _env;
-    const sbe::RuntimeEnvironment& _runtimeEnv;
+    const NamedSlotsProvider& _namedSlots;
 
     sbe::value::SlotIdGenerator& _slotIdGenerator;
 

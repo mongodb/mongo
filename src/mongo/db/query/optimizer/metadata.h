@@ -253,14 +253,13 @@ private:
  * info, and data related to associated indexes in addition to other relevant metadata.
  */
 struct Metadata {
-    Metadata() = default;
     Metadata(opt::unordered_map<std::string, ScanDefinition> scanDefs);
     Metadata(opt::unordered_map<std::string, ScanDefinition> scanDefs, size_t numberOfPartitions);
 
     opt::unordered_map<std::string, ScanDefinition> _scanDefs;
 
     // Degree of parallelism.
-    size_t _numberOfPartitions{1};
+    size_t _numberOfPartitions;
 
     bool isParallelExecution() const;
 

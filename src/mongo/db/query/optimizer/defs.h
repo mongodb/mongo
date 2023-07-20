@@ -237,7 +237,6 @@ public:
 
     static CostType fromDouble(double cost);
 
-    CostType() = default;
     CostType(const CostType& other) = default;
     CostType(CostType&& other) = default;
     CostType& operator=(const CostType& other) = default;
@@ -262,8 +261,8 @@ public:
 private:
     CostType(bool isInfinite, double cost);
 
-    bool _isInfinite{false};
-    double _cost{0.0};
+    bool _isInfinite;
+    double _cost;
 };
 
 struct CostAndCE {
