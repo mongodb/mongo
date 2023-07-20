@@ -1139,9 +1139,6 @@ def check_command_params_or_type_struct_fields(
     # We allow collMod isTimeseriesNamespace parameter to be removed because it's implicitly
     # added from mongos and not documented in the API.
     allow_list += ["collMod-param-isTimeseriesNamespace"]
-    # We allow collMod "recordPreImages" parameter to be removed because it was incorrectly marked as stable
-    # in 5.0.x versions.
-    allow_list += ["collMod-param-recordPreImages"]
 
     for old_field in old_struct_fields or []:
         new_field_exists = False

@@ -670,8 +670,6 @@ private:
             // TODO SERVER-78330 remove this.
             deleteShardingStateRecoveryDoc(opCtx);
         }
-
-        _removeRecordPreImagesCollectionOption(opCtx);
     }
 
     void _maybeMigrateAuditConfig(OperationContext* opCtx,
@@ -794,33 +792,6 @@ private:
             if (indexCatalogNss == NamespaceString::kShardIndexCatalogNamespace) {
                 uassertStatusOK(sharding_util::createShardCollectionCatalogIndexes(opCtx));
             }
-        }
-    }
-
-    // Removes collection option "recordPreImages" from all collection definitions.
-    // TODO SERVER-74036: Remove once FCV 7.0 becomes last-LTS.
-    void _removeRecordPreImagesCollectionOption(OperationContext* opCtx) {
-        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-            Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-            catalog::forEachCollectionFromDb(
-                opCtx,
-                dbName,
-                MODE_X,
-                [&](const Collection* collection) {
-                    // To remove collection option "recordPreImages" from persistent storage, issue
-                    // the "collMod" command with none of the parameters set.
-                    BSONObjBuilder responseBuilder;
-                    uassertStatusOK(processCollModCommand(
-                        opCtx, collection->ns(), CollMod{collection->ns()}, &responseBuilder));
-                    LOGV2(7383300,
-                          "Removed 'recordPreImages' collection option",
-                          "ns"_attr = collection->ns(),
-                          "collModResponse"_attr = responseBuilder.obj());
-                    return true;
-                },
-                [&](const Collection* collection) {
-                    return collection->getCollectionOptions().recordPreImagesOptionUsed;
-                });
         }
     }
 
