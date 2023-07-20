@@ -56,7 +56,7 @@ class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
 
     def conn_config(self):
         if self.failpoint_enabled:
-            return 'timing_stress_for_test=[failpoint_eviction_fail_after_reconciliation]'
+            return 'timing_stress_for_test=[failpoint_eviction_split]'
         else:
             return ''
 

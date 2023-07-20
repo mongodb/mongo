@@ -168,8 +168,8 @@ configure_timing_stress(char **p, size_t max)
         CONFIG_APPEND(*p, ",prepare_checkpoint_delay");
     if (GV(STRESS_EVICT_REPOSITION))
         CONFIG_APPEND(*p, ",evict_reposition");
-    if (GV(STRESS_FAILPOINT_EVICTION_FAIL_AFTER_RECONCILIATION))
-        CONFIG_APPEND(*p, ",failpoint_eviction_fail_after_reconciliation");
+    if (GV(STRESS_FAILPOINT_EVICTION_SPLIT))
+        CONFIG_APPEND(*p, ",failpoint_eviction_split");
     if (GV(STRESS_FAILPOINT_HS_DELETE_KEY_FROM_TS))
         CONFIG_APPEND(*p, ",failpoint_history_store_delete_key_from_ts");
     if (GV(STRESS_HS_CHECKPOINT_DELAY))

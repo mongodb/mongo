@@ -295,7 +295,7 @@ CONFIG configuration_list[] = {
 
 {"stress.evict_reposition", "stress evict reposition", C_BOOL, 2, 0, 0}
 
-{"stress.failpoint_eviction_fail_after_reconciliation", "stress failpoint eviction fail after reconciliation", C_BOOL, 30, 0, 0}
+{"stress.failpoint_eviction_split", "stress failpoint eviction split", C_BOOL, 30, 0, 0}
 
 {"stress.failpoint_hs_delete_key_from_ts", "stress failpoint history store delete key from ts", C_BOOL, 30, 0, 0}
 

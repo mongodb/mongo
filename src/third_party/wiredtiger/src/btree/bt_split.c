@@ -2160,6 +2160,10 @@ __split_multi_lock(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
     WT_DECL_RET;
     WT_PAGE *parent;
 
+    /* Fail 1% of the time to simulate we fail to split the page. */
+    if (!closing && __wt_failpoint(session, WT_TIMING_STRESS_FAILPOINT_EVICTION_SPLIT, 100))
+        return (EBUSY);
+
     /* Lock the parent page, then proceed with the split. */
     WT_RET(__split_internal_lock(session, ref, false, &parent));
     if ((ret = __split_multi(session, ref, closing)) != 0 || closing) {

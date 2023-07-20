@@ -188,13 +188,13 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     WT_DECL_RET;
     WT_PAGE *page;
     uint8_t stats_flags;
-    bool clean_page, closing, inmem_split, tree_dead;
+    bool clean_page, closing, inmem_split, tree_dead, ebusy_only;
 
     conn = S2C(session);
     page = ref->page;
     closing = LF_ISSET(WT_EVICT_CALL_CLOSING);
     stats_flags = 0;
-    clean_page = false;
+    clean_page = ebusy_only = false;
 
     __wt_verbose(
       session, WT_VERB_EVICT, "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
@@ -272,15 +272,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     if (!tree_dead && __wt_page_is_modified(page))
         WT_ERR(__evict_reconcile(session, ref, flags));
 
-    /*
-     * Fail 0.1% of the time after we have done reconciliation. We should always evict the page of a
-     * dead tree.
-     */
-    if (!closing && !tree_dead &&
-      __wt_failpoint(session, WT_TIMING_STRESS_FAILPOINT_EVICTION_FAIL_AFTER_RECONCILIATION, 10)) {
-        ret = EBUSY;
-        goto err;
-    }
+    /* After this spot, the only recoverable failure is EBUSY. */
+    ebusy_only = true;
 
     /* Check we are not evicting an accessible internal page with an active split generation. */
     WT_ASSERT(session,
@@ -326,6 +319,9 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
 err:
         if (!closing)
             __evict_exclusive_clear(session, ref, previous_state);
+
+        if (ebusy_only && ret != EBUSY)
+            WT_RET_PANIC(session, ret, "eviction failed when only EBUSY is allowed");
     }
 
 done:

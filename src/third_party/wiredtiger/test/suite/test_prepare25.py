@@ -32,7 +32,7 @@ from wtscenario import make_scenarios
 # test_prepare25.py
 # Test prepare rollback and then prepare commit with failed eviction.
 class test_prepare25(wttest.WiredTigerTestCase):
-    conn_config = 'timing_stress_for_test=[failpoint_eviction_fail_after_reconciliation]'
+    conn_config = 'timing_stress_for_test=[failpoint_eviction_split]'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
