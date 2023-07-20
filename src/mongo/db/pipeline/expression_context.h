@@ -224,8 +224,8 @@ public:
     /**
      * Returns true if this is a collectionless aggregation on the specified database.
      */
-    bool isDBAggregation(StringData dbName) const {
-        return ns.db() == dbName && ns.isCollectionlessAggregateNS();
+    bool isDBAggregation(const DatabaseName& dbName) const {
+        return ns.dbName() == dbName && ns.isCollectionlessAggregateNS();
     }
 
     /**

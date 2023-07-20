@@ -140,7 +140,7 @@ NamespaceString DocumentSourceChangeStreamAddPostImage::assertValidNamespace(
                           << nss.toStringForErrorMsg() << ", expected "
                           << pExpCtx->ns.toStringForErrorMsg(),
             nss == pExpCtx->ns ||
-                (pExpCtx->isClusterAggregation() || pExpCtx->isDBAggregation(nss.db())));
+                (pExpCtx->isClusterAggregation() || pExpCtx->isDBAggregation(nss.dbName())));
 
     return nss;
 }
