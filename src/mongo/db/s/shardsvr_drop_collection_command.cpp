@@ -41,7 +41,6 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
@@ -59,7 +58,6 @@
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/uuid.h"
@@ -115,22 +113,14 @@ public:
             CurOp::get(opCtx)->raiseDbProfileLevel(
                 CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns().dbName()));
 
-            auto dropCollCoordinator = [&] {
-                FixedFCVRegion fixedFcvRegion{opCtx};
-                // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
-                const DDLCoordinatorTypeEnum coordType =
-                    feature_flags::gDropCollectionHoldingCriticalSection.isEnabled(*fixedFcvRegion)
-                    ? DDLCoordinatorTypeEnum::kDropCollection
-                    : DDLCoordinatorTypeEnum::kDropCollectionPre70Compatible;
+            auto coordinatorDoc = DropCollectionCoordinatorDocument();
+            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                {{ns(), DDLCoordinatorTypeEnum::kDropCollection}});
+            coordinatorDoc.setCollectionUUID(request().getCollectionUUID());
 
-                auto coordinatorDoc = DropCollectionCoordinatorDocument();
-                coordinatorDoc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
-                coordinatorDoc.setCollectionUUID(request().getCollectionUUID());
-
-                auto service = ShardingDDLCoordinatorService::getService(opCtx);
-                return checked_pointer_cast<DropCollectionCoordinator>(
-                    service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
-            }();
+            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto dropCollCoordinator = checked_pointer_cast<DropCollectionCoordinator>(
+                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
 
             dropCollCoordinator->getCompletionFuture().get(opCtx);
         }

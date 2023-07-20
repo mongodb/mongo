@@ -173,9 +173,6 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this, executor = executor, anchor = shared_from_this()] {
-            if (_isPre70Compatible())
-                return;
-
             if (_doc.getPhase() < Phase::kFreezeCollection)
                 _checkPreconditionsAndSaveArgumentsOnDoc();
         })
@@ -185,9 +182,6 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                                  }))
 
         .then([this, token, executor = executor, anchor = shared_from_this()] {
-            if (_isPre70Compatible())
-                return;
-
             _buildPhaseHandler(Phase::kEnterCriticalSection,
                                [this, token, executor = executor, anchor = shared_from_this()] {
                                    _enterCriticalSection(executor, token);
@@ -198,25 +192,11 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                                      _commitDropCollection(executor);
                                  }))
         .then([this, token, executor = executor, anchor = shared_from_this()] {
-            if (_isPre70Compatible())
-                return;
-
             _buildPhaseHandler(Phase::kReleaseCriticalSection,
                                [this, token, executor = executor, anchor = shared_from_this()] {
                                    _exitCriticalSection(executor, token);
                                })();
         });
-}
-
-void DropCollectionCoordinator::_saveCollInfo(OperationContext* opCtx) {
-
-    try {
-        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss());
-        _doc.setCollInfo(std::move(coll));
-    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // The collection is not sharded or doesn't exist.
-        _doc.setCollInfo(boost::none);
-    }
 }
 
 void DropCollectionCoordinator::_checkPreconditionsAndSaveArgumentsOnDoc() {
@@ -248,7 +228,13 @@ void DropCollectionCoordinator::_checkPreconditionsAndSaveArgumentsOnDoc() {
         }
     }
 
-    _saveCollInfo(opCtx);
+    try {
+        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss());
+        _doc.setCollInfo(std::move(coll));
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // The collection is not sharded or doesn't exist.
+        _doc.setCollInfo(boost::none);
+    }
 }
 
 void DropCollectionCoordinator::_freezeMigrations(
@@ -256,26 +242,6 @@ void DropCollectionCoordinator::_freezeMigrations(
     auto opCtxHolder = cc().makeOperationContext();
     auto* opCtx = opCtxHolder.get();
     getForwardableOpMetadata().setOn(opCtx);
-
-    if (_isPre70Compatible()) {
-        _saveCollInfo(opCtx);
-
-        // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
-        // This check can be removed since it is also present in _checkPreconditions.
-        {
-            AutoGetCollection coll{opCtx,
-                                   nss(),
-                                   MODE_IS,
-                                   AutoGetCollection::Options{}
-                                       .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
-                                       .expectedUUID(_doc.getCollectionUUID())};
-        }
-
-        // Persist the collection info before sticking to using it's uuid. This ensures this node is
-        // still the RS primary, so it was also the primary at the moment we read the collection
-        // metadata.
-        _updateStateDocument(opCtx, StateDoc(_doc));
-    }
 
     BSONObjBuilder logChangeDetail;
     if (_doc.getCollInfo()) {

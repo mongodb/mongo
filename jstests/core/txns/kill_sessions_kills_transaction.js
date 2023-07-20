@@ -58,14 +58,7 @@ assert.soon(
                        {
                            $match: {
                                $or: [
-                                   {
-                                       $or: [
-                                           {'command.drop': collName},
-                                           // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
-                                           {'command._shardsvrDropCollectionParticipant': collName}
-                                       ],
-                                       waitingForLock: true
-                                   },
+                                   {'command.drop': collName, waitingForLock: true},
                                    {'command._shardsvrParticipantBlock': collName},
                                ]
                            }

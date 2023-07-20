@@ -182,44 +182,6 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
         opCtx, std::move(transactionChain), wc, osi, useClusterTransaction, executor);
 }
 
-// TODO SERVER-73627: Remove once 7.0 becomes last LTS
-class ScopedDatabaseCriticalSection {
-public:
-    ScopedDatabaseCriticalSection(OperationContext* opCtx,
-                                  const std::string dbName,
-                                  const BSONObj reason)
-        : _opCtx(opCtx), _dbName(std::move(dbName)), _reason(std::move(reason)) {
-        // TODO SERVER-67438 Once ScopedDatabaseCriticalSection holds a DatabaseName obj, use dbName
-        // directly
-        DatabaseName databaseName = DatabaseNameUtil::deserialize(boost::none, _dbName);
-        Lock::DBLock dbLock(_opCtx, databaseName, MODE_X);
-        auto scopedDss =
-            DatabaseShardingState::assertDbLockedAndAcquireExclusive(_opCtx, databaseName);
-        scopedDss->enterCriticalSectionCatchUpPhase(_opCtx, _reason);
-        scopedDss->enterCriticalSectionCommitPhase(_opCtx, _reason);
-    }
-
-    ~ScopedDatabaseCriticalSection() {
-        // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard guard(_opCtx->lockState());  // NOLINT.
-        // TODO SERVER-67438 Once ScopedDatabaseCriticalSection holds a DatabaseName obj, use dbName
-        // directly
-        DatabaseName databaseName = DatabaseNameUtil::deserialize(boost::none, _dbName);
-        Lock::DBLock dbLock(_opCtx, databaseName, MODE_X);
-        auto scopedDss =
-            DatabaseShardingState::assertDbLockedAndAcquireExclusive(_opCtx, databaseName);
-        scopedDss->exitCriticalSection(_opCtx, _reason);
-    }
-
-    ScopedDatabaseCriticalSection(const ScopedDatabaseCriticalSection&) = delete;
-    ScopedDatabaseCriticalSection(ScopedDatabaseCriticalSection&&) = delete;
-
-private:
-    OperationContext* _opCtx;
-    const std::string _dbName;
-    const BSONObj _reason;
-};
-
 bool isDbAlreadyDropped(OperationContext* opCtx,
                         const boost::optional<mongo::DatabaseVersion>& dbVersion,
                         const StringData& dbName) {
@@ -255,7 +217,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     const CancellationToken& token) {
     const auto& nss = coll.getNss();
 
-    if (!_isPre70Compatible()) {
+    {
         ShardsvrParticipantBlock blockCRUDOperationsRequest(nss);
         blockCRUDOperationsRequest.setBlockType(
             mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
@@ -301,7 +263,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
         opCtx, nss, {primaryShardId}, **executor, getNewSession(opCtx), false /* fromMigrate */);
 
-    if (!_isPre70Compatible()) {
+    {
         ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss);
         unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
         unblockCRUDOperationsRequest.setReason(getReasonForDropCollection(nss));
@@ -374,16 +336,6 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 // ensure we do not delete collections of a different DB
                 if (!_firstExecution &&
                     isDbAlreadyDropped(opCtx, _doc.getDatabaseVersion(), _dbName)) {
-                    if (_isPre70Compatible()) {
-                        // Clear the database sharding state so that all subsequent write operations
-                        // with the old database version will fail due to StaleDbVersion.
-                        // Note: because we are using an scoped critical section it could happen
-                        // that the dbversion being deleted is recovered once we return. It is a
-                        // rare occurence, but it might lead to a situation where the now former
-                        // primary will believe to still be primary.
-                        _clearDatabaseInfoOnPrimary(opCtx);
-                        _clearDatabaseInfoOnSecondaries(opCtx);
-                    }
                     VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
                     return;  // skip to FlushDatabaseCacheUpdates
                 }
@@ -435,23 +387,17 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 {
                     // Acquire the database critical section in order to disallow implicit
                     // collection creations from happening concurrently with dropDatabase
-                    boost::optional<ScopedDatabaseCriticalSection> scopedCritSec;
-                    // Only use the recoverable critical section in new versions.
-                    if (!_isPre70Compatible()) {
-                        auto recoveryService = ShardingRecoveryService::get(opCtx);
-                        recoveryService->acquireRecoverableCriticalSectionBlockWrites(
-                            opCtx,
-                            NamespaceStringUtil::deserialize(boost::none, _dbName),
-                            _critSecReason,
-                            ShardingCatalogClient::kLocalWriteConcern);
-                        recoveryService->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                            opCtx,
-                            NamespaceStringUtil::deserialize(boost::none, _dbName),
-                            _critSecReason,
-                            ShardingCatalogClient::kLocalWriteConcern);
-                    } else {
-                        scopedCritSec.emplace(opCtx, _dbName.toString(), _critSecReason);
-                    }
+                    auto recoveryService = ShardingRecoveryService::get(opCtx);
+                    recoveryService->acquireRecoverableCriticalSectionBlockWrites(
+                        opCtx,
+                        NamespaceStringUtil::deserialize(boost::none, _dbName),
+                        _critSecReason,
+                        ShardingCatalogClient::kLocalWriteConcern);
+                    recoveryService->promoteRecoverableCriticalSectionToBlockAlsoReads(
+                        opCtx,
+                        NamespaceStringUtil::deserialize(boost::none, _dbName),
+                        _critSecReason,
+                        ShardingCatalogClient::kLocalWriteConcern);
 
                     auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
                     dropDatabaseParticipantCmd.setDbName(
@@ -516,17 +462,15 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 }
             }))
         .then([this, executor = executor, anchor = shared_from_this()] {
-            if (!_isPre70Compatible()) {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-                ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
-                    opCtx,
-                    NamespaceStringUtil::deserialize(boost::none, _dbName),
-                    _critSecReason,
-                    WriteConcerns::kMajorityWriteConcernNoTimeout,
-                    /* throwIfReasonDiffers */ false);
-            }
+            auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            getForwardableOpMetadata().setOn(opCtx);
+            ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+                opCtx,
+                NamespaceStringUtil::deserialize(boost::none, _dbName),
+                _critSecReason,
+                WriteConcerns::kMajorityWriteConcernNoTimeout,
+                /* throwIfReasonDiffers */ false);
         })
         .then([this, token, executor = executor, anchor = shared_from_this()] {
             auto opCtxHolder = cc().makeOperationContext();

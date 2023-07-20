@@ -599,18 +599,6 @@ private:
                     opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
         }
 
-        // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
-        if (isDowngrading &&
-            feature_flags::gDropCollectionHoldingCriticalSection
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
-                                                           DDLCoordinatorTypeEnum::kDropCollection);
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
-                                                           DDLCoordinatorTypeEnum::kDropDatabase);
-        }
-
         if (isUpgrading) {
             _createShardingIndexCatalogIndexes(
                 opCtx, requestedVersion, NamespaceString::kShardIndexCatalogNamespace);
@@ -1482,18 +1470,6 @@ private:
     // back to the user/client. Therefore, these tasks **must** be idempotent/retryable.
     void _finalizeUpgrade(OperationContext* opCtx,
                           const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-            feature_flags::gDropCollectionHoldingCriticalSection.isEnabledOnVersion(
-                requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kDropCollectionPre70Compatible);
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kDropDatabasePre70Compatible);
-        }
-
         _maybeRemoveOldAuditConfig(opCtx, requestedVersion);
     }
 

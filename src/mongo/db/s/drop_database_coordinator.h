@@ -74,12 +74,7 @@ private:
     }
 
     bool _mustAlwaysMakeProgress() override {
-        return !_isPre70Compatible() && _doc.getPhase() > Phase::kUnset;
-    }
-
-    // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
-    bool _isPre70Compatible() const {
-        return operationType() == DDLCoordinatorTypeEnum::kDropDatabasePre70Compatible;
+        return _doc.getPhase() > Phase::kUnset;
     }
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
