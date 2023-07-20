@@ -3702,9 +3702,11 @@ buildvariants:
       mongodb_setup: mongo-perf-standalone.2023-02
       # Try to use the Bonsai optimizer with sampling CE mode, or fall back to the classic planner.
       config_params_json: *config_params_bonsai_sampling
-    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
-    # Add tasks to the anchor that this variant references
-    # If diverging from that list, add the entire list of desired tasks here
+    tasks: &microbenchmarks-bonsai-tasks
+      - name: agg-query-comparison_read_commands
+      - name: aggregation_read_commands
+      - name: query_read_commands
+      - name: query_read_commands_large_dataset
 
   - <<: *linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-heuristic-bonsai-arm.2023-01
@@ -3715,9 +3717,7 @@ buildvariants:
       mongodb_setup: mongo-perf-standalone.2023-02
         # Try to use the Bonsai optimizer with heuristic CE mode, or fall back to the classic planner.
       config_params_json: *config_params_bonsai_heuristic
-     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
-    # Add tasks to the anchor that this variant references
-    # If diverging from that list, add the entire list of desired tasks here
+    tasks: *microbenchmarks-bonsai-tasks
 
   - <<: *linux-microbenchmarks-repl-arm
     name: linux-microbenchmarks-repl-all-feature-flags-arm.2023-01
@@ -3806,9 +3806,7 @@ buildvariants:
       mongodb_setup: mongo-perf-standalone.2023-02
       # Try to use the Bonsai optimizer with sampling CE mode, or fall back to the classic planner.
       config_params_json: *config_params_bonsai_sampling
-    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
-    # Add tasks to the anchor that this variant references
-    # If diverging from that list, add the entire list of desired tasks here
+    tasks: *microbenchmarks-bonsai-tasks
 
   - <<: *linux-microbenchmarks-standalone-intel
     name: linux-microbenchmarks-standalone-heuristic-bonsai.2023-01
@@ -3819,9 +3817,7 @@ buildvariants:
       mongodb_setup: mongo-perf-standalone.2023-02
       # Try to use the Bonsai optimizer with heuristic CE mode, or fall back to the classic planner.
       config_params_json: *config_params_bonsai_heuristic
-    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
-    # Add tasks to the anchor that this variant references
-    # If diverging from that list, add the entire list of desired tasks here
+    tasks: *microbenchmarks-bonsai-tasks
 
   - <<: *linux-microbenchmarks-repl-intel
     name: linux-microbenchmarks-repl-all-feature-flags.2023-01
