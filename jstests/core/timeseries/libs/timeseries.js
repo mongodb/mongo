@@ -63,6 +63,28 @@ export var TimeseriesTest = class {
     }
 
     /**
+     * Decompresses a compressed bucket document. Replaces the compressed data in-place.
+     */
+    static decompressBucket(compressedBucket) {
+        assert.hasFields(
+            compressedBucket,
+            ["control"],
+            "TimeseriesTest.decompressBucket() should only be called on a bucket document");
+        assert.eq(
+            2,
+            compressedBucket.control.version,
+            "TimeseriesTest.decompressBucket() should only be called on a compressed bucket document");
+
+        for (const column in compressedBucket.data) {
+            compressedBucket.data[column] = decompressBSONColumn(compressedBucket.data[column]);
+        }
+
+        // The control object should reflect that the data is uncompressed.
+        compressedBucket.control.version = 1;
+        delete compressedBucket.control.count;
+    }
+
+    /**
      * Returns a random element from an array.
      */
     static getRandomElem(arr) {
