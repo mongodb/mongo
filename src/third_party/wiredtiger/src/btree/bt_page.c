@@ -329,8 +329,8 @@ err:
  *     Build in-memory page information.
  */
 int
-__wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, size_t image_alloc_size,
-  uint32_t flags, WT_PAGE **pagep, bool *preparedp)
+__wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint32_t flags,
+  WT_PAGE **pagep, bool *preparedp)
 {
     WT_CELL_UNPACK_ADDR unpack_addr;
     WT_DECL_RET;
@@ -346,7 +346,6 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, size_t
 
     dsk = image;
     alloc_entries = 0;
-    size = 0;
 
     /*
      * Figure out how many underlying objects the page references so we can allocate them along with
@@ -412,15 +411,12 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, size_t
     /*
      * Track the memory allocated to build this page so we can update the cache statistics in a
      * single call. If the disk image is in allocated memory, start with that.
+     *
+     * Accounting is based on the page-header's in-memory disk size instead of the buffer memory
+     * used to instantiate the page image even though the values might not match exactly, because
+     * that's the only value we have when discarding the page image and accounting needs to match.
      */
-    if (LF_ISSET(WT_PAGE_DISK_ALLOC)) {
-        /*
-         * The page-header's in-memory disk size should not be greater than the buffer memory
-         * passed.
-         */
-        WT_ASSERT(session, page->dsk->mem_size <= image_alloc_size);
-        size = page->dsk_alloc_size = image_alloc_size;
-    }
+    size = LF_ISSET(WT_PAGE_DISK_ALLOC) ? dsk->mem_size : 0;
 
     switch (page->type) {
     case WT_PAGE_COL_FIX:
