@@ -66,15 +66,52 @@ UNKNOWN_RE = re.compile("([0-9]+) unknown")
 FAIL_RE = re.compile("([0-9]+) failures")
 
 
-def parse(text: List[str]) -> ParserOutput:
-    """Given a List of strings representing jepsen log file split by newlines, return the ParserOutput struct."""
+def parse(text: List[str]) -> ParserOutput:  # noqa: D406
+    """Given a List of strings representing jepsen log file split by newlines, return the ParserOutput struct.
+
+    Args:
+        text (List[str]): List of strings representing the jepsen log file split by newlines.
+
+    Returns:
+        ParserOutput: The parsed output struct.
+
+    Raises:
+        AssertionError: If there is a mismatch between the count of matches and the corresponding test list.
+    """
 
     successful_tests: List[str] = []
     indeterminate_tests: List[str] = []
     crashed_tests: List[str] = []
     failed_tests: List[str] = []
     target = None
-    table_matches = 0
+    success_table_matches = 0
+    unknown_table_matches = 0
+    crash_table_matches = 0
+    fail_table_matches = 0
+
+    # we're parsing this kind of table through entire file:
+
+    # # Successful tests
+    # store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20230718T215050.000Z
+    # 1 successes
+    # 0 unknown
+    # 0 crashed
+    # 0 failures
+
+    # # Crashed tests
+    # store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20230718T005314.000Z
+    # 0 successes
+    # 0 unknown
+    # 1 crashed
+    # 0 failures
+
+    # # Failed tests tests
+    # store/mongodb list-append w:majority r:majority tw:majority tr:snapshot partition/20230718T220100.000Z
+    # 0 successes
+    # 0 unknown
+    # 0 crashed
+    # 1 failures
+
     for line in text:
         if "# Successful tests" in line:
             target = successful_tests
@@ -89,37 +126,35 @@ def parse(text: List[str]) -> ParserOutput:
             target = failed_tests
             continue
 
-        # at this point we're parsing this table:
-        # 29 successes
-        # 0 unknown
-        # 1 crashed
-        # 0 failures
         s_match = SUCCESS_RE.match(line)
         if s_match:
             target = None
-            assert int(s_match[1]) == len(successful_tests)
-            table_matches += 1
+            success_table_matches += int(s_match[1])
 
         u_match = UNKNOWN_RE.match(line)
         if u_match:
             target = None
-            assert int(u_match[1]) == len(indeterminate_tests)
-            table_matches += 1
+            unknown_table_matches += int(u_match[1])
         c_match = CRASH_RE.match(line)
         if c_match:
             target = None
-            assert int(c_match[1]) == len(crashed_tests)
-            table_matches += 1
+            crash_table_matches += int(c_match[1])
         f_match = FAIL_RE.match(line)
         if f_match:
             target = None
-            assert int(f_match[1]) == len(failed_tests)
-            table_matches += 1
-
+            fail_table_matches += int(f_match[1])
         if target is not None and line.strip():
             target.append(line)
 
-    assert table_matches == 4, f"Failed to parse summary table. Expected 4, found {table_matches}"
+    assert success_table_matches == len(
+        successful_tests), "Mismatch in success_table_matches and length of successful_tests"
+    assert unknown_table_matches == len(
+        indeterminate_tests), "Mismatch in unknown_table_matches and length of indeterminate_tests"
+    assert crash_table_matches == len(
+        crashed_tests), "Mismatch in crash_table_matches and length of crashed_tests"
+    assert fail_table_matches == len(
+        failed_tests), "Mismatch in fail_table_matches and length of failed_tests"
+
     return ParserOutput({
         'success': successful_tests,
         'unknown': indeterminate_tests,

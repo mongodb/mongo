@@ -1894,7 +1894,7 @@ functions:
   "tar jepsen logs": &tar_jepsen_logs
     command: archive.targz_pack
     params:
-      target: "src/jepsen-mongod-logs.tgz"
+      target: "src/jepsen-tcpdump-logs.tgz"
       source_dir: "${workdir}/src/jepsen-workdir"
       include:
       - "./**.log"
@@ -1904,12 +1904,12 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: src/jepsen-mongod-logs.tgz
-      remote_file: ${project}/${build_variant}/${revision}/jepsen/jepsen-mongod-logs-${task_id}-${execution}.tgz
+      local_file: src/jepsen-tcpdump-logs.tgz
+      remote_file: ${project}/${build_variant}/${revision}/jepsen/jepsen-tcpdump-logs-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/gzip
-      display_name: Jepsen mongod Logs - ${execution}
+      display_name: Jepsen tcpdump Logs - ${execution}
       optional: true
 
   "tar jepsen results": &tar_jepsen_results
@@ -1933,6 +1933,48 @@ functions:
       display_name: Jepsen Test Results - ${execution}
       optional: true
 
+  "tar jepsen mongod logs": &tar_jepsen_mongod_logs
+    command: archive.targz_pack
+    params:
+      target: "src/jepsen-mongod-logs.tgz"
+      source_dir: "src/jepsen-mongodb/mongodlogs"
+      include:
+      - "./**"
+
+  "archive jepsen mongod logs": &archive_jepsen_mongod_logs
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/jepsen-mongod-logs.tgz
+      remote_file: ${project}/${build_variant}/${revision}/jepsen/jepsen-mongod-logs-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/gzip
+      display_name: Jepsen Mongod logs - ${execution}
+      optional: true
+
+  "tar jepsen mongos logs": &tar_jepsen_mongos_logs
+    command: archive.targz_pack
+    params:
+      target: "src/jepsen-mongos-logs.tgz"
+      source_dir: "src/jepsen-mongodb/mongoslogs"
+      include:
+      - "./**"
+
+  "archive jepsen mongos logs": &archive_jepsen_mongos_logs
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/jepsen-mongos-logs.tgz
+      remote_file: ${project}/${build_variant}/${revision}/jepsen/jepsen-mongos-logs-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/gzip
+      display_name: Jepsen Mongos logs - ${execution}
+      optional: true
+
   "upload jepsen_log": &upload_jepsen_log
     command: s3.put
     params:
@@ -1952,6 +1994,10 @@ functions:
   - *tar_jepsen_results
   - *archive_jepsen_results
   - *upload_jepsen_log
+  - *tar_jepsen_mongod_logs
+  - *archive_jepsen_mongod_logs
+  - *tar_jepsen_mongos_logs
+  - *archive_jepsen_mongos_logs
 
   "save blackduck artifacts":
   - command: archive.targz_pack
