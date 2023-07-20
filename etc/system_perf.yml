@@ -1656,7 +1656,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: standalone
+      mongodb_setup: standalone-classic-query-engine
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single-intel
       workload_setup: 2022-11
@@ -1664,7 +1664,6 @@ buildvariants:
       project_dir: *project_dir
       authentication: enabled
       storageEngine: wiredTiger
-      config_params_json: &config_params_classic_engine '{"v":0, "internalQueryFrameworkControl": "forceClassicEngine"}'
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
@@ -1695,7 +1694,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: standalone
+      mongodb_setup: standalone-sbe
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single-intel
       workload_setup: 2022-11
@@ -1703,9 +1702,6 @@ buildvariants:
       project_dir: *project_dir
       authentication: enabled
       storageEngine: wiredTiger
-      # Fully enable the SBE query execution engine. This should be the only configuration difference
-      # between this builder and the equivalent classic engine builder.
-      config_params_json: &config_params_sbe_full '{"v":0, "featureFlagSbeFull": true}'
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
@@ -1717,7 +1713,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: single-replica
+      mongodb_setup: single-replica-classic-query-engine
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single-intel
       workload_setup: 2022-11
@@ -1725,7 +1721,6 @@ buildvariants:
       project_dir: *project_dir
       authentication: enabled
       storageEngine: wiredTiger
-      config_params_json: *config_params_classic_engine
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
@@ -1742,7 +1737,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: single-replica
+      mongodb_setup: single-replica-sbe
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single-intel
       workload_setup: 2022-11
@@ -1750,7 +1745,6 @@ buildvariants:
       project_dir: *project_dir
       authentication: enabled
       storageEngine: wiredTiger
-      config_params_json: *config_params_sbe_full
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
@@ -2078,7 +2072,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: standalone
+      mongodb_setup: standalone-classic-query-engine
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single
       workload_setup: 2022-11
@@ -2087,7 +2081,6 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: "-arm64"
-      config_params_json: *config_params_classic_engine
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
@@ -2119,7 +2112,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: standalone
+      mongodb_setup: standalone-sampling-bonsai
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single
       workload_setup: 2022-11
@@ -2128,7 +2121,6 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: "-arm64"
-      config_params_json: &config_params_bonsai_sampling '{"v":0, "enableTestCommands": true, "internalCascadesOptimizerSamplingCEScanStartOfColl": true, "featureFlagCommonQueryFramework": true, "internalQueryCardinalityEstimatorMode": "sampling", "internalQueryFrameworkControl": "tryBonsai"}'
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
@@ -2140,7 +2132,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: standalone
+      mongodb_setup: standalone-sampling-bonsai
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single-intel
       workload_setup: 2022-11
@@ -2148,7 +2140,6 @@ buildvariants:
       project_dir: *project_dir
       authentication: enabled
       storageEngine: wiredTiger
-      config_params_json: *config_params_bonsai_sampling
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
@@ -2160,7 +2151,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: standalone
+      mongodb_setup: standalone-heuristic-bonsai
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single
       workload_setup: 2022-11
@@ -2169,8 +2160,6 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: "-arm64"
-      # Try to use the Bonsai optimizer with heuristic CE mode, or fall back to the classic planner.
-      config_params_json: &config_params_bonsai_heuristic '{"v":0, "featureFlagCommonQueryFramework": true, "internalQueryCardinalityEstimatorMode": "heuristic", "internalQueryFrameworkControl": "tryBonsai"}'
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
@@ -2182,7 +2171,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: standalone
+      mongodb_setup: standalone-heuristic-bonsai
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single-intel
       workload_setup: 2022-11
@@ -2190,8 +2179,6 @@ buildvariants:
       project_dir: *project_dir
       authentication: enabled
       storageEngine: wiredTiger
-      # Try to use the Bonsai optimizer with heuristic CE mode, or fall back to the classic planner.
-      config_params_json: *config_params_bonsai_heuristic
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
@@ -2203,7 +2190,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: single-replica
+      mongodb_setup: single-replica-sampling-bonsai
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single-intel
       workload_setup: 2022-11
@@ -2211,7 +2198,6 @@ buildvariants:
       project_dir: *project_dir
       authentication: enabled
       storageEngine: wiredTiger
-      config_params_json: *config_params_bonsai_sampling
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
@@ -2223,7 +2209,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: single-replica
+      mongodb_setup: single-replica-sampling-bonsai
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single
       workload_setup: 2022-11
@@ -2232,7 +2218,6 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: "-arm64"
-      config_params_json: *config_params_bonsai_sampling
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
@@ -2244,7 +2229,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: single-replica
+      mongodb_setup: single-replica-heuristic-bonsai
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single-intel
       workload_setup: 2022-11
@@ -2252,8 +2237,6 @@ buildvariants:
       project_dir: *project_dir
       authentication: enabled
       storageEngine: wiredTiger
-      # Try to use the Bonsai optimizer with heuristic CE mode, or fall back to the classic planner.
-      config_params_json: *config_params_bonsai_heuristic
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
@@ -2265,7 +2248,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: single-replica
+      mongodb_setup: single-replica-heuristic-bonsai
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single
       workload_setup: 2022-11
@@ -2274,8 +2257,6 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: "-arm64"
-      # Try to use the Bonsai optimizer with heuristic CE mode, or fall back to the classic planner.
-      config_params_json: *config_params_bonsai_heuristic
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
@@ -2287,7 +2268,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: single-replica
+      mongodb_setup: single-replica-classic-query-engine
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single
       workload_setup: 2022-11
@@ -2296,7 +2277,6 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: "-arm64"
-      config_params_json: *config_params_classic_engine
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
@@ -2308,7 +2288,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: single-replica
+      mongodb_setup: single-replica-sbe
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single
       workload_setup: 2022-11
@@ -2317,9 +2297,6 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: "-arm64"
-      # Fully enable the SBE query execution engine. This should be the only configuration difference
-      # between this builder and the equivalent classic engine builder.
-      config_params_json: *config_params_sbe_full
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
@@ -2787,7 +2764,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
-      mongodb_setup: shard
+      mongodb_setup: shard-heuristic-bonsai
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: shard
       workload_setup: 2022-11
@@ -2796,7 +2773,6 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: "-arm64"
-      config_params_json: *config_params_bonsai_heuristic
     run_on:
       - "rhel70-perf-shard"
     depends_on: *_compile_amazon_linux2_arm64
@@ -3676,8 +3652,7 @@ buildvariants:
     cron: "0 0 * * 4"  # 00:00 on Thursday
     expansions:
       <<: *standalone-arm-expansions
-      mongodb_setup: mongo-perf-standalone.2023-02
-      config_params_json: *config_params_classic_engine
+      mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
@@ -3699,9 +3674,8 @@ buildvariants:
     cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
     expansions:
       <<: *standalone-arm-expansions
-      mongodb_setup: mongo-perf-standalone.2023-02
-      # Try to use the Bonsai optimizer with sampling CE mode, or fall back to the classic planner.
-      config_params_json: *config_params_bonsai_sampling
+      mongodb_setup: mongo-perf-standalone-sampling-bonsai.2023-02
+        # Try to use the Bonsai optimizer with sampling CE mode, or fall back to the classic planner.
     tasks: &microbenchmarks-bonsai-tasks
       - name: agg-query-comparison_read_commands
       - name: aggregation_read_commands
@@ -3714,9 +3688,8 @@ buildvariants:
     cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
     expansions:
       <<: *standalone-arm-expansions
-      mongodb_setup: mongo-perf-standalone.2023-02
+      mongodb_setup: mongo-perf-standalone-heuristic-bonsai.2023-02
         # Try to use the Bonsai optimizer with heuristic CE mode, or fall back to the classic planner.
-      config_params_json: *config_params_bonsai_heuristic
     tasks: *microbenchmarks-bonsai-tasks
 
   - <<: *linux-microbenchmarks-repl-arm
@@ -3780,8 +3753,7 @@ buildvariants:
     cron: "0 0 * * 4"  # 00:00 on Thursday
     expansions:
       <<: *standalone-intel-expansions
-      mongodb_setup: mongo-perf-standalone.2023-02
-      config_params_json: *config_params_classic_engine
+      mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
@@ -3803,9 +3775,8 @@ buildvariants:
     cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
     expansions:
       <<: *standalone-intel-expansions
-      mongodb_setup: mongo-perf-standalone.2023-02
+      mongodb_setup: mongo-perf-standalone-sampling-bonsai.2023-02
       # Try to use the Bonsai optimizer with sampling CE mode, or fall back to the classic planner.
-      config_params_json: *config_params_bonsai_sampling
     tasks: *microbenchmarks-bonsai-tasks
 
   - <<: *linux-microbenchmarks-standalone-intel
@@ -3814,9 +3785,8 @@ buildvariants:
     cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
     expansions:
       <<: *standalone-intel-expansions
-      mongodb_setup: mongo-perf-standalone.2023-02
+      mongodb_setup: mongo-perf-standalone-heuristic-bonsai.2023-02
       # Try to use the Bonsai optimizer with heuristic CE mode, or fall back to the classic planner.
-      config_params_json: *config_params_bonsai_heuristic
     tasks: *microbenchmarks-bonsai-tasks
 
   - <<: *linux-microbenchmarks-repl-intel
