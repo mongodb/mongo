@@ -138,7 +138,6 @@ public:
 
             AutoGetCollection ecocColl(opCtx, namespaces.ecocNss, MODE_IX);
             AutoGetCollection ecocTempColl(opCtx, namespaces.ecocRenameNss, MODE_IX);
-            AutoGetCollection escDeletesColl(opCtx, namespaces.escDeletesNss, MODE_IX);
 
             CleanupStructuredEncryptionDataState cleanup;
 
@@ -148,16 +147,12 @@ public:
             if (ecocTempColl.getCollection()) {
                 cleanup.setEcocRenameUuid(ecocTempColl->uuid());
             }
-            if (escDeletesColl.getCollection()) {
-                cleanup.setEscDeletesUuid(escDeletesColl->uuid());
-            }
 
             cleanup.setShardingDDLCoordinatorMetadata(
                 {{nss, DDLCoordinatorTypeEnum::kCleanupStructuredEncryptionData}});
             cleanup.setEscNss(namespaces.escNss);
             cleanup.setEcocNss(namespaces.ecocNss);
             cleanup.setEcocRenameNss(namespaces.ecocRenameNss);
-            cleanup.setEscDeletesNss(namespaces.escDeletesNss);
             cleanup.setCleanupTokens(req.getCleanupTokens().getOwned());
 
             return cleanup;

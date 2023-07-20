@@ -300,10 +300,6 @@ const escDeleteChange = {
     ns: {db: dbName, coll: escName},
     documentKey: {_id: placeholderBinData0},
 };
-const escDeletesDropChange = {
-    operationType: "drop",
-    ns: {db: dbName, coll: escName + ".deletes"},
-};
 const ecocCompactDropChange = {
     operationType: "drop",
     ns: {db: dbName, coll: ecocName + ".compact"},
@@ -374,27 +370,17 @@ jsTestLog("Testing cleanup");
 
     cst.assertNoChange(cursor);
 
-    const escDeletesInsertChange = {
-        documentKey: {_id: placeholderBinData0},
-        fullDocument: {_id: placeholderBinData0},
-        ns: {db: dbName, coll: escName + ".deletes"},
-        operationType: "insert",
-    };
-
     // temp ecoc rename
     cst.assertNextChangesEqual({cursor: cursordb, expectedChanges: [ecocRenameChange]});
-    // each null anchor insert is followed by a single insert to esc.deletes
+    // null anchor inserts
     escInsertChange.fullDocument.value = placeholderBinData0;
     for (let i = 0; i < anchorCount; i++) {
-        cst.assertNextChangesEqual(
-            {cursor: cursordb, expectedChanges: [escInsertChange, escDeletesInsertChange]});
+        cst.assertNextChangesEqual({cursor: cursordb, expectedChanges: [escInsertChange]});
     }
     // non-anchors and regular anchors are deleted from ESC
     for (let i = 0; i < deleteCount; i++) {
         cst.assertNextChangesEqual({cursor: cursordb, expectedChanges: [escDeleteChange]});
     }
-    // temp esc.deletes drop
-    cst.assertNextChangesEqual({cursor: cursordb, expectedChanges: [escDeletesDropChange]});
     // temp ecoc.compact drop
     cst.assertNextChangesEqual({cursor: cursordb, expectedChanges: [ecocCompactDropChange]});
     cst.assertNoChange(cursordb);

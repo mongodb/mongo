@@ -47,6 +47,13 @@ structs:
         default: 268435456 # 256 MB
         validator:
           gt: 0
+      maxAnchorCompactionSize:
+        description: "Limits the total size of the set of ESC anchors that will be removed by
+            each cleanupStructuredEncryptionData operation"
+        type: int
+        default: 268435456 # 256 MB
+        validator:
+          gt: 0
       maxESCEntriesPerCompactionDelete:
         description: "Limits the number of ESC non-anchor documents that will be removed by each
             delete operation performed by the compactStructuredEncryptionData operation"

@@ -99,12 +99,19 @@ private:
     // The response to the cleanup command
     boost::optional<CleanupStructuredEncryptionDataCommandReply> _response;
 
-    // Contains the set of _id values of documents that must be deleted from the ESC
+    // Contains the set of _id values of non-anchor documents that must be deleted from the ESC
     // during the cleanup phase. This is populated during the rename phase.
     // It is by design that this is not persisted to disk between phases, as this should
     // be emptied (and hence no ESC deletions must happen) if the coordinator were resumed
     // from disk during the cleanup phase.
     FLECompactESCDeleteSet _escDeleteSet;
+
+    // Priority queue of _id values of anchor documents that must be deleted from the ESC
+    // during the "delete anchors" phase. This is populated during the cleanup phase.
+    // It is by design that this is not persisted to disk between phases, as this should
+    // be emptied if the coordinator were resumed from disk during the cleanup or anchor deletes
+    // phase.
+    FLECleanupESCDeleteQueue _escAnchorDeleteQueue;
 };
 
 

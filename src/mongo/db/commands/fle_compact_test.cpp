@@ -203,10 +203,7 @@ protected:
 
     void createCollection(const NamespaceString& ns);
 
-    void assertDocumentCounts(uint64_t edc,
-                              uint64_t esc,
-                              uint64_t ecoc,
-                              boost::optional<uint64_t> escDeletes = boost::none);
+    void assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t ecoc);
 
     void assertESCNonAnchorDocument(BSONObj obj, bool exists, uint64_t cpos);
     void assertESCAnchorDocument(
@@ -270,12 +267,10 @@ void FleCompactTest::setUp() {
     _namespaces.escNss = NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.esc");
     _namespaces.ecocNss = NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.ecoc");
     _namespaces.ecocRenameNss = NamespaceString::createNamespaceString_forTest("test.ecoc.compact");
-    _namespaces.escDeletesNss = NamespaceString::createNamespaceString_forTest("test.esc.deletes");
 
     createCollection(_namespaces.edcNss);
     createCollection(_namespaces.escNss);
     createCollection(_namespaces.ecocNss);
-    createCollection(_namespaces.escDeletesNss);
 }
 
 void FleCompactTest::tearDown() {
@@ -294,16 +289,10 @@ void FleCompactTest::createCollection(const NamespaceString& ns) {
     ASSERT_OK(statusCC);
 }
 
-void FleCompactTest::assertDocumentCounts(uint64_t edc,
-                                          uint64_t esc,
-                                          uint64_t ecoc,
-                                          boost::optional<uint64_t> escDeletes) {
+void FleCompactTest::assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t ecoc) {
     ASSERT_EQ(_queryImpl->countDocuments(_namespaces.edcNss), edc);
     ASSERT_EQ(_queryImpl->countDocuments(_namespaces.escNss), esc);
     ASSERT_EQ(_queryImpl->countDocuments(_namespaces.ecocNss), ecoc);
-    if (escDeletes) {
-        ASSERT_EQ(_queryImpl->countDocuments(_namespaces.escDeletesNss), *escDeletes);
-    }
 }
 
 void FleCompactTest::assertESCNonAnchorDocument(BSONObj obj, bool exists, uint64_t cpos) {
@@ -588,6 +577,9 @@ TEST_F(FleCompactTest, CompactValueV2_WithNullAnchor) {
     uint64_t escCount = 0;
     uint64_t ecocCount = 0;
 
+    std::vector<PrfBlock> anchorsToDelete;
+    size_t anchorLimit = 100;
+
     // Insert new documents
     values[value].toInsertCount = 5;
     insertFieldValues(key, values);
@@ -597,10 +589,11 @@ TEST_F(FleCompactTest, CompactValueV2_WithNullAnchor) {
     assertDocumentCounts(edcCount, escCount, ecocCount);
 
     // Run cleanup on ESC to insert the null anchor
-    cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, _namespaces.escDeletesNss, &escStats);
+    anchorsToDelete = cleanupOneFieldValuePair(
+        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     escCount++;
-    assertDocumentCounts(edcCount, escCount, ecocCount, 0);
+    ASSERT(anchorsToDelete.empty());
+    assertDocumentCounts(edcCount, escCount, ecocCount);
     assertESCNullAnchorDocument(testPair, true, 0 /*apos*/, 5 /*cpos*/);
 
     // Compact ESC which now contains the null anchor + stale non-anchors; assert no change
@@ -679,15 +672,15 @@ TEST_F(FleCompactTest, CleanupValueV2_EmptyESC) {
                          << "brian");
     auto ecocDoc = generateTestECOCDocumentV2(testPair);
     assertDocumentCounts(0, 0, 0);
+    size_t anchorLimit = 100;
 
     // Cleanup an empty ESC; assert an error is thrown because cleanup should not be called
     // if there are no ESC entries that correspond to the ECOC document.
     // Note: this tests cleanup where EmuBinary returns (cpos = 0, apos = 0)
-    ASSERT_THROWS_CODE(
-        cleanupOneFieldValuePair(
-            _queryImpl.get(), ecocDoc, _namespaces.escNss, _namespaces.escDeletesNss, &escStats),
-        DBException,
-        7618816);
+    ASSERT_THROWS_CODE(cleanupOneFieldValuePair(
+                           _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats),
+                       DBException,
+                       7618816);
     assertDocumentCounts(0, 0, 0);
 }
 
@@ -705,6 +698,9 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_NoAnchors) {
     uint64_t escCount = 0;
     uint64_t ecocCount = 0;
 
+    std::vector<PrfBlock> anchorsToDelete;
+    size_t anchorLimit = 100;
+
     // Insert new documents
     values[value].toInsertCount = 5;
     insertFieldValues(key, values);
@@ -714,16 +710,18 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_NoAnchors) {
     assertDocumentCounts(edcCount, escCount, ecocCount);
 
     // Run cleanup on empty ESC to insert the null anchor with (apos = 0, cpos = 5)
-    cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, _namespaces.escDeletesNss, &escStats);
+    anchorsToDelete = cleanupOneFieldValuePair(
+        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     escCount++;
-    assertDocumentCounts(edcCount, escCount, ecocCount, 0);
+    ASSERT(anchorsToDelete.empty());
+    assertDocumentCounts(edcCount, escCount, ecocCount);
     assertESCNullAnchorDocument(testPair, true, 0 /*apos*/, 5 /*cpos*/);
 
     // Run cleanup again; (tests emuBinary apos = null, cpos = null)
-    cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, _namespaces.escDeletesNss, &escStats);
-    assertDocumentCounts(edcCount, escCount, ecocCount, 0);
+    anchorsToDelete = cleanupOneFieldValuePair(
+        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+    ASSERT(anchorsToDelete.empty());
+    assertDocumentCounts(edcCount, escCount, ecocCount);
 
     // Assert null anchor is unchanged
     assertESCNullAnchorDocument(testPair, true, 0 /*apos*/, 5 /*cpos*/);
@@ -736,9 +734,10 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_NoAnchors) {
     ecocCount += 5;
 
     // Run cleanup again; (tests emuBinary apos = null, cpos > 0)
-    cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, _namespaces.escDeletesNss, &escStats);
-    assertDocumentCounts(edcCount, escCount, ecocCount, 0);
+    anchorsToDelete = cleanupOneFieldValuePair(
+        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+    ASSERT(anchorsToDelete.empty());
+    assertDocumentCounts(edcCount, escCount, ecocCount);
 
     // Assert null anchor is updated with new cpos
     assertESCNullAnchorDocument(testPair, true, 0 /*apos*/, 10 /*cpos*/);
@@ -756,26 +755,31 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_WithAnchors) {
 
     uint64_t numAnchors, edcCount, ecocCount, escCount;
 
+    std::vector<PrfBlock> anchorsToDelete;
+    size_t anchorLimit = 100;
+
     // Run a few insert & compact cycles to populate the ESC with non-anchors & plain anchors
     doInsertAndCompactCycles(key, values, true, 5 /*cycles*/, 25 /*insertsPerCycle*/);
     numAnchors = 5;
     edcCount = 25 * 5;
     escCount = edcCount + numAnchors;
     ecocCount = edcCount;
-    assertDocumentCounts(edcCount, escCount, ecocCount, 0);
+    assertDocumentCounts(edcCount, escCount, ecocCount);
     assertESCAnchorDocument(testPair, true, numAnchors /*apos*/, edcCount /*cpos*/);
 
     // Run cleanup to insert the null anchor
-    cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, _namespaces.escDeletesNss, &escStats);
+    anchorsToDelete = cleanupOneFieldValuePair(
+        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     escCount++;  // null anchor inserted
-    assertDocumentCounts(edcCount, escCount, ecocCount, numAnchors);
+    ASSERT_EQ(numAnchors, anchorsToDelete.size());
+    assertDocumentCounts(edcCount, escCount, ecocCount);
     assertESCNullAnchorDocument(testPair, true, numAnchors, edcCount);
 
     // Run cleanup again; (tests emuBinary apos = null, cpos = null)
-    cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, _namespaces.escDeletesNss, &escStats);
-    assertDocumentCounts(edcCount, escCount, ecocCount, numAnchors);
+    anchorsToDelete = cleanupOneFieldValuePair(
+        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+    assertDocumentCounts(edcCount, escCount, ecocCount);
+    ASSERT(anchorsToDelete.empty());
 
     // Assert null anchor is unchanged
     assertESCNullAnchorDocument(testPair, true, numAnchors, edcCount);
@@ -785,12 +789,13 @@ TEST_F(FleCompactTest, CleanupValue_NullAnchorHasLatestApos_WithAnchors) {
     edcCount += 25;
     escCount += 25;
     ecocCount = edcCount;
-    assertDocumentCounts(edcCount, escCount, ecocCount, numAnchors);
+    assertDocumentCounts(edcCount, escCount, ecocCount);
 
     // Run cleanup again; (tests emuBinary apos = null, cpos > 0)
-    cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, _namespaces.escDeletesNss, &escStats);
-    assertDocumentCounts(edcCount, escCount, ecocCount, numAnchors);
+    anchorsToDelete = cleanupOneFieldValuePair(
+        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+    assertDocumentCounts(edcCount, escCount, ecocCount);
+    ASSERT(anchorsToDelete.empty());
 
     // Assert null anchor is updated with new cpos
     assertESCNullAnchorDocument(testPair, true, numAnchors, edcCount);
@@ -809,19 +814,23 @@ TEST_F(FleCompactTest, CleanupValue_NoAnchorsExist) {
     uint64_t escCount = 0;
     uint64_t ecocCount = 0;
 
+    std::vector<PrfBlock> anchorsToDelete;
+    size_t anchorLimit = 100;
+
     // Insert new documents
     values[value].toInsertCount = 5;
     insertFieldValues(key, values);
     edcCount = values[value].count;
     escCount += edcCount;
     ecocCount = edcCount;
-    assertDocumentCounts(edcCount, escCount, ecocCount, 0);
+    assertDocumentCounts(edcCount, escCount, ecocCount);
 
     // Cleanup ESC with new non-anchors; (tests emuBinary apos = 0, cpos > 0)
-    cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, _namespaces.escDeletesNss, &escStats);
+    anchorsToDelete = cleanupOneFieldValuePair(
+        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     escCount++;  // null anchor inserted
-    assertDocumentCounts(edcCount, escCount, ecocCount, 0);
+    ASSERT(anchorsToDelete.empty());
+    assertDocumentCounts(edcCount, escCount, ecocCount);
 
     // Assert null doc is inserted with apos = 0, cpos = 5
     assertESCNullAnchorDocument(testPair, true, 0, edcCount);
@@ -839,40 +848,45 @@ TEST_F(FleCompactTest, CleanupValue_NewAnchorsExist) {
     uint64_t numAnchors, edcCount, ecocCount, escCount;
     uint64_t escDeletesCount = 0;
 
+    std::vector<PrfBlock> anchorsToDelete;
+    size_t anchorLimit = 100;
+
     // Run a few insert & compact cycles to populate the ESC with non-anchors & plain anchors
     doInsertAndCompactCycles(key, values, true, 5 /*cycles*/, 25 /*insertsPerCycle*/);
     numAnchors = 5;
     edcCount = 25 * 5;
     escCount = edcCount + numAnchors;
     ecocCount = edcCount;
-    assertDocumentCounts(edcCount, escCount, ecocCount, 0);
+    assertDocumentCounts(edcCount, escCount, ecocCount);
     assertESCAnchorDocument(testPair, true, numAnchors /*apos*/, edcCount /*cpos*/);
 
     // Run cleanup; (tests emuBinary apos > 0, cpos = null)
     // Assert null doc is inserted & has the latest apos & cpos
-    cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, _namespaces.escDeletesNss, &escStats);
+    anchorsToDelete = cleanupOneFieldValuePair(
+        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
     escCount++;  // null anchor inserted
     escDeletesCount = numAnchors;
-    assertDocumentCounts(edcCount, escCount, ecocCount, escDeletesCount);
+    ASSERT_EQ(escDeletesCount, anchorsToDelete.size());
+    assertDocumentCounts(edcCount, escCount, ecocCount);
     assertESCNullAnchorDocument(testPair, true, numAnchors, edcCount);
 
     // Run a few more insert & compact cycles, but don't compact on last cycle
     doInsertAndCompactCycles(key, values, false /*compactOnLastCycle*/, 5, 25);
     numAnchors += 4;
+    escDeletesCount = 4;
     edcCount += (25 * 5);
     escCount += (4 + 25 * 5);
     ecocCount = edcCount;
-    assertDocumentCounts(edcCount, escCount, ecocCount, escDeletesCount);
+    assertDocumentCounts(edcCount, escCount, ecocCount);
     // assert latest anchor has cpos that is 25 inserts stale.
     assertESCAnchorDocument(testPair, true, numAnchors, edcCount - 25);
 
     // Run cleanup; (tests emuBinary apos > 0, cpos > 0)
     // Assert null doc is updated with the latest apos & cpos
-    cleanupOneFieldValuePair(
-        _queryImpl.get(), ecocDoc, _namespaces.escNss, _namespaces.escDeletesNss, &escStats);
-    escDeletesCount = numAnchors;
-    assertDocumentCounts(edcCount, escCount, ecocCount, escDeletesCount);
+    anchorsToDelete = cleanupOneFieldValuePair(
+        _queryImpl.get(), ecocDoc, _namespaces.escNss, anchorLimit, &escStats);
+    ASSERT_EQ(escDeletesCount, anchorsToDelete.size());
+    assertDocumentCounts(edcCount, escCount, ecocCount);
     assertESCNullAnchorDocument(testPair, true, numAnchors, edcCount);
 }
 

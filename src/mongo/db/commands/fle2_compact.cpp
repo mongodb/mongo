@@ -310,8 +310,6 @@ EncryptedStateCollectionsNamespaces::createFromDataCollection(const Collection& 
         NamespaceString(db, namespaces.ecocNss.coll().toString().append(".compact"));
     namespaces.ecocLockNss =
         NamespaceString(db, namespaces.ecocNss.coll().toString().append(".lock"));
-    namespaces.escDeletesNss =
-        NamespaceString(db, namespaces.escNss.coll().toString().append(".deletes"));
     return namespaces;
 }
 
@@ -413,14 +411,16 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
 }
 
 
-void cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
-                              const ECOCCompactionDocumentV2& ecocDoc,
-                              const NamespaceString& escNss,
-                              const NamespaceString& escDeletesNss,
-                              ECStats* escStats) {
+std::vector<PrfBlock> cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
+                                               const ECOCCompactionDocumentV2& ecocDoc,
+                                               const NamespaceString& escNss,
+                                               std::size_t maxAnchorListLength,
+                                               ECStats* escStats) {
 
     CompactStatsCounter<ECStats> stats(escStats);
     auto valueToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(ecocDoc.esc);
+
+    std::vector<PrfBlock> anchorsToDelete;
 
     /**
      * Send a getQueryableEncryptionCountInfo command with query type "cleanup".
@@ -465,7 +465,7 @@ void cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
         if (emuBinaryResult.cpos == boost::none) {
             // if cpos is none, then the null anchor also contains the latest
             // non-anchor position, so no need to update it.
-            return;
+            return anchorsToDelete;
         }
 
         auto latestApos = countInfo.nullAnchorCounts->apos;
@@ -510,25 +510,14 @@ void cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
             bottomApos = countInfo.nullAnchorCounts->apos;
         }
 
-        StmtId stmtId = kUninitializedStmtId;
-
         for (auto i = bottomApos + 1; i <= latestApos; i++) {
-            auto block = ESCCollection::generateAnchorId(countInfo.tagToken, i);
-            auto doc = BSON("_id"_sd << BSONBinData(block.data(), block.size(), BinDataGeneral));
-
-            auto swReply = queryImpl->insertDocuments(escDeletesNss, {doc}, &stmtId, false);
-            if (swReply.getStatus() == ErrorCodes::DuplicateKey) {
-                // ignore duplicate _id error, which can happen in case of a restart.
-                LOGV2_DEBUG(7295010,
-                            2,
-                            "Duplicate anchor ID found in ESC deletes collection",
-                            "namespace"_attr = escDeletesNss);
-                continue;
+            if (anchorsToDelete.size() >= maxAnchorListLength) {
+                break;
             }
-            uassertStatusOK(swReply.getStatus());
-            checkWriteErrors(swReply.getValue());
+            anchorsToDelete.push_back(ESCCollection::generateAnchorId(countInfo.tagToken, i));
         }
     }
+    return anchorsToDelete;
 }
 
 void processFLECompactV2(OperationContext* opCtx,
@@ -582,17 +571,23 @@ void processFLECompactV2(OperationContext* opCtx,
     }
 }
 
-void processFLECleanup(OperationContext* opCtx,
-                       const CleanupStructuredEncryptionData& request,
-                       GetTxnCallback getTxn,
-                       const EncryptedStateCollectionsNamespaces& namespaces,
-                       ECStats* escStats,
-                       ECOCStats* ecocStats) {
+FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
+                                           const CleanupStructuredEncryptionData& request,
+                                           GetTxnCallback getTxn,
+                                           const EncryptedStateCollectionsNamespaces& namespaces,
+                                           size_t pqMemoryLimit,
+                                           ECStats* escStats,
+                                           ECOCStats* ecocStats) {
     auto innerEscStats = std::make_shared<ECStats>();
 
     /* uniqueEcocEntries corresponds to the set 'C_f' in OST-1 */
     auto uniqueEcocEntries = readUniqueECOCEntriesInTxn(
         opCtx, getTxn, namespaces.ecocRenameNss, request.getCleanupTokens(), ecocStats);
+
+    auto anchorsToRemove = std::make_shared<std::vector<PrfBlock>>();
+
+    FLECleanupESCDeleteQueue pq;
+    const size_t pqMaxEntries = pqMemoryLimit / sizeof(PrfBlock);
 
     // Each entry in 'C_f' represents a unique field/value pair. For each field/value pair,
     // compact the ESC entries for that field/value pair in one transaction.
@@ -602,19 +597,22 @@ void processFLECleanup(OperationContext* opCtx,
 
         // The function that handles the transaction may outlive this function so we need to use
         // shared_ptrs
-        auto argsBlock = std::make_tuple(ecocDoc, namespaces.escNss, namespaces.escDeletesNss);
+        auto maxAnchors = pqMaxEntries - pq.size();
+        auto argsBlock = std::make_tuple(ecocDoc, namespaces.escNss, maxAnchors);
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
 
         auto swResult = trun->runNoThrow(
             opCtx,
-            [sharedBlock, innerEscStats](const txn_api::TransactionClient& txnClient,
-                                         ExecutorPtr txnExec) {
+            [sharedBlock, innerEscStats, anchorsToRemove](
+                const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
 
-                auto [ecocDoc2, escNss, escDeletesNss] = *sharedBlock.get();
+                auto [ecocDoc2, escNss, maxAnchors2] = *sharedBlock.get();
 
-                cleanupOneFieldValuePair(
-                    &queryImpl, ecocDoc2, escNss, escDeletesNss, innerEscStats.get());
+                anchorsToRemove->clear();
+
+                *anchorsToRemove = cleanupOneFieldValuePair(
+                    &queryImpl, ecocDoc2, escNss, maxAnchors2, innerEscStats.get());
 
                 return SemiFuture<void>::makeReady();
             });
@@ -622,8 +620,12 @@ void processFLECleanup(OperationContext* opCtx,
         uassertStatusOK(swResult);
         uassertStatusOK(swResult.getValue().getEffectiveStatus());
 
+        for (auto& anchorId : *anchorsToRemove) {
+            pq.emplace(anchorId);
+        }
+
         if (MONGO_unlikely(fleCleanupFailAfterTransactionCommit.shouldFail())) {
-            uasserted(7663002, "Failedg due to fleCleanupFailAfterTransactionCommit fail point");
+            uasserted(7663002, "Failed due to fleCleanupFailAfterTransactionCommit fail point");
         }
     }
 
@@ -632,6 +634,7 @@ void processFLECleanup(OperationContext* opCtx,
         CompactStatsCounter<ECStats> ctr(escStats);
         ctr.add(*innerEscStats);
     }
+    return pq;
 }
 
 void validateCompactRequest(const CompactStructuredEncryptionData& request, const Collection& edc) {
@@ -774,26 +777,13 @@ void cleanupESCNonAnchors(OperationContext* opCtx,
 
 void cleanupESCAnchors(OperationContext* opCtx,
                        const NamespaceString& escNss,
-                       const NamespaceString& escDeletesNss,
+                       FLECleanupESCDeleteQueue& pq,
                        size_t maxTagsPerDelete,
                        ECStats* escStats) {
-
     DBDirectClient client(opCtx);
     std::int64_t deleted = 0;
 
-    FindCommandRequest findCmd{escDeletesNss};
-
-    auto cursor = client.find(std::move(findCmd));
-
-    uassert(7618812,
-            str::stream() << "Got an invalid cursor while reading the Queryable Encryption ESC "
-                          << escDeletesNss.toStringForErrorMsg(),
-            cursor);
-
-    std::vector<PrfBlock> deleteSet;
-    deleteSet.reserve(maxTagsPerDelete);
-
-    while (cursor->more()) {
+    while (!pq.empty()) {
         write_ops::DeleteCommandRequest deleteRequest(escNss,
                                                       std::vector<write_ops::DeleteOpEntry>{});
         deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(
@@ -807,16 +797,10 @@ void cleanupESCAnchors(OperationContext* opCtx,
             BSONObjBuilder idBuilder(queryBuilder.subobjStart(kId));
             BSONArrayBuilder array = idBuilder.subarrayStart("$in");
 
-            for (size_t tagCount = 0; tagCount < maxTagsPerDelete && cursor->more(); tagCount++) {
-                const auto doc = cursor->nextSafe();
-                BSONElement id;
-                auto status = bsonExtractTypedField(doc, kId, BinData, &id);
-                uassertStatusOK(status);
-                uassert(7618813,
-                        "Found a document in esc.deletes with _id of incorrect BinDataType",
-                        id.binDataType() == BinDataType::BinDataGeneral);
-
-                array.append(id);
+            for (size_t tagCount = 0; tagCount < maxTagsPerDelete && !pq.empty(); tagCount++) {
+                auto& block = pq.top();
+                array.append(BSONBinData(block.data(), block.size(), BinDataGeneral));
+                pq.pop();
             }
         }
 

@@ -31,6 +31,7 @@
 
 #include <cstddef>
 #include <numeric>
+#include <queue>
 #include <vector>
 
 #include "mongo/base/status_with.h"
@@ -58,8 +59,9 @@ struct EncryptedStateCollectionsNamespaces {
     NamespaceString ecocNss;
     NamespaceString ecocRenameNss;
     NamespaceString ecocLockNss;
-    NamespaceString escDeletesNss;
 };
+
+using FLECleanupESCDeleteQueue = std::priority_queue<PrfBlock>;
 
 /**
  * Validate a compact request has the right encryption tokens.
@@ -79,12 +81,13 @@ void processFLECompactV2(OperationContext* opCtx,
                          ECStats* escStats,
                          ECOCStats* ecocStats);
 
-void processFLECleanup(OperationContext* opCtx,
-                       const CleanupStructuredEncryptionData& request,
-                       GetTxnCallback getTxn,
-                       const EncryptedStateCollectionsNamespaces& namespaces,
-                       ECStats* escStats,
-                       ECOCStats* ecocStats);
+FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
+                                           const CleanupStructuredEncryptionData& request,
+                                           GetTxnCallback getTxn,
+                                           const EncryptedStateCollectionsNamespaces& namespaces,
+                                           size_t pqMemoryLimit,
+                                           ECStats* escStats,
+                                           ECOCStats* ecocStats);
 
 /**
  * Get all unique documents in the ECOC collection in their decrypted form.
@@ -113,14 +116,15 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
 /**
  * Performs cleanup of the ESC entries for the encrypted field/value pair
  * whose tokens are in the provided ECOC compaction document.
- *
+ * Returns a list of the IDs of anchors to be deleted from the ESC. The length
+ * of this list is capped by maxAnchorListLength.
  * Used by unit tests.
  */
-void cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
-                              const ECOCCompactionDocumentV2& ecocDoc,
-                              const NamespaceString& escNss,
-                              const NamespaceString& escDeletesNss,
-                              ECStats* escStats);
+std::vector<PrfBlock> cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
+                                               const ECOCCompactionDocumentV2& ecocDoc,
+                                               const NamespaceString& escNss,
+                                               std::size_t maxAnchorListLength,
+                                               ECStats* escStats);
 
 /**
  * Container for the _id values of ESC entries that are slated for deletion
@@ -164,11 +168,11 @@ void cleanupESCNonAnchors(OperationContext* opCtx,
 
 /**
  * Deletes from the ESC collection the anchor documents whose _ids
- * appear in the collection escDeletesNss
+ * appear in the priority queue pq
  */
 void cleanupESCAnchors(OperationContext* opCtx,
                        const NamespaceString& escNss,
-                       const NamespaceString& escDeletesNss,
+                       FLECleanupESCDeleteQueue& pq,
                        size_t maxTagsPerDelete,
                        ECStats* escStats);
 

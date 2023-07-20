@@ -121,8 +121,8 @@ void dropQEStateCollection(OperationContext* opCtx, const NamespaceString& nss) 
  *
  * At a high level, the cleanup algorithm works as follows:
  * 1. The _ids of random ESC non-anchors are first read into an in-memory set 'P'.
- * 2. (*) a temporary 'esc.deletes' collection is created. This will collection will contain
-       the _ids of anchor documents that cleanup will remove towards the end of the operation.
+ * 2. (*) an in-memory priority queue 'PQ' is created. This will contain the _ids of
+ *    anchor documents that cleanup will remove towards the end of the operation.
  * 3. The ECOC is renamed to a temporary namespace (hereby referred to as 'ecoc.compact').
  * 4. Unique entries from 'ecoc.compact' are decoded into an in-memory set of tokens: 'C'.
  * 5. For each token in 'C', the following is performed:
@@ -130,12 +130,11 @@ void dropQEStateCollection(OperationContext* opCtx, const NamespaceString& nss) 
  *    b. Run EmuBinary to collect the latest anchor and non-anchor positions for the current token.
  *    c. (*) Insert (or update an existing) null anchor which encodes the latest positions.
  *    d. (*) If there are anchors corresponding to the current token, insert their _ids
- *       into 'esc.deletes'. These anchors are now stale and are marked for deletion.
+ *       into 'PQ'. These anchors are now stale and are marked for deletion.
  *    e. Commit transaction
  * 6. Delete every document in the ESC whose _id can be found in 'P'
- * 7. (*) Delete every document in the ESC whose _id can be found in 'esc.deletes'
- * 8. (*) Drop 'esc.deletes'
- * 9. Drop 'ecoc.compact'
+ * 7. (*) Delete every document in the ESC whose _id can be found in 'PQ'
+ * 8. Drop 'ecoc.compact'
  *
  * Steps marked with (*) are unique to the cleanup operation.
  */
@@ -199,24 +198,12 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
 
     CleanupStats stats({}, {});
     FLECompactESCDeleteSet escDeleteSet;
+
     auto tagsPerDelete =
         ServerParameterSet::getClusterParameterSet()
             ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
             ->getValue(boost::none)
             .getMaxESCEntriesPerCompactionDelete();
-
-    // If 'esc.deletes' exists, clean up the matching anchors in ESC and drop 'esc.deletes'
-    {
-        AutoGetCollection escDeletes(opCtx, namespaces.escDeletesNss, MODE_IS);
-        if (escDeletes) {
-            LOGV2(7618806,
-                  "Cleaning up ESC deletes collection from a prior cleanup operation",
-                  logAttrs(namespaces.escDeletesNss));
-            cleanupESCAnchors(
-                opCtx, namespaces.escNss, namespaces.escDeletesNss, tagsPerDelete, &stats.getEsc());
-        }
-    }
-    dropQEStateCollection(opCtx, namespaces.escDeletesNss);
 
     bool createEcoc = false;
     bool renameEcoc = false;
@@ -267,43 +254,37 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
         createQEClusteredStateCollection(opCtx, namespaces.ecocNss);
     }
 
-    // Create the temporary 'esc.deletes' clustered collection
-    createQEClusteredStateCollection(opCtx, namespaces.escDeletesNss);
-
     {
         AutoGetCollection ecocCompact(opCtx, namespaces.ecocRenameNss, MODE_IS);
-        AutoGetCollection escDeletes(opCtx, namespaces.escDeletesNss, MODE_IS);
 
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Renamed encrypted compaction collection "
                               << namespaces.ecocRenameNss.toStringForErrorMsg()
                               << " no longer exists prior to cleanup",
                 ecocCompact.getCollection());
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "ESC deletes collection "
-                              << namespaces.escDeletesNss.toStringForErrorMsg()
-                              << " no longer exists prior to cleanup",
-                escDeletes.getCollection());
+
+        auto pqMemLimit =
+            ServerParameterSet::getClusterParameterSet()
+                ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
+                ->getValue(boost::none)
+                .getMaxAnchorCompactionSize();
 
         // Clean up entries for each encrypted field in compactionTokens
-        processFLECleanup(opCtx,
-                          request,
-                          &getTransactionWithRetriesForMongoD,
-                          namespaces,
-                          &stats.getEsc(),
-                          &stats.getEcoc());
+        auto pq = processFLECleanup(opCtx,
+                                    request,
+                                    &getTransactionWithRetriesForMongoD,
+                                    namespaces,
+                                    pqMemLimit,
+                                    &stats.getEsc(),
+                                    &stats.getEcoc());
 
         // Delete the entries in 'C' from the ESC
         cleanupESCNonAnchors(
             opCtx, namespaces.escNss, escDeleteSet, tagsPerDelete, &stats.getEsc());
 
         // Delete the entries in esc.deletes collection from the ESC
-        cleanupESCAnchors(
-            opCtx, namespaces.escNss, namespaces.escDeletesNss, tagsPerDelete, &stats.getEsc());
+        cleanupESCAnchors(opCtx, namespaces.escNss, pq, tagsPerDelete, &stats.getEsc());
     }
-
-    // Drop the 'esc.deletes' collection
-    dropQEStateCollection(opCtx, namespaces.escDeletesNss);
 
     // Drop the 'ecoc.compact' collection
     dropQEStateCollection(opCtx, namespaces.ecocRenameNss);

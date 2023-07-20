@@ -403,10 +403,7 @@ export var EncryptedClient = class {
         assert.docEq(docs, onDiskDocs);
     }
 
-    assertStateCollectionsAfterCompact(collName,
-                                       ecocExists,
-                                       ecocTempExists = false,
-                                       escDeletesExists = false) {
+    assertStateCollectionsAfterCompact(collName, ecocExists, ecocTempExists = false) {
         const baseCollInfos = this._edb.getCollectionInfos({"name": collName});
         assert.eq(baseCollInfos.length, 1);
         const baseCollInfo = baseCollInfos[0];
@@ -418,8 +415,6 @@ export var EncryptedClient = class {
         checkMap[baseCollInfo.options.encryptedFields.escCollection] = true;
         checkMap[baseCollInfo.options.encryptedFields.ecocCollection] = ecocExists;
         checkMap[baseCollInfo.options.encryptedFields.ecocCollection + ".compact"] = ecocTempExists;
-        checkMap[baseCollInfo.options.encryptedFields.escCollection + ".deletes"] =
-            escDeletesExists;
 
         const edb = this._edb;
         Object.keys(checkMap).forEach(function(coll) {

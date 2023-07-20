@@ -47,7 +47,8 @@ enums:
 
 structs:
     CleanupStructuredEncryptionDataState:
-        description: "Represents the state of the cleanupStructuredEncryptionData pipeline
+        description:
+            "Represents the state of the cleanupStructuredEncryptionData pipeline
             for protocol version 2"
         strict: false
         chained_structs:
@@ -76,13 +77,6 @@ structs:
                 type: namespacestring
             ecocRenameUuid:
                 description: "UUID of the collection identified by ecocRenameNss"
-                type: uuid
-                optional: true
-            escDeletesNss:
-                description: "Temporary name to use while performing cleanup of ESC anchors"
-                type: namespacestring
-            escDeletesUuid:
-                description: "UUID of the collection identified by escDeletesNss"
                 type: uuid
                 optional: true
             cleanupTokens:

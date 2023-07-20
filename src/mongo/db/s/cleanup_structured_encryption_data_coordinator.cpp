@@ -134,55 +134,25 @@ void dropQEStateCollection(OperationContext* opCtx,
 
 void checkRequiredOperation(const CleanupStructuredEncryptionDataState& state,
                             OperationContext* opCtx,
-                            bool* needLeftoverAnchorCleanup,
                             bool* needRename,
                             bool* needEcocCreate,
                             bool* needCleanup) {
     const auto& ecocNss = state.getEcocNss();
     const auto& ecocRenameNss = state.getEcocRenameNss();
-    const auto& escDeletesNss = state.getEscDeletesNss();
 
     auto catalog = CollectionCatalog::get(opCtx);
 
     auto ecocUuid = catalog->lookupUUIDByNSS(opCtx, ecocNss);
     auto ecocRenameUuid = catalog->lookupUUIDByNSS(opCtx, ecocRenameNss);
-    auto escDeletesUuid = catalog->lookupUUIDByNSS(opCtx, escDeletesNss);
 
     auto hasEcocBefore = state.getEcocUuid().has_value();
     auto hasEcocNow = !!ecocUuid;
     auto hasEcocRenameBefore = state.getEcocRenameUuid().has_value();
     auto hasEcocRenameNow = !!ecocRenameUuid;
-    auto hasEscDeletesBefore = state.getEscDeletesUuid().has_value();
-    auto hasEscDeletesNow = !!escDeletesUuid;
 
-    *needLeftoverAnchorCleanup = false;
     *needRename = false;
     *needEcocCreate = false;
     *needCleanup = true;
-
-    // Check the current state of the 'esc.deletes' collection is consistent with the
-    // state document. If not, then don't do cleanup.
-    if (hasEscDeletesBefore != hasEscDeletesNow) {
-        LOGV2_DEBUG(7647902,
-                    1,
-                    "Skipping cleanup due to change in collection state",
-                    "escDeletesNss"_attr = escDeletesNss,
-                    "hasEscDeletesBefore"_attr = hasEscDeletesBefore,
-                    "hasEscDeletesNow"_attr = hasEscDeletesNow);
-        *needCleanup = false;
-        return;
-    } else if (hasEscDeletesNow && escDeletesUuid.value() != state.getEscDeletesUuid().value()) {
-        LOGV2_DEBUG(7647903,
-                    1,
-                    "Skipping cleanup due to mismatched collection uuid",
-                    "escDeletesNss"_attr = escDeletesNss,
-                    "uuid"_attr = escDeletesUuid.value(),
-                    "expectedUUID"_attr = state.getEscDeletesUuid().value());
-        *needCleanup = false;
-        return;
-    } else {
-        *needLeftoverAnchorCleanup = hasEscDeletesNow;
-    }
 
     if (hasEcocRenameBefore != hasEcocRenameNow) {
         LOGV2_DEBUG(7647904,
@@ -245,7 +215,7 @@ void checkRequiredOperation(const CleanupStructuredEncryptionDataState& state,
 
 void doAnchorCleanupWithUpdatedCollectionState(OperationContext* opCtx,
                                                const NamespaceString& escNss,
-                                               const NamespaceString& escDeletesNss,
+                                               FLECleanupESCDeleteQueue& pq,
                                                StringData description,
                                                ECStats* escStats) {
     auto tagsPerDelete =
@@ -255,47 +225,28 @@ void doAnchorCleanupWithUpdatedCollectionState(OperationContext* opCtx,
             .getMaxESCEntriesPerCompactionDelete();
 
     // Run the anchor cleanups in CollectionRouters to force refresh of catalog cache entries
-    // for the ESC and ESC.deletes collections, and retry if write errors occur due to StaleConfig.
-    sharding::router::CollectionRouter escDeletesRouter(opCtx->getServiceContext(), escDeletesNss);
+    // for the ESC collection, and retry if write errors occur due to StaleConfig.
     sharding::router::CollectionRouter escRouter(opCtx->getServiceContext(), escNss);
 
-    // TODO: SERVER-77402 refactor once sharding API has better support for this use case
-    escDeletesRouter.route(
-        opCtx,
-        description,
-        [&](OperationContext* outerOpCtx, const CollectionRoutingInfo& outerCri) {
-            tassert(7647923,
-                    str::stream() << "Namespace " << escDeletesNss.toStringForErrorMsg()
-                                  << " is expected to be unsharded, but is sharded",
-                    !outerCri.cm.isSharded());
+    escRouter.route(opCtx,
+                    description,
+                    [&](OperationContext* innerOpCtx, const CollectionRoutingInfo& innerCri) {
+                        tassert(7647924,
+                                str::stream() << "Namespace " << escNss.toStringForErrorMsg()
+                                              << " is expected to be unsharded, but is sharded",
+                                !innerCri.cm.isSharded());
 
-            onCollectionPlacementVersionMismatch(
-                outerOpCtx, escDeletesNss, ChunkVersion::UNSHARDED());
-            ScopedSetShardRole escDeletesShardRole(
-                outerOpCtx, escDeletesNss, ShardVersion::UNSHARDED(), outerCri.cm.dbVersion());
+                        onCollectionPlacementVersionMismatch(
+                            innerOpCtx, escNss, ChunkVersion::UNSHARDED());
+                        ScopedSetShardRole escShardRole(
+                            innerOpCtx, escNss, ShardVersion::UNSHARDED(), innerCri.cm.dbVersion());
 
-            escRouter.route(
-                outerOpCtx,
-                description,
-                [&](OperationContext* innerOpCtx, const CollectionRoutingInfo& innerCri) {
-                    tassert(7647924,
-                            str::stream() << "Namespace " << escNss.toStringForErrorMsg()
-                                          << " is expected to be unsharded, but is sharded",
-                            !innerCri.cm.isSharded());
-
-                    onCollectionPlacementVersionMismatch(
-                        innerOpCtx, escNss, ChunkVersion::UNSHARDED());
-                    ScopedSetShardRole escShardRole(
-                        innerOpCtx, escNss, ShardVersion::UNSHARDED(), innerCri.cm.dbVersion());
-
-                    cleanupESCAnchors(innerOpCtx, escNss, escDeletesNss, tagsPerDelete, escStats);
-                });
-        });
+                        cleanupESCAnchors(innerOpCtx, escNss, pq, tagsPerDelete, escStats);
+                    });
 }
 
 bool doRenameOperation(const CleanupStructuredEncryptionDataState& state,
                        boost::optional<UUID>* newEcocRenameUuid,
-                       boost::optional<UUID>* newEscDeletesUuid,
                        FLECompactESCDeleteSet* escDeleteSet,
                        ECStats* escStats) {
     LOGV2_DEBUG(
@@ -303,30 +254,13 @@ bool doRenameOperation(const CleanupStructuredEncryptionDataState& state,
 
     const auto& ecocNss = state.getEcocNss();
     const auto& ecocRenameNss = state.getEcocRenameNss();
-    const auto& escNss = state.getEscNss();
-    const auto& escDeletesNss = state.getEscDeletesNss();
     auto opCtx = cc().makeOperationContext();
 
-    bool needLeftoverAnchorCleanup, needRename, needEcocCreate, needCleanup;
+    bool needRename, needEcocCreate, needCleanup;
 
-    checkRequiredOperation(
-        state, opCtx.get(), &needLeftoverAnchorCleanup, &needRename, &needEcocCreate, &needCleanup);
+    checkRequiredOperation(state, opCtx.get(), &needRename, &needEcocCreate, &needCleanup);
 
     *newEcocRenameUuid = state.getEcocRenameUuid();
-    *newEscDeletesUuid = state.getEscDeletesUuid();
-
-    if (needLeftoverAnchorCleanup) {
-        LOGV2(7647910,
-              "Cleaning up ESC deletes collection from a prior cleanup operation",
-              logAttrs(escDeletesNss));
-        doAnchorCleanupWithUpdatedCollectionState(
-            opCtx.get(),
-            escNss,
-            escDeletesNss,
-            "rename phase of queryable encryption cleanup coordinator"_sd,
-            escStats);
-        dropQEStateCollection(opCtx.get(), escDeletesNss, state.getEscDeletesUuid());
-    }
 
     if (needRename) {
         invariant(needEcocCreate);
@@ -361,23 +295,14 @@ bool doRenameOperation(const CleanupStructuredEncryptionDataState& state,
         createQEClusteredStateCollection(opCtx.get(), ecocNss);
     }
 
-    if (needCleanup) {
-        // Create the temporary 'esc.deletes' clustered collection
-        createQEClusteredStateCollection(opCtx.get(), escDeletesNss);
-
-        auto catalog = CollectionCatalog::get(opCtx.get());
-        *newEscDeletesUuid = catalog->lookupUUIDByNSS(opCtx.get(), escDeletesNss);
-        invariant(newEscDeletesUuid->has_value());
-    }
-
     // returns whether we can skip the remaining phases of cleanup
     return !needCleanup;
 }
 
-void doCleanupOperation(const CleanupStructuredEncryptionDataState& state,
-                        const FLECompactESCDeleteSet& escDeleteSet,
-                        ECStats* escStats,
-                        ECOCStats* ecocStats) {
+FLECleanupESCDeleteQueue doCleanupOperation(const CleanupStructuredEncryptionDataState& state,
+                                            const FLECompactESCDeleteSet& escDeleteSet,
+                                            ECStats* escStats,
+                                            ECOCStats* ecocStats) {
     LOGV2_DEBUG(
         7647912, 1, "Queryable Encryption cleanup entered cleanup phase", "state"_attr = state);
 
@@ -386,7 +311,7 @@ void doCleanupOperation(const CleanupStructuredEncryptionDataState& state,
                     1,
                     "Skipping cleanup structured encryption data phase",
                     logAttrs(state.getId().getNss()));
-        return;
+        return {};
     }
 
     EncryptedStateCollectionsNamespaces namespaces;
@@ -394,12 +319,22 @@ void doCleanupOperation(const CleanupStructuredEncryptionDataState& state,
     namespaces.escNss = state.getEscNss();
     namespaces.ecocNss = state.getEcocNss();
     namespaces.ecocRenameNss = state.getEcocRenameNss();
-    namespaces.escDeletesNss = state.getEscDeletesNss();
     auto opCtx = cc().makeOperationContext();
     CleanupStructuredEncryptionData request(namespaces.edcNss, state.getCleanupTokens());
 
-    processFLECleanup(
-        opCtx.get(), request, &getTransactionWithRetriesForMongoS, namespaces, escStats, ecocStats);
+    auto pqMemLimit =
+        ServerParameterSet::getClusterParameterSet()
+            ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
+            ->getValue(boost::none)
+            .getMaxAnchorCompactionSize();
+
+    auto pq = processFLECleanup(opCtx.get(),
+                                request,
+                                &getTransactionWithRetriesForMongoS,
+                                namespaces,
+                                pqMemLimit,
+                                escStats,
+                                ecocStats);
 
     if (MONGO_unlikely(fleCleanupHangBeforeCleanupESCNonAnchors.shouldFail())) {
         LOGV2(7647914, "Hanging due to fleCleanupHangBeforeCleanupESCNonAnchors fail point");
@@ -413,9 +348,12 @@ void doCleanupOperation(const CleanupStructuredEncryptionDataState& state,
             .getMaxESCEntriesPerCompactionDelete();
 
     cleanupESCNonAnchors(opCtx.get(), namespaces.escNss, escDeleteSet, tagsPerDelete, escStats);
+
+    return pq;
 }
 
 void doAnchorRemovalOperation(const CleanupStructuredEncryptionDataState& state,
+                              FLECleanupESCDeleteQueue& pq,
                               ECStats* escStats) {
     LOGV2_DEBUG(7647915,
                 1,
@@ -429,12 +367,11 @@ void doAnchorRemovalOperation(const CleanupStructuredEncryptionDataState& state,
 
     auto opCtx = cc().makeOperationContext();
     auto escNss = state.getEscNss();
-    auto escDeletesNss = state.getEscDeletesNss();
 
     doAnchorCleanupWithUpdatedCollectionState(
         opCtx.get(),
         escNss,
-        escDeletesNss,
+        pq,
         "anchor deletes phase of queryable encryption cleanup coordinator"_sd,
         escStats);
 
@@ -455,19 +392,8 @@ void doDropOperation(const CleanupStructuredEncryptionDataState& state) {
 
     auto opCtx = cc().makeOperationContext();
     auto catalog = CollectionCatalog::get(opCtx.get());
-    auto escDeletesNss = state.getEscDeletesNss();
-    auto escDeletesUuid = catalog->lookupUUIDByNSS(opCtx.get(), escDeletesNss);
     auto ecocCompactNss = state.getEcocRenameNss();
     auto ecocCompactUuid = catalog->lookupUUIDByNSS(opCtx.get(), ecocCompactNss);
-
-    if (escDeletesUuid) {
-        dropQEStateCollection(opCtx.get(), escDeletesNss, state.getEscDeletesUuid());
-    } else {
-        LOGV2_DEBUG(7647920,
-                    1,
-                    "Skipping drop operation as 'esc.deletes' does not exist",
-                    logAttrs(escDeletesNss));
-    }
 
     if (ecocCompactUuid) {
         dropQEStateCollection(opCtx.get(), ecocCompactNss, state.getEcocRenameUuid());
@@ -498,9 +424,6 @@ boost::optional<BSONObj> CleanupStructuredEncryptionDataCoordinator::reportForCu
     bob.append("ecocRenameNss", NamespaceStringUtil::serialize(_doc.getEcocRenameNss()));
     bob.append("ecocRenameUuid",
                _doc.getEcocRenameUuid() ? _doc.getEcocRenameUuid().value().toString() : "none");
-    bob.append("escDeletesNss", NamespaceStringUtil::serialize(_doc.getEscDeletesNss()));
-    bob.append("escDeletesUuid",
-               _doc.getEscDeletesUuid() ? _doc.getEscDeletesUuid().value().toString() : "none");
     return bob.obj();
 }
 
@@ -521,40 +444,37 @@ void CleanupStructuredEncryptionDataCoordinator::updateCleanupStats(const ECOCSt
 
 std::set<NamespaceString> CleanupStructuredEncryptionDataCoordinator::_getAdditionalLocksToAcquire(
     OperationContext* opCtx) {
-    return {_doc.getEcocNss(), _doc.getEscNss(), _doc.getEcocRenameNss(), _doc.getEscDeletesNss()};
+    return {_doc.getEcocNss(), _doc.getEscNss(), _doc.getEcocRenameNss()};
 }
 
 ExecutorFuture<void> CleanupStructuredEncryptionDataCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_buildPhaseHandler(
-            Phase::kRenameEcocForCleanup,
-            [this, anchor = shared_from_this()]() {
-                // if this was resumed from an interrupt, the _escDeleteSet
-                // might not be empty, so clear it.
-                _escDeleteSet.clear();
+        .then(_buildPhaseHandler(Phase::kRenameEcocForCleanup,
+                                 [this, anchor = shared_from_this()]() {
+                                     // if this was resumed from an interrupt, the _escDeleteSet
+                                     // might not be empty, so clear it.
+                                     _escDeleteSet.clear();
 
-                ECStats phaseEscStats;
-                boost::optional<UUID> ecocRenameUuid;
-                boost::optional<UUID> escDeletesUuid;
+                                     ECStats phaseEscStats;
+                                     boost::optional<UUID> ecocRenameUuid;
 
-                bool skipCleanup = doRenameOperation(
-                    _doc, &ecocRenameUuid, &escDeletesUuid, &_escDeleteSet, &phaseEscStats);
+                                     bool skipCleanup = doRenameOperation(
+                                         _doc, &ecocRenameUuid, &_escDeleteSet, &phaseEscStats);
 
-                updateCleanupStats(ECOCStats{}, phaseEscStats);
+                                     updateCleanupStats(ECOCStats{}, phaseEscStats);
 
-                stdx::lock_guard lg(_docMutex);
-                _doc.setSkipCleanup(skipCleanup);
-                _doc.setEcocRenameUuid(ecocRenameUuid);
-                _doc.setEscDeletesUuid(escDeletesUuid);
-            }))
+                                     stdx::lock_guard lg(_docMutex);
+                                     _doc.setSkipCleanup(skipCleanup);
+                                     _doc.setEcocRenameUuid(ecocRenameUuid);
+                                 }))
         .then(_buildPhaseHandler(Phase::kCleanupStructuredEncryptionData,
                                  [this, anchor = shared_from_this()]() {
                                      ECStats phaseEscStats;
                                      ECOCStats phaseEcocStats;
 
-                                     doCleanupOperation(
+                                     _escAnchorDeleteQueue = doCleanupOperation(
                                          _doc, _escDeleteSet, &phaseEscStats, &phaseEcocStats);
                                      updateCleanupStats(phaseEcocStats, phaseEscStats);
                                  }))
@@ -562,7 +482,8 @@ ExecutorFuture<void> CleanupStructuredEncryptionDataCoordinator::_runImpl(
                                  [this, anchor = shared_from_this()]() {
                                      ECStats phaseEscStats;
 
-                                     doAnchorRemovalOperation(_doc, &phaseEscStats);
+                                     doAnchorRemovalOperation(
+                                         _doc, _escAnchorDeleteQueue, &phaseEscStats);
                                      updateCleanupStats(ECOCStats{}, phaseEscStats);
                                  }))
         .then(_buildPhaseHandler(Phase::kDropTempCollection, [this, anchor = shared_from_this()] {
