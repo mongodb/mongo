@@ -419,6 +419,18 @@ config_table(TABLE *table, void *arg)
                   table->id);
             config_single(table, "ops.truncate=0", false);
         }
+
+        /*
+         * We don't support the hs_search stress point with pareto distribution in predictable
+         * replay as it prevents us stopping in time.
+         */
+        if (GV(STRESS_HS_SEARCH) && TV(OPS_PARETO)) {
+            if (config_explicit(NULL, "stress.hs_search"))
+                WARN("turning off stress.hs_search to work with predictable replay as table%" PRIu32
+                     " has pareto enabled",
+                  table->id);
+            config_single(NULL, "stress.hs_search=0", false);
+        }
     }
 
     /*
