@@ -847,6 +847,12 @@ public:
             _cq->setCollator(mainColl->getDefaultCollator()->clone());
         }
 
+        // Before consulting the plan cache, check if we should short-circuit and construct a
+        // find-by-_id plan.
+        if (auto result = buildIdHackPlan()) {
+            return {std::move(result)};
+        }
+
         auto planCacheKey = buildPlanCacheKey();
         getResult()->planCacheInfo().queryHash = planCacheKey.queryHash();
         getResult()->planCacheInfo().planCacheKey = planCacheKey.planCacheKeyHash();
@@ -961,6 +967,12 @@ protected:
     virtual PlanStageType buildExecutableTree(const QuerySolution& solution) const = 0;
 
     /**
+     * Attempts to build a special cased fast-path query plan for a find-by-_id query. Returns
+     * nullptr if this optimization does not apply.
+     */
+    virtual std::unique_ptr<ResultType> buildIdHackPlan() = 0;
+
+    /**
      * Constructs the plan cache key.
      */
     virtual KeyType buildPlanCacheKey() const = 0;
@@ -1031,7 +1043,8 @@ protected:
         return stage_builder::buildClassicExecutableTree(_opCtx, _collection, *_cq, solution, _ws);
     }
 
-    std::unique_ptr<ClassicPrepareExecutionResult> buildIdHackPlan() {
+    std::unique_ptr<ClassicPrepareExecutionResult> buildIdHackPlan() final {
+        initializePlannerParamsIfNeeded();
         if (!isIdHackEligibleQuery(getMainCollection(), *_cq))
             return nullptr;
 
@@ -1044,6 +1057,7 @@ protected:
                     2,
                     "Using classic engine idhack",
                     "canonicalQuery"_attr = redact(_cq->toStringShort()));
+        planCacheCounters.incrementClassicMissesCounter();
 
         auto result = releaseResult();
         std::unique_ptr<PlanStage> stage =
@@ -1114,15 +1128,6 @@ protected:
         const PlanCacheKey& planCacheKey) final {
         initializePlannerParamsIfNeeded();
 
-        // Before consulting the plan cache, check if we should short-circuit and construct a
-        // find-by-_id plan.
-        std::unique_ptr<ClassicPrepareExecutionResult> result = buildIdHackPlan();
-
-        if (result) {
-            planCacheCounters.incrementClassicMissesCounter();
-            return result;
-        }
-
         if (shouldCacheQuery(*_cq)) {
             // Try to look up a cached solution for the query.
             if (auto cs = CollectionQueryInfo::get(getMainCollection())
@@ -1142,7 +1147,7 @@ protected:
                                     "query"_attr = redact(_cq->toStringShort()));
                     }
 
-                    result = releaseResult();
+                    auto result = releaseResult();
                     auto&& root = buildExecutableTree(*querySolution);
 
                     // Add a CachedPlanStage on top of the previous root.
@@ -1237,6 +1242,10 @@ public:
     }
 
 protected:
+    std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlan() final {
+        // TODO SERVER-66437 SBE is not currently used for IDHACK plans.
+        return nullptr;
+    }
     sbe::PlanCacheKey buildPlanCacheKey() const {
         return plan_cache_key_factory::make(*_cq, _collections);
     }
