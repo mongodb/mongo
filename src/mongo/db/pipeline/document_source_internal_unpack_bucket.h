@@ -221,8 +221,8 @@ public:
 
     /**
      * Helper method which checks if we can avoid unpacking if we have a group stage with min/max
-     * aggregates. If a rewrite is possible, 'container' is modified, and we returns result value
-     * for 'doOptimizeAt'.
+     * aggregates. If the rewrite is possible, 'container' is modified, bool in the return pair is
+     * set to 'true' and the iterator is set to point to the new group.
      */
     std::pair<bool, Pipeline::SourceContainer::iterator> rewriteGroupByMinMax(
         Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
@@ -245,6 +245,7 @@ private:
     // Used to avoid infinite loops after we step backwards to optimize a $match on bucket level
     // fields, otherwise we may do an infinite number of $match pushdowns.
     bool _triedBucketLevelFieldsPredicatesPushdown = false;
+
     bool _optimizedEndOfPipeline = false;
     bool _triedInternalizeProject = false;
 };
