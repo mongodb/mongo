@@ -410,6 +410,8 @@ last-continuous:
     ticket: SERVER-78786
   - test_file: jstests/sharding/internal_txns/transaction_api_test_command_basic.js
     ticket: SERVER-78786
+  - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
+    ticket: SERVER-79136
   suites: null
 last-lts:
   all:
@@ -901,4 +903,6 @@ last-lts:
     ticket: SERVER-78786
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_snapshot.js
     ticket: SERVER-78855
+  - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
+    ticket: SERVER-79136
   suites: null

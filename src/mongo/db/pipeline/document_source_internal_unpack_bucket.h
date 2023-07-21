@@ -222,8 +222,8 @@ public:
 
     /**
      * Helper method which checks if we can avoid unpacking if we have a group stage with min/max
-     * aggregates. If a rewrite is possible, 'container' is modified, and we returns result value
-     * for 'doOptimizeAt'.
+     * aggregates. If the rewrite is possible, 'container' is modified, bool in the return pair is
+     * set to 'true' and the iterator is set to point to the new group.
      */
     std::pair<bool, Pipeline::SourceContainer::iterator> rewriteGroupByMinMax(
         Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
@@ -285,7 +285,15 @@ private:
     int _bucketMaxCount = 0;
     boost::optional<long long> _sampleSize;
 
-    // Filters pushed from the later $match stages
+    // It's benefitial to do as much filtering at the bucket level as possible to avoid unpacking
+    // buckets that wouldn't contribute to the results anyway. There is a generic mechanism that
+    // allows to swap $match stages with this one (see 'getModifiedPaths()'). It lets us split out
+    // and push down a filter on the metaField "as is". The remaining filters might cause creation
+    // of additional bucket-level filters (see 'createPredicatesOnBucketLevelField()') that are
+    // inserted before this stage while the original filter is incorporated into this stage as
+    // '_eventFilter' (to be applied to each unpacked document) and/or '_wholeBucketFilter' for the
+    // cases when _all_ events in a bucket would match (currently, we only do this for the
+    // timeField).
     std::unique_ptr<MatchExpression> _eventFilter;
     BSONObj _eventFilterBson;
     DepsTracker _eventFilterDeps;

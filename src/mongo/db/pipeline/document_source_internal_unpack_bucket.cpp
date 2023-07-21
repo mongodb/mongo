@@ -767,99 +767,125 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
     const auto& metaField = *_bucketUnpacker.bucketSpec().metaField();
 
     const auto& idFields = groupPtr->getIdFields();
+
+    // Currently, we only support simple group key. TODO: SERVER-68811. Allow rewrites of object
+    // group key if all its fields depend on the metaField only.
     if (idFields.size() != 1) {
         return {};
     }
 
     const auto& exprId = idFields.cbegin()->second;
-    // TODO: SERVER-68811. Allow rewrites if expression is constant.
     const auto* exprIdPath = dynamic_cast<const ExpressionFieldPath*>(exprId.get());
+
+    // Currently, we only support group key expression of the form {_id : "<path>"}.
+    // TODO: SERVER-68811. Allow rewrites if expression is constant.
     if (exprIdPath == nullptr) {
         return {};
     }
 
     const auto& idPath = exprIdPath->getFieldPath();
+    // {The path must be at or under the metaField for this re-write to be correct (and the zero
+    // component is always CURRENT).}
     if (idPath.getPathLength() < 2 || idPath.getFieldName(1) != metaField) {
         return {};
     }
 
-    std::vector<AccumulationStatement> accumulationStatements;
+    std::vector<AccumulationStatement> accumulationStatementsBucket;
     for (const AccumulationStatement& stmt : groupPtr->getAccumulatedFields()) {
-        const auto* exprArg = stmt.expr.argument.get();
-        if (const auto* exprArgPath = dynamic_cast<const ExpressionFieldPath*>(exprArg)) {
-            const auto& path = exprArgPath->getFieldPath();
-            if (path.getPathLength() <= 1) {
-                return {};
-            }
-
-            const auto& rootFieldName = path.getFieldName(1);
-            if (rootFieldName == _bucketUnpacker.bucketSpec().timeField()) {
-                // Rewrite not valid for time field. We want to eliminate the bucket
-                // unpack stage here.
-                return {};
-            }
-
-            std::ostringstream os;
-            if (rootFieldName == metaField) {
-                // Update aggregates to reference the meta field.
-                os << timeseries::kBucketMetaFieldName;
-
-                for (size_t index = 2; index < path.getPathLength(); index++) {
-                    os << "." << path.getFieldName(index);
-                }
-            } else {
-                // Update aggregates to reference the control field.
-                const auto op = stmt.expr.name;
-                if (op == "$min") {
-                    os << timeseries::kControlMinFieldNamePrefix;
-                } else if (op == "$max") {
-                    os << timeseries::kControlMaxFieldNamePrefix;
-                } else {
-                    // Rewrite is valid only for min and max aggregates.
-                    return {};
-                }
-
-                for (size_t index = 1; index < path.getPathLength(); index++) {
-                    if (index > 1) {
-                        os << ".";
-                    }
-                    os << path.getFieldName(index);
-                }
-            }
-
-            const auto& newExpr = ExpressionFieldPath::createPathFromString(
-                pExpCtx.get(), os.str(), pExpCtx->variablesParseState);
-
-            AccumulationExpression accExpr = stmt.expr;
-            accExpr.argument = newExpr;
-            accumulationStatements.emplace_back(stmt.fieldName, std::move(accExpr));
-        } else {
+        const auto& op = stmt.expr.name;
+        // If _any_ of the accumulators aren't $min/$max we won't perform the re-write (some other
+        // accs might be re-writable in terms of the bucket controls, we just haven't invested into
+        // implementing them).
+        if (op != "$min" && op != "$max") {
             return {};
         }
+
+        const auto* exprArgPath =
+            dynamic_cast<const ExpressionFieldPath*>(stmt.expr.argument.get());
+
+        // This is either a const or a compound expression. While some such expressions (e.g: {$min:
+        // {$add:
+        // ['$a', 2]}}) could be re-written in terms of the min/max on the control fields, in
+        // general we cannot do it (e.g. {$min: {$add: ['$a', '$b']}}), so we block the re-write.
+        if (!exprArgPath) {
+            return {};
+        }
+
+        // Path can have a single component if it's using $$CURRENT or a similar variable. We don't
+        // support these.
+        const auto& path = exprArgPath->getFieldPath();
+        if (path.getPathLength() <= 1) {
+            return {};
+        }
+        const auto& accFieldName = path.getFieldName(1);
+
+        // Rewrite not valid for the timeField because control.min.time contains a rounded-down time
+        // and not the actual min time of events in the bucket.
+        if (accFieldName == _bucketUnpacker.bucketSpec().timeField()) {
+            return {};
+        }
+
+        // Build the paths for the bucket-level fields.
+        std::ostringstream os;
+        if (accFieldName == metaField) {
+            // Update aggregates to reference the meta field.
+            os << timeseries::kBucketMetaFieldName;
+
+            for (size_t index = 2; index < path.getPathLength(); index++) {
+                os << "." << path.getFieldName(index);
+            }
+        } else {
+            // Update aggregates to reference the control field.
+            const auto op = stmt.expr.name;
+            if (op == "$min") {
+                os << timeseries::kControlMinFieldNamePrefix;
+            } else if (op == "$max") {
+                os << timeseries::kControlMaxFieldNamePrefix;
+            } else {
+                MONGO_UNREACHABLE;
+            }
+
+            for (size_t index = 1; index < path.getPathLength(); index++) {
+                if (index > 1) {
+                    os << ".";
+                }
+                os << path.getFieldName(index);
+            }
+        }
+
+        // Re-create the accumulator using the bucket-level paths.
+        const auto& newExpr = ExpressionFieldPath::createPathFromString(
+            pExpCtx.get(), os.str(), pExpCtx->variablesParseState);
+
+        AccumulationExpression accExpr = stmt.expr;
+        accExpr.argument = newExpr;
+        accumulationStatementsBucket.emplace_back(stmt.fieldName, std::move(accExpr));
     }
 
+    // Re-create the group key using the bucket-level path.
     std::ostringstream os;
     os << timeseries::kBucketMetaFieldName;
     for (size_t index = 2; index < idPath.getPathLength(); index++) {
         os << "." << idPath.getFieldName(index);
     }
-    auto exprId1 = ExpressionFieldPath::createPathFromString(
+    auto exprIdBucket = ExpressionFieldPath::createPathFromString(
         pExpCtx.get(), os.str(), pExpCtx->variablesParseState);
 
     auto newGroup = DocumentSourceGroup::create(pExpCtx,
-                                                std::move(exprId1),
-                                                std::move(accumulationStatements),
+                                                std::move(exprIdBucket),
+                                                std::move(accumulationStatementsBucket),
                                                 groupPtr->getMaxMemoryUsageBytes());
 
-    // Erase current stage and following group stage, and replace with updated group.
+    // Replace the current stage (DocumentSourceInternalUnpackBucket) and the following group stage
+    // with the new group.
     container->erase(std::next(itr));
     *itr = std::move(newGroup);
 
     if (itr == container->begin()) {
-        // Optimize group stage.
+        // Optimize the new group stage.
         return {true, itr};
     } else {
-        // Give chance of the previous stage to optimize against group stage.
+        // Give chance to the previous stage to optimize against the new group stage.
         return {true, std::prev(itr)};
     }
 }
@@ -1311,7 +1337,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
             return itr;
         }
     }
-    {
+
+    if (!_eventFilter) {
         // Check if we can avoid unpacking if we have a group stage with min/max aggregates.
         auto [success, result] = rewriteGroupByMinMax(itr, container);
         if (success) {

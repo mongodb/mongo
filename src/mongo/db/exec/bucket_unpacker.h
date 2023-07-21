@@ -153,29 +153,32 @@ public:
     };
 
     /**
-     * Takes a predicate after $_internalUnpackBucket on a bucketed field as an argument and
-     * attempts to map it to new predicates on the 'control' field. There will be a 'loose'
-     * predicate that will match if some of the event field matches, also a 'tight' predicate that
-     * will match if all of the event field matches. For example, the event level predicate {a:
-     * {$gt: 5}} will generate the loose predicate {control.max.a: {$_internalExprGt: 5}}, and the
-     * tight predicate {control.min.a: {$_internalExprGt: 5}}. The loose predicate will be added
-     * before the
-     * $_internalUnpackBucket stage to filter out buckets with no match. The tight predicate will
-     * be used to evaluate predicate on bucket level to avoid unnecessary event level evaluation.
+     * Takes a predicate after $_internalUnpackBucket as an argument and attempts to rewrite it as
+     * new predicates on the 'control' field. There will be a 'loose' predicate that will match if
+     * some of the event field matches, also a 'tight' predicate that will match if all of the event
+     * field matches.
+     *
+     * For example, the event level predicate {a: {$gt: 5}} will generate the loose predicate
+     * {control.max.a: {$_internalExprGt: 5}}. The loose predicate will be added before the
+     * $_internalUnpackBucket stage to filter out buckets with no match.
+     *
+     * Ideally, we'd like to add a tight predicate such as {control.min.a: {$_internalExprGt: 5}} to
+     * evaluate the filter on bucket level to avoid unnecessary event level evaluation. However, a
+     * bucket might contain events with missing fields that are skipped when computing the controls,
+     * so in reality we only add a tight predicate on timeField which is required to exist.
      *
      * If the original predicate is on the bucket's timeField we may also create a new loose
-     * predicate on the '_id' field to assist in index utilization. For example, the predicate
-     * {time: {$lt: new Date(...)}} will generate the following predicate:
+     * predicate on the '_id' field (as it incorporates min time for the bucket) to assist in index
+     * utilization. For example, the predicate {time: {$lt: new Date(...)}} will generate the
+     * following predicate:
      * {$and: [
      *      {_id: {$lt: ObjectId(...)}},
      *      {control.min.time: {$_internalExprLt: new Date(...)}}
      * ]}
      *
-     * If the provided predicate is ineligible for this mapping, the function will return a nullptr.
-     * This should be interpreted as an always-true predicate.
-     *
-     * When using IneligiblePredicatePolicy::kIgnore, if the predicate can't be pushed down, it
-     * returns null. When using IneligiblePredicatePolicy::kError it raises a user error.
+     * If the provided predicate is ineligible for this mapping and using
+     * IneligiblePredicatePolicy::kIgnore, both loose and tight predicates will be set to nullptr.
+     * When using IneligiblePredicatePolicy::kError it raises a user error.
      */
     static BucketPredicate createPredicatesOnBucketLevelField(
         const MatchExpression* matchExpr,
