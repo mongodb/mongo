@@ -1652,7 +1652,7 @@ buildvariants:
 
   - name: linux-intel-standalone-classic-query-engine
     display_name: Linux Intel Standalone (Classic Query Engine)
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: &cron_query_perf_schedule "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -1690,7 +1690,7 @@ buildvariants:
 
   - name: linux-intel-standalone-sbe
     display_name: Linux Intel Standalone (SBE)
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: *cron_query_perf_schedule
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -1733,7 +1733,7 @@ buildvariants:
 
   - name: linux-intel-1-node-replSet-sbe
     display_name: Linux Intel 1-Node ReplSet (SBE)
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: *linux-1-node-repl-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -1752,7 +1752,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-lite-all-feature-flags.2022-11
     display_name: Linux 1-Node ReplSet (graviton lite, all FF) 2022-11
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: *linux-1-node-repl-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2068,7 +2068,7 @@ buildvariants:
 
   - name: linux-standalone-classic-query-engine.2022-11
     display_name: Linux Standalone (Classic Query Engine) 2022-11
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: *cron_query_perf_schedule
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2088,7 +2088,7 @@ buildvariants:
 
   - name: linux-standalone-sbe.2022-11
     display_name: Linux Standalone (SBE) 2022-11
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: *cron_query_perf_schedule
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2128,7 +2128,7 @@ buildvariants:
 
   - name: linux-intel-standalone-sampling-bonsai
     display_name: Linux Intel Standalone (Bonsai with Sampling CE)
-    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    cron: *cron_query_perf_schedule
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2167,7 +2167,7 @@ buildvariants:
 
   - name: linux-intel-standalone-heuristic-bonsai
     display_name: Linux Intel Standalone (Bonsai with Heuristic CE)
-    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    cron: *cron_query_perf_schedule
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2264,7 +2264,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-classic-query-engine.2022-11
     display_name: Linux 1-Node ReplSet (Classic Query Engine) 2022-11
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: *linux-1-node-repl-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2284,7 +2284,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-sbe.2022-11
     display_name: Linux 1-Node ReplSet (SBE) 2022-11
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: *linux-1-node-repl-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2355,7 +2355,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-all-feature-flags.2022-11
     display_name: Linux 1-Node ReplSet (all feature flags) 2022-11
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: *linux-1-node-repl-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -3649,7 +3649,7 @@ buildvariants:
   - <<: *linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-classic-query-engine-arm.2023-01
     display_name: MicroBenchmarks Arm Standalone inMemory (Classic Query Engine).2023-01
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: *cron_query_perf_schedule
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
@@ -3660,7 +3660,7 @@ buildvariants:
   - <<: *linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-sbe-arm.2023-01
     display_name: MicroBenchmarks Arm Standalone inMemory (SBE).2023-01
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: *cron_query_perf_schedule
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-sbe.2023-02
@@ -3671,7 +3671,7 @@ buildvariants:
   - <<: *linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-sampling-bonsai-arm.2023-01
     display_name: MicroBenchmarks Arm Standalone inMemory (Bonsai with Sampling CE).2023-01
-    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    cron: *cron_query_perf_schedule
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-sampling-bonsai.2023-02
@@ -3750,7 +3750,7 @@ buildvariants:
   - <<: *linux-microbenchmarks-standalone-intel
     name: linux-microbenchmarks-standalone-classic-query-engine.2023-01
     display_name: MicroBenchmarks Intel Standalone inMemory (Classic Query Engine).2023-01
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: *cron_query_perf_schedule
     expansions:
       <<: *standalone-intel-expansions
       mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
@@ -3761,7 +3761,7 @@ buildvariants:
   - <<: *linux-microbenchmarks-standalone-intel
     name: linux-microbenchmarks-standalone-sbe.2023-01
     display_name: MicroBenchmarks Intel Standalone inMemory (SBE).2023-01
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: *cron_query_perf_schedule
     expansions:
       <<: *standalone-intel-expansions
       mongodb_setup: mongo-perf-standalone-sbe.2023-02
@@ -3772,7 +3772,7 @@ buildvariants:
   - <<: *linux-microbenchmarks-standalone-intel
     name: linux-microbenchmarks-standalone-sampling-bonsai.2023-01
     display_name: MicroBenchmarks Intel Standalone inMemory (Bonsai with Sampling CE).2023-01
-    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    cron: *cron_query_perf_schedule
     expansions:
       <<: *standalone-intel-expansions
       mongodb_setup: mongo-perf-standalone-sampling-bonsai.2023-02
@@ -3782,7 +3782,7 @@ buildvariants:
   - <<: *linux-microbenchmarks-standalone-intel
     name: linux-microbenchmarks-standalone-heuristic-bonsai.2023-01
     display_name: MicroBenchmarks Intel Standalone inMemory (Bonsai with Heuristic CE).2023-01
-    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    cron: *cron_query_perf_schedule
     expansions:
       <<: *standalone-intel-expansions
       mongodb_setup: mongo-perf-standalone-heuristic-bonsai.2023-02
