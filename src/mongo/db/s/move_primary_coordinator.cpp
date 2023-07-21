@@ -332,6 +332,8 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                 triggerCleanup(opCtx, status);
             }
+
+            return status;
         });
 }
 
