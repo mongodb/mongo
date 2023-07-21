@@ -219,6 +219,50 @@ struct ServerGlobalParams {
             return _version.load();
         }
 
+        int majorVersion(Version version) const {
+            switch (version) {
+                case Version::kUnsetDefault42Behavior:
+                    return -1;
+                case Version::kFullyDowngradedTo42:
+                case Version::kDowngradingTo42:
+                case Version::kUpgradingTo44:
+                case Version::kFullyUpgradedTo44:
+                    return 4;
+                default:
+                    return -1;
+            }
+        }
+
+        int minorVersion(Version version) const {
+            switch (version) {
+                case Version::kUnsetDefault42Behavior:
+                    return -1;
+                case Version::kFullyDowngradedTo42:
+                case Version::kDowngradingTo42:
+                    return 2;
+                case Version::kUpgradingTo44:
+                case Version::kFullyUpgradedTo44:
+                    return 4;
+                default:
+                    return -1;
+            }
+        }
+
+        int transitionState(Version version) const {
+            switch (version) {
+                case Version::kUnsetDefault42Behavior:
+                case Version::kFullyUpgradedTo44:
+                case Version::kFullyDowngradedTo42:
+                    return 0;
+                case Version::kDowngradingTo42:
+                    return -1;
+                case Version::kUpgradingTo44:
+                    return 1;
+                default:
+                    return 0;
+            }
+        }
+
         void reset() {
             _version.store(Version::kUnsetDefault42Behavior);
         }
