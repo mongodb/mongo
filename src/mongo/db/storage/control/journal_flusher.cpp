@@ -141,7 +141,7 @@ void JournalFlusher::run() {
             _currentSharedPromise->emplaceValue();
         } catch (const AssertionException& e) {
             // Can be caused by killOp or stepdown.
-            if (e.code() == ErrorCodes::Interrupted) {
+            if (ErrorCodes::isInterruption(e.code())) {
                 // When this thread is interrupted it will immediately restart the journal flush
                 // without sending errors to waiting callers. The opCtx error should already be
                 // cleared of the interrupt by the ON_BLOCK_EXIT handling above.
