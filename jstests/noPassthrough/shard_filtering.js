@@ -4,8 +4,6 @@
  * find() and makes sure that orphaned documents are filtered out.
  * @tags: [
  *   requires_sharding,
- *   # TODO SERVER-71169: Implement shard filtering for CQF.
- *   cqf_experimental_incompatible,
  * ]
  */
 import {isIndexOnly, isIxscan, planHasStage} from "jstests/libs/analyze_plan.js";
