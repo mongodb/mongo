@@ -250,6 +250,10 @@ public:
         size_t numberOfPrePostImagesToWrite,
         Date_t wallClockTime) override {}
 
+    void postTransactionPrepare(OperationContext* opCtx,
+                                const std::vector<OplogSlot>& reservedSlots,
+                                const TransactionOperations& transactionOperations) override {}
+
     void onTransactionPrepareNonPrimary(OperationContext* opCtx,
                                         const LogicalSessionId& lsid,
                                         const std::vector<repl::OplogEntry>& statements,

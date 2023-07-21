@@ -560,6 +560,15 @@ public:
         }
     }
 
+    void postTransactionPrepare(OperationContext* opCtx,
+                                const std::vector<OplogSlot>& reservedSlots,
+                                const TransactionOperations& transactionOperations) override {
+        ReservedTimes times{opCtx};
+        for (auto& observer : _observers) {
+            observer->postTransactionPrepare(opCtx, reservedSlots, transactionOperations);
+        }
+    }
+
     void onTransactionPrepareNonPrimary(OperationContext* opCtx,
                                         const LogicalSessionId& lsid,
                                         const std::vector<repl::OplogEntry>& statements,

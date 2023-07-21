@@ -588,6 +588,20 @@ public:
         Date_t wallClockTime) = 0;
 
     /**
+     * The postTransactionPrepare method is called after an atomic transaction is prepared. It must
+     * be called when a transaction is active.
+     *
+     * 'reservedSlots' is a list of oplog slots reserved for the oplog entries in a transaction. The
+     * last reserved slot represents the prepareOpTime used for the prepare oplog entry.
+     *
+     * The 'transactionOperations' contains the list of CRUD operations to be applied in
+     * this transaction.
+     */
+    virtual void postTransactionPrepare(OperationContext* opCtx,
+                                        const std::vector<OplogSlot>& reservedSlots,
+                                        const TransactionOperations& transactionOperations) = 0;
+
+    /**
      * This method is called when a transaction transitions into prepare while it is not primary,
      * e.g. during secondary oplog application or recoverying prepared transactions from the
      * oplog after restart. The method explicitly requires a session id (i.e. does not use the
