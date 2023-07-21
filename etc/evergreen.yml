@@ -1200,6 +1200,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: streams
+  - name: streams_auth
   - name: vector_search
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1347,6 +1348,7 @@ buildvariants:
   - name: .shard_split
   - name: .shard_merge
   - name: streams
+  - name: streams_auth
   - name: vector_search
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
@@ -1592,6 +1594,7 @@ buildvariants:
   - name: .shard_split
   - name: .shard_merge
   - name: streams
+  - name: streams_auth
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
@@ -2084,6 +2087,7 @@ buildvariants:
   - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: streams
+  - name: streams_auth
   - name: .updatefuzzer
   - name: vector_search
   - name: query_stats_passthrough
@@ -2295,6 +2299,7 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
   - name: streams
+  - name: streams_auth
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
   - name: .serverless
@@ -2531,6 +2536,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: streams
+  - name: streams_auth
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel80-no-latch-64-bit enterprise-rhel80-no-latch-64-bit
@@ -3063,6 +3069,7 @@ buildvariants:
   - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: streams
+  - name: streams_auth
   - name: .updatefuzzer
   - name: vector_search
   - name: query_stats_passthrough
