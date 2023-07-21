@@ -1,5 +1,5 @@
 conn_config="statistics=(all),statistics_log=(json=true,on_close=true,wait=1),cache_size=50MB,eviction=(threads_max=8)"
-chunk_cache_config="chunk_cache=[enabled=true,chunk_size=100MB,capacity=25GB]"
+chunk_cache_config="chunk_cache=[enabled=true,chunk_size=100MB,capacity=25GB,type=DRAM]"
 readonly=false
 table_count=5
 icount=25000000

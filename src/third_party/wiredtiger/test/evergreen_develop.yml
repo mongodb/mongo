@@ -46,6 +46,9 @@ variables:
     - name: Wiredtiger-perf-log-jobs
       execution_tasks:
       - ".log-perf"
+    - name: Wiredtiger-perf-chunk-cache-jobs
+      execution_tasks:
+      - ".chunk-cache-perf"
     - name: Wiredtiger-perf-long-jobs
       execution_tasks:
       - ".long-perf"
@@ -75,6 +78,7 @@ buildvariants:
     - name: ".checkpoint-perf"
     - name: ".evict-perf"
     - name: ".log-perf"
+    - name: ".chunk-cache-perf"
     - name: ".long-perf"
     - name: ".oplog-perf"
     - name: many-dhandle-stress
@@ -98,6 +102,7 @@ buildvariants:
     - name: ".checkpoint-perf"
     - name: ".evict-perf"
     - name: ".log-perf"
+    - name: ".chunk-cache-perf"
     - name: ".long-perf"
     - name: ".oplog-perf"
     - name: many-dhandle-stress

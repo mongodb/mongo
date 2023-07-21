@@ -1088,7 +1088,6 @@ config_reopen(CONFIG_OPTS *opts)
 
     chunk_cache_cfg_len = strlen(opts->chunk_cache_config);
     req_len = strlen(opts->conn_config) + 1;
-    opts->reopen_connection = true;
     if (opts->readonly)
         req_len += strlen(READONLY_CONFIG);
     if (chunk_cache_cfg_len != 0)

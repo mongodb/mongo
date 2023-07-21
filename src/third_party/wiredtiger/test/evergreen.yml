@@ -5445,6 +5445,47 @@ tasks:
         vars:
           test-name: log.wtperf
 
+    #####################################
+    # Performance Tests for chunk cache #
+    #####################################
+
+  - name: perf-test-chunk-cache
+    tags: ["chunk-cache-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: chunk-cache-reads.wtperf
+          maxruns: 1
+          wtarg: -ops ['"read"']
+      - func: "upload stats to atlas"
+        vars:
+          test-name: chunk-cache-reads.wtperf
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: chunk-cache-reads.wtperf
+
+  - name: perf-test-chunk-cache-base
+    tags: ["chunk-cache-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: chunk-cache-reads-base.wtperf
+          maxruns: 1
+          wtarg: -ops ['"read"']
+      - func: "upload stats to atlas"
+        vars:
+          test-name: chunk-cache-reads-base.wtperf
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: chunk-cache-reads-base.wtperf
+
+
     ###########################################
     #        Performance Long Tests           #
     ###########################################

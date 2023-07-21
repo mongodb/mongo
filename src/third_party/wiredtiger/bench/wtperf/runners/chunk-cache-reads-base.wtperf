@@ -1,0 +1,10 @@
+conn_config="statistics=(all),statistics_log=(json=true,on_close=true,wait=1),cache_size=50MB,eviction=(threads_max=8)"
+readonly=false
+table_count=5
+icount=25000000
+key_sz=1024
+value_sz=1024
+threads=((count=10,reads=1))
+run_time=120
+verbose=2
+populate_threads=4
