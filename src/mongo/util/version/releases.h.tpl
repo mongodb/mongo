@@ -246,6 +246,24 @@ constexpr StringData toString(FeatureCompatibilityVersion v) {
     return findExtended(v).second;
 }
 
+inline int majorVersion(FeatureCompatibilityVersion v) {
+    auto str = toString(v);
+    auto pos = str.rfind('.');
+    if (pos == std::string::npos) {
+        return -1;
+    }
+    return stoi(str.substr(pos-1, 1).toString());
+}
+
+inline int minorVersion(FeatureCompatibilityVersion v) {
+    auto str = toString(v);
+    auto pos = str.rfind('.');
+    if (pos == std::string::npos) {
+        return -1;
+    }
+    return stoi(str.substr(pos+1, 1).toString());
+}
+
 /**
  * Pointers to nodes of the extended table that represent numbered software versions.
  * Other FCV enum members, such as those representing transitions, are excluded.

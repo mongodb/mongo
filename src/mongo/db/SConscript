@@ -2134,6 +2134,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='feature_compatibility_version_metrics',
+    source=[
+        'feature_compatibility_version_metrics.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        'server_base',
+    ],
+)
+
 # This library is the base class for tests which require the presence of ServiceContext. However it
 # does not perform any default initialisation of the relevant services, such as lockers and
 # transaction resources, so any test which directly references it must perform its own
@@ -2355,6 +2366,7 @@ env.Library(
         'dbdirectclient',
         'dbhelpers',
         'exec/working_set',
+        'feature_compatibility_version_metrics',
         'free_mon/free_mon_mongod',
         'ftdc/ftdc_mongod',
         'fts/ftsmongod',
