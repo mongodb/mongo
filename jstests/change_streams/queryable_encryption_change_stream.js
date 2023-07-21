@@ -4,7 +4,7 @@
 // @tags: [
 // change_stream_does_not_expect_txns,
 // assumes_unsharded_collection,
-// featureFlagFLE2CleanupCommand
+// requires_fcv_71
 // ]
 //
 load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest and

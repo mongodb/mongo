@@ -59,7 +59,8 @@ feature_flags:
     featureFlagFLE2CleanupCommand:
         description: "Enable support for the Cleanup Structured Encryption Data command"
         cpp_varname: gFeatureFlagFLE2CleanupCommand
-        default: false
+        default: true
+        version: 7.1
         shouldBeFCVGated: true
 
 structs:

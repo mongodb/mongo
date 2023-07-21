@@ -2,9 +2,8 @@
  * Cannot run cleanup against a shard server
  *
  * @tags: [
- * requires_fcv_70,
- * requires_sharding,
- * featureFlagFLE2CleanupCommand
+ * requires_fcv_71,
+ * requires_sharding
  * ]
  */
 import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
