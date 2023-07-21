@@ -174,10 +174,15 @@ protected:
 
     PreImagesRemoverTest() : CatalogTestFixture(Options{}.useMockClock(true)) {}
 
-    ChangeStreamPreImage generatePreImage(const UUID& nsUUID, Timestamp ts) {
+    ChangeStreamPreImage generatePreImage(
+        const UUID& nsUUID,
+        Timestamp ts,
+        boost::optional<Date_t> forcedOperationTime = boost::none) {
         auto preImageId = ChangeStreamPreImageId(nsUUID, ts, 0);
         const BSONObj doc = BSON("x" << 1);
-        auto operationTime = Date_t::fromDurationSinceEpoch(Seconds{ts.getSecs()});
+        auto operationTime = forcedOperationTime
+            ? *forcedOperationTime
+            : Date_t::fromDurationSinceEpoch(Seconds{ts.getSecs()});
         return ChangeStreamPreImage(preImageId, operationTime, doc);
     }
 
@@ -218,14 +223,17 @@ protected:
         wuow.commit();
     };
 
-    void insertPreImage(NamespaceString nss, Timestamp operationTime) {
-        auto uuid = CollectionCatalog::get(operationContext())
-                        ->lookupCollectionByNamespace(operationContext(), nss)
-                        ->uuid();
-        auto& manager = ChangeStreamPreImagesCollectionManager::get(getServiceContext());
+    // Inserts a pre-image into the pre-images collection. The pre-image inserted has a 'ts' of
+    // 'preImageTS', and an 'operationTime' of either (1) 'preImageOperationTime', when explicitly
+    // specified, or (2) a 'Date_t' derived from the 'preImageTS'.
+    void insertPreImage(NamespaceString nss,
+                        Timestamp preImageTS,
+                        boost::optional<Date_t> preImageOperationTime = boost::none) {
         auto opCtx = operationContext();
+        auto uuid = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)->uuid();
+        auto& manager = ChangeStreamPreImagesCollectionManager::get(getServiceContext());
         WriteUnitOfWork wuow(opCtx);
-        auto image = generatePreImage(uuid, operationTime);
+        auto image = generatePreImage(uuid, preImageTS, preImageOperationTime);
         manager.insertPreImage(opCtx, boost::none, image);
         wuow.commit();
     }
@@ -272,7 +280,6 @@ protected:
         return change_stream_pre_image_util::toRecordId(preImageId);
     }
 
-
     RecordId generatePreImageRecordId(Date_t wallTime) {
         const UUID uuid{UUID::gen()};
         Timestamp timestamp{wallTime};
@@ -300,6 +307,23 @@ protected:
 
         invariantStatusOK(storageInterface()->createCollection(
             operationContext(), kPreImageEnabledCollection, CollectionOptions{}));
+    }
+
+    // Forces the 'lastApplied' Timestamp to be 'targetTimestamp'. The ReplicationCoordinator keeps
+    // track of OpTimeAndWallTime for 'lastApplied'. This method exclusively changes the
+    // 'opTime.timestamp', but not the other values (term, wallTime, etc) associated with
+    // 'lastApplied'.
+    void forceLastAppliedTimestamp(Timestamp targetTimestamp) {
+        auto replCoord = repl::ReplicationCoordinator::get(operationContext());
+        auto lastAppliedOpTimeAndWallTime = replCoord->getMyLastAppliedOpTimeAndWallTime();
+        auto newOpTime =
+            repl::OpTime(targetTimestamp, lastAppliedOpTimeAndWallTime.opTime.getTerm());
+        replCoord->setMyLastAppliedOpTimeAndWallTime(
+            repl::OpTimeAndWallTime(newOpTime, lastAppliedOpTimeAndWallTime.wallTime));
+
+        // Verify the Timestamp is set accordingly.
+        ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime().opTime.getTimestamp(),
+                  targetTimestamp);
     }
 
     // A 'boost::none' tenantId implies a single tenant environment.
@@ -586,6 +610,45 @@ TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollection) {
     ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
     ASSERT_EQ(passStats["docsDeleted"].numberLong(), 0);
     ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 0);
+}
+
+TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurable) {
+    RAIIServerParameterControllerForTest truncateFeatureFlag{
+        "featureFlagUseUnreplicatedTruncatesForDeletions", true};
+    RAIIServerParameterControllerForTest minBytesPerMarkerController{
+        "preImagesCollectionTruncateMarkersMinBytes", 1};
+
+    auto clock = clockSource();
+    auto startOperationTime = clock->now();
+    auto numRecordsBeforeAllDurableTimestamp = 1000;
+    prePopulatePreImagesCollection(nullTenantId(),
+                                   kPreImageEnabledCollection,
+                                   numRecordsBeforeAllDurableTimestamp,
+                                   startOperationTime);
+
+    // Advance the clock to align with the most recent pre-image inserted.
+    clock->advance(Milliseconds{numRecordsBeforeAllDurableTimestamp});
+
+    auto allDurableTS = storageInterface()->getAllDurableTimestamp(getServiceContext());
+
+    // Insert a pre-image that would be expired by truncate given its 'ts' is greater than
+    // the 'allDurable'. Force the 'operationTime' so the pre-image is expired by it's
+    // 'operationTime'.
+    insertPreImage(kPreImageEnabledCollection, allDurableTS + 1, clock->now());
+
+    // Pre-images eligible for truncation must have timestamps less than both the 'allDurable' and
+    // 'lastApplied' timestamps. In this test case, demonstrate that the 'allDurable' timestamp is
+    // respected even if the most recent pre-image 'ts' is less than the 'lastApplied'.
+    forceLastAppliedTimestamp(allDurableTS + 2);
+
+    // Force all pre-images to be expired by 'operationTime'.
+    clock->advance(Seconds{10});
+    setExpirationTime(Seconds{1});
+
+    auto passStats = performPass(Milliseconds{0});
+    ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
+    ASSERT_EQ(passStats["docsDeleted"].numberLong(), numRecordsBeforeAllDurableTimestamp);
+    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
 }
 
 }  // namespace mongo
