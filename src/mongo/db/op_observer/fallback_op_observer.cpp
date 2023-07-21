@@ -184,7 +184,7 @@ void FallbackOpObserver::onDelete(OperationContext* opCtx,
 }
 
 void FallbackOpObserver::onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
-    if (dbName.db() == NamespaceString::kSessionTransactionsTableNamespace.db()) {
+    if (dbName == NamespaceString::kSessionTransactionsTableNamespace.dbName()) {
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
         mongoDSessionCatalog->invalidateAllSessions(opCtx);
     }

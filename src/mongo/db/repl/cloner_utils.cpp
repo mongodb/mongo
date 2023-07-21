@@ -75,7 +75,8 @@ bool ClonerUtils::isDatabaseForTenant(const DatabaseName& db,
     if (db.tenantId()) {
         return *db.tenantId() == *prefix;
     } else {
-        auto fullDbName = db.db();
+        // No tenant id, check if db has a matched tenant prefix.
+        auto fullDbName = DatabaseNameUtil::serialize(db);
         auto tenantDelim = fullDbName.find('_');
         if (tenantDelim != std::string::npos) {
             return (*prefix).toString() == fullDbName.substr(0, tenantDelim);

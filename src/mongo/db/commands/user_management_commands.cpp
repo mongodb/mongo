@@ -852,7 +852,7 @@ public:
 
 private:
     static bool validNamespace(const NamespaceString& nss) {
-        return (nss.dbName().db() == kAdminDB);
+        return (nss.isAdminDB());
     }
 
     StatusWith<std::uint32_t> doCrudOp(BSONObj op) try {

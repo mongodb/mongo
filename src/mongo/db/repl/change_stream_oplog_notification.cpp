@@ -137,12 +137,14 @@ void notifyChangeStreamsOnDatabaseAdded(OperationContext* opCtx,
 
     for (const auto& dbName : databasesAddedNotification.getNames()) {
         repl::MutableOplogEntry oplogEntry;
+        const auto dbNameStr = DatabaseNameUtil::serialize(dbName);
+
         oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
         oplogEntry.setNss(NamespaceString(dbName));
         oplogEntry.setTid(dbName.tenantId());
-        oplogEntry.setObject(BSON("msg" << BSON(operationName << dbName.db())));
+        oplogEntry.setObject(BSON("msg" << BSON(operationName << dbNameStr)));
         BSONObjBuilder o2Builder;
-        o2Builder.append(operationName, dbName.db());
+        o2Builder.append(operationName, dbNameStr);
         if (databasesAddedNotification.getPhase() == CommitPhaseEnum::kPrepare) {
             o2Builder.append("primaryShard", *databasesAddedNotification.getPrimaryShard());
         }
@@ -161,12 +163,14 @@ void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
                                       const ShardId& oldPrimary,
                                       const ShardId& newPrimary) {
     repl::MutableOplogEntry oplogEntry;
+    const auto dbNameStr = DatabaseNameUtil::serialize(dbName);
+
     oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
     oplogEntry.setNss(NamespaceString(dbName));
     oplogEntry.setTid(dbName.tenantId());
-    oplogEntry.setObject(BSON("msg" << BSON("movePrimary" << dbName.db())));
+    oplogEntry.setObject(BSON("msg" << BSON("movePrimary" << dbNameStr)));
     oplogEntry.setObject2(
-        BSON("movePrimary" << dbName.db() << "from" << oldPrimary << "to" << newPrimary));
+        BSON("movePrimary" << dbNameStr << "from" << oldPrimary << "to" << newPrimary));
     oplogEntry.setOpTime(repl::OpTime());
     oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
 

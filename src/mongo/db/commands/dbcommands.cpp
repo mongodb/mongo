@@ -674,7 +674,7 @@ public:
 
             // We need to copy the serialization context from the request to the reply object
             Reply reply(SerializationContext::stateCommandReply(cmd.getSerializationContext()));
-            reply.setDB(dbname.db());
+            reply.setDB(DatabaseNameUtil::serialize(dbname, reply.getSerializationContext()));
 
             if (!db) {
                 // This preserves old behavior where we used to create an empty database even when

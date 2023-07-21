@@ -106,7 +106,9 @@ void deleteTenantDataWhenMergeAborts(OperationContext* opCtx,
                          allDatabases.end(),
                          std::back_inserter(databases),
                          [tenant = tenantId.toString() + "_"](const DatabaseName& db) {
-                             return StringData{db.db()}.startsWith(tenant);
+                             // In non multitenacy environment, check if the db has a matched tenant
+                             // prefix.
+                             return StringData{DatabaseNameUtil::serialize(db)}.startsWith(tenant);
                          });
         }
 

@@ -98,7 +98,8 @@ int64_t setReplyItems(OperationContext* opCtx,
         }
 
         // If setTenantId is true, always return the dbName without the tenantId
-        ReplyItemType item(setTenantId ? dbName.db().toString()
+        // TODO SERVER-78263: Serialize db name with serialization context.
+        ReplyItemType item(setTenantId ? dbName.serializeWithoutTenantPrefix_UNSAFE()
                                        : DatabaseNameUtil::serialize(dbName));
         if (setTenantId) {
             initializeItemWithTenantId(item, dbName);
