@@ -122,7 +122,6 @@ buildvariants:
   - ubuntu2004-test
   expansions:
     database: WTCodeStatisticsDB
-    collection: CodeCoverage
     configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars:
