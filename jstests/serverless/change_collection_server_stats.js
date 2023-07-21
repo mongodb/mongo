@@ -15,7 +15,12 @@ const kExpireAfterSeconds = 1;
 
 const replicaSet = new ChangeStreamMultitenantReplicaSetTest({
     nodes: 1,
-    changeCollectionExpiredDocumentsRemoverJobSleepSeconds: kExpiredChangeRemovalJobSleepSeconds
+    nodeOptions: {
+        setParameter: {
+            changeCollectionExpiredDocumentsRemoverJobSleepSeconds:
+                kExpiredChangeRemovalJobSleepSeconds
+        }
+    }
 });
 
 const primary = replicaSet.getPrimary();
