@@ -274,6 +274,102 @@ struct ServerGlobalParams {
             return version != kLatest && version != kLastContinuous && version != kLastLTS;
         }
 
+        int majorVersion(Version version) const {
+            switch (version) {
+                case Version::kInvalid:
+                case Version::kUnsetDefault44Behavior:
+                    return -1;
+                case Version::kFullyDowngradedTo44:
+                case Version::kDowngradingFrom47To44:
+                case Version::kDowngradingFrom48To44:
+                case Version::kDowngradingFrom49To44:
+                case Version::kDowngradingFrom50To44:
+                case Version::kUpgradingFrom44To47:
+                case Version::kUpgradingFrom44To48:
+                case Version::kUpgradingFrom44To49:
+                case Version::kVersion47:
+                case Version::kDowngradingFrom48To47:
+                case Version::kUpgradingFrom47To48:
+                case Version::kVersion48:
+                case Version::kDowngradingFrom49To48:
+                case Version::kUpgradingFrom48To49:
+                case Version::kVersion49:
+                case Version::kDowngradingFrom50To49:
+                    return 4;
+                case Version::kUpgradingFrom44To50:
+                case Version::kUpgradingFrom49To50:
+                case Version::kVersion50:
+                    return 5;
+                default:
+                    return -1;
+            }
+        }
+
+        int minorVersion(Version version) const {
+            switch (version) {
+                case Version::kInvalid:
+                case Version::kUnsetDefault44Behavior:
+                    return -1;
+                case Version::kFullyDowngradedTo44:
+                case Version::kDowngradingFrom47To44:
+                case Version::kDowngradingFrom48To44:
+                case Version::kDowngradingFrom49To44:
+                case Version::kDowngradingFrom50To44:
+                    return 4;
+                case Version::kUpgradingFrom44To47:
+                case Version::kVersion47:
+                case Version::kDowngradingFrom48To47:
+                    return 7;
+                case Version::kUpgradingFrom47To48:
+                case Version::kVersion48:
+                case Version::kDowngradingFrom49To48:
+                case Version::kUpgradingFrom44To48:
+                    return 8;
+                case Version::kUpgradingFrom44To49:
+                case Version::kUpgradingFrom48To49:
+                case Version::kVersion49:
+                case Version::kDowngradingFrom50To49:
+                    return 9;
+                case Version::kUpgradingFrom44To50:
+                case Version::kUpgradingFrom49To50:
+                case Version::kVersion50:
+                    return 0;
+                default:
+                    return -1;
+            }
+        }
+
+        int transitionState(Version version) const {
+            switch (version) {
+                case Version::kInvalid:
+                case Version::kUnsetDefault44Behavior:
+                case Version::kFullyDowngradedTo44:
+                case Version::kVersion47:
+                case Version::kVersion48:
+                case Version::kVersion49:
+                case Version::kVersion50:
+                    return 0;
+                case Version::kDowngradingFrom47To44:
+                case Version::kDowngradingFrom48To44:
+                case Version::kDowngradingFrom49To44:
+                case Version::kDowngradingFrom50To44:
+                case Version::kDowngradingFrom48To47:
+                case Version::kDowngradingFrom49To48:
+                case Version::kDowngradingFrom50To49:
+                    return -1;
+                case Version::kUpgradingFrom44To47:
+                case Version::kUpgradingFrom44To48:
+                case Version::kUpgradingFrom44To49:
+                case Version::kUpgradingFrom44To50:
+                case Version::kUpgradingFrom47To48:
+                case Version::kUpgradingFrom48To49:
+                case Version::kUpgradingFrom49To50:
+                    return 1;
+                default:
+                    return 0;
+            }
+        }
+
         void reset() {
             _version.store(Version::kUnsetDefault44Behavior);
         }
@@ -284,16 +380,15 @@ struct ServerGlobalParams {
 
     private:
         AtomicWord<Version> _version{Version::kUnsetDefault44Behavior};
-
     } mutableFeatureCompatibility;
 
     // Const reference for featureCompatibilityVersion checks.
     const FeatureCompatibility& featureCompatibility = mutableFeatureCompatibility;
 
-    // Feature validation differs depending on the role of a mongod in a replica set. Replica set
-    // primaries can accept user-initiated writes and validate based on the feature compatibility
-    // version. A secondary always validates in the upgraded mode so that it can sync new features,
-    // even when in the downgraded feature compatibility mode.
+    // Feature validation differs depending on the role of a mongod in a replica set. Replica
+    // set primaries can accept user-initiated writes and validate based on the feature
+    // compatibility version. A secondary always validates in the upgraded mode so that it can
+    // sync new features, even when in the downgraded feature compatibility mode.
     AtomicWord<bool> validateFeaturesAsPrimary{true};
 
     std::vector<std::string> disabledSecureAllocatorDomains;
