@@ -334,7 +334,9 @@ OplogEntry makeOplogEntry(OpTime opTime,
                           const boost::optional<UUID>& uuid,
                           BSONObj o,
                           boost::optional<BSONObj> o2 = boost::none,
-                          boost::optional<bool> fromMigrate = boost::none);
+                          boost::optional<bool> fromMigrate = boost::none,
+                          OperationSessionInfo sessionInfo = OperationSessionInfo(),
+                          boost::optional<RetryImageEnum> needsRetryImage = boost::none);
 
 OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, boost::optional<UUID> uuid);
 

@@ -486,7 +486,9 @@ OplogEntry makeOplogEntry(OpTime opTime,
                           const boost::optional<UUID>& uuid,
                           BSONObj o,
                           boost::optional<BSONObj> o2,
-                          boost::optional<bool> fromMigrate) {
+                          boost::optional<bool> fromMigrate,
+                          OperationSessionInfo sessionInfo,
+                          boost::optional<RetryImageEnum> needsRetryImage) {
     return {DurableOplogEntry(opTime,                     // optime
                               opType,                     // opType
                               std::move(nss),             // namespace
@@ -495,16 +497,16 @@ OplogEntry makeOplogEntry(OpTime opTime,
                               OplogEntry::kOplogVersion,  // version
                               o,                          // o
                               o2,                         // o2
-                              {},                         // sessionInfo
+                              sessionInfo,                // sessionInfo
                               boost::none,                // upsert
                               Date_t(),                   // wall clock time
                               {},                         // statement ids
-                              boost::none,    // optime of previous write within same transaction
-                              boost::none,    // pre-image optime
-                              boost::none,    // post-image optime
-                              boost::none,    // ShardId of resharding recipient
-                              boost::none,    // _id
-                              boost::none)};  // needsRetryImage
+                              boost::none,  // optime of previous write within same transaction
+                              boost::none,  // pre-image optime
+                              boost::none,  // post-image optime
+                              boost::none,  // ShardId of resharding recipient
+                              boost::none,  // _id
+                              needsRetryImage)};  // needsRetryImage
 }
 
 OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, boost::optional<UUID> uuid) {

@@ -825,7 +825,7 @@ public:
     boost::optional<std::int64_t> getDonorApplyOpsIndex() const&;
     const boost::optional<mongo::repl::OpTime>& getPrevWriteOpTimeInTransaction() const&;
     const boost::optional<mongo::repl::OpTime>& getPostImageOpTime() const&;
-    boost::optional<RetryImageEnum> getNeedsRetryImage() const;
+
     OpTime getOpTime() const;
     bool isCommand() const;
     bool isPartialTransaction() const;
@@ -883,6 +883,18 @@ public:
      */
     mongo::Date_t getWallClockTimeForPreImage() const;
 
+    /**
+     * Overrides the needsRetryImage value from DurableOplogEntry with boost::none
+     */
+    void clearNeedsRetryImage();
+
+    /**
+     * Returns the retry image setting from the original DurableOplogEntry, unless it
+     * has been suppressed
+     */
+    boost::optional<RetryImageEnum> getNeedsRetryImage() const;
+
+
     bool isCrudOpType() const;
     bool isGlobalIndexCrudOpType() const;
     bool isUpdateOrDelete() const;
@@ -910,6 +922,9 @@ private:
     boost::optional<Date_t> _applyOpsWallClockTime{boost::none};
 
     bool _isForCappedCollection = false;
+
+    // We allow this to be suppressed during secondary oplog application.
+    boost::optional<RetryImageEnum> _needsRetryImage;
 };
 
 std::ostream& operator<<(std::ostream& s, const DurableOplogEntry& o);
