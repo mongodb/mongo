@@ -408,6 +408,62 @@ TEST_F(ABTPlanGeneration, LowerShardFiltering) {
                          boost::none,
                          scanDefs);
     }
+
+    {
+        // Test lowering for a shardFilter with expressions other than Variables as children.
+        sbe::RuntimeEnvironment runtimeEnv;
+        sbe::value::SlotIdGenerator ids = sbe::value::SlotIdGenerator{};
+        runtimeEnv.registerSlot(
+            kshardFiltererSlotName, sbe::value::TypeTags::Nothing, 0, false, &ids);
+        NodeProps filterNodeProps{getNextNodeID() /*_planNodeId*/,
+                                  {} /*_groupId*/,
+                                  {} /*_logicalProps*/,
+                                  {} /*_physicalProps*/,
+                                  boost::none /*_ridProjName*/,
+                                  CostType::fromDouble(0) /*_cost*/,
+                                  CostType::fromDouble(0) /*_localCost*/,
+                                  {false} /*_adjustedCE*/};
+        properties::setPropertyOverwrite(
+            filterNodeProps._logicalProps,
+            properties::IndexingAvailability(10,
+                                             ProjectionName("testProjectionName"),
+                                             shardKeyName,
+                                             false,
+                                             false,
+                                             opt::unordered_set<std::string>()));
+
+        DistributionAndPaths dnp(
+            DistributionType::RangePartitioning,
+            {make<PathGet>("a", make<PathIdentity>()), make<PathGet>("b", make<PathIdentity>())});
+        ScanDefinition shardKeyScanDef =
+            buildScanDefinition(opt::unordered_map<std::string, IndexDefinition>(), dnp);
+        opt::unordered_map<std::string, ScanDefinition> scanDefs{
+            std::make_pair(shardKeyName, shardKeyScanDef)};
+
+        auto functionCallNode = make<FunctionCall>(
+            "shardFilter",
+            makeSeq(_path(make<EvalPath>(make<PathGet>("a", make<PathIdentity>()),
+                                         make<Variable>("scan0"))),
+                    make<Variable>("proj_b")));
+
+        auto filterNode =
+            _node(make<FilterNode>(
+                      std::move(functionCallNode),
+                      _node(make<PhysicalScanNode>(
+                          FieldProjectionMap{{},
+                                             {ProjectionName{"scan0"}},
+                                             {{FieldNameType{"b"}, ProjectionName{"proj_b"}}}},
+                          "collName",
+                          false))),
+                  filterNodeProps);
+        runNodeVariation(ctx,
+                         "Shard Filtering with Inlined path",
+                         std::move(filterNode),
+                         &runtimeEnv,
+                         &ids,
+                         boost::none,
+                         scanDefs);
+    }
 }
 
 TEST_F(ABTPlanGeneration, LowerConstantExpression) {
