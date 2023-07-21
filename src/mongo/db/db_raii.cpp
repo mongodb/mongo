@@ -77,7 +77,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
@@ -85,10 +84,6 @@
 
 namespace mongo {
 namespace {
-
-MONGO_FAIL_POINT_DEFINE(hangBeforeAutoGetCollectionLockFreeShardedStateAccess);
-MONGO_FAIL_POINT_DEFINE(hangBeforeAutoGetShardVersionCheck);
-MONGO_FAIL_POINT_DEFINE(reachedAutoGetLockFreeShardConsistencyRetry);
 
 const boost::optional<int> kDoNotChangeProfilingLevel = boost::none;
 
@@ -773,14 +768,6 @@ getCollectionForLockFreeRead(OperationContext* opCtx,
                              boost::optional<Timestamp> readTimestamp,
                              const NamespaceStringOrUUID& nsOrUUID,
                              const AutoGetCollection::Options& options) {
-    hangBeforeAutoGetCollectionLockFreeShardedStateAccess.executeIf(
-        [&](auto&) { hangBeforeAutoGetCollectionLockFreeShardedStateAccess.pauseWhileSet(opCtx); },
-        [&](const BSONObj& data) {
-            return opCtx->getLogicalSessionId() &&
-                opCtx->getLogicalSessionId()->getId() == UUID::fromCDR(data["lsid"].uuid());
-        });
-
-
     // Returns a collection reference compatible with the specified 'readTimestamp'. Creates and
     // places a compatible PIT collection reference in the 'catalog' if needed and the collection
     // exists at that PIT.
@@ -904,6 +891,9 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
               (!opCtx->recoveryUnit()->isActive() || _isLockFreeReadSubOperation));
 
     DatabaseShardingState::assertMatchingDbVersion(opCtx, nsOrUUID.dbName());
+    if (nsOrUUID.isNamespaceString()) {
+        CollectionShardingState::acquire(opCtx, nsOrUUID.nss())->checkShardVersionOrThrow(opCtx);
+    }
 
     auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     if (_isLockFreeReadSubOperation) {
@@ -958,11 +948,13 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
             });
     }
 
+    auto scopedCss = CollectionShardingState::acquire(opCtx, _resolvedNss);
+    scopedCss->checkShardVersionOrThrow(opCtx);
+
     if (_collectionPtr) {
         assertReadConcernSupported(
             _collectionPtr, readConcernArgs, opCtx->recoveryUnit()->getTimestampReadSource());
 
-        auto scopedCss = CollectionShardingState::acquire(opCtx, _collectionPtr->ns());
         auto collDesc = scopedCss->getCollectionDescription(opCtx);
         if (collDesc.isSharded()) {
             _collectionPtr.setShardKeyPattern(collDesc.getKeyPattern());
@@ -1021,25 +1013,36 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
                                         const NamespaceStringOrUUID& nsOrUUID,
                                         const AutoGetCollection::Options& options,
                                         AutoStatsTracker::LogMode logMode)
-    :  // We disable the expectedUUID option as we must check it after all the shard versioning
-       // checks.
-      _autoCollForRead(
-          opCtx, nsOrUUID, AutoGetCollection::Options{options}.expectedUUID(boost::none)),
-      _statsTracker(opCtx,
-                    _autoCollForRead.getNss(),
+    :  // Initialize _statsTracker here only if we are acquiring by nss. In the by-uuid case we need
+       // to first resolve the uuid to nss, so we defer the construction of _statsTracker.
+      _statsTracker(boost::in_place_init_if,
+                    nsOrUUID.isNamespaceString(),
+                    opCtx,
+                    nsOrUUID.isNamespaceString() ? nsOrUUID.nss() : NamespaceString(),
                     Top::LockType::ReadLocked,
                     logMode,
-                    CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(
-                        _autoCollForRead.getNss().dbName()),
+                    CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsOrUUID.dbName()),
                     options._deadline,
                     options._secondaryNssOrUUIDsBegin,
-                    options._secondaryNssOrUUIDsEnd) {
-    hangBeforeAutoGetShardVersionCheck.executeIf(
-        [&](auto&) { hangBeforeAutoGetShardVersionCheck.pauseWhileSet(opCtx); },
-        [&](const BSONObj& data) {
-            return opCtx->getLogicalSessionId() &&
-                opCtx->getLogicalSessionId()->getId() == UUID::fromCDR(data["lsid"].uuid());
-        });
+                    options._secondaryNssOrUUIDsEnd),
+      // We disable the expectedUUID option as we must check it after all the shard versioning
+      // checks.
+      _autoCollForRead(
+          opCtx, nsOrUUID, AutoGetCollection::Options{options}.expectedUUID(boost::none)) {
+
+    // For acquisitions by uuid, construct _statsTracker after having resolved the uuid to a
+    // nss (i.e. after having constructed _autoCollForRead).
+    if (nsOrUUID.isUUID()) {
+        _statsTracker.emplace(opCtx,
+                              _autoCollForRead.getNss(),
+                              Top::LockType::ReadLocked,
+                              logMode,
+                              CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(
+                                  _autoCollForRead.getNss().dbName()),
+                              options._deadline,
+                              options._secondaryNssOrUUIDsBegin,
+                              options._secondaryNssOrUUIDsEnd);
+    }
 
     if (!_autoCollForRead.getView()) {
         auto scopedCss = CollectionShardingState::acquire(opCtx, _autoCollForRead.getNss());
@@ -1048,41 +1051,6 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
 
     checkCollectionUUIDMismatch(
         opCtx, _autoCollForRead.getNss(), _autoCollForRead.getCollection(), options._expectedUUID);
-}
-
-AutoGetCollectionForReadCommandLockFree::AutoGetCollectionForReadCommandLockFree(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollection::Options options,
-    AutoStatsTracker::LogMode logMode) {
-    _autoCollForReadCommandBase.emplace(opCtx, nsOrUUID, options, logMode);
-    auto receivedShardVersion =
-        OperationShardingState::get(opCtx).getShardVersion(_autoCollForReadCommandBase->getNss());
-
-    while (_autoCollForReadCommandBase->getCollection() &&
-           _autoCollForReadCommandBase->getCollection().isSharded() && receivedShardVersion &&
-           receivedShardVersion.value() == ShardVersion::UNSHARDED()) {
-        reachedAutoGetLockFreeShardConsistencyRetry.executeIf(
-            [&](auto&) { reachedAutoGetLockFreeShardConsistencyRetry.pauseWhileSet(opCtx); },
-            [&](const BSONObj& data) {
-                return opCtx->getLogicalSessionId() &&
-                    opCtx->getLogicalSessionId()->getId() == UUID::fromCDR(data["lsid"].uuid());
-            });
-
-        // A request may arrive with an UNSHARDED shard version for the namespace, and then running
-        // lock-free it is possible that the lock-free state finds a sharded collection but
-        // subsequently the namespace was dropped and recreated UNSHARDED again, in time for the SV
-        // check performed in AutoGetCollectionForReadCommandBase. We must check here whether
-        // sharded state was found by the lock-free state setup, and make sure that the collection
-        // state in-use matches the shard version in the request. If there is an issue, we can
-        // simply retry: the scenario is very unlikely.
-        //
-        // It's possible for there to be no SV for the namespace in the command request. That's OK
-        // because shard versioning isn't needed in that case. See SERVER-63009 for more details.
-        _autoCollForReadCommandBase.emplace(opCtx, nsOrUUID, options, logMode);
-        receivedShardVersion = OperationShardingState::get(opCtx).getShardVersion(
-            _autoCollForReadCommandBase->getNss());
-    }
 }
 
 OldClientContext::OldClientContext(OperationContext* opCtx,
