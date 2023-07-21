@@ -165,6 +165,16 @@ const tests = [
             },
         ]
     },
+    {
+        name: "cpuload",
+        database: "test",
+        testcases: [
+            {
+                shortDescription: "Runs cpuload.",
+                command: {cpuload: 1, cpuFactor: 1},
+            },
+        ]
+    },
 ];
 
 /* runTestcase function runs a testcase in a given database
