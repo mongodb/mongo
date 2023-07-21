@@ -1393,6 +1393,492 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentIncorr
     ASSERT(!collectionExists(_opCtx.get(), nssTenant2));
 }
 
+TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierRetryableUpdate) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(2);
+
+    // The namespace names here are significant.  We do a sort by namespace when we apply these
+    // operations, which ensures the config.image_collection writes will be done first.
+    auto configImagesUUID =
+        createCollectionWithUuid(_opCtx.get(), NamespaceString::kConfigImagesNamespace);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto collUUID = createCollectionWithUuid(_opCtx.get(), nss);
+    BSONObj doc = BSON("_id" << 0);
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {doc}, 0));
+    Timestamp oldTs{1, 1};
+    BSONObj existingRetryImage = BSON("_id" << sessionId.toBSON() << "txnNum" << 1 << "ts" << oldTs
+                                            << "invalidated" << true);
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        _opCtx.get(), NamespaceString::kConfigImagesNamespace, {existingRetryImage}, 0));
+    OpTime updateOpTime{{2, 1}, 1};
+    OpTime deleteOpTime{{2, 2}, 1};
+
+    auto updateOp = makeOplogEntry(updateOpTime,
+                                   repl::OpTypeEnum::kUpdate,
+                                   nss,
+                                   collUUID,
+                                   update_oplog_entry::makeDeltaOplogEntry(BSON(
+                                       doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
+                                   BSON("_id" << 0) /* o2 */,
+                                   boost::none, /* fromMigrate*/
+                                   sessionInfo,
+                                   RetryImageEnum::kPreImage);
+
+    auto deleteOp = makeOplogEntry(deleteOpTime,
+                                   repl::OpTypeEnum::kDelete,
+                                   NamespaceString::kConfigImagesNamespace,
+                                   configImagesUUID,
+                                   BSON("_id" << sessionId.toBSON()));
+
+    setServerParameter("replWriterThreadCount", 1);
+    setServerParameter("replWriterMinThreadCount", 1);
+    auto writerPool = makeReplWriterPool();
+    NoopOplogApplierObserver observer;
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        &observer,
+        ReplicationCoordinator::get(_opCtx.get()),
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        writerPool.get());
+    ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {updateOp, deleteOp}));
+    CollectionReader collectionReaderConfigImages(_opCtx.get(),
+                                                  NamespaceString::kConfigImagesNamespace);
+    // We should have deleted the config.image_collection entry.
+    ASSERT_NOT_OK(collectionReaderConfigImages.next());
+
+    // The doc update should have gone through.
+    BSONObj updatedDoc = BSON("_id" << 0 << "a" << 1);
+    CollectionReader collectionReader(_opCtx.get(), nss);
+    ASSERT_BSONOBJ_EQ(updatedDoc, unittest::assertGet(collectionReader.next()));
+}
+
+TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierFirstRetryableUpdate) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(2);
+
+    // The namespace names here are significant.  We do a sort by namespace when we apply these
+    // operations, which ensures the config.image_collection writes will be done first.
+    auto configImagesUUID =
+        createCollectionWithUuid(_opCtx.get(), NamespaceString::kConfigImagesNamespace);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto collUUID = createCollectionWithUuid(_opCtx.get(), nss);
+    BSONObj doc = BSON("_id" << 0);
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {doc}, 0));
+    OpTime updateOpTime{{2, 1}, 1};
+    OpTime deleteOpTime{{2, 2}, 1};
+
+    auto updateOp = makeOplogEntry(updateOpTime,
+                                   repl::OpTypeEnum::kUpdate,
+                                   nss,
+                                   collUUID,
+                                   update_oplog_entry::makeDeltaOplogEntry(BSON(
+                                       doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
+                                   BSON("_id" << 0) /* o2 */,
+                                   boost::none, /* fromMigrate*/
+                                   sessionInfo,
+                                   RetryImageEnum::kPreImage);
+
+    auto deleteOp = makeOplogEntry(deleteOpTime,
+                                   repl::OpTypeEnum::kDelete,
+                                   NamespaceString::kConfigImagesNamespace,
+                                   configImagesUUID,
+                                   BSON("_id" << sessionId.toBSON()));
+
+    setServerParameter("replWriterThreadCount", 1);
+    setServerParameter("replWriterMinThreadCount", 1);
+    auto writerPool = makeReplWriterPool();
+    NoopOplogApplierObserver observer;
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        &observer,
+        ReplicationCoordinator::get(_opCtx.get()),
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        writerPool.get());
+    ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {updateOp, deleteOp}));
+    CollectionReader collectionReaderConfigImages(_opCtx.get(),
+                                                  NamespaceString::kConfigImagesNamespace);
+    // We should have deleted the config.image_collection entry.
+    ASSERT_NOT_OK(collectionReaderConfigImages.next());
+
+    // The doc update should have gone through.
+    BSONObj updatedDoc = BSON("_id" << 0 << "a" << 1);
+    CollectionReader collectionReader(_opCtx.get(), nss);
+    ASSERT_BSONOBJ_EQ(updatedDoc, unittest::assertGet(collectionReader.next()));
+}
+
+TEST_F(OplogApplierImplTest, ApplySessionDeleteAfterLaterRetryableUpdate) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(2);
+
+    // The namespace names here are significant.  We do a sort by namespace when we apply these
+    // operations, which ensures the config.image_collection writes will be done later.
+    auto configImagesUUID =
+        createCollectionWithUuid(_opCtx.get(), NamespaceString::kConfigImagesNamespace);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("atest.t");
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto collUUID = createCollectionWithUuid(_opCtx.get(), nss);
+    BSONObj doc = BSON("_id" << 0);
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {doc}, 0));
+    Timestamp oldTs{1, 1};
+    BSONObj existingRetryImage = BSON("_id" << sessionId.toBSON() << "txnNum" << 1 << "ts" << oldTs
+                                            << "invalidated" << true);
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        _opCtx.get(), NamespaceString::kConfigImagesNamespace, {existingRetryImage}, 0));
+    OpTime updateOpTime{{2, 2}, 1};
+    OpTime deleteOpTime{{2, 1}, 1};
+
+    auto updateOp = makeOplogEntry(updateOpTime,
+                                   repl::OpTypeEnum::kUpdate,
+                                   nss,
+                                   collUUID,
+                                   update_oplog_entry::makeDeltaOplogEntry(BSON(
+                                       doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
+                                   BSON("_id" << 0) /* o2 */,
+                                   boost::none, /* fromMigrate*/
+                                   sessionInfo,
+                                   RetryImageEnum::kPreImage);
+
+    auto deleteOp = makeOplogEntry(deleteOpTime,
+                                   repl::OpTypeEnum::kDelete,
+                                   NamespaceString::kConfigImagesNamespace,
+                                   configImagesUUID,
+                                   BSON("_id" << sessionId.toBSON()));
+
+    setServerParameter("replWriterThreadCount", 1);
+    setServerParameter("replWriterMinThreadCount", 1);
+    auto writerPool = makeReplWriterPool();
+    NoopOplogApplierObserver observer;
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        &observer,
+        ReplicationCoordinator::get(_opCtx.get()),
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        writerPool.get());
+    ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {deleteOp, updateOp}));
+    CollectionReader collectionReaderConfigImages(_opCtx.get(),
+                                                  NamespaceString::kConfigImagesNamespace);
+    BSONObj expectedPreImage = BSON("_id" << sessionId.toBSON() << "txnNum" << 2 << "ts"
+                                          << updateOpTime.getTimestamp() << "imageKind"
+                                          << "preImage"
+                                          << "image" << BSON("_id" << 0) << "invalidated" << false);
+    // We should have only the pre-image in the config.image_collection entry.
+    ASSERT_BSONOBJ_EQ(expectedPreImage, unittest::assertGet(collectionReaderConfigImages.next()));
+    ASSERT_NOT_OK(collectionReaderConfigImages.next());
+
+    // The doc update should have gone through.
+    BSONObj updatedDoc = BSON("_id" << 0 << "a" << 1);
+    CollectionReader collectionReader(_opCtx.get(), nss);
+    ASSERT_BSONOBJ_EQ(updatedDoc, unittest::assertGet(collectionReader.next()));
+}
+
+TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierRetryableInternalTransactionUpdate) {
+    const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(
+        boost::none, /* let helper generate parentLsid */
+        TxnNumber(10));
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(2);
+
+    // The namespace names here are significant.  We do a sort by namespace when we apply these
+    // operations, which ensures the config.image_collection writes will be done first.
+    auto configImagesUUID =
+        createCollectionWithUuid(_opCtx.get(), NamespaceString::kConfigImagesNamespace);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto collUUID = createCollectionWithUuid(_opCtx.get(), nss);
+    BSONObj doc = BSON("_id" << 0);
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {doc}, 0));
+    Timestamp oldTs{1, 1};
+    BSONObj existingRetryImage = BSON("_id" << sessionId.toBSON() << "txnNum" << 1 << "ts" << oldTs
+                                            << "invalidated" << true);
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        _opCtx.get(), NamespaceString::kConfigImagesNamespace, {existingRetryImage}, 0));
+    OpTime updateOpTime{{2, 1}, 1};
+    OpTime deleteOpTime{{2, 2}, 1};
+
+    auto applyOpsOp = makeCommandOplogEntryWithSessionInfoAndStmtIds(
+        updateOpTime,
+        NamespaceString::kAdminCommandNamespace,
+        BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                           << "u"
+                                           << "ns" << nss.ns() << "ui" << collUUID << "o"
+                                           << update_oplog_entry::makeDeltaOplogEntry(
+                                                  BSON(doc_diff::kUpdateSectionFieldName
+                                                       << fromjson("{a: 1}")))
+                                           << "o2" << BSON("_id" << 0) << "needsRetryImage"
+                                           << "preImage"
+                                           << "stmtId" << 0))),
+        sessionId,
+        *sessionInfo.getTxnNumber(),
+        {} /* no stmt id at outer level */,
+        OpTime() /* prevOpTime */);
+
+    auto deleteOp = makeOplogEntry(deleteOpTime,
+                                   repl::OpTypeEnum::kDelete,
+                                   NamespaceString::kConfigImagesNamespace,
+                                   configImagesUUID,
+                                   BSON("_id" << sessionId.toBSON()));
+
+    setServerParameter("replWriterThreadCount", 1);
+    setServerParameter("replWriterMinThreadCount", 1);
+    auto writerPool = makeReplWriterPool();
+    NoopOplogApplierObserver observer;
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        &observer,
+        ReplicationCoordinator::get(_opCtx.get()),
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        writerPool.get());
+    ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {applyOpsOp, deleteOp}));
+    CollectionReader collectionReaderConfigImages(_opCtx.get(),
+                                                  NamespaceString::kConfigImagesNamespace);
+    // We should have deleted the config.image_collection entry.
+    ASSERT_NOT_OK(collectionReaderConfigImages.next());
+
+    // The doc update should have gone through.
+    BSONObj updatedDoc = BSON("_id" << 0 << "a" << 1);
+    CollectionReader collectionReader(_opCtx.get(), nss);
+    ASSERT_BSONOBJ_EQ(updatedDoc, unittest::assertGet(collectionReader.next()));
+}
+
+TEST_F(OplogApplierImplTest, ApplySessionDeleteAfterLaterRetryableInternalTransactionUpdate) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(2);
+
+    // The namespace names here are significant.  We do a sort by namespace when we apply these
+    // operations, which ensures the config.image_collection writes will be done later.
+    auto configImagesUUID =
+        createCollectionWithUuid(_opCtx.get(), NamespaceString::kConfigImagesNamespace);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("atest.t");
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto collUUID = createCollectionWithUuid(_opCtx.get(), nss);
+    BSONObj doc = BSON("_id" << 0);
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {doc}, 0));
+    Timestamp oldTs{1, 1};
+    BSONObj existingRetryImage = BSON("_id" << sessionId.toBSON() << "txnNum" << 1 << "ts" << oldTs
+                                            << "invalidated" << true);
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        _opCtx.get(), NamespaceString::kConfigImagesNamespace, {existingRetryImage}, 0));
+    OpTime updateOpTime{{2, 2}, 1};
+    OpTime deleteOpTime{{2, 1}, 1};
+
+    auto applyOpsOp = makeCommandOplogEntryWithSessionInfoAndStmtIds(
+        updateOpTime,
+        NamespaceString::kAdminCommandNamespace,
+        BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                           << "u"
+                                           << "ns" << nss.ns() << "ui" << collUUID << "o"
+                                           << update_oplog_entry::makeDeltaOplogEntry(
+                                                  BSON(doc_diff::kUpdateSectionFieldName
+                                                       << fromjson("{a: 1}")))
+                                           << "o2" << BSON("_id" << 0) << "needsRetryImage"
+                                           << "preImage"
+                                           << "stmtId" << 0))),
+        sessionId,
+        *sessionInfo.getTxnNumber(),
+        {} /* no stmt id at outer level */,
+        OpTime() /* prevOpTime */);
+
+    auto deleteOp = makeOplogEntry(deleteOpTime,
+                                   repl::OpTypeEnum::kDelete,
+                                   NamespaceString::kConfigImagesNamespace,
+                                   configImagesUUID,
+                                   BSON("_id" << sessionId.toBSON()));
+
+    setServerParameter("replWriterThreadCount", 1);
+    setServerParameter("replWriterMinThreadCount", 1);
+    auto writerPool = makeReplWriterPool();
+    NoopOplogApplierObserver observer;
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        &observer,
+        ReplicationCoordinator::get(_opCtx.get()),
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        writerPool.get());
+    ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {deleteOp, applyOpsOp}));
+    CollectionReader collectionReaderConfigImages(_opCtx.get(),
+                                                  NamespaceString::kConfigImagesNamespace);
+    BSONObj expectedPreImage = BSON("_id" << sessionId.toBSON() << "txnNum" << 2 << "ts"
+                                          << updateOpTime.getTimestamp() << "imageKind"
+                                          << "preImage"
+                                          << "image" << BSON("_id" << 0) << "invalidated" << false);
+    // We should have only the pre-image in the config.image_collection entry.
+    ASSERT_BSONOBJ_EQ(expectedPreImage, unittest::assertGet(collectionReaderConfigImages.next()));
+    ASSERT_NOT_OK(collectionReaderConfigImages.next());
+
+    // The doc update should have gone through.
+    BSONObj updatedDoc = BSON("_id" << 0 << "a" << 1);
+    CollectionReader collectionReader(_opCtx.get(), nss);
+    ASSERT_BSONOBJ_EQ(updatedDoc, unittest::assertGet(collectionReader.next()));
+}
+
+TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteBeforeEarlierRetryableUpdate) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(2);
+
+    // The namespace names here are significant.  We do a sort by namespace when we apply these
+    // operations, which ensures the config.image_collection writes will be done first.
+    auto configImagesUUID =
+        createCollectionWithUuid(_opCtx.get(), NamespaceString::kConfigImagesNamespace);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto collUUID = createCollectionWithUuid(_opCtx.get(), nss);
+    BSONObj doc = BSON("_id" << 0);
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {doc}, 0));
+    Timestamp oldTs{1, 1};
+    BSONObj existingRetryImage = BSON("_id" << sessionId.toBSON() << "txnNum" << 1 << "ts" << oldTs
+                                            << "invalidated" << true);
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        _opCtx.get(), NamespaceString::kConfigImagesNamespace, {existingRetryImage}, 0));
+    OpTime updateOpTime{{2, 1}, 1};
+    OpTime deleteOpTime{{2, 2}, 1};
+
+    auto updateOp = makeOplogEntry(updateOpTime,
+                                   repl::OpTypeEnum::kUpdate,
+                                   nss,
+                                   collUUID,
+                                   update_oplog_entry::makeDeltaOplogEntry(BSON(
+                                       doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
+                                   BSON("_id" << 0) /* o2 */,
+                                   boost::none, /* fromMigrate*/
+                                   sessionInfo,
+                                   RetryImageEnum::kPreImage);
+
+    auto applyOpsOp = makeCommandOplogEntry(
+        deleteOpTime,
+        NamespaceString::kAdminCommandNamespace,
+        BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                           << "d"
+                                           << "ns" << NamespaceString::kConfigImagesNamespace.ns()
+                                           << "ui" << configImagesUUID << "o"
+                                           << BSON("_id" << sessionId.toBSON())))));
+
+    setServerParameter("replWriterThreadCount", 1);
+    setServerParameter("replWriterMinThreadCount", 1);
+    auto writerPool = makeReplWriterPool();
+    NoopOplogApplierObserver observer;
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        &observer,
+        ReplicationCoordinator::get(_opCtx.get()),
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        writerPool.get());
+    ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {updateOp, applyOpsOp}));
+    CollectionReader collectionReaderConfigImages(_opCtx.get(),
+                                                  NamespaceString::kConfigImagesNamespace);
+    // We should have deleted the config.image_collection entry.
+    ASSERT_NOT_OK(collectionReaderConfigImages.next());
+
+    // The doc update should have gone through.
+    BSONObj updatedDoc = BSON("_id" << 0 << "a" << 1);
+    CollectionReader collectionReader(_opCtx.get(), nss);
+    ASSERT_BSONOBJ_EQ(updatedDoc, unittest::assertGet(collectionReader.next()));
+}
+
+TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteAfterLaterRetryableUpdate) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(2);
+
+    // The namespace names here are significant.  We do a sort by namespace when we apply these
+    // operations, which ensures the config.image_collection writes will be done later.
+    auto configImagesUUID =
+        createCollectionWithUuid(_opCtx.get(), NamespaceString::kConfigImagesNamespace);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("atest.t");
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    auto collUUID = createCollectionWithUuid(_opCtx.get(), nss);
+    BSONObj doc = BSON("_id" << 0);
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {doc}, 0));
+    Timestamp oldTs{1, 1};
+    BSONObj existingRetryImage = BSON("_id" << sessionId.toBSON() << "txnNum" << 1 << "ts" << oldTs
+                                            << "invalidated" << true);
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        _opCtx.get(), NamespaceString::kConfigImagesNamespace, {existingRetryImage}, 0));
+    OpTime updateOpTime{{2, 2}, 1};
+    OpTime deleteOpTime{{2, 1}, 1};
+
+    auto updateOp = makeOplogEntry(updateOpTime,
+                                   repl::OpTypeEnum::kUpdate,
+                                   nss,
+                                   collUUID,
+                                   update_oplog_entry::makeDeltaOplogEntry(BSON(
+                                       doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
+                                   BSON("_id" << 0) /* o2 */,
+                                   boost::none, /* fromMigrate*/
+                                   sessionInfo,
+                                   RetryImageEnum::kPreImage);
+
+    auto applyOpsOp = makeCommandOplogEntry(
+        deleteOpTime,
+        NamespaceString::kAdminCommandNamespace,
+        BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                           << "d"
+                                           << "ns" << NamespaceString::kConfigImagesNamespace.ns()
+                                           << "ui" << configImagesUUID << "o"
+                                           << BSON("_id" << sessionId.toBSON())))));
+
+    setServerParameter("replWriterThreadCount", 1);
+    setServerParameter("replWriterMinThreadCount", 1);
+    auto writerPool = makeReplWriterPool();
+    NoopOplogApplierObserver observer;
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        &observer,
+        ReplicationCoordinator::get(_opCtx.get()),
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        writerPool.get());
+    ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {applyOpsOp, updateOp}));
+    CollectionReader collectionReaderConfigImages(_opCtx.get(),
+                                                  NamespaceString::kConfigImagesNamespace);
+    BSONObj expectedPreImage = BSON("_id" << sessionId.toBSON() << "txnNum" << 2 << "ts"
+                                          << updateOpTime.getTimestamp() << "imageKind"
+                                          << "preImage"
+                                          << "image" << BSON("_id" << 0) << "invalidated" << false);
+    // We should have only the pre-image in the config.image_collection entry.
+    ASSERT_BSONOBJ_EQ(expectedPreImage, unittest::assertGet(collectionReaderConfigImages.next()));
+    ASSERT_NOT_OK(collectionReaderConfigImages.next());
+
+    // The doc update should have gone through.
+    BSONObj updatedDoc = BSON("_id" << 0 << "a" << 1);
+    CollectionReader collectionReader(_opCtx.get(), nss);
+    ASSERT_BSONOBJ_EQ(updatedDoc, unittest::assertGet(collectionReader.next()));
+}
+
 class MultiOplogEntryOplogApplierImplTest : public OplogApplierImplTest {
 public:
     MultiOplogEntryOplogApplierImplTest()

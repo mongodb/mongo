@@ -338,11 +338,6 @@ void createIndexForApplyOps(OperationContext* opCtx,
 /**
  * @param dataImage can be BSONObj::isEmpty to signal the node is in initial sync and must
  *                  invalidate relevant image collection data.
- * @param upsertConfigImage indicates whether to upsert the config image. If a DuplicateKey error is
- * encountered performing the update (i.e. due to performing racing upserts), this value will be
- * overwritten to false, and this method will throw a write conflict exception. Callers performing
- * upserts using this method within a writeConflictRetry loop should always pass the same variable
- * in on retries, to avoid hitting repeated DuplicateKey errors.
  */
 void writeToImageCollection(OperationContext* opCtx,
                             const LogicalSessionId& sessionId,
@@ -350,8 +345,7 @@ void writeToImageCollection(OperationContext* opCtx,
                             const Timestamp timestamp,
                             repl::RetryImageEnum imageKind,
                             const BSONObj& dataImage,
-                            const StringData& invalidatedReason,
-                            bool* upsertConfigImage) {
+                            const StringData& invalidatedReason) {
     // In practice, this lock acquisition on kConfigImagesNamespace cannot block. The only time a
     // stronger lock acquisition is taken on this namespace is during step up to create the
     // collection.
@@ -373,22 +367,13 @@ void writeToImageCollection(OperationContext* opCtx,
 
     UpdateRequest request;
     request.setNamespaceString(NamespaceString::kConfigImagesNamespace);
-    request.setQuery(
-        BSON("_id" << imageEntry.get_id().toBSON() << "ts" << BSON("$lte" << imageEntry.getTs())));
-    request.setUpsert(*upsertConfigImage);
+    request.setQuery(BSON("_id" << imageEntry.get_id().toBSON()));
+    request.setUpsert(true);
     request.setUpdateModification(
         write_ops::UpdateModification::parseFromClassicUpdate(imageEntry.toBSON()));
     request.setFromOplogApplication(true);
-    try {
-        // This code path can also be hit by things such as `applyOps` and tenant migrations.
-        ::mongo::update(opCtx, autoColl.getDb(), request);
-    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
-        // We can get a duplicate key when two upserts race on inserting a document.
-        *upsertConfigImage = false;
-        // This write conflict is always retried internally and never exposed to the user.
-        throwWriteConflictException(
-            "DuplicateKey error when inserting a document into the pre-images collection.");
-    }
+    // This code path can also be hit by things such as `applyOps` and tenant migrations.
+    ::mongo::update(opCtx, autoColl.getDb(), request);
 }
 
 /* we write to local.oplog.rs:
@@ -1550,9 +1535,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     "mode should be in initialSync or recovering",
                     mode == OplogApplication::Mode::kInitialSync ||
                         OplogApplication::inRecovering(mode));
-            // writeToImageCollection will set this variable to false if a DuplicateKeyError is
-            // encountered, allowing us to retry as a non-upsert. See SERVER-79033 for context.
-            bool upsertConfigImage = true;
             writeConflictRetry(opCtx, "applyOps_imageInvalidation", op.getNss().toString(), [&] {
                 WriteUnitOfWork wuow(opCtx);
                 writeToImageCollection(opCtx,
@@ -1561,8 +1543,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                        op.getApplyOpsTimestamp().value_or(op.getTimestamp()),
                                        op.getNeedsRetryImage().value(),
                                        BSONObj(),
-                                       getInvalidatingReason(mode, isDataConsistent),
-                                       &upsertConfigImage);
+                                       getInvalidatingReason(mode, isDataConsistent));
                 wuow.commit();
             });
         }
@@ -1938,19 +1919,17 @@ Status applyOperation_inlock(OperationContext* opCtx,
             // session. Thus updates to `config.image_collection` documents can be
             // concurrent. Secondaries already coalesce (read: intentionally ignore) some writes to
             // `config.transactions`, we may also omit some writes to `config.image_collection`, so
-            // long as the last write persists. To accomplish this we update
-            // `config.image_collection` entries with an upsert. The query predicate is `{_id:
-            // <lsid>, ts $lt <oplogEntry.ts>}`. This can result in a WriteConflictException when
-            // two writers are concurrently updating/inserting the same document.
+            // long as the last write persists.  We handle this in the oplog applier by allowing
+            // only one write (whether implicit update or explicit delete) to
+            // config.image_collection per applier batch.  This works in the case of rollback
+            // because we are only allowed to retry the latest find-and-modify operation on a
+            // session; any images lost to rollback would have had the wrong transaction ID and
+            // thus not been legal to use anyway
             //
-            // However, when an upsert turns into an insert, a writer can also observe a
-            // DuplicateKeyException as its `ts` clause can hide the document from being
-            // updated. Following up the failed update with an insert turns into a
-            // DuplicateKeyException. This is safe, but to break an infinite loop, we retry the
-            // operation with a regular update as opposed to an upsert. We're guaranteed to not need
-            // to insert a document. We only have to make sure we didn't race with an insert that
-            // won, but with an earlier `ts`.
-            bool upsertConfigImage = true;
+            // On the primary, we are assured the writes to this collection are ordered because
+            // the logical session ID being written is checked out when we do the write.
+            // We can still get a write conflict on the primary as a delete done as part of expired
+            // session cleanup can race with a use of the expired session.
             auto status = writeConflictRetry(opCtx, "applyOps_update", ns, [&] {
                 WriteUnitOfWork wuow(opCtx);
                 if (timestamp != Timestamp::min()) {
@@ -2052,8 +2031,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                            // initial sync, the value passed in here is conveniently
                                            // the empty BSONObj.
                                            ur.requestedDocImage,
-                                           getInvalidatingReason(mode, isDataConsistent),
-                                           &upsertConfigImage);
+                                           getInvalidatingReason(mode, isDataConsistent));
                 }
 
                 if (recordChangeStreamPreImage) {
@@ -2111,7 +2089,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
             const bool recordChangeStreamPreImage = shouldRecordChangeStreamPreImage();
 
             const StringData ns = op.getNss().ns();
-            bool upsertConfigImage = true;
             writeConflictRetry(opCtx, "applyOps_delete", ns, [&] {
                 WriteUnitOfWork wuow(opCtx);
                 if (timestamp != Timestamp::min()) {
@@ -2148,8 +2125,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                            op.getApplyOpsTimestamp().value_or(op.getTimestamp()),
                                            repl::RetryImageEnum::kPreImage,
                                            result.requestedPreImage.value_or(BSONObj()),
-                                           getInvalidatingReason(mode, isDataConsistent),
-                                           &upsertConfigImage);
+                                           getInvalidatingReason(mode, isDataConsistent));
                 }
 
                 if (recordChangeStreamPreImage) {
@@ -2171,8 +2147,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 // It is legal for a delete operation on the pre-images collection to delete zero
                 // documents - pre-image collections are not guaranteed to contain the same set of
                 // documents at all times.
+                //
+                // It is also legal for a delete operation on the config.image_collection (used for
+                // find-and-modify retries) to delete zero documents.  Since we do not write updates
+                // to this collection which are in the same batch as later deletes, a rollback to
+                // the middle of a batch with both an update and a delete may result in a missing
+                // document, which may be later deleted.
                 if (result.nDeleted == 0 && mode == OplogApplication::Mode::kSecondary &&
-                    !requestNss.isChangeStreamPreImagesCollection()) {
+                    !requestNss.isChangeStreamPreImagesCollection() &&
+                    !requestNss.isConfigImagesCollection()) {
                     // In FCV 4.4, each node is responsible for deleting the excess documents in
                     // capped collections. This implies that capped deletes may not be synchronized
                     // between nodes at times. When upgraded to FCV 5.0, the primary will generate

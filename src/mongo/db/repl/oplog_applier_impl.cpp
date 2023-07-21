@@ -111,27 +111,181 @@ Status finishAndLogApply(OperationContext* opCtx,
     return finalStatus;
 }
 
+namespace {
+// Tracks writes to the side table config.image_collection.  This collection is implicitly
+// replicated, and to avoid out-of-order writes, we only want to do the last write
+// to a given row in this collection.  Writes to this collection may be implicit, in CRUD
+// oplog entries with needsRetryImage set, or they can be explicit deletes done by the
+// session reaper.  Anything else is not handled specially.
+//
+// For implicit writes we don't want to do, we clear the needsRetryImage field in the ops
+// vector.  For explict deletes we don't want to do, we just don't add them to the
+// writerVectors.
+class RetryImageRectifier {
+public:
+    ~RetryImageRectifier() {
+        // We should have called the handleLatestDeletes method, which clears this
+        dassert(_retryImageWrites.empty());
+    }
+
+    bool _isSkippableDelete(OplogEntry* op) {
+        return op->getOpType() == OpTypeEnum::kDelete &&
+            op->getNss() == NamespaceString::kConfigImagesNamespace;
+    }
+    /**
+     * Returns true if the op should be skipped because it's a delete in the retry images
+     * table that we don't want to do because there could be a later delete or implicit update on
+     * the same row.
+     *
+     * The ops must be presented to shouldSkipOp in opTime the same order they were in the original
+     * ops vector, and they must be pointers to the ops which will be applied (whether the original
+     * ops or derived ops on the 'derivedOps' vector declared in _applyOplogBatch).  As a side
+     * effect, an OplogEntry passed in a previous call may be modified to prevent a retry image from
+     * being written.
+     */
+    bool shouldSkipOp(OplogEntry* op) {
+        boost::optional<LogicalSessionId> retryImageKey;
+        if (op->getNeedsRetryImage()) {
+            retryImageKey = *op->getSessionId();
+        } else if (_isSkippableDelete(op)) {
+            try {
+                retryImageKey = LogicalSessionId::parse(
+                    IDLParserContext("RectifyConfigImagesWrites"), op->getIdElement().Obj());
+            } catch (const ExceptionFor<ErrorCodes::FailedToParse>&) {
+                LOGV2_WARNING(6796201,
+                              "Found a delete oplog entry for the config.image_collection which "
+                              "did not have a session id as key",
+                              "op"_attr = redact(op->toBSONForLogging()));
+                dassert(false,
+                        "Found a delete oplog entry for the config.image_collection which did not "
+                        "have a session id as key");
+            }
+        }
+        if (retryImageKey) {
+            auto [iter, wasInserted] = _retryImageWrites.emplace(*retryImageKey, op);
+            if (!wasInserted) {
+                // Keep _retryImageWrites up to date with the latest write for a session id.
+                auto* prevOp = iter->second;
+                iter->second = op;
+                // If the previous op had an implicit write of the retry image, we don't want to
+                // do that write.  If it was a delete we'll have already skipped it.
+                if (prevOp->getNeedsRetryImage()) {
+                    prevOp->clearNeedsRetryImage();
+                }
+                LOGV2_DEBUG(6796200,
+                            2,
+                            "Found multiple writes to the same config.image_collection row",
+                            "prevOp"_attr = redact(prevOp->toBSONForLogging()),
+                            "op"_attr = redact(op->toBSONForLogging()));
+            }
+            // We always skip deletes to the retry image table.
+            if (!op->getNeedsRetryImage())
+                return true;
+        }
+        return false;
+    }
+
+    /**
+     * Handles any implicit retry images embedded in an applyOps.  The vector is modified to remove
+     * any image table deletes (which might occur if we are replicating multiple deletes in
+     * applyOps entries)
+     */
+    std::vector<OplogEntry> handleExtractedOpsAndRemoveDeletes(
+        std::vector<OplogEntry>& extractedOps, bool isPrepared) {
+        std::vector<OplogEntry> deletes;
+        auto newEnd = std::remove_if(extractedOps.begin(), extractedOps.end(), [&](OplogEntry& op) {
+            if (_isSkippableDelete(&op)) {
+                // We should never have delete from the retry images
+                // table in a prepared transaction.
+                dassert(!isPrepared);
+                deletes.emplace_back(std::move(op));
+                return true;
+            }
+            return false;
+        });
+        extractedOps.erase(newEnd, extractedOps.end());
+
+        // The following two lines record the ops in the _retryImageWrites table. We cannot do this
+        // until they have been placed on their respective vectors, because we need the
+        // _retryImageWrites table to hold pointers to the actual ops which will be applied.
+        //
+        // The order does not matter, because extracted ops vectors are all at the same timestamp.
+        // We do not expect either multiple implicit writes for the same session ID, nor
+        // an implicit write and a delete for the same session ID, in the same extracted ops vector.
+        std::for_each(extractedOps.begin(), extractedOps.end(), [&](OplogEntry& op) {
+            bool skipped = shouldSkipOp(&op);
+            dassert(!skipped);
+        });
+        std::for_each(deletes.begin(), deletes.end(), [&](OplogEntry& op) {
+            bool skipped = shouldSkipOp(&op);
+            dassert(skipped);
+        });
+        return deletes;
+    }
+
+    // Convenience function to call handleExtractedOpsAndRemoveDeletes, store both deletes and
+    // remaining extracted ops in derivedOps, and return a reference to the remaining extractedOps
+    // on the derivedOps vector.  The deletes and extracted ops are stored in the derivedOps vector
+    // to ensure their lifetime continues until batch application is complete; the deletes may be
+    // applied when handleLatestDeletes() is called.
+    std::vector<OplogEntry>& storeExtractedOpsAndDeletes(
+        std::vector<OplogEntry>&& origExtractedOps,
+        std::vector<std::vector<OplogEntry>>* derivedOps,
+        bool isPrepared) {
+        derivedOps->emplace_back(std::move(origExtractedOps));
+        auto deletes = handleExtractedOpsAndRemoveDeletes(derivedOps->back(), isPrepared);
+        if (deletes.empty())
+            return derivedOps->back();
+        derivedOps->emplace_back(std::move(deletes));
+        return (*derivedOps)[derivedOps->size() - 2];
+    }
+
+    // Should be called after all oplog entries have been processed to handle the deletes that
+    // were not superceded by a later write.
+    void handleLatestDeletes(std::function<void(OplogEntry*)> handler) {
+        std::for_each(_retryImageWrites.begin(),
+                      _retryImageWrites.end(),
+                      [&handler](decltype(_retryImageWrites)::value_type& val) {
+                          auto* op = val.second;
+                          // We don't want to execute operations with implicit updates again, we
+                          // only want to do the deletes we skipped.
+                          if (!op->getNeedsRetryImage()) {
+                              dassert(op->getOpType() == OpTypeEnum::kDelete);
+                              handler(op);
+                          }
+                      });
+        _retryImageWrites.clear();
+    }
+
+private:
+    LogicalSessionIdMap<OplogEntry*> _retryImageWrites;
+};
+}  // namespace
+
 void _addOplogChainOpsToWriterVectors(OperationContext* opCtx,
                                       OplogEntry* op,
                                       std::vector<OplogEntry*>* partialTxnList,
                                       std::vector<std::vector<OplogEntry>>* derivedOps,
                                       std::vector<std::vector<ApplierOperation>>* writerVectors,
-                                      CachedCollectionProperties* collPropertiesCache) {
+                                      CachedCollectionProperties* collPropertiesCache,
+                                      RetryImageRectifier* retryImageRectifier) {
     auto [txnOps, shouldSerialize] =
         readTransactionOperationsFromOplogChainAndCheckForCommands(opCtx, *op, *partialTxnList);
-    derivedOps->emplace_back(std::move(txnOps));
+    auto& extractedOps = retryImageRectifier->storeExtractedOpsAndDeletes(
+        std::move(txnOps), derivedOps, op->shouldPrepare());
+
     partialTxnList->clear();
 
     if (op->shouldPrepare()) {
         // Prepared transaction operations should not have commands.
         invariant(!shouldSerialize);
         OplogApplierUtils::addDerivedPrepares(
-            opCtx, op, &derivedOps->back(), writerVectors, collPropertiesCache);
+            opCtx, op, &extractedOps, writerVectors, collPropertiesCache);
         return;
     }
 
     OplogApplierUtils::addDerivedOps(
-        opCtx, &derivedOps->back(), writerVectors, collPropertiesCache, shouldSerialize);
+        opCtx, &extractedOps, writerVectors, collPropertiesCache, shouldSerialize);
 }
 
 Status _insertDocumentsToOplogAndChangeCollections(
@@ -704,12 +858,15 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
 }
 
 /**
- * ops - This only modifies the isForCappedCollection field on each op. It does not alter the ops
- *      vector in any other way.
+ * ops - This only modifies the isForCappedCollection and hasRetryImage fields on each op. It does
+ *       not alter the ops vector in any other way.
+ *
  * writerVectors - Set of operations for each worker thread to apply.
- * derivedOps - If provided, this function inserts a decomposition of applyOps operations
- *      and instructions for updating the transactions table.  Required if processing oplogs
- *      with transactions.
+ *
+ * derivedOps - If provided, this function inserts a decomposition of applyOps operations and
+ *              instructions for updating the transactions table.  Required if processing oplogs
+ *              with transactions.
+ *
  * sessionUpdateTracker - if provided, keeps track of session info from ops.
  */
 void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
@@ -745,6 +902,8 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
 
     CachedCollectionProperties collPropertiesCache;
 
+    RetryImageRectifier retryImageRectifier;
+
     for (auto&& op : *ops) {
         // If the operation's optime is before or the same as the beginApplyingOpTime we don't want
         // to apply it, so don't include it in writerVectors.
@@ -762,6 +921,14 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
                                                  writerVectors,
                                                  &collPropertiesCache,
                                                  false /*serial*/);
+            }
+
+            // If this is a delete for a config.images_collection entry that will be written later
+            // in this batch, skip it.  We only check this when there is a sessionUpdateTracker,
+            // because the operations passed in when there is no sessionUpdateTracker (which are
+            // session table updates) should not be affecting the retry image table.
+            if (retryImageRectifier.shouldSkipOp(&op)) {
+                continue;
             }
         }
 
@@ -805,21 +972,24 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
                 // oplog and fill writers with those operations.
                 // Flush partialTxnList operations for current transaction.
                 auto* partialTxnList = getPartialTxnList(op);
-                _addOplogChainOpsToWriterVectors(
-                    opCtx, &op, partialTxnList, derivedOps, writerVectors, &collPropertiesCache);
+                _addOplogChainOpsToWriterVectors(opCtx,
+                                                 &op,
+                                                 partialTxnList,
+                                                 derivedOps,
+                                                 writerVectors,
+                                                 &collPropertiesCache,
+                                                 &retryImageRectifier);
                 invariant(partialTxnList->empty(), op.toStringForLogging());
             } else {
                 // The applyOps entry was not generated as part of a transaction.
                 invariant(!op.getPrevWriteOpTimeInTransaction());
 
-                derivedOps->emplace_back(ApplyOps::extractOperations(op));
+                auto& extractedOps = retryImageRectifier.storeExtractedOpsAndDeletes(
+                    ApplyOps::extractOperations(op), derivedOps, false /* isPrepared */);
 
                 // Nested entries cannot have different session updates.
-                OplogApplierUtils::addDerivedOps(opCtx,
-                                                 &derivedOps->back(),
-                                                 writerVectors,
-                                                 &collPropertiesCache,
-                                                 false /*serial*/);
+                OplogApplierUtils::addDerivedOps(
+                    opCtx, &extractedOps, writerVectors, &collPropertiesCache, false /*serial*/);
             }
             continue;
         }
@@ -830,8 +1000,13 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
             // operations and fill writers with the extracted operations.
             if (op.shouldPrepare() && (getOptions().mode == OplogApplication::Mode::kSecondary)) {
                 auto* partialTxnList = getPartialTxnList(op);
-                _addOplogChainOpsToWriterVectors(
-                    opCtx, &op, partialTxnList, derivedOps, writerVectors, &collPropertiesCache);
+                _addOplogChainOpsToWriterVectors(opCtx,
+                                                 &op,
+                                                 partialTxnList,
+                                                 derivedOps,
+                                                 writerVectors,
+                                                 &collPropertiesCache,
+                                                 &retryImageRectifier);
                 continue;
             }
 
@@ -850,14 +1025,22 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
         // with the extracted operations.
         if (op.isPreparedCommit() && (getOptions().mode == OplogApplication::Mode::kInitialSync)) {
             auto* partialTxnList = getPartialTxnList(op);
-            _addOplogChainOpsToWriterVectors(
-                opCtx, &op, partialTxnList, derivedOps, writerVectors, &collPropertiesCache);
+            _addOplogChainOpsToWriterVectors(opCtx,
+                                             &op,
+                                             partialTxnList,
+                                             derivedOps,
+                                             writerVectors,
+                                             &collPropertiesCache,
+                                             &retryImageRectifier);
             invariant(partialTxnList->empty(), op.toStringForLogging());
             continue;
         }
 
         OplogApplierUtils::addToWriterVector(opCtx, &op, writerVectors, &collPropertiesCache);
     }
+    retryImageRectifier.handleLatestDeletes([&](OplogEntry* op) {
+        OplogApplierUtils::addToWriterVector(opCtx, op, writerVectors, &collPropertiesCache);
+    });
 }
 
 void OplogApplierImpl::_fillWriterVectors(
