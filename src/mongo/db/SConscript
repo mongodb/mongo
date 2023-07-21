@@ -2062,6 +2062,17 @@ env.Library(
 )
 
 env.Library(
+    target='feature_compatibility_version_metrics',
+    source=[
+        'feature_compatibility_version_metrics.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        'server_base',
+    ],
+)
+
+env.Library(
     target='service_context_test_fixture',
     source=[
         'service_context_test_fixture.cpp',
@@ -2293,6 +2304,7 @@ env.Library(
         'dbdirectclient',
         'dbhelpers',
         'exec/working_set',
+        'feature_compatibility_version_metrics',
         'ftdc/ftdc_mongod',
         'fts/ftsmongod',
         'index/index_access_method',
