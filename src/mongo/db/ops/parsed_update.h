@@ -188,7 +188,7 @@ private:
      * Handles splitting and/or translating the timeseries query predicate, if applicable. Must be
      * called before parsing the query and update.
      */
-    void maybeTranslateTimeseriesUpdate();
+    Status maybeTranslateTimeseriesUpdate();
 
     // Unowned pointer to the transactional context.
     OperationContext* _opCtx;

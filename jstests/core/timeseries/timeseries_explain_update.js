@@ -134,12 +134,11 @@ function testUpdateExplain({
             u: {$set: {[metaFieldName]: 3}},
             multi: true,
         },
-        expectedUpdateStageName: "TS_MODIFY",
+        // If the update query is empty, we should use the UPDATE plan.
+        expectedUpdateStageName: "UPDATE",
         expectedOpType: "updateMany",
-        expectedBucketFilter: makeBucketFilter({}),
-        expectedResidualFilter: {},
+        expectedBucketFilter: makeBucketFilter(),
         expectedNumUpdated: 4,
-        expectedNumUnpacked: 2
     });
 })();
 

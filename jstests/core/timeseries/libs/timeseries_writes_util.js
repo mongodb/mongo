@@ -88,8 +88,13 @@ export let mongos1DB = null;
  *
  * The bucket-level filter is composed of the closed bucket filter and the given filter(s) which
  * are ANDed together. The closed bucket filter is always the first element of the AND array.
+ * Zero or more filters can be passed in as arguments.
  */
 export function makeBucketFilter(...args) {
+    if (!args.length) {
+        return closedBucketFilter;
+    }
+
     return {$and: [closedBucketFilter].concat(Array.from(args))};
 }
 
