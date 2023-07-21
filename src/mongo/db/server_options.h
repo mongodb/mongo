@@ -148,6 +148,13 @@ struct ServerGlobalParams {
             return _version.load();
         }
 
+        /**
+         * Returns the current version but caller is responsible for verifying if it's initialized.
+         */
+        FCV getVersionMustVerifyInitialized() const {
+            return _version.load();
+        }
+
         bool isLessThanOrEqualTo(FCV version, FCV* versionReturn = nullptr) const {
             auto currentVersion = getVersion();
             if (versionReturn != nullptr) {

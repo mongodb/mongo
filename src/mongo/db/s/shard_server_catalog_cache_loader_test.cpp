@@ -645,5 +645,44 @@ TEST_F(ShardServerCatalogCacheLoaderTest, setFCVForGetDatabase) {
     ASSERT_FALSE(cachedDoc.isEmpty());
 }
 
+TEST_F(ShardServerCatalogCacheLoaderTest, getChunksWithUninitializedFCV) {
+    const auto kOriginalRole = serverGlobalParams.clusterRole;
+    const auto kOriginalFCV = serverGlobalParams.featureCompatibility.getVersion();
+
+    ON_BLOCK_EXIT([&] {
+        serverGlobalParams.clusterRole = kOriginalRole;
+        serverGlobalParams.mutableFeatureCompatibility.setVersion(kOriginalFCV);
+    });
+
+    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    serverGlobalParams.mutableFeatureCompatibility.reset();
+
+    const ChunkVersion collectionPlacementVersion({OID::gen(), Timestamp(1, 1)}, {1, 2});
+    const auto collectionType = makeCollectionType(collectionPlacementVersion);
+
+    auto future = _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED());
+    ASSERT_THROWS_CODE(future.get(), DBException, 7918300);
+}
+
+TEST_F(ShardServerCatalogCacheLoaderTest, getChunksWithUninitializedFCVWhileSecondary) {
+    const auto kOriginalRole = serverGlobalParams.clusterRole;
+    const auto kOriginalFCV = serverGlobalParams.featureCompatibility.getVersion();
+
+    ON_BLOCK_EXIT([&] {
+        serverGlobalParams.clusterRole = kOriginalRole;
+        serverGlobalParams.mutableFeatureCompatibility.setVersion(kOriginalFCV);
+    });
+
+    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    serverGlobalParams.mutableFeatureCompatibility.reset();
+
+    const ChunkVersion collectionPlacementVersion({OID::gen(), Timestamp(1, 1)}, {1, 2});
+    const auto collectionType = makeCollectionType(collectionPlacementVersion);
+
+    _shardLoader->onStepDown();
+    auto future = _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED());
+    ASSERT_THROWS_CODE(future.get(), DBException, 7918300);
+}
+
 }  // namespace
 }  // namespace mongo

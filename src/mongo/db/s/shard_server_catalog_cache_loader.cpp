@@ -354,9 +354,19 @@ void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx, S
 
 // TODO: SERVER-74105 remove
 bool shouldSkipStoringLocally() {
-    // Note: cannot use isExclusivelyConfigSvrRole as it ignores fcv.
-    return serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-        !gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility);
+    // Note: cannot use isExclusivelyConfigSvrRole as it ignores the feature flag.
+    if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+        return false;
+    }
+
+    const auto fcv = serverGlobalParams.featureCompatibility.getVersionMustVerifyInitialized();
+
+    // Note: it is possible for fcv to become uninitialized temporarily during initial sync.
+    uassert(7918300,
+            "feature compatibility version is not initialized",
+            fcv != multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
+
+    return !gFeatureFlagCatalogShard.isEnabledOnVersion(fcv);
 }
 
 }  // namespace
