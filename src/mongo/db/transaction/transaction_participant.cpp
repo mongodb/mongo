@@ -1793,6 +1793,8 @@ TransactionParticipant::Participant::prepareTransaction(
                                      p().transactionOperations.getNumberOfPrePostImagesToWrite(),
                                      wallClockTime);
 
+    opObserver->postTransactionPrepare(opCtx, reservedSlots, *completedTransactionOperations);
+
     abortGuard.dismiss();
 
     {

@@ -1293,6 +1293,7 @@ protected:
                                           applyOpsAssignment,
                                           numberOfPrePostImagesToWrite,
                                           currentTime);
+        opObserver().postTransactionPrepare(opCtx(), reservedSlots, *txnOps);
     }
 
 private:
