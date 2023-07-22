@@ -135,15 +135,10 @@ runWildcardIndexTest({'$**': 1}, {'b.c': 0}, ['a', 'b.d.e']);
 runWildcardIndexTest({'$**': 1}, {a: 0, 'b.c': 0}, ['b.d.e']);
 
 // Test compound wildcard indexes.
-// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
-const allowCompoundWildcardIndexes =
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
-if (allowCompoundWildcardIndexes) {
-    runWildcardIndexTest({'$**': 1, 'other': 1}, {'other': 0}, ['a', 'b.c', 'b.d.e']);
-    runWildcardIndexTest({'$**': -1, 'other': 1}, {'other': 0}, ['a', 'b.c', 'b.d.e'], -1);
-    runWildcardIndexTest({'a.$**': 1, 'other': 1}, null, ['a']);
-    runWildcardIndexTest({'b.c.$**': 1, 'other': -1}, null, ['b.c']);
-}
+runWildcardIndexTest({'$**': 1, 'other': 1}, {'other': 0}, ['a', 'b.c', 'b.d.e']);
+runWildcardIndexTest({'$**': -1, 'other': 1}, {'other': 0}, ['a', 'b.c', 'b.d.e'], -1);
+runWildcardIndexTest({'a.$**': 1, 'other': 1}, null, ['a']);
+runWildcardIndexTest({'b.c.$**': 1, 'other': -1}, null, ['b.c']);
 
 const wildcardIndexes = [
     {keyPattern: {"$**": 1}},
@@ -156,9 +151,6 @@ for (const indexSpec of wildcardIndexes) {
     coll = db.getCollection(collNamePrefix + collCount++);
     coll.drop();
 
-    if (!allowCompoundWildcardIndexes && indexSpec.wildcardProjection) {
-        continue;
-    }
     const option = {};
     if (indexSpec.wildcardProjection) {
         option['wildcardProjection'] = indexSpec.wildcardProjection;
@@ -186,9 +178,6 @@ coll = db.getCollection(collNamePrefix + collCount++);
 for (const indexSpec of wildcardIndexes) {
     coll.drop();
 
-    if (!allowCompoundWildcardIndexes && indexSpec.wildcardProjection) {
-        continue;
-    }
     const option = {};
     if (indexSpec.wildcardProjection) {
         option['wildcardProjection'] = indexSpec.wildcardProjection;
@@ -267,9 +256,6 @@ coll = db.getCollection(collNamePrefix + collCount++);
 for (const indexSpec of wildcardIndexes) {
     coll.drop();
 
-    if (!allowCompoundWildcardIndexes && indexSpec.wildcardProjection) {
-        continue;
-    }
     const option = {};
     if (indexSpec.wildcardProjection) {
         option['wildcardProjection'] = indexSpec.wildcardProjection;
@@ -323,9 +309,6 @@ coll = db.getCollection(collNamePrefix + collCount++);
 for (const indexSpec of wildcardIndexes) {
     coll.drop();
 
-    if (!allowCompoundWildcardIndexes && indexSpec.wildcardProjection) {
-        continue;
-    }
     const option = {};
     if (indexSpec.wildcardProjection) {
         option['wildcardProjection'] = indexSpec.wildcardProjection;

@@ -165,9 +165,7 @@ BSONObj buildRepairedIndexSpec(
 }
 }  // namespace
 
-Status validateKeyPattern(const BSONObj& key,
-                          IndexDescriptor::IndexVersion indexVersion,
-                          bool checkFCV) {
+Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion indexVersion) {
     const ErrorCodes::Error code = ErrorCodes::CannotCreateIndex;
 
     if (key.objsize() > 2048)
@@ -186,17 +184,7 @@ Status validateKeyPattern(const BSONObj& key,
             return Status(code, str::stream() << "Unknown index plugin '" << pluginName << '\'');
     }
 
-    // (Ignore FCV check): This is intentional because we want clusters which have wildcard indexes
-    // still be able to use the feature even if the FCV is downgraded.
-    auto compoundWildcardIndexesAllowed =
-        feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe();
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() && checkFCV) {
-        compoundWildcardIndexesAllowed =
-            feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
-                serverGlobalParams.featureCompatibility);
-    }
-
-    if (pluginName == IndexNames::WILDCARD && compoundWildcardIndexesAllowed) {
+    if (pluginName == IndexNames::WILDCARD) {
         auto status = validateWildcardIndex(key);
         if (!status.isOK()) {
             return status;
@@ -225,10 +213,6 @@ Status validateKeyPattern(const BSONObj& key,
                         return {code, "Values in the index key pattern cannot be NaN."};
                     } else if (value == 0.0) {
                         return {code, "Values in the index key pattern cannot be 0."};
-                    } else if (value < 0.0 && pluginName == IndexNames::WILDCARD &&
-                               !compoundWildcardIndexesAllowed) {
-                        return {code,
-                                "A numeric value in a $** index key pattern must be positive."};
                     }
                 } else if (keyElement.type() != BSONType::String) {
                     return {code,
@@ -254,11 +238,9 @@ Status validateKeyPattern(const BSONObj& key,
 
         StringData fieldName(keyElement.fieldNameStringData());
 
-        // TODO SERVER-68303: Remove the CompoundWildcardIndexes feature flag.
-        if ((pluginName == IndexNames::WILDCARD && !compoundWildcardIndexesAllowed) ||
-            pluginName == IndexNames::COLUMN) {
+        if (pluginName == IndexNames::COLUMN) {
             if (key.nFields() != 1) {
-                // Columnstore and wildcard indexes do not support compound indexes.
+                // Columnstore indexes do not support compound indexes.
                 return Status(code,
                               str::stream() << pluginName << " indexes do not allow compounding");
             } else if (!WildcardNames::isWildcardFieldName(fieldName)) {
@@ -366,9 +348,7 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
     return buildRepairedIndexSpec(ns, indexSpec, allowedFieldNames, fixIndexSpecFn);
 }
 
-StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
-                                      const BSONObj& indexSpec,
-                                      bool checkFCV) {
+StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& indexSpec) {
     bool hasKeyPatternField = false;
     bool hasIndexNameField = false;
     bool hasNamespaceField = false;
@@ -422,7 +402,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
             // Here we always validate the key pattern according to the most recent rules, in order
             // to enforce that all new indexes have well-formed key patterns.
             Status keyPatternValidateStatus =
-                validateKeyPattern(keyPattern, IndexDescriptor::kLatestIndexVersion, checkFCV);
+                validateKeyPattern(keyPattern, IndexDescriptor::kLatestIndexVersion);
             if (!keyPatternValidateStatus.isOK()) {
                 return keyPatternValidateStatus;
             }
@@ -581,12 +561,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
             }
             try {
                 if (isWildcard) {
-                    // (Ignore FCV check): This is intentional because we want clusters which have
-                    // wildcard indexes still be able to use the feature even if the FCV is
-                    // downgraded.
-                    if (key.nFields() > 1 &&
-                        feature_flags::gFeatureFlagCompoundWildcardIndexes
-                            .isEnabledAndIgnoreFCVUnsafe()) {
+                    if (key.nFields() > 1) {
                         auto validationStatus =
                             validateWildcardProjection(key, indexSpecElem.embeddedObject());
                         if (!validationStatus.isOK()) {
@@ -771,7 +746,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
 
     if (hasOriginalSpecField) {
         StatusWith<BSONObj> modifiedOriginalSpec = validateIndexSpec(
-            opCtx, indexSpec.getObjectField(IndexDescriptor::kOriginalSpecFieldName), checkFCV);
+            opCtx, indexSpec.getObjectField(IndexDescriptor::kOriginalSpecFieldName));
         if (!modifiedOriginalSpec.isOK()) {
             return modifiedOriginalSpec.getStatus();
         }
@@ -1027,15 +1002,13 @@ bool isIndexAllowedInAPIVersion1(const IndexDescriptor& indexDesc) {
         !indexDesc.isSparse();
 }
 
-BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx,
-                                   const BSONObj& indexSpecObj,
-                                   bool checkFCV) {
+BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx, const BSONObj& indexSpecObj) {
     constexpr auto k_id_ = "_id_"_sd;
     constexpr auto kStar = "*"_sd;
 
     BSONObj parsedIndexSpec = indexSpecObj;
 
-    auto indexSpecStatus = index_key_validate::validateIndexSpec(opCtx, parsedIndexSpec, checkFCV);
+    auto indexSpecStatus = index_key_validate::validateIndexSpec(opCtx, parsedIndexSpec);
     uassertStatusOK(indexSpecStatus.getStatus().withContext(
         str::stream() << "Error in specification " << parsedIndexSpec.toString()));
 

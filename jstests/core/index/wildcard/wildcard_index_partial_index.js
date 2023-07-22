@@ -10,10 +10,6 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const coll = db.wildcard_partial_index;
 
-// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
-const allowCompoundWildcardIndexes =
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
-
 function testPartialWildcardIndex(indexKeyPattern, indexOptions) {
     coll.drop();
 
@@ -52,22 +48,20 @@ testPartialWildcardIndex({"$**": 1}, {partialFilterExpression: {a: {$lte: 1.5}}}
 // Case where the partial filter expression is on a field not included in the index.
 testPartialWildcardIndex({"x.$**": 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
 
-if (allowCompoundWildcardIndexes) {
-    // Test compound wildcard indexes work with 'partialFilterExpression' as well.
-    // Case where the partial filter expression is on a field in the index.
-    testPartialWildcardIndex(
-        {"$**": 1, other: 1},
-        {partialFilterExpression: {a: {$lte: 1.5}}, wildcardProjection: {other: 0}});
+// Test compound wildcard indexes work with 'partialFilterExpression' as well.
+// Case where the partial filter expression is on a field in the index.
+testPartialWildcardIndex(
+    {"$**": 1, other: 1},
+    {partialFilterExpression: {a: {$lte: 1.5}}, wildcardProjection: {other: 0}});
 
-    testPartialWildcardIndex(
-        {a: 1, "$**": -1, other: 1},
-        {partialFilterExpression: {a: {$lte: 1.5}}, wildcardProjection: {a: 0, other: 0}});
+testPartialWildcardIndex(
+    {a: 1, "$**": -1, other: 1},
+    {partialFilterExpression: {a: {$lte: 1.5}}, wildcardProjection: {a: 0, other: 0}});
 
-    testPartialWildcardIndex({"a.$**": -1, other: 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
+testPartialWildcardIndex({"a.$**": -1, other: 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
 
-    // Case where the partial filter expression is on a field not included in the index.
-    testPartialWildcardIndex({"x.$**": 1, other: 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
-}
+// Case where the partial filter expression is on a field not included in the index.
+testPartialWildcardIndex({"x.$**": 1, other: 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
 
 // This part of this test is designed to reproduce SERVER-48614. Historically, the correctness of
 // the following queries was impacted by a bug in the plan caching system.

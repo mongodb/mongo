@@ -15,14 +15,8 @@ const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojso
 
 const wildcardIndexes =
     [{keyPattern: {"$**": 1}}, {keyPattern: {"$**": 1, other: 1}, wildcardProjection: {other: 0}}];
-// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
-const allowCompoundWildcardIndexes =
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
 
 for (const indexSpec of wildcardIndexes) {
-    if (!allowCompoundWildcardIndexes && indexSpec.wildcardProjection) {
-        continue;
-    }
     coll.drop();
     const option = {};
     if (indexSpec.wildcardProjection) {

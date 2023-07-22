@@ -8,10 +8,6 @@ import {getWinningPlan, getPlanStages} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load("jstests/libs/fixture_helpers.js");  // For numberOfShardsForCollection().
 
-// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
-const allowCompoundWildcardIndexes =
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
-
 const coll = db.wildcard_nonblocking_sort;
 coll.drop();
 
@@ -101,14 +97,12 @@ for (const dir of [1, -1]) {
 }
 
 // Repeat tests for compound wildcard indexes.
-if (allowCompoundWildcardIndexes) {
-    assert.commandWorked(coll.dropIndexes());
-    assert.commandWorked(
-        coll.createIndex({"$**": 1, excludedField: 1}, {wildcardProjection: {"excludedField": 0}}));
+assert.commandWorked(coll.dropIndexes());
+assert.commandWorked(
+    coll.createIndex({"$**": 1, excludedField: 1}, {wildcardProjection: {"excludedField": 0}}));
 
-    for (const dir of [1, -1]) {
-        for (const proj of [{}, {_id: 0, a: 1}]) {
-            runSortTests(dir, proj, {a: dir, excludedField: dir}, true /* isCompound */);
-        }
+for (const dir of [1, -1]) {
+    for (const proj of [{}, {_id: 0, a: 1}]) {
+        runSortTests(dir, proj, {a: dir, excludedField: dir}, true /* isCompound */);
     }
 }

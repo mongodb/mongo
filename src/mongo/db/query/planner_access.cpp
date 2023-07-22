@@ -1618,10 +1618,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
 
     // Short-circuit: an AND of one child is just the child.
     if (ixscanNodes.size() == 1) {
-        // (Ignore FCV check): This is intentional because we want clusters which have wildcard
-        // indexes still be able to use the feature even if the FCV is downgraded.
         if (root->numChildren() > 0 &&
-            feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe() &&
             wildcard_planning::canOnlyAnswerWildcardPrefixQuery(ixscanNodes)) {
             // If we get here, we have a compound wildcard index which can answer one or more of the
             // predicates in the $and, but we also have at least one additional node attached to the

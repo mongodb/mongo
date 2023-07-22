@@ -2,7 +2,6 @@
  * Tests that Compound Wildcard Indexes indexes obey hinting.
  * @tags: [
  *   assumes_read_concern_local,
- *   featureFlagCompoundWildcardIndexes,
  *   requires_fcv_70,
  * ]
  */

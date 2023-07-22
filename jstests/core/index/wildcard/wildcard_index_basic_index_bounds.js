@@ -12,7 +12,6 @@
  *   # worse CWI because the planner may not run sufficient trials if there's no enough docs in some
  *   # shard.
  *   assumes_unsharded_collection,
- *   featureFlagCompoundWildcardIndexes,
  * ]
  */
 import {
@@ -35,10 +34,6 @@ function assertResultsEq(cursor1, cursor2) {
 
 const coll = db.wildcard_index_bounds;
 coll.drop();
-
-// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
-const allowCompoundWildcardIndexes =
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
 
 // Template document which defines the 'schema' of the documents in the test collection.
 const templateDoc = {
@@ -290,9 +285,6 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
 
 // Given a compound wildcard key pattern, runs tests similar to 'runWildcardIndexTest()'.
 function runCompoundWildcardIndexTest(keyPattern, pathProjection) {
-    if (!allowCompoundWildcardIndexes) {
-        return;
-    }
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(
         coll.createIndex(keyPattern, pathProjection ? {wildcardProjection: pathProjection} : {}));

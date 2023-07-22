@@ -26,14 +26,7 @@ assert.commandWorked(coll.insert([
 
 const wildcardIndexes =
     [{keyPattern: {"$**": 1}}, {keyPattern: {"$**": 1, b: 1}, wildcardProjection: {b: 0}}];
-// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
-const allowCompoundWildcardIndexes =
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
-
 for (const indexSpec of wildcardIndexes) {
-    if (!allowCompoundWildcardIndexes && indexSpec.wildcardProjection) {
-        continue;
-    }
     const option = {};
     if (indexSpec.wildcardProjection) {
         option['wildcardProjection'] = indexSpec.wildcardProjection;

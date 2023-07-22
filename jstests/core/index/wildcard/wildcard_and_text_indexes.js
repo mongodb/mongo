@@ -21,9 +21,6 @@ const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojso
 const coll = db.wildcard_and_text_indexes;
 coll.drop();
 
-// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
-const allowCompoundWildcardIndexes =
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
 const compoundPattern = {
     "pre": 1,
     "$**": -1
@@ -33,10 +30,10 @@ const compoundPattern = {
 // index on the given 'expectedPath' was used to answer the query, and that the results are
 // identical to those obtained via COLLSCAN.
 function assertWildcardQuery(query, expectedPath, isCompound) {
-    if (allowCompoundWildcardIndexes && !isCompound) {
+    if (!isCompound) {
         // Hide the compound wildcard index to make sure the single-field wildcard index is used.
         assert.commandWorked(coll.hideIndex(compoundPattern));
-    } else if (allowCompoundWildcardIndexes && isCompound) {
+    } else {
         // Hide the regular wildcard index to make sure the compound wildcard index is used.
         assert.commandWorked(coll.hideIndex({"$**": 1}));
     }
@@ -53,9 +50,9 @@ function assertWildcardQuery(query, expectedPath, isCompound) {
     // Verify that the results obtained from the $** index are identical to a COLLSCAN.
     assertArrayEq(coll.find(query).toArray(), coll.find(query).hint({$natural: 1}).toArray());
 
-    if (allowCompoundWildcardIndexes && !isCompound) {
+    if (!isCompound) {
         assert.commandWorked(coll.unhideIndex(compoundPattern));
-    } else if (allowCompoundWildcardIndexes && isCompound) {
+    } else {
         assert.commandWorked(coll.unhideIndex({"$**": 1}));
     }
 }
@@ -72,16 +69,12 @@ assert.commandWorked(coll.insertMany([
 // Build a wildcard index, and verify that it can be used to query for the field '_fts'.
 assert.commandWorked(coll.createIndex({"$**": 1}));
 
-if (allowCompoundWildcardIndexes) {
-    // Build a compound wildcard index, and verify that it can be used to query for the field '_fts'
-    // and a regular field.
-    assert.commandWorked(coll.createIndex(compoundPattern, {'wildcardProjection': {pre: 0}}));
-}
+// Build a compound wildcard index, and verify that it can be used to query for the field '_fts'
+// and a regular field.
+assert.commandWorked(coll.createIndex(compoundPattern, {'wildcardProjection': {pre: 0}}));
 
 assertWildcardQuery({_fts: {$gt: 0, $lt: 4}}, {'_fts': 1}, false /* isCompound */);
-if (allowCompoundWildcardIndexes) {
-    assertWildcardQuery({_fts: 10, pre: 1}, {'pre': 1, '$_path': 1}, true /* isCompound */);
-}
+assertWildcardQuery({_fts: 10, pre: 1}, {'pre': 1, '$_path': 1}, true /* isCompound */);
 
 // Perform the tests below for simple and compound $text indexes.
 for (let textIndex of [{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
@@ -91,9 +84,7 @@ for (let textIndex of [{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
     // Confirm that the wildcard index can still be used to query for the '_fts' field outside of
     // $text queries.
     assertWildcardQuery({_fts: {$gt: 0, $lt: 4}}, {'_fts': 1}, false /* isCompound */);
-    if (allowCompoundWildcardIndexes) {
-        assertWildcardQuery({_fts: 10, pre: 1}, {'pre': 1, '$_path': 1}, true /* isCompound */);
-    }
+    assertWildcardQuery({_fts: 10, pre: 1}, {'pre': 1, '$_path': 1}, true /* isCompound */);
 
     // Confirm that $** does not generate a candidate plan for $text search, including cases
     // when the query filter contains a compound field in the $text index.

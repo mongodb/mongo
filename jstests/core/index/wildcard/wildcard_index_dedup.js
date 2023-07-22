@@ -16,17 +16,11 @@ coll.drop();
 
 assert.commandWorked(coll.createIndex({"$**": 1}));
 
-// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
-const allowCompoundWildcardIndexes =
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
-
 const compoundKeyPattern = {
     "a.$**": 1,
     post: 1
 };
-if (allowCompoundWildcardIndexes) {
-    assert.commandWorked(coll.createIndex(compoundKeyPattern));
-}
+assert.commandWorked(coll.createIndex(compoundKeyPattern));
 
 assert.commandWorked(
     coll.insert({a: {b: 1, c: {f: 1, g: 1}, h: [1, 2, 3]}, d: {e: [1, 2, 3]}, post: 1}));
@@ -43,8 +37,6 @@ assert.eq(1, coll.find({d: {$exists: true}}).hint({"$**": 1}).itcount());
 // does not return duplicates of the same object.
 assert.eq(1, coll.find({"a.c": {$exists: true}}).hint({"$**": 1}).itcount());
 
-if (allowCompoundWildcardIndexes) {
-    // Test compound wildcard indexes do not return duplicates.
-    assert.eq(1, coll.find({"a.c": {$exists: true}, post: 1}).hint(compoundKeyPattern).itcount());
-    assert.eq(1, coll.find({"a.h": {$exists: true}, post: 1}).hint(compoundKeyPattern).itcount());
-}
+// Test compound wildcard indexes do not return duplicates.
+assert.eq(1, coll.find({"a.c": {$exists: true}, post: 1}).hint(compoundKeyPattern).itcount());
+assert.eq(1, coll.find({"a.h": {$exists: true}, post: 1}).hint(compoundKeyPattern).itcount());

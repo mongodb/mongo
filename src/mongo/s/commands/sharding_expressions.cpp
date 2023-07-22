@@ -525,8 +525,8 @@ Value ExpressionInternalIndexKey::evaluate(const Document& root, Variables* vari
     auto specObj = _spec->evaluate(root, variables).getDocument().toBson();
 
     // Parse and validate the index spec and then create the index descriptor object from it.
-    auto indexSpec = index_key_validate::parseAndValidateIndexSpecs(
-        getExpressionContext()->opCtx, specObj, false /* checkFCV */);
+    auto indexSpec =
+        index_key_validate::parseAndValidateIndexSpecs(getExpressionContext()->opCtx, specObj);
     BSONObj keyPattern = indexSpec.getObjectField(kIndexSpecKeyField);
     auto indexDescriptor =
         std::make_unique<IndexDescriptor>(IndexNames::findPluginName(keyPattern), indexSpec);

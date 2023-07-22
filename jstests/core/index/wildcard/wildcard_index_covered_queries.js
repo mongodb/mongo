@@ -19,10 +19,6 @@ const assertArrayEq = (l, r) => assert(arrayEq(l, r));
 const coll = db.wildcard_covered_query;
 coll.drop();
 
-// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
-const allowCompoundWildcardIndexes =
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
-
 // Confirms that the $** index can answer the given query and projection, that it produces a
 // covered solution, and that the results are identical to those obtained by a COLLSCAN. If
 // 'shouldFailToCover' is true, inverts the assertion and confirms that the given query and
@@ -64,9 +60,6 @@ const wildcardIndexes = [
 
 for (const indexSpec of wildcardIndexes) {
     const isCompound = Object.keys(indexSpec.keyPattern).length > 1;
-    if (!allowCompoundWildcardIndexes && isCompound) {
-        continue;
-    }
     const option = {};
     if (indexSpec.wildcardProjection) {
         option['wildcardProjection'] = indexSpec.wildcardProjection;

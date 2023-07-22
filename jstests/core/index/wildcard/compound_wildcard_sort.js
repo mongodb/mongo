@@ -11,7 +11,6 @@
  *   # shard.
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
- *   featureFlagCompoundWildcardIndexes,
  *   requires_fcv_70,
  * ]
  */

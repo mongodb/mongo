@@ -1034,12 +1034,9 @@ const testScenarios = [
         ]
     },
     {
-        // TODO SERVER-68303: Update this test case when the feature flag is removed.
         doc: {a: {b: "one", c: 2}},
         spec: {key: {"$**": 1, "a.b": 1}, name: "wildcardIndex"},
-        expectedErrorCode:
-            ErrorCodes.CannotCreateIndex,  // wildcard indexes do not allow compounding.
-        skipCWI: true
+        expectedErrorCode: ErrorCodes.CannotCreateIndex,  // Must have 'wildcardProjection'.
     },
 ];
 
@@ -1047,13 +1044,6 @@ const testScenarios = [
 // expected response.
 testScenarios.forEach(testScenario => {
     jsTestLog("Testing scenario: " + tojson(testScenario));
-
-    // TODO SERVER-68303: Remove this.
-    if (testScenario.hasOwnProperty("skipCWI") && testScenario["skipCWI"] === true &&
-        FeatureFlagUtil.isEnabled(db, "CompoundWildcardIndexes")) {
-        jsTestLog("Skipping because compound wildcard indexes are enabled");
-        return;
-    }
 
     // Drop the collection so the '$$ROOT' does not pick documents from the last test
     // scenario.

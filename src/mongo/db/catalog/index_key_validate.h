@@ -105,27 +105,16 @@ static std::map<StringData, std::set<IndexType>> allowedFieldNames = {
 
 /**
  * Checks if the key is valid for building an index according to the validation rules for the given
- * index version. If 'checkFCV' is true we will check FCV for compound wildcard indexes validation.
- *
- * TODO SERVER-68303: Consider removing 'checkFCV' flag when 'CompoundWildcardIndexes'
- * feature flag is removed.
+ * index version.
  */
-Status validateKeyPattern(const BSONObj& key,
-                          IndexDescriptor::IndexVersion indexVersion,
-                          bool checkFCV = false);
+Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion indexVersion);
 
 /**
  * Validates the index specification 'indexSpec' and returns an equivalent index specification that
  * has any missing attributes filled in. If the index specification is malformed, then an error
- * status is returned. If 'checkFCV' is true we will check FCV for compound wildcard indexes
- * validation.
- *
- * TODO SERVER-68303: Consider removing 'checkFCV' flag when 'CompoundWildcardIndexes'
- * feature flag is removed.
+ * status is returned.
  */
-StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
-                                      const BSONObj& indexSpec,
-                                      bool checkFCV = false);
+StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& indexSpec);
 
 /**
  * Returns a new index spec with any unknown field names removed from 'indexSpec'.
@@ -192,13 +181,9 @@ bool isIndexAllowedInAPIVersion1(const IndexDescriptor& indexDesc);
 /**
  * Parses the index specifications from 'indexSpecObj', validates them, and returns equivalent index
  * specifications that have any missing attributes filled in. If any index specification is
- * malformed, then an error status is returned. If 'checkFCV' is true we should validate the index
- * spec taking into account the FCV value. Some certain type of index cannot be created with
- * downgraded FCV but can be continuously used if it's already created before FCV downgrade.
+ * malformed, then an error status is returned.
  */
-BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx,
-                                   const BSONObj& indexSpecObj,
-                                   bool checkFCV);
+BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx, const BSONObj& indexSpecObj);
 
 /**
  * Optional filtering function to adjust allowed index field names at startup.

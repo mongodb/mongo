@@ -528,19 +528,6 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
             "expandWildcardIndexEntry expected only WildcardIndexes",
             wildcardIndex.type == INDEX_WILDCARD);
 
-    // (Ignore FCV check): This is intentional because we want clusters which have wildcard indexes
-    // still be able to use the feature even if the FCV is downgraded.
-    if (!feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe()) {
-        // Should only have one field of the form {"path.$**" : 1}.
-        tassert(7246511,
-                "Wildcard Index's key pattern must always have length 1 for non-compound Wildcard "
-                "Indexes",
-                wildcardIndex.keyPattern.nFields() == 1);
-        tassert(7246512,
-                "Wildcard Index's field name must end with the wildcard suffix '$**'",
-                wildcardIndex.keyPattern.firstElement().fieldNameStringData().endsWith("$**"));
-    }
-
     // $** indexes do not keep the multikey metadata inside the index catalog entry, as the amount
     // of metadata is not bounded. We do not expect IndexEntry objects for $** indexes to have a
     // fixed-size vector of multikey metadata until after they are expanded.
@@ -576,29 +563,25 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
     // should also check whether the regular fields is able to answer the query or not. That is - if
     // any field of the regular fields in a compound wildcard index is in 'fields', then we should
     // also generate an expanded wildcard 'IndexEntry' for later index analysis.
-    // (Ignore FCV check): This is intentional because we want clusters which have wildcard indexes
-    // still be able to use the feature even if the FCV is downgraded.
-    if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe()) {
-        bool shouldExpand = false;
-        for (auto elem : wildcardIndex.keyPattern) {
-            auto fieldName = elem.fieldNameStringData();
-            if (WildcardNames::isWildcardFieldName(fieldName)) {
-                break;
-            }
-            if (fields.count(fieldName.toString())) {
-                shouldExpand = true;
-                break;
-            }
+    bool shouldExpand = false;
+    for (auto elem : wildcardIndex.keyPattern) {
+        auto fieldName = elem.fieldNameStringData();
+        if (WildcardNames::isWildcardFieldName(fieldName)) {
+            break;
         }
+        if (fields.count(fieldName.toString())) {
+            shouldExpand = true;
+            break;
+        }
+    }
 
-        // This expanded IndexEntry is for queries on the non-wildcard prefix of a compound wildcard
-        // index, the wildcard component is not required. We use the reserved path, "$_path", to
-        // instruct the query planner to generate "all values" index bounds and not consider this
-        // field in supporting any sort operation.
-        if (shouldExpand) {
-            auto entry = createExpandedIndexEntry(wildcardIndex, "$_path", {} /* paths included */);
-            out->push_back(*entry);
-        }
+    // This expanded IndexEntry is for queries on the non-wildcard prefix of a compound wildcard
+    // index, the wildcard component is not required. We use the reserved path, "$_path", to
+    // instruct the query planner to generate "all values" index bounds and not consider this
+    // field in supporting any sort operation.
+    if (shouldExpand) {
+        auto entry = createExpandedIndexEntry(wildcardIndex, "$_path", {} /* paths included */);
+        out->push_back(*entry);
     }
 }
 
@@ -627,12 +610,6 @@ BoundsTightness translateWildcardIndexBoundsAndTightness(
     // only have a single keyPattern field and multikeyPath entry, but this is sufficient to
     // determine whether it will be necessary to adjust the tightness.
     invariant(index.type == IndexType::INDEX_WILDCARD);
-    // (Ignore FCV check): This is intentional because we want clusters which have wildcard indexes
-    // still be able to use the feature even if the FCV is downgraded.
-    if (!feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe()) {
-        invariant(index.keyPattern.nFields() == 1);
-        invariant(index.multikeyPaths.size() == 1);
-    }
     invariant(oil);
 
     // If 'oil' was not filled the filter type may not be supported, but we can still use this
@@ -681,17 +658,6 @@ void finalizeWildcardIndexScanConfiguration(
 
     // We should only ever reach this point when processing a $** index. Sanity check the arguments.
     invariant(index && index->type == IndexType::INDEX_WILDCARD);
-    // (Ignore FCV check): This is intentional because we want clusters which have wildcard indexes
-    // still be able to use the feature even if the FCV is downgraded.
-    if (!feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe()) {
-        invariant(index->keyPattern.nFields() == 1);
-        invariant(index->multikeyPaths.size() == 1);
-        invariant(bounds && bounds->fields.size() == 1);
-        invariant(bounds->fields.front().name == index->keyPattern.firstElementFieldName());
-        tassert(6536700,
-                "IET Builders list must be size of 1 or empty for wildcard indexes",
-                ietBuilders->empty() || ietBuilders->size() == 1);
-    }
 
     // For $** indexes, the IndexEntry key pattern is {..., 'path.to.field': 1, ...} but the actual
     // keys in the index are of the form {..., '$_path': 1, 'path.to.field': 1, ...}, where the
@@ -769,19 +735,6 @@ bool isWildcardObjectSubpathScan(const IndexScanNode* node) {
     // If the node is not a $** index scan, return false immediately.
     if (!node || node->index.type != IndexType::INDEX_WILDCARD) {
         return false;
-    }
-
-    // We expect consistent arguments, representing a $** index which has already been finalized.
-    // (Ignore FCV check): This is intentional because we want clusters which have wildcard indexes
-    // still be able to use the feature even if the FCV is downgraded.
-    if (!feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe()) {
-        invariant(node->index.keyPattern.nFields() == 2);
-        invariant(node->index.multikeyPaths.size() == 2);
-        invariant(node->bounds.fields.size() == 2);
-        invariant(node->bounds.fields.front().name ==
-                  node->index.keyPattern.firstElementFieldName());
-        invariant(node->bounds.fields.back().name ==
-                  std::next(node->index.keyPattern.begin())->fieldName());
     }
 
     // Check the bounds on the query field for any intersections with the object type bracket.

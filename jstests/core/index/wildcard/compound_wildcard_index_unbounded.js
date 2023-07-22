@@ -3,7 +3,6 @@
  * cause any errors.
  *
  * @tags: [
- *   featureFlagCompoundWildcardIndexes,
  *   requires_fcv_70,
  *   # explain does not support majority read concern
  *   assumes_read_concern_local,

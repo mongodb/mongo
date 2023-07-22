@@ -35,9 +35,6 @@ import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 const coll = db.wildcard_cached_plans;
 
 const wildcardIndexes = [{keyPattern: {"b.$**": 1}}, {keyPattern: {"b.$**": 1, "other": 1}}];
-// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
-const allowCompoundWildcardIndexes =
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
 
 function getCacheEntryForQuery(query) {
     const match = {
@@ -57,9 +54,6 @@ function getCacheEntryForQuery(query) {
 const isSbeEnabled = checkSBEEnabled(db);
 
 for (const indexSpec of wildcardIndexes) {
-    if (!allowCompoundWildcardIndexes && indexSpec.keyPattern.other) {
-        continue;
-    }
     coll.drop();
     assert.commandWorked(coll.createIndex(indexSpec.keyPattern));
     assert.commandWorked(coll.createIndex({"a": 1}));

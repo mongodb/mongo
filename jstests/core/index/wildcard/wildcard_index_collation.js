@@ -25,10 +25,6 @@ const assertArrayEq = (l, r) => assert(arrayEq(l, r));
 let coll = assertDropAndRecreateCollection(
     db, "wildcard_collation", {collation: {locale: "en_US", strength: 1}});
 
-// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
-const allowCompoundWildcardIndexes =
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
-
 // Extracts the winning plan for the given query and projection from the explain output.
 const winningPlan = (query, proj) => FixtureHelpers.isMongos(db)
     ? getWinningPlan(getWinningPlan(coll.find(query, proj).explain().queryPlanner).shards[0])
@@ -68,9 +64,6 @@ const wildcardIndexes =
     [{keyPattern: {"$**": 1}}, {keyPattern: {"$**": 1, b: 1}, wildcardProjection: {b: 0}}];
 
 for (const indexSpec of wildcardIndexes) {
-    if (!allowCompoundWildcardIndexes && indexSpec.wildcardProjection) {
-        continue;
-    }
     const option = {};
     if (indexSpec.wildcardProjection) {
         option['wildcardProjection'] = indexSpec.wildcardProjection;

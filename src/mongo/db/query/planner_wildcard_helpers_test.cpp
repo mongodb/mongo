@@ -89,8 +89,6 @@ struct IndexEntryMock {
 }  // namespace
 
 TEST(PlannerWildcardHelpersTest, Expand_SingleWildcardIndex_WithProjection) {
-    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
-
     IndexEntryMock wildcardIndex{BSON("$**" << 1), BSON("a" << 1), {FieldRef{"a"_sd}}};
 
     stdx::unordered_set<std::string> fields{"a", "b"};
@@ -104,8 +102,6 @@ TEST(PlannerWildcardHelpersTest, Expand_SingleWildcardIndex_WithProjection) {
 }
 
 TEST(PlannerWildcardHelpersTest, Expand_SingleWildcardIndex_WithoutProjection) {
-    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
-
     IndexEntryMock wildcardIndex{BSON("$**" << 1), BSONObj{}, {FieldRef{"a"_sd}}};
 
     stdx::unordered_set<std::string> fields{"a", "b"};
@@ -130,8 +126,6 @@ TEST(PlannerWildcardHelpersTest, Expand_SingleWildcardIndex_WithoutProjection) {
 }
 
 TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_WithProjection) {
-    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
-
     IndexEntryMock wildcardIndex{
         BSON("e.f" << 1 << "$**" << 1 << "m.n" << 1), BSON("a" << 1), {FieldRef{"a"_sd}}};
 
@@ -149,8 +143,6 @@ TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_WithProjection) {
 }
 
 TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_WithoutProjection) {
-    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
-
     IndexEntryMock wildcardIndex{BSON("e.f" << 1 << "b.d" << 1 << "prefix.$**" << 1 << "m.n" << 1),
                                  BSONObj{},
                                  {FieldRef{"prefix.a"_sd}}};
@@ -182,8 +174,6 @@ TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_WithoutProjection)
 }
 
 TEST(PlannerWildcardHelpersTest, FinalizeBasicPatternInCompoundWildcardIndexScanConfiguration) {
-    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
-
     IndexEntryMock wildcardIndex{
         BSON("a" << 1 << "$**" << 1 << "c" << 1), BSON("b" << 1), {FieldRef{"b"_sd}}};
     std::vector<IndexEntry> expandedIndexes{};
@@ -217,8 +207,6 @@ TEST(PlannerWildcardHelpersTest, FinalizeBasicPatternInCompoundWildcardIndexScan
 }
 
 TEST(PlannerWildcardHelpersTest, AddSubpathBoundsIfBoundsOverlapWithObjects) {
-    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
-
     IndexEntryMock wildcardIndex{BSON("$**" << 1 << "b" << 1), BSON("a" << 1), {}};
     std::vector<IndexEntry> expandedIndexes{};
     stdx::unordered_set<std::string> fields{"a"};
@@ -246,7 +234,6 @@ TEST(PlannerWildcardHelpersTest, AddSubpathBoundsIfBoundsOverlapWithObjects) {
 }
 
 TEST(PlannerWildcardHelpersTest, GetCorrectWildcardElement) {
-    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
     IndexEntryMock wildcardIndex{BSON("$**" << 1 << "b" << 1), BSON("a" << 1), {}};
     wildcardIndex.indexEntry->wildcardFieldPos = 0;
     auto elem = getWildcardField(*wildcardIndex.indexEntry);
@@ -259,8 +246,6 @@ TEST(PlannerWildcardHelpersTest, GetCorrectWildcardElement) {
 }
 
 TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_NumericComponents) {
-    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
-
     IndexEntryMock wildcardIndex{BSON("e.f" << 1 << "$**" << 1 << "m.n" << 1),
                                  BSON("a.0" << 1 << "b" << 1),
                                  {FieldRef{"a"_sd}}};

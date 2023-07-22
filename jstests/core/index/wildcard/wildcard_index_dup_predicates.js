@@ -17,18 +17,11 @@ const wildcardIndexes = [
     {keyPattern: {"$**": -1, c: 1}, wildcardProjection: {c: 0}}
 ];
 
-// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
-const allowCompoundWildcardIndexes =
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
-
 // Inserts the given document and runs the given query to confirm that:
 // (1) query matches the given document
 // (2) the winning plan does a wildcard index scan
 function assertExpectedDocAnswersWildcardIndexQuery(doc, query, match) {
     for (const indexSpec of wildcardIndexes) {
-        if (!allowCompoundWildcardIndexes && indexSpec.wildcardProjection) {
-            continue;
-        }
         coll.drop();
         const option = {};
         if (indexSpec.wildcardProjection) {

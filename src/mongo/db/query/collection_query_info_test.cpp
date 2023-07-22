@@ -193,7 +193,6 @@ std::unique_ptr<IndexDescriptor> makeIndexDescriptor(StringData indexName,
 }  // namespace
 
 TEST(CollectionQueryInfoTest, computeUpdateIndexDataForCompoundWildcardIndex) {
-    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test"_sd);
     CollectionOptions collOptions{};
     DevNullKVEngine engine{};
@@ -223,7 +222,6 @@ TEST(CollectionQueryInfoTest, computeUpdateIndexDataForCompoundWildcardIndex) {
 }
 
 TEST(CollectionQueryInfoTest, computeUpdateIndexDataForCompoundWildcardIndex_ExcludeCase) {
-    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test"_sd);
     CollectionOptions collOptions{};
     DevNullKVEngine engine{};

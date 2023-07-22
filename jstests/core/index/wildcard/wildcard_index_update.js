@@ -14,16 +14,10 @@ const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
 
-// TODO SERVER-68303: Remove the feature flag and update corresponding tests.
-const allowCompoundWildcardIndexes =
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompoundWildcardIndexes");
-
 assert.commandWorked(coll.createIndex({"a.b.c.d.$**": 1}));
-if (allowCompoundWildcardIndexes) {
-    assert.commandWorked(coll.createIndex({"a.b.c.d.$**": 1, "other": 1}));
-    assert.commandWorked(coll.createIndex({"pre": 1, "a.b.c.d.$**": 1, "other": 1}));
-    assert.commandWorked(coll.createIndex({"pre": 1, "a.b.c.d.$**": -1}));
-}
+assert.commandWorked(coll.createIndex({"a.b.c.d.$**": 1, "other": 1}));
+assert.commandWorked(coll.createIndex({"pre": 1, "a.b.c.d.$**": 1, "other": 1}));
+assert.commandWorked(coll.createIndex({"pre": 1, "a.b.c.d.$**": -1}));
 
 const validate = function() {
     const validateRes = coll.validate({full: true});

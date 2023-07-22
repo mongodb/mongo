@@ -1957,8 +1957,6 @@ TEST_F(IndexBoundsBuilderTest, TranslateBoundsForWildcardIndexes) {
 }
 
 TEST_F(IndexBoundsBuilderTest, TranslateBoundsForCompoundWildcardIndexes) {
-    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
-
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
     auto testIndex = buildWildcardIndexEntry(keyPattern, {{}}, 0);
     BSONObj obj = fromjson("{a: {$lt: 1}}");
@@ -1978,8 +1976,6 @@ TEST_F(IndexBoundsBuilderTest, TranslateBoundsForCompoundWildcardIndexes) {
 }
 
 TEST_F(IndexBoundsBuilderTest, AdjustIndexBoundsForWildcardIndexesIfObjectIncluded) {
-    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
-
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
     auto testIndex = buildWildcardIndexEntry(keyPattern, {{}}, 0);
     BSONObj obj = fromjson("{a: {$eq: {a: 1}}}");

@@ -74,5 +74,4 @@ executor:
       oplogSize: 1024
       set_parameters:
         enableTestCommands: true
-        featureFlagCompoundWildcardIndexes: true
     num_nodes: 1

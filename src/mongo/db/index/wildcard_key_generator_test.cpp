@@ -1287,11 +1287,7 @@ TEST_F(WildcardKeyGeneratorDottedFieldsTest, DoNotIndexDottedFieldsWithSimilarSu
 //
 // Following unit tests are for compound wildcard indexes.
 //
-struct WildcardKeyGeneratorCompoundTest : public WildcardKeyGeneratorTest {
-    WildcardKeyGeneratorCompoundTest() {}
-
-    RAIIServerParameterControllerForTest controllerCWI{"featureFlagCompoundWildcardIndexes", true};
-};
+struct WildcardKeyGeneratorCompoundTest : public WildcardKeyGeneratorTest {};
 
 TEST_F(WildcardKeyGeneratorCompoundTest, ExtractTopLevelKeyCompound) {
     WildcardKeyGenerator keyGen{fromjson("{'$**': 1, a: 1}"),

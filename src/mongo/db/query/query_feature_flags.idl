@@ -61,13 +61,6 @@ feature_flags:
       default: false
       shouldBeFCVGated: true
 
-    featureFlagCompoundWildcardIndexes:
-      description: "Feature flag to enable compound wildcard indexes."
-      cpp_varname: gFeatureFlagCompoundWildcardIndexes
-      default: true
-      version: 7.0
-      shouldBeFCVGated: true
-
     featureFlagSearchBatchSizeLimit:
       description: "Feature flag to enable the search batchsize and limit optimization."
       cpp_varname: gFeatureFlagSearchBatchSizeLimit

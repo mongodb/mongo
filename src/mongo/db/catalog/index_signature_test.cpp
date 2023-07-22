@@ -483,8 +483,6 @@ TEST_F(IndexSignatureTest,
 
 TEST_F(IndexSignatureTest,
        CanCreateMultipleCompoundWildcardIndexesOnSameKeyPatternWithDifferentWildcardProjections) {
-    RAIIServerParameterControllerForTest controllerCWI{"featureFlagCompoundWildcardIndexes", true};
-
     // Creates a base wildcard index to verify 'wildcardProjection' option is part of index
     // signature.
     auto* wildcardIndex = unittest::assertGet(createIndex(
