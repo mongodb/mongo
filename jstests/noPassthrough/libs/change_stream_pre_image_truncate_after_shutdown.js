@@ -4,7 +4,6 @@ load('jstests/replsets/rslib.js');                 // For getLatestOp, getFirstO
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
 load("jstests/libs/change_stream_util.js");        // For kPreImagesCollectionDatabase,
                                                    // kPreImagesCollectionName, getPreImages.
-load("jstests/replsets/libs/rollback_test.js");    // For stepUp.
 
 /**
  * Test fixture which exposes several methods to test different pre-image truncate behaviors after
@@ -207,7 +206,7 @@ var PreImageTruncateAfterShutdownTest = class {
 
         if (runAsPrimary) {
             // The 'checkPreImageCollection' check relies on there being a writable primary.
-            stepUp(conn);
+            assert.commandWorked(conn.adminCommand({replSetStepUp: 1}));
         }
 
         this._assertNumPreImagesAfterShutdown({
