@@ -138,12 +138,6 @@ public:
         size_t numberOfPrePostImagesToWrite,
         Date_t wallClockTime) override {
         ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-        OpObserverNoop::onTransactionPrepare(opCtx,
-                                             reservedSlots,
-                                             transactionOperations,
-                                             applyOpsOperationAssignment,
-                                             numberOfPrePostImagesToWrite,
-                                             Date_t::now());
 
         uassert(ErrorCodes::OperationFailed,
                 "onTransactionPrepare() failed",
