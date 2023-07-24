@@ -36,6 +36,7 @@ a notice will be included in
 | [JSON-Schema-Test-Suite]   | MIT               | 728066f9c5        |                      |                                 |
 | [libstemmer]               | BSD-3-Clause      | Unknown           |          ✗           |                ✗                |
 | [librdkafka]               | BSD-2-Clause      | 2.0.2             |                      |                                 |
+| [libmongocrypt]            | Apache-2.0        | e656245b7e        |          ✗           |                ✗                |
 | [linenoise]                | BSD-3-Clause      | Unknown + changes |                      |                ✗                |
 | [MozJS]                    | MPL-2.0           | ESR 91.3.0        |                      |                ✗                |
 | [MurmurHash3]              | Public Domain     | Unknown + changes |          ✗           |                ✗                |
@@ -71,6 +72,7 @@ a notice will be included in
 [JSON-Schema-Test-Suite]: https://github.com/json-schema-org/JSON-Schema-Test-Suite
 [libstemmer]: https://github.com/snowballstem/snowball
 [librdkafka]: https://github.com/confluentinc/librdkafka
+[libmongocrypt]: https://github.com/mongodb/libmongocrypt
 [linenoise]: https://github.com/antirez/linenoise
 [MozJS]: https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox-esr
 [MurmurHash3]: https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
