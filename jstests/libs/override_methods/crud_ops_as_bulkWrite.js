@@ -7,7 +7,13 @@
 
 let originalRunCommand = Mongo.prototype.runCommand;
 
-const commandsToBulkWriteOverride = new Set(["insert", "update", "delete", "findandmodify"]);
+let normalCluster = connect(TestData.normalCluster).getMongo();
+let bulkWriteCluster = connect(TestData.bulkWriteCluster).getMongo();
+
+jsTestLog("Normal Cluster: " + normalCluster);
+jsTestLog("BulkWrite Cluster: " + bulkWriteCluster);
+
+const commandsToBulkWriteOverride = new Set(["insert", "update", "delete"]);
 
 const commandsToAlwaysFlushBulkWrite = new Set([
     "aggregate",
@@ -62,10 +68,6 @@ function resetBulkWriteBatch() {
     ordered = true;
 }
 
-function checkNamespaceStoredInBufferedOps(ns) {
-    return nsInfos.findIndex((element) => element.ns == ns) != -1;
-}
-
 function getLetFromCommand(cmdObj) {
     if (cmdObj.hasOwnProperty("updates")) {
         if (cmdObj.updates[0].hasOwnProperty("let")) {
@@ -114,6 +116,34 @@ function opCompatibleWithCurrentBatch(cmdObj) {
     return true;
 }
 
+function validateClusterConsistency(options) {
+    // Want to check that every namespace we just altered is the same on both clusters.
+    nsInfos.forEach(nsInfo => {
+        let [dbName, ...coll] = nsInfo.ns.split('.');
+        coll = coll.join('.');
+
+        // Using originalRunCommand directly to avoid recursing back into this override file.
+        let res = originalRunCommand.apply(normalCluster,
+                                           [dbName, {find: coll, sort: {_id: 1}}, options]);
+        let cursor0 = new DBCommandCursor(normalCluster.getDB(dbName), res);
+
+        res = originalRunCommand.apply(bulkWriteCluster,
+                                       [dbName, {find: coll, sort: {_id: 1}}, options]);
+        let cursor1 = new DBCommandCursor(bulkWriteCluster.getDB(dbName), res);
+
+        const diff = DataConsistencyChecker.getDiff(cursor0, cursor1);
+
+        assert.eq(diff,
+                  {
+                      docsWithDifferentContents: [],
+                      docsMissingOnFirst: [],
+                      docsMissingOnSecond: [],
+                  },
+                  `crud_ops_as_bulkWrite: The two clusters have different contents for namespace ${
+                      nsInfo.ns}`);
+    });
+}
+
 function flushCurrentBulkWriteBatch(options) {
     if (bufferedOps.length == 0) {
         return {};
@@ -135,7 +165,7 @@ function flushCurrentBulkWriteBatch(options) {
     }
 
     let resp = {};
-    resp = originalRunCommand.apply(this, ["admin", bulkWriteCmd, options]);
+    resp = originalRunCommand.apply(bulkWriteCluster, ["admin", bulkWriteCmd, options]);
 
     let response = convertBulkWriteResponse(bulkWriteCmd, resp);
     let finalResponse = response;
@@ -155,32 +185,17 @@ function flushCurrentBulkWriteBatch(options) {
         }
         bulkWriteCmd.ops = bufferedOps;
 
-        resp = originalRunCommand.apply(this, ["admin", bulkWriteCmd, options]);
+        resp = originalRunCommand.apply(bulkWriteCluster, ["admin", bulkWriteCmd, options]);
         response = convertBulkWriteResponse(bulkWriteCmd, resp);
         finalResponse = finalResponse.concat(response);
     }
 
+    // After performing the bulkWrite make sure the two clusters have the same documents on
+    // impacted collections.
+    validateClusterConsistency(options);
+
     resetBulkWriteBatch();
     return response;
-}
-
-function processFindAndModifyResponse(current, isRemove, resp) {
-    // findAndModify will only ever be a single op so we can freely replace
-    // the existing response.
-    resp = {ok: 1, value: null};
-    if (current.hasOwnProperty("value")) {
-        resp["value"] = current.value;
-    }
-    let lastErrorObject = {};
-    lastErrorObject["n"] = current.n;
-    if (current.hasOwnProperty("upserted")) {
-        lastErrorObject["upserted"] = current.upserted._id;
-    }
-    if (!isRemove) {
-        lastErrorObject["updatedExisting"] = current.nModified != 0;
-    }
-    resp["lastErrorObject"] = lastErrorObject;
-    return resp;
 }
 
 function initializeResponse(op) {
@@ -222,32 +237,26 @@ function convertBulkWriteResponse(cmd, bulkWriteResponse) {
 
                 let current = bulkWriteResponse.cursor.firstBatch[cursorIdx];
 
-                // findAndModify returns have a different format. Detect findAndModify
-                // by the precense of 'return' field in the op.
-                if (cmd.ops[cursorIdx].hasOwnProperty("return")) {
-                    resp = processFindAndModifyResponse(
-                        current, cmd.ops[cursorIdx].hasOwnProperty("delete"), resp);
+                if (current.ok == 0) {
+                    // Normal write contains an error.
+                    if (!resp.hasOwnProperty("writeErrors")) {
+                        resp["writeErrors"] = [];
+                    }
+                    let writeError = {index: num, code: current.code, errmsg: current.errmsg};
+                    resp["writeErrors"].push(writeError);
                 } else {
-                    if (current.ok == 0) {
-                        // Normal write contains an error.
-                        if (!resp.hasOwnProperty("writeErrors")) {
-                            resp["writeErrors"] = [];
+                    resp.n += current.n;
+                    if (current.hasOwnProperty("nModified")) {
+                        resp.nModified += current.nModified;
+                    }
+                    if (current.hasOwnProperty("upserted")) {
+                        if (!resp.hasOwnProperty("upserted")) {
+                            resp["upserted"] = [];
                         }
-                        let writeError = {index: num, code: current.code, errmsg: current.errmsg};
-                        resp["writeErrors"].push(writeError);
-                    } else {
-                        resp.n += current.n;
-                        if (current.hasOwnProperty("nModified")) {
-                            resp.nModified += current.nModified;
-                        }
-                        if (current.hasOwnProperty("upserted")) {
-                            if (!resp.hasOwnProperty("upserted")) {
-                                resp["upserted"] = [];
-                            }
-                            resp["upserted"].push(current.upserted);
-                        }
+                        resp["upserted"].push(current.upserted);
                     }
                 }
+
                 cursorIdx += 1;
                 num += 1;
             }
@@ -312,58 +321,14 @@ function processDeleteOp(nsInfoIdx, cmdObj, deleteCmd) {
     return op;
 }
 
-function processFindAndModifyOp(nsInfoIdx, cmdObj) {
-    let op = {};
-
-    if (cmdObj.hasOwnProperty("remove") && (cmdObj.remove == true)) {
-        // is delete.
-        op["delete"] = nsInfoIdx;
-        op["return"] = true;
-    } else {
-        // is update.
-        op["update"] = nsInfoIdx;
-        op["updateMods"] = cmdObj.update;
-        op["return"] = cmdObj.new ? "post" : "pre";
-        if (cmdObj.hasOwnProperty("upsert")) {
-            op["upsert"] = cmdObj.upsert;
-        }
-        if (cmdObj.hasOwnProperty("arrayFilters")) {
-            op["arrayFilters"] = cmdObj.arrayFilters;
-        }
-    }
-
-    op["filter"] = cmdObj.query;
-
-    ["sort", "collation", "hint", "sampleId"].forEach(property => {
-        if (cmdObj.hasOwnProperty(property)) {
-            op[property] = cmdObj[property];
-        }
-    });
-
-    if (cmdObj.hasOwnProperty("fields")) {
-        op["returnFields"] = cmdObj.fields;
-    }
-
-    if (cmdObj.hasOwnProperty("let")) {
-        letObj = cmdObj.let;
-    }
-
-    return op;
-}
-
 Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
-    /**
-     * After SERVER-76660 this function will be used to direct a command to 2 different clusters.
-     * The main cluster will always execute originalRunCommand and the second will follow the
-     * current execution path below and their responses will be compared (if the bulkWrite path
-     * executed anything).
-     */
+    // Run the command always against normalCluster as is and eventually return the results.
+    const normalClusterResults = originalRunCommand.apply(normalCluster, arguments);
 
     let cmdName = Object.keys(cmdObj)[0].toLowerCase();
     if (commandsToBulkWriteOverride.has(cmdName)) {
-        let response = {};
         if (!opCompatibleWithCurrentBatch(cmdObj)) {
-            response = flushCurrentBulkWriteBatch.apply(this, [options]);
+            flushCurrentBulkWriteBatch.apply(bulkWriteCluster, [options]);
         }
 
         // Set bypassDocumentValidation if necessary.
@@ -380,7 +345,6 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
 
         let numOps = 0;
 
-        // Is insert
         if (cmdName === "insert") {
             assert(cmdObj.documents);
             for (let doc of cmdObj.documents) {
@@ -399,33 +363,24 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
                 bufferedOps.push(processDeleteOp(nsInfoIdx, cmdObj, deleteCmd));
                 numOps += 1;
             }
-        } else if (cmdName === "findandmodify") {
-            bufferedOps.push(processFindAndModifyOp(nsInfoIdx, cmdObj));
-            numOps += 1;
         } else {
             throw new Error("Unrecognized command in bulkWrite override");
         }
 
         numOpsPerResponse.push(numOps);
 
-        return response;
-    } else if (commandsToAlwaysFlushBulkWrite.has(cmdName)) {
-        flushCurrentBulkWriteBatch.apply(this, [options]);
-    } else {
-        // Commands which are selectively allowed. If they are operating on a namespace which we
-        // have stored in our buffered ops then we will flush, if not then we allow the command to
-        // execute normally.
-        if (typeof cmdObj[cmdName] === 'string') {
-            // Should be the collection that the command is operating on, can make full namespace.
-            const ns = dbName + "." + cmdObj[cmdName];
-            if (checkNamespaceStoredInBufferedOps(ns)) {
-                flushCurrentBulkWriteBatch.apply(this, [options]);
-            }
-        }
-        // Otherwise is an always allowed command (like `isMaster`).
+        return normalClusterResults;
     }
 
-    // Not a bulkWrite supported CRUD op, execute the command unmodified.
-    return originalRunCommand.apply(this, arguments);
+    // Not a CRUD op that can be converted into bulkWrite, check if we need to flush the current
+    // bulkWrite before executing the command.
+    if (commandsToAlwaysFlushBulkWrite.has(cmdName)) {
+        flushCurrentBulkWriteBatch.apply(bulkWriteCluster, [options]);
+    }
+
+    // Execute the command unmodified against the bulkWrite cluster.
+    originalRunCommand.apply(bulkWriteCluster, arguments);
+
+    return normalClusterResults;
 };
 })();

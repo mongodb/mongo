@@ -775,6 +775,7 @@ _SELECTOR_REGISTRY = {
     "gennylib_test": (_GennylibTestCaseSelectorConfig, _GennylibTestCaseSelector),
     "cpp_libfuzzer_test": (_CppTestSelectorConfig, _CppTestSelector),
     "tla_plus_test": (_FileBasedSelectorConfig, _Selector),
+    "bulk_write_cluster_js_test": (_JSTestSelectorConfig, _JSTestSelector),
 }
 
 

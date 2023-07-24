@@ -107,7 +107,9 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         self.nodes = []
         if "serverless" not in self.mongod_options:
-            self.replset_name = self.mongod_options.setdefault("replSet", "rs")
+            if not self.replset_name:
+                self.replset_name = "rs"
+            self.replset_name = self.mongod_options.setdefault("replSet", self.replset_name)
         self.initial_sync_node = None
         self.initial_sync_node_idx = -1
         self.config_shard = config_shard
