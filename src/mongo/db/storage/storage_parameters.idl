@@ -33,13 +33,6 @@ global:
         - "mongo/db/storage/storage_options.h"
 
 server_parameters:
-    notablescan:
-        # NOT recommended for production use.
-        description: >-
-            Whether all queries must use indexes.
-            If true, MongoDB will not execute queries that require a table scan and will return an error.
-        set_at: [ startup, runtime ]
-        cpp_varname: 'storageGlobalParams.noTableScan'
     # This is an alias for the 'storage.syncPeriodSecs' config, and the default is defined in the
     # StorageGlobalParams struct to resolve a conflict between config parameter and set parameter evaluation.
     syncdelay:

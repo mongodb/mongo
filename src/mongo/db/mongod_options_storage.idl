@@ -38,15 +38,22 @@ global:
             register: addMongodStorageOptions
 
 server_parameters:
-  recoverToOplogTimestamp:
-    description: >-
-        When --queryableBackupMode is supplied on startup along with this server parameter, the
-        server will perform replication recovery up to and including the provided timestamp. The
-        parameter should be passed in as a JSON string with the following format:
-        {timestamp: Timestamp(123, 456)}.
-    set_at: [ startup ]
-    cpp_vartype: std::string
-    cpp_varname: recoverToOplogTimestamp
+    recoverToOplogTimestamp:
+        description: >-
+            When --queryableBackupMode is supplied on startup along with this server parameter, the
+            server will perform replication recovery up to and including the provided timestamp. The
+            parameter should be passed in as a JSON string with the following format:
+            {timestamp: Timestamp(123, 456)}.
+        set_at: [ startup ]
+        cpp_vartype: std::string
+        cpp_varname: recoverToOplogTimestamp
+    notablescan:
+        # NOT recommended for production use.
+        description: >-
+            Whether all queries must use indexes.
+            If true, MongoDB will not execute queries that require a table scan and will return an error.
+        set_at: [ startup, runtime ]
+        cpp_varname: 'storageGlobalParams.noTableScan'
 
 configs:
     'storage.engine':
