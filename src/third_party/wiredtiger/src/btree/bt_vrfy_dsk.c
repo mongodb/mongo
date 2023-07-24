@@ -346,12 +346,14 @@ static int
 __verify_row_key_order_check(
   WT_ITEM *last, uint32_t last_cell_num, WT_ITEM *current, uint32_t cell_num, WT_VERIFY_INFO *vi)
 {
+    WT_BTREE *btree;
     WT_DECL_ITEM(tmp1);
     WT_DECL_ITEM(tmp2);
     WT_DECL_RET;
     int cmp;
 
-    WT_RET(__wt_compare(vi->session, S2BT(vi->session)->collator, last, current, &cmp));
+    btree = S2BT(vi->session);
+    WT_RET(__wt_compare(vi->session, btree->collator, last, current, &cmp));
     if (cmp < 0)
         return (0);
 
@@ -362,8 +364,10 @@ __verify_row_key_order_check(
     WT_ERR_VRFY(vi->session, vi->flags,
       "the %" PRIu32 " and %" PRIu32 " keys on page at %s are incorrectly sorted: %s, %s",
       last_cell_num, cell_num, vi->tag,
-      __wt_buf_set_printable(vi->session, last->data, last->size, false, tmp1),
-      __wt_buf_set_printable(vi->session, current->data, current->size, false, tmp2));
+      __wt_buf_set_printable_format(
+        vi->session, last->data, last->size, btree->key_format, false, tmp1),
+      __wt_buf_set_printable_format(
+        vi->session, current->data, current->size, btree->key_format, false, tmp2));
 
 err:
     __wt_scr_free(vi->session, &tmp1);
