@@ -93,14 +93,16 @@ std::pair<value::SlotAccessor*, value::SlotAccessor*> BaseRuntimePlanner::prepar
     stage_builder::prepareSlotBasedExecutableTree(
         _opCtx, root, data, _cq, _collections, _yieldPolicy, preparingFromCache);
 
+    const stage_builder::PlanStageSlots& outputs = data->staticData->outputs;
+
     value::SlotAccessor* resultSlot{nullptr};
-    if (auto slot = data->staticData->resultSlot) {
+    if (auto slot = outputs.getIfExists(stage_builder::PlanStageSlots::kResult)) {
         resultSlot = root->getAccessor(data->env.ctx, *slot);
         tassert(4822871, "Query does not have a result slot.", resultSlot);
     }
 
     value::SlotAccessor* recordIdSlot{nullptr};
-    if (auto slot = data->staticData->recordIdSlot) {
+    if (auto slot = outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId)) {
         recordIdSlot = root->getAccessor(data->env.ctx, *slot);
         tassert(4822872, "Query does not have a recordId slot.", recordIdSlot);
     }

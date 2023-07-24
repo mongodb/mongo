@@ -236,7 +236,7 @@ std::unique_ptr<sbe::EExpression> generateTraverseF(
     FieldIndex level,
     sbe::value::FrameIdGenerator* frameIdGenerator,
     optimizer::SlotVarMap& slotVarMap,
-    StageBuilderState& state,
+    const sbe::RuntimeEnvironment& runtimeEnv,
     const MakePredicateFn& makePredicate,
     bool matchesNothing,
     LeafTraversalMode mode) {
@@ -259,7 +259,7 @@ std::unique_ptr<sbe::EExpression> generateTraverseF(
 
     auto fieldExpr = topLevelFieldSlot ? makeVariable(*topLevelFieldSlot)
                                        : makeFunction("getField",
-                                                      inputExpr.getExpr(slotVarMap, state),
+                                                      inputExpr.getExpr(slotVarMap, runtimeEnv),
                                                       makeConstant(fp.getPart(level)));
 
     if (childIsLeafWithEmptyName) {
@@ -281,7 +281,7 @@ std::unique_ptr<sbe::EExpression> generateTraverseF(
                                                       level + 1,
                                                       frameIdGenerator,
                                                       slotVarMap,
-                                                      state,
+                                                      runtimeEnv,
                                                       makePredicate,
                                                       matchesNothing,
                                                       mode);
@@ -297,8 +297,8 @@ std::unique_ptr<sbe::EExpression> generateTraverseF(
         // effectively allows us to skip over cases where we would be calling getField() on a scalar
         // value or an array and getting back Nothing. The subset of such cases where we should
         // return true is handled by the previous level before execution would reach here.
-        auto cond =
-            makeFillEmptyFalse(makeFunction("isObject", lambdaParam.getExpr(slotVarMap, state)));
+        auto cond = makeFillEmptyFalse(
+            makeFunction("isObject", lambdaParam.getExpr(slotVarMap, runtimeEnv)));
 
         resultExpr = sbe::makeE<sbe::EIf>(std::move(cond),
                                           std::move(resultExpr),
@@ -337,7 +337,7 @@ std::unique_ptr<sbe::EExpression> generateTraverseF(
                                                               getBSONTypeMask(BSONType::Object))))),
             std::move(traverseFExpr),
             !inputExpr.isNull() ? makeNot(makeFillEmptyFalse(makeFunction(
-                                      "isArray", inputExpr.getExpr(slotVarMap, state))))
+                                      "isArray", inputExpr.getExpr(slotVarMap, runtimeEnv))))
                                 : makeConstant(sbe::value::TypeTags::Boolean, true));
     }
 
@@ -406,7 +406,7 @@ void generatePredicate(MatchExpressionVisitorContext* context,
                                      0, /* level */
                                      context->state.frameIdGenerator,
                                      context->state.slotVarMap,
-                                     context->state,
+                                     *context->state.env,
                                      makePredicate,
                                      matchesNothing,
                                      mode));
@@ -448,7 +448,7 @@ void generateArraySize(MatchExpressionVisitorContext* context,
         return makeFillEmptyFalse(makeBinaryOp(
             sbe::EPrimBinary::eq,
             makeFunction("getArraySize",
-                         inputExpr.extractExpr(context->state.slotVarMap, context->state)),
+                         inputExpr.extractExpr(context->state.slotVarMap, *context->state.env)),
             std::move(sizeExpr)));
     };
 
@@ -465,7 +465,7 @@ void generateComparison(MatchExpressionVisitorContext* context,
                         sbe::EPrimBinary::Op binaryOp) {
     auto makePredicate = [context, expr, binaryOp](EvalExpr inputExpr) {
         return generateComparisonExpr(context->state, expr, binaryOp, std::move(inputExpr))
-            .extractExpr(context->state.slotVarMap, context->state);
+            .extractExpr(context->state.slotVarMap, *context->state.env);
     };
 
     // A 'kArrayAndItsElements' traversal mode matches the following semantics: when the path we are
@@ -505,7 +505,7 @@ void generateBitTest(MatchExpressionVisitorContext* context,
                      const sbe::BitTestBehavior& bitOp) {
     auto makePredicate = [context, expr, bitOp](EvalExpr inputExpr) {
         return generateBitTestExpr(context->state, expr, bitOp, std::move(inputExpr))
-            .extractExpr(context->state.slotVarMap, context->state);
+            .extractExpr(context->state.slotVarMap, *context->state.env);
     };
 
     const auto traversalMode = LeafTraversalMode::kArrayElementsOnly;
@@ -793,9 +793,9 @@ public:
             return makeFillEmptyFalse(makeBinaryOp(
                 sbe::EPrimBinary::logicAnd,
                 makeFunction("isArray",
-                             inputExpr.getExpr(_context->state.slotVarMap, _context->state)),
+                             inputExpr.getExpr(_context->state.slotVarMap, *_context->state.env)),
                 makeFunction("traverseF",
-                             inputExpr.getExpr(_context->state.slotVarMap, _context->state),
+                             inputExpr.getExpr(_context->state.slotVarMap, *_context->state.env),
                              std::move(lambdaExpr),
                              makeConstant(sbe::value::TypeTags::Boolean, false))));
         };
@@ -834,9 +834,9 @@ public:
             return makeFillEmptyFalse(makeBinaryOp(
                 sbe::EPrimBinary::logicAnd,
                 makeFunction("isArray",
-                             inputExpr.getExpr(_context->state.slotVarMap, _context->state)),
+                             inputExpr.getExpr(_context->state.slotVarMap, *_context->state.env)),
                 makeFunction("traverseF",
-                             inputExpr.getExpr(_context->state.slotVarMap, _context->state),
+                             inputExpr.getExpr(_context->state.slotVarMap, *_context->state.env),
                              std::move(lambdaExpr),
                              makeConstant(sbe::value::TypeTags::Boolean, false))));
         };
@@ -904,10 +904,10 @@ public:
                     : sbe::makeE<sbe::EIf>(
                           generateNullOrMissing(inputExpr.clone(), _context->state),
                           makeConstant(sbe::value::TypeTags::Null, 0),
-                          inputExpr.getExpr(_context->state.slotVarMap, _context->state));
+                          inputExpr.getExpr(_context->state.slotVarMap, *_context->state.env));
 
                 return makeIsMember(
-                    std::move(valueExpr), std::move(equalitiesExpr), _context->state);
+                    std::move(valueExpr), std::move(equalitiesExpr), _context->state.env);
             };
 
             generatePredicate(_context, *expr->fieldRef(), makePredicate, traversalMode, hasNull);
@@ -952,14 +952,14 @@ public:
         auto makePredicate = [&, hasNull = hasNull](EvalExpr inputExpr) {
             auto resultExpr = makeBinaryOp(
                 sbe::EPrimBinary::logicOr,
-                makeFillEmptyFalse(
-                    makeFunction("isMember",
-                                 inputExpr.getExpr(_context->state.slotVarMap, _context->state),
-                                 std::move(regexSetConstant))),
-                makeFillEmptyFalse(
-                    makeFunction("regexMatch",
-                                 std::move(pcreRegexesConstant),
-                                 inputExpr.getExpr(_context->state.slotVarMap, _context->state))));
+                makeFillEmptyFalse(makeFunction(
+                    "isMember",
+                    inputExpr.getExpr(_context->state.slotVarMap, *_context->state.env),
+                    std::move(regexSetConstant))),
+                makeFillEmptyFalse(makeFunction(
+                    "regexMatch",
+                    std::move(pcreRegexesConstant),
+                    inputExpr.getExpr(_context->state.slotVarMap, *_context->state.env))));
 
             if (expr->getEqualities().size() > 0) {
                 // We have to match nulls and undefined if a 'null' is present in equalities.
@@ -967,13 +967,13 @@ public:
                     inputExpr = sbe::makeE<sbe::EIf>(
                         generateNullOrMissing(inputExpr.clone(), _context->state),
                         makeConstant(sbe::value::TypeTags::Null, 0),
-                        inputExpr.getExpr(_context->state.slotVarMap, _context->state));
+                        inputExpr.getExpr(_context->state.slotVarMap, *_context->state.env));
                 }
 
                 resultExpr = makeBinaryOp(sbe::EPrimBinary::logicOr,
                                           makeIsMember(inputExpr.extractExpr(_context->state),
                                                        std::move(equalitiesExpr),
-                                                       _context->state),
+                                                       _context->state.env),
                                           std::move(resultExpr));
             }
 
@@ -1344,12 +1344,12 @@ EvalExpr generateComparisonExpr(StageBuilderState& state,
         inputExpr = buildMultiBranchConditional(
             CaseValuePair{generateNullOrMissing(inputExpr.clone(), state),
                           makeConstant(sbe::value::TypeTags::Null, 0)},
-            inputExpr.getExpr(state));
+            inputExpr.getExpr(state.slotVarMap, *state.env));
 
         return makeFillEmptyFalse(makeBinaryOp(binaryOp,
                                                inputExpr.extractExpr(state),
                                                makeConstant(sbe::value::TypeTags::Null, 0),
-                                               state));
+                                               state.env));
     } else if (sbe::value::isNaN(tagView, valView)) {
         // Construct an expression to perform a NaN check.
         switch (binaryOp) {
@@ -1380,7 +1380,7 @@ EvalExpr generateComparisonExpr(StageBuilderState& state,
     }(tagView, valView);
 
     return makeFillEmptyFalse(
-        makeBinaryOp(binaryOp, inputExpr.extractExpr(state), std::move(valExpr), state));
+        makeBinaryOp(binaryOp, inputExpr.extractExpr(state), std::move(valExpr), state.env));
 }
 
 EvalExpr generateInExpr(StageBuilderState& state,
@@ -1392,7 +1392,7 @@ EvalExpr generateInExpr(StageBuilderState& state,
 
     auto [equalities, hasArray, hasObject, hasNull] = _generateInExprInternal(state, expr);
 
-    return makeIsMember(inputExpr.extractExpr(state), std::move(equalities), state);
+    return makeIsMember(inputExpr.extractExpr(state), std::move(equalities), state.env.runtimeEnv);
 }
 
 EvalExpr generateBitTestExpr(StageBuilderState& state,
@@ -1417,7 +1417,7 @@ EvalExpr generateBitTestExpr(StageBuilderState& state,
     auto binaryBitTestExpr =
         makeFunction("bitTestPosition"_sd,
                      std::move(bitPosExpr),
-                     inputExpr.getExpr(state),
+                     inputExpr.getExpr(state.slotVarMap, *state.env),
                      makeConstant(sbe::value::TypeTags::NumberInt32, static_cast<int32_t>(bitOp)));
 
     // Build An EExpression for the numeric bitmask case. The AllSet case tests if (mask &
@@ -1439,12 +1439,12 @@ EvalExpr generateBitTestExpr(StageBuilderState& state,
     // consistent with MongoDB's documentation.
     auto numericBitTestInputExpr = sbe::makeE<sbe::EIf>(
         makeFunction("typeMatch",
-                     inputExpr.getExpr(state),
+                     inputExpr.getExpr(state.slotVarMap, *state.env),
                      makeConstant(sbe::value::TypeTags::NumberInt64,
                                   sbe::value::bitcastFrom<int64_t>(
                                       getBSONTypeMask(sbe::value::TypeTags::NumberDecimal)))),
-        makeFunction("round"_sd, inputExpr.getExpr(state)),
-        inputExpr.getExpr(state));
+        makeFunction("round"_sd, inputExpr.getExpr(state.slotVarMap, *state.env)),
+        inputExpr.getExpr(state.slotVarMap, *state.env));
 
     std::unique_ptr<sbe::EExpression> bitMaskExpr = [&]() -> std::unique_ptr<sbe::EExpression> {
         if (auto bitMaskParamId = expr->getBitMaskParamId()) {
@@ -1488,7 +1488,8 @@ EvalExpr generateModExpr(StageBuilderState& state,
                          EvalExpr inputExpr) {
     auto& dividend = inputExpr;
     auto truncatedArgument = sbe::makeE<sbe::ENumericConvert>(
-        makeFunction("trunc"_sd, dividend.getExpr(state)), sbe::value::TypeTags::NumberInt64);
+        makeFunction("trunc"_sd, dividend.getExpr(state.slotVarMap, *state.env)),
+        sbe::value::TypeTags::NumberInt64);
     tassert(6142202,
             "Either both divisor and remainer are parameterized or none",
             (expr->getDivisorInputParamId() && expr->getRemainderInputParamId()) ||
@@ -1551,10 +1552,12 @@ EvalExpr generateRegexExpr(StageBuilderState& state,
 
     auto resultExpr = makeBinaryOp(
         sbe::EPrimBinary::logicOr,
-        makeFillEmptyFalse(
-            makeBinaryOp(sbe::EPrimBinary::eq, inputExpr.getExpr(state), std::move(bsonRegexExpr))),
-        makeFillEmptyFalse(
-            makeFunction("regexMatch", std::move(compiledRegexExpr), inputExpr.getExpr(state))));
+        makeFillEmptyFalse(makeBinaryOp(sbe::EPrimBinary::eq,
+                                        inputExpr.getExpr(state.slotVarMap, *state.env),
+                                        std::move(bsonRegexExpr))),
+        makeFillEmptyFalse(makeFunction("regexMatch",
+                                        std::move(compiledRegexExpr),
+                                        inputExpr.getExpr(state.slotVarMap, *state.env))));
 
     return std::move(resultExpr);
 }

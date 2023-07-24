@@ -93,7 +93,7 @@ struct ProjectionTraversalVisitorContext {
             return inputExpr.clone();
         }
         std::unique_ptr<sbe::EExpression> getInputExpr() const {
-            return inputExpr.getExpr(state.slotVarMap, state);
+            return inputExpr.getExpr(state.slotVarMap, *state.env);
         }
 
         EvalExpr extractInputEvalExpr() {

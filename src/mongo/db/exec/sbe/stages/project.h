@@ -56,7 +56,7 @@ namespace mongo::sbe {
 class ProjectStage final : public PlanStage {
 public:
     ProjectStage(std::unique_ptr<PlanStage> input,
-                 SlotExprPairVector projects,
+                 value::SlotMap<std::unique_ptr<EExpression>> projects,
                  PlanNodeId planNodeId,
                  bool participateInTrialRunTracking = true);
 
@@ -77,7 +77,7 @@ protected:
     void doSaveState(bool relinquishCursor) final;
 
 private:
-    const SlotExprPairVector _projects;
+    const value::SlotMap<std::unique_ptr<EExpression>> _projects;
     value::SlotMap<std::pair<std::unique_ptr<vm::CodeFragment>, value::OwnedValueAccessor>> _fields;
 
     vm::ByteCode _bytecode;
@@ -87,7 +87,6 @@ private:
 
 template <typename... Ts>
 inline auto makeProjectStage(std::unique_ptr<PlanStage> input, PlanNodeId nodeId, Ts&&... pack) {
-    return makeS<ProjectStage>(
-        std::move(input), makeSlotExprPairVec(std::forward<Ts>(pack)...), nodeId);
+    return makeS<ProjectStage>(std::move(input), makeEM(std::forward<Ts>(pack)...), nodeId);
 }
 }  // namespace mongo::sbe

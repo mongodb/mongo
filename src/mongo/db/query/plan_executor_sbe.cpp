@@ -103,17 +103,19 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     invariant(!_nss.isEmpty());
     invariant(_root);
 
-    auto& env = _rootData.env;
-    if (auto slot = _rootData.staticData->resultSlot) {
-        _result = _root->getAccessor(env.ctx, *slot);
+    auto& outputs = _rootData.staticData->outputs;
+
+    if (auto slot = outputs.getIfExists(stage_builder::PlanStageSlots::kResult)) {
+        _result = _root->getAccessor(_rootData.env.ctx, *slot);
         uassert(4822865, "Query does not have result slot.", _result);
     }
 
-    if (auto slot = _rootData.staticData->recordIdSlot) {
-        _resultRecordId = _root->getAccessor(env.ctx, *slot);
+    if (auto slot = outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId)) {
+        _resultRecordId = _root->getAccessor(_rootData.env.ctx, *slot);
         uassert(4822866, "Query does not have recordId slot.", _resultRecordId);
     }
 
+    auto& env = _rootData.env;
     if (_rootData.staticData->shouldTrackLatestOplogTimestamp) {
         _oplogTs = env->getAccessor(env->getSlot("oplogTs"_sd));
     }

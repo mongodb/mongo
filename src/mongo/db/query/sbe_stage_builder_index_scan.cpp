@@ -332,11 +332,11 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
         false /* Preserve null and empty arrays, in our case it cannot be empty anyway. */,
         planNodeId);
 
-    sbe::SlotExprPairVector projects;
-    projects.emplace_back(
-        lowKeySlot, makeFunction("getField"_sd, makeVariable(unwindSlot), makeConstant("l"_sd)));
-    projects.emplace_back(
-        highKeySlot, makeFunction("getField"_sd, makeVariable(unwindSlot), makeConstant("h"_sd)));
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
+    projects.emplace(lowKeySlot,
+                     makeFunction("getField"_sd, makeVariable(unwindSlot), makeConstant("l"_sd)));
+    projects.emplace(highKeySlot,
+                     makeFunction("getField"_sd, makeVariable(unwindSlot), makeConstant("h"_sd)));
 
     // Add another project stage to extract low and high keys from each value produced by unwind and
     // bind the keys to the 'lowKeySlot' and 'highKeySlot'.

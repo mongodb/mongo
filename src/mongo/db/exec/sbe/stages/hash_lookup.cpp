@@ -71,7 +71,7 @@ HashLookupStage::HashLookupStage(std::unique_ptr<PlanStage> outer,
                                  value::SlotId outerCond,
                                  value::SlotId innerCond,
                                  value::SlotVector innerProjects,
-                                 SlotExprPairVector innerAggs,
+                                 value::SlotMap<std::unique_ptr<EExpression>> innerAggs,
                                  boost::optional<value::SlotId> collatorSlot,
                                  PlanNodeId planNodeId,
                                  bool participateInTrialRunTracking)
@@ -87,9 +87,9 @@ HashLookupStage::HashLookupStage(std::unique_ptr<PlanStage> outer,
 }
 
 std::unique_ptr<PlanStage> HashLookupStage::clone() const {
-    SlotExprPairVector innerAggs;
+    value::SlotMap<std::unique_ptr<EExpression>> innerAggs;
     for (auto& [k, v] : _innerAggs) {
-        innerAggs.emplace_back(k, v->clone());
+        innerAggs.emplace(k, v->clone());
     }
 
     return std::make_unique<HashLookupStage>(outerChild()->clone(),
@@ -654,7 +654,7 @@ std::vector<DebugPrinter::Block> HashLookupStage::debugPrint() const {
 
     ret.emplace_back(DebugPrinter::Block("[`"));
     bool first = true;
-    for (auto&& [slot, expr] : _innerAggs) {
+    value::orderedSlotMapTraverse(_innerAggs, [&](auto slot, auto&& expr) {
         if (!first) {
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
@@ -663,7 +663,7 @@ std::vector<DebugPrinter::Block> HashLookupStage::debugPrint() const {
         ret.emplace_back("=");
         DebugPrinter::addBlocks(ret, expr->debugPrint());
         first = false;
-    }
+    });
     ret.emplace_back("`]");
 
     if (_collatorSlot) {

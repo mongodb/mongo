@@ -145,17 +145,59 @@ namespace {
  * the slots specified by 'reqs'.
  */
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateEofPlan(
-    PlanNodeId nodeId, const PlanStageReqs& reqs, StageBuilderState& state) {
-    PlanStageSlots outputs;
+    PlanNodeId nodeId, const PlanStageReqs& reqs, sbe::value::SlotIdGenerator* slotIdGenerator) {
+    PlanStageSlots outputs(reqs, slotIdGenerator);
 
-    reqs.forEachReq([&](const std::pair<PlanStageReqs::Type, StringData>& name) {
-        auto slot =
-            state.env->registerSlot(sbe::value::TypeTags::Nothing, 0, false, state.slotIdGenerator);
-        outputs.set(name, slot);
-    });
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
+    auto slots = getSlotsToForward(reqs, outputs);
+    for (auto&& slot : slots) {
+        projects.insert({slot, sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0)});
+    }
 
-    auto stage = makeLimitCoScanTree(nodeId, 0);
+    auto stage = sbe::makeS<sbe::LimitSkipStage>(
+        sbe::makeS<sbe::CoScanStage>(nodeId), 0, boost::none, nodeId);
+
+    if (!projects.empty()) {
+        // Even though this SBE tree will produce zero documents, we still need a ProjectStage to
+        // define the slots in 'outputSlots' so that calls to getAccessor() won't fail.
+        stage = sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), nodeId);
+    }
+
     return {std::move(stage), std::move(outputs)};
+}
+
+/**
+ * Creates a new compilation environment and registers global values within the
+ * new environment.
+ */
+std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
+    const CanonicalQuery& cq,
+    OperationContext* opCtx,
+    sbe::value::SlotIdGenerator* slotIdGenerator) {
+    auto env = std::make_unique<sbe::RuntimeEnvironment>();
+
+    // Register an unowned global timezone database for datetime expression evaluation.
+    env->registerSlot("timeZoneDB"_sd,
+                      sbe::value::TypeTags::timeZoneDB,
+                      sbe::value::bitcastFrom<const TimeZoneDatabase*>(getTimeZoneDatabase(opCtx)),
+                      false,
+                      slotIdGenerator);
+
+    for (auto&& [id, name] : Variables::kIdToBuiltinVarName) {
+        if (id != Variables::kRootId && id != Variables::kRemoveId &&
+            cq.getExpCtx()->variables.hasValue(id)) {
+            auto [tag, val] = sbe::value::makeValue(cq.getExpCtx()->variables.getValue(id));
+            env->registerSlot(name, tag, val, true, slotIdGenerator);
+        } else if (id == Variables::kSearchMetaId) {
+            // Normally, $search is responsible for setting a value for SEARCH_META, in which case
+            // we will bind the value to a slot above. However, in the event of a query that does
+            // not use $search, but references SEARCH_META, we need to bind a value of 'missing' to
+            // a slot so that the plan can run correctly.
+            env->registerSlot(name, sbe::value::TypeTags::Nothing, 0, false, slotIdGenerator);
+        }
+    }
+
+    return env;
 }
 }  // namespace
 
@@ -249,13 +291,12 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
 
     // Refresh "let" variables in the 'RuntimeEnvironment'.
     auto ids = expCtx->variablesParseState.getDefinedVariableIDs();
-    auto& variables = expCtx->variables;
     for (auto id : ids) {
         // Variables defined in "ExpressionContext" may not always be translated into SBE slots.
         if (auto it = data->staticData->variableIdToSlotMap.find(id);
             it != data->staticData->variableIdToSlotMap.end()) {
             auto slotId = it->second;
-            auto [tag, val] = sbe::value::makeValue(variables.getValue(id));
+            auto [tag, val] = sbe::value::makeValue(expCtx->variables.getValue(id));
             env->resetSlot(slotId, tag, val, true);
         }
     }
@@ -264,11 +305,10 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
         // This can happen if the query that created the cache entry had no value for a system
         // variable, whereas the current query has a value for the system variable but does not
         // actually make use of it in the query plan.
-        if (id != Variables::kRootId && id != Variables::kRemoveId) {
-            if (auto slot = env->getSlotIfExists(name); slot && variables.hasValue(id)) {
-                auto [tag, val] = sbe::value::makeValue(variables.getValue(id));
-                env->resetSlot(*slot, tag, val, true);
-            }
+        if (auto slot = env->getSlotIfExists(name); id != Variables::kRootId &&
+            id != Variables::kRemoveId && expCtx->variables.hasValue(id) && slot) {
+            auto [tag, val] = sbe::value::makeValue(expCtx->variables.getValue(id));
+            env->resetSlot(*slot, tag, val, true);
         }
     }
 
@@ -295,10 +335,10 @@ PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
 std::string PlanStageData::debugString() const {
     StringBuilder builder;
 
-    if (auto slot = staticData->resultSlot) {
+    if (auto slot = staticData->outputs.getIfExists(PlanStageSlots::kResult)) {
         builder << "$$RESULT=s" << *slot << " ";
     }
-    if (auto slot = staticData->recordIdSlot) {
+    if (auto slot = staticData->outputs.getIfExists(PlanStageSlots::kRecordId)) {
         builder << "$$RID=s" << *slot << " ";
     }
 
@@ -382,6 +422,21 @@ std::unique_ptr<fts::FTSMatcher> makeFtsMatcher(OperationContext* opCtx,
     tassert(5432220, "expected FTSQueryImpl", query);
     return std::make_unique<fts::FTSMatcher>(*query, accessMethod->getSpec());
 }
+
+void initCollator(const CanonicalQuery& cq,
+                  PlanStageEnvironment& env,
+                  PlanStageStaticData* data,
+                  sbe::value::SlotIdGenerator* slotIdGenerator) {
+    data->queryCollator = cq.getCollatorShared();
+
+    if (auto coll = data->queryCollator.get()) {
+        env->registerSlot("collator"_sd,
+                          sbe::value::TypeTags::collator,
+                          sbe::value::bitcastFrom<const CollatorInterface*>(coll),
+                          false,
+                          slotIdGenerator);
+    }
+}
 }  // namespace
 
 SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
@@ -393,7 +448,7 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
       _collections(collections),
       _mainNss(cq.nss()),
       _yieldPolicy(yieldPolicy),
-      _env(std::make_unique<sbe::RuntimeEnvironment>()),
+      _env(makeRuntimeEnvironment(_cq, _opCtx, &_slotIdGenerator)),
       _data(std::make_unique<PlanStageStaticData>()),
       _state(_opCtx,
              _env,
@@ -404,8 +459,7 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
              &_spoolIdGenerator,
              _cq.getExpCtx()->needsMerge,
              _cq.getExpCtx()->allowDiskUse) {
-    // Initialize '_data->queryCollator'.
-    _data->queryCollator = cq.getCollatorShared();
+    initCollator(cq, _env, _data.get(), &_slotIdGenerator);
 
     // SERVER-52803: In the future if we need to gather more information from the QuerySolutionNode
     // tree, rather than doing one-off scans for each piece of information, we should add a formal
@@ -452,16 +506,15 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
     invariant(!_buildHasStarted);
     _buildHasStarted = true;
 
-    const bool needsRecordIdSlot = _data->shouldUseTailableScan || _data->shouldTrackResumeToken ||
-        _cq.getForceGenerateRecordId();
-
     // We always produce a 'resultSlot'.
     PlanStageReqs reqs;
     reqs.set(kResult);
-
-    // We force the root stage to produce a 'recordId' if the iteration can be resumed (via a resume
-    // token or a tailable cursor) or if the caller simply expects to be able to read it.
-    reqs.setIf(kRecordId, needsRecordIdSlot);
+    // We force the root stage to produce a 'recordId' if the iteration can be
+    // resumed (via a resume token or a tailable cursor) or if the caller simply expects to be able
+    // to read it.
+    reqs.setIf(kRecordId,
+               (_data->shouldUseTailableScan || _data->shouldTrackResumeToken ||
+                _cq.getForceGenerateRecordId()));
 
     // Set the target namespace to '_mainNss'. This is necessary as some QuerySolutionNodes that
     // require a collection when stage building do not explicitly name which collection they are
@@ -476,8 +529,7 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
     invariant(outputs.has(kResult));
     invariant(reqs.has(kRecordId) == outputs.has(kRecordId));
 
-    _data->resultSlot = outputs.getIfExists(stage_builder::PlanStageSlots::kResult);
-    _data->recordIdSlot = outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId);
+    _data->outputs = std::move(outputs);
 
     return {std::move(stage), PlanStageData(std::move(_env), std::move(_data))};
 }
@@ -1004,7 +1056,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             6935000, "ABT must be valid if have fields to project", fieldsToProject.empty() || abt);
         optimizer::SlotVarMap slotMap{};
         slotMap[rootStr] = rowStoreSlot;
-        rowStoreExpr = abt ? abtToExpr(*abt, slotMap, _state)
+        rowStoreExpr = abt ? abtToExpr(*abt, slotMap, *_env)
                            : sbe::makeE<sbe::EFunction>("newObj", sbe::EExpression::Vector{});
     }
 
@@ -1157,9 +1209,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                      &outputs);
     stage = std::move(outStage);
 
-    auto collatorSlot = _state.getCollatorSlot();
+    auto collatorSlot = _env->getSlotIfExists("collator"_sd);
 
-    sbe::SlotExprPairVector projects;
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
     for (size_t i = 0; i < fieldsAndSortKeys.size(); ++i) {
         auto name = std::move(fieldsAndSortKeys[i]);
         if (sortKeysSet.count(name)) {
@@ -1169,7 +1221,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 sortKeyExpr = makeFunction(
                     "collComparisonKey"_sd, std::move(sortKeyExpr), makeVariable(*collatorSlot));
             }
-            projects.emplace_back(slot, std::move(sortKeyExpr));
+            projects.insert({slot, std::move(sortKeyExpr)});
             outputs.set(std::make_pair(PlanStageSlots::kSortKey, name), slot);
         }
         if (i < numOfFields) {
@@ -1403,7 +1455,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto [stage, childOutputs] = build(child, childReqs);
     auto outputs = std::move(childOutputs);
 
-    auto collatorSlot = _state.getCollatorSlot();
+    auto collatorSlot = _env->getSlotIfExists("collator"_sd);
 
     sbe::value::SlotVector orderBy;
     std::vector<sbe::value::SortDirection> direction;
@@ -1480,7 +1532,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                           std::move(failOnParallelArrays));
         }
 
-        sbe::SlotExprPairVector sortExpressions;
+        sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> sortExpressions;
 
         for (const auto& part : sortPattern) {
             auto topLevelFieldSlot = outputs.get(
@@ -1501,7 +1553,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                     "collComparisonKey"_sd, std::move(sortExpr), makeVariable(*collatorSlot));
             }
             sbe::value::SlotId sortKeySlot = _slotIdGenerator.generate();
-            sortExpressions.emplace_back(sortKeySlot, std::move(sortExpr));
+            sortExpressions.emplace(sortKeySlot, std::move(sortExpr));
 
             orderBy.push_back(sortKeySlot);
             direction.push_back(part.isAscending ? sbe::value::SortDirection::Ascending
@@ -1552,7 +1604,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             // sort [s1, s2] [asc, dsc] ...
             // project s1=getElement(fullSortKey,0), s2=getElement(fullSortKey,1)
             // project fullSortKey=generateSortKeyCheap(bson)
-            sbe::SlotExprPairVector projects;
+            sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> prjSlotToExprMap;
 
             int i = 0;
             for (const auto& part : sortPattern) {
@@ -1562,15 +1614,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 direction.push_back(part.isAscending ? sbe::value::SortDirection::Ascending
                                                      : sbe::value::SortDirection::Descending);
 
-                projects.emplace_back(
-                    sortKeySlot,
+                prjSlotToExprMap[sortKeySlot] =
                     makeFunction("sortKeyComponentVectorGetElement",
                                  makeVariable(fullSortKeySlot),
-                                 makeConstant(sbe::value::TypeTags::NumberInt32, i)));
+                                 makeConstant(sbe::value::TypeTags::NumberInt32, i));
                 ++i;
             }
             stage = sbe::makeS<sbe::ProjectStage>(
-                std::move(stage), std::move(projects), root->nodeId());
+                std::move(stage), std::move(prjSlotToExprMap), root->nodeId());
         }
     }
 
@@ -1622,7 +1673,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto [stage, outputs] = build(child, childReqs);
 
-    auto collatorSlot = _state.getCollatorSlot();
+    auto collatorSlot = _env->getSlotIfExists("collator"_sd);
 
     sbe::value::SlotVector orderBy;
     std::vector<sbe::value::SortDirection> direction;
@@ -1639,7 +1690,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                              : sbe::value::SortDirection::Descending);
     }
 
-    sbe::SlotExprPairVector projects;
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projectMap;
     auto makeSortKey = [&](sbe::value::SlotId inputSlot) {
         auto sortKeyExpr = makeFillEmptyNull(makeVariable(inputSlot));
         if (collatorSlot) {
@@ -1654,11 +1705,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     for (size_t idx = 0; idx < orderBy.size(); ++idx) {
         auto sortKeySlot{_slotIdGenerator.generate()};
-        projects.emplace_back(sortKeySlot, makeSortKey(orderBy[idx]));
+        projectMap.emplace(sortKeySlot, makeSortKey(orderBy[idx]));
         orderBy[idx] = sortKeySlot;
     }
 
-    stage = sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), root->nodeId());
+    stage = sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projectMap), root->nodeId());
 
     // Slots for sort stage to forward to parent stage. Values in these slots are not used during
     // sorting.
@@ -2139,7 +2190,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildEof(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
-    return generateEofPlan(root->nodeId(), reqs, _state);
+    return generateEofPlan(root->nodeId(), reqs, &_slotIdGenerator);
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildAndHash(
@@ -2173,7 +2224,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto innerCondSlots = sbe::makeSV(innerIdSlot);
     auto innerProjectSlots = sbe::makeSV(innerResultSlot);
 
-    auto collatorSlot = _state.getCollatorSlot();
+    auto collatorSlot = _env->getSlotIfExists("collator"_sd);
 
     // Designate outputs.
     PlanStageSlots outputs;
@@ -2493,7 +2544,7 @@ sbe::value::SlotVector generateAccumulator(
     sbe::AggExprVector& aggSlotExprs,
     boost::optional<sbe::value::SlotId> initializerRootSlot) {
     auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
-    auto collatorSlot = state.getCollatorSlot();
+    auto collatorSlot = state.env->getSlotIfExists("collator"_sd);
 
     // One accumulator may be translated to multiple accumulator expressions. For example, The
     // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
@@ -2609,7 +2660,7 @@ sbe::SlotExprPairVector generateMergingExpressions(StageBuilderState& state,
     tassert(7039557, "expected non-null 'frameIdGenerator' pointer", frameIdGenerator);
 
     auto spillSlots = slotIdGenerator->generateMultiple(numInputSlots);
-    auto collatorSlot = state.getCollatorSlot();
+    auto collatorSlot = state.env->getSlotIfExists("collator"_sd);
 
     auto mergingExprs = [&]() {
         if (isTopBottomN(accStmt)) {
@@ -2644,7 +2695,7 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
     const std::vector<sbe::value::SlotVector>& aggSlotsVec,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator) {
-    sbe::SlotExprPairVector projects;
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> prjSlotToExprMap;
     sbe::value::SlotVector groupOutSlots{groupEvalStage.getOutSlots()};
     // To passthrough the output slots of accumulators with trivial finalizers, we need to find
     // their slot ids. We can do this by sorting 'groupEvalStage.outSlots' because the slot ids
@@ -2662,12 +2713,12 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
             return dedupedGroupBySlots[0];
         } else {
             auto slot = slotIdGenerator->generate();
-            projects.emplace_back(slot, std::move(idFinalExpr));
+            prjSlotToExprMap.emplace(slot, std::move(idFinalExpr));
             return slot;
         }
     }();
 
-    auto collatorSlot = state.getCollatorSlot();
+    auto collatorSlot = state.env->getSlotIfExists("collator"_sd);
     auto finalSlots{sbe::value::SlotVector{finalGroupBySlot}};
     std::vector<std::string> fieldNames{"_id"};
     size_t idxAccFirstSlot = dedupedGroupBySlots.size();
@@ -2700,7 +2751,7 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
         if (finalExpr) {
             auto outSlot = slotIdGenerator->generate();
             finalSlots.push_back(outSlot);
-            projects.emplace_back(outSlot, std::move(finalExpr));
+            prjSlotToExprMap.emplace(outSlot, std::move(finalExpr));
         } else {
             finalSlots.push_back(groupOutSlots[idxAccFirstSlot]);
         }
@@ -2712,9 +2763,9 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
 
     // Gathers all accumulator results. If there're no project expressions, does not add a project
     // stage.
-    auto retEvalStage = projects.empty()
+    auto retEvalStage = prjSlotToExprMap.empty()
         ? std::move(groupEvalStage)
-        : makeProject(std::move(groupEvalStage), std::move(projects), nodeId);
+        : makeProject(std::move(groupEvalStage), std::move(prjSlotToExprMap), nodeId);
 
     return {std::move(fieldNames), std::move(finalSlots), std::move(retEvalStage)};
 }
@@ -2838,11 +2889,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Slot to EExpression map that tracks path traversal expressions. Note that this only contains
     // expressions corresponding to paths which require traversals (that is, if there exists a
-    // top level field slot corresponding to a field, we take care not to add it to 'projects' to
+    // top level field slot corresponding to a field, we take care not to add it to 'fpMap' to
     // avoid rebinding a slot).
-    sbe::SlotExprPairVector projects;
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> fpMap;
 
-    // Lambda which populates 'projects' and 'childOutputs' with an expression and/or a slot,
+    // Lambda which populates 'fpMap' and 'childOutputs' with an expression and/or a slot,
     // respectively, corresponding to the value of 'fieldExpr'.
     auto accumulateFieldPaths = [&](const ExpressionFieldPath* fieldExpr) {
         // We optimize neither a field path for the top-level document itself nor a field path
@@ -2873,7 +2924,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                     return *result.getSlot();
                 } else {
                     auto newSlot = _slotIdGenerator.generate();
-                    projects.emplace_back(newSlot, result.extractExpr(_state));
+                    fpMap.emplace(newSlot, result.extractExpr(_state));
                     return newSlot;
                 }
             }
@@ -2894,8 +2945,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto childEvalStage =
         EvalStage{std::move(childStage), getSlotsToForward(forwardingReqs, childOutputs)};
 
-    if (!projects.empty()) {
-        childEvalStage = makeProject(std::move(childEvalStage), std::move(projects), nodeId);
+    if (!fpMap.empty()) {
+        childEvalStage = makeProject(std::move(childEvalStage), std::move(fpMap), nodeId);
     }
 
     bool isVariableGroupInitializer = false;
@@ -2979,7 +3030,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto groupEvalStage = makeHashAgg(std::move(currentStage),
                                       dedupedGroupBySlots,
                                       std::move(aggSlotExprs),
-                                      _state.getCollatorSlot(),
+                                      _state.env->getSlotIfExists("collator"_sd),
                                       _cq.getExpCtx()->allowDiskUse,
                                       std::move(mergingExprs),
                                       nodeId);
