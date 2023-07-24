@@ -179,6 +179,7 @@ void installShardedCollectionMetadata(OperationContext* opCtx,
     auto rt = RoutingTableHistory::makeNew(nss,
                                            uuid,
                                            shardKeyPattern.getKeyPattern(),
+                                           false, /*unsplittable*/
                                            nullptr,
                                            false,
                                            epoch,

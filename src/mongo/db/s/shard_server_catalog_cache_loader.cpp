@@ -295,6 +295,7 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
     return CollectionAndChangedChunks{shardCollectionEntry.getEpoch(),
                                       shardCollectionEntry.getTimestamp(),
                                       shardCollectionEntry.getUuid(),
+                                      shardCollectionEntry.getUnsplittable(),
                                       shardCollectionEntry.getKeyPattern().toBSON(),
                                       shardCollectionEntry.getDefaultCollation(),
                                       shardCollectionEntry.getUnique(),

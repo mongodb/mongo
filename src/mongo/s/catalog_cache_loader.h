@@ -82,6 +82,7 @@ public:
             OID epoch,
             Timestamp timestamp,
             UUID uuid,
+            bool unsplittable,
             const BSONObj& collShardKeyPattern,
             const BSONObj& collDefaultCollation,
             bool collShardKeyIsUnique,
@@ -95,6 +96,9 @@ public:
         Timestamp timestamp;
         boost::optional<UUID> uuid;  // This value can never be boost::none,
                                      // except under the default constructor
+
+        bool unsplittable;
+
         BSONObj shardKeyPattern;
         BSONObj defaultCollation;
         bool shardKeyIsUnique;

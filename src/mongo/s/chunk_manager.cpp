@@ -626,6 +626,7 @@ RoutingTableHistory::RoutingTableHistory(
     NamespaceString nss,
     UUID uuid,
     KeyPattern shardKeyPattern,
+    bool unsplittable,
     std::unique_ptr<CollatorInterface> defaultCollator,
     bool unique,
     boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
@@ -635,6 +636,7 @@ RoutingTableHistory::RoutingTableHistory(
     : _nss(std::move(nss)),
       _uuid(std::move(uuid)),
       _shardKeyPattern(std::move(shardKeyPattern)),
+      _unsplittable(unsplittable),
       _defaultCollator(std::move(defaultCollator)),
       _unique(unique),
       _timeseriesFields(std::move(timeseriesFields)),
@@ -814,6 +816,13 @@ ChunkManager ChunkManager::makeAtTime(const ChunkManager& cm, Timestamp clusterT
     return ChunkManager(cm.dbPrimary(), cm.dbVersion(), cm._rt, clusterTime);
 }
 
+bool ChunkManager::isSplittable() const {
+    if (!_rt->optRt)
+        return false;
+
+    return !_rt->optRt->_unsplittable;
+}
+
 bool ChunkManager::allowMigrations() const {
     if (!_rt->optRt)
         return true;
@@ -866,6 +875,7 @@ RoutingTableHistory RoutingTableHistory::makeNew(
     NamespaceString nss,
     UUID uuid,
     KeyPattern shardKeyPattern,
+    bool unsplittable,
     std::unique_ptr<CollatorInterface> defaultCollator,
     bool unique,
     OID epoch,
@@ -881,6 +891,7 @@ RoutingTableHistory RoutingTableHistory::makeNew(
         std::move(nss),
         std::move(uuid),
         std::move(shardKeyPattern),
+        std::move(unsplittable),
         std::move(defaultCollator),
         std::move(unique),
         std::move(timeseriesFields),
@@ -908,6 +919,7 @@ RoutingTableHistory RoutingTableHistory::makeUpdated(
     return RoutingTableHistory(_nss,
                                _uuid,
                                getShardKeyPattern().getKeyPattern(),
+                               _unsplittable,
                                CollatorInterface::cloneCollator(getDefaultCollator()),
                                isUnique(),
                                std::move(timeseriesFields),

@@ -103,6 +103,7 @@ CollectionAndChangedChunks getCollectionRefresh(
     return CollectionAndChangedChunks{swCollectionReturnValue.getValue().getEpoch(),
                                       swCollectionReturnValue.getValue().getTimestamp(),
                                       swCollectionReturnValue.getValue().getUuid(),
+                                      swCollectionReturnValue.getValue().getUnsplittable(),
                                       swCollectionReturnValue.getValue().getKeyPattern().toBSON(),
                                       swCollectionReturnValue.getValue().getDefaultCollation(),
                                       swCollectionReturnValue.getValue().getUnique(),

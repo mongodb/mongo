@@ -338,6 +338,7 @@ private:
         auto rt = RoutingTableHistory::makeNew(nss,
                                                uuid,
                                                shardKey,
+                                               false, /*unsplittable*/
                                                nullptr /* defaultCollator */,
                                                false /* unique */,
                                                epoch,

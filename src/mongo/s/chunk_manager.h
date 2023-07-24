@@ -301,6 +301,7 @@ public:
         NamespaceString nss,
         UUID uuid,
         KeyPattern shardKeyPattern,
+        bool unsplittable,
         std::unique_ptr<CollatorInterface> defaultCollator,
         bool unique,
         OID epoch,
@@ -457,6 +458,7 @@ private:
     RoutingTableHistory(NamespaceString nss,
                         UUID uuid,
                         KeyPattern shardKeyPattern,
+                        bool unsplittable,
                         std::unique_ptr<CollatorInterface> defaultCollator,
                         bool unique,
                         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
@@ -474,6 +476,9 @@ private:
 
     // The key pattern used to shard the collection
     ShardKeyPattern _shardKeyPattern;
+
+    // True for tracked unsharded collections
+    bool _unsplittable;
 
     // Default collation to use for routing data queries for this collection
     std::unique_ptr<CollatorInterface> _defaultCollator;
@@ -655,6 +660,8 @@ public:
     bool isSharded() const {
         return bool(_rt->optRt);
     }
+
+    bool isSplittable() const;
 
     bool isAtPointInTime() const {
         return bool(_clusterTime);

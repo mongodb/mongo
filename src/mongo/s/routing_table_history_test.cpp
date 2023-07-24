@@ -191,6 +191,7 @@ public:
         return RoutingTableHistory::makeNew(kNss,
                                             _collUUID,
                                             _shardKeyPattern,
+                                            false, /*unsplittable*/
                                             nullptr,
                                             false,
                                             _epoch,
@@ -613,6 +614,7 @@ TEST_F(RoutingTableHistoryTest, AllowMigrationFlag) {
         auto rt = RoutingTableHistory::makeNew(kNss,
                                                collUUID(),
                                                getShardKeyPattern(),
+                                               false, /*unsplittable*/
                                                nullptr,
                                                false,
                                                collEpoch(),

@@ -106,6 +106,7 @@ protected:
             kNss,
             uuid,
             shardKeyPattern.getKeyPattern(),
+            false, /*unsplittable*/
             nullptr,
             false,
             epoch,

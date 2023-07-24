@@ -169,6 +169,7 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
         return RoutingTableHistory::makeNew(nss,
                                             *collectionAndChunks.uuid,
                                             KeyPattern(collectionAndChunks.shardKeyPattern),
+                                            collectionAndChunks.unsplittable,
                                             std::move(defaultCollator),
                                             collectionAndChunks.shardKeyIsUnique,
                                             collectionAndChunks.epoch,

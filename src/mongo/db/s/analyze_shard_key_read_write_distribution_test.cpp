@@ -142,6 +142,7 @@ protected:
             RoutingTableHistory::makeNew(nss,
                                          collUuid,
                                          chunkSplitInfo.shardKeyPattern.getKeyPattern(),
+                                         false, /*unsplittable*/
                                          std::move(defaultCollator) /* collator */,
                                          false /* unique */,
                                          OID::gen(),

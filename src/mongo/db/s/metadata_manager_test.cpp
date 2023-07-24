@@ -99,6 +99,7 @@ protected:
             kNss,
             uuid,
             shardKeyPattern,
+            false, /*unsplittable*/
             nullptr,
             false,
             epoch,

@@ -132,6 +132,7 @@ void RangeDeleterServiceTest::_setFilteringMetadataByUUID(OperationContext* opCt
                             RoutingTableHistory::makeNew(nss,
                                                          uuid,
                                                          kShardKeyPattern,
+                                                         false, /*unsplittable*/
                                                          nullptr,
                                                          false,
                                                          epoch,

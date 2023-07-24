@@ -137,6 +137,12 @@ structs:
 
                               If the flag is not present it defaults to true."
                 optional: true
+            unsplittable:
+                type: optionalBool
+                description: "Flag that identifies whether the collection is splittable in multiple 
+                            chunks. If unsplittable, the collection is always equivalent to a 1 
+                            chunk collection."
+
             timeseriesFields:
                 type: TypeCollectionTimeseriesFields
                 description: "Time-series collection fields. Only set when this is a time-series

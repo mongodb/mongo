@@ -165,6 +165,7 @@ protected:
                             RoutingTableHistory::makeNew(nss,
                                                          uuid,
                                                          shardKeyPattern,
+                                                         false, /*unsplittable*/
                                                          nullptr,
                                                          false,
                                                          epoch,

@@ -129,6 +129,7 @@ public:
         auto rt = RoutingTableHistory::makeNew(kSourceNss,
                                                _sourceUUID,
                                                BSON(kSourceShardKey << 1),
+                                               false, /*unsplittable*/
                                                nullptr /* defaultCollator */,
                                                false /* unique */,
                                                std::move(epoch),

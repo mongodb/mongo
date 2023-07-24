@@ -242,6 +242,7 @@ protected:
                             RoutingTableHistory::makeNew(kNss,
                                                          collIdentifier,
                                                          shardKeyPattern,
+                                                         false, /*unsplittable*/
                                                          nullptr,
                                                          false,
                                                          collEpoch,

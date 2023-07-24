@@ -112,6 +112,7 @@ CollectionMetadata makeCollectionMetadataImpl(
                          RoutingTableHistory::makeNew(kNss,
                                                       uuid,
                                                       shardKeyPattern,
+                                                      false, /*unsplittable*/
                                                       nullptr,
                                                       false,
                                                       epoch,

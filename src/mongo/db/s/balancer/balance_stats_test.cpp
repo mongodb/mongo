@@ -77,6 +77,7 @@ public:
         auto routingTableHistory = RoutingTableHistory::makeNew(_nss,
                                                                 _uuid,  // UUID
                                                                 shardKeyPattern,
+                                                                false,  /*unsplittable*/
                                                                 {},     // collator
                                                                 false,  // unique
                                                                 _epoch,

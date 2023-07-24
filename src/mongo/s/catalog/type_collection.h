@@ -125,6 +125,7 @@ public:
     using CollectionTypeBase::getTimeseriesFields;
     using CollectionTypeBase::getTimestamp;
     using CollectionTypeBase::getUnique;
+    using CollectionTypeBase::getUnsplittable;
     using CollectionTypeBase::getUpdatedAt;
     using CollectionTypeBase::getUuid;
     using CollectionTypeBase::setDefragmentationPhase;
@@ -135,6 +136,7 @@ public:
     using CollectionTypeBase::setTimeseriesFields;
     using CollectionTypeBase::setTimestamp;
     using CollectionTypeBase::setUnique;
+    using CollectionTypeBase::setUnsplittable;
     using CollectionTypeBase::setUpdatedAt;
     using CollectionTypeBase::setUuid;
     using CollectionTypeBase::toBSON;

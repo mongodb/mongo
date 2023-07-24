@@ -72,6 +72,7 @@ public:
     using ShardCollectionTypeBase::getTimeseriesFields;
     using ShardCollectionTypeBase::getTimestamp;
     using ShardCollectionTypeBase::getUnique;
+    using ShardCollectionTypeBase::getUnsplittable;
     using ShardCollectionTypeBase::getUuid;
     using ShardCollectionTypeBase::setDefaultCollation;
     using ShardCollectionTypeBase::setEnterCriticalSectionCounter;

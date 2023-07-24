@@ -117,6 +117,7 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
     auto rt = RoutingTableHistory::makeNew(kNss,
                                            collUuid,
                                            shardKeyPattern,
+                                           false, /*unsplittable*/
                                            nullptr,
                                            true,
                                            collEpoch,
@@ -307,6 +308,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
         auto rt = RoutingTableHistory::makeNew(kNss,
                                                collUuid,
                                                shardKeyPattern,
+                                               false, /*unsplittable*/
                                                nullptr,
                                                true,
                                                collEpoch,

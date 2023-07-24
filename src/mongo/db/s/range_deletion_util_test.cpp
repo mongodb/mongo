@@ -129,6 +129,7 @@ public:
             kNss,
             uuid,
             kShardKeyPattern,
+            false, /*unsplittable*/
             nullptr,
             false,
             epoch,
