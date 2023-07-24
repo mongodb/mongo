@@ -431,8 +431,9 @@ __posix_file_read(
     for (addr = buf; len > 0; addr += nr, len -= (size_t)nr, offset += nr) {
         chunk = WT_MIN(len, WT_GIGABYTE);
         /*
-         * The WT_SYSCALL_RETRY macro expects 0 for success. pread returns > 0 when successful,
-         * adjust the return value.
+         * The WT_SYSCALL_RETRY macro expects 0 for success. pread returns > 0 when it successfully
+         * reads bytes, adjust the return value. pread returns 0 when its EOF and if that is reached
+         * it is unexpected as we know how much we are reading.
          */
         WT_SYSCALL_RETRY((nr = pread(pfh->fd, addr, chunk, offset)) <= 0 ? -1 : 0, ret);
         if (ret != 0)
