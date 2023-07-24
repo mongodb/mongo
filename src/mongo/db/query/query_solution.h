@@ -1687,7 +1687,10 @@ struct SentinelNode : public QuerySolutionNode {
 };
 
 struct SearchNode : public QuerySolutionNode {
-    explicit SearchNode(bool isSearchMeta) : isSearchMeta(isSearchMeta) {}
+    explicit SearchNode(bool isSearchMeta) : isSearchMeta(isSearchMeta) {
+        // TODO SERVER-78565: Support $search in SBE plan cache
+        eligibleForPlanCache = false;
+    }
 
     StageType getType() const override {
         return STAGE_SEARCH;
