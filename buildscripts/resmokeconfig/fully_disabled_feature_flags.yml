@@ -13,3 +13,4 @@
 - featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
 - featureFlagUpdateDocumentShardKeyUsingTransactionApi
 - featureFlagAuthoritativeShardCollection
+- featureFlagAllMongodsAreSharded

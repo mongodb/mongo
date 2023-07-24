@@ -68,6 +68,7 @@
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/repl/repl_set_config_params_gen.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_nongeneral_gen.h"
@@ -164,6 +165,9 @@ StatusWith<repl::ReplSettings> populateReplSettings(const moe::Environment& para
         // "replSetName" is previously removed if "replSet" and "replSetName" are both found to be
         // set by the user. Therefore, we only need to check for it if "replSet" in not found.
         replSettings.setReplSetString(params["replication.replSetName"].as<std::string>().c_str());
+    } else if (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+        replSettings.setShouldAutoInitiate();
+        replSettings.setReplSetString(repl::ReplSettings::kDefaultSetName);
     }
 
     if (params.count("replication.oplogSizeMB")) {

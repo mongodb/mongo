@@ -53,7 +53,7 @@ std::string ReplSettings::ourSetName() const {
 }
 
 bool ReplSettings::isReplSet() const {
-    return _isServerless || !_replSetString.empty();
+    return _isServerless || !_replSetString.empty() || _shouldAutoInitiate;
 }
 
 /**
@@ -77,6 +77,10 @@ bool ReplSettings::shouldRecoverFromOplogAsStandalone() {
     return recoverFromOplogAsStandalone;
 }
 
+bool ReplSettings::shouldAutoInitiate() const {
+    return _shouldAutoInitiate;
+}
+
 /**
  * Setters
  */
@@ -93,6 +97,11 @@ void ReplSettings::setReplSetString(std::string replSetString) {
 void ReplSettings::setServerlessMode() {
     invariant(_replSetString.empty());
     _isServerless = true;
+}
+
+void ReplSettings::setShouldAutoInitiate() {
+    invariant(!_isServerless);
+    _shouldAutoInitiate = true;
 }
 
 }  // namespace repl

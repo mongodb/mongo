@@ -40,6 +40,9 @@ namespace repl {
 
 class ReplSettings {
 public:
+    // TODO SERVER-79188: Generate a random default replica set name instead of hard-coding 'rs'.
+    static constexpr char kDefaultSetName[] = "rs";
+
     std::string ourSetName() const;
     bool isReplSet() const;
 
@@ -49,6 +52,7 @@ public:
     long long getOplogSizeBytes() const;
     std::string getReplSetString() const;
     bool isServerless() const;
+    bool shouldAutoInitiate() const;
 
     /**
      * Static getter for the 'recoverFromOplogAsStandalone' server parameter.
@@ -61,11 +65,13 @@ public:
     void setOplogSizeBytes(long long oplogSizeBytes);
     void setReplSetString(std::string replSetString);
     void setServerlessMode();
+    void setShouldAutoInitiate();
 
 private:
     long long _oplogSizeBytes = 0;  // --oplogSize
 
     bool _isServerless = false;
+    bool _shouldAutoInitiate = false;
     std::string _replSetString;  // --replSet[/<seedlist>]
 };
 

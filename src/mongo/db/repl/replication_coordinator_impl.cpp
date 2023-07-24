@@ -1008,9 +1008,19 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
         if (doneLoadingConfig) {
             // If we're not done loading the config, then the config state will be set by
             // _finishLoadLocalConfig.
-            stdx::lock_guard<Latch> lk(_mutex);
-            invariant(!_rsConfig.isInitialized());
-            _setConfigState_inlock(kConfigUninitialized);
+            {
+                stdx::lock_guard<Latch> lk(_mutex);
+                invariant(!_rsConfig.isInitialized());
+                _setConfigState_inlock(kConfigUninitialized);
+            }
+            if (_settings.shouldAutoInitiate()) {
+                BSONObjBuilder bob;
+                bob.append("replSetInitiate", BSONObj());
+                auto initiateCmd = OpMsgRequest::fromDBAndBody("", bob.obj());
+                auto status = getStatusFromCommandResult(
+                    CommandHelpers::runCommandDirectly(opCtx, initiateCmd));
+                uassertStatusOK(status);
+            }
         }
     } catch (DBException& e) {
         auto status = e.toStatus();
