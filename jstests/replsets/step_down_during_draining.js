@@ -80,7 +80,7 @@ assert.soon(
         return bufferCountChange == numDocuments - 1;
     },
     'secondary did not buffer operations for new inserts on primary',
-    replSet.kDefaultTimeoutMs,
+    ReplSetTest.kDefaultTimeoutMS,
     1000);
 
 reconnect(secondary);
