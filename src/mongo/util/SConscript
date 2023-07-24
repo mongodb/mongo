@@ -936,7 +936,7 @@ pretty_printer_test_program = env.Program(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
     ],
-    AIB_COMPONENT='pretty-printer-test',
+    AIB_COMPONENT='pretty-printer-tests',
     AIB_COMPONENTS_EXTRA=['dist-test'],
 )
 pretty_printer_test_program_installed = env.GetAutoInstalledFiles(pretty_printer_test_program[0])
