@@ -117,9 +117,9 @@ thread_ckpt_run(void *arg)
         fflush(stdout);
         /*
          * Create the checkpoint file so that the parent process knows at least one checkpoint has
-         * finished and can start its timer.
+         * finished with the oldest timestamp set so it can start its timer.
          */
-        if (first_ckpt) {
+        if (first_ckpt && stable > MAX_DATA) {
             testutil_assert_errno((fp = fopen(ckpt_file, "w")) != NULL);
             first_ckpt = false;
             testutil_assert_errno(fclose(fp) == 0);
