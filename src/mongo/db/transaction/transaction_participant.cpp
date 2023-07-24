@@ -1786,12 +1786,24 @@ TransactionParticipant::Participant::prepareTransaction(
     opCtx->getWriteUnitOfWork()->prepare();
     p().needToWriteAbortEntry = true;
 
-    opObserver->onTransactionPrepare(opCtx,
-                                     reservedSlots,
-                                     *completedTransactionOperations,
-                                     applyOpsOplogSlotAndOperationAssignment,
-                                     p().transactionOperations.getNumberOfPrePostImagesToWrite(),
-                                     wallClockTime);
+    // Don't write oplog entry on secondaries.
+    if (opCtx->writesAreReplicated()) {
+        // We write the oplog entry in a side transaction so that we do not commit the now-prepared
+        // transaction. See SERVER-34824.
+        TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
+
+        writeConflictRetry(opCtx, "onTransactionPrepare", NamespaceString::kRsOplogNamespace, [&] {
+            WriteUnitOfWork wuow(opCtx);
+            opObserver->onTransactionPrepare(
+                opCtx,
+                reservedSlots,
+                *completedTransactionOperations,
+                applyOpsOplogSlotAndOperationAssignment,
+                p().transactionOperations.getNumberOfPrePostImagesToWrite(),
+                wallClockTime);
+            wuow.commit();
+        });
+    }
 
     opObserver->postTransactionPrepare(opCtx, reservedSlots, *completedTransactionOperations);
 

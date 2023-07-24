@@ -1287,12 +1287,25 @@ protected:
                                     /*prepare=*/true);
         opObserver().preTransactionPrepare(opCtx(), *txnOps, applyOpsAssignment, currentTime);
         opCtx()->recoveryUnit()->setPrepareTimestamp(prepareOpTime.getTimestamp());
-        opObserver().onTransactionPrepare(opCtx(),
-                                          reservedSlots,
-                                          *txnOps,
-                                          applyOpsAssignment,
-                                          numberOfPrePostImagesToWrite,
-                                          currentTime);
+
+        // Don't write oplog entry on secondaries.
+        if (opCtx()->writesAreReplicated()) {
+            auto opCtxForPrepare = opCtx();
+            TransactionParticipant::SideTransactionBlock sideTxn(opCtxForPrepare);
+
+            writeConflictRetry(
+                opCtxForPrepare, "onTransactionPrepare", NamespaceString::kRsOplogNamespace, [&] {
+                    WriteUnitOfWork wuow(opCtxForPrepare);
+                    opObserver().onTransactionPrepare(opCtxForPrepare,
+                                                      reservedSlots,
+                                                      *txnOps,
+                                                      applyOpsAssignment,
+                                                      numberOfPrePostImagesToWrite,
+                                                      currentTime);
+                    wuow.commit();
+                });
+        }
+
         opObserver().postTransactionPrepare(opCtx(), reservedSlots, *txnOps);
     }
 
