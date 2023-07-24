@@ -1371,15 +1371,17 @@ std::shared_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
     return kEmptyStats;
 }
 
-void mergeExecutionStatsToMainBucketCatalog(BucketCatalog& mainBucketCatalog,
-                                            BucketCatalog& sideBucketCatalog,
-                                            const NamespaceString& viewNs) {
-    auto collStats = [&] {
-        stdx::lock_guard catalogLock{sideBucketCatalog.mutex};
-        invariant(sideBucketCatalog.executionStats.size() == 1);
-        return sideBucketCatalog.executionStats.begin()->second;
-    }();
-    ExecutionStatsController stats = getOrInitializeExecutionStats(mainBucketCatalog, viewNs);
+std::pair<NamespaceString, std::shared_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
+    BucketCatalog& sideBucketCatalog) {
+    stdx::lock_guard catalogLock{sideBucketCatalog.mutex};
+    invariant(sideBucketCatalog.executionStats.size() == 1);
+    return *sideBucketCatalog.executionStats.begin();
+}
+
+void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
+                                        std::shared_ptr<ExecutionStats> collStats,
+                                        const NamespaceString& viewNs) {
+    ExecutionStatsController stats = getOrInitializeExecutionStats(catalog, viewNs);
     addCollectionExecutionStats(stats, *collStats);
 }
 

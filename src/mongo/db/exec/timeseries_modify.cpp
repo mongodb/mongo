@@ -142,17 +142,19 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
 
 TimeseriesModifyStage::~TimeseriesModifyStage() {
     if (_sideBucketCatalog && !_insertedBucketIds.empty()) {
+        auto [viewNs, collStats] =
+            timeseries::bucket_catalog::internal::getSideBucketCatalogCollectionStats(
+                *_sideBucketCatalog);
         // Finishes tracking the newly inserted buckets in the main bucket catalog as direct
         // writes when the whole update operation is done.
         auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx());
-        auto viewNs = collectionPtr()->ns().getTimeseriesViewNamespace();
         for (const auto bucketId : _insertedBucketIds) {
             timeseries::bucket_catalog::directWriteFinish(
                 bucketCatalog.bucketStateRegistry, viewNs, bucketId);
         }
-
-        timeseries::bucket_catalog::internal::mergeExecutionStatsToMainBucketCatalog(
-            bucketCatalog, *_sideBucketCatalog, viewNs);
+        // Merges the execution stats of the side bucket catalog to the main one.
+        timeseries::bucket_catalog::internal::mergeExecutionStatsToBucketCatalog(
+            bucketCatalog, collStats, viewNs);
     }
 }
 
