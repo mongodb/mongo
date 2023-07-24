@@ -406,7 +406,8 @@ boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
         // time-series metric indexes feature flag is enabled. If the feature flag isn't enabled,
         // the reverse mapping mechanism will be used. This is necessary to skip returning any
         // incompatible indexes created when the feature flag was enabled.
-        return bucketsIndex.getObjectField(kOriginalSpecFieldName);
+        BSONObj intermediateObj = bucketsIndex.getObjectField(kOriginalSpecFieldName);
+        return intermediateObj.addField(bucketsIndex[IndexDescriptor::k2dsphereVersionFieldName]);
     }
     if (bucketsIndex.hasField(kKeyFieldName)) {
         auto timeseriesKeyValue = createTimeseriesIndexSpecFromBucketsIndexSpec(
