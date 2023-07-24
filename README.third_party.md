@@ -38,6 +38,7 @@ a notice will be included in
 | [librdkafka]               | BSD-2-Clause      | 2.0.2             |                      |                                 |
 | [libmongocrypt]            | Apache-2.0        | e656245b7e        |          ✗           |                ✗                |
 | [linenoise]                | BSD-3-Clause      | Unknown + changes |                      |                ✗                |
+| [mongo-c-driver]           | Apache-2.0        | 1.23.0            |          ✗           |                ✗                |
 | [MozJS]                    | MPL-2.0           | ESR 91.3.0        |                      |                ✗                |
 | [MurmurHash3]              | Public Domain     | Unknown + changes |          ✗           |                ✗                |
 | [ocspbuilder]              | MIT               | 0.10.2            |                      |                                 |
@@ -74,6 +75,7 @@ a notice will be included in
 [librdkafka]: https://github.com/confluentinc/librdkafka
 [libmongocrypt]: https://github.com/mongodb/libmongocrypt
 [linenoise]: https://github.com/antirez/linenoise
+[mongo-c-driver]: https://github.com/mongodb/mongo-c-driver
 [MozJS]: https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox-esr
 [MurmurHash3]: https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
 [ocspbuilder]: https://github.com/wbond/ocspbuilder
