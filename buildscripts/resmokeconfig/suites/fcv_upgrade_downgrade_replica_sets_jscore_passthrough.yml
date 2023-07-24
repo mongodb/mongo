@@ -58,10 +58,10 @@ selector:
   - jstests/aggregation/api_version_stage_allowance_checks.js
 
   # TODO (SERVER-78200): The tests below sometimes hang when they run concurrently with a setFCV command.
-  - src/mongo/db/modules/enterprise/jstests/fle/fle_admin_e2e.js
-  - src/mongo/db/modules/enterprise/jstests/fle/fle_implicit_encryption.js
-  - src/mongo/db/modules/enterprise/jstests/fle/fle_use_cases.js
-  - src/mongo/db/modules/enterprise/jstests/fle/fle_drivers_integration.js
+  - src/mongo/db/modules/*/jstests/fle/fle_admin_e2e.js
+  - src/mongo/db/modules/*/jstests/fle/fle_implicit_encryption.js
+  - src/mongo/db/modules/*/jstests/fle/fle_use_cases.js
+  - src/mongo/db/modules/*/jstests/fle/fle_drivers_integration.js
 
   # The test uses a resumeToken from previous calls so FCV change will make the token invalid and fail.
   - jstests/core/resume_query_from_non_existent_record.js
