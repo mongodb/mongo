@@ -88,8 +88,18 @@ handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *messa
     SAP *sap;
     WT_DECL_RET;
     int nw;
+    bool printf_msg;
 
     (void)handler;
+
+    /*
+     * If Antithesis is enabled and the message starts with ANTITHESIS: then make sure it always
+     * goes to stdout and is flushed.
+     */
+    printf_msg = false;
+#ifdef ENABLE_ANTITHESIS
+    printf_msg = WT_PREFIX_MATCH(message, "ANTITHESIS:");
+#endif
 
     /*
      * Log to the trace database when tracing messages. In threaded paths there will be a per-thread
@@ -99,13 +109,14 @@ handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *messa
      */
     if ((sap = session->app_private) != NULL && sap->trace != NULL) {
         testutil_check(sap->trace->log_printf(sap->trace, "%s", message));
-        return (0);
-    }
-    if (g.trace_session != NULL) {
+        if (!printf_msg)
+            return (0);
+    } else if (g.trace_session != NULL) {
         __wt_spin_lock((WT_SESSION_IMPL *)g.trace_session, &g.trace_lock);
         testutil_check(g.trace_session->log_printf(g.trace_session, "%s", message));
         __wt_spin_unlock((WT_SESSION_IMPL *)g.trace_session, &g.trace_lock);
-        return (0);
+        if (!printf_msg)
+            return (0);
     }
 
     /* Write and flush the message so we're up-to-date on error. */
