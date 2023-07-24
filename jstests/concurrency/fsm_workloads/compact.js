@@ -15,6 +15,11 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeral
 load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 
+// WiredTiger eviction is slow on Windows debug variants and can cause timeouts when taking a
+// checkpoint through compaction.
+const buildInfo = getBuildInfo();
+const skipTest = buildInfo.debug && buildInfo.buildEnvironment.target_os == "windows";
+
 export const $config = (function() {
     var data = {
         nDocumentsToInsert: 1000,
@@ -91,7 +96,7 @@ export const $config = (function() {
 
     return {
         threadCount: 3,
-        iterations: 8,
+        iterations: skipTest ? 0 : 8,
         states: states,
         transitions: transitions,
         data: data,

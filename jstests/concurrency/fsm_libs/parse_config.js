@@ -29,7 +29,6 @@ function parseConfig(config) {
     assert.gt(config.threadCount, 0, 'expected number of threads to be positive');
 
     assert(Number.isInteger(config.iterations), 'expected number of iterations to be an integer');
-    assert.gt(config.iterations, 0, 'expected number of iterations to be positive');
 
     config.startState = config.startState || 'init';
     assert.eq('string', typeof config.startState);
