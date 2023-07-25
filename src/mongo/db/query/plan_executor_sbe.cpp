@@ -316,7 +316,8 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
     boost::optional<AutoGetCollectionForReadMaybeLockFree> coll;
     std::unique_ptr<insert_listener::Notifier> notifier;
     if (insert_listener::shouldListenForInserts(_opCtx, _cq.get())) {
-        if (!_opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IS)) {
+        if (!_opCtx->isLockFreeReadsOp() &&
+            !_opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IS)) {
             coll.emplace(_opCtx, _nss);
         }
 
