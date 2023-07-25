@@ -50,7 +50,6 @@
 namespace mongo {
 namespace {
 
-constexpr auto kRawFieldName = "raw"_sd;
 class FsyncCommand : public ErrmsgCommandDeprecated {
 public:
     FsyncCommand() : ErrmsgCommandDeprecated("fsync") {}
@@ -116,7 +115,7 @@ public:
             return false;
         }
 
-        auto shardResults = scatterGatherUnversionedTargetAllShards(
+        auto shardResults = scatterGatherUnversionedTargetConfigServerAndShards(
             opCtx,
             dbname,
             applyReadWriteConcern(
@@ -130,7 +129,7 @@ public:
         // This field has had dummy value since MMAP went away. It is undocumented.
         // Maintaining it so as not to cause unnecessary user pain across upgrades.
         result.append("numFiles", 1);
-        result.append("all", rawResult.obj()[kRawFieldName].Obj());
+        result.append("all", rawResult.obj());
         if (!response.responseOK) {
             if (cmdObj["lock"].trueValue()) {
                 unlockLockedShards(response.shardsWithSuccessResponses, opCtx, dbname);

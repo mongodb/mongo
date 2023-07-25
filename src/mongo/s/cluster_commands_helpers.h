@@ -164,6 +164,27 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
     Shard::RetryPolicy retryPolicy);
 
 /**
+ * Utility for dispatching unversioned commands to a dedicated config server if it exists and all
+ * shards in a cluster.
+ *
+ * Returns a non-OK status if a failure occurs on *this* node during execution. Otherwise, returns
+ * success and a list of responses from the config server and shards (including errors from the
+ * config server or shards or errors reaching the config server or shards).
+ *
+ * Note, if this mongos has not refreshed its shard list since
+ * 1) a shard has been *added* through a different mongos, a request will not be sent to the added
+ *    shard
+ * 2) a shard has been *removed* through a different mongos, this function will return a
+ *    ShardNotFound error status.
+ */
+std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigServerAndShards(
+    OperationContext* opCtx,
+    StringData dbName,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy);
+
+/**
  * Utility for dispatching versioned commands on a namespace, deciding which shards to
  * target by applying the passed-in query and collation to the local routing table cache.
  *
