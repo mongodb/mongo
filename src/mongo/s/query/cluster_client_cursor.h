@@ -218,6 +218,7 @@ public:
      */
     virtual boost::optional<uint32_t> getQueryHash() const = 0;
 
+    virtual boost::optional<std::size_t> getQueryStatsStoreKeyHash() const = 0;
     /**
      * Returns the number of batches returned by this cursor.
      */
