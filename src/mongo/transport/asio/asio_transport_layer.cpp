@@ -1612,6 +1612,7 @@ AsioTransportLayer::_createSSLContext(std::shared_ptr<SSLManagerInterface>& mana
     const auto& sslParams = getSSLGlobalParams();
 
     if (sslMode != SSLParams::SSLMode_disabled && _listenerOptions.isIngress()) {
+        invariant(manager, "SSLManager must be set when SSL is not disabled");
         newSSLContext->ingress = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
 
         Status status = newSSLContext->manager->initSSLContext(
