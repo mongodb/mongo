@@ -41,12 +41,31 @@
 #include "mongo/util/assert_util_core.h"
 
 namespace mongo {
+namespace {
+
+bool locked(OperationContext* opCtx, const NamespaceString& ns) {
+    if (ns.isEmpty()) {
+        return true;
+    }
+
+    if (ns.isOplog()) {
+        return opCtx->lockState()->isReadLocked();
+    }
+
+    if (ns.isChangeCollection() && ns.tenantId()) {
+        return opCtx->lockState()->isLockHeldForMode(
+            {ResourceType::RESOURCE_TENANT, *ns.tenantId()}, MODE_IS);
+    }
+
+    return opCtx->lockState()->isCollectionLockedForMode(ns, MODE_IS);
+}
+
+}  // namespace
+
 LockedCollectionYieldRestore::LockedCollectionYieldRestore(OperationContext* opCtx,
                                                            const CollectionPtr& coll)
     : _nss(coll ? coll->ns() : NamespaceString()) {
-    if (!_nss.isEmpty()) {
-        invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IS));
-    }
+    invariant(locked(opCtx, _nss));
 }
 
 const Collection* LockedCollectionYieldRestore::operator()(OperationContext* opCtx,
@@ -55,7 +74,7 @@ const Collection* LockedCollectionYieldRestore::operator()(OperationContext* opC
     // performed.
     invariant(!_nss.isEmpty());
     // Confirm that we are holding the necessary collection level lock.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IS));
+    invariant(locked(opCtx, _nss));
 
     // Hold reference to the catalog for collection lookup without locks to be safe.
     auto catalog = CollectionCatalog::get(opCtx);

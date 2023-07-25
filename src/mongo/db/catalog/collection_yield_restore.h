@@ -37,8 +37,8 @@
 namespace mongo {
 
 /**
- * Default implementation for restoring a CollectionPtr after yield. Requires at least a MODE_IS
- * collection level lock on the namespace.
+ * Default implementation for restoring a CollectionPtr after yield. Requires at least the necessary
+ * corresponding MODE_IS lock.
  */
 class LockedCollectionYieldRestore {
 public:
