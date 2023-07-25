@@ -236,23 +236,19 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // Construct the query and parameters. Defer setting skip and limit here until
     // we determine if the query is targeting multi-shards or a single shard below.
     ClusterClientCursorParams params(
-        query.nss(), APIParameters::get(opCtx), readPref, repl::ReadConcernArgs::get(opCtx), [&] {
-            if (!opCtx->getLogicalSessionId())
-                return OperationSessionInfoFromClient();
-
-            OperationSessionInfoFromClient osi{*opCtx->getLogicalSessionId(),
-                                               opCtx->getTxnNumber()};
-            if (TransactionRouter::get(opCtx)) {
-                osi.setAutocommit(false);
-            }
-            return osi;
-        }());
+        query.nss(), APIParameters::get(opCtx), readPref, repl::ReadConcernArgs::get(opCtx));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.batchSize = findCommand.getBatchSize();
     params.tailableMode = query_request_helper::getTailableMode(findCommand);
     params.isAllowPartialResults = findCommand.getAllowPartialResults();
+    params.lsid = opCtx->getLogicalSessionId();
+    params.txnNumber = opCtx->getTxnNumber();
     params.originatingPrivileges = {
         Privilege(ResourcePattern::forExactNamespace(query.nss()), ActionType::find)};
+
+    if (TransactionRouter::get(opCtx)) {
+        params.isAutoCommit = false;
+    }
 
     // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
     // usually use the batchSize associated with the initial find, but as it is illegal to send a

@@ -219,7 +219,7 @@ boost::optional<LogicalSessionId> ClusterClientCursorImpl::getLsid() const {
 }
 
 boost::optional<TxnNumber> ClusterClientCursorImpl::getTxnNumber() const {
-    return _params.osi.getTxnNumber();
+    return _params.txnNumber;
 }
 
 Date_t ClusterClientCursorImpl::getCreatedDate() const {

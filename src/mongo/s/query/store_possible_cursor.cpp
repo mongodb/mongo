@@ -105,19 +105,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 
     ClusterClientCursorParams params(incomingCursorResponse.getValue().getNSS(),
                                      APIParameters::get(opCtx),
-                                     boost::none /* ReadPreferenceSetting */,
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     [&] {
-                                         if (!opCtx->getLogicalSessionId())
-                                             return OperationSessionInfoFromClient();
-
-                                         OperationSessionInfoFromClient osi{
-                                             *opCtx->getLogicalSessionId(), opCtx->getTxnNumber()};
-                                         if (TransactionRouter::get(opCtx)) {
-                                             osi.setAutocommit(false);
-                                         }
-                                         return osi;
-                                     }());
+                                     boost::none,
+                                     repl::ReadConcernArgs::get(opCtx));
     params.remotes.emplace_back();
     auto& remoteCursor = params.remotes.back();
     remoteCursor.setShardId(shardId.toString());
@@ -130,9 +119,15 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                        incomingCursorResponse.getValue().getPostBatchResumeToken()));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.tailableMode = tailableMode;
+    params.lsid = opCtx->getLogicalSessionId();
+    params.txnNumber = opCtx->getTxnNumber();
     params.originatingPrivileges = std::move(privileges);
     if (routerSort) {
         params.sortToApplyOnRouter = *routerSort;
+    }
+
+    if (TransactionRouter::get(opCtx)) {
+        params.isAutoCommit = false;
     }
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, std::move(executor), std::move(params));

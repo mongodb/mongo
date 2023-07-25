@@ -35,13 +35,11 @@ ClusterClientCursorParams::ClusterClientCursorParams(
     NamespaceString nss,
     APIParameters apiParameters,
     boost::optional<ReadPreferenceSetting> readPreference,
-    boost::optional<repl::ReadConcernArgs> readConcern,
-    OperationSessionInfoFromClient osi)
+    boost::optional<repl::ReadConcernArgs> readConcern)
     : nsString(std::move(nss)),
       apiParameters(std::move(apiParameters)),
       readPreference(std::move(readPreference)),
-      readConcern(std::move(readConcern)),
-      osi(std::move(osi)) {}
+      readConcern(std::move(readConcern)) {}
 
 AsyncResultsMergerParams ClusterClientCursorParams::extractARMParams() {
     AsyncResultsMergerParams armParams;
@@ -54,7 +52,17 @@ AsyncResultsMergerParams ClusterClientCursorParams::extractARMParams() {
     armParams.setBatchSize(batchSize);
     armParams.setNss(nsString);
     armParams.setAllowPartialResults(isAllowPartialResults);
-    armParams.setOperationSessionInfo(osi);
+
+    if (lsid) {
+        OperationSessionInfoFromClient sessionInfo([&] {
+            LogicalSessionFromClient lsidFromClient(lsid->getId());
+            lsidFromClient.setUid(lsid->getUid());
+            return lsidFromClient;
+        }());
+        sessionInfo.setTxnNumber(txnNumber);
+        sessionInfo.setAutocommit(isAutoCommit);
+        armParams.setOperationSessionInfo(sessionInfo);
+    }
 
     return armParams;
 }

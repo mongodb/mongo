@@ -737,14 +737,13 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(OperationCon
 
     // Return the latest routing table if not running in a transaction with snapshot level read
     // concern.
-    if (auto txnRouter = TransactionRouter::get(opCtx)) {
-        if (auto atClusterTime = txnRouter.getSelectedAtClusterTime()) {
-            return catalogCache->getCollectionRoutingInfoAt(
-                opCtx, nss, atClusterTime->asTimestamp());
-        }
+    auto txnRouter = TransactionRouter::get(opCtx);
+    if (!txnRouter || !txnRouter.mustUseAtClusterTime()) {
+        return catalogCache->getCollectionRoutingInfo(opCtx, nss);
     }
 
-    return catalogCache->getCollectionRoutingInfo(opCtx, nss);
+    auto atClusterTime = txnRouter.getSelectedAtClusterTime();
+    return catalogCache->getCollectionRoutingInfoAt(opCtx, nss, atClusterTime.asTimestamp());
 }
 
 StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationContext* opCtx,

@@ -44,7 +44,6 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/tailable_mode.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/util/net/hostandport.h"
@@ -62,9 +61,8 @@ namespace mongo {
 struct ClusterClientCursorParams {
     ClusterClientCursorParams(NamespaceString nss,
                               APIParameters apiParameters,
-                              boost::optional<ReadPreferenceSetting> readPreference,
-                              boost::optional<repl::ReadConcernArgs> readConcern,
-                              OperationSessionInfoFromClient osi);
+                              boost::optional<ReadPreferenceSetting> readPreference = boost::none,
+                              boost::optional<repl::ReadConcernArgs> readConcern = boost::none);
 
     /**
      * Extracts the subset of fields here needed by the AsyncResultsMerger. The returned
@@ -117,13 +115,18 @@ struct ClusterClientCursorParams {
     // Set if a readConcern must be respected throughout the lifetime of the cursor.
     boost::optional<repl::ReadConcernArgs> readConcern;
 
-    // Session/transaction information to attach with this request (if run under a session or
-    // transaction)
-    OperationSessionInfoFromClient osi;
-
     // Whether the client indicated that it is willing to receive partial results in the case of an
     // unreachable host.
     bool isAllowPartialResults = false;
+
+    // The logical session id of the command that created the cursor.
+    boost::optional<LogicalSessionId> lsid;
+
+    // The transaction number of the command that created the cursor.
+    boost::optional<TxnNumber> txnNumber;
+
+    // Set to false for multi statement transactions.
+    boost::optional<bool> isAutoCommit;
 };
 
 }  // namespace mongo

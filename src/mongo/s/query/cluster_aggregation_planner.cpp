@@ -266,21 +266,11 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
                                      const NamespaceString& requestedNss,
                                      std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMerging,
                                      const PrivilegeVector& privileges) {
+
     ClusterClientCursorParams params(requestedNss,
                                      APIParameters::get(opCtx),
                                      ReadPreferenceSetting::get(opCtx),
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     [&] {
-                                         if (!opCtx->getLogicalSessionId())
-                                             return OperationSessionInfoFromClient();
-
-                                         OperationSessionInfoFromClient osi{
-                                             *opCtx->getLogicalSessionId(), opCtx->getTxnNumber()};
-                                         if (TransactionRouter::get(opCtx)) {
-                                             osi.setAutocommit(false);
-                                         }
-                                         return osi;
-                                     }());
+                                     repl::ReadConcernArgs::get(opCtx));
 
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.tailableMode = pipelineForMerging->getContext()->tailableMode;
@@ -288,7 +278,13 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     // size we pass here is used for getMores, so do not specify a batch size if the initial request
     // had a batch size of 0.
     params.batchSize = batchSize == 0 ? boost::none : boost::make_optional(batchSize);
+    params.lsid = opCtx->getLogicalSessionId();
+    params.txnNumber = opCtx->getTxnNumber();
     params.originatingPrivileges = privileges;
+
+    if (TransactionRouter::get(opCtx)) {
+        params.isAutoCommit = false;
+    }
 
     auto ccc = cluster_aggregation_planner::buildClusterCursor(
         opCtx, std::move(pipelineForMerging), std::move(params));

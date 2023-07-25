@@ -103,7 +103,6 @@
 
 namespace mongo {
 namespace {
-
 MONGO_FAIL_POINT_DEFINE(hangBeforeCheckingMongosShutdownInterrupt);
 const auto kOperationTime = "operationTime"_sd;
 
@@ -417,7 +416,7 @@ private:
 
     std::shared_ptr<CommandInvocation> _invocation;
     boost::optional<std::string> _ns;
-    OperationSessionInfoFromClient _osi;
+    boost::optional<OperationSessionInfoFromClient> _osi;
     boost::optional<WriteConcernOptions> _wc;
     boost::optional<bool> _isHello;
 };
@@ -482,28 +481,30 @@ void ParseAndRunCommand::_updateStatsAndApplyErrorLabels(const Status& status) {
     auto opCtx = _rec->getOpCtx();
     const auto command = _rec->getCommand();
 
+    if (command)
+        command->incrementCommandsFailed();
     NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(status.code());
-
-    if (!command)
-        return;
-
-    command->incrementCommandsFailed();
-
     // WriteConcern error (wcCode) is set to boost::none because:
     // 1. TransientTransaction error label handling for commitTransaction command in mongos is
     //    delegated to the shards. Mongos simply propagates the shard's response up to the client.
     // 2. For other commands in a transaction, they shouldn't get a writeConcern error so this
     //    setting doesn't apply.
-    auto errorLabels = getErrorLabels(opCtx,
-                                      _osi,
-                                      command->getName(),
-                                      status.code(),
-                                      boost::none,
-                                      false /* isInternalClient */,
-                                      true /* isMongos */,
-                                      repl::OpTime{},
-                                      repl::OpTime{});
-    _errorBuilder->appendElements(errorLabels);
+
+    if (_osi.has_value()) {
+
+        auto errorLabels = getErrorLabels(opCtx,
+                                          *_osi,
+                                          command->getName(),
+                                          status.code(),
+                                          boost::none,
+                                          false /* isInternalClient */,
+                                          true /* isMongos */,
+                                          repl::OpTime{},
+                                          repl::OpTime{});
+
+
+        _errorBuilder->appendElements(errorLabels);
+    }
 }
 void ParseAndRunCommand::_parseCommand() {
     auto opCtx = _rec->getOpCtx();
@@ -579,14 +580,14 @@ void ParseAndRunCommand::_parseCommand() {
     // Fill out all currentOp details.
     CurOp::get(opCtx)->setGenericOpRequestDetails(nss, command, request.body, _opType);
 
-    _osi = initializeOperationSessionInfo(opCtx,
-                                          request.body,
-                                          command->requiresAuth(),
-                                          command->attachLogicalSessionsToOpCtx(),
-                                          true);
+    _osi.emplace(initializeOperationSessionInfo(opCtx,
+                                                request.body,
+                                                command->requiresAuth(),
+                                                command->attachLogicalSessionsToOpCtx(),
+                                                true));
 
     auto allowTransactionsOnConfigDatabase = !isMongos();
-    validateSessionOptions(_osi, command->getName(), nss, allowTransactionsOnConfigDatabase);
+    validateSessionOptions(*_osi, command->getName(), nss, allowTransactionsOnConfigDatabase);
 
     _wc.emplace(uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body)));
 
@@ -663,7 +664,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
     CommandHelpers::evaluateFailCommandFailPoint(opCtx, invocation.get());
     bool startTransaction = false;
-    if (_parc->_osi.getAutocommit()) {
+    if (_parc->_osi->getAutocommit()) {
         _routerSession.emplace(opCtx);
 
         load_balancer_support::setMruSession(opCtx->getClient(), *opCtx->getLogicalSessionId());
@@ -675,7 +676,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         invariant(txnNumber);
 
         auto transactionAction = ([&] {
-            auto startTxnSetting = _parc->_osi.getStartTransaction();
+            auto startTxnSetting = _parc->_osi->getStartTransaction();
             if (startTxnSetting && *startTxnSetting) {
                 return TransactionRouter::TransactionActions::kStart;
             }
@@ -1155,6 +1156,8 @@ Future<void> ParseAndRunCommand::run() {
         });
 }
 
+}  // namespace
+
 // Maintains the state required to execute client commands, and provides the interface to construct
 // a future-chain that runs the command against the database.
 class ClientCommand final {
@@ -1311,8 +1314,6 @@ Future<DbResponse> ClientCommand::run() {
         .onError([this](Status status) { return _handleException(std::move(status)); })
         .then([this] { return _produceResponse(); });
 }
-
-}  // namespace
 
 Future<DbResponse> Strategy::clientCommand(std::shared_ptr<RequestExecutionContext> rec) {
     return future_util::makeState<ClientCommand>(std::move(rec)).thenWithState([](auto* runner) {

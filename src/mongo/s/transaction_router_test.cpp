@@ -1291,85 +1291,6 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     future.default_timed_get();
 }
 
-TEST(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRC) {
-    repl::ReadConcernArgs defaultRCArgs;
-    auto result = TransactionRouter::appendFieldsForStartTransaction(
-        BSON("MyCmd" << 1), defaultRCArgs, boost::none, true /* doAppendStartTransaction */);
-
-    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
-    ASSERT_BSONOBJ_EQ(result["readConcern"].Obj(), BSONObj());
-    ASSERT_EQ(result["startTransaction"].boolean(), true);
-}
-
-TEST(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCMajority) {
-    repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kMajorityReadConcern);
-    auto result = TransactionRouter::appendFieldsForStartTransaction(
-        BSON("MyCmd" << 1), defaultRCArgs, boost::none, true /* doAppendStartTransaction */);
-
-    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
-    repl::ReadConcernArgs resultArgs;
-    ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
-    ASSERT_EQ(result["readConcern"]["level"].valueStringData(), "majority");
-    ASSERT(!result["readConcern"]["atClusterTime"]);
-    ASSERT_EQ(result["startTransaction"].boolean(), true);
-}
-
-TEST(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpecifiesRCLocal) {
-    repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kLocalReadConcern);
-    auto result =
-        TransactionRouter::appendFieldsForStartTransaction(BSON("MyCmd" << 1 << "readConcern"
-                                                                        << BSON("level"
-                                                                                << "local")),
-                                                           defaultRCArgs,
-                                                           boost::none,
-                                                           true /* doAppendStartTransaction */);
-
-    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
-    repl::ReadConcernArgs resultArgs;
-    ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
-    ASSERT_EQ(result["readConcern"]["level"].valueStringData(), "local");
-    ASSERT_EQ(result["startTransaction"].boolean(), true);
-}
-
-TEST(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpecifiesRCSnapshot) {
-    repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-    auto result =
-        TransactionRouter::appendFieldsForStartTransaction(BSON("MyCmd" << 1 << "readConcern"
-                                                                        << BSON("level"
-                                                                                << "snapshot")),
-                                                           defaultRCArgs,
-                                                           LogicalTime(Timestamp(1, 2)),
-                                                           false /* doAppendStartTransaction */);
-
-    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
-    repl::ReadConcernArgs resultArgs;
-    ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
-    ASSERT_EQ(result["readConcern"]["level"].valueStringData(), "snapshot");
-    ASSERT_EQ(result["readConcern"]["atClusterTime"].timestamp(), Timestamp(1, 2));
-    ASSERT(!result["startTransaction"]);
-}
-
-TEST(TransactionRouterTest,
-     AppendFieldsForStartTransactionDefaultRCCommandSpecifiesRCSnapshotAndAtClusterTime) {
-    repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-    defaultRCArgs.setArgsAtClusterTimeForSnapshot(Timestamp(1, 2));
-    auto result = TransactionRouter::appendFieldsForStartTransaction(
-        BSON("MyCmd" << 1 << "readConcern"
-                     << BSON("level"
-                             << "snapshot"
-                             << "atClusterTime" << Timestamp(1, 2))),
-        defaultRCArgs,
-        LogicalTime(Timestamp(1, 2)),
-        false /* doAppendStartTransaction */);
-
-    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
-    repl::ReadConcernArgs resultArgs;
-    ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
-    ASSERT_EQ(result["readConcern"]["level"].valueStringData(), "snapshot");
-    ASSERT_EQ(result["readConcern"]["atClusterTime"].timestamp(), Timestamp(1, 2));
-    ASSERT(!result["startTransaction"]);
-}
-
 TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
     LogicalSessionId lsid(makeLogicalSessionIdForTest());
     TxnNumber txnNum{3};
@@ -2654,14 +2575,14 @@ TEST_F(TransactionRouterTestWithDefaultSession, NonSnapshotReadConcernHasNoAtClu
             operationContext(), txnNum++, TransactionRouter::TransactionActions::kStart);
 
         // No atClusterTime is placed on the router by default.
-        ASSERT(!txnRouter.getSelectedAtClusterTime());
+        ASSERT_FALSE(txnRouter.mustUseAtClusterTime());
 
         // Can't compute and set an atClusterTime.
         txnRouter.setDefaultAtClusterTime(operationContext());
-        ASSERT(!txnRouter.getSelectedAtClusterTime());
+        ASSERT_FALSE(txnRouter.mustUseAtClusterTime());
 
         // Can't continue on snapshot errors.
-        ASSERT(!txnRouter.canContinueOnSnapshotError());
+        ASSERT_FALSE(txnRouter.canContinueOnSnapshotError());
     }
 }
 

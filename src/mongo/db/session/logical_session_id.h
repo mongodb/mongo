@@ -200,19 +200,20 @@ inline bool operator!=(const TxnNumberAndRetryCounter& l, const TxnNumberAndRetr
  */
 class OperationSessionInfoFromClient : public OperationSessionInfoFromClientBase {
 public:
-    /**
-     * Returns a default-constructed object meaning "there is no logical session".
-     */
-    OperationSessionInfoFromClient() = default;
     OperationSessionInfoFromClient(LogicalSessionFromClient lsidFromClient);
-
-    // TODO (SERVER-77506): This constructor performs incomplete conversion from LogicalSessionId to
-    // LogicalSessionFromClient which is what this class expects. The current usages are only in
-    // ClusterClientCursorParams.
-    OperationSessionInfoFromClient(LogicalSessionId lsid, boost::optional<TxnNumber> txnNumber);
 
     explicit OperationSessionInfoFromClient(OperationSessionInfoFromClientBase other)
         : OperationSessionInfoFromClientBase(std::move(other)) {}
+
+    /**
+     * Returns a default-constructed object meaning "there is no logical session".
+     */
+    static OperationSessionInfoFromClient noSession() {
+        return OperationSessionInfoFromClient();
+    }
+
+private:
+    OperationSessionInfoFromClient() = default;
 };
 
 }  // namespace mongo
