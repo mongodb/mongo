@@ -286,10 +286,20 @@ class Job(object):
         suite_with_balancer = isinstance(
             self.fixture, shardedcluster.ShardedClusterFixture) and self.fixture.enable_balancer
 
-        try:
-            if not background and suite_with_balancer:
+        if not background and suite_with_balancer:
+            try:
                 self.logger.info("Stopping the balancer before running end-test hooks")
                 self.fixture.stop_balancer()
+            except:
+                self.logger.exception("%s failed while stopping the balancer for end-test hooks",
+                                      test.short_description())
+                self.report.setFailure(test, return_code=2)
+                if self.archival:
+                    result = TestResult(test=test, hook=None, success=False)
+                    self.archival.archive(self.logger, result, self.manager)
+                raise errors.StopExecution("stop_balancer failed before running after test hooks")
+
+        try:
             for hook in self.hooks:
                 if hook.IS_BACKGROUND == background:
                     self._run_hook(hook, hook.after_test, test, hook_failure_flag)
@@ -315,8 +325,18 @@ class Job(object):
             raise
 
         if not background and suite_with_balancer:
-            self.logger.info("Resuming the balancer after running end-test hooks")
-            self.fixture.start_balancer()
+            try:
+                self.logger.info("Resuming the balancer after running end-test hooks")
+                self.fixture.start_balancer()
+            except:
+                self.logger.exception(
+                    "%s failed while re-starting the balancer after end-test hooks",
+                    test.short_description())
+                self.report.setFailure(test, return_code=2)
+                if self.archival:
+                    result = TestResult(test=test, hook=None, success=False)
+                    self.archival.archive(self.logger, result, self.manager)
+                raise errors.StopExecution("start_balancer failed after running after test hooks")
 
     def _fail_test(self, test, exc_info, return_code=1):
         """Provide helper to record a test as a failure with the provided return code.
