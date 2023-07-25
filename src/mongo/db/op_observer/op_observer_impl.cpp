@@ -1850,7 +1850,8 @@ void OpObserverImpl::onTransactionPrepare(
     const TransactionOperations& transactionOperations,
     const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
     size_t numberOfPrePostImagesToWrite,
-    Date_t wallClockTime) {
+    Date_t wallClockTime,
+    OpStateAccumulator* opAccumulator) {
     invariant(!reservedSlots.empty());
     const auto prepareOpTime = reservedSlots.back();
     invariant(opCtx->getTxnNumber());

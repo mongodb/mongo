@@ -136,7 +136,8 @@ public:
         const TransactionOperations& transactionOperations,
         const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         size_t numberOfPrePostImagesToWrite,
-        Date_t wallClockTime) override {
+        Date_t wallClockTime,
+        OpStateAccumulator* opAccumulator = nullptr) override {
         ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
 
         uassert(ErrorCodes::OperationFailed,

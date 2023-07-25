@@ -585,7 +585,8 @@ public:
         const TransactionOperations& transactionOperations,
         const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         size_t numberOfPrePostImagesToWrite,
-        Date_t wallClockTime) = 0;
+        Date_t wallClockTime,
+        OpStateAccumulator* opAccumulator = nullptr) = 0;
 
     /**
      * The postTransactionPrepare method is called after an atomic transaction is prepared. It must

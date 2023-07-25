@@ -248,7 +248,8 @@ public:
         const TransactionOperations& transactionOperations,
         const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         size_t numberOfPrePostImagesToWrite,
-        Date_t wallClockTime) override {}
+        Date_t wallClockTime,
+        OpStateAccumulator* opAccumulator = nullptr) override {}
 
     void postTransactionPrepare(OperationContext* opCtx,
                                 const std::vector<OplogSlot>& reservedSlots,
