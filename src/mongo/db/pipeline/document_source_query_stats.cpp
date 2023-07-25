@@ -40,7 +40,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/document_source_query_stats_gen.h"
@@ -100,6 +99,21 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
         }
     }
     return ctor(algorithm, hmacKey);
+}
+
+
+/**
+ * Given a partition, it copies the QueryStatsEntries located in partition of cache into a
+ * vector of pairs that contain the cache key and a corresponding QueryStatsEntry. This ensures
+ * that the partition mutex is only held for the duration of copying.
+ */
+std::vector<std::pair<size_t, QueryStatsEntry>> copyPartition(
+    QueryStatsStore::Partition&& partition) {
+    std::vector<std::pair<size_t, QueryStatsEntry>> currKeyMetrics;
+    for (auto&& [key, metrics] : *partition) {
+        currKeyMetrics.push_back(std::make_pair(*key, QueryStatsEntry(*metrics)));
+    }
+    return currKeyMetrics;
 }
 
 }  // namespace
@@ -162,20 +176,22 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
             return DocumentSource::GetNextResult::makeEOF();
         }
 
-        // We only keep the partition (which holds a lock) for the time needed to materialize it to
-        // a set of Document instances.
-        auto&& partition = _queryStatsStore.getPartition(_currentPartition);
-
         // Capture the time at which reading the partition begins to indicate to the caller
         // when the snapshot began.
         const auto partitionReadTime =
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
-        for (auto&& [key, metrics] : *partition) {
+
+        auto&& partition = _queryStatsStore.getPartition(_currentPartition);
+        // We only keep the partition (which holds a lock) for the time needed to collect the key
+        // and metric pairs
+        auto currKeyMetrics = copyPartition(std::move(partition));
+
+        for (auto&& [key, metrics] : currKeyMetrics) {
             try {
                 auto queryStatsKey =
-                    metrics->computeQueryStatsKey(pExpCtx->opCtx, _algorithm, _hmacKey);
+                    metrics.computeQueryStatsKey(pExpCtx->opCtx, _algorithm, _hmacKey);
                 _materializedPartition.push_back({{"key", std::move(queryStatsKey)},
-                                                  {"metrics", metrics->toBSON()},
+                                                  {"metrics", metrics.toBSON()},
                                                   {"asOf", partitionReadTime}});
             } catch (const DBException& ex) {
                 queryStatsHmacApplicationErrors.increment();
@@ -184,17 +200,17 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
                             "Error encountered when applying hmac to query shape, will not publish "
                             "queryStats for this entry.",
                             "status"_attr = ex.toStatus(),
-                            "hash"_attr = *key,
+                            "hash"_attr = key,
                             "representativeQueryShape"_attr =
-                                metrics->getRepresentativeQueryShapeForDebug());
+                                metrics.getRepresentativeQueryShapeForDebug());
                 if (kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) {
-                    auto keyString = std::to_string(*key);
-                    auto queryShape = metrics->getRepresentativeQueryShapeForDebug();
+                    auto keyString = std::to_string(key);
+                    auto queryShape = metrics.getRepresentativeQueryShapeForDebug();
                     tasserted(7349401,
-                              "Was not able to re-parse queryStats key when reading queryStats. "
-                              "Status: " +
-                                  ex.toString() + " Hash: " + keyString +
-                                  " Query Shape: " + queryShape.toString());
+                              str::stream() << "Was not able to re-parse queryStats key when "
+                                               "reading queryStats.Status "
+                                            << ex.toString() << " Hash: " << keyString
+                                            << " Query Shape: " << queryShape.toString());
                 }
             }
         }
