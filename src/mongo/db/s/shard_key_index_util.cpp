@@ -41,7 +41,6 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/s/shard_key_index_util.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -191,21 +190,14 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
     return false;
 }
 
-bool isLastNonHiddenRangedShardKeyIndex(OperationContext* opCtx,
-                                        const CollectionPtr& collection,
-                                        const std::string& indexName,
-                                        const BSONObj& shardKey) {
+bool isLastNonHiddenShardKeyIndex(OperationContext* opCtx,
+                                  const CollectionPtr& collection,
+                                  const std::string& indexName,
+                                  const BSONObj& shardKey) {
     const auto index = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
     if (!index ||
         !isCompatibleWithShardKey(
             opCtx, collection, index->getEntry(), shardKey, false /* requireSingleKey */)) {
-        return false;
-    }
-
-    // Users are allowed to drop hashed shard key indexes.
-    if (gFeatureFlagShardKeyIndexOptionalHashedSharding.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
-        ShardKeyPattern(shardKey).isHashedPattern()) {
         return false;
     }
 

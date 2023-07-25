@@ -431,7 +431,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
             // to drop the shard key index, so it could be possible to hide it.
             if (!cmrIndex->idx->hidden() && *cmdIndex.getHidden()) {
                 if (shardKeyPattern) {
-                    if (isLastNonHiddenRangedShardKeyIndex(
+                    if (isLastNonHiddenShardKeyIndex(
                             opCtx, coll, cmrIndex->idx->indexName(), shardKeyPattern->toBSON())) {
                         return {ErrorCodes::InvalidOptions,
                                 "Can't hide the only compatible index for this collection's "

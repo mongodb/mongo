@@ -102,12 +102,11 @@ boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(OperationContext* opCtx
 
 /**
  * Returns true if the given index exists and it is the last non-hidden index compatible with the
- * ranged shard key. False otherwise. Hashed indexes are excluded here because users are allowed
- * to drop shard key compatible hashed indexes.
+ * shard key. False otherwise.
  */
-bool isLastNonHiddenRangedShardKeyIndex(OperationContext* opCtx,
-                                        const CollectionPtr& collection,
-                                        const std::string& indexName,
-                                        const BSONObj& shardKey);
+bool isLastNonHiddenShardKeyIndex(OperationContext* opCtx,
+                                  const CollectionPtr& collection,
+                                  const std::string& indexName,
+                                  const BSONObj& shardKey);
 
 }  // namespace mongo

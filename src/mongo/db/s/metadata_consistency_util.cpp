@@ -58,7 +58,6 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_key_index_util.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -100,15 +99,8 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
     const auto performChecks = [&](const CollectionPtr& localColl,
                                    std::vector<MetadataInconsistencyItem>& inconsistencies) {
         // Check that the collection has an index that supports the shard key. If so, check that
-        // exists an index that supports the shard key and is not multikey. We allow users to drop
-        // hashed shard key indexes, and therefore we don't require hashed shard keys to have a
-        // supporting index.
-        const bool skipHashedShardKeyCheck =
-            gFeatureFlagShardKeyIndexOptionalHashedSharding.isEnabled(
-                serverGlobalParams.featureCompatibility) &&
-            ShardKeyPattern(shardKey).isHashedPattern();
-        if (!skipHashedShardKeyCheck &&
-            !findShardKeyPrefixedIndex(opCtx, localColl, shardKey, false /*requireSingleKey*/)) {
+        // exists an index that supports the shard key and is not multikey.
+        if (!findShardKeyPrefixedIndex(opCtx, localColl, shardKey, false /*requireSingleKey*/)) {
             inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
                 MetadataInconsistencyTypeEnum::kMissingShardKeyIndex,
                 MissingShardKeyIndexDetails{localColl->ns(), shardId, shardKey}));
