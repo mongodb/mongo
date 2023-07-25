@@ -631,9 +631,8 @@ Status ChunkType::validate() const {
     if (!_history.empty()) {
         if (_history.front().getShard() != *_shard) {
             return {ErrorCodes::BadValue,
-                    str::stream() << "Latest entry of chunk history refer to shard "
-                                  << _history.front().getShard()
-                                  << " that does not match the current shard " << *_shard};
+                    str::stream() << "History contains an invalid shard "
+                                  << _history.front().getShard()};
         }
         if (_onCurrentShardSince.has_value() &&
             _history.front().getValidAfter() != *_onCurrentShardSince) {

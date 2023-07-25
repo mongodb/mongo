@@ -131,31 +131,29 @@ ShardPlacementVersionMap ChunkMap::constructShardPlacementVersionMap() const {
         // Tracks the max placement version for the shard on which the current range will reside
         auto placementVersionIt = placementVersions.find(currentRangeShardId);
         if (placementVersionIt == placementVersions.end()) {
-            placementVersionIt = placementVersions
-                                     .emplace(std::piecewise_construct,
-                                              std::forward_as_tuple(currentRangeShardId),
-                                              std::forward_as_tuple(CollectionGeneration{
-                                                  _collectionPlacementVersion.epoch(),
-                                                  _collectionPlacementVersion.getTimestamp()}))
-                                     .first;
+            placementVersionIt =
+                placementVersions
+                    .emplace(std::piecewise_construct,
+                             std::forward_as_tuple(currentRangeShardId),
+                             std::forward_as_tuple(_collectionPlacementVersion.epoch(),
+                                                   _collectionPlacementVersion.getTimestamp()))
+                    .first;
         }
 
         auto& maxPlacementVersion = placementVersionIt->second.placementVersion;
-        auto& maxValidAfter = placementVersionIt->second.validAfter;
 
-        current = std::find_if(current, _chunkMap.cend(), [&](const auto& currentChunk) {
-            if (currentChunk->getShardIdAt(boost::none) != currentRangeShardId)
-                return true;
+        current =
+            std::find_if(current,
+                         _chunkMap.cend(),
+                         [&currentRangeShardId, &maxPlacementVersion](const auto& currentChunk) {
+                             if (currentChunk->getShardIdAt(boost::none) != currentRangeShardId)
+                                 return true;
 
-            if (maxPlacementVersion.isOlderThan(currentChunk->getLastmod()))
-                maxPlacementVersion = currentChunk->getLastmod();
+                             if (maxPlacementVersion.isOlderThan(currentChunk->getLastmod()))
+                                 maxPlacementVersion = currentChunk->getLastmod();
 
-            if (auto& history = currentChunk->getHistory();
-                !history.empty() && maxValidAfter < history.front().getValidAfter())
-                maxValidAfter = history.front().getValidAfter();
-
-            return false;
-        });
+                             return false;
+                         });
 
         const auto rangeLast = *std::prev(current);
 
@@ -320,8 +318,9 @@ ChunkMap::_overlappingBounds(const BSONObj& min, const BSONObj& max, bool isMaxI
     return {itMin, itMax};
 }
 
-PlacementVersionTargetingInfo::PlacementVersionTargetingInfo(const CollectionGeneration& generation)
-    : placementVersion(generation, {0, 0}) {}
+PlacementVersionTargetingInfo::PlacementVersionTargetingInfo(const OID& epoch,
+                                                             const Timestamp& timestamp)
+    : placementVersion({epoch, timestamp}, {0, 0}) {}
 
 RoutingTableHistory::RoutingTableHistory(
     NamespaceString nss,
@@ -513,15 +512,22 @@ std::string ChunkManager::toString() const {
     return _rt->optRt ? _rt->optRt->toString() : "UNSHARDED";
 }
 
-PlacementVersionTargetingInfo RoutingTableHistory::_getVersion(const ShardId& shardName,
-                                                               bool throwOnStaleShard) const {
+bool RoutingTableHistory::compatibleWith(const RoutingTableHistory& other,
+                                         const ShardId& shardName) const {
+    // Return true if the placement version is the same in the two chunk managers
+    // TODO: This doesn't need to be so strong, just major vs
+    return other.getVersion(shardName) == getVersion(shardName);
+}
+
+ChunkVersion RoutingTableHistory::_getVersion(const ShardId& shardName,
+                                              bool throwOnStaleShard) const {
     auto it = _placementVersions.find(shardName);
     if (it == _placementVersions.end()) {
         // Shards without explicitly tracked placement versions (meaning they have no chunks) always
-        // have a version of (epoch, timestamp, 0, 0)
-        auto collPlacementVersion = _chunkMap.getVersion();
-        return PlacementVersionTargetingInfo(ChunkVersion(collPlacementVersion, {0, 0}),
-                                             Timestamp(0, 0));
+        // have a version of (0, 0, epoch, timestamp)
+        const auto collPlacementVersion = _chunkMap.getVersion();
+        return ChunkVersion({collPlacementVersion.epoch(), collPlacementVersion.getTimestamp()},
+                            {0, 0});
     }
 
     if (throwOnStaleShard && gEnableFinerGrainedCatalogCacheRefresh) {
@@ -530,9 +536,15 @@ PlacementVersionTargetingInfo RoutingTableHistory::_getVersion(const ShardId& sh
                 !it->second.isStale.load());
     }
 
-    const auto& placementVersionTargetingInfo = it->second;
-    return PlacementVersionTargetingInfo(placementVersionTargetingInfo.placementVersion,
-                                         placementVersionTargetingInfo.validAfter);
+    return it->second.placementVersion;
+}
+
+ChunkVersion RoutingTableHistory::getVersion(const ShardId& shardName) const {
+    return _getVersion(shardName, true);
+}
+
+ChunkVersion RoutingTableHistory::getVersionForLogging(const ShardId& shardName) const {
+    return _getVersion(shardName, false);
 }
 
 std::string RoutingTableHistory::toString() const {
@@ -543,8 +555,7 @@ std::string RoutingTableHistory::toString() const {
 
     sb << "Shard placement versions:\n";
     for (const auto& entry : _placementVersions) {
-        sb << "\t" << entry.first << ": " << entry.second.placementVersion.toString() << " @ "
-           << entry.second.validAfter.toString() << '\n';
+        sb << "\t" << entry.first << ": " << entry.second.placementVersion.toString() << '\n';
     }
 
     return sb.str();
