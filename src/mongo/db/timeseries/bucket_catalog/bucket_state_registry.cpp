@@ -287,9 +287,10 @@ StateChangeSucessful unprepareBucketState(BucketStateRegistry& registry,
     return StateChangeSucessful::kYes;
 }
 
-stdx::variant<BucketState, DirectWriteCounter> addDirectWrite(BucketStateRegistry& registry,
-                                                              const BucketId& bucketId,
-                                                              bool stopTracking) {
+stdx::variant<BucketState, DirectWriteCounter> addDirectWrite(
+    BucketStateRegistry& registry,
+    const BucketId& bucketId,
+    ContinueTrackingBucket continueTrackingBucket) {
     stdx::lock_guard catalogLock{registry.mutex};
 
     auto it = registry.bucketStates.find(bucketId);
@@ -319,7 +320,7 @@ stdx::variant<BucketState, DirectWriteCounter> addDirectWrite(BucketStateRegistr
 
     // Convert the direct write counter to a negative value so we can interpret it as an untracked
     // state when the counter goes to 0.
-    if (stopTracking && newDirectWriteCount > 0) {
+    if (continueTrackingBucket == ContinueTrackingBucket::kStop && newDirectWriteCount > 0) {
         newDirectWriteCount *= -1;
     }
     it->second = newDirectWriteCount;

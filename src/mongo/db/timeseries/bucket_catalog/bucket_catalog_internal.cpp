@@ -480,8 +480,10 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
         auto& archivedSet = setIt->second;
         if (auto bucketIt = archivedSet.find(bucket->minTime);
             bucketIt != archivedSet.end() && bucket->bucketId == bucketIt->second.bucketId) {
-            long long memory =
-                marginalMemoryUsageForArchivedBucket(bucketIt->second, archivedSet.size() == 1);
+            long long memory = marginalMemoryUsageForArchivedBucket(
+                bucketIt->second,
+                (archivedSet.size() == 1) ? IncludeMemoryOverheadFromMap::kInclude
+                                          : IncludeMemoryOverheadFromMap::kExclude);
             if (archivedSet.size() == 1) {
                 stripe.archivedBuckets.erase(setIt);
             } else {
@@ -736,9 +738,8 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
     Bucket* bucket = useBucket(catalog, stripe, stripeLock, info, mode);
     if (!bucket) {
         invariant(mode == AllowBucketCreation::kNo);
-        constexpr bool allowQueryBasedReopening = true;
         result.candidate = getReopeningCandidate(
-            opCtx, catalog, stripe, stripeLock, info, allowQueryBasedReopening);
+            opCtx, catalog, stripe, stripeLock, info, AllowQueryBasedReopening::kAllow);
         return std::move(result);
     }
 
@@ -773,10 +774,14 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                 // reopening procedure.
             }
         }
-
-        bool allowQueryBasedReopening = (*reason == RolloverReason::kTimeBackward);
-        result.candidate = getReopeningCandidate(
-            opCtx, catalog, stripe, stripeLock, info, allowQueryBasedReopening);
+        result.candidate = getReopeningCandidate(opCtx,
+                                                 catalog,
+                                                 stripe,
+                                                 stripeLock,
+                                                 info,
+                                                 (*reason == RolloverReason::kTimeBackward)
+                                                     ? AllowQueryBasedReopening::kAllow
+                                                     : AllowQueryBasedReopening::kDisallow);
     } else {
         result.batch = *stdx::get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
     }
@@ -887,9 +892,10 @@ void archiveBucket(BucketCatalog& catalog,
     if (it == archivedSet.end()) {
         auto [it, inserted] =
             archivedSet.emplace(bucket.minTime, ArchivedBucket{bucket.bucketId, bucket.timeField});
-
-        long long memory =
-            marginalMemoryUsageForArchivedBucket(it->second, archivedSet.size() == 1);
+        long long memory = marginalMemoryUsageForArchivedBucket(
+            it->second,
+            (archivedSet.size() == 1) ? IncludeMemoryOverheadFromMap::kInclude
+                                      : IncludeMemoryOverheadFromMap::kExclude);
         catalog.memoryUsage.fetchAndAdd(memory);
         archived = true;
     }
@@ -942,8 +948,10 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
                 // finishes.
                 stopTrackingBucketState(catalog.bucketStateRegistry, candidateBucket.bucketId);
             }
-            long long memory =
-                marginalMemoryUsageForArchivedBucket(candidateBucket, archivedSet.size() == 1);
+            long long memory = marginalMemoryUsageForArchivedBucket(
+                candidateBucket,
+                (archivedSet.size() == 1) ? IncludeMemoryOverheadFromMap::kInclude
+                                          : IncludeMemoryOverheadFromMap::kExclude);
             if (archivedSet.size() == 1) {
                 stripe.archivedBuckets.erase(setIt);
             } else {
@@ -963,12 +971,12 @@ stdx::variant<std::monostate, OID, std::vector<BSONObj>> getReopeningCandidate(
     Stripe& stripe,
     WithLock stripeLock,
     const CreationInfo& info,
-    bool allowQueryBasedReopening) {
+    AllowQueryBasedReopening allowQueryBasedReopening) {
     if (auto archived = findArchivedCandidate(catalog, stripe, stripeLock, info)) {
         return archived.value();
     }
 
-    if (!allowQueryBasedReopening) {
+    if (allowQueryBasedReopening == AllowQueryBasedReopening::kDisallow) {
         return {};
     }
 
@@ -1105,8 +1113,10 @@ void expireIdleBuckets(BucketCatalog& catalog,
 
         auto& [timestamp, bucket] = *archivedSet.begin();
         closeArchivedBucket(catalog.bucketStateRegistry, bucket, closedBuckets);
-
-        long long memory = marginalMemoryUsageForArchivedBucket(bucket, archivedSet.size() == 1);
+        long long memory = marginalMemoryUsageForArchivedBucket(
+            bucket,
+            (archivedSet.size() == 1) ? IncludeMemoryOverheadFromMap::kInclude
+                                      : IncludeMemoryOverheadFromMap::kExclude);
         if (archivedSet.size() == 1) {
             // If this is the only entry, erase the whole map so we don't leave it empty.
             stripe.archivedBuckets.erase(stripe.archivedBuckets.begin());

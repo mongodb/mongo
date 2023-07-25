@@ -46,6 +46,12 @@
 namespace mongo::timeseries::bucket_catalog {
 
 /**
+ * Whether to include the memory overhead of the map data structure when calculating marginal memory
+ * usage for a bucket.
+ */
+enum class IncludeMemoryOverheadFromMap { kInclude, kExclude };
+
+/**
  * Function that should run validation against the bucket to ensure it's a proper bucket document.
  * Typically, this should execute Collection::checkValidation.
  */
@@ -83,13 +89,12 @@ struct ArchivedBucket {
 };
 
 /**
- * Calculates the marginal memory usage for an archived bucket. The 'onlyEntryForMatchingMetaHash'
- * parameter indicates that the bucket will be (if inserting) or was (if removing) the only bucket
- * associated with it's meta hash value. If true, then the returned value will attempt to account
- * for the overhead of the map data structure for the meta hash value.
+ * Calculates the marginal memory usage for an archived bucket. The 'IncludeMemoryOverheadFromMap'
+ * parameter will be set to 'kInclude' if the bucket will be (if inserting) or was (if removing) the
+ * only bucket associated with it's meta hash value. If so, then the returned value will attempt to
+ * account for the overhead of the map data structure for the meta hash value.
  */
-long long marginalMemoryUsageForArchivedBucket(const ArchivedBucket& bucket,
-                                               bool onlyEntryForMatchingMetaHash);
-
+long long marginalMemoryUsageForArchivedBucket(
+    const ArchivedBucket& bucket, IncludeMemoryOverheadFromMap includeMemoryOverheadFromMap);
 
 }  // namespace mongo::timeseries::bucket_catalog

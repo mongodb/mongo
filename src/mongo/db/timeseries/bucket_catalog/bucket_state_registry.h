@@ -58,6 +58,11 @@ struct Bucket;
 enum class StateChangeSucessful { kYes, kNo };
 
 /**
+ * Controls whether to stop tracking the bucket after finishing all direct writes.
+ */
+enum class ContinueTrackingBucket { kContinue, kStop };
+
+/**
  * State Transition Chart:
  * {+ = valid transition, INV = invariants, WCE = throws WriteConflictException, nop = no-operation}
  *
@@ -237,8 +242,8 @@ StateChangeSucessful unprepareBucketState(BucketStateRegistry& registry,
 /**
  * Tracks the bucket with a counter which is incremented everytime this function is called and must
  * be followed by a call to 'removeDirectWrite'. We cannot perform transition on prepared buckets.
- * If 'stopTracking' is set, we will erase the bucket from the registry upon finishing all direct
- * writes else the bucket will transition to 'kCleared'.
+ * If 'ContinueTrackingBucket' is set to 'kStop', we will erase the bucket from the registry upon
+ * finishing all direct writes else the bucket will transition to 'kCleared'.
  *
  * |   Current State    |      Result
  * |--------------------|-----------------
@@ -249,9 +254,10 @@ StateChangeSucessful unprepareBucketState(BucketStateRegistry& registry,
  * | PreparedAndCleared |       -
  * | DirectWriteCounter | increments value
  */
-stdx::variant<BucketState, DirectWriteCounter> addDirectWrite(BucketStateRegistry& registry,
-                                                              const BucketId& bucketId,
-                                                              bool stopTracking = false);
+stdx::variant<BucketState, DirectWriteCounter> addDirectWrite(
+    BucketStateRegistry& registry,
+    const BucketId& bucketId,
+    ContinueTrackingBucket continueTrackingBucket = ContinueTrackingBucket::kContinue);
 
 /**
  * Requires the state to be tracked by a counter. The direct write counter can be positive or

@@ -103,6 +103,12 @@ enum class IgnoreBucketState { kYes, kNo };
 enum class BucketPrepareAction { kPrepare, kUnprepare };
 
 /**
+ * Mode enum to control whether getReopeningCandidate() will allow query-based
+ * reopening of buckets when attempting to accommodate a new measurement.
+ */
+enum class AllowQueryBasedReopening { kAllow, kDisallow };
+
+/**
  * Maps bucket key to the stripe that is responsible for it.
  */
 StripeNumber getStripeNumber(const BucketKey& key, size_t numberOfStripes);
@@ -272,7 +278,7 @@ stdx::variant<std::monostate, OID, std::vector<BSONObj>> getReopeningCandidate(
     Stripe& stripe,
     WithLock stripeLock,
     const CreationInfo& info,
-    bool allowQueryBasedReopening);
+    AllowQueryBasedReopening allowQueryBasedReopening);
 
 /**
  * Aborts 'batch', and if the corresponding bucket still exists, proceeds to abort any other
