@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/service_context.h"
+#include "mongo/executor/task_executor_cursor.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/uuid.h"
 
@@ -96,6 +97,19 @@ public:
      */
     virtual bool isSearchMetaPipeline(const Pipeline* pipeline) {
         return false;
+    }
+
+    /**
+     * Establish a cursor given the search query and CursorResponse from the initial execution.
+     */
+    boost::optional<executor::TaskExecutorCursor> establishSearchCursor(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const BSONObj& query,
+        CursorResponse&& response,
+        boost::optional<long long> docsRequested = boost::none,
+        std::function<void(BSONObjBuilder& bob)> augmentGetMore = nullptr,
+        const boost::optional<int>& protocolVersion = boost::none) {
+        return boost::none;
     }
 };
 
