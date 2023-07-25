@@ -458,14 +458,12 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
     if (_params.getSessionId()) {
         BSONObjBuilder newCmdBob(std::move(cmdObj));
 
-        BSONObjBuilder lsidBob(
-            newCmdBob.subobjStart(OperationSessionInfoFromClient::kSessionIdFieldName));
+        BSONObjBuilder lsidBob(newCmdBob.subobjStart(OperationSessionInfo::kSessionIdFieldName));
         _params.getSessionId()->serialize(&lsidBob);
         lsidBob.doneFast();
 
         if (_params.getTxnNumber()) {
-            newCmdBob.append(OperationSessionInfoFromClient::kTxnNumberFieldName,
-                             *_params.getTxnNumber());
+            newCmdBob.append(OperationSessionInfo::kTxnNumberFieldName, *_params.getTxnNumber());
         }
 
         if (_params.getAutocommit()) {

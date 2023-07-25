@@ -26,8 +26,9 @@
 # it in the license file.
 #
 
-# This IDL file describes the BSON format for a LogicalSessionId, and handles the serialization to
-# and deserialization from its BSON representation for that class.
+# This IDL file describes the BSON format for a LogicalSessionId, and
+# handles the serialization to and deserialization from its BSON representation
+# for that class.
 
 global:
   cpp_namespace: "mongo"
@@ -63,7 +64,6 @@ types:
     deserializer: "mongo::BSONElement::_numberInt"
 
 structs:
-
   LogicalSessionId:
     description: "A struct representing a LogicalSessionId"
     strict: true
@@ -131,7 +131,6 @@ structs:
         optional: true
         stability: stable
 
-  # TODO (SERVER-77506): This class is only used for OpLog persistence and should be moved to the OpLog's IDL files
   OperationSessionInfo:
     description: "Parser for serializing session transaction metadata"
     strict: false
@@ -158,16 +157,8 @@ structs:
         type: bool
         optional: true
 
-  OperationSessionInfoFromClientBase:
-    description: "Parser for pulling out session transaction metadata from commands, as opposed to
-                  the OperationSessionInfo class above, which is used for persistence.
-
-                  Any new fields added here must be added as optional:true so that the default
-                  constructed value continues to mean \"no logical session was sent by the client\".
-
-                  Please refer to the implementing class OperationSessionInfoFromClient for more
-                  information on its usage and contract.
-                  "
+  OperationSessionInfoFromClient:
+    description: "Parser for pulling out session transaction metadata from commands"
     strict: false
     unsafe_dangerous_disable_extra_field_duplicate_checks: true
     fields:

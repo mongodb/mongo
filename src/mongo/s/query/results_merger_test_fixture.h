@@ -90,15 +90,17 @@ protected:
             params.setAllowPartialResults(findCommand->getAllowPartialResults());
         }
 
+        OperationSessionInfoFromClient sessionInfo;
+        boost::optional<LogicalSessionFromClient> lsidFromClient;
+
         if (auto lsid = operationContext()->getLogicalSessionId()) {
-            OperationSessionInfoFromClient sessionInfo([&] {
-                LogicalSessionFromClient lsidFromClient(lsid->getId());
-                lsidFromClient.setUid(lsid->getUid());
-                return lsidFromClient;
-            }());
-            sessionInfo.setTxnNumber(operationContext()->getTxnNumber());
-            params.setOperationSessionInfo(sessionInfo);
+            lsidFromClient.emplace(lsid->getId());
+            lsidFromClient->setUid(lsid->getUid());
         }
+
+        sessionInfo.setSessionId(lsidFromClient);
+        sessionInfo.setTxnNumber(operationContext()->getTxnNumber());
+        params.setOperationSessionInfo(sessionInfo);
         return params;
     }
     /**

@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 
 #include "mongo/db/catalog_shard_feature_flag_gen.h"
@@ -163,12 +164,11 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
     }
 
     if (expCtx->opCtx->getTxnNumber()) {
-        invariant(
-            cmdForShards.peek()[OperationSessionInfoFromClient::kTxnNumberFieldName].missing(),
-            str::stream() << "Command for shards unexpectedly had the "
-                          << OperationSessionInfoFromClient::kTxnNumberFieldName
-                          << " field set: " << cmdForShards.peek().toString());
-        cmdForShards[OperationSessionInfoFromClient::kTxnNumberFieldName] =
+        invariant(cmdForShards.peek()[OperationSessionInfo::kTxnNumberFieldName].missing(),
+                  str::stream() << "Command for shards unexpectedly had the "
+                                << OperationSessionInfo::kTxnNumberFieldName
+                                << " field set: " << cmdForShards.peek().toString());
+        cmdForShards[OperationSessionInfo::kTxnNumberFieldName] =
             Value(static_cast<long long>(*expCtx->opCtx->getTxnNumber()));
     }
 
@@ -1272,20 +1272,23 @@ AsyncResultsMergerParams buildArmParams(boost::intrusive_ptr<ExpressionContext> 
     armParams.setTailableMode(expCtx->tailableMode);
     armParams.setNss(expCtx->ns);
 
-    if (auto lsid = expCtx->opCtx->getLogicalSessionId()) {
-        OperationSessionInfoFromClient sessionInfo([&] {
-            LogicalSessionFromClient lsidFromClient(lsid->getId());
-            lsidFromClient.setUid(lsid->getUid());
-            return lsidFromClient;
-        }());
-        sessionInfo.setTxnNumber(expCtx->opCtx->getTxnNumber());
+    OperationSessionInfoFromClient sessionInfo;
+    boost::optional<LogicalSessionFromClient> lsidFromClient;
 
-        if (TransactionRouter::get(expCtx->opCtx)) {
-            sessionInfo.setAutocommit(false);
-        }
-
-        armParams.setOperationSessionInfo(sessionInfo);
+    auto lsid = expCtx->opCtx->getLogicalSessionId();
+    if (lsid) {
+        lsidFromClient.emplace(lsid->getId());
+        lsidFromClient->setUid(lsid->getUid());
     }
+
+    sessionInfo.setSessionId(lsidFromClient);
+    sessionInfo.setTxnNumber(expCtx->opCtx->getTxnNumber());
+
+    if (TransactionRouter::get(expCtx->opCtx)) {
+        sessionInfo.setAutocommit(false);
+    }
+
+    armParams.setOperationSessionInfo(sessionInfo);
 
     // Convert owned cursors into a vector of remote cursors to be transferred to the merge
     // pipeline.

@@ -66,7 +66,7 @@ structs:
     AsyncResultsMergerParams:
         description: The parameters needed to establish an AsyncResultsMerger.
         chained_structs:
-            OperationSessionInfoFromClientBase : OperationSessionInfo
+            OperationSessionInfoFromClient : OperationSessionInfo
         fields:
             sort:
                 type: object

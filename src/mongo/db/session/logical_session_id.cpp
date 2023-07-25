@@ -67,9 +67,4 @@ LogicalSessionRecord makeLogicalSessionRecordForTest() {
     return record;
 }
 
-OperationSessionInfoFromClient::OperationSessionInfoFromClient(
-    LogicalSessionFromClient lsidFromClient) {
-    setSessionId(std::move(lsidFromClient));
-}
-
 }  // namespace mongo

@@ -434,8 +434,7 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
         } else if (OperationSessionInfoFromClient::kAutocommitFieldName ==
                    elem.fieldNameStringData()) {
             hasAutoCommit = true;
-        } else if (OperationSessionInfoFromClient::kTxnNumberFieldName ==
-                   elem.fieldNameStringData()) {
+        } else if (OperationSessionInfo::kTxnNumberFieldName == elem.fieldNameStringData()) {
             hasTxnNum = true;
         }
     }
@@ -471,7 +470,7 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     }
 
     if (!hasTxnNum) {
-        newCmd.append(OperationSessionInfoFromClient::kTxnNumberFieldName,
+        newCmd.append(OperationSessionInfo::kTxnNumberFieldName,
                       sharedOptions.txnNumberAndRetryCounter.getTxnNumber());
     } else {
         auto osi = OperationSessionInfoFromClient::parse(IDLParserContext{"OperationSessionInfo"},

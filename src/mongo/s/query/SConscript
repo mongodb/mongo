@@ -8,7 +8,6 @@ env.Library(
     target='cluster_query',
     source=[
         'cluster_client_cursor_impl.cpp',
-        'cluster_client_cursor_params.cpp',
         'cluster_find.cpp',
         'cluster_query_knobs.idl',
         'store_possible_cursor.cpp',

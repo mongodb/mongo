@@ -27,6 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/s/query/async_results_merger.h"
+
+#include <memory>
+
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/resume_token.h"
@@ -35,12 +41,12 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/query/async_results_merger.h"
 #include "mongo/s/query/results_merger_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
 namespace {
 
 LogicalSessionId parseSessionIdFromCmd(BSONObj cmdObj) {
@@ -2111,6 +2117,20 @@ TEST_F(AsyncResultsMergerTest, GetMoresShouldIncludeLSIDAndTxnNumIfSpecified) {
         return CursorResponse(kTestNss, 0LL, {BSON("x" << 1)})
             .toBSON(CursorResponse::ResponseType::SubsequentResponse);
     });
+}
+
+DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
+                   ConstructingARMWithTxnNumAndNoLSIDShouldCrash,
+                   R"#(Invariant failure.*params.getSessionId\(\))#") {
+    AsyncResultsMergerParams params;
+
+    OperationSessionInfoFromClient sessionInfo;
+    sessionInfo.setTxnNumber(5);
+    params.setOperationSessionInfo(sessionInfo);
+
+    // This should trigger an invariant.
+    ASSERT_FALSE(
+        std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params)));
 }
 
 DEATH_TEST_F(AsyncResultsMergerTest,

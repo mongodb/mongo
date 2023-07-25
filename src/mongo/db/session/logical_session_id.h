@@ -55,7 +55,10 @@ const TxnRetryCounter kUninitializedTxnRetryCounter = -1;
 class BSONObjBuilder;
 class OperationContext;
 
-constexpr Minutes kLogicalSessionDefaultTimeout{Minutes(kLocalLogicalSessionTimeoutMinutesDefault)};
+// The constant kLocalLogicalSessionTimeoutMinutesDefault comes from the generated
+// header logical_session_id_gen.h.
+constexpr Minutes kLogicalSessionDefaultTimeout =
+    Minutes(kLocalLogicalSessionTimeoutMinutesDefault);
 
 inline bool operator==(const LogicalSessionId& lhs, const LogicalSessionId& rhs) {
     return (lhs.getId() == rhs.getId()) && (lhs.getTxnNumber() == rhs.getTxnNumber()) &&
@@ -105,12 +108,13 @@ private:
 
 struct LogicalSessionRecordHash {
     std::size_t operator()(const LogicalSessionRecord& lsid) const {
-        return _hasher(lsid.getId());
+        return LogicalSessionIdHash{}(lsid.getId());
     }
 
 private:
-    LogicalSessionIdHash _hasher;
+    UUID::Hash _hasher;
 };
+
 
 inline std::ostream& operator<<(std::ostream& s, const LogicalSessionId& lsid) {
     return (s << lsid.getId() << " - " << lsid.getUid() << " - "
@@ -155,10 +159,9 @@ public:
 
     BSONObj toBSON() const {
         BSONObjBuilder bob;
-        bob.append(OperationSessionInfoFromClientBase::kTxnNumberFieldName, _txnNumber);
+        bob.append(OperationSessionInfo::kTxnNumberFieldName, _txnNumber);
         if (_txnRetryCounter) {
-            bob.append(OperationSessionInfoFromClientBase::kTxnRetryCounterFieldName,
-                       *_txnRetryCounter);
+            bob.append(OperationSessionInfo::kTxnRetryCounterFieldName, *_txnRetryCounter);
         }
         return bob.obj();
     }
@@ -191,29 +194,5 @@ inline bool operator==(const TxnNumberAndRetryCounter& l, const TxnNumberAndRetr
 inline bool operator!=(const TxnNumberAndRetryCounter& l, const TxnNumberAndRetryCounter& r) {
     return !(l == r);
 }
-
-/**
- * Represents all the session-related state that a client can attach when invoking a command against
- * the server. Clients are allowed to invoke commands without attaching a session in which case the
- * default-constructed value means "no logical session". However, if a client sends a session, they
- * must specify at least the "lsid" field.
- */
-class OperationSessionInfoFromClient : public OperationSessionInfoFromClientBase {
-public:
-    OperationSessionInfoFromClient(LogicalSessionFromClient lsidFromClient);
-
-    explicit OperationSessionInfoFromClient(OperationSessionInfoFromClientBase other)
-        : OperationSessionInfoFromClientBase(std::move(other)) {}
-
-    /**
-     * Returns a default-constructed object meaning "there is no logical session".
-     */
-    static OperationSessionInfoFromClient noSession() {
-        return OperationSessionInfoFromClient();
-    }
-
-private:
-    OperationSessionInfoFromClient() = default;
-};
 
 }  // namespace mongo

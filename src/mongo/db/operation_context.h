@@ -214,9 +214,6 @@ public:
      */
     void releaseOperationKey();
 
-    // TODO (SERVER-77506): BEGIN Expose OperationSessionInfoFromClient as a decoration instead of
-    // projecting all its fields as properties
-
     /**
      * Returns the session ID associated with this operation, if there is one.
      */
@@ -239,52 +236,11 @@ public:
     }
 
     /**
-     * Associates a transaction number with this operation context. May only be called once for the
-     * lifetime of the operation and the operation must have a logical session id assigned.
-     */
-    void setTxnNumber(TxnNumber txnNumber);
-
-    /**
      * Returns the txnRetryCounter associated with this operation.
      */
     boost::optional<TxnRetryCounter> getTxnRetryCounter() const {
         return _txnRetryCounter;
     }
-
-    /**
-     * Associates a txnRetryCounter with this operation context. May only be called once for the
-     * lifetime of the operation and the operation must have a logical session id and a transaction
-     * number assigned.
-     */
-    void setTxnRetryCounter(TxnRetryCounter txnRetryCounter);
-
-    /**
-     * Returns whether this operation is part of a multi-document transaction. Specifically, it
-     * indicates whether the user asked for a multi-document transaction.
-     */
-    bool inMultiDocumentTransaction() const {
-        return _inMultiDocumentTransaction;
-    }
-
-    /**
-     * Sets that this operation is part of a multi-document transaction. Once this is set, it cannot
-     * be unset.
-     */
-    void setInMultiDocumentTransaction() {
-        _inMultiDocumentTransaction = true;
-        if (!_txnRetryCounter.has_value()) {
-            _txnRetryCounter = 0;
-        }
-    }
-
-    bool isRetryableWrite() const {
-        return _txnNumber &&
-            (!_inMultiDocumentTransaction ||
-             isInternalSessionForRetryableWrite(*getLogicalSessionId()));
-    }
-
-    // TODO (SERVER-77506): END Expose OperationSessionInfoFromClient as a decoration instead of
-    // projecting all its fields as properties
 
     /**
      * Returns a CancellationToken that will be canceled when the OperationContext is killed via
@@ -308,6 +264,19 @@ public:
     const BatonHandle& getBaton() const {
         return _baton;
     }
+
+    /**
+     * Associates a transaction number with this operation context. May only be called once for the
+     * lifetime of the operation and the operation must have a logical session id assigned.
+     */
+    void setTxnNumber(TxnNumber txnNumber);
+
+    /**
+     * Associates a txnRetryCounter with this operation context. May only be called once for the
+     * lifetime of the operation and the operation must have a logical session id and a transaction
+     * number assigned.
+     */
+    void setTxnRetryCounter(TxnRetryCounter txnRetryCounter);
 
     /**
      * Returns the top-level WriteUnitOfWork associated with this operation context, if any.
@@ -475,6 +444,31 @@ public:
     Microseconds getRemainingMaxTimeMicros() const;
 
     bool isIgnoringInterrupts() const;
+
+    /**
+     * Returns whether this operation is part of a multi-document transaction. Specifically, it
+     * indicates whether the user asked for a multi-document transaction.
+     */
+    bool inMultiDocumentTransaction() const {
+        return _inMultiDocumentTransaction;
+    }
+
+    bool isRetryableWrite() const {
+        return _txnNumber &&
+            (!_inMultiDocumentTransaction ||
+             isInternalSessionForRetryableWrite(*getLogicalSessionId()));
+    }
+
+    /**
+     * Sets that this operation is part of a multi-document transaction. Once this is set, it cannot
+     * be unset.
+     */
+    void setInMultiDocumentTransaction() {
+        _inMultiDocumentTransaction = true;
+        if (!_txnRetryCounter.has_value()) {
+            _txnRetryCounter = 0;
+        }
+    }
 
     /**
      * Some operations coming into the system must be validated to ensure they meet constraints,
