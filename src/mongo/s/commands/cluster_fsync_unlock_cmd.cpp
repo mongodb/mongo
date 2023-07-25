@@ -73,7 +73,7 @@ public:
         Response typedRun(OperationContext* opCtx) {
             BSONObj fsyncUnlockCmdObj = BSON("fsyncUnlock" << 1);
 
-            auto responses = scatterGatherUnversionedTargetAllShards(
+            auto responses = scatterGatherUnversionedTargetConfigServerAndShards(
                 opCtx,
                 DatabaseName::kAdmin.db(),
                 applyReadWriteConcern(
