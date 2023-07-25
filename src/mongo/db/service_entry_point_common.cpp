@@ -1702,6 +1702,10 @@ void ExecCommandDatabase::_initiateCommand() {
         }
     }
 
+    if (command->shouldAffectQueryCounter()) {
+        globalOpCounters.gotQuery();
+    }
+
     if (cmdOptionMaxTimeMSField || maxTimeMSOpOnlyField) {
         // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
         // the OperationContext. The 'maxTimeMS' option unfortunately has a different meaning for a

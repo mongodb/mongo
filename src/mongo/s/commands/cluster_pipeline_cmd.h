@@ -188,6 +188,18 @@ public:
         return ReadWriteType::kRead;
     }
 
+    /**
+     * A pipeline/aggregation command does not increment the command counter, but rather increments
+     * the query counter.
+     */
+    bool shouldAffectCommandCounter() const override final {
+        return false;
+    }
+
+    bool shouldAffectQueryCounter() const override final {
+        return true;
+    }
+
     bool adminOnly() const override {
         return false;
     }

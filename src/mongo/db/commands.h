@@ -506,11 +506,19 @@ public:
     virtual AllowedOnSecondary secondaryAllowed(ServiceContext* context) const = 0;
 
     /**
-     * Override and return fales if the command opcounters should not be incremented on
+     * Override and return false if the command opcounters should not be incremented on
      * behalf of this command.
      */
     virtual bool shouldAffectCommandCounter() const {
         return true;
+    }
+
+    /**
+     * Override and return true if the query opcounters should be incremented on
+     * behalf of this command.
+     */
+    virtual bool shouldAffectQueryCounter() const {
+        return false;
     }
 
     /**

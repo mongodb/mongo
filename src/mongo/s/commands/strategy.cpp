@@ -926,6 +926,10 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         }
     }
 
+    if (command->shouldAffectQueryCounter()) {
+        globalOpCounters.gotQuery();
+    }
+
     return Status::OK();
 }
 

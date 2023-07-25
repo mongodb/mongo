@@ -293,6 +293,10 @@ public:
         return false;
     }
 
+    bool shouldAffectQueryCounter() const override {
+        return true;
+    }
+
     bool shouldAffectReadConcernCounter() const override {
         return true;
     }
@@ -475,8 +479,6 @@ public:
          */
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-            // Although it is a command, a find command gets counted as a query.
-            globalOpCounters.gotQuery();
 
             const BSONObj& cmdObj = _request.body;
 

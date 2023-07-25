@@ -90,8 +90,16 @@ public:
         return ReadWriteType::kRead;
     }
 
-    bool shouldAffectCommandCounter() const final {
+    /**
+     * A find command does not increment the command counter, but rather increments the
+     * query counter.
+     */
+    bool shouldAffectCommandCounter() const override final {
         return false;
+    }
+
+    bool shouldAffectQueryCounter() const override final {
+        return true;
     }
 
     bool allowedInTransactions() const final {
@@ -201,8 +209,6 @@ public:
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-            // We count find command as a query op.
-            globalOpCounters.gotQuery();
 
             Impl::checkCanRunHere(opCtx);
 

@@ -135,6 +135,18 @@ public:
         return true;
     }
 
+    /**
+     * A pipeline/aggregation command does not increment the command counter, but rather increments
+     * the query counter.
+     */
+    bool shouldAffectCommandCounter() const override {
+        return false;
+    }
+
+    bool shouldAffectQueryCounter() const override {
+        return true;
+    }
+
     bool shouldAffectReadConcernCounter() const override {
         return true;
     }

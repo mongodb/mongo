@@ -128,6 +128,20 @@ assert.throws(function() {
 });
 assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
 
+t.drop();
+t.insert([{_id: 0}, {_id: 1}, {_id: 2}]);
+
+opCounters = newdb.serverStatus().opcounters;
+t.aggregate({$match: {_id: 1}});
+assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
+
+// Query, with error.
+opCounters = newdb.serverStatus().opcounters;
+assert.throws(function() {
+    t.aggregate({$match: {$invalidOp: 1}});
+});
+assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
+
 //
 // 5. Getmore.
 //
