@@ -102,7 +102,6 @@ void assertViewCatalogValid(const ViewsForDatabase& viewsForDb) {
 const auto maxUuid = UUID::parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF").getValue();
 const auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
 
-
 // Copy existing value from immutable data structure or default-construct if not existing
 template <typename Container, typename Key>
 auto copyIfExists(const Container& container, const Key& key) {
@@ -113,6 +112,48 @@ auto copyIfExists(const Container& container, const Key& key) {
     return typename Container::mapped_type();
 }
 
+// CSFLE 1 collections have a schema validator with the encrypt keyword
+bool isCSFLE1Validator(BSONObj doc) {
+    if (doc.isEmpty()) {
+        return false;
+    }
+
+    std::stack<BSONObjIterator> frameStack;
+
+    const ScopeGuard frameStackGuard([&] {
+        while (!frameStack.empty()) {
+            frameStack.pop();
+        }
+    });
+
+    frameStack.emplace(BSONObjIterator(doc));
+
+    while (frameStack.size() > 1 || frameStack.top().more()) {
+        if (frameStack.size() == BSONDepth::kDefaultMaxAllowableDepth) {
+            return false;
+        }
+
+        auto& iterator = frameStack.top();
+        if (iterator.more()) {
+            BSONElement elem = iterator.next();
+            if (elem.type() == BSONType::Object) {
+                if (elem.fieldNameStringData() == "encrypt"_sd) {
+                    return true;
+                }
+
+                frameStack.emplace(BSONObjIterator(elem.Obj()));
+            } else if (elem.type() == BSONType::Array) {
+                frameStack.emplace(BSONObjIterator(elem.Obj()));
+            }
+        } else {
+            frameStack.pop();
+        }
+    }
+
+    dassert(frameStack.size() == 1);
+
+    return false;
+}
 }  // namespace
 
 /**
@@ -2081,6 +2122,12 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
         if (coll->isClustered()) {
             _stats.userClustered += 1;
         }
+        if (coll->getCollectionOptions().encryptedFieldConfig) {
+            _stats.queryableEncryption += 1;
+        }
+        if (isCSFLE1Validator(coll->getValidatorDoc())) {
+            _stats.csfle += 1;
+        }
     } else {
         _stats.internal += 1;
     }
@@ -2155,6 +2202,12 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
         }
         if (coll->isClustered()) {
             _stats.userClustered -= 1;
+        }
+        if (coll->getCollectionOptions().encryptedFieldConfig) {
+            _stats.queryableEncryption -= 1;
+        }
+        if (isCSFLE1Validator(coll->getValidatorDoc())) {
+            _stats.csfle -= 1;
         }
     } else {
         _stats.internal -= 1;

@@ -108,7 +108,7 @@ public:
     }
 
     BSONObj getValidatorDoc() const {
-        MONGO_UNREACHABLE;
+        return BSONObj();
     }
 
     std::pair<SchemaValidationResult, Status> checkValidation(OperationContext* opCtx,
@@ -326,7 +326,7 @@ public:
     }
 
     const CollectionOptions& getCollectionOptions() const {
-        MONGO_UNREACHABLE;
+        return _options;
     }
 
     StatusWith<std::vector<BSONObj>> addCollationDefaultsToIndexSpecsForCreate(
@@ -478,6 +478,7 @@ private:
     RecordId _catalogId{0};
     clonable_ptr<IndexCatalog> _indexCatalog;
     bool _committed = true;
+    CollectionOptions _options;
 };
 
 }  // namespace mongo

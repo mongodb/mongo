@@ -616,6 +616,10 @@ public:
         int userClustered = 0;
         // System collections or collections on internal databases
         int internal = 0;
+        // Client Side Field Level Encryption collections on non-internal databases
+        int csfle = 0;
+        // Queryable Encryption collections on non-internal databases
+        int queryableEncryption = 0;
     };
 
     /**

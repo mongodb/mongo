@@ -63,6 +63,8 @@ public:
         int internalCollections = 0;
         int internalViews = 0;
         int timeseriesExtendedRange = 0;
+        int csfle = 0;
+        int queryableEncryption = 0;
 
         void toBson(BSONObjBuilder* builder) const {
             builder->append("collections", collections);
@@ -75,6 +77,8 @@ public:
             if (timeseriesExtendedRange > 0) {
                 builder->append("timeseriesExtendedRange", timeseriesExtendedRange);
             }
+            builder->append("csfle", csfle);
+            builder->append("queryableEncryption", queryableEncryption);
         }
     };
 
@@ -89,6 +93,8 @@ public:
         stats.clustered = catalogStats.userClustered;
         stats.internalCollections = catalogStats.internal;
         stats.timeseriesExtendedRange = requiresTimeseriesExtendedRangeSupport.load();
+        stats.csfle = catalogStats.csfle;
+        stats.queryableEncryption = catalogStats.queryableEncryption;
 
         const auto viewCatalogDbNames = catalog->getViewCatalogDbNames(opCtx);
         for (const auto& dbName : viewCatalogDbNames) {
