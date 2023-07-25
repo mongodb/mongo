@@ -112,10 +112,13 @@ The \c compact command attempts to rewrite the specified table to
 consume less disk space.
 
 @subsection util_compact_synopsis Synopsis
-`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] compact uri`
+`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] compact [-c config] uri`
 
 @subsection util_compact_options Options
-The \c compact command has no command-specific options.
+The following are command-specific options for the \c compact command:
+
+@par \c -c
+Include a configuration string to be passed to WT_SESSION::compact.
 
 <hr>
 @section util_copyright wt copyright

@@ -15,9 +15,11 @@
 static int
 usage(void)
 {
-    static const char *options[] = {"-?", "show this message", NULL, NULL};
+    static const char *options[] = {"-c config",
+      "a configuration string to be passed to WT_SESSION.compact", "-?", "show this message", NULL,
+      NULL};
 
-    util_usage("compact uri", "options:", options);
+    util_usage("compact [-c configuration] uri", "options:", options);
     return (1);
 }
 
@@ -30,11 +32,14 @@ util_compact(WT_SESSION *session, int argc, char *argv[])
 {
     WT_DECL_RET;
     int ch;
-    char *uri;
+    char *config, *uri;
 
-    uri = NULL;
-    while ((ch = __wt_getopt(progname, argc, argv, "?")) != EOF)
+    config = uri = NULL;
+    while ((ch = __wt_getopt(progname, argc, argv, "c:?")) != EOF)
         switch (ch) {
+        case 'c': /* command-line configuration */
+            config = __wt_optarg;
+            break;
         case '?':
             usage();
             return (0);
@@ -50,7 +55,7 @@ util_compact(WT_SESSION *session, int argc, char *argv[])
     if ((uri = util_uri(session, *argv, "table")) == NULL)
         return (1);
 
-    if ((ret = session->compact(session, uri, NULL)) != 0)
+    if ((ret = session->compact(session, uri, config)) != 0)
         (void)util_err(session, ret, "session.compact: %s", uri);
 
     util_free(uri);
