@@ -634,9 +634,11 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     boost::optional<BucketUnpacker> bucketUnpacker) {
     OperationContext* opCtx = expCtx->opCtx;
 
-    // Verify that we are already under a collection lock. We avoid taking locks ourselves in this
-    // function because double-locking forces any PlanExecutor we create to adopt a NO_YIELD policy.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_IS));
+    // Verify that we are already under a collection lock or in a lock-free read. We avoid taking
+    // locks ourselves in this function because double-locking forces any PlanExecutor we create to
+    // adopt a NO_YIELD policy.
+    invariant(opCtx->isLockFreeReadsOp() ||
+              opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_IS));
 
     auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
     auto* randomCursorSampleRatioParam =
