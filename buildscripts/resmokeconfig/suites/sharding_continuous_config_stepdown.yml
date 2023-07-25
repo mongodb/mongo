@@ -235,6 +235,9 @@ selector:
   # SERVER-51805 splitChunk op is not idempotent
   - jstests/sharding/mongos_get_shard_version.js
 
+  # Test runs command on a config shard and does not shutdown safely upon transitioning to a dedicated config server.
+  - jstests/sharding/fsync_lock_unlock.js
+
   exclude_with_any_tags:
   - does_not_support_stepdowns
 
