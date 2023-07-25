@@ -653,7 +653,11 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
                                .getStatus();
 
     if (!versionStatus.isOK()) {
-        std::cout << " Version: " << versionStatus.reason() << std::endl;
+        LOGV2_ERROR(7887900,
+                    "Metadata format version check failed.",
+                    "uri"_attr = _uri,
+                    "namespace"_attr = params.nss.toStringForErrorMsg(),
+                    "version"_attr = versionStatus.reason());
         if (versionStatus.code() == ErrorCodes::FailedToParse) {
             uasserted(28548, versionStatus.reason());
         } else {
