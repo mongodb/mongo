@@ -1273,7 +1273,12 @@ AsyncResultsMergerParams buildArmParams(boost::intrusive_ptr<ExpressionContext> 
     armParams.setNss(expCtx->ns);
 
     if (auto lsid = expCtx->opCtx->getLogicalSessionId()) {
-        OperationSessionInfoFromClient sessionInfo(*lsid, expCtx->opCtx->getTxnNumber());
+        OperationSessionInfoFromClient sessionInfo([&] {
+            LogicalSessionFromClient lsidFromClient(lsid->getId());
+            lsidFromClient.setUid(lsid->getUid());
+            return lsidFromClient;
+        }());
+        sessionInfo.setTxnNumber(expCtx->opCtx->getTxnNumber());
 
         if (TransactionRouter::get(expCtx->opCtx)) {
             sessionInfo.setAutocommit(false);

@@ -406,10 +406,6 @@ last-continuous:
     ticket: SERVER-77386
   - test_file: jstests/replsets/config_txns_reaping_interrupt.js
     ticket: SERVER-78187
-  - test_file: jstests/sharding/internal_txns/transaction_api_distributed_from_shard.js
-    ticket: SERVER-78786
-  - test_file: jstests/sharding/internal_txns/transaction_api_test_command_basic.js
-    ticket: SERVER-78786
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
     ticket: SERVER-79136
   suites: null
@@ -897,10 +893,6 @@ last-lts:
     ticket: SERVER-78414
   - test_file: jstests/replsets/config_txns_reaping_interrupt.js
     ticket: SERVER-78187
-  - test_file: jstests/sharding/internal_txns/transaction_api_distributed_from_shard.js
-    ticket: SERVER-78786
-  - test_file: jstests/sharding/internal_txns/transaction_api_test_command_basic.js
-    ticket: SERVER-78786
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_snapshot.js
     ticket: SERVER-78855
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js

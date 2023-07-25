@@ -77,8 +77,6 @@ OperationSessionInfoFromClient::OperationSessionInfoFromClient(LogicalSessionId 
     : OperationSessionInfoFromClient([&] {
           LogicalSessionFromClient lsidFromClient(lsid.getId());
           lsidFromClient.setUid(lsid.getUid());
-          lsidFromClient.setTxnNumber(lsid.getTxnNumber());
-          lsidFromClient.setTxnUUID(lsid.getTxnUUID());
           return lsidFromClient;
       }()) {
     setTxnNumber(std::move(txnNumber));

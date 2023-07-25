@@ -16,25 +16,15 @@ const kDbName = "foo";
 const kCollName = "bar";
 const kNs = kDbName + "." + kCollName;
 
-function runTestSuccess(sessionOpts) {
+function runTestSuccess() {
     const commands = [
         {dbName: kDbName, command: {find: kCollName, singleBatch: true}},
+        {dbName: kDbName, command: {insert: kCollName, documents: [{_id: 2}, {_id: 3}]}},
         {
             dbName: kDbName,
-            command: {insert: kCollName, documents: [{_id: 2}, {_id: 3}], stmtId: NumberInt(0)}
+            command: {update: kCollName, updates: [{q: {_id: 2}, u: {$set: {updated: true}}}]}
         },
-        {
-            dbName: kDbName,
-            command: {
-                update: kCollName,
-                updates: [{q: {_id: 2}, u: {$set: {updated: true}}}],
-                stmtId: NumberInt(2)
-            }
-        },
-        {
-            dbName: kDbName,
-            command: {delete: kCollName, deletes: [{q: {_id: 3}, limit: 1}], stmtId: NumberInt(3)}
-        },
+        {dbName: kDbName, command: {delete: kCollName, deletes: [{q: {_id: 3}, limit: 1}]}},
         {dbName: kDbName, command: {find: kCollName, singleBatch: true}},
         {dbName: kDbName, command: {aggregate: kCollName, pipeline: [{$match: {}}], cursor: {}}},
     ];
@@ -42,9 +32,8 @@ function runTestSuccess(sessionOpts) {
     // Insert initial data.
     assert.commandWorked(st.s.getCollection(kNs).insert([{_id: 1}]));
 
-    let testCmd = Object.merge(
-        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}, sessionOpts);
-    const res = assert.commandWorked(shard0Primary.adminCommand(testCmd));
+    const res = assert.commandWorked(shard0Primary.adminCommand(
+        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}));
     res.responses.forEach((innerRes) => {
         assert.commandWorked(innerRes, tojson(res));
     });
@@ -69,12 +58,9 @@ function runTestSuccess(sessionOpts) {
     assert.commandWorked(st.s.getCollection(kNs).remove({}, false /* justOne */));
 }
 
-function runTestFailure(sessionOpts) {
+function runTestFailure() {
     const commands = [
-        {
-            dbName: kDbName,
-            command: {insert: kCollName, documents: [{_id: 2}, {_id: 3}], stmtId: NumberInt(0)}
-        },
+        {dbName: kDbName, command: {insert: kCollName, documents: [{_id: 2}, {_id: 3}]}},
         {dbName: kDbName, command: {find: kCollName, singleBatch: true}},
         // clusterCount does not exist, so the API will reject this command without running it. This
         // will still abort the transaction.
@@ -84,9 +70,10 @@ function runTestFailure(sessionOpts) {
     // Insert initial data.
     assert.commandWorked(st.s.getCollection(kNs).insert([{_id: 1}]));
 
-    let testCmd = Object.merge(
-        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}, sessionOpts);
-    const res = assert.commandFailedWithCode(shard0Primary.adminCommand(testCmd), 6349501);
+    const res = assert.commandFailedWithCode(
+        shard0Primary.adminCommand(
+            {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}),
+        6349501);
     assert(!res.hasOwnProperty("responses"));
 
     // Verify the API didn't insert any documents.
@@ -96,7 +83,7 @@ function runTestFailure(sessionOpts) {
     assert.commandWorked(st.s.getCollection(kNs).remove({}, false /* justOne */));
 }
 
-function runTestGetMore(sessionOpts) {
+function runTestGetMore() {
     // Insert initial data.
     const startVal = -50;
     const numDocs = 100;
@@ -115,9 +102,8 @@ function runTestGetMore(sessionOpts) {
 
     const commandMetricsBefore = shard0Primary.getDB(kDbName).serverStatus().metrics.commands;
 
-    let testCmd = Object.merge(
-        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}, sessionOpts);
-    const res = assert.commandWorked(shard0Primary.adminCommand(testCmd));
+    const res = assert.commandWorked(shard0Primary.adminCommand(
+        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}));
     assert.eq(res.responses.length, 1, tojson(res));
 
     // The response from an exhausted cursor is an array of BSON objects, so we don't assert the
@@ -147,17 +133,9 @@ function runTestGetMore(sessionOpts) {
 // Unsharded collection case.
 //
 
-runTestSuccess({});
-runTestSuccess({lsid: {id: new UUID()}});
-runTestSuccess({lsid: {id: new UUID()}, txnNumber: NumberLong(0)});
-
-runTestFailure({});
-runTestFailure({lsid: {id: new UUID()}});
-runTestFailure({lsid: {id: new UUID()}, txnNumber: NumberLong(0)});
-
-runTestGetMore({});
-runTestGetMore({lsid: {id: new UUID()}});
-runTestGetMore({lsid: {id: new UUID()}, txnNumber: NumberLong(0)});
+runTestSuccess();
+runTestFailure();
+runTestGetMore();
 
 //
 // Sharded collection case.
@@ -171,17 +149,9 @@ assert.commandWorked(st.s.adminCommand({shardCollection: kNs, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: kNs, middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: kNs, find: {x: 0}, to: st.shard1.shardName}));
 
-runTestSuccess({});
-runTestSuccess({lsid: {id: new UUID()}});
-runTestSuccess({lsid: {id: new UUID()}, txnNumber: NumberLong(0)});
-
-runTestFailure({});
-runTestFailure({lsid: {id: new UUID()}});
-runTestFailure({lsid: {id: new UUID()}, txnNumber: NumberLong(0)});
-
-runTestGetMore({});
-runTestGetMore({lsid: {id: new UUID()}});
-runTestGetMore({lsid: {id: new UUID()}, txnNumber: NumberLong(0)});
+runTestSuccess();
+runTestFailure();
+runTestGetMore();
 
 st.stop();
 })();
