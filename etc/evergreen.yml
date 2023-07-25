@@ -1924,14 +1924,7 @@ buildvariants:
       --link-model=dynamic
       --linker=gold
     resmoke_jobs_max: 2
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: s390x
-    packager_distro: rhel72
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: s390x-enterprise-rhel72
+    has_packages: false
     repo_edition: enterprise
     multiversion_platform: rhel72
     multiversion_architecture: s390x

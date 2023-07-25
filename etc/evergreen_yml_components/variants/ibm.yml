@@ -70,6 +70,7 @@ buildvariants:
   display_name: Enterprise RHEL 8.1 PPC64LE Shared
   expansions:
     <<: *enterprise-rhel-81-ppc64le-expansions-template
+    has_packages: false
     compile_flags: >-
       --link-model=dynamic
       --ssl
@@ -211,6 +212,7 @@ buildvariants:
   display_name: Enterprise RHEL 8.3 s390x Shared
   expansions:
     <<: *enterprise-rhel-83-s390x-expansions-template
+    has_packages: false
     compile_flags: >-
       --link-model=dynamic
       --ssl
