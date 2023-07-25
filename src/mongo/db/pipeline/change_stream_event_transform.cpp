@@ -47,7 +47,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_document_diff_parser.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
-#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/resume_token.h"
@@ -362,11 +361,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             break;
         }
         case repl::OpTypeEnum::kNoop: {
-            // TODO SERVER-66138: The legacy oplog format for some no-op operations can include
-            // 'type' field, which was removed post 6.0. We can remove all the logic related to the
-            // 'type' field once 7.0 is release.
-            const auto o2Field = change_stream_legacy::convertFromLegacyOplogFormat(
-                input[repl::OplogEntry::kObject2FieldName].getDocument(), nss);
+            const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
 
             // Check whether this is a shardCollection oplog entry.
             if (!o2Field["shardCollection"].missing()) {

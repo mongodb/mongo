@@ -47,7 +47,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_rewrite_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
@@ -338,9 +338,6 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
         internalOpTypeOrBuilder.append(BSON("o2." + eventName << BSON("$exists" << true)));
     }
 
-    // TODO SERVER-66138: This filter can be removed after 7.0 release.
-    change_stream_legacy::populateInternalOperationFilter(expCtx, &internalOpTypeOrBuilder);
-
     // Finalize the array of $or filter predicates.
     internalOpTypeOrBuilder.done();
 
@@ -354,7 +351,7 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
 
 BSONObj getMatchFilterForClassicOperationTypes() {
     return BSON(DocumentSourceChangeStream::kOperationTypeField
-                << BSON("$in" << change_stream_legacy::kClassicOperationTypes));
+                << BSON("$in" << change_stream::kClassicOperationTypes));
 }
 
 }  // namespace change_stream_filter

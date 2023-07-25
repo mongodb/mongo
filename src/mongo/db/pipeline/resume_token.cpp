@@ -42,7 +42,7 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/assert_util.h"
@@ -68,7 +68,7 @@ ResumeTokenData::ResumeTokenData(Timestamp clusterTimeIn,
             documentKey.missing() || opDescription.missing());
 
     // For v1 classic change events, the eventIdentifier is always the documentKey, even if missing.
-    if (change_stream_legacy::kClassicOperationTypes.count(opType) && version <= 1) {
+    if (change_stream::kClassicOperationTypes.count(opType) && version <= 1) {
         eventIdentifier = documentKey;
         return;
     }

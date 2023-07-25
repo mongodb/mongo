@@ -31,6 +31,7 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
@@ -45,6 +46,23 @@ namespace change_stream {
  */
 ResumeTokenData resolveResumeTokenFromSpec(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            const DocumentSourceChangeStreamSpec& spec);
+
+/**
+ * Represents the change stream operation types that are NOT guarded behind the 'showExpandedEvents'
+ * flag.
+ */
+static const std::set<StringData> kClassicOperationTypes =
+    std::set<StringData>{DocumentSourceChangeStream::kUpdateOpType,
+                         DocumentSourceChangeStream::kDeleteOpType,
+                         DocumentSourceChangeStream::kReplaceOpType,
+                         DocumentSourceChangeStream::kInsertOpType,
+                         DocumentSourceChangeStream::kDropCollectionOpType,
+                         DocumentSourceChangeStream::kRenameCollectionOpType,
+                         DocumentSourceChangeStream::kDropDatabaseOpType,
+                         DocumentSourceChangeStream::kInvalidateOpType,
+                         DocumentSourceChangeStream::kReshardBeginOpType,
+                         DocumentSourceChangeStream::kReshardDoneCatchUpOpType,
+                         DocumentSourceChangeStream::kNewShardDetectedOpType};
 
 }  // namespace change_stream
 }  // namespace mongo

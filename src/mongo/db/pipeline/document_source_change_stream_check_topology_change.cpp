@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/change_stream_topology_change_info.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/util/assert_util.h"
