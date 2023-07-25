@@ -315,6 +315,25 @@ const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
     L"MongoDB", L"MongoDB", L"MongoDB Server"};
 #endif
 
+auto makeTransportLayer(ServiceContext* svcCtx) {
+    boost::optional<int> internalPort;
+    boost::optional<int> loadBalancerPort;
+
+    if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+        internalPort = serverGlobalParams.internalPort;
+        if (*internalPort == serverGlobalParams.port) {
+            LOGV2_ERROR(7791701,
+                        "The internal port must be different from the public listening port.",
+                        "port"_attr = serverGlobalParams.port);
+            quickExit(ExitCode::badOptions);
+        }
+        // TODO SERVER-78730: add support for load-balanced connections.
+    }
+
+    return transport::TransportLayerManager::createWithConfig(
+        &serverGlobalParams, svcCtx, std::move(loadBalancerPort), std::move(internalPort));
+}
+
 void logStartup(OperationContext* opCtx) {
     BSONObjBuilder toLog;
     std::stringstream id;
@@ -524,10 +543,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 #endif
 
     if (!storageGlobalParams.repair) {
-        auto tl =
-            transport::TransportLayerManager::createWithConfig(&serverGlobalParams, serviceContext);
-        auto res = tl->setup();
-        if (!res.isOK()) {
+        auto tl = makeTransportLayer(serviceContext);
+        if (auto res = tl->setup(); !res.isOK()) {
             LOGV2_ERROR(20568,
                         "Error setting up listener: {error}",
                         "Error setting up listener",

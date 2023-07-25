@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/mongod_options_sharding.h"
+        - "mongo/db/server_options.h"
     configs:
         section: 'Sharding options'
         initializer:
@@ -79,3 +80,11 @@ configs:
             a dedicated port (27017 by default) for routing requests.
         arg_vartype: Bool
         source: yaml
+    'net.internalPort':
+        source: [ cli, ini ]
+        description: 'The port to accept connections from other servers, when acting as a router.'
+        short_name: internalPort
+        arg_vartype: Int
+        validator: { gte: 0, lte: 65535 }
+        default:
+            expr: static_cast<int>(mongo::ServerGlobalParams::ShardServerPort)

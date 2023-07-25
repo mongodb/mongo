@@ -768,6 +768,18 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target='mongod_options_test',
+    source=[
+        'mongod_options_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'mongod_options',
+        'server_base',
+    ],
+)
+
 env.Library(
     target="coll_mod_command_idl",
     source=[

@@ -81,6 +81,8 @@ struct ServerGlobalParams {
 
     ClusterRole clusterRole = ClusterRole::None;  // --configsvr/--shardsvr
 
+    int internalPort = ShardServerPort;  // --internalPort
+
     bool objcheck = true;  // --objcheck
 
     // Shell parameter, used for testing only, to tell the shell to crash on InvalidBSON errors.

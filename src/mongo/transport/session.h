@@ -165,6 +165,13 @@ public:
      */
     virtual bool isFromLoadBalancer() const = 0;
 
+    /**
+     * Returns true if this session corresponds to a connection accepted from the internal port.
+     */
+    virtual bool isFromInternalPort() const {
+        return false;
+    }
+
     virtual const HostAndPort& remote() const = 0;
     virtual const HostAndPort& local() const = 0;
 

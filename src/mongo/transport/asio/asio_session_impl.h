@@ -109,6 +109,11 @@ public:
         return _isFromLoadBalancer;
     }
 
+    bool isFromInternalPort() const override {
+        auto internalPort = _tl->internalPort();
+        return _isIngressSession && internalPort && *internalPort == _local.port();
+    }
+
 #ifdef MONGO_CONFIG_SSL
     const std::shared_ptr<SSLManagerInterface>& getSSLManager() const override;
 #endif

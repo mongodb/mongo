@@ -156,10 +156,16 @@ std::unique_ptr<TransportLayer> TransportLayerManager::makeAndStartDefaultEgress
 }
 
 std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
-    const ServerGlobalParams* config, ServiceContext* ctx, boost::optional<int> loadBalancerPort) {
+    const ServerGlobalParams* config,
+    ServiceContext* ctx,
+    boost::optional<int> loadBalancerPort,
+    boost::optional<int> internalPort) {
     auto sep = ctx->getServiceEntryPoint();
 
-    transport::AsioTransportLayer::Options opts(config, loadBalancerPort);
+    transport::AsioTransportLayer::Options opts(config);
+    opts.loadBalancerPort = std::move(loadBalancerPort);
+    opts.internalPort = std::move(internalPort);
+
     std::vector<std::unique_ptr<TransportLayer>> retVector;
     retVector.push_back(std::make_unique<transport::AsioTransportLayer>(opts, sep));
     auto egress = retVector[0].get();

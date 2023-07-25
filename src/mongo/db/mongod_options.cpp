@@ -633,21 +633,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         }
         return Status(ErrorCodes::BadValue, "--cacheSize option not currently supported");
     }
-    if (!params.count("net.port")) {
-        if (params.count("sharding.clusterRole")) {
-            std::string clusterRole = params["sharding.clusterRole"].as<std::string>();
-            if (clusterRole == "configsvr") {
-                serverGlobalParams.port = ServerGlobalParams::ConfigServerPort;
-            } else if (clusterRole == "shardsvr") {
-                serverGlobalParams.port = ServerGlobalParams::ShardServerPort;
-            } else {
-                StringBuilder sb;
-                sb << "Bad value for sharding.clusterRole: " << clusterRole
-                   << ".  Supported modes are: (configsvr|shardsvr)";
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-        }
-    }
     if (params.count("sharding.clusterRole")) {
         auto clusterRoleParam = params["sharding.clusterRole"].as<std::string>();
         // Force to set up the node as a replica set, unless we're a shard and we're using queryable
@@ -672,11 +657,24 @@ Status storeMongodOptions(const moe::Environment& params) {
             }
         } else if (clusterRoleParam == "shardsvr") {
             serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+        } else {
+            return Status(ErrorCodes::BadValue,
+                          fmt::format("Bad value for sharding.clusterRole: {}. Supported modes "
+                                      "are: (configsvr|shardsvr)",
+                                      clusterRoleParam));
         }
 
         if (feature_flags::gCohostedRouter.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
             params.count("sharding.routerEnabled") && params["sharding.routerEnabled"].as<bool>()) {
             serverGlobalParams.clusterRole += ClusterRole::RouterServer;
+        }
+    }
+
+    if (!params.count("net.port")) {
+        if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
+            serverGlobalParams.port = ServerGlobalParams::ShardServerPort;
+        } else if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ConfigServer)) {
+            serverGlobalParams.port = ServerGlobalParams::ConfigServerPort;
         }
     }
 

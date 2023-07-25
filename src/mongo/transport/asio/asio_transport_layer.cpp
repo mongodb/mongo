@@ -50,6 +50,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_options_gen.h"
@@ -308,10 +309,8 @@ private:
 
 thread_local AsioReactor* AsioReactor::_reactorForThread = nullptr;
 
-AsioTransportLayer::Options::Options(const ServerGlobalParams* params,
-                                     boost::optional<int> loadBalancerPort)
+AsioTransportLayer::Options::Options(const ServerGlobalParams* params)
     : port(params->port),
-      loadBalancerPort(loadBalancerPort),
       ipList(params->bind_ips),
 #ifndef _WIN32
       useUnixSockets(!params->noUnixSocket),
@@ -1144,6 +1143,10 @@ Status AsioTransportLayer::setup() {
         if (_listenerOptions.loadBalancerPort) {
             listenAddrs.push_back(makeUnixSockPath(*_listenerOptions.loadBalancerPort));
         }
+
+        if (auto port = _listenerOptions.internalPort) {
+            listenAddrs.push_back(makeUnixSockPath(*port));
+        }
     }
 #endif
 
@@ -1162,6 +1165,9 @@ Status AsioTransportLayer::setup() {
     std::vector<int> ports = {_listenerPort};
     if (_listenerOptions.loadBalancerPort) {
         ports.push_back(*_listenerOptions.loadBalancerPort);
+    }
+    if (auto port = _listenerOptions.internalPort) {
+        ports.push_back(*port);
     }
 
     // Self-deduplicating list of unique endpoint addresses.
@@ -1214,17 +1220,17 @@ Status AsioTransportLayer::setup() {
         } catch (std::exception&) {
             // Allow the server to start when "ipv6: true" and "bindIpAll: true", but the platform
             // does not support ipv6 (e.g., ipv6 kernel module is not loaded in Linux).
-            auto bindAllFmt = [](auto p) {
-                return fmt::format(":::{}", p);
+            auto addrIsBindAll = [&] {
+                for (auto port : ports) {
+                    if (addr.toString() == fmt::format(":::{}", port)) {
+                        return true;
+                    }
+                }
+                return false;
             };
-            bool addrIsBindAll = addr.toString() == bindAllFmt(_listenerPort);
-
-            if (!addrIsBindAll && _listenerOptions.loadBalancerPort) {
-                addrIsBindAll = (addr.toString() == bindAllFmt(*_listenerOptions.loadBalancerPort));
-            }
 
             if (errno == EAFNOSUPPORT && _listenerOptions.enableIPv6 && addr.family() == AF_INET6 &&
-                addrIsBindAll) {
+                addrIsBindAll()) {
                 LOGV2_WARNING(4206501,
                               "Failed to bind to address as the platform does not support ipv6",
                               "Failed to bind to {address} as the platform does not support ipv6",
@@ -1360,7 +1366,7 @@ void AsioTransportLayer::_runListener() noexcept {
         }
 
         _acceptConnection(acceptorRecord->acceptor);
-        LOGV2(23015, "Listening on", "address"_attr = acceptorRecord->address.getAddr());
+        LOGV2(23015, "Listening on", "address"_attr = acceptorRecord->address);
     }
 
     const char* ssl = "off";

@@ -96,9 +96,8 @@ public:
         constexpr static auto kIngress = 0x1;
         constexpr static auto kEgress = 0x10;
 
-        explicit Options(const ServerGlobalParams* params) : Options(params, {}) {}
-        Options(const ServerGlobalParams* params, boost::optional<int> loadBalancerPort);
         Options() = default;
+        explicit Options(const ServerGlobalParams* params);
 
         int mode = kIngress | kEgress;
 
@@ -112,6 +111,7 @@ public:
 
         int port = ServerGlobalParams::DefaultDBPort;  // port to bind to
         boost::optional<int> loadBalancerPort;         // accepts load balancer connections
+        boost::optional<int> internalPort;             // an optional port for accepting connections
         std::vector<std::string> ipList;               // addresses to bind to
 #ifndef _WIN32
         bool useUnixSockets = true;  // whether to allow UNIX sockets in ipList
@@ -217,6 +217,14 @@ public:
 
     boost::optional<int> loadBalancerPort() const {
         return _listenerOptions.loadBalancerPort;
+    }
+
+    /**
+     * Returns the internal listening port, if set. This is set and used to separate router from
+     * shard-server traffic when a server acts as both a router and a shard-server.
+     */
+    boost::optional<int> internalPort() const {
+        return _listenerOptions.internalPort;
     }
 
     std::vector<std::pair<SockAddr, int>> getListenerSocketBacklogQueueDepths() const;

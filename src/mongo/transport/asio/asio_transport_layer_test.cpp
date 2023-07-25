@@ -38,6 +38,7 @@
 
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/config.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -50,7 +51,9 @@
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_options_gen.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -300,8 +303,8 @@ private:
     synchronized_value<std::vector<std::unique_ptr<SessionThread>>> _sessions;
 };
 
-std::unique_ptr<transport::AsioTransportLayer> makeTLA(ServiceEntryPoint* sep) {
-    auto options = [] {
+std::unique_ptr<transport::AsioTransportLayer> makeTLA(
+    ServiceEntryPoint* sep, transport::AsioTransportLayer::Options options = [] {
         ServerGlobalParams params;
         params.noUnixSocket = true;
         transport::AsioTransportLayer::Options opts(&params);
@@ -309,7 +312,7 @@ std::unique_ptr<transport::AsioTransportLayer> makeTLA(ServiceEntryPoint* sep) {
         // provided by resmoke.
         opts.port = 0;
         return opts;
-    }();
+    }()) {
     auto tla = std::make_unique<transport::AsioTransportLayer>(options, sep);
     ASSERT_OK(tla->setup());
     ASSERT_OK(tla->start());
@@ -323,6 +326,9 @@ std::unique_ptr<transport::AsioTransportLayer> makeTLA(ServiceEntryPoint* sep) {
 class TestFixture {
 public:
     TestFixture() : _tla{makeTLA(&_sep)} {}
+
+    explicit TestFixture(transport::AsioTransportLayer::Options options)
+        : _tla(makeTLA(&_sep, std::move(options))) {}
 
     ~TestFixture() {
         _sep.endAllSessions({});
@@ -850,6 +856,81 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
 }
 #endif  // _WIN32
 #endif  // MONGO_CONFIG_SSL
+
+class AsioTransportLayerWithInternalPortTest : public unittest::Test {
+public:
+    // We opted to use static ports for simplicity. If this results in test failures due to busy
+    // ports, we may change the fixture, as well as the underlying transport layer, to dynamically
+    // choose the listening ports.
+    static constexpr auto kExternalPort = 22000;
+    static constexpr auto kInternalPort = 22001;
+
+    AsioTransportLayerWithInternalPortTest() {
+        _savedClusterRole =
+            std::exchange(serverGlobalParams.clusterRole, {ClusterRole::RouterServer});
+        _savedTFOClient = std::exchange(transport::gTCPFastOpenClient, false);
+    }
+
+    ~AsioTransportLayerWithInternalPortTest() {
+        serverGlobalParams.clusterRole = _savedClusterRole;
+        transport::gTCPFastOpenClient = _savedTFOClient;
+    }
+
+    void setUp() override {
+        auto options = [] {
+            ServerGlobalParams params;
+            params.noUnixSocket = true;
+            transport::AsioTransportLayer::Options opts(&params);
+            opts.port = kExternalPort;
+            opts.internalPort = kInternalPort;
+            return opts;
+        }();
+        _fixture = std::make_unique<TestFixture>(std::move(options));
+    }
+
+    void tearDown() override {
+        _fixture.reset();
+    }
+
+    auto& fixture() {
+        return *_fixture;
+    }
+
+    auto connect(HostAndPort remote) {
+        const Seconds kTimeout{10};
+        return fixture().tla().connect(
+            remote, transport::ConnectSSLMode::kDisableSSL, kTimeout, {});
+    }
+
+private:
+    RAIIServerParameterControllerForTest _scopedFeature{"featureFlagCohostedRouter", true};
+    std::unique_ptr<TestFixture> _fixture;
+    decltype(serverGlobalParams.clusterRole) _savedClusterRole;
+    bool _savedTFOClient;
+};
+
+TEST_F(AsioTransportLayerWithInternalPortTest, ListensOnBothPorts) {
+    for (auto port : {kInternalPort, kExternalPort}) {
+        HostAndPort remote("localhost", port);
+        ASSERT_OK(connect(remote).getStatus()) << "Unable to connect to " << remote;
+    }
+}
+
+TEST_F(AsioTransportLayerWithInternalPortTest, DifferentiatesConnections) {
+    auto connectTest = [&](int port, bool isInternal) {
+        auto isFromInternalPort = std::make_shared<Notification<bool>>();
+        fixture().sep().setOnStartSession([isFromInternalPort](SessionThread& st) {
+            isFromInternalPort->set(st.session().isFromInternalPort());
+        });
+
+        auto conn = uassertStatusOK(connect({"localhost", port}));
+        ASSERT_FALSE(conn->isFromInternalPort());
+        ASSERT_EQ(isFromInternalPort->get(), isInternal);
+    };
+
+    connectTest(kInternalPort, true);
+    connectTest(kExternalPort, false);
+}
 
 #ifdef __linux__
 
