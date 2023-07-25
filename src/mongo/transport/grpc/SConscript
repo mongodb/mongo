@@ -10,6 +10,7 @@ env.Library(
     source=[
         'client.cpp',
         'client_cache.cpp',
+        'grpc_parameters.idl',
         'grpc_transport_layer.cpp',
         'server.cpp',
         'service.cpp',
