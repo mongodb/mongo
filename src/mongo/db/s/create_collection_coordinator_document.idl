@@ -38,6 +38,12 @@ imports:
     - "mongo/s/request_types/sharded_ddl_commands.idl"
 
 enums:
+    CreateCollectionCoordinatorPhaseLegacy:
+        description: "Current create collection coordinator's operation state."
+        type: string
+        values:
+            kUnset: "unset"
+            kCommit: "commit"
     CreateCollectionCoordinatorPhase:
         description: "Current create collection coordinator's operation state."
         type: string
@@ -64,6 +70,22 @@ structs:
                 description: "Collation value from the targeted unsharded collection if this exists; otherwise, simple-collation"
                 optional: false
 
+    CreateCollectionCoordinatorDocumentLegacy:
+        description: "Object with neccessary fields to create a collection"
+        generate_comparison_operators: false
+        strict: false
+        chained_structs:
+            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+            CreateCollectionRequest: CreateCollectionRequest
+        fields:
+            phase:
+                type: CreateCollectionCoordinatorPhaseLegacy
+                description: "Coordinator phase."
+                default: kUnset
+            translatedRequestParams:
+                type: TranslatedRequestParams
+                description: "The field is populated only once the kTranslateRequest phase is completed"
+                optional: true
     CreateCollectionCoordinatorDocument:
         description: "Object with neccessary fields to create a collection"
         generate_comparison_operators: false

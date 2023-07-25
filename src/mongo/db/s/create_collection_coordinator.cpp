@@ -476,11 +476,17 @@ void broadcastDropCollection(OperationContext* opCtx,
 
 }  // namespace
 
-void CreateCollectionCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
+void CreateCollectionCoordinatorLegacy::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
     cmdInfoBuilder->appendElements(_request.toBSON());
 }
 
-const NamespaceString& CreateCollectionCoordinator::nss() const {
+CreateCollectionResponse CreateCollectionCoordinatorLegacy::getResult(OperationContext* opCtx) {
+    getCompletionFuture().get(opCtx);
+    invariant(_result.is_initialized());
+    return *_result;
+}
+
+const NamespaceString& CreateCollectionCoordinatorLegacy::nss() const {
     // Rely on the resolved request parameters to retrieve the nss to be targeted by the
     // coordinator.
     stdx::lock_guard lk{_docMutex};
@@ -488,10 +494,10 @@ const NamespaceString& CreateCollectionCoordinator::nss() const {
     return _doc.getTranslatedRequestParams()->getNss();
 }
 
-void CreateCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
+void CreateCollectionCoordinatorLegacy::checkIfOptionsConflict(const BSONObj& doc) const {
     // If we have two shard collections on the same namespace, then the arguments must be the same.
-    const auto otherDoc = CreateCollectionCoordinatorDocument::parse(
-        IDLParserContext("CreateCollectionCoordinatorDocument"), doc);
+    const auto otherDoc = CreateCollectionCoordinatorDocumentLegacy::parse(
+        IDLParserContext("CreateCollectionCoordinatorDocumentLegacy"), doc);
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Another create collection with different arguments is already running for the same "
@@ -500,7 +506,7 @@ void CreateCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) con
                 _request.toBSON() == otherDoc.getCreateCollectionRequest().toBSON()));
 }
 
-ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
+ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
@@ -600,7 +606,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
                 // Translate request parameters and persist them in the coordiantor document
                 _doc.setTranslatedRequestParams(_translateRequestParameters(opCtx));
-                _updateStateDocument(opCtx, CreateCollectionCoordinatorDocument(_doc));
+                _updateStateDocument(opCtx, CreateCollectionCoordinatorDocumentLegacy(_doc));
 
                 ShardKeyPattern shardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
                 _createPolicy(opCtx, shardKeyPattern);
@@ -661,7 +667,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 }
 
 boost::optional<CreateCollectionResponse>
-CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
+CreateCollectionCoordinatorLegacy::_checkIfCollectionAlreadyShardedWithSameOptions(
     OperationContext* opCtx) {
     // If the request is part of a C2C synchronisation, the check on the received UUID must be
     // performed first to honor the contract with mongosync (see SERVER-67885 for details).
@@ -778,7 +784,7 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
     return response;
 }
 
-void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx) {
+void CreateCollectionCoordinatorLegacy::_checkCommandArguments(OperationContext* opCtx) {
     LOGV2_DEBUG(5277902, 2, "Create collection _checkCommandArguments", logAttrs(originalNss()));
 
     uassert(ErrorCodes::IllegalOperation,
@@ -831,7 +837,7 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
     }
 }
 
-TranslatedRequestParams CreateCollectionCoordinator::_translateRequestParameters(
+TranslatedRequestParams CreateCollectionCoordinatorLegacy::_translateRequestParameters(
     OperationContext* opCtx) {
     auto performCheckOnCollectionUUID = [this, opCtx](const NamespaceString& resolvedNss) {
         AutoGetCollection coll{
@@ -924,7 +930,7 @@ TranslatedRequestParams CreateCollectionCoordinator::_translateRequestParameters
         resolveCollationForUserQueries(opCtx, resolvedNamespace, _request.getCollation()));
 }
 
-void CreateCollectionCoordinator::_acquireCriticalSections(OperationContext* opCtx) {
+void CreateCollectionCoordinatorLegacy::_acquireCriticalSections(OperationContext* opCtx) {
     ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
         opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
@@ -937,7 +943,7 @@ void CreateCollectionCoordinator::_acquireCriticalSections(OperationContext* opC
         ShardingCatalogClient::kMajorityWriteConcern);
 }
 
-void CreateCollectionCoordinator::_promoteCriticalSectionsToBlockReads(
+void CreateCollectionCoordinatorLegacy::_promoteCriticalSectionsToBlockReads(
     OperationContext* opCtx) const {
     ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
         opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
@@ -949,8 +955,8 @@ void CreateCollectionCoordinator::_promoteCriticalSectionsToBlockReads(
         ShardingCatalogClient::kMajorityWriteConcern);
 }
 
-void CreateCollectionCoordinator::_releaseCriticalSections(OperationContext* opCtx,
-                                                           bool throwIfReasonDiffers) {
+void CreateCollectionCoordinatorLegacy::_releaseCriticalSections(OperationContext* opCtx,
+                                                                 bool throwIfReasonDiffers) {
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
         opCtx,
         originalNss(),
@@ -966,7 +972,7 @@ void CreateCollectionCoordinator::_releaseCriticalSections(OperationContext* opC
         throwIfReasonDiffers);
 }
 
-void CreateCollectionCoordinator::_createCollectionAndIndexes(
+void CreateCollectionCoordinatorLegacy::_createCollectionAndIndexes(
     OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern) {
     LOGV2_DEBUG(5277903, 2, "Create collection _createCollectionAndIndexes", logAttrs(nss()));
 
@@ -1034,8 +1040,8 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(
     _collectionUUID = *sharding_ddl_util::getCollectionUUID(opCtx, nss());
 }
 
-void CreateCollectionCoordinator::_createPolicy(OperationContext* opCtx,
-                                                const ShardKeyPattern& shardKeyPattern) {
+void CreateCollectionCoordinatorLegacy::_createPolicy(OperationContext* opCtx,
+                                                      const ShardKeyPattern& shardKeyPattern) {
     LOGV2_DEBUG(6042001, 2, "Create collection _createPolicy", logAttrs(nss()));
     _collectionEmpty = checkIfCollectionIsEmpty(opCtx, nss());
 
@@ -1049,8 +1055,8 @@ void CreateCollectionCoordinator::_createPolicy(OperationContext* opCtx,
         *_collectionEmpty);
 }
 
-void CreateCollectionCoordinator::_createChunks(OperationContext* opCtx,
-                                                const ShardKeyPattern& shardKeyPattern) {
+void CreateCollectionCoordinatorLegacy::_createChunks(OperationContext* opCtx,
+                                                      const ShardKeyPattern& shardKeyPattern) {
     LOGV2_DEBUG(5277904, 2, "Create collection _createChunks", logAttrs(nss()));
     _initialChunks = _splitPolicy->createFirstChunks(
         opCtx, shardKeyPattern, {*_collectionUUID, ShardingState::get(opCtx)->shardId()});
@@ -1060,7 +1066,7 @@ void CreateCollectionCoordinator::_createChunks(OperationContext* opCtx,
     invariant(!_initialChunks->chunks.empty());
 }
 
-void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(
+void CreateCollectionCoordinatorLegacy::_createCollectionOnNonPrimaryShards(
     OperationContext* opCtx, const OperationSessionInfo& osi) {
     LOGV2_DEBUG(
         5277905, 2, "Create collection _createCollectionOnNonPrimaryShards", logAttrs(nss()));
@@ -1120,8 +1126,8 @@ void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(
     }
 }
 
-void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
-                                          const std::shared_ptr<executor::TaskExecutor>& executor) {
+void CreateCollectionCoordinatorLegacy::_commit(
+    OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor) {
     LOGV2_DEBUG(5277906, 2, "Create collection _commit", logAttrs(nss()));
 
     if (MONGO_unlikely(failAtCommitCreateCollectionCoordinator.shouldFail())) {
@@ -1245,7 +1251,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
           "placementVersion"_attr = _result->getCollectionVersion());
 }
 
-void CreateCollectionCoordinator::_logStartCreateCollection(OperationContext* opCtx) {
+void CreateCollectionCoordinatorLegacy::_logStartCreateCollection(OperationContext* opCtx) {
     BSONObjBuilder collectionDetail;
     const auto serializedNss = NamespaceStringUtil::serialize(originalNss());
     collectionDetail.append("shardKey", *_request.getShardKey());
@@ -1255,7 +1261,7 @@ void CreateCollectionCoordinator::_logStartCreateCollection(OperationContext* op
         opCtx, "shardCollection.start", serializedNss, collectionDetail.obj());
 }
 
-void CreateCollectionCoordinator::_logEndCreateCollection(OperationContext* opCtx) {
+void CreateCollectionCoordinatorLegacy::_logEndCreateCollection(OperationContext* opCtx) {
     BSONObjBuilder collectionDetail;
     _result->getCollectionUUID()->appendToBuilder(&collectionDetail, "uuid");
     collectionDetail.append("placementVersion", _result->getCollectionVersion().toString());
@@ -1268,6 +1274,49 @@ void CreateCollectionCoordinator::_logEndCreateCollection(OperationContext* opCt
                                            "shardCollection.end",
                                            NamespaceStringUtil::serialize(originalNss()),
                                            collectionDetail.obj());
+}
+
+void CreateCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
+    // If we have two shard collections on the same namespace, then the arguments must be the same.
+    const auto otherDoc = CreateCollectionCoordinatorDocumentLegacy::parse(
+        IDLParserContext("CreateCollectionCoordinatorDocument"), doc);
+
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "Another create collection with different arguments is already running for the same "
+            "namespace",
+            SimpleBSONObjComparator::kInstance.evaluate(
+                _request.toBSON() == otherDoc.getCreateCollectionRequest().toBSON()));
+}
+
+void CreateCollectionCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
+    cmdInfoBuilder->appendElements(_request.toBSON());
+}
+
+CreateCollectionResponse CreateCollectionCoordinator::getResult(OperationContext* opCtx) {
+    getCompletionFuture().get(opCtx);
+    // Setting hardcoded values to ensure that the code will not invariant at runtime.
+    CreateCollectionResponse response(ShardVersion::UNSHARDED());
+    response.setCollectionUUID(UUID::gen());
+    return response;
+}
+
+const NamespaceString& CreateCollectionCoordinator::nss() const {
+    // Rely on the resolved request parameters to retrieve the nss to be targeted by the
+    // coordinator.
+    stdx::lock_guard lk{_docMutex};
+    invariant(_doc.getTranslatedRequestParams());
+    return _doc.getTranslatedRequestParams()->getNss();
+}
+
+ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) noexcept {
+    return ExecutorFuture<void>(**executor)
+        .then([] {
+            uasserted(ErrorCodes::NotImplemented,
+                      "The new shardCollection version is still incomplete.");
+        })
+        .onError([](const Status& status) { return status; });
 }
 
 }  // namespace mongo

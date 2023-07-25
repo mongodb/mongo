@@ -119,20 +119,28 @@ public:
 
                 FixedFCVRegion fixedFcvRegion{opCtx};
 
-                const DDLCoordinatorTypeEnum coordType =
-                    feature_flags::gAuthoritativeShardCollection.isEnabled(*fixedFcvRegion)
-                    ? DDLCoordinatorTypeEnum::kCreateCollection
-                    : DDLCoordinatorTypeEnum::kCreateCollectionPre71Compatible;
-
                 auto coordinatorDoc = [&] {
-                    auto doc = CreateCollectionCoordinatorDocument();
-                    doc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
-                    doc.setCreateCollectionRequest(requestToForward);
-                    return doc.toBSON();
+                    // TODO SERVER-79246 Remove ns() the condition over config.system.session
+                    if (feature_flags::gAuthoritativeShardCollection.isEnabled(*fixedFcvRegion) &&
+                        ns() != NamespaceString::kLogicalSessionsNamespace) {
+                        const DDLCoordinatorTypeEnum coordType =
+                            DDLCoordinatorTypeEnum::kCreateCollection;
+                        auto doc = CreateCollectionCoordinatorDocument();
+                        doc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
+                        doc.setCreateCollectionRequest(requestToForward);
+                        return doc.toBSON();
+                    } else {
+                        const DDLCoordinatorTypeEnum coordType =
+                            DDLCoordinatorTypeEnum::kCreateCollectionPre71Compatible;
+                        auto doc = CreateCollectionCoordinatorDocumentLegacy();
+                        doc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
+                        doc.setCreateCollectionRequest(requestToForward);
+                        return doc.toBSON();
+                    }
                 }();
 
                 auto service = ShardingDDLCoordinatorService::getService(opCtx);
-                return checked_pointer_cast<CreateCollectionCoordinator>(
+                return dynamic_pointer_cast<CreateCollectionResponseProvider>(
                     service->getOrCreateInstance(opCtx, std::move(coordinatorDoc)));
             }();
 

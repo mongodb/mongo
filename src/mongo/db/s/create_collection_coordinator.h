@@ -61,21 +61,31 @@
 
 namespace mongo {
 
-class CreateCollectionCoordinator
-    : public RecoverableShardingDDLCoordinator<CreateCollectionCoordinatorDocument,
-                                               CreateCollectionCoordinatorPhaseEnum> {
+// This interface allows the retrieval of the outcome of a shardCollection request (which may be
+// served by different types of Coordinator)
+class CreateCollectionResponseProvider {
 public:
-    using CoordDoc = CreateCollectionCoordinatorDocument;
-    using Phase = CreateCollectionCoordinatorPhaseEnum;
+    virtual CreateCollectionResponse getResult(OperationContext* opCtx) = 0;
+    virtual ~CreateCollectionResponseProvider() {}
+};
 
-    CreateCollectionCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
+class CreateCollectionCoordinatorLegacy
+    : public RecoverableShardingDDLCoordinator<CreateCollectionCoordinatorDocumentLegacy,
+                                               CreateCollectionCoordinatorPhaseLegacyEnum>,
+      public CreateCollectionResponseProvider {
+public:
+    using CoordDoc = CreateCollectionCoordinatorDocumentLegacy;
+    using Phase = CreateCollectionCoordinatorPhaseLegacyEnum;
+
+    CreateCollectionCoordinatorLegacy(ShardingDDLCoordinatorService* service,
+                                      const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "CreateCollectionCoordinator", initialState),
           _request(_doc.getCreateCollectionRequest()),
           _critSecReason(BSON("command"
                               << "createCollection"
                               << "ns" << NamespaceStringUtil::serialize(originalNss()))) {}
 
-    ~CreateCollectionCoordinator() = default;
+    ~CreateCollectionCoordinatorLegacy() = default;
 
 
     void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
@@ -86,18 +96,14 @@ public:
      * Waits for the termination of the parent DDLCoordinator (so all the resources are liberated)
      * and then return the
      */
-    CreateCollectionResponse getResult(OperationContext* opCtx) {
-        getCompletionFuture().get(opCtx);
-        invariant(_result.is_initialized());
-        return *_result;
-    }
+    CreateCollectionResponse getResult(OperationContext* opCtx) override;
 
 protected:
     const NamespaceString& nss() const override;
 
 private:
     StringData serializePhase(const Phase& phase) const override {
-        return CreateCollectionCoordinatorPhase_serializer(phase);
+        return CreateCollectionCoordinatorPhaseLegacy_serializer(phase);
     }
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -176,6 +182,46 @@ private:
     std::unique_ptr<InitialSplitPolicy> _splitPolicy;
     boost::optional<InitialSplitPolicy::ShardCollectionConfig> _initialChunks;
     boost::optional<bool> _collectionEmpty;
+};
+
+class CreateCollectionCoordinator
+    : public RecoverableShardingDDLCoordinator<CreateCollectionCoordinatorDocument,
+                                               CreateCollectionCoordinatorPhaseEnum>,
+      public CreateCollectionResponseProvider {
+public:
+    using CoordDoc = CreateCollectionCoordinatorDocument;
+    using Phase = CreateCollectionCoordinatorPhaseEnum;
+
+    CreateCollectionCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
+        : RecoverableShardingDDLCoordinator(service, "CreateCollectionCoordinator", initialState),
+          _request(_doc.getCreateCollectionRequest()),
+          _critSecReason(BSON("command"
+                              << "createCollection"
+                              << "ns" << NamespaceStringUtil::serialize(originalNss()))) {}
+
+    ~CreateCollectionCoordinator() = default;
+
+
+    void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
+
+    void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
+
+    CreateCollectionResponse getResult(OperationContext* opCtx) override;
+
+protected:
+    const NamespaceString& nss() const override;
+
+private:
+    StringData serializePhase(const Phase& phase) const override {
+        return CreateCollectionCoordinatorPhase_serializer(phase);
+    }
+
+    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                  const CancellationToken& token) noexcept override;
+
+    mongo::CreateCollectionRequest _request;
+
+    const BSONObj _critSecReason;
 };
 
 }  // namespace mongo
