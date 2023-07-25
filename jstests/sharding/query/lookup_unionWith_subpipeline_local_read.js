@@ -15,7 +15,15 @@ load('jstests/aggregation/extras/utils.js');  // For arrayEq()
 load("jstests/libs/fail_point_util.js");      // for configureFailPoint.
 load("jstests/libs/log.js");                  // For findMatchingLogLines.
 
-const st = new ShardingTest({name: jsTestName(), mongos: 1, shards: 2, rs: {nodes: 2}});
+const st = new ShardingTest({
+    name: jsTestName(),
+    mongos: 1,
+    shards: 2,
+    rs: {
+        nodes: 2,
+        setParameter: {logComponentVerbosity: tojson({sharding: 2, command: 1})},
+    },
+});
 
 // In this test we perform writes which we expect to read on a secondary, so we need to enable
 // causal consistency.
