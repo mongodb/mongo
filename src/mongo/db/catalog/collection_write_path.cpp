@@ -205,7 +205,8 @@ Status insertDocumentsImpl(OperationContext* opCtx,
                            bool fromMigrate) {
     const auto& nss = collection->ns();
 
-    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX) ||
+            (nss.isOplog() && opCtx->lockState()->isWriteLocked()));
 
     const size_t count = std::distance(begin, end);
 
@@ -359,7 +360,8 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
         return status;
     }
 
-    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX) ||
+            (nss.isOplog() && opCtx->lockState()->isWriteLocked()));
 
     RecordId recordId;
     if (collection->isClustered()) {
