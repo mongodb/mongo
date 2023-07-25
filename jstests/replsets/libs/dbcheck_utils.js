@@ -24,11 +24,8 @@ export const dbCheckCompleted = (db) => {
     return db.currentOp().inprog.filter(x => x["desc"] == "dbCheck")[0] === undefined;
 };
 
-// Wait for dbCheck to complete (on both primaries and secondaries).  Fails an assertion if
-// dbCheck takes longer than maxMs.
-export const awaitDbCheckCompletion = (replSet, db, collName, maxKey, maxSize, maxCount) => {
-    let start = Date.now();
-
+// Wait for dbCheck to complete (on both primaries and secondaries).
+export const awaitDbCheckCompletion = (replSet, db) => {
     assert.soon(() => dbCheckCompleted(db), "dbCheck timed out");
     replSet.awaitSecondaryNodes();
     replSet.awaitReplication();
@@ -52,20 +49,26 @@ export const resetAndInsert = (replSet, db, collName, nDocs) => {
 };
 
 // Run dbCheck with given parameters and potentially wait for completion.
-export const runDbCheck = (replSet,
-                           db,
-                           collName,
-                           maxDocsPerBatch,
-                           writeConcern = {
-                               w: 'majority'
-                           },
-                           awaitCompletion = false) => {
-    assert.commandWorked(db.runCommand({
-        dbCheck: collName,
-        maxDocsPerBatch: maxDocsPerBatch,
-        batchWriteConcern: writeConcern,
-    }));
+export const runDbCheck = (replSet, db, collName, parameters = {}, awaitCompletion = false) => {
+    let dbCheckCommand = {dbCheck: collName};
+    for (let parameter in parameters) {
+        dbCheckCommand[parameter] = parameters[parameter];
+    }
+    assert.commandWorked(db.runCommand(dbCheckCommand));
     if (awaitCompletion) {
         awaitDbCheckCompletion(replSet, db);
     }
+};
+
+export const checkHealthlog = (healthlog, query, numExpected, timeout = 60 * 1000) => {
+    let query_count;
+    assert.soon(
+        function() {
+            query_count = healthlog.find(query).itcount();
+            return query_count == numExpected;
+        },
+        `dbCheck command didn't complete, health log query returned ${
+            query_count} entries, expected ${numExpected}: ` +
+            query,
+        timeout);
 };

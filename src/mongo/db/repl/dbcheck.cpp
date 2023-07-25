@@ -128,6 +128,11 @@ std::pair<bool, BSONObj> expectedFound(const boost::optional<T>& expected,
     return std::pair<bool, BSONObj>(true, obj);
 }
 
+}  // namespace
+
+/**
+ * Returns corresponding string for enums.
+ */
 std::string renderForHealthLog(OplogEntriesEnum op) {
     switch (op) {
         case OplogEntriesEnum::Batch:
@@ -143,7 +148,18 @@ std::string renderForHealthLog(OplogEntriesEnum op) {
     MONGO_UNREACHABLE;
 }
 
-}  // namespace
+std::string renderForHealthLog(DbCheckValidationModeEnum validateMode) {
+    switch (validateMode) {
+        case DbCheckValidationModeEnum::dataConsistency:
+            return "dataConsistency";
+        case DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck:
+            return "dataConsistencyAndMissingIndexKeysCheck";
+        case DbCheckValidationModeEnum::extraIndexKeysCheck:
+            return "extraIndexKeysCheck";
+    }
+    MONGO_UNREACHABLE;
+}
+
 /**
  * Fills in the timestamp and scope, which are always the same for dbCheck's entries.
  */
@@ -514,13 +530,18 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
         case OplogEntriesEnum::Start:
             [[fallthrough]];
         case OplogEntriesEnum::Stop:
-            const auto healthLogEntry = mongo::dbCheckHealthLogEntry(boost::none /*nss*/,
-                                                                     boost::none /*collectionUUID*/,
-                                                                     SeverityEnum::Info,
-                                                                     "",
-                                                                     type,
-                                                                     boost::none /*data*/
-            );
+            const auto invocation = DbCheckOplogStartStop::parse(ctx, cmd);
+            auto healthLogEntry = mongo::dbCheckHealthLogEntry(boost::none /*nss*/,
+                                                               boost::none /*collectionUUID*/,
+                                                               SeverityEnum::Info,
+                                                               "",
+                                                               type,
+                                                               boost::none /*data*/);
+            const auto secondaryIndexCheckParameters =
+                invocation.getSecondaryIndexCheckParameters();
+            if (secondaryIndexCheckParameters) {
+                healthLogEntry->setData(secondaryIndexCheckParameters.value().toBSON());
+            }
             HealthLogInterface::get(Client::getCurrent()->getServiceContext())
                 ->log(*healthLogEntry);
             return Status::OK();

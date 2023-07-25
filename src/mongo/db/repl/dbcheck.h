@@ -68,6 +68,12 @@ class OpTime;
 }
 
 /**
+ * Converts OplogEntriesEnum or DbCheckValidationModeEnum into string for health log.
+ */
+std::string renderForHealthLog(OplogEntriesEnum op);
+std::string renderForHealthLog(DbCheckValidationModeEnum validateMode);
+
+/**
  * Logs an entry into 'local.system.healthLog'.
  *
  * The parameters nss and collectionUUID are boost::optional because they are not present in

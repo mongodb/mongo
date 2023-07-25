@@ -83,6 +83,19 @@ enums:
 
 
 structs:
+  SecondaryIndexCheckParameters:
+    description: "User-specified parameters for secondary index checks"
+    fields:
+      validateMode: 
+        type: DbCheckValidationMode
+        default: dataConsistency
+      secondaryIndex:
+        type: string
+        default: StringData("")
+      skipLookupForExtraKeys:
+        type: safeBool
+        default: false
+
   DbCheckSingleInvocation:
     description: "Command object for dbCheck invocation"
     fields:
@@ -201,6 +214,10 @@ structs:
       readTimestamp:
         type: timestamp
         optional: false
+      secondaryIndexCheckParameters:
+        type: SecondaryIndexCheckParameters
+        cpp_name: secondaryIndexCheckParameters
+        optional: true
 
   DbCheckOplogCollection:
     description: "Oplog entry for dbCheck collection metadata"
@@ -238,3 +255,7 @@ structs:
       type:
         type: OplogEntries
         cpp_name: type
+      secondaryIndexCheckParameters:
+        type: SecondaryIndexCheckParameters
+        cpp_name: secondaryIndexCheckParameters
+        optional: true

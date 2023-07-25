@@ -17,6 +17,7 @@ const replSet = new ReplSetTest({
 });
 replSet.startSet();
 replSet.initiateWithHighElectionTimeout();
+
 const primary = replSet.getPrimary();
 const db = primary.getDB(dbName);
 const col = db[colName];
@@ -94,8 +95,8 @@ function testValidParameter() {
         validateMode: "dataConsistency",
     }));
 
-    // dataConsistencyAndMissingIndexKeysCheck is a supported enum for the validateMode.
-    // field
+    // dataConsistencyAndMissingIndexKeysCheck is a supported enum for the validateMode
+    // field.
     assert.commandWorked(db.runCommand({
         dbCheck: colName,
         validateMode: "dataConsistencyAndMissingIndexKeysCheck",

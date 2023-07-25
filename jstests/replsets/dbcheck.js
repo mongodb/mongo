@@ -12,10 +12,12 @@
 
 import {
     awaitDbCheckCompletion,
+    checkHealthlog,
     clearHealthLog,
     dbCheckCompleted,
     forEachNode,
     forEachSecondary,
+    runDbCheck
 } from "jstests/replsets/libs/dbcheck_utils.js";
 
 (function() {
@@ -159,9 +161,8 @@ function simpleTestConsistent() {
 
     assert.neq(primary, undefined);
     let db = primary.getDB(dbName);
-    assert.commandWorked(db.runCommand({"dbCheck": multiBatchSimpleCollName}));
 
-    awaitDbCheckCompletion(replSet, db, multiBatchSimpleCollName);
+    runDbCheck(replSet, db, multiBatchSimpleCollName, {}, true);
 
     checkLogAllConsistent(primary);
     checkTotalCounts(primary, db[multiBatchSimpleCollName]);
@@ -263,10 +264,8 @@ function testDbCheckParameters() {
     let start = 1000;
     let end = 9000;
 
-    assert.commandWorked(
-        db.runCommand({dbCheck: multiBatchSimpleCollName, minKey: start, maxKey: end}));
-
-    awaitDbCheckCompletion(replSet, db, multiBatchSimpleCollName, end);
+    let dbCheckParameters = {minKey: start, maxKey: end};
+    runDbCheck(replSet, db, multiBatchSimpleCollName, dbCheckParameters, true);
 
     checkEntryBounds(start, end);
 
@@ -275,20 +274,19 @@ function testDbCheckParameters() {
 
     let maxCount = 5000;
 
-    // and do the same with a count constraint.
-    assert.commandWorked(db.runCommand(
-        {dbCheck: multiBatchSimpleCollName, minKey: start, maxKey: end, maxCount: maxCount}));
+    // Do the same with a count constraint. We expect it to reach the count limit before reaching
+    // maxKey.
+    dbCheckParameters = {minKey: start, maxKey: end, maxCount: maxCount};
+    runDbCheck(replSet, db, multiBatchSimpleCollName, dbCheckParameters, true);
 
-    // We expect it to reach the count limit before reaching maxKey.
-    awaitDbCheckCompletion(replSet, db, multiBatchSimpleCollName, undefined, undefined, maxCount);
     checkEntryBounds(start, start + maxCount);
 
     // Finally, do the same with a size constraint.
     clearHealthLog(replSet);
     let maxSize = maxCount * docSize;
-    assert.commandWorked(db.runCommand(
-        {dbCheck: multiBatchSimpleCollName, minKey: start, maxKey: end, maxSize: maxSize}));
-    awaitDbCheckCompletion(replSet, db, multiBatchSimpleCollName, end, maxSize);
+    dbCheckParameters = {minKey: start, maxKey: end, maxSize: maxSize};
+    runDbCheck(replSet, db, multiBatchSimpleCollName, dbCheckParameters, true);
+
     checkEntryBounds(start, start + maxCount);
 
     // The remaining tests only run on debug builds because they rely on dbCheck health-logging
@@ -304,21 +302,15 @@ function testDbCheckParameters() {
         // Validate custom maxDocsPerBatch
         clearHealthLog(replSet);
         const maxDocsPerBatch = 100;
-        assert.commandWorked(
-            db.runCommand({dbCheck: multiBatchSimpleCollName, maxDocsPerBatch: maxDocsPerBatch}));
+        runDbCheck(replSet, db, multiBatchSimpleCollName, {maxDocsPerBatch: maxDocsPerBatch});
 
-        const healthlog = db.getSiblingDB('local').system.healthlog;
-        assert.soon(function() {
-            const expectedBatches = multiBatchSimpleCollSize / maxDocsPerBatch +
-                (multiBatchSimpleCollSize % maxDocsPerBatch ? 1 : 0);
-            return (healthlog.find({"operation": "dbCheckBatch"}).itcount() == expectedBatches);
-        }, "dbCheck doesn't seem to complete", 60 * 1000);
+        let query = {"operation": "dbCheckBatch"};
+        const expectedBatches = multiBatchSimpleCollSize / maxDocsPerBatch +
+            (multiBatchSimpleCollSize % maxDocsPerBatch ? 1 : 0);
+        checkHealthlog(healthlog, query, expectedBatches);
 
-        assert.eq(
-            db.getSiblingDB('local')
-                .system.healthlog.find({"operation": "dbCheckBatch", "data.count": maxDocsPerBatch})
-                .itcount(),
-            multiBatchSimpleCollSize / maxDocsPerBatch);
+        query = {"operation": "dbCheckBatch", "data.count": maxDocsPerBatch};
+        checkHealthlog(healthlog, query, multiBatchSimpleCollSize / maxDocsPerBatch);
     }
     {
         // Validate custom maxBytesPerBatch
@@ -331,20 +323,17 @@ function testDbCheckParameters() {
         coll.insertMany([...Array(nDocs).keys()].map(x => ({a: 'a'.repeat(1024 * 1024)})),
                         {ordered: false});
         const maxBytesPerBatch = 1024 * 1024;
-        assert.commandWorked(db.getSiblingDB("maxBytesPerBatch").runCommand({
-            dbCheck: coll.getName(),
+
+        runDbCheck(replSet, db.getSiblingDB("maxBytesPerBatch"), coll.getName(), {
             maxBytesPerBatch: maxBytesPerBatch
-        }));
+        });
 
         // Confirm dbCheck logs nDocs batches.
-        assert.soon(function() {
-            return (healthlog.find({"operation": "dbCheckBatch"}).itcount() == nDocs);
-        }, "dbCheck doesn't seem to complete", 60 * 1000);
+        let query = {"operation": "dbCheckBatch"};
+        checkHealthlog(healthlog, query, nDocs);
 
-        assert.eq(db.getSiblingDB('local')
-                      .system.healthlog.find({"operation": "dbCheckBatch", "data.count": 1})
-                      .itcount(),
-                  nDocs);
+        query = {"operation": "dbCheckBatch", "data.count": 1};
+        checkHealthlog(healthlog, query, nDocs);
     }
 }
 
@@ -387,7 +376,7 @@ function testSucceedsOnStepdown() {
     let db = primary.getDB(dbName);
 
     let nodeId = replSet.getNodeId(primary);
-    assert.commandWorked(db.runCommand({dbCheck: multiBatchSimpleCollName}));
+    runDbCheck(replSet, db, multiBatchSimpleCollName);
 
     // Step down the primary.
     assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 0, force: true}));
@@ -456,17 +445,13 @@ function simpleTestCatchesExtra() {
         const primary = replSet.getPrimary();
         const db = primary.getDB(dbName);
 
-        assert.commandWorked(db.runCommand({dbCheck: collName}));
-        awaitDbCheckCompletion(replSet, db, collName);
+        runDbCheck(replSet, db, collName, {}, true);
     }
-    assert.soon(function() {
-        return (replSet.getSecondary()
-                    .getDB("local")
-                    .system.healthlog.find({"operation": "dbCheckStop"})
-                    .itcount() === 1);
-    }, "dbCheck didn't complete on secondary");
-    const errors = replSet.getSecondary().getDB("local").system.healthlog.find(
-        {operation: /dbCheck.*/, severity: "error"});
+
+    let query = {"operation": "dbCheckStop"};
+    const healthlog = replSet.getSecondary().getDB("local").system.healthlog;
+    checkHealthlog(healthlog, query, 1);
+    const errors = healthlog.find({operation: /dbCheck.*/, severity: "error"});
 
     assert.eq(errors.count(),
               1,

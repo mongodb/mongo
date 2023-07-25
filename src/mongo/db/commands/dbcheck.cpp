@@ -134,57 +134,6 @@ repl::OpTime _logOp(OperationContext* opCtx,
 }
 
 /**
- * RAII-style class, which logs dbCheck start and stop events in the healthlog and replicates them.
- */
-class DbCheckStartAndStopLogger {
-public:
-    DbCheckStartAndStopLogger(OperationContext* opCtx) : _opCtx(opCtx) {
-        try {
-            const auto healthLogEntry = dbCheckHealthLogEntry(boost::none /*nss*/,
-                                                              boost::none /*collectionUUID*/,
-                                                              SeverityEnum::Info,
-                                                              "",
-                                                              OplogEntriesEnum::Start,
-                                                              boost::none /*data*/
-            );
-            HealthLogInterface::get(_opCtx->getServiceContext())->log(*healthLogEntry);
-
-            DbCheckOplogStartStop oplogEntry;
-            const auto nss = NamespaceString::kAdminCommandNamespace;
-            oplogEntry.setNss(nss);
-            oplogEntry.setType(OplogEntriesEnum::Start);
-            _logOp(_opCtx, nss, boost::none /*uuid*/, oplogEntry.toBSON());
-        } catch (const DBException&) {
-            LOGV2(6202200, "Could not log start event");
-        }
-    }
-
-    ~DbCheckStartAndStopLogger() {
-        try {
-            DbCheckOplogStartStop oplogEntry;
-            const auto nss = NamespaceString::kAdminCommandNamespace;
-            oplogEntry.setNss(nss);
-            oplogEntry.setType(OplogEntriesEnum::Stop);
-            _logOp(_opCtx, nss, boost::none /*uuid*/, oplogEntry.toBSON());
-
-            const auto healthLogEntry = dbCheckHealthLogEntry(boost::none /*nss*/,
-                                                              boost::none /*collectionUUID*/,
-                                                              SeverityEnum::Info,
-                                                              "",
-                                                              OplogEntriesEnum::Stop,
-                                                              boost::none /*data*/
-            );
-            HealthLogInterface::get(_opCtx->getServiceContext())->log(*healthLogEntry);
-        } catch (const DBException&) {
-            LOGV2(6202201, "Could not log stop event");
-        }
-    }
-
-private:
-    OperationContext* _opCtx;
-};
-
-/**
  * All the information needed to run dbCheck on a single collection.
  */
 struct DbCheckCollectionInfo {
@@ -199,6 +148,77 @@ struct DbCheckCollectionInfo {
     int64_t maxBytesPerBatch;
     int64_t maxBatchTimeMillis;
     WriteConcernOptions writeConcern;
+    boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters;
+};
+
+/**
+ * RAII-style class, which logs dbCheck start and stop events in the healthlog and replicates them.
+ * The parameter info is boost::none when for a fullDatabaseRun where all collections are not
+ * replicated.
+ */
+// TODO SERVER-79132: Remove boost::optional from _info once dbCheck no longer allows for full
+// database run
+class DbCheckStartAndStopLogger {
+    boost::optional<DbCheckCollectionInfo> _info;
+
+public:
+    DbCheckStartAndStopLogger(OperationContext* opCtx, boost::optional<DbCheckCollectionInfo> info)
+        : _info(info), _opCtx(opCtx) {
+        try {
+            DbCheckOplogStartStop oplogEntry;
+            const auto nss = NamespaceString::kAdminCommandNamespace;
+            oplogEntry.setNss(nss);
+            oplogEntry.setType(OplogEntriesEnum::Start);
+
+            auto healthLogEntry = dbCheckHealthLogEntry(boost::none /*nss*/,
+                                                        boost::none /*collectionUUID*/,
+                                                        SeverityEnum::Info,
+                                                        "",
+                                                        OplogEntriesEnum::Start,
+                                                        boost::none /*data*/);
+            if (_info && _info.value().secondaryIndexCheckParameters) {
+                oplogEntry.setSecondaryIndexCheckParameters(
+                    _info.value().secondaryIndexCheckParameters.value());
+                healthLogEntry->setData(
+                    _info.value().secondaryIndexCheckParameters.value().toBSON());
+            }
+
+            HealthLogInterface::get(_opCtx->getServiceContext())->log(*healthLogEntry);
+            _logOp(_opCtx, nss, boost::none /*uuid*/, oplogEntry.toBSON());
+        } catch (const DBException&) {
+            LOGV2(6202200, "Could not log start event");
+        }
+    }
+
+    ~DbCheckStartAndStopLogger() {
+        try {
+            DbCheckOplogStartStop oplogEntry;
+            const auto nss = NamespaceString::kAdminCommandNamespace;
+            oplogEntry.setNss(nss);
+            oplogEntry.setType(OplogEntriesEnum::Stop);
+
+            auto healthLogEntry = dbCheckHealthLogEntry(boost::none /*nss*/,
+                                                        boost::none /*collectionUUID*/,
+                                                        SeverityEnum::Info,
+                                                        "",
+                                                        OplogEntriesEnum::Stop,
+                                                        boost::none /*data*/);
+            if (_info && _info.value().secondaryIndexCheckParameters) {
+                oplogEntry.setSecondaryIndexCheckParameters(
+                    _info.value().secondaryIndexCheckParameters.value());
+                healthLogEntry->setData(
+                    _info.value().secondaryIndexCheckParameters.value().toBSON());
+            }
+
+            _logOp(_opCtx, nss, boost::none /*uuid*/, oplogEntry.toBSON());
+            HealthLogInterface::get(_opCtx->getServiceContext())->log(*healthLogEntry);
+        } catch (const DBException&) {
+            LOGV2(6202201, "Could not log stop event");
+        }
+    }
+
+private:
+    OperationContext* _opCtx;
 };
 
 /**
@@ -209,8 +229,10 @@ using DbCheckRun = std::vector<DbCheckCollectionInfo>;
 std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                                 const DatabaseName& dbName,
                                                 const DbCheckSingleInvocation& invocation) {
-    if (!repl::feature_flags::gSecondaryIndexChecksInDbCheck.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    const auto gSecondaryIndexChecksInDbCheck =
+        repl::feature_flags::gSecondaryIndexChecksInDbCheck.isEnabled(
+            serverGlobalParams.featureCompatibility);
+    if (!gSecondaryIndexChecksInDbCheck) {
         uassert(ErrorCodes::InvalidOptions,
                 "When featureFlagSecondaryIndexChecksInDbCheck is not enabled, the validateMode "
                 "parameter cannot be set.",
@@ -256,6 +278,19 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
     const auto maxDocsPerBatch = invocation.getMaxDocsPerBatch();
     const auto maxBytesPerBatch = invocation.getMaxBytesPerBatch();
     const auto maxBatchTimeMillis = invocation.getMaxBatchTimeMillis();
+    boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters = boost::none;
+    if (gSecondaryIndexChecksInDbCheck) {
+        secondaryIndexCheckParameters = SecondaryIndexCheckParameters();
+        secondaryIndexCheckParameters->setSkipLookupForExtraKeys(
+            invocation.getSkipLookupForExtraKeys());
+        if (invocation.getValidateMode()) {
+            secondaryIndexCheckParameters->setValidateMode(invocation.getValidateMode().value());
+        }
+        if (invocation.getSecondaryIndex()) {
+            secondaryIndexCheckParameters->setSecondaryIndex(
+                invocation.getSecondaryIndex().value());
+        }
+    }
     const auto info = DbCheckCollectionInfo{nss,
                                             agc->uuid(),
                                             start,
@@ -266,7 +301,9 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                             maxDocsPerBatch,
                                             maxBytesPerBatch,
                                             maxBatchTimeMillis,
-                                            invocation.getBatchWriteConcern()};
+                                            invocation.getBatchWriteConcern(),
+                                            secondaryIndexCheckParameters};
+
     auto result = std::make_unique<DbCheckRun>();
     result->push_back(info);
     return result;
@@ -305,7 +342,8 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
                                    maxDocsPerBatch,
                                    maxBytesPerBatch,
                                    maxBatchTimeMillis,
-                                   invocation.getBatchWriteConcern()};
+                                   invocation.getBatchWriteConcern(),
+                                   boost::none};
         result->push_back(info);
         return true;
     };
@@ -382,7 +420,14 @@ protected:
         auto uniqueOpCtx = tc->makeOperationContext();
         auto opCtx = uniqueOpCtx.get();
 
-        DbCheckStartAndStopLogger startStop(opCtx);
+        // DbCheckRun will be empty in a fullDatabaseRun where all collections are not replicated.
+        // TODO SERVER-79132: Remove this logic once dbCheck no longer allows for a full database
+        // run
+        boost::optional<DbCheckCollectionInfo> info = boost::none;
+        if (!_run->empty()) {
+            info = _run->front();
+        }
+        DbCheckStartAndStopLogger startStop(opCtx, info);
 
         for (const auto& coll : *_run) {
             try {
@@ -664,6 +709,9 @@ private:
         batch.setMinKey(first);
         batch.setMaxKey(BSONKey(hasher->lastKey()));
         batch.setReadTimestamp(*readTimestamp);
+        if (info.secondaryIndexCheckParameters) {
+            batch.setSecondaryIndexCheckParameters(info.secondaryIndexCheckParameters);
+        }
 
         // Send information on this batch over the oplog.
         BatchStats result;
