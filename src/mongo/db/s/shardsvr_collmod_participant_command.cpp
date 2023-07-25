@@ -95,14 +95,10 @@ public:
                         "collMod unblocking should always be on a time-series collection",
                         timeseries::getTimeseriesOptions(opCtx, ns(), true));
                 auto bucketNs = ns().makeTimeseriesBucketsNamespace();
-
-                try {
-                    forceShardFilteringMetadataRefresh(opCtx, bucketNs);
-                } catch (const DBException&) {
-                    // If the refresh fails, then set the placement version to UNKNOWN and let a
-                    // future operation to refresh the metadata.
-                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+                {
+                    // Clear the filtering metadata before releasing the critical section to prevent
+                    // scenarios where a stepDown/stepUp will leave the node with wrong metadata.
+                    // Cleanup on secondary nodes is performed by the release of the section.
                     AutoGetCollection autoColl(opCtx, bucketNs, MODE_IX);
                     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
                                                                                          bucketNs)
