@@ -45,7 +45,7 @@ namespace SnapshotHelper {
  *
  * Returns true if the state is such that we should read at last applied, false otherwise.
  */
-bool changeReadSourceIfNeeded(OperationContext* opCtx, const NamespaceString& nss);
+bool changeReadSourceIfNeeded(OperationContext* opCtx, boost::optional<const NamespaceString&> nss);
 
 /**
  * Returns true if 'collectionMin' is not compatible with 'readTimestamp'. They are incompatible

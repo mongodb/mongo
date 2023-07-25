@@ -259,7 +259,7 @@ void assertReadConcernSupported(const CollectionPtr& coll,
     }
 }
 
-void checkInvariantsForReadOptions(const NamespaceString& nss,
+void checkInvariantsForReadOptions(boost::optional<const NamespaceString&> nss,
                                    const boost::optional<LogicalTime>& afterClusterTime,
                                    const RecoveryUnit::ReadSource& readSource,
                                    const boost::optional<Timestamp>& readTimestamp,
@@ -295,8 +295,8 @@ void checkInvariantsForReadOptions(const NamespaceString& nss,
     // unintentionally see inconsistent data during a batch. Certain namespaces are applied
     // serially in oplog application, and therefore can be safely read without taking the PBWM
     // lock or reading at a timestamp.
-    if (readSource == RecoveryUnit::ReadSource::kNoTimestamp && callerWasConflicting &&
-        !nss.mustBeAppliedInOwnOplogBatch() && shouldReadAtLastApplied) {
+    if (readSource == RecoveryUnit::ReadSource::kNoTimestamp && callerWasConflicting && nss &&
+        !nss->mustBeAppliedInOwnOplogBatch() && shouldReadAtLastApplied) {
         LOGV2_FATAL(4728700,
                     "Reading from replicated collection on a secondary without read timestamp "
                     "or PBWM lock",
@@ -553,10 +553,6 @@ const NamespaceString& AutoGetCollectionForRead::getNss() const {
 
 namespace {
 
-void openSnapshot(OperationContext* opCtx) {
-    opCtx->recoveryUnit()->preallocateSnapshot();
-}
-
 /**
  * Used as a return value for the following function.
  */
@@ -609,7 +605,8 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
     std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsBegin,
     std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsEnd,
     const repl::ReadConcernArgs& readConcernArgs,
-    bool callerExpectedToConflictWithSecondaryBatchApplication) {
+    bool callerExpectedToConflictWithSecondaryBatchApplication,
+    bool allowReadSourceChange) {
     // Loop until we get a consistent catalog and snapshot or throw an exception.
     while (true) {
         // The read source used can change depending on replication state, so we must fetch the repl
@@ -628,22 +625,28 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
         // used to determine if the read source needs to be changed and we only do this if the
         // original read source is kNoTimestamp or kLastApplied. If it's neither of the two we can
         // safely continue.
-        NamespaceString nss;
-        try {
-            nss = catalogBeforeSnapshot->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            invariant(nsOrUUID.isUUID());
+        NamespaceString nssStorage;
+        boost::optional<const NamespaceString&> nss = nssStorage;
 
-            const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
-            if (readSource == RecoveryUnit::ReadSource::kNoTimestamp ||
-                readSource == RecoveryUnit::ReadSource::kLastApplied) {
-                throw;
-            }
+        try {
+            nssStorage = catalogBeforeSnapshot->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            // The UUID cannot be resolved to a namespace in the latest catalog, but we allow the
+            // call to continue which eventually calls
+            // CollectionCatalog::establishConsistentCollection() which will read from the durable
+            // catalog to create a new collection instance if it exists in the snapshot. This allows
+            // query yields, which use UUID, to restore where the collection is committed to the
+            // storage engine but not yet committed into the local catalog.
+            invariant(nsOrUUID.isUUID());
+            nss = boost::none;
         }
 
         // This may modify the read source on the recovery unit for opCtx if the current read source
         // is either kNoTimestamp or kLastApplied.
-        const bool shouldReadAtLastApplied = SnapshotHelper::changeReadSourceIfNeeded(opCtx, nss);
+        bool shouldReadAtLastApplied = false;
+        if (allowReadSourceChange) {
+            shouldReadAtLastApplied = SnapshotHelper::changeReadSourceIfNeeded(opCtx, nss);
+        }
 
         const auto resolvedSecondaryNamespaces = resolveSecondaryNamespacesOrUUIDs(
             opCtx, catalogBeforeSnapshot.get(), secondaryNssOrUUIDsBegin, secondaryNssOrUUIDsEnd);
@@ -657,7 +660,7 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
         // catalog.
         establishCappedSnapshotIfNeeded(opCtx, catalogBeforeSnapshot, nsOrUUID);
 
-        openSnapshot(opCtx);
+        opCtx->recoveryUnit()->preallocateSnapshot();
 
         const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
         const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
@@ -805,22 +808,37 @@ inline CatalogStateForNamespace acquireCatalogStateForNamespace(
     bool callerExpectedToConflictWithSecondaryBatchApplication,
     const AutoGetCollection::Options& options) {
 
-    auto [catalog, isAnySecondaryNssShardedOrAView, readSource, readTimestamp] =
-        getConsistentCatalogAndSnapshot(opCtx,
-                                        nsOrUUID,
-                                        options._secondaryNssOrUUIDsBegin,
-                                        options._secondaryNssOrUUIDsEnd,
-                                        readConcernArgs,
-                                        callerExpectedToConflictWithSecondaryBatchApplication);
+    bool needsRetry = false;
+    while (true) {
+        auto [catalog, isAnySecondaryNssShardedOrAView, readSource, readTimestamp] =
+            getConsistentCatalogAndSnapshot(opCtx,
+                                            nsOrUUID,
+                                            options._secondaryNssOrUUIDsBegin,
+                                            options._secondaryNssOrUUIDsEnd,
+                                            readConcernArgs,
+                                            callerExpectedToConflictWithSecondaryBatchApplication,
+                                            /*allowReadSourceChange=*/!needsRetry);
 
-    auto [resolvedNss, collection, view] =
-        getCollectionForLockFreeRead(opCtx, catalog, readTimestamp, nsOrUUID, options);
+        auto [resolvedNss, collection, view] =
+            getCollectionForLockFreeRead(opCtx, catalog, readTimestamp, nsOrUUID, options);
 
-    return CatalogStateForNamespace{std::move(catalog),
-                                    isAnySecondaryNssShardedOrAView,
-                                    std::move(resolvedNss),
-                                    collection,
-                                    std::move(view)};
+        // If we setup using UUID and the resolved namespace is pointing to an unreplicated
+        // namespace (or the oplog), then we should retry the setup after resetting the read source
+        // here using the resolved namespace. This only needs to be done once.
+        if (nsOrUUID.isUUID() && !collection->ns().isReplicated() && !needsRetry) {
+            opCtx->recoveryUnit()->abandonSnapshot();
+            [[maybe_unused]] bool shouldReadAtLastApplied =
+                SnapshotHelper::changeReadSourceIfNeeded(opCtx, collection->ns());
+            needsRetry = true;
+            continue;
+        }
+
+        return CatalogStateForNamespace{std::move(catalog),
+                                        isAnySecondaryNssShardedOrAView,
+                                        std::move(resolvedNss),
+                                        collection,
+                                        std::move(view)};
+    }
 }
 
 boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
