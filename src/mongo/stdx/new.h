@@ -36,7 +36,11 @@
 namespace mongo {
 namespace stdx {
 
-#if __cplusplus < 201703L
+// This is a c++17 library feature which is implemented until GCC 12.
+// So it does not work if you only compile with flags "-std=c++17"
+// Refer to https://en.cppreference.com/w/cpp/compiler_support/17
+#if __cplusplus < 201703L || \
+    !(defined(__cpp_lib_hardware_interference_size) && !defined(_LIBCPP_VERSION))
 
 #if defined(MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT)
 static_assert(MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT >= sizeof(uint64_t), "Bad extended alignment");

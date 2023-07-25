@@ -1,0 +1,21 @@
+If:
+  PathMatch: src/.*
+  PathExclude:
+    [
+      src/mongo/db/modules/monograph/cass/.*,
+      src/mongo/db/modules/monograph/tx_service/.*,
+      src/mongo/db/modules/monograph/mono_metrics/.*,
+    ]
+CompileFlags:
+  CompilationDatabase: ./
+
+---
+If:
+  PathMatch:
+    [
+      src/mongo/db/modules/monograph/cass/*,
+      src/mongo/db/modules/monograph/tx_service/*,
+      src/mongo/db/modules/monograph/mono_metrics/*,
+    ]
+CompileFlags:
+  CompilationDatabase: src/mongo/db/modules/monograph/build

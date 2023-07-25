@@ -215,7 +215,7 @@ public:
      * below, to cause the function to be executed on ServiceContext instances before they
      * are destroyed.
      */
-    using DestructorAction = stdx::function<void(ServiceContext*) noexcept>;
+    using DestructorAction = stdx::function<void(ServiceContext*) >;
 
     /**
      * Representation of a paired ConstructorAction and DestructorAction.

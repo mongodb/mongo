@@ -444,8 +444,8 @@ add_option('cache-dir',
 )
 
 add_option("cxx-std",
-    choices=["14"],
-    default="14",
+    choices=["17"],
+    default="17",
     help="Select the C++ langauge standard to build with",
 )
 
@@ -2318,14 +2318,14 @@ def doConfigure(myenv):
         conf.Finish()
 
     if not myenv.ToolchainIs('msvc'):
-        if get_option('cxx-std') == "14":
-            if not AddToCXXFLAGSIfSupported(myenv, '-std=c++14'):
-                myenv.ConfError('Compiler does not honor -std=c++14')
-        if not AddToCFLAGSIfSupported(myenv, '-std=c11'):
-            myenv.ConfError("C++14 mode selected for C++ files, but can't enable C11 for C files")
+        if get_option('cxx-std') == "17":
+            if not AddToCXXFLAGSIfSupported(myenv, '-std=c++17'):
+                myenv.ConfError('Compiler does not honor -std=c++17')
+        if not AddToCFLAGSIfSupported(myenv, '-std=c17'):
+            myenv.ConfError("C++17 mode selected for C++ files, but can't enable C11 for C files")
 
     if using_system_version_of_cxx_libraries():
-        print( 'WARNING: System versions of C++ libraries must be compiled with C++14 support' )
+        print( 'WARNING: System versions of C++ libraries must be compiled with C++17 support' )
 
     # We appear to have C++14, or at least a flag to enable it. Check that the declared C++
     # language level is not less than C++14, and that we can at least compile an 'auto'

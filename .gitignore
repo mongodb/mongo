@@ -165,3 +165,6 @@ src/mongo/embedded/java/jar/build/
 local.properties
 
 compile_commands.json
+
+.cache/
+src/mongo/installer/compass/install_compass
