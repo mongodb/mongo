@@ -347,7 +347,9 @@ __modify_apply_no_overlap(WT_SESSION_IMPL *session, WT_ITEM *value, const size_t
 
 /*
  * __wt_modify_apply_item --
- *     Apply a single set of WT_MODIFY changes to a WT_ITEM buffer.
+ *     Apply a single set of WT_MODIFY changes to a WT_ITEM buffer. This function assumes the size
+ *     of the value is larger than or equal to 0 except for the string format which must be larger
+ *     than 0.
  */
 int
 __wt_modify_apply_item(
@@ -388,8 +390,11 @@ __wt_modify_apply_item(
      * Decrement the size to discard the trailing nul (done after growing the buffer to ensure it
      * can be restored without further checking).
      */
-    if (sformat)
+    if (sformat) {
+        /* string size must be larger than 0 with trailing nul. */
+        WT_ASSERT(session, value->size > 0);
         --value->size;
+    }
 
     __modify_fast_path(value, p, nentries, &napplied, &overlap, &datasz, &destsz);
 
