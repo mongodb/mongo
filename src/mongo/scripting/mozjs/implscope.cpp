@@ -919,18 +919,26 @@ bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success)
     }
 
     JS::RootedValue ex(cx);
-    if (!JS_GetPendingException(cx, &ex)) {
+    if (!JS_GetPendingException(cx, &ex) || !ex.isObject()) {
         return false;
     }
 
     JS::RootedObject obj(cx, ex.toObjectOrNull());
-    const JSClass* syntaxError = js::ProtoKeyToClass(JSProto_SyntaxError);
-    if (!JS_InstanceOf(cx, obj, syntaxError, nullptr)) {
+    JSErrorReport* report = JS_ErrorFromException(cx, obj);
+    if (!report) {
         return false;
     }
 
-    JSErrorReport* report = JS_ErrorFromException(cx, obj);
-    if (!report) {
+    const JSClass* referenceError = js::ProtoKeyToClass(JSProto_ReferenceError);
+    // During runtime, we can get a ReferenceError: await is not defined because there can be await
+    // not in global scope, which is not detected during compile.
+    if (JS_InstanceOf(cx, obj, referenceError, nullptr) &&
+        strstr(report->message().c_str(), "await is not defined")) {
+        return true;
+    }
+
+    const JSClass* syntaxError = js::ProtoKeyToClass(JSProto_SyntaxError);
+    if (!JS_InstanceOf(cx, obj, syntaxError, nullptr)) {
         return false;
     }
 
@@ -987,7 +995,18 @@ bool MozJSImplScope::exec(StringData code,
             if (scriptPtr) {
                 JS::RootedScript script(_context, scriptPtr);
                 success = JS_ExecuteScript(_context, script, &out);
-            } else {
+
+                if (shouldTryExecAsModule(_context, name, success)) {
+                    // If we should run this as a module, we need to clear the previous exception
+                    // in order to catch stack traces for future exceptions.
+                    JS_ClearPendingException(_context);
+
+                    modulePtr = _moduleLoader->loadRootModuleFromSource(_context, name, code);
+                    success = modulePtr != nullptr;
+                }
+            }
+
+            if (modulePtr) {
                 JS::RootedObject module(_context, modulePtr);
                 success = JS::ModuleInstantiate(_context, module);
                 if (success) {
