@@ -2438,3 +2438,22 @@ oplog.
 
 [copy-on-write]: https://en.wikipedia.org/wiki/Copy-on-write
 [Multiversion concurrency control]: https://en.wikipedia.org/wiki/Multiversion_concurrency_control
+
+## Table of MongoDB <-> WiredTiger <-> Log version numbers
+|                MongoDB | WiredTiger | Log |
+|------------------------|------------|-----|
+|                 3.0.15 |      2.5.3 |   1 |
+|                 3.2.20 |      2.9.2 |   1 |
+|                 3.4.15 |      2.9.2 |   1 |
+|                  3.6.4 |      3.0.1 |   2 |
+|                 4.0.16 |      3.1.1 |   3 |
+|                  4.2.1 |      3.2.2 |   3 |
+|                  4.2.6 |      3.3.0 |   3 |
+| 4.2.6 (blessed by 4.4) |      3.3.0 |   4 |
+|                  4.4.0 |     10.0.0 |   5 |
+|                  5.0.0 |     10.0.1 |   5 |
+|          4.4.11, 5.0.6 |     10.0.2 |   5 |
+|                  6.0.0 |     10.0.2 |   5 |
+|                  6.1.0 |     11.0.1 |   5 |
+|                  6.2.0 |     11.2.0 |   5 |
+|                  7.0.0 |     11.2.0 |   5 |
