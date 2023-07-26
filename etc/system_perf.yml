@@ -2695,11 +2695,12 @@ buildvariants:
       - name: ycsb_60GB
       - name: ycsb_60GB.long
 
-  - name: linux-3-shard.2022-11
+  - &shard-baseline
+    name: linux-3-shard.2022-11
     display_name: Linux 3-Shard Cluster 2022-11
     cron: &linux-3-shard-cron "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
-    expansions:
+    expansions: &shard-baseline-expansions
       mongodb_setup_release: 2022-11
       mongodb_setup: shard
       infrastructure_provisioning_release: 2022-11
@@ -2733,30 +2734,33 @@ buildvariants:
       - name: tsbs_query_sharded_balancer
       - name: tsbs_query_finance_sharded_balancer
 
-  - name: linux-3-shard-query-stats
-    display_name: Linux 3-Shard Cluster 2022-11 (QueryStats)
+# A variant of 3-shard with $queryStats activated (unlimited).
+  - <<: *shard-baseline
+    name: linux-3-shard-query-stats
+    display_name: Linux 3-Shard Cluster (QueryStats)
     cron: *linux-3-shard-cron
     modules: *modules
     expansions:
-      mongodb_setup_release: 2022-11
+      <<: *shard-baseline-expansions
       mongodb_setup: shard-query-stats
-      infrastructure_provisioning_release: 2022-11
-      infrastructure_provisioning: shard
-      workload_setup: 2022-11
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-      compile_variant: "-arm64"
-    run_on:
-      - "rhel70-perf-shard"
-    depends_on: *_compile_amazon_linux2_arm64
-    tasks:
+    tasks: &sharded-query-stats-tasks
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
-      - name: crud_workloads_majority
-      - name: crud_workloads_w1
+      - name: mongos_workloads
+      - name: tsbs_query_sharded
+      - name: tsbs_query_finance_sharded
+      - name: tsbs_query_sharded_balancer
+      - name: tsbs_query_finance_sharded_balancer
+
+# A variant of 3-shard with $queryStats activated but with a rate limit.
+  - <<: *shard-baseline
+    name: linux-3-shard-limited-query-stats
+    display_name: Linux 3-Shard Cluster (Limited QueryStats)
+    expansions:
+      <<: *shard-baseline-expansions
+      mongodb_setup: shard-limited-query-stats
+    tasks: *sharded-query-stats-tasks
 
   - name: linux-3-shard-heuristic-bonsai.2022-11
     display_name: Linux 3-Shard Cluster 2022-11 (Bonsai with Heuristic CE)
@@ -2799,11 +2803,12 @@ buildvariants:
     tasks:
       - name: industry_benchmarks
 
-  - name: linux-shard-lite.2022-11
+  - &shard-lite-baseline
+    name: linux-shard-lite.2022-11
     display_name: Linux Shard Lite Cluster 2022-11
     cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
     modules: *modules
-    expansions:
+    expansions: &shard-lite-baseline-expansions
       mongodb_setup_release: 2022-11
       mongodb_setup: shard-lite
       infrastructure_provisioning_release: 2022-11
@@ -2920,6 +2925,34 @@ buildvariants:
       - name: tsbs_query_finance_sharded
       - name: tsbs_query_sharded_balancer
       - name: tsbs_query_finance_sharded_balancer
+
+  # A variant of shard-lite with $queryStats enabled (unlimited).
+  - <<: *shard-lite-baseline
+    name: linux-shard-lite-query-stats
+    display_name: Linux Shard Lite (QueryStats)
+    expansions:
+      <<: *shard-lite-baseline-expansions
+      mongodb_setup: shard-lite-query-stats
+    tasks: &shard-lite-query-stats-tasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: bestbuy_query
+      - name: industry_benchmarks
+      - name: linkbench
+      - name: mongos_workloads
+      - name: tsbs_query_sharded
+      - name: tsbs_query_finance_sharded
+      - name: tsbs_query_sharded_balancer
+      - name: tsbs_query_finance_sharded_balancer
+
+# A variant of shard-lite with $queryStats enabled with a rate limit.
+  - <<: *shard-lite-baseline
+    name: linux-shard-lite-limited-query-stats
+    display_name: Linux Shard Lite (Limited QueryStats)
+    expansions:
+      <<: *shard-lite-baseline-expansions
+      mongodb_setup: shard-lite-limited-query-stats
+    tasks: *shard-lite-query-stats-tasks
 
   - name: linux-shard-single.2022-11
     display_name: Linux Shard Single 2022-11
@@ -3564,7 +3597,7 @@ buildvariants:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-query-stats-small-rate-limit
 
-# Variant: Microbenchmarks with QueryStats
+  # Variant: Microbenchmarks with QueryStats
   - <<: *linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-arm-query-stats.2023-01
     display_name: MicroBenchmarks Arm Standalone inMemory.2023-01 (QueryStats)
@@ -3572,7 +3605,7 @@ buildvariants:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-query-stats
 
-# Variant: Microbenchmarks with rate limited QueryStats
+  # Variant: Microbenchmarks with rate limited QueryStats
   - <<: *linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-arm-limited-query-stats.2023-01
     display_name: MicroBenchmarks (Rate Limitied QueryStats)
