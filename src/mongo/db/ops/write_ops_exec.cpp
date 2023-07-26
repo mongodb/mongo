@@ -2946,6 +2946,9 @@ void performUnorderedTimeseriesWritesWithRetries(OperationContext* opCtx,
                                                        containsRetry,
                                                        request,
                                                        retryAttemptsForDup);
+        if (!retryAttemptsForDup.empty()) {
+            timeseries::bucket_catalog::resetBucketOIDCounter();
+        }
     } while (!docsToRetry.empty());
 }
 
