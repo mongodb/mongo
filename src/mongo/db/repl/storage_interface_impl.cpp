@@ -698,11 +698,13 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
         using Result = StatusWith<std::vector<BSONObj>>;
 
         auto collectionAccessMode = isFind ? MODE_IS : MODE_IX;
-        const auto collection =
-            acquireCollection(opCtx,
-                              CollectionAcquisitionRequest::fromOpCtx(
-                                  opCtx, nsOrUUID, AcquisitionPrerequisites::kWrite),
-                              collectionAccessMode);
+        const auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx,
+                                                    nsOrUUID,
+                                                    isFind ? AcquisitionPrerequisites::kRead
+                                                           : AcquisitionPrerequisites::kWrite),
+            collectionAccessMode);
         if (!collection.exists()) {
             return Status{ErrorCodes::NamespaceNotFound,
                           str::stream()

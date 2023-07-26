@@ -200,7 +200,9 @@ void verifyDbAndCollection(OperationContext* opCtx,
     // actually system.views until we take the lock here. So we have this one last assertion.
     uassert(6944500,
             "Modifications to system.views must take an exclusive lock",
-            !nss.isSystemDotViews() || opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+            operationType == AcquisitionPrerequisites::OperationType::kRead ||
+                !nss.isSystemDotViews() ||
+                opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
     // Verify that we are using the latest instance if we intend to perform writes.
     if (operationType == AcquisitionPrerequisites::OperationType::kWrite) {
