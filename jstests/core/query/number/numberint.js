@@ -1,54 +1,58 @@
-assert.eq.automsg("0", "new NumberInt()");
+assert.eq(0, new NumberInt());
 
 let n = new NumberInt(4);
-assert.eq.automsg("4", "n");
-assert.eq.automsg("4", "n.toNumber()");
-assert.eq.automsg("8", "n + 4");
-assert.eq.automsg("'NumberInt(4)'", "n.toString()");
-assert.eq.automsg("'NumberInt(4)'", "tojson( n )");
+assert.eq(4, n);
+assert.eq(4, n.toNumber());
+assert.eq(8, n + 4);
+assert.eq('NumberInt(4)', n.toString());
+assert.eq('NumberInt(4)', tojson(n));
 let a = {};
 a.a = n;
 let p = tojson(a);
-assert.eq.automsg("'{ \"a\" : NumberInt(4) }'", "p");
+assert.eq('{ \"a\" : NumberInt(4) }', p);
 
-assert.eq.automsg("NumberInt(4 )", "eval( tojson( NumberInt( 4 ) ) )");
-assert.eq.automsg("a", "eval( tojson( a ) )");
+assert.eq(NumberInt(4), eval(tojson(NumberInt(4))));
+
+let y;
+eval(`y = ${tojson(a)}`);
+assert.eq(a, y);
 
 n = new NumberInt(-4);
-assert.eq.automsg("-4", "n");
-assert.eq.automsg("-4", "n.toNumber()");
-assert.eq.automsg("0", "n + 4");
-assert.eq.automsg("'NumberInt(-4)'", "n.toString()");
-assert.eq.automsg("'NumberInt(-4)'", "tojson( n )");
+assert.eq(-4, n);
+assert.eq(-4, n.toNumber());
+assert.eq(0, n + 4);
+assert.eq('NumberInt(-4)', n.toString());
+assert.eq('NumberInt(-4)', tojson(n));
 a = {};
 a.a = n;
 p = tojson(a);
-assert.eq.automsg("'{ \"a\" : NumberInt(-4) }'", "p");
+assert.eq('{ \"a\" : NumberInt(-4) }', p);
 
 n = new NumberInt("11111");
-assert.eq.automsg("'NumberInt(11111)'", "n.toString()");
-assert.eq.automsg("'NumberInt(11111)'", "tojson( n )");
+assert.eq('NumberInt(11111)', n.toString());
+assert.eq('NumberInt(11111)', tojson(n));
 a = {};
 a.a = n;
 p = tojson(a);
-assert.eq.automsg("'{ \"a\" : NumberInt(11111) }'", "p");
+assert.eq('{ \"a\" : NumberInt(11111) }', p);
 
-assert.eq.automsg("NumberInt('11111' )", "eval( tojson( NumberInt( '11111' ) ) )");
-assert.eq.automsg("a", "eval( tojson( a ) )");
+assert.eq(NumberInt('11111'), eval(tojson(NumberInt('11111'))));
+eval(`y = ${tojson(a)}`);
+assert.eq(a, y);
 
 n = new NumberInt("-11111");
-assert.eq.automsg("-11111", "n.toNumber()");
-assert.eq.automsg("-11107", "n + 4");
-assert.eq.automsg("'NumberInt(-11111)'", "n.toString()");
-assert.eq.automsg("'NumberInt(-11111)'", "tojson( n )");
+assert.eq(-11111, n.toNumber());
+assert.eq(-11107, n + 4);
+assert.eq('NumberInt(-11111)', n.toString());
+assert.eq('NumberInt(-11111)', tojson(n));
 a = {};
 a.a = n;
 p = tojson(a);
-assert.eq.automsg("'{ \"a\" : NumberInt(-11111) }'", "p");
+assert.eq('{ \"a\" : NumberInt(-11111) }', p);
 
 // parsing: SpiderMonkey evaluates non-numeric strings as 0, which is not bad
-// assert.throws.automsg( function() { new NumberInt( "" ); } );
-// assert.throws.automsg( function() { new NumberInt( "y" ); } );
+// assert.throws( function() { new NumberInt( "" ); } );
+// assert.throws( function() { new NumberInt( "y" ); } );
 
 // eq
 

@@ -21,8 +21,8 @@ o = {
 };
 t.save(o);
 
-assert.eq.automsg("2", "t.find().length()");
-assert.eq.automsg("2", "t.find().sort( { 'z.a' : 1 } ).length()");
-assert.eq.automsg("2", "t.find().sort( { 'z.a' : -1 } ).length()");
+assert.eq(2, t.find().length());
+assert.eq(2, t.find().sort({'z.a': 1}).length());
+assert.eq(2, t.find().sort({'z.a': -1}).length());
 
 assert(t.validate().valid);

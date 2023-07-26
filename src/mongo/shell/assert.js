@@ -152,10 +152,6 @@ assert = (function() {
         doassert(_buildAssertionMessage(msg, "assert failed"));
     };
 
-    assert.automsg = function(b) {
-        assert(eval(b), b);
-    };
-
     assert._debug = false;
 
     function _isEq(a, b) {
@@ -260,10 +256,6 @@ assert = (function() {
                 failAssertion();
             }
         }
-    };
-
-    assert.eq.automsg = function(a, b) {
-        assert.eq(eval(a), eval(b), "[" + a + "] != [" + b + "]");
     };
 
     assert.neq = function(a, b, msg) {
@@ -639,18 +631,6 @@ assert = (function() {
                 throw e;
             }
         }
-    };
-
-    assert.throws.automsg = function(func, params) {
-        if (arguments.length === 1)
-            params = [];
-        assert.throws(func, params, func.toString());
-    };
-
-    assert.doesNotThrow.automsg = function(func, params) {
-        if (arguments.length === 1)
-            params = [];
-        assert.doesNotThrow(func, params, func.toString());
     };
 
     function _rawReplyOkAndNoWriteErrors(raw, {ignoreWriteErrors, ignoreWriteConcernErrors} = {}) {

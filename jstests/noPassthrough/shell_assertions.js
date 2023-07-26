@@ -152,17 +152,6 @@
         assert.neq(-1, err.message.indexOf("msg parameter must be a "));
     });
 
-    /* assert.automsg tests */
-
-    tests.push(function automsgShouldPassToAssert() {
-        const defaultMessage = '1 === 2';
-        const err = assert.throws(() => {
-            assert.automsg(defaultMessage);
-        });
-
-        assert.neq(-1, err.message.indexOf(defaultMessage), 'default message should be returned');
-    });
-
     /* assert.eq tests */
 
     tests.push(function eqShouldPassOnEquality() {
@@ -208,17 +197,6 @@
         assert.doesNotThrow(() => {
             assert.eq(a, b);
         }, [], 'eq should not throw exception on two objects with the same content');
-    });
-
-    /* assert.eq.automsg tests */
-
-    tests.push(function eqAutomsgShouldCreateMessage() {
-        const defaultMessage = '[1] != [2]';
-        const err = assert.throws(() => {
-            assert.eq.automsg(1, 2);
-        });
-
-        assert.neq(-1, err.message.indexOf(defaultMessage), 'default message should be returned');
     });
 
     /* assert.neq tests */
