@@ -44,6 +44,10 @@ class test_bug010(wttest.WiredTigerTestCase):
     conn_config = 'checkpoint_sync=false'
 
     def test_checkpoint_dirty(self):
+        # FIXME-WT-11354 Too many open files
+        if self.runningHook('tiered'):
+            self.skipTest("this test does not yet work with tiered storage")
+
         # Create a lot of tables
         # insert the same item in each
         # Start a checkpoint with some of the updates

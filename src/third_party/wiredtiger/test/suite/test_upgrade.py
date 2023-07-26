@@ -57,6 +57,10 @@ class test_upgrade(wttest.WiredTigerTestCase):
 
     # Test upgrade of an object.
     def test_upgrade(self):
+        # FIXME-WT-11366
+        if self.runningHook('tiered'):
+            self.skipTest("this test does not yet work with tiered storage")
+
         # Simple file or table object.
         self.upgrade(SimpleDataSet, False)
         self.upgrade(SimpleDataSet, True)

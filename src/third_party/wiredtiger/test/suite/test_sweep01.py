@@ -58,6 +58,10 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     scenarios = make_scenarios(types)
 
     def test_ops(self):
+        # FIXME-WT-11367
+        if self.runningHook('tiered'):
+            self.skipTest("this test does not yet work with tiered storage")
+
         #
         # Set up numfiles with numkv entries.  We just want some data in there
         # we don't care what it is.
