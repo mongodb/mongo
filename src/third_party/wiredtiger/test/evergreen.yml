@@ -3717,16 +3717,16 @@ tasks:
       # format test
       - func: "format test"
         vars:
-          extra_args: file_type=fix
+          extra_args: file_type=fix runs.rows=1000000:2500000
       - func: "format test"
         vars:
-          extra_args: file_type=row
+          extra_args: file_type=row runs.rows=1000000:2500000
 
       # format test for stressing compaction code path
       - func: "format test"
         vars:
           times: 3
-          extra_args: file_type=row compaction=1 verify=1 runs.timer=3 ops.pct.delete=30
+          extra_args: file_type=row compaction=1 verify=1 runs.rows=1000000:2500000 runs.timer=3 ops.pct.delete=30
 
   - name: time-shift-sensitivity-test
     depends_on:
