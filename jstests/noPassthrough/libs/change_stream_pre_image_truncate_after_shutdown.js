@@ -206,7 +206,8 @@ var PreImageTruncateAfterShutdownTest = class {
 
         if (runAsPrimary) {
             // The 'checkPreImageCollection' check relies on there being a writable primary.
-            assert.commandWorked(conn.adminCommand({replSetStepUp: 1}));
+            this._stepUp(conn);
+            assert.soon(() => conn.adminCommand('hello').isWritablePrimary);
         }
 
         this._assertNumPreImagesAfterShutdown({
@@ -217,6 +218,18 @@ var PreImageTruncateAfterShutdownTest = class {
         });
 
         this._rst.checkPreImageCollection(this.testName);
+    }
+
+    /** @private */
+    _stepUp(connection) {
+        assert.soonNoExcept(() => {
+            const res = connection.adminCommand({replSetStepUp: 1});
+            if (!res.ok) {
+                jsTestLog(`Failed to step up with ${res}`);
+            }
+            return res.ok;
+        }, "Failed to step up");
+        jsTestLog(`Forced step up to ${connection}`);
     }
 
     /** @private */
