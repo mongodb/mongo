@@ -127,9 +127,9 @@ function configureMoveChunkFailPoint(shardConnection, stepNumber, mode) {
 function waitForMoveChunkStep(shardConnection, stepNumber) {
     var searchString = 'step ' + stepNumber, admin = shardConnection.getDB('admin');
 
-    assert.between(migrateStepNames.deletedPriorDataInRange,
+    assert.between(moveChunkStepNames.parsedOptions,
                    stepNumber,
-                   migrateStepNames.done,
+                   moveChunkStepNames.committed,
                    "incorrect stepNumber",
                    true);
 
