@@ -424,18 +424,6 @@ public:
 
 private:
     std::string _hashCollection(OperationContext* opCtx, const CollectionPtr& collection) {
-        boost::optional<Lock::CollectionLock> collLock;
-        if (opCtx->recoveryUnit()->getTimestampReadSource() ==
-            RecoveryUnit::ReadSource::kProvided) {
-            // When performing a read at a timestamp, we are only holding the database lock in
-            // intent mode. We need to also acquire the collection lock in intent mode to ensure
-            // reading from the consistent snapshot doesn't overlap with any catalog operations on
-            // the collection.
-            invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IS));
-        } else {
-            invariant(opCtx->lockState()->isDbLockedForMode(collection->ns().dbName(), MODE_S));
-        }
-
         auto desc = collection->getIndexCatalog()->findIdIndex(opCtx);
 
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
