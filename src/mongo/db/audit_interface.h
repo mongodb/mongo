@@ -54,6 +54,7 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
+#include "mongo/db/matcher/matchable.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
@@ -67,6 +68,7 @@ namespace audit {
 
 class AuthenticateEvent;
 class CommandInterface;
+class AuditConfigDocument;
 
 class AuditInterface {
     AuditInterface(const AuditInterface&) = delete;
@@ -397,6 +399,55 @@ public:
                               const Status& logStatus,
                               const std::vector<Status>& errors,
                               const std::string& suffix) const = 0;
+
+    virtual void logConfigEvent(Client* client, const AuditConfigDocument& config) const = 0;
+
+
+    /**
+     * Base class of types representing events for writing to the audit log.
+     */
+    class AuditEvent : public MatchableDocument {
+    public:
+        using Serializer = std::function<void(BSONObjBuilder*)>;
+
+        Date_t getTimestamp() const {
+            return _ts;
+        }
+
+        BSONObj toBSON() const final {
+            return _obj;
+        }
+
+        virtual StringData getTimestampFieldName() const = 0;
+
+        ElementIterator* allocateIterator(const ElementPath* path) const final {
+            if (_iteratorUsed) {
+                return new BSONElementIterator(path, _obj);
+            }
+
+            _iteratorUsed = true;
+            _iterator.reset(path, _obj);
+            return &_iterator;
+        }
+
+        void releaseIterator(ElementIterator* iterator) const final {
+            if (iterator == &_iterator) {
+                _iteratorUsed = false;
+            } else {
+                delete iterator;
+            }
+        }
+
+    private:
+        AuditEvent& operator=(const AuditEvent&) = delete;
+
+    protected:
+        BSONObj _obj;
+        mutable BSONElementIterator _iterator;
+        mutable bool _iteratorUsed = false;
+
+        Date_t _ts;
+    };
 };
 
 
@@ -573,6 +624,8 @@ public:
                       const Status& logStatus,
                       const std::vector<Status>& errors,
                       const std::string& suffix) const {};
+
+    void logConfigEvent(Client* client, const AuditConfigDocument& config) const {};
 };
 
 }  // namespace audit
