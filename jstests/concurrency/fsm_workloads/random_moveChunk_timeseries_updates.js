@@ -1,8 +1,6 @@
 /**
- * Tests the updates into sharded time-series collection during a chunk migration. To ensure the
- * correctness, the test does the same writes into an unsharded collection and verifies that the
- * number of documents remain the same at the end. This test also checks that indexes on the
- * time-series buckets collection remain consistent after the test run.
+ * Tests the updates into sharded time-series collection during a chunk migration.
+ *
  * @tags: [
  *  requires_sharding,
  *  assumes_balancer_off,
@@ -42,8 +40,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const updateField = this.metaField + ".tid" + this.tid;
         const oldValue = Random.randInt(numValues);
 
-        // Updates some measurements along the field owned by this thread in both sharded and
-        // unsharded ts collections.
         jsTestLog("Executing update state on: " + collName + " on field " + updateField);
         assertAlways.commandWorked(shardedColl.update(
             {[updateField]: {$gte: oldValue}}, {$inc: {[updateField]: 1}}, {multi: true}));
@@ -53,12 +49,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // Since we can't use a 'snapshot' read concern for timeseries updates, updates on the
         // sharded collection may not see the exact same records as the non-sharded, so the
         // validation needs to be more lenient.
-        const count = db[collName].find().itcount();
-        const countNonSharded = db[this.nonShardCollName].find().itcount();
+        const pipeline = [{$project: {_id: "$_id"}}, {$sort: {_id: 1}}];
+        const diff = DataConsistencyChecker.getDiff(db[collName].aggregate(pipeline),
+                                                    db[this.nonShardCollName].aggregate(pipeline));
         assertAlways.eq(
-            count,
-            countNonSharded,
-            "Expected sharded collection to have the same number of records as unsharded");
+            diff, {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []});
     };
 
     $config.transitions = {
