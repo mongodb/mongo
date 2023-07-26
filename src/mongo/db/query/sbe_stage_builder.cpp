@@ -3413,6 +3413,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             std::move(outputs)};
 }
 
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSearch(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    return generateEofPlan(root->nodeId(), reqs, &_slotIdGenerator);
+}
+
 const CollectionPtr& SlotBasedStageBuilder::getCurrentCollection(const PlanStageReqs& reqs) const {
     return _collections.lookupCollection(reqs.getTargetNamespace());
 }
@@ -3452,7 +3457,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             {STAGE_SORT_MERGE, &SlotBasedStageBuilder::buildSortMerge},
             {STAGE_GROUP, &SlotBasedStageBuilder::buildGroup},
             {STAGE_EQ_LOOKUP, &SlotBasedStageBuilder::buildLookup},
-            {STAGE_SHARDING_FILTER, &SlotBasedStageBuilder::buildShardFilter}};
+            {STAGE_SHARDING_FILTER, &SlotBasedStageBuilder::buildShardFilter},
+            {STAGE_SEARCH, &SlotBasedStageBuilder::buildSearch}};
 
     tassert(4822884,
             str::stream() << "Unsupported QSN in SBE stage builder: " << root->toString(),

@@ -640,3 +640,12 @@ export function assertFetchFilter({coll, predicate, expectedFilter, nReturned}) 
                   "Expected " + nReturned + " documents, got " + exp.executionStats.nReturned);
     }
 }
+
+/**
+ * Assert that a pipeline runs with the engine that is passed in as a parameter.
+ */
+export function assertEngine(pipeline, engine, coll) {
+    const explain = coll.explain().aggregate(pipeline);
+    assert(explain.hasOwnProperty("explainVersion"), explain);
+    assert.eq(explain.explainVersion, engine === "sbe" ? "2" : "1", explain);
+}

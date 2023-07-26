@@ -223,6 +223,10 @@ boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTr
  * when all of:
  *    - 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
  *    - featureFlagSbeFull is enabled (TODO SERVER-72549 remove this comment line: SBE Pushdown)
+ *
+ * Search is extracted from the pipeline when the following conditions are met:
+ *    - When the 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
+ *    - When 'featureFlagSearchInSbe' is true.
  */
 std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStagesForPushdown(
     const MultipleCollectionAccessor& collections,
@@ -260,11 +264,17 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         internalQuerySlotBasedExecutionDisableLookupPushdown.load() || isMainCollectionSharded ||
         collections.isAnySecondaryNamespaceAViewOrSharded();
 
+    // (Ignore FCV check): FCV checking is unnecessary because SBE execution is local to a given
+    // node.
+    const bool disallowSearchPushdown =
+        !feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe();
+
     for (auto itr = sources.begin(); itr != sources.end(); ++itr) {
-        const bool isLastSource = itr->get() == sources.back().get();
+        DocumentSource* stage = itr->get();
+        const bool isLastSource = stage == sources.back().get();
 
         // $group pushdown logic.
-        if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(itr->get())) {
+        if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(stage)) {
             if (internalQuerySlotBasedExecutionDisableGroupPushdown.load()) {
                 break;
             }
@@ -279,7 +289,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         }
 
         // $lookup pushdown logic.
-        if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(itr->get())) {
+        if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(stage)) {
             if (disallowLookupPushdown) {
                 break;
             }
@@ -304,6 +314,19 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
                     std::make_unique<InnerPipelineStageImpl>(projectionStage, isLastSource));
                 continue;
             }
+        }
+
+        // $search pushdown logic.
+        if (getSearchHelpers(pipeline->getContext()->opCtx->getServiceContext())
+                ->isSearchStage(stage) ||
+            getSearchHelpers(pipeline->getContext()->opCtx->getServiceContext())
+                ->isSearchMetaStage(stage)) {
+            if (disallowSearchPushdown) {
+                break;
+            }
+            stagesForPushdown.push_back(
+                std::make_unique<InnerPipelineStageImpl>(stage, isLastSource));
+            continue;
         }
 
         // Current stage cannot be pushed down.
@@ -934,8 +957,10 @@ PipelineD::buildInnerQueryExecutor(const MultipleCollectionAccessor& collections
     auto firstStageIsSearch =
         getSearchHelpers(expCtx->opCtx->getServiceContext())->isSearchPipeline(pipeline) ||
         getSearchHelpers(expCtx->opCtx->getServiceContext())->isSearchMetaPipeline(pipeline);
-    auto searchInSbeEnabled =
-        feature_flags::gFeatureFlagSearchInSbe.isEnabled(serverGlobalParams.featureCompatibility);
+
+    // (Ignore FCV check): FCV checking is unnecessary because SBE execution is local to a given
+    // node.
+    auto searchInSbeEnabled = feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe();
 
     // TODO SERVER-78998: This check should be modified once we've refactored checking
     // 'internalQueryFrameworkControl'.

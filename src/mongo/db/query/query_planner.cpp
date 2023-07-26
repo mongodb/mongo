@@ -74,6 +74,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
+#include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -528,6 +529,39 @@ bool canUseClusteredCollScan(QuerySolutionNode* node,
     return false;
 }
 
+/**
+ * Creates a query solution node for $search plans that are being pushed down into SBE.
+ */
+StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
+    const CanonicalQuery& query) {
+    if (query.pipeline().empty()) {
+        return {ErrorCodes::InvalidOptions,
+                "not building $search node because the query pipeline is empty"};
+    }
+
+    const auto stage = query.pipeline().front()->documentSource();
+    auto isSearch = getSearchHelpers(query.getOpCtx()->getServiceContext())->isSearchStage(stage);
+    auto isSearchMeta =
+        getSearchHelpers(query.getOpCtx()->getServiceContext())->isSearchMetaStage(stage);
+
+    if (isSearch || isSearchMeta) {
+        tassert(7816300,
+                "Pushing down $search into SBE but forceClassicEngine is true.",
+                !query.getForceClassicEngine());
+
+        // (Ignore FCV check): FCV checking is unnecessary because SBE execution is local to a given
+        // node.
+        tassert(7816301,
+                "Pushing down $search into SBE but featureFlagSearchInSbe is disabled.",
+                feature_flags::gFeatureFlagSearchInSbe.isEnabledAndIgnoreFCVUnsafe());
+
+        auto querySoln = std::make_unique<QuerySolution>();
+        querySoln->setRoot(std::make_unique<SearchNode>(isSearchMeta));
+        return std::move(querySoln);
+    }
+
+    return {ErrorCodes::InvalidOptions, "no search stage found at front of pipeline"};
+}
 }  // namespace
 
 using std::numeric_limits;
@@ -1613,6 +1647,19 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
     }
 
+    // Create a $search QuerySolution if we are performing a $search.
+    if (out.empty()) {
+        auto statusWithSoln = tryToBuildSearchQuerySolution(query);
+        if (statusWithSoln.isOK()) {
+            out.emplace_back(std::move(statusWithSoln.getValue()));
+        } else {
+            LOGV2_DEBUG(7816302,
+                        4,
+                        "Not pushing down $search into SBE",
+                        "reason"_attr = statusWithSoln.getStatus());
+        }
+    }
+
     // The caller can explicitly ask for a collscan.
     bool collscanRequested = (params.options & QueryPlannerParams::INCLUDE_COLLSCAN);
 
@@ -1726,6 +1773,19 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
         if (projectionStage) {
             solnForAgg = std::make_unique<ProjectionNodeDefault>(
                 std::move(solnForAgg), nullptr, projectionStage->projection());
+            continue;
+        }
+
+        auto isSearch = getSearchHelpers(query.getOpCtx()->getServiceContext())
+                            ->isSearchStage(innerStage->documentSource());
+        auto isSearchMeta = getSearchHelpers(query.getOpCtx()->getServiceContext())
+                                ->isSearchMetaStage(innerStage->documentSource());
+        if (isSearch || isSearchMeta) {
+            // In the $search case, we create the $search query solution node in QueryPlanner::Plan
+            // instead of here. The empty branch here assures that we don't hit the tassert below
+            // and continue in creating the query plan.
+            // TODO: SERVER-78565 add tests to test pushing down $search + $group and $search +
+            // $lookup pipelines to make sure pushdown works correctly.
             continue;
         }
 

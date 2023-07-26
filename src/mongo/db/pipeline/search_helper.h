@@ -111,6 +111,20 @@ public:
         const boost::optional<int>& protocolVersion = boost::none) {
         return boost::none;
     }
+
+    /**
+     * Check if this is a $searchMeta stage.
+     */
+    virtual bool isSearchStage(DocumentSource* stage) {
+        return false;
+    }
+
+    /**
+     * Check if this is a $searchMeta stage.
+     */
+    virtual bool isSearchMetaStage(DocumentSource* stage) {
+        return false;
+    }
 };
 
 /**
