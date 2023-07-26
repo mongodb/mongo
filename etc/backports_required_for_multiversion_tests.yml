@@ -406,9 +406,12 @@ last-continuous:
     ticket: SERVER-77386
   - test_file: jstests/replsets/config_txns_reaping_interrupt.js
     ticket: SERVER-78187
+  - test_file: jstests/sharding/min_max_key.js
+    ticket: SERVER-67529
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
     ticket: SERVER-79136
   suites: null
+
 last-lts:
   all:
   - test_file: jstests/sharding/conn_pool_stats.js
@@ -895,6 +898,8 @@ last-lts:
     ticket: SERVER-78187
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_snapshot.js
     ticket: SERVER-78855
+  - test_file: jstests/sharding/min_max_key.js
+    ticket: SERVER-67529
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
     ticket: SERVER-79136
   suites: null

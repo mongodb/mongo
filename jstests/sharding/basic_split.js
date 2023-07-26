@@ -90,6 +90,10 @@ assert.neq(null, findChunksUtil.findOneChunkByNs(configDB, 'test.compound', {min
 
 // cannot split on existing chunk boundary.
 assert.commandFailed(configDB.adminCommand({split: 'test.compound', middle: {x: 0, y: 0}}));
+assert.commandFailed(
+    configDB.adminCommand({split: 'test.compound', middle: {x: MinKey, y: MinKey}}));
+assert.commandFailed(
+    configDB.adminCommand({split: 'test.compound', middle: {x: MaxKey, y: MaxKey}}));
 
 bulk = testDB.compound.initializeUnorderedBulkOp();
 for (x = -1200; x < 1200; x++) {

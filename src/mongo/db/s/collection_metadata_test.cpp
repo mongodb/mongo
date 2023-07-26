@@ -299,7 +299,7 @@ TEST_F(SingleChunkMinMaxCompoundKeyFixture, KeyBelongsToMe) {
     ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << MINKEY << "b" << 10)));
     ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << 10 << "b" << 20)));
 
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << MAXKEY << "b" << MAXKEY)));
+    ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << MAXKEY << "b" << MAXKEY)));
 
     ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSONObj()));
 }
@@ -381,10 +381,10 @@ TEST_F(ThreeChunkWithRangeGapFixture, KeyBelongsToMe) {
     ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << 10)));
     ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << 30)));
     ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << 40)));
+    ASSERT(makeCollectionMetadata().keyBelongsToMe(BSON("a" << MAXKEY)));
 
     ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << 20)));
     ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << 25)));
-    ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSON("a" << MAXKEY)));
 
     ASSERT(!makeCollectionMetadata().keyBelongsToMe(BSONObj()));
 }

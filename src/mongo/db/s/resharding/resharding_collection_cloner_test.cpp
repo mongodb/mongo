@@ -255,8 +255,7 @@ TEST_F(ReshardingCollectionClonerTest, MaxKeyChunk) {
         Doc(fromjson("{_id: {x: {$minKey: 1}}, max: {x: 0.0}, shard: 'myShardName'}")),
         Doc(fromjson("{_id: {x: 0.0}, max: {x: {$maxKey: 1}}, shard: 'shard2' }")),
     };
-    // TODO SERVER-67529: Change expected documents to 4.
-    constexpr auto kExpectedCopiedCount = 3;
+    constexpr auto kExpectedCopiedCount = 4;
     const auto verify = [](auto cursor) {
         auto next = cursor->next();
         ASSERT(next);
@@ -273,12 +272,10 @@ TEST_F(ReshardingCollectionClonerTest, MaxKeyChunk) {
         ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 5 << "x" << 0.001 << "$sortKey" << BSON_ARRAY(5)),
                                  next->data.toBson());
 
-        // TODO SERVER-67529: Enable after ChunkManager can handle documents with $maxKey.
-        // next = cursor->next();
-        // ASSERT(next);
-        // ASSERT_BSONOBJ_BINARY_EQ(
-        //     BSON("_id" << 6 << "x" << MAXKEY << "$sortKey" << BSON_ARRAY(6)),
-        //     next->data.toBson());
+        next = cursor->next();
+        ASSERT(next);
+        ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 6 << "x" << MAXKEY << "$sortKey" << BSON_ARRAY(6)),
+                                 next->data.toBson());
 
         ASSERT_FALSE(cursor->next());
     };

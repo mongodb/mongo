@@ -143,7 +143,14 @@ std::shared_ptr<ChunkInfo> ChunkMap::findIntersectingChunk(const BSONObj& shardK
 
     const auto it = _chunkVectorMap.upper_bound(shardKeyString);
     if (it == _chunkVectorMap.end()) {
-        return {};
+        // upper_bound() will miss the last chunkVector if shardKey is actually the MaxKey,
+        // thus we need to check explicitly if shardKey is contained in the last chunk.
+        if (const auto& lastChunk = std::prev(_chunkVectorMap.end())->second->back();
+            lastChunk->containsKey(shardKey)) {
+            return lastChunk;
+        } else {
+            return {};
+        }
     }
 
     const auto& chunkVector = *(it->second);
@@ -158,7 +165,12 @@ std::shared_ptr<ChunkInfo> ChunkMap::findIntersectingChunk(const BSONObj& shardK
 }
 
 ChunkMap ChunkMap::createMerged(std::vector<std::shared_ptr<ChunkInfo>> changedChunks) const {
-    return _makeUpdated(std::move(changedChunks));
+    auto updatedChunkMap = _makeUpdated(std::move(changedChunks));
+    tassert(6752900,
+            "Chunk map found to be empty after refresh",
+            updatedChunkMap._chunkVectorMap.size() &&
+                updatedChunkMap._chunkVectorMap.begin()->second->size());
+    return updatedChunkMap;
 }
 
 void ChunkMap::_commitUpdatedChunkVector(std::shared_ptr<ChunkVector>&& chunkVectorPtr,
@@ -642,7 +654,7 @@ Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
     uassert(ErrorCodes::ShardKeyNotFound,
             str::stream() << "Cannot target single shard using key " << shardKey
                           << " for namespace " << _rt->optRt->nss(),
-            chunkInfo && chunkInfo->containsKey(shardKey));
+            chunkInfo);
 
     return Chunk(*chunkInfo, _clusterTime);
 }
@@ -654,8 +666,6 @@ bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& sha
     auto chunkInfo = _rt->optRt->findIntersectingChunk(shardKey);
     if (!chunkInfo)
         return false;
-
-    invariant(chunkInfo->containsKey(shardKey));
 
     return chunkInfo->getShardIdAt(_clusterTime) == shardId;
 }
