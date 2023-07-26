@@ -306,11 +306,14 @@ last-continuous:
     ticket: SERVER-60466
   - test_file: jstests/core/query/elemmatch/elemmatch_or_pushdown_paths.js
     ticket: SERVER-74954
+  - test_file: jstests/sharding/min_max_key.js
+    ticket: SERVER-67529
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
     ticket: SERVER-79136
   - test_file: jstests/core/timeseries/timeseries_create_collection.js
     ticket: SERVER-77382
   suites: null
+
 last-lts:
   all:
   - test_file: jstests/sharding/query/find_and_modify_with_partial_shard_key.js
@@ -689,6 +692,8 @@ last-lts:
     ticket: SERVER-60466
   - test_file: jstests/core/query/elemmatch/elemmatch_or_pushdown_paths.js
     ticket: SERVER-74954
+  - test_file: jstests/sharding/min_max_key.js
+    ticket: SERVER-67529
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
     ticket: SERVER-79136
   - test_file: jstests/replsets/commit_point_propagation_with_oplog_exhaust_cursor.js
