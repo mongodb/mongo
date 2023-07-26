@@ -550,7 +550,6 @@ public:
                 false /* setIsCleaningServerMetadata */);
         }
 
-
         // _finalizeUpgrade is only for any tasks that must be done to fully complete the FCV
         // upgrade AFTER the FCV document has already been updated to the UPGRADED FCV.
         // This is because during _runUpgrade, the FCV is still in the transitional state (which
@@ -597,6 +596,15 @@ private:
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(
                     opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
+        }
+
+        // TODO SERVER-79304 Remove once shardCollection authoritative version becomes LTS
+        if (isDowngrading &&
+            feature_flags::gAuthoritativeShardCollection
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kCreateCollection);
         }
 
         if (isUpgrading) {
@@ -1441,6 +1449,13 @@ private:
     // back to the user/client. Therefore, these tasks **must** be idempotent/retryable.
     void _finalizeUpgrade(OperationContext* opCtx,
                           const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        // TODO SERVER-79304 Remove once shardCollection authoritative version becomes LTS
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
+            feature_flags::gAuthoritativeShardCollection.isEnabledOnVersion(requestedVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kCreateCollectionPre71Compatible);
+        }
         _maybeRemoveOldAuditConfig(opCtx, requestedVersion);
     }
 
