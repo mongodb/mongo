@@ -1247,6 +1247,9 @@ public:
                                                                 electionId,
                                                                 containsRetry,
                                                                 retryAttemptsForDup);
+                if (!retryAttemptsForDup.empty()) {
+                    BucketCatalog::get(opCtx).resetBucketOIDCounter();
+                }
             } while (!docsToRetry.empty());
         }
 
