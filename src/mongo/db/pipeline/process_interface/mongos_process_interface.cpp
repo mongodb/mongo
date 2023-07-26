@@ -95,7 +95,7 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfo(
     auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
     auto swRoutingInfo = catalogCache->getCollectionRoutingInfo(expCtx->opCtx, expCtx->ns);
     // Additionally check that the ExpressionContext's UUID matches the collection routing info.
-    if (swRoutingInfo.isOK() && expCtx->uuid && swRoutingInfo.getValue().cm.isSharded()) {
+    if (swRoutingInfo.isOK() && expCtx->uuid && swRoutingInfo.getValue().cm.hasRoutingTable()) {
         if (!swRoutingInfo.getValue().cm.uuidMatches(*expCtx->uuid)) {
             return {ErrorCodes::NamespaceNotFound,
                     str::stream() << "The UUID of collection " << expCtx->ns.toStringForErrorMsg()
@@ -214,7 +214,7 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
                 auto cri = uassertStatusOK(getCollectionRoutingInfo(foreignExpCtx));
 
                 // Finalize the 'find' command object based on the routing table information.
-                if (findCmdIsByUuid && cri.cm.isSharded()) {
+                if (findCmdIsByUuid && cri.cm.hasRoutingTable()) {
                     // Find by UUID and shard versioning do not work together (SERVER-31946).  In
                     // the sharded case we've already checked the UUID, so find by namespace is
                     // safe.  In the unlikely case that the collection has been deleted and a new

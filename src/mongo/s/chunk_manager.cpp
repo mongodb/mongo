@@ -826,13 +826,6 @@ ChunkManager ChunkManager::makeAtTime(const ChunkManager& cm, Timestamp clusterT
     return ChunkManager(cm.dbPrimary(), cm.dbVersion(), cm._rt, clusterTime);
 }
 
-bool ChunkManager::isSplittable() const {
-    if (!_rt->optRt)
-        return false;
-
-    return !_rt->optRt->_unsplittable;
-}
-
 bool ChunkManager::allowMigrations() const {
     if (!_rt->optRt)
         return true;

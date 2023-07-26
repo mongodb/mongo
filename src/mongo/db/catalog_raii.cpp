@@ -359,6 +359,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         scopedCss->checkShardVersionOrThrow(opCtx);
 
         auto collDesc = scopedCss->getCollectionDescription(opCtx);
+        // TODO SERVER-79296 remove call to isSharded
         if (collDesc.isSharded()) {
             _coll.setShardKeyPattern(collDesc.getKeyPattern());
         }

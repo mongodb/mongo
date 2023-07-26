@@ -709,7 +709,7 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
 
     // Collections which are always UNSHARDED have a fixed CSS, which never changes, so we don't
     // need to do anything
-    if (collectionName.isNamespaceAlwaysUnsharded()) {
+    if (collectionName.isNamespaceAlwaysUntracked()) {
         return;
     }
 

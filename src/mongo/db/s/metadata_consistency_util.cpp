@@ -325,9 +325,9 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
             // Case where we have found a local collection that is not in the catalog client.
             const auto& nss = localNss;
 
-            // TODO SERVER-59957 use function introduced in this ticket to decide if a namesapce
-            // should be ignored and stop using isNamepsaceAlwaysUnsharded().
-            if (!nss.isNamespaceAlwaysUnsharded() && shardId != primaryShardId) {
+            // TODO SERVER-59957 use function introduced in this ticket to decide if a namespace
+            // should be ignored and stop using isNamepsaceAlwaysUntracked().
+            if (!nss.isNamespaceAlwaysUntracked() && shardId != primaryShardId) {
                 inconsistencies.emplace_back(
                     makeInconsistency(MetadataInconsistencyTypeEnum::kMisplacedCollection,
                                       MisplacedCollectionDetails{localNss, shardId, localUUID}));
@@ -341,9 +341,9 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
         // hidden unsharded collection inconsistency if we are not the db primary shard.
         while (itLocalCollections != localCollections.end()) {
             const auto localColl = itLocalCollections->get();
-            // TODO SERVER-59957 use function introduced in this ticket to decide if a namesapce
-            // should be ignored and stop using isNamepsaceAlwaysUnsharded().
-            if (!localColl->ns().isNamespaceAlwaysUnsharded()) {
+            // TODO SERVER-59957 use function introduced in this ticket to decide if a namespace
+            // should be ignored and stop using isNamepsaceAlwaysUntracked().
+            if (!localColl->ns().isNamespaceAlwaysUntracked()) {
                 inconsistencies.emplace_back(makeInconsistency(
                     MetadataInconsistencyTypeEnum::kMisplacedCollection,
                     MisplacedCollectionDetails{localColl->ns(), shardId, localColl->uuid()}));

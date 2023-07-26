@@ -307,7 +307,7 @@ public:
                 return reply;
             }
 
-            if (collection.isSharded()) {
+            if (collection.isSharded_DEPRECATED()) {
                 const auto& shardKeyPattern = collection.getShardKeyPattern();
                 uassert(ErrorCodes::BadValue,
                         "keyPattern must be empty or must be an object that equals the shard key",

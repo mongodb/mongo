@@ -250,7 +250,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
 
     bool isMainCollectionSharded = false;
     if (const auto& mainColl = collections.getMainCollection()) {
-        isMainCollectionSharded = mainColl.isSharded();
+        isMainCollectionSharded = mainColl.isSharded_DEPRECATED();
     }
 
     // If lookup pushdown isn't enabled or the main collection is sharded or any of the secondary

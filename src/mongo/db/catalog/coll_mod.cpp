@@ -129,7 +129,9 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString cons
         auto collDesc = scopedCss->getCollectionDescription(opCtx);
         collDesc.throwIfReshardingInProgress(nss);
 
-        if (!collDesc.isSharded()) {
+        // Only collections that are not registered in the sharding catalog are affected by
+        // movePrimary
+        if (!collDesc.hasRoutingTable()) {
             if (scopedDss->isMovePrimaryInProgress()) {
                 LOGV2(4945200, "assertNoMovePrimaryInProgress", logAttrs(nss));
 

@@ -657,11 +657,26 @@ public:
 
     // Methods supported on both sharded and unsharded collections
 
-    bool isSharded() const {
+    /*
+     * Returns true if this chunk manager has a routing table.
+     *
+     * True for:
+     *   - sharded collections.
+     *   - unsharded collections tracked by the configsvr.
+     * False for:
+     *   - unsharded collections not tracked by the configsvr.
+     *   - non-existent collections.
+     */
+    bool hasRoutingTable() const {
         return bool(_rt->optRt);
     }
 
-    bool isSplittable() const;
+    /*
+     * Returns true if routing table is present and unsplittable flag is not set
+     */
+    bool isSharded() const {
+        return hasRoutingTable() ? !_rt->optRt->_unsplittable : false;
+    }
 
     bool isAtPointInTime() const {
         return bool(_clusterTime);
@@ -687,7 +702,8 @@ public:
 
     std::string toString() const;
 
-    // Methods only supported on sharded collections (caller must check isSharded())
+    // Methods only supported on collections registered in the sharding catalog (caller must check
+    // hasRoutingTable())
 
     const ShardKeyPattern& getShardKeyPattern() const {
         tassert(7626400, "Expected routing table to be initialized", _rt->optRt);

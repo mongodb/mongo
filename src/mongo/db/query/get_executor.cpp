@@ -478,7 +478,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
 
     // If the caller wants a shard filter, make sure we're actually sharded.
     if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        if (collection.isSharded()) {
+        if (collection.isSharded_DEPRECATED()) {
             const auto& shardKeyPattern = collection.getShardKeyPattern();
 
             // If the shard key is specified exactly, the query is guaranteed to only target one

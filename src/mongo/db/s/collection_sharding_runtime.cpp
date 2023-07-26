@@ -85,9 +85,9 @@
 namespace mongo {
 namespace {
 
-class UnshardedCollection : public ScopedCollectionDescription::Impl {
+class UntrackedCollection : public ScopedCollectionDescription::Impl {
 public:
-    UnshardedCollection() = default;
+    UntrackedCollection() = default;
 
     const CollectionMetadata& get() override {
         return _metadata;
@@ -97,7 +97,7 @@ private:
     CollectionMetadata _metadata;
 };
 
-const auto kUnshardedCollection = std::make_shared<UnshardedCollection>();
+const auto kUntrackedCollection = std::make_shared<UntrackedCollection>();
 
 boost::optional<ShardVersion> getOperationReceivedVersion(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
@@ -131,7 +131,7 @@ CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime::
 CollectionShardingRuntime::CollectionShardingRuntime(ServiceContext* service, NamespaceString nss)
     : _serviceContext(service),
       _nss(std::move(nss)),
-      _metadataType(_nss.isNamespaceAlwaysUnsharded() ? MetadataType::kUnsharded
+      _metadataType(_nss.isNamespaceAlwaysUntracked() ? MetadataType::kUntracked
                                                       : MetadataType::kUnknown) {}
 
 CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime
@@ -195,13 +195,13 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
     OperationContext* opCtx, bool operationIsVersioned) const {
     // If the server has been started with --shardsvr, but hasn't been added to a cluster we should
-    // consider all collections as unsharded
+    // consider all collections as untracked
     if (!ShardingState::get(opCtx)->enabled())
-        return {kUnshardedCollection};
+        return {kUntrackedCollection};
 
     // Present the collection as unsharded to internal or direct commands against shards
     if (!operationIsVersioned)
-        return {kUnshardedCollection};
+        return {kUntrackedCollection};
 
     auto& oss = OperationShardingState::get(opCtx);
 
@@ -279,8 +279,8 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
                                                      CollectionMetadata newMetadata) {
     tassert(7032302,
             str::stream() << "Namespace " << _nss.toStringForErrorMsg()
-                          << " must never be sharded.",
-            !newMetadata.isSharded() || !_nss.isNamespaceAlwaysUnsharded());
+                          << " must never have a routing table.",
+            !newMetadata.hasRoutingTable() || !_nss.isNamespaceAlwaysUntracked());
 
     stdx::lock_guard lk(_metadataManagerLock);
 
@@ -293,19 +293,16 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
             _cleanupBeforeInstallingNewCollectionMetadata(lk, opCtx);
     }
 
-    if (!newMetadata.isSharded()) {
-        LOGV2(21917,
-              "Marking collection {namespace} as unsharded",
-              "Marking collection as unsharded",
-              logAttrs(_nss));
-        _metadataType = MetadataType::kUnsharded;
+    if (!newMetadata.hasRoutingTable()) {
+        LOGV2(7917801, "Marking collection as untracked", logAttrs(_nss));
+        _metadataType = MetadataType::kUntracked;
         _metadataManager.reset();
         ++_numMetadataManagerChanges;
         return;
     }
 
-    // At this point we know that the new metadata is associated to a sharded collection.
-    _metadataType = MetadataType::kSharded;
+    // At this point we know that the new metadata is associated to a tracked collection.
+    _metadataType = MetadataType::kTracked;
 
     if (!_metadataManager || !newMetadata.uuidMatches(_metadataManager->getCollectionUuid())) {
         _metadataManager =
@@ -322,23 +319,26 @@ void CollectionShardingRuntime::_clearFilteringMetadata(OperationContext* opCtx,
         _placementVersionInRecoverOrRefresh->cancellationSource.cancel();
     }
 
-    stdx::lock_guard lk(_metadataManagerLock);
-    if (!_nss.isNamespaceAlwaysUnsharded()) {
-        LOGV2_DEBUG(4798530,
-                    1,
-                    "Clearing metadata for collection {namespace}",
-                    "Clearing collection metadata",
-                    logAttrs(_nss),
-                    "collIsDropped"_attr = collIsDropped);
-
-        // If the collection is sharded and it's being dropped we might need to clean up some state.
-        if (collIsDropped)
-            _cleanupBeforeInstallingNewCollectionMetadata(lk, opCtx);
-
-        _metadataType = MetadataType::kUnknown;
-        if (collIsDropped)
-            _metadataManager.reset();
+    if (_nss.isNamespaceAlwaysUntracked()) {
+        // The namespace is always marked as untraked thus there is no need to clear anything.
+        return;
     }
+
+    stdx::lock_guard lk(_metadataManagerLock);
+    LOGV2_DEBUG(4798530,
+                1,
+                "Clearing metadata for collection {namespace}",
+                "Clearing collection metadata",
+                logAttrs(_nss),
+                "collIsDropped"_attr = collIsDropped);
+
+    // If the collection is sharded and it's being dropped we might need to clean up some state.
+    if (collIsDropped)
+        _cleanupBeforeInstallingNewCollectionMetadata(lk, opCtx);
+
+    _metadataType = MetadataType::kUnknown;
+    if (collIsDropped)
+        _metadataManager.reset();
 }
 
 void CollectionShardingRuntime::clearFilteringMetadata(OperationContext* opCtx) {
@@ -365,7 +365,7 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
 
             // If the metadata was reset, or the collection was dropped and recreated since the
             // metadata manager was created, return an error.
-            if (self->_metadataType != MetadataType::kSharded ||
+            if (self->_metadataType != MetadataType::kTracked ||
                 (collectionUuid != self->_metadataManager->getCollectionUuid())) {
                 return {ErrorCodes::ConflictingOperationInProgress,
                         "Collection being migrated was dropped and created or otherwise had its "
@@ -440,12 +440,12 @@ CollectionShardingRuntime::_getCurrentMetadataIfKnown(
             // the only sharded collection.
             if (getGlobalReplSettings().isServerless() &&
                 _nss != NamespaceString::kLogicalSessionsNamespace) {
-                return kUnshardedCollection;
+                return kUntrackedCollection;
             }
             return nullptr;
-        case MetadataType::kUnsharded:
-            return kUnshardedCollection;
-        case MetadataType::kSharded:
+        case MetadataType::kUntracked:
+            return kUntrackedCollection;
+        case MetadataType::kTracked:
             return _metadataManager->getActiveMetadata(atClusterTime);
     };
     MONGO_UNREACHABLE;
@@ -460,14 +460,14 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     // If the server has been started with --shardsvr, but hasn't been added to a cluster we should
     // consider all collections as unsharded
     if (!ShardingState::get(opCtx)->enabled())
-        return kUnshardedCollection;
+        return kUntrackedCollection;
 
     if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
         repl::ReadConcernLevel::kAvailableReadConcern)
-        return kUnshardedCollection;
+        return kUntrackedCollection;
 
     if (!optReceivedShardVersion && !supportNonVersionedOperations)
-        return kUnshardedCollection;
+        return kUntrackedCollection;
 
     // Assume that the received shard version was IGNORED if the current operation wasn't versioned
     const auto& receivedShardVersion = optReceivedShardVersion

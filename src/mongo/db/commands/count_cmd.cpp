@@ -255,7 +255,7 @@ public:
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
         boost::optional<ScopedCollectionFilter> rangePreserver;
-        if (collection.isSharded()) {
+        if (collection.isSharded_DEPRECATED()) {
             rangePreserver.emplace(
                 CollectionShardingState::acquire(opCtx, nss)
                     ->getOwnershipFilter(
@@ -363,7 +363,7 @@ public:
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
         boost::optional<ScopedCollectionFilter> rangePreserver;
-        if (collection.isSharded()) {
+        if (collection.isSharded_DEPRECATED()) {
             rangePreserver.emplace(
                 CollectionShardingState::acquire(opCtx, nss)
                     ->getOwnershipFilter(

@@ -277,7 +277,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                 const auto& collection = collections.getMainCollection();
                 tassert(6108307,
                         "Setting shard filterer slot on un-sharded collection",
-                        collection.isSharded());
+                        collection.isSharded_DEPRECATED());
 
                 ShardFiltererFactoryImpl shardFiltererFactory(collection);
                 return shardFiltererFactory.makeShardFilterer(opCtx);

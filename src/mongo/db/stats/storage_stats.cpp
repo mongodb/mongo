@@ -113,7 +113,7 @@ void _appendRecordStats(OperationContext* opCtx,
                         const CollectionPtr& collection,
                         const NamespaceString& collNss,
                         const SerializationContext& serializationCtx,
-                        bool isNamespaceAlwaysUnsharded,
+                        bool isNamespaceAlwaysUntracked,
                         int scale,
                         bool isTimeseries,
                         BSONObjBuilder* result) {
@@ -141,7 +141,7 @@ void _appendRecordStats(OperationContext* opCtx,
     }
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-        !isNamespaceAlwaysUnsharded) {
+        !isNamespaceAlwaysUntracked) {
         result->appendNumber(
             kOrphanCountField,
             BalancerStatsRegistry::get(opCtx)->getCollNumOrphanDocsFromDiskIfNeeded(
@@ -413,7 +413,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
                                    collection,
                                    collNss,
                                    serializationCtx,
-                                   nss.isNamespaceAlwaysUnsharded(),
+                                   nss.isNamespaceAlwaysUntracked(),
                                    scale,
                                    isTimeseries,
                                    result);

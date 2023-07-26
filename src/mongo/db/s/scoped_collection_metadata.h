@@ -53,6 +53,10 @@ public:
 
     ScopedCollectionDescription(std::shared_ptr<Impl> impl) : _impl(std::move(impl)) {}
 
+    bool hasRoutingTable() const {
+        return _impl->get().hasRoutingTable();
+    }
+
     bool isSharded() const {
         return _impl->get().isSharded();
     }

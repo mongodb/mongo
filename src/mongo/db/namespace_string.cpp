@@ -328,7 +328,7 @@ StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const 
     return repl::OpTime(Timestamp(Seconds(seconds), increment), term);
 }
 
-bool NamespaceString::isNamespaceAlwaysUnsharded() const {
+bool NamespaceString::isNamespaceAlwaysUntracked() const {
     // Local and admin never have sharded collections
     if (isLocalDB() || isAdminDB())
         return true;

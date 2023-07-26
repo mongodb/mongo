@@ -783,7 +783,8 @@ public:
     void setShardKeyPattern(const BSONObj& shardKeyPattern);
     const ShardKeyPattern& getShardKeyPattern() const;
 
-    bool isSharded() const {
+    // TODO SERVER-79296 remove sharding info from CollectionPtr
+    bool isSharded_DEPRECATED() const {
         return static_cast<bool>(_shardKeyPattern);
     }
 

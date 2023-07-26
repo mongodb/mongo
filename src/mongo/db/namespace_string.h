@@ -588,10 +588,12 @@ public:
     }
 
     /**
-     * Returns whether the specified namespace is used for internal purposes only and can
-     * never be marked as anything other than UNSHARDED.
+     * Returns whether the specified namespace is never tracked in the sharding catalog.
+     *
+     * These class of namespaces are used for internal purposes only and they are only registered in
+     * the local catalog but not tracked by the sharding catalog.
      */
-    bool isNamespaceAlwaysUnsharded() const;
+    bool isNamespaceAlwaysUntracked() const;
 
     /**
      * Returns whether the specified namespace is config.cache.chunks.<>.

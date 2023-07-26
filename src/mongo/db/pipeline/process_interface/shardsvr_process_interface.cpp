@@ -121,8 +121,8 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     auto wantedVersion = [&] {
         auto routingInfo =
             uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss));
-        auto foundVersion =
-            routingInfo.cm.isSharded() ? routingInfo.cm.getVersion() : ChunkVersion::UNSHARDED();
+        auto foundVersion = routingInfo.cm.hasRoutingTable() ? routingInfo.cm.getVersion()
+                                                             : ChunkVersion::UNSHARDED();
 
         auto ignoreIndexVersion = ShardVersionFactory::make(
             foundVersion,
@@ -243,7 +243,7 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
 
 BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
-    if (nss.isNamespaceAlwaysUnsharded()) {
+    if (nss.isNamespaceAlwaysUntracked()) {
         return getCollectionOptionsLocally(opCtx, nss);
     }
 

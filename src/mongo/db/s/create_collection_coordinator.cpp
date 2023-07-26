@@ -789,7 +789,7 @@ void CreateCollectionCoordinatorLegacy::_checkCommandArguments(OperationContext*
 
     uassert(ErrorCodes::IllegalOperation,
             "Special collection '" + originalNss().toStringForErrorMsg() + "' cannot be sharded",
-            !originalNss().isNamespaceAlwaysUnsharded());
+            !originalNss().isNamespaceAlwaysUntracked());
 
     // Ensure that hashed and unique are not both set.
     uassert(ErrorCodes::InvalidOptions,

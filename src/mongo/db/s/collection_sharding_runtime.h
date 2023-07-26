@@ -372,13 +372,17 @@ private:
     mutable Mutex _metadataManagerLock =
         MONGO_MAKE_LATCH("CollectionShardingRuntime::_metadataManagerLock");
 
-    // Tracks whether the filtering metadata is unknown, unsharded, or sharded
-    enum class MetadataType { kUnknown, kUnsharded, kSharded } _metadataType;
+    // Track status of filtering metadata for a specific collection
+    enum class MetadataType {
+        kUnknown,    // metadata is not known to this node
+        kUntracked,  // no metadata found in the sharding catalog
+        kTracked     // metadata for this collection is registered in the sharding catalog
+    } _metadataType;
 
-    // If the collection state is known and is unsharded, this will be nullptr.
+    // If the collection state is known and is untracked, this will be nullptr.
     //
-    // If the collection state is known and is sharded, this will point to the metadata associated
-    // with this collection.
+    // If the collection state is known and is tracked, this will point to the metadata
+    // associated with this collection.
     //
     // If the collection state is unknown:
     // - If the metadata had never been set yet, this will be nullptr.
@@ -386,15 +390,15 @@ private:
     // were known for the collection before the last invocation of clearFilteringMetadata().
     //
     // The following matrix enumerates the valid (Y) and invalid (X) scenarios.
-    //                          _________________________________
-    //                         | _metadataType (collection state)|
-    //                         |_________________________________|
-    //                         | UNKNOWN | UNSHARDED |  SHARDED  |
-    //  _______________________|_________|___________|___________|
-    // |_metadataManager unset |    Y    |     Y     |     X     |
-    // |_______________________|_________|___________|___________|
-    // |_metadataManager set   |    Y    |     X     |     Y     |
-    // |_______________________|_________|___________|___________|
+    //                          __________________________________
+    //                         | _metadataType (collection state) |
+    //                         |__________________________________|
+    //                         | UNKNOWN | UNTRACKED |  TRACKED   |
+    //  _______________________|_________|___________|____________|
+    // |_metadataManager unset |    Y    |     Y     |     X      |
+    // |_______________________|_________|___________|____________|
+    // |_metadataManager set   |    Y    |     X     |     Y      |
+    // |_______________________|_________|___________|____________|
     std::shared_ptr<MetadataManager> _metadataManager;
 
     // Used for testing to check the number of times a new MetadataManager has been installed.

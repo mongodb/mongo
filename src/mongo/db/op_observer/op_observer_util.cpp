@@ -117,7 +117,7 @@ DocumentKey getDocumentKey(const CollectionPtr& coll, BSONObj const& doc) {
     BSONObj id = idField ? idField.wrap() : doc;
     boost::optional<BSONObj> shardKey;
 
-    if (coll.isSharded()) {
+    if (coll.isSharded_DEPRECATED()) {
         shardKey = dotted_path_support::extractElementsBasedOnTemplate(
                        doc, coll.getShardKeyPattern().toBSON())
                        .getOwned();

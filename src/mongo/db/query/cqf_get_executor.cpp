@@ -359,7 +359,7 @@ void setupShardFiltering(OperationContext* opCtx,
 
     // TODO SERVER-79007: Merge this method of creating a ShardFilterer with that in
     // sbe_stage_builders.cpp.
-    if (collection.isSharded()) {
+    if (collection.isSharded_DEPRECATED()) {
         auto shardFilterer = [&]() -> std::unique_ptr<ShardFilterer> {
             ShardFiltererFactoryImpl shardFiltererFactory(collection);
             return shardFiltererFactory.makeShardFilterer(opCtx);

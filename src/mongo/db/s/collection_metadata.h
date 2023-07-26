@@ -86,7 +86,11 @@ public:
      * Returns whether this metadata object represents a sharded or unsharded collection.
      */
     bool isSharded() const {
-        return bool(_cm);
+        return _cm && _cm->isSharded();
+    }
+
+    bool hasRoutingTable() const {
+        return _cm && _cm->hasRoutingTable();
     }
 
     bool allowMigrations() const;
@@ -110,7 +114,7 @@ public:
      * the CollectionMetadata's current chunk manager.
      */
     ChunkVersion getShardPlacementVersion() const {
-        return (isSharded() ? _cm->getVersion(_thisShardId) : ChunkVersion::UNSHARDED());
+        return (hasRoutingTable() ? _cm->getVersion(_thisShardId) : ChunkVersion::UNSHARDED());
     }
 
     /**
@@ -123,7 +127,7 @@ public:
      * the CollectionMetadata's current chunk manager.
      */
     Timestamp getShardMaxValidAfter() const {
-        return (isSharded() ? _cm->getMaxValidAfter(_thisShardId) : Timestamp(0, 0));
+        return (hasRoutingTable() ? _cm->getMaxValidAfter(_thisShardId) : Timestamp(0, 0));
     }
 
     /**
@@ -136,26 +140,27 @@ public:
      * instead.
      */
     ChunkVersion getShardPlacementVersionForLogging() const {
-        return (isSharded() ? _cm->getVersionForLogging(_thisShardId) : ChunkVersion::UNSHARDED());
+        return (hasRoutingTable() ? _cm->getVersionForLogging(_thisShardId)
+                                  : ChunkVersion::UNSHARDED());
     }
 
     /**
      * Returns the current collection placement version or UNSHARDED if it is not sharded.
      */
     ChunkVersion getCollPlacementVersion() const {
-        return (isSharded() ? _cm->getVersion() : ChunkVersion::UNSHARDED());
+        return (hasRoutingTable() ? _cm->getVersion() : ChunkVersion::UNSHARDED());
     }
 
     /**
      * Obtains the shard id with which this collection metadata is configured.
      */
     const ShardId& shardId() const {
-        invariant(isSharded());
+        invariant(hasRoutingTable());
         return _thisShardId;
     }
 
     const ShardKeyPattern& getShardKeyPattern() const {
-        invariant(isSharded());
+        invariant(hasRoutingTable());
         return _cm->getShardKeyPattern();
     }
 
@@ -183,7 +188,7 @@ public:
     }
 
     bool uuidMatches(UUID uuid) const {
-        invariant(isSharded());
+        invariant(hasRoutingTable());
         return _cm->uuidMatches(uuid);
     }
 
@@ -213,7 +218,7 @@ public:
     //
 
     const ChunkManager* getChunkManager() const {
-        invariant(isSharded());
+        invariant(hasRoutingTable());
         return _cm.get_ptr();
     }
 
@@ -222,7 +227,7 @@ public:
      * returns false. If key is not a valid shard key, the behaviour is undefined.
      */
     bool keyBelongsToMe(const BSONObj& key) const {
-        invariant(isSharded());
+        invariant(hasRoutingTable());
         return _cm->keyBelongsToShard(key, _thisShardId);
     }
 
@@ -238,7 +243,7 @@ public:
      * Returns true if the argument range overlaps any chunk.
      */
     bool rangeOverlapsChunk(const ChunkRange& range) const {
-        invariant(isSharded());
+        invariant(hasRoutingTable());
         return _cm->rangeOverlapsShard(range, _thisShardId);
     }
 
@@ -279,12 +284,12 @@ public:
     void toBSONChunks(BSONArrayBuilder* builder) const;
 
     const boost::optional<TypeCollectionReshardingFields>& getReshardingFields() const {
-        invariant(isSharded());
+        invariant(hasRoutingTable());
         return _cm->getReshardingFields();
     }
 
     const boost::optional<TypeCollectionTimeseriesFields>& getTimeseriesFields() const {
-        invariant(isSharded());
+        invariant(hasRoutingTable());
         return _cm->getTimeseriesFields();
     }
 

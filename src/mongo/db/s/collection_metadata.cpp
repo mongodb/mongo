@@ -66,7 +66,7 @@ bool CollectionMetadata::allowMigrations() const {
 }
 
 boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldForwardOps() const {
-    if (!isSharded())
+    if (!hasRoutingTable())
         return boost::none;
 
     const auto& reshardingFields = getReshardingFields();
@@ -108,7 +108,7 @@ boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldFor
 }
 
 void CollectionMetadata::throwIfReshardingInProgress(NamespaceString const& nss) const {
-    if (isSharded()) {
+    if (hasRoutingTable()) {
         const auto& reshardingFields = getReshardingFields();
         // Throw if the coordinator is not in states "aborting", "committing", or "done".
         if (reshardingFields && reshardingFields->getState() < CoordinatorStateEnum::kAborting) {
@@ -146,7 +146,7 @@ BSONObj CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {
 }
 
 std::string CollectionMetadata::toStringBasic() const {
-    if (isSharded()) {
+    if (hasRoutingTable()) {
         return str::stream() << "collection placement version: " << _cm->getVersion().toString()
                              << ", shard placement version: "
                              << getShardPlacementVersionForLogging().toString();
@@ -156,7 +156,7 @@ std::string CollectionMetadata::toStringBasic() const {
 }
 
 RangeMap CollectionMetadata::getChunks() const {
-    invariant(isSharded());
+    invariant(hasRoutingTable());
 
     RangeMap chunksMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>());
 
@@ -171,7 +171,7 @@ RangeMap CollectionMetadata::getChunks() const {
 }
 
 bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey, ChunkType* chunk) const {
-    invariant(isSharded());
+    invariant(hasRoutingTable());
 
     auto nextChunk = _cm->getNextChunkOnShard(lookupKey, _thisShardId);
     if (!nextChunk)
@@ -184,7 +184,7 @@ bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey, ChunkType* chunk
 }
 
 bool CollectionMetadata::currentShardHasAnyChunks() const {
-    invariant(isSharded());
+    invariant(hasRoutingTable());
     std::set<ShardId> shards;
     _cm->getAllShardIds(&shards);
     return shards.find(_thisShardId) != shards.end();
@@ -260,7 +260,7 @@ boost::optional<ChunkRange> CollectionMetadata::getNextOrphanRange(
 }
 
 void CollectionMetadata::toBSONChunks(BSONArrayBuilder* builder) const {
-    if (!isSharded())
+    if (!hasRoutingTable())
         return;
 
     _cm->forEachChunk([this, &builder](const auto& chunk) {
