@@ -172,7 +172,9 @@ CollectionShardingState::ScopedCollectionShardingState::acquireScopedCollectionS
 CollectionShardingState::ScopedCollectionShardingState
 CollectionShardingState::assertCollectionLockedAndAcquire(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
+    dassert(opCtx->isLockFreeReadsOp() ||
+            opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS) ||
+            (nss.isOplog() && opCtx->lockState()->isReadLocked()));
 
     return acquire(opCtx, nss);
 }
