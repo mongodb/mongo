@@ -13,6 +13,10 @@ if not gdb:
 OPTIMIZER_NS = "mongo::optimizer"
 
 
+def strip_namespace(value):
+    return str(value).split("::")[-1]
+
+
 def eval_print_fn(val, print_fn):
     """Evaluate a print function, and return the resulting string."""
 
@@ -59,6 +63,14 @@ class IntervalPrinter(OptimizerTypePrinter):
     def __init__(self, val):
         """Initialize IntervalPrinter."""
         super().__init__(val, "ExplainGenerator::explainInterval")
+
+
+class CompoundIntervalPrinter(OptimizerTypePrinter):
+    """Pretty-printer for mongo::optimizer::CompoundIntervalRequirement."""
+
+    def __init__(self, val):
+        """Initialize CompoundIntervalPrinter."""
+        super().__init__(val, "ExplainGenerator::explainCompoundInterval")
 
 
 class CandidateIndexEntryPrinter(OptimizerTypePrinter):
@@ -354,7 +366,7 @@ class PathComparePrinter(FixedArityNodePrinter):
         super().__init__(val, 1, "PathCompare")
 
     def to_string(self):
-        return "PathCompare[{}]".format(op_to_string(self.val["_cmp"]))
+        return "PathCompare[{}]".format(strip_namespace(self.val["_cmp"]))
 
 
 class PathTraversePrinter(FixedArityNodePrinter):
@@ -388,10 +400,6 @@ class EvalFilterPrinter(FixedArityNodePrinter):
         super().__init__(val, 2, "EvalFilter")
 
 
-def op_to_string(op):
-    return str(op).split("::")[-1]
-
-
 class UnaryOpPrinter(FixedArityNodePrinter):
     """Pretty-printer for UnaryOp."""
 
@@ -400,7 +408,7 @@ class UnaryOpPrinter(FixedArityNodePrinter):
         super().__init__(val, 1, "UnaryOp")
 
     def to_string(self):
-        return "UnaryOp[{}]".format(op_to_string(self.val["_op"]))
+        return "UnaryOp[{}]".format(strip_namespace(self.val["_op"]))
 
 
 class BinaryOpPrinter(FixedArityNodePrinter):
@@ -411,7 +419,7 @@ class BinaryOpPrinter(FixedArityNodePrinter):
         super().__init__(val, 2, "BinaryOp")
 
     def to_string(self):
-        return "BinaryOp[{}]".format(op_to_string(self.val["_op"]))
+        return "BinaryOp[{}]".format(strip_namespace(self.val["_op"]))
 
 
 class EvalPathPrinter(FixedArityNodePrinter):
@@ -752,13 +760,24 @@ class RIDIntersectNodePrinter(FixedArityNodePrinter):
         """Initialize RIDIntersectNodePrinter."""
         super().__init__(val, 2, "RIDIntersect")
 
+    def to_string(self):
+        return "RIDIntersect[" + str(self.val["_scanProjectionName"]) + "]"
+
 
 class RIDUnionNodePrinter(FixedArityNodePrinter):
     """Pretty-printer for RIDUnionNode."""
 
     def __init__(self, val):
         """Initialize RIDUnionNodePrinter."""
-        super().__init__(val, 2, "RIDUnion")
+        super().__init__(val, 4, "RIDUnion")
+
+    def to_string(self):
+        return "RIDUnion[" + str(self.val["_scanProjectionName"]) + "]"
+
+
+def print_correlated_projections(projections):
+    # Strip off the extra absl map prefix.
+    return str(projections).split("elems ")[-1]
 
 
 class BinaryJoinNodePrinter(FixedArityNodePrinter):
@@ -768,6 +787,19 @@ class BinaryJoinNodePrinter(FixedArityNodePrinter):
         """Initialize BinaryJoinNodePrinter."""
         super().__init__(val, 3, "BinaryJoin")
 
+    def to_string(self):
+        correlated = print_correlated_projections(self.val["_correlatedProjectionNames"])
+        return "BinaryJoin[type=" + str(strip_namespace(
+            self.val["_joinType"])) + ", " + correlated + "]"
+
+
+def print_eq_join_condition(leftKeys, rightKeys):
+    condition = "Condition["
+    for i in range(leftKeys.count()):
+        condition += str(leftKeys.get(i)) + "==" + str(rightKeys.get(i)) + ","
+    condition += "]"
+    return condition
+
 
 class HashJoinNodePrinter(FixedArityNodePrinter):
     """Pretty-printer for HashJoinNode."""
@@ -775,6 +807,14 @@ class HashJoinNodePrinter(FixedArityNodePrinter):
     def __init__(self, val):
         """Initialize HashJoinNodePrinter."""
         super().__init__(val, 3, "HashJoin")
+
+        # Manually add the child which prints the sets of keys.
+        leftKeys = Vector(self.val["_leftKeys"])
+        rightKeys = Vector(self.val["_rightKeys"])
+        self.add_child(print_eq_join_condition(leftKeys, rightKeys))
+
+    def to_string(self):
+        return "HashJoin[type=" + strip_namespace(self.val["_joinType"]) + "]"
 
 
 class MergeJoinNodePrinter(FixedArityNodePrinter):
@@ -784,6 +824,26 @@ class MergeJoinNodePrinter(FixedArityNodePrinter):
         """Initialize MergeJoinNodePrinter."""
         super().__init__(val, 3, "MergeJoin")
 
+        # Manually add the collation ops.
+        collationOps = Vector(self.val["_collation"])
+        collationChild = "Collation[" + ", ".join(str(collation)
+                                                  for collation in collationOps) + "]"
+        self.add_child(collationChild)
+
+        # Manually add the child which prints the sets of keys.
+        leftKeys = Vector(self.val["_leftKeys"])
+        rightKeys = Vector(self.val["_rightKeys"])
+        self.add_child(print_eq_join_condition(leftKeys, rightKeys))
+
+    def to_string(self):
+        return "MergeJoin"
+
+
+def print_collation_req(req):
+    spec = Vector(req["_spec"])
+    return ", ".join(
+        str(entry["first"]) + ": " + strip_namespace(entry["second"]) for entry in spec)
+
 
 class SortedMergeNodePrinter(DynamicArityNodePrinter):
     """Pretty-printer for SortedMergeNode."""
@@ -792,6 +852,11 @@ class SortedMergeNodePrinter(DynamicArityNodePrinter):
         """Initialize SortedMergeNodePrinter."""
         super().__init__(val, 2, "MergeJoin")
 
+        self.add_child("collation[" + print_collation_req(self.val["_collationReq"]) + "]")
+
+    def to_string(self):
+        return "SortedMerge"
+
 
 class NestedLoopJoinNodePrinter(FixedArityNodePrinter):
     """Pretty-printer for NestedLoopJoinNode."""
@@ -799,6 +864,11 @@ class NestedLoopJoinNodePrinter(FixedArityNodePrinter):
     def __init__(self, val):
         """Initialize NestedLoopJoinNodePrinter."""
         super().__init__(val, 3, "NestedLoopJoin")
+
+    def to_string(self):
+        correlated = print_correlated_projections(self.val["_correlatedProjectionNames"])
+        return "NestedLoopJoin[type=" + strip_namespace(
+            self.val["_joinType"]) + ", " + correlated + "]"
 
 
 class UnwindNodePrinter(FixedArityNodePrinter):
@@ -824,6 +894,10 @@ class SpoolProducerNodePrinter(FixedArityNodePrinter):
         """Initialize SpoolProducerNodePrinter."""
         super().__init__(val, 4, "SpoolProducer")
 
+    def to_string(self):
+        return "SpoolProducer[" + strip_namespace(self.val["_type"]) + ", id:" + str(
+            self.val["_spoolId"]) + "]"
+
 
 class SpoolConsumerNodePrinter(FixedArityNodePrinter):
     """Pretty-printer for SpoolConsumerNode."""
@@ -832,13 +906,22 @@ class SpoolConsumerNodePrinter(FixedArityNodePrinter):
         """Initialize SpoolConsumerNodePrinter."""
         super().__init__(val, 1, "SpoolConsumer")
 
+    def to_string(self):
+        return "SpoolConsumer[" + strip_namespace(self.val["_type"]) + ", id:" + str(
+            self.val["_spoolId"]) + "]"
+
 
 class CollationNodePrinter(FixedArityNodePrinter):
     """Pretty-printer for CollationNode."""
 
     def __init__(self, val):
         """Initialize CollationNodePrinter."""
-        super().__init__(val, 2, "Collation")
+
+        # Don't print the references, will print them inline below.
+        super().__init__(val, 1, "Collation")
+
+    def to_string(self):
+        return "Collation[" + print_collation_req(self.val["_property"]) + "]"
 
 
 class LimitSkipNodePrinter(FixedArityNodePrinter):
@@ -848,6 +931,10 @@ class LimitSkipNodePrinter(FixedArityNodePrinter):
         """Initialize LimitSkipNodePrinter."""
         super().__init__(val, 1, "LimitSkip")
 
+    def to_string(self):
+        return "LimitSkip[limit: " + str(self.val["_property"]["_limit"]) + ", skip: " + str(
+            self.val["_property"]["_skip"]) + "]"
+
 
 class ExchangeNodePrinter(FixedArityNodePrinter):
     """Pretty-printer for ExchangeNode."""
@@ -855,6 +942,12 @@ class ExchangeNodePrinter(FixedArityNodePrinter):
     def __init__(self, val):
         """Initialize ExchangeNodePrinter."""
         super().__init__(val, 2, "Exchange")
+
+    def to_string(self):
+        return "Exchange[type: " + str(
+            self.val["_distribution"]["_distributionAndProjections"]
+            ["_type"]) + ", projections: " + str(
+                self.val["_distribution"]["_distributionAndProjections"]["_projectionNames"]) + "]"
 
 
 class ReferencesPrinter(DynamicArityNodePrinter):
@@ -901,7 +994,7 @@ class PolyValuePrinter(object):
         # of ControlBlockVTable<T, Ts...>::ConcreteType where T is the template argument derived
         # from the _tag member variable.
         poly_type = self.val.type.template_argument(self.tag)
-        dynamic_type = f"{OPTIMIZER_NS}::algebra::ControlBlockVTable<{poly_type.name}"
+        dynamic_type = f"{OPTIMIZER_NS}::algebra::ControlBlockVTable<{poly_type.name},"
         dynamic_type += ", ".join(self.type_namespace + "::" + t for t in self.type_set)
         dynamic_type += ">::ConcreteType"
         return dynamic_type
@@ -1080,7 +1173,7 @@ def register_abt_printers(pp):
     # IntervalRequirement printer.
     pp.add("Interval", f"{OPTIMIZER_NS}::IntervalRequirement", False, IntervalPrinter)
     pp.add("CompoundInterval", f"{OPTIMIZER_NS}::CompoundIntervalRequirement", False,
-           IntervalPrinter)
+           CompoundIntervalPrinter)
 
     # IntervalReqExpr::Node printer.
     pp.add(

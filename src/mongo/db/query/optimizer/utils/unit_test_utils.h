@@ -114,6 +114,8 @@ std::string getPropsStrForExplain(const OptPhaseManager& phaseManager);
 #define ASSERT_INTERVAL_AUTO(expected, interval) \
     ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainIntervalExpr(interval))
 
+#define ASSERT_COMPOUND_INTERVAL_AUTO(expected, interval) \
+    ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainCompoundIntervalExpr(interval))
 
 #define ASSERT_RESIDUAL_REQS(expected, residReqs) \
     ASSERT_EQ(expected, ExplainGenerator::explainResidualRequirements(residReqs))

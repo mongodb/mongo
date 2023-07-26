@@ -3103,7 +3103,7 @@ std::string ExplainGenerator::explainInterval(const IntervalRequirement& interva
     return gen.printInterval(interval);
 }
 
-std::string ExplainGenerator::explainInterval(const CompoundIntervalRequirement& interval) {
+std::string ExplainGenerator::explainCompoundInterval(const CompoundIntervalRequirement& interval) {
     ExplainGeneratorV2 gen;
     return gen.printInterval(interval);
 }
@@ -3113,7 +3113,7 @@ std::string ExplainGenerator::explainIntervalExpr(const IntervalReqExpr::Node& i
     return gen.printIntervalExpr<IntervalRequirement>(intervalExpr).str();
 }
 
-std::string ExplainGenerator::explainIntervalExpr(
+std::string ExplainGenerator::explainCompoundIntervalExpr(
     const CompoundIntervalReqExpr::Node& intervalExpr) {
     ExplainGeneratorV2 gen;
     return gen.printIntervalExpr<CompoundIntervalRequirement>(intervalExpr).str();

@@ -123,11 +123,12 @@ public:
 
     static std::string explainInterval(const IntervalRequirement& interval);
 
-    static std::string explainInterval(const CompoundIntervalRequirement& interval);
+    static std::string explainCompoundInterval(const CompoundIntervalRequirement& interval);
 
     static std::string explainIntervalExpr(const IntervalReqExpr::Node& intervalExpr);
 
-    static std::string explainIntervalExpr(const CompoundIntervalReqExpr::Node& intervalExpr);
+    static std::string explainCompoundIntervalExpr(
+        const CompoundIntervalReqExpr::Node& intervalExpr);
 
     static std::string explainCandidateIndex(const CandidateIndexEntry& indexEntry);
 };
