@@ -137,7 +137,8 @@ CollectionShardingRuntime::CollectionShardingRuntime(ServiceContext* service, Na
 CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime
 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(OperationContext* opCtx,
                                                                   const NamespaceString& nss) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS) ||
+            (nss.isCommand() && opCtx->inMultiDocumentTransaction()));
     return ScopedSharedCollectionShardingRuntime(
         ScopedCollectionShardingState::acquireScopedCollectionShardingState(opCtx, nss, MODE_IS));
 }
