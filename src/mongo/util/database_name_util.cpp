@@ -227,4 +227,10 @@ DatabaseName DatabaseNameUtil::deserializeForCatalog(StringData db,
     return DatabaseNameUtil::parseFromStringExpectTenantIdInMultitenancyMode(db);
 }
 
+DatabaseName DatabaseNameUtil::deserializeForErrorMsg(StringData dbInErrMsg) {
+    // TenantId always prefix in the error message. This method returns either (tenantId,
+    // nonPrefixedDb) or (none, prefixedDb) depending on gMultitenancySupport flag.
+    return DatabaseNameUtil::parseFromStringExpectTenantIdInMultitenancyMode(dbInErrMsg);
+}
+
 }  // namespace mongo

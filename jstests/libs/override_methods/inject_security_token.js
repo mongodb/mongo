@@ -10,7 +10,7 @@ load(
     "jstests/libs/override_methods/tenant_aware_response_checker.js");  // For
                                                                         // `assertExpectedDbNameInResponse`
                                                                         // and
-                                                                        // `updateDbNamesInResponse`.
+                                                                        // `removeTenantPrefixFromResponse`.
 
 const kUserName = "userTenant1";
 const kTenantId = ObjectId();
@@ -136,10 +136,11 @@ function runCommandWithResponseCheck(
 
     // Actually run the provided command.
     let res = originalRunCommand.apply(conn, makeRunCommandArgs(cmdObj));
-    const prefixedDbName = kTenantId + "_" + dbName;
+    const prefix = kTenantId + "_";
+    const prefixedDbName = prefix + dbName;
 
     assertExpectedDbNameInResponse(res, dbName, prefixedDbName, tojsononeline(res));
-    updateDbNamesInResponse(res, dbName, prefixedDbName);
+    removeTenantPrefixFromResponse(res, prefix);
     return res;
 }
 

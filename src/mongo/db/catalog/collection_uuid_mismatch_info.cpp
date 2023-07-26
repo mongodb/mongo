@@ -56,14 +56,16 @@ constexpr StringData kActualCollectionFieldName = "actualCollection"_sd;
 std::shared_ptr<const ErrorExtraInfo> CollectionUUIDMismatchInfo::parse(const BSONObj& obj) {
     auto actualNamespace = obj[kActualCollectionFieldName];
     return std::make_shared<CollectionUUIDMismatchInfo>(
-        DatabaseNameUtil::deserialize(boost::none, obj[kDbFieldName].str()),
+        // Deserialize db name object from a string which is formated for error messages.
+        DatabaseNameUtil::deserializeForErrorMsg(obj[kDbFieldName].str()),
         UUID::parse(obj[kCollectionUUIDFieldName]).getValue(),
         obj[kExpectedCollectionFieldName].str(),
         actualNamespace.isNull() ? boost::none : boost::make_optional(actualNamespace.str()));
 }
 
 void CollectionUUIDMismatchInfo::serialize(BSONObjBuilder* builder) const {
-    builder->append(kDbFieldName, _dbName.db());
+    // Serialize to the extra error message of a an error Status.
+    builder->append(kDbFieldName, _dbName.toStringForErrorMsg());
     _collectionUUID.appendToBuilder(builder, kCollectionUUIDFieldName);
     builder->append(kExpectedCollectionFieldName, _expectedCollection);
     if (_actualCollection) {

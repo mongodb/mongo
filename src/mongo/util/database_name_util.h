@@ -112,6 +112,11 @@ public:
     static DatabaseName deserializeForCatalog(
         StringData db, const SerializationContext& context = SerializationContext());
 
+    /**
+     * To be used only for deserializing a DatabaseName object from a db string in error messages.
+     */
+    static DatabaseName deserializeForErrorMsg(StringData dbInErrMsg);
+
 private:
     static DatabaseName parseFromStringExpectTenantIdInMultitenancyMode(StringData dbName);
 
