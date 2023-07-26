@@ -204,7 +204,7 @@ __wt_spin_backoff(uint64_t *yield_count, uint64_t *sleep_usecs)
 static inline void
 __wt_timing_stress(WT_SESSION_IMPL *session, uint32_t flag)
 {
-#ifdef ENABLE_ANTHITHESIS
+#ifdef ENABLE_ANTITHESIS
     const WT_NAME_FLAG *ft;
 #endif
 
@@ -212,7 +212,7 @@ __wt_timing_stress(WT_SESSION_IMPL *session, uint32_t flag)
     if (flag != 0 && !FLD_ISSET(S2C(session)->timing_stress_flags, flag))
         return;
 
-#ifdef ENABLE_ANTHITHESIS
+#ifdef ENABLE_ANTITHESIS
     for (ft = __wt_stress_types; ft->name != NULL; ft++)
         if (ft->flag == flag) {
             (void)__wt_msg(session, "ANTITHESIS: %s", ft->name);
