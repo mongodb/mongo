@@ -991,11 +991,12 @@ Status runAggregate(OperationContext* opCtx,
                     !request.getCollectionUUID());
 
             // If this is a collectionless agg with no foreign namespaces, don't acquire any locks.
-            statsTracker.emplace(opCtx,
-                                 nss,
-                                 Top::LockType::NotLocked,
-                                 AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                 0);
+            statsTracker.emplace(
+                opCtx,
+                nss,
+                Top::LockType::NotLocked,
+                AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
             auto [collator, match] = resolveCollator(
                 opCtx, request.getCollation().get_value_or(BSONObj()), CollectionPtr());
             collatorToUse.emplace(std::move(collator));

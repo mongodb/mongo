@@ -121,7 +121,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
     AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
     OpDebug::appendUserInfo(*CurOp::get(opCtx), b, authSession);
 
-    const BSONObj p = b.done();
+    const BSONObj p = b.done().redact(BSONObj::RedactLevel::sensitiveOnly);
 
     const auto ns = CurOp::get(opCtx)->getNSS();
 

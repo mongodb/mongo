@@ -17,7 +17,7 @@ class RunQueryStats(Hook):
         description = "Read query stats data after each test."
         super().__init__(hook_logger, fixture, description)
         self.client = self.fixture.mongo_client()
-        self.hmac_key = binary.Binary(("0" * 32).encode('utf-8'))
+        self.hmac_key = binary.Binary(("0" * 32).encode('utf-8'), 8)
 
     def verify_query_stats(self, querystats_spec):
         """Verify a $queryStats call has all the right properties."""

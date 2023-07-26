@@ -1,5 +1,5 @@
 const kShellApplicationName = "MongoDB Shell";
-const kDefaultQueryStatsHmacKey = BinData(0, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=");
+const kDefaultQueryStatsHmacKey = BinData(8, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=");
 
 /**
  * Utility for checking that the aggregated queryStats metrics are logical (follows sum >= max >=

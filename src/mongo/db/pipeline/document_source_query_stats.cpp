@@ -139,10 +139,19 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
     });
 }
 
-Value DocumentSourceQueryStats::serialize(SerializationOptions opts) const {
-    // This document source never contains any user information, so no need for any work when
-    // applying hmac.
-    return Value{Document{{kStageName, Document{}}}};
+Value DocumentSourceQueryStats::serialize(SerializationOptions opt) const {
+    // This document source never contains any user information, so serialization options do not
+    // apply.
+    return Value{Document{
+        {kStageName,
+         _transformIdentifiers
+             ? Document{{"transformIdentifiers",
+                         Document{
+                             {"algorithm", TransformAlgorithm_serializer(_algorithm)},
+                             {"hmacKey",
+                              opt.serializeLiteral(BSONBinData(
+                                  _hmacKey.c_str(), _hmacKey.size(), BinDataType::Sensitive))}}}}
+             : Document{}}}};
 }
 
 DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {

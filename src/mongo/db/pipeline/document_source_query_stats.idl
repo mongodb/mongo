@@ -45,8 +45,11 @@ structs:
               validator:
                     {callback: "validateAlgo"}
         hmacKey:
-            description: "The hmac key to be used to transform the identifiers."
-            type: bindata_generic
+            description: >
+                The hmac key to be used to transform the identifiers. This is considered sensitive
+                data and should be redacted from data dumps, output I/O, logs, and other persistent
+                storages.
+            type: bindata_sensitive
             optional: true
             validator:
                   {callback: "validateHmac"}
