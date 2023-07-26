@@ -111,7 +111,7 @@ void ChunkInfo::throwIfMovedSince(const Timestamp& ts) const {
 }
 
 bool ChunkInfo::containsKey(const BSONObj& shardKey) const {
-    return getMin().woCompare(shardKey) <= 0 && shardKey.woCompare(getMax()) < 0;
+    return _range.containsKey(shardKey);
 }
 
 std::string ChunkInfo::toString() const {

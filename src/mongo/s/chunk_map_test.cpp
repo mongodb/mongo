@@ -449,6 +449,14 @@ TEST_F(ChunkMapTest, TestIntersectingChunk) {
         SimpleBSONObjComparator::kInstance.evaluate(intersectingChunk->getMin() == BSON("a" << 0)));
     ASSERT(SimpleBSONObjComparator::kInstance.evaluate(intersectingChunk->getMax() ==
                                                        BSON("a" << 100)));
+
+    // findIntersectingChunks returns last chunk if invoked with MaxKey
+    intersectingChunk =
+        newChunkMap.findIntersectingChunk(BSON("a" << getShardKeyPattern().globalMax()));
+    ASSERT(SimpleBSONObjComparator::kInstance.evaluate(intersectingChunk->getMin() ==
+                                                       BSON("a" << 100)));
+    ASSERT(SimpleBSONObjComparator::kInstance.evaluate(intersectingChunk->getMax() ==
+                                                       getShardKeyPattern().globalMax()));
 }
 
 TEST_F(ChunkMapTest, TestIntersectingChunkRandom) {

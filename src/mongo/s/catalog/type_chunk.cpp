@@ -93,6 +93,15 @@ Status extractObject(const BSONObj& obj, const std::string& fieldName, BSONEleme
     return Status::OK();
 }
 
+bool allElementsAreMaxKey(const BSONObj& obj) {
+    for (auto&& elem : obj) {
+        if (elem.type() != MaxKey) {
+            return false;
+        }
+    }
+    return true;
+}
+
 }  // namespace
 
 ChunkRange::ChunkRange(BSONObj minKey, BSONObj maxKey)
@@ -129,7 +138,8 @@ StatusWith<ChunkRange> ChunkRange::fromBSON(const BSONObj& obj) {
 }
 
 bool ChunkRange::containsKey(const BSONObj& key) const {
-    return _minKey.woCompare(key) <= 0 && key.woCompare(_maxKey) < 0;
+    return (_minKey.woCompare(key) <= 0 && key.woCompare(_maxKey) < 0) ||
+        MONGO_unlikely(allElementsAreMaxKey(key) && key.binaryEqual(_maxKey));
 }
 
 void ChunkRange::append(BSONObjBuilder* builder) const {

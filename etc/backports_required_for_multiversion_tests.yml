@@ -425,9 +425,12 @@ last-continuous:
     ticket: SERVER-78187
   - test_file: jstests/sharding/analyze_shard_key/query_sampling_server_params.js
     ticket: SERVER-78913
+  - test_file: jstests/sharding/min_max_key.js
+    ticket: SERVER-67529
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js
     ticket: SERVER-79136
   suites: null
+
 last-lts:
   all:
   - test_file: jstests/sharding/ingress_handshake_and_auth_metrics_mongos.js
@@ -944,6 +947,8 @@ last-lts:
     ticket: SERVER-78855
   - test_file: jstests/sharding/analyze_shard_key/query_sampling_server_params.js
     ticket: SERVER-78913
+  - test_file: jstests/sharding/min_max_key.js
+    ticket: SERVER-67529
   - test_file: jstests/replsets/commit_point_propagation_with_oplog_exhaust_cursor.js
     ticket: SERVER-78813
   - test_file: jstests/core/timeseries/timeseries_groupby_reorder.js

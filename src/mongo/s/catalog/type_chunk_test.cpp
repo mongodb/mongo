@@ -382,6 +382,69 @@ TEST(ChunkRange, Union) {
            target.unionWith(ChunkRange(BSON("x" << 9), BSON("x" << 15))));
 }
 
+TEST(ChunkRange, ContainsKey) {
+    auto target = ChunkRange(BSON("x" << 5), BSON("x" << 10));
+    ASSERT_FALSE(target.containsKey(BSON("x" << MINKEY)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << 2)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 5)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 7)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << 10)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << 15)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY)));
+
+    target = ChunkRange(BSON("x" << MINKEY), BSON("x" << 5));
+    ASSERT_TRUE(target.containsKey(BSON("x" << MINKEY)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 2)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << 5)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << 10)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY)));
+
+    target = ChunkRange(BSON("x" << 5), BSON("x" << MAXKEY));
+    ASSERT_FALSE(target.containsKey(BSON("x" << MINKEY)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << 2)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 5)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 10)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << MAXKEY)));
+}
+
+TEST(ChunkRange, ContainsKeyCompound) {
+    auto target = ChunkRange(BSON("x" << 5 << "y" << 100), BSON("x" << 10 << "y" << 120));
+    ASSERT_FALSE(target.containsKey(BSON("x" << MINKEY)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << MINKEY << "y" << 110)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << 2)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << 2 << "y" << 110)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << 5)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << 5 << "y" << 0)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 5 << "y" << 120)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 5 << "y" << MAXKEY)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 5 << "y" << 100)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 5 << "y" << 110)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 7 << "y" << MINKEY)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 7 << "y" << 100)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 7 << "y" << 110)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 7 << "y" << 120)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 7 << "y" << MAXKEY)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 10)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 10 << "y" << 0)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 10 << "y" << 100)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 10 << "y" << 110)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << 10 << "y" << 120)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << 10 << "y" << MAXKEY)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << 15)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY << "y" << 0)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY << "y" << 100)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY << "y" << 110)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY << "y" << 120)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << MAXKEY << "y" << MAXKEY)));
+
+    target = ChunkRange(BSON("x" << 5 << "y" << 5), BSON("x" << MAXKEY << "y" << MAXKEY));
+    ASSERT_FALSE(target.containsKey(BSON("x" << MINKEY << "y" << MAXKEY)));
+    ASSERT_FALSE(target.containsKey(BSON("x" << 2 << "y" << MAXKEY)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << 5 << "y" << MAXKEY)));
+    ASSERT_TRUE(target.containsKey(BSON("x" << MAXKEY << "y" << MAXKEY)));
+}
+
 TEST(ChunkRange, MinGreaterThanMaxShouldError) {
     auto parseStatus =
         ChunkRange::fromBSON(BSON("min" << BSON("x" << 10) << "max" << BSON("x" << 0)));
