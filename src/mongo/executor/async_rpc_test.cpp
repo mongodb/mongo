@@ -62,6 +62,7 @@
 #include "mongo/executor/async_rpc_retry_policy.h"
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/async_rpc_test_fixture.h"
+#include "mongo/executor/async_rpc_util.h"
 #include "mongo/executor/async_transaction_rpc.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
@@ -1208,7 +1209,6 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorAttemptedTargetMatchesActual) {
     HostAndPort target("FakeHost1", 12345);
     auto targeter = std::make_unique<FixedTargeter>(target);
 
-
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
         helloCmd, getExecutorPtr(), _cancellationToken);
@@ -1329,6 +1329,115 @@ TEST_F(AsyncRPCTestFixture, CancelAfterNetworkResponse) {
     ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], BSON("x" << 1));
 
     worker.join();
+}
+
+/**
+ * Tests the getAllResponsesOrFirstErrorWithCancellation function returns the responses
+ * of each sendCommand.
+ */
+TEST_F(AsyncRPCTestFixture, GetAllResponsesUtil) {
+    const size_t total_targets = 3;
+    auto opCtxHolder = makeOperationContext();
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
+    FindCommandRequest findCmd(nss);
+
+    CancellationSource source;
+    std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>>> futures;
+    for (size_t i = 0; i < total_targets; ++i) {
+        std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+        auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+            findCmd, getExecutorPtr(), source.token());
+        futures.push_back(async_rpc::sendCommand<FindCommandRequest>(
+            options, opCtxHolder.get(), std::move(targeter)));
+    }
+
+    auto responsesFut = async_rpc::getAllResponsesOrFirstErrorWithCancellation<
+        size_t,
+        async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>>(
+        std::move(futures),
+        source,
+        [](async_rpc::AsyncRPCResponse<FindCommandRequest::Reply> reply, size_t index) -> size_t {
+            return index;
+        });
+
+    NetworkTestEnv::OnCommandFunction returnSuccess = [&](const auto& request) {
+        return CursorResponse(nss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    };
+    onCommands(std::vector(total_targets, returnSuccess));
+
+    auto responses = responsesFut.get();
+    std::sort(responses.begin(), responses.end());
+
+    for (size_t i = 0; i < total_targets; ++i) {
+        ASSERT_EQ(responses[i], i);
+    }
+}
+
+/**
+ * Tests that when the getAllResponsesOrFirstErrorWithCancellation function cancels early due
+ * to an error, the rest of the sendCommand functions are able to run to completion.
+ */
+TEST_F(AsyncRPCTestFixture, GetAllResponsesUtilCancellationFinishesResolvingPendingFutures) {
+    auto opCtxHolder = makeOperationContext();
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
+    FindCommandRequest findCmd(nss);
+
+    const auto timeoutStatus = Status(ErrorCodes::NetworkTimeout, "dummy status");
+
+    CancellationSource source;
+    std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>>> futures;
+
+    // Make an immediately ready future filled with an error status, intended to cancel other
+    // futures.
+    futures.push_back(ExecutorFuture<AsyncRPCResponse<FindCommandRequest::Reply>>(
+        getExecutorPtr(), Status{AsyncRPCErrorInfo(timeoutStatus), "mock"}));
+
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, getExecutorPtr(), source.token());
+    futures.push_back(async_rpc::sendCommand<FindCommandRequest>(
+        options, opCtxHolder.get(), std::move(targeter)));
+
+    // runReadyNetworkOperations blocks until waitForWork is called, therefore ensuring
+    // sendCommand schedules the request.
+    auto network = getNetworkInterfaceMock();
+    network->enterNetwork();
+    network->exitNetwork();
+
+    // A ready future with an error status already exists, so the util function will
+    // be able to cancel the token before the network steps below.
+    auto responsesFut = async_rpc::getAllResponsesOrFirstErrorWithCancellation<
+        async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>,
+        async_rpc::AsyncRPCResponse<FindCommandRequest::Reply>>(
+        std::move(futures),
+        source,
+        [](async_rpc::AsyncRPCResponse<FindCommandRequest::Reply> reply, size_t index)
+            -> async_rpc::AsyncRPCResponse<FindCommandRequest::Reply> { return reply; });
+
+    network->enterNetwork();
+    ASSERT_TRUE(source.token().isCanceled());
+
+    // Make sure that despite cancellation, responseFut is not ready because there is still
+    // a future that has not finished.
+    ASSERT_FALSE(responsesFut.isReady());
+
+    // Process the cancellation, which should result in the second future returning
+    // CallbackCancelled.
+    network->runReadyNetworkOperations();
+    network->exitNetwork();
+
+    auto counters = network->getCounters();
+    ASSERT_EQ(counters.canceled, 1);
+
+    auto error = responsesFut.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(extraInfo);
+    ASSERT(extraInfo->isLocal());
+    ASSERT_EQ(extraInfo->asLocal(), timeoutStatus);
 }
 
 }  // namespace

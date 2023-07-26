@@ -99,28 +99,23 @@ struct AsyncRPCCommandHelpers {
     }
 };
 
-template <typename ResultType>
-struct SharedResult {
-    SharedResult(Promise<ResultType> resultPromise) : resultPromise(std::move(resultPromise)) {}
-    AtomicWord<bool> done{false};
-    Promise<ResultType> resultPromise;
-};
-
 /**
- * Template to process futures into a SharedResult.
+ * Template to combine futures using a future processing callable.
  */
 template <typename ResultType, typename FutureType, typename ProcessSWCallable>
 Future<ResultType> processMultipleFutures(std::vector<ExecutorFuture<FutureType>>&& futures,
                                           ProcessSWCallable&& processStatusWith) {
     auto [resultPromise, resultFuture] = makePromiseFuture<ResultType>();
 
-    auto sharedResult = std::make_shared<SharedResult<ResultType>>(std::move(resultPromise));
+    // Dependent on caller to synchronize sharedPromise access in processStatusWith.
+    std::shared_ptr<Promise<ResultType>> sharedPromise =
+        std::make_shared<Promise<ResultType>>(std::move(resultPromise));
 
     for (size_t i = 0; i < futures.size(); ++i) {
         std::move(futures[i])
             .getAsync(
-                [index = i, sharedResult, processStatusWith](StatusOrStatusWith<FutureType> sw) {
-                    processStatusWith(sw, sharedResult, index);
+                [index = i, sharedPromise, processStatusWith](StatusOrStatusWith<FutureType> sw) {
+                    processStatusWith(sw, sharedPromise, index);
                 });
     }
     return std::move(resultFuture);
@@ -134,17 +129,18 @@ Future<ResultType> processMultipleFutures(std::vector<ExecutorFuture<FutureType>
 template <typename ResultType, typename ConditionCallable>
 Future<ResultType> whenAnyThat(std::vector<ExecutorFuture<ResultType>>&& futures,
                                ConditionCallable&& shouldAccept) {
+    std::shared_ptr<AtomicWord<bool>> done = std::make_shared<AtomicWord<bool>>(false);
     invariant(futures.size() > 0);
 
-    auto processSW = [shouldAccept](StatusOrStatusWith<ResultType> value,
-                                    std::shared_ptr<SharedResult<ResultType>> sharedResult,
-                                    size_t index) {
+    auto processSW = [shouldAccept, done](StatusOrStatusWith<ResultType> value,
+                                          std::shared_ptr<Promise<ResultType>> promise,
+                                          size_t index) {
         if (shouldAccept(value, index)) {
             // If this is the first input future to complete and satisfy the
             // shouldAccept condition, change done to true and set the value on the
             // promise.
-            if (!sharedResult->done.swap(true)) {
-                sharedResult->resultPromise.setFrom(std::move(value));
+            if (!done->swap(true)) {
+                promise->setFrom(std::move(value));
             }
         }
     };
@@ -155,53 +151,58 @@ Future<ResultType> whenAnyThat(std::vector<ExecutorFuture<ResultType>>&& futures
 /**
  * Given a vector of input Futures and a processResponse callable, processes the responses
  * from each of the futures and pushes the results onto a vector. Cancels early on error
- * status.
+ * status, but waits until other futures resolve. Caller must manually create a
+ * CancellationSource wrapping the sendCommand cancellation token.
  */
 template <typename SingleResult, typename FutureType, typename ProcessResponseCallable>
 Future<std::vector<SingleResult>> getAllResponsesOrFirstErrorWithCancellation(
     std::vector<ExecutorFuture<FutureType>>&& futures,
-    CancellationToken token,
+    CancellationSource cancelSource,
     ProcessResponseCallable&& processResponse) {
 
     struct SharedUtil {
-        SharedUtil(int responsesLeft, CancellationToken token)
-            : responsesLeft(responsesLeft), source(token) {}
+        SharedUtil(int responsesLeft, CancellationSource cancelSource)
+            : responsesLeft(responsesLeft), source(cancelSource) {}
         Mutex mutex = MONGO_MAKE_LATCH("SharedUtil::mutex");
         int responsesLeft;
-        std::vector<SingleResult> results = std::vector<SingleResult>();
+        StatusWith<std::vector<SingleResult>> results =
+            StatusWith<std::vector<SingleResult>>(std::vector<SingleResult>());
         CancellationSource source;
     };
 
-    auto sharedUtil = std::make_shared<SharedUtil>(futures.size(), token);
+    auto sharedUtil = std::make_shared<SharedUtil>(futures.size(), cancelSource);
     auto processWrapper = [sharedUtil, processResponse](
                               StatusOrStatusWith<FutureType> sw,
-                              std::shared_ptr<SharedResult<std::vector<SingleResult>>> sharedResult,
+                              std::shared_ptr<Promise<std::vector<SingleResult>>> sharedPromise,
                               size_t index) {
-        if (sharedUtil->source.token().isCanceled()) {
-            return;
-        }
-
         if (!sw.isOK()) {
-            sharedResult->done.store(true);
             sharedUtil->source.cancel();
-            sharedResult->resultPromise.setError(async_rpc::unpackRPCStatus(sw.getStatus()));
+            stdx::lock_guard<Latch> lk(sharedUtil->mutex);
+            if (sharedUtil->results.getStatus() == Status::OK()) {
+                sharedUtil->results = sw.getStatus();
+            }
+            // Need to wait for all responses to protect against pending work after promise is
+            // fulfilled.
+            if (--sharedUtil->responsesLeft == 0) {
+                sharedPromise->setFrom(sharedUtil->results);
+            }
             return;
         }
 
         auto reply = sw.getValue();
         auto response = processResponse(reply, index);
 
-        stdx::unique_lock<Latch> lk(sharedUtil->mutex);
-        invariant(sharedUtil->responsesLeft != 0);
-        sharedUtil->results.push_back(response);
+        stdx::lock_guard<Latch> lk(sharedUtil->mutex);
+        if (sharedUtil->results.getStatus() == Status::OK()) {
+            sharedUtil->results.getValue().push_back(response);
+        }
         if (--sharedUtil->responsesLeft == 0) {
-            sharedResult->done.store(true);
-            sharedResult->resultPromise.emplaceValue(sharedUtil->results);
+            sharedPromise->setFrom(sharedUtil->results);
         }
     };
 
-    return processMultipleFutures<std::vector<AsyncRequestsSender::Response>>(
-        std::move(futures), std::move(processWrapper));
+    return processMultipleFutures<std::vector<SingleResult>>(std::move(futures),
+                                                             std::move(processWrapper));
 }
 
 }  // namespace mongo::async_rpc

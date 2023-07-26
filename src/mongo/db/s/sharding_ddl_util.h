@@ -115,6 +115,8 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<typename CommandType::Reply>>> futures;
     auto indexToShardId = std::make_shared<stdx::unordered_map<int, ShardId>>();
 
+    CancellationSource cancelSource(originalOpts->token);
+
     for (size_t i = 0; i < shardIds.size(); ++i) {
         ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly);
         std::unique_ptr<async_rpc::Targeter> targeter =
@@ -128,30 +130,44 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
         auto opts =
             std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(originalOpts->cmd,
                                                                       originalOpts->exec,
-                                                                      originalOpts->token,
+                                                                      cancelSource.token(),
                                                                       originalOpts->genericArgs,
                                                                       retryPolicy);
         futures.push_back(async_rpc::sendCommand<CommandType>(opts, opCtx, std::move(targeter)));
         (*indexToShardId)[i] = shardIds[i];
     }
 
-    auto responses = async_rpc::getAllResponsesOrFirstErrorWithCancellation<
-        AsyncRequestsSender::Response,
-        async_rpc::AsyncRPCResponse<typename CommandType::Reply>>(
-        std::move(futures),
-        originalOpts->token,
-        [indexToShardId](async_rpc::AsyncRPCResponse<typename CommandType::Reply> reply,
-                         size_t index) -> AsyncRequestsSender::Response {
-            BSONObjBuilder replyBob;
-            reply.response.serialize(&replyBob);
-            reply.genericReplyFields.stable.serialize(&replyBob);
-            reply.genericReplyFields.unstable.serialize(&replyBob);
-            return AsyncRequestsSender::Response{
-                (*indexToShardId)[index],
-                executor::RemoteCommandOnAnyResponse(
-                    reply.targetUsed, replyBob.obj(), reply.elapsed)};
-        });
-    return responses.get();
+    auto responses =
+        async_rpc::getAllResponsesOrFirstErrorWithCancellation<
+            AsyncRequestsSender::Response,
+            async_rpc::AsyncRPCResponse<typename CommandType::Reply>>(
+            std::move(futures),
+            cancelSource,
+            [indexToShardId](async_rpc::AsyncRPCResponse<typename CommandType::Reply> reply,
+                             size_t index) -> AsyncRequestsSender::Response {
+                BSONObjBuilder replyBob;
+                reply.response.serialize(&replyBob);
+                reply.genericReplyFields.stable.serialize(&replyBob);
+                reply.genericReplyFields.unstable.serialize(&replyBob);
+                return AsyncRequestsSender::Response{
+                    (*indexToShardId)[index],
+                    executor::RemoteCommandOnAnyResponse(
+                        reply.targetUsed, replyBob.obj(), reply.elapsed)};
+            })
+            .getNoThrow();
+
+    if (auto status = responses.getStatus(); status != Status::OK()) {
+        // TODO: SERVER-79070 Remove the if/else, invariant on RemoteCommandExecutionError instead.
+        if (status == ErrorCodes::RemoteCommandExecutionError) {
+            uassertStatusOK(async_rpc::unpackRPCStatus(status));
+        } else {
+            // Matches behavior in ScopedTaskExecutor on shutdown.
+            invariant(status.code() == ErrorCodes::BrokenPromise);
+            uassertStatusOK(Status{ErrorCodes::CallbackCanceled, status.reason()});
+        }
+    }
+
+    return responses.getValue();
 }
 
 /**

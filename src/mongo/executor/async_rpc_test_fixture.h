@@ -120,6 +120,10 @@ public:
         _networkTestEnv->onCommand(func);
     }
 
+    void onCommands(std::vector<NetworkTestEnv::OnCommandFunction> funcs) {
+        _networkTestEnv->onCommands(funcs);
+    }
+
     /**
      * Initialize an IDL command with the necessary fields (dbName) to avoid an invariant failure.
      */
