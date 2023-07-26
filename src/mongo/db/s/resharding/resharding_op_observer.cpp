@@ -127,10 +127,12 @@ boost::optional<Timestamp> _calculatePin(OperationContext* opCtx) {
     //
     // If there are concurrent transactions updating different keys in the donor collection, there
     // can be write skew resulting in the wrong pin, including leaking a resource. We enforce the
-    // collection is held in exclusive mode to prevent this.
+    // collection is held in exclusive mode to prevent this. However an exception to this is oplog
+    // application, which already serializes these writes.
 
-    invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString::kDonorReshardingOperationsNamespace, LockMode::MODE_X));
+    invariant(!opCtx->isEnforcingConstraints() ||
+              opCtx->lockState()->isCollectionLockedForMode(
+                  NamespaceString::kDonorReshardingOperationsNamespace, LockMode::MODE_X));
 
     // If the RecoveryUnit already had an open snapshot, keep the snapshot open. Otherwise abandon
     // the snapshot when exitting the function.
