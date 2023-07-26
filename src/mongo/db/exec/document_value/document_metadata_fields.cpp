@@ -102,8 +102,8 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
     if (!hasSearchSortValues() && other.hasSearchSortValues()) {
         setSearchSortValues(other.getSearchSortValues());
     }
-    if (!hasVectorSearchDistance() && other.hasVectorSearchDistance()) {
-        setVectorSearchDistance(other.getVectorSearchDistance());
+    if (!hasVectorSearchScore() && other.hasVectorSearchScore()) {
+        setVectorSearchScore(other.getVectorSearchScore());
     }
 }
 
@@ -144,8 +144,8 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
     if (other.hasSearchSortValues()) {
         setSearchSortValues(other.getSearchSortValues());
     }
-    if (other.hasVectorSearchDistance()) {
-        setVectorSearchDistance(other.getVectorSearchDistance());
+    if (other.hasVectorSearchScore()) {
+        setVectorSearchScore(other.getVectorSearchScore());
     }
 }
 
@@ -228,9 +228,9 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(static_cast<char>(MetaType::kSearchSortValues + 1));
         getSearchSortValues().appendSelfToBufBuilder(buf);
     }
-    if (hasVectorSearchDistance()) {
-        buf.appendNum(static_cast<char>(MetaType::kVectorSearchDistance + 1));
-        buf.appendNum(getVectorSearchDistance());
+    if (hasVectorSearchScore()) {
+        buf.appendNum(static_cast<char>(MetaType::kVectorSearchScore + 1));
+        buf.appendNum(getVectorSearchScore());
     }
     buf.appendNum(static_cast<char>(0));
 }
@@ -272,8 +272,8 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
         } else if (marker == static_cast<char>(MetaType::kSearchSortValues) + 1) {
             out->setSearchSortValues(
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
-        } else if (marker == static_cast<char>(MetaType::kVectorSearchDistance) + 1) {
-            out->setVectorSearchDistance(buf.read<LittleEndian<double>>());
+        } else if (marker == static_cast<char>(MetaType::kVectorSearchScore) + 1) {
+            out->setVectorSearchScore(buf.read<LittleEndian<double>>());
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }
@@ -335,7 +335,7 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
             return "timeseries bucket max time";
         case DocumentMetadataFields::kSearchSortValues:
             return "$search sort values";
-        case DocumentMetadataFields::kVectorSearchDistance:
+        case DocumentMetadataFields::kVectorSearchScore:
             return "$vectorSearch distance";
         default:
             MONGO_UNREACHABLE;

@@ -102,7 +102,7 @@ const StringDataSet Document::allMetadataFieldNames{Document::metaFieldTextScore
                                                     Document::metaFieldSearchSortValues,
                                                     Document::metaFieldIndexKey,
                                                     Document::metaFieldSearchScoreDetails,
-                                                    Document::metaFieldVectorSearchDistance};
+                                                    Document::metaFieldVectorSearchScore};
 
 DocumentStorageIterator::DocumentStorageIterator(DocumentStorage* storage, BSONObjIterator bsonIt)
     : _bsonIt(std::move(bsonIt)),
@@ -480,8 +480,8 @@ void DocumentStorage::loadLazyMetadata() const {
                 _metadataFields.setSearchScoreDetails(elem.Obj());
             } else if (fieldName == Document::metaFieldSearchSortValues) {
                 _metadataFields.setSearchSortValues(elem.Obj());
-            } else if (fieldName == Document::metaFieldVectorSearchDistance) {
-                _metadataFields.setVectorSearchDistance(elem.Double());
+            } else if (fieldName == Document::metaFieldVectorSearchScore) {
+                _metadataFields.setVectorSearchScore(elem.Double());
             }
         }
     }
@@ -552,7 +552,7 @@ constexpr StringData Document::metaFieldSearchScore;
 constexpr StringData Document::metaFieldSearchHighlights;
 constexpr StringData Document::metaFieldSearchScoreDetails;
 constexpr StringData Document::metaFieldSearchSortValues;
-constexpr StringData Document::metaFieldVectorSearchDistance;
+constexpr StringData Document::metaFieldVectorSearchScore;
 
 void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
     toBson(builder);
@@ -583,8 +583,8 @@ void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
     if (metadata().hasSearchSortValues()) {
         builder->append(metaFieldSearchSortValues, metadata().getSearchSortValues());
     }
-    if (metadata().hasVectorSearchDistance()) {
-        builder->append(metaFieldVectorSearchDistance, metadata().getVectorSearchDistance());
+    if (metadata().hasVectorSearchScore()) {
+        builder->append(metaFieldVectorSearchScore, metadata().getVectorSearchScore());
     }
 }
 

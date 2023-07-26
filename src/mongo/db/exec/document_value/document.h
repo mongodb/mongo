@@ -125,7 +125,7 @@ public:
     static constexpr StringData metaFieldSearchScoreDetails = "$searchScoreDetails"_sd;
     static constexpr StringData metaFieldSearchSortValues = "$searchSortValues"_sd;
     static constexpr StringData metaFieldIndexKey = "$indexKey"_sd;
-    static constexpr StringData metaFieldVectorSearchDistance = "$vectorSearchDistance"_sd;
+    static constexpr StringData metaFieldVectorSearchScore = "$vectorSearchScore"_sd;
 
     static const StringDataSet allMetadataFieldNames;
 
