@@ -59,6 +59,7 @@
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/index_version.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_router_test_fixture.h"
@@ -359,6 +360,65 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithGreaterPlacementVersion) {
     const auto status =
         _catalogCache->getCollectionRoutingInfo(operationContext(), kNss).getStatus();
     ASSERT(status == ErrorCodes::InternalError);
+}
+
+TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksReturnsImmediately) {
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
+
+    loadDatabases({DatabaseType(kNss.db_forTest().toString(), kShards[0], dbVersion)});
+    auto coll = loadCollection(cachedCollVersion);
+
+    const auto swCri = _catalogCache->getCollectionRoutingInfo(
+        operationContext(), coll.getNss(), true /* allowLocks */);
+    ASSERT_OK(swCri.getStatus());
+
+    ASSERT(swCri.getValue().getCollectionVersion() == cachedCollVersion);
+}
+
+TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksNeedsToFetchNewCollInfo) {
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
+    const auto wantedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {2, 0}), boost::optional<CollectionIndexes>(boost::none));
+
+    loadDatabases({DatabaseType(kNss.db_forTest().toString(), kShards[0], dbVersion)});
+    loadCollection(cachedCollVersion);
+    _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+        kNss, wantedCollVersion, kShards[0]);
+
+    const auto status =
+        _catalogCache->getCollectionRoutingInfo(operationContext(), kNss, true /* allowLocks */)
+            .getStatus();
+
+    ASSERT(status == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
+    auto refreshInfo = status.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+    ASSERT(refreshInfo);
+}
+
+TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksNeedsToFetchNewDBInfo) {
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
+    const auto wantedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {2, 0}), boost::optional<CollectionIndexes>(boost::none));
+
+    loadDatabases({DatabaseType(kNss.db_forTest().toString(), kShards[0], dbVersion)});
+    loadCollection(cachedCollVersion);
+    _catalogCache->invalidateDatabaseEntry_LINEARIZABLE(kNss.db_forTest());
+
+    const auto status =
+        _catalogCache->getCollectionRoutingInfo(operationContext(), kNss, true /* allowLocks */)
+            .getStatus();
+
+    ASSERT(status == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
+    auto refreshInfo = status.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+    ASSERT(refreshInfo);
 }
 
 TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
